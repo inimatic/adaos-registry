@@ -1,6 +1,7 @@
 name: media_center_skill
-version: 0.8.45
-description: Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.
+version: 0.8.46
+description: Distributed Media Center coordinator with federated discovery, bounded
+  catalog, personalization, and rendition-aware playback.
 supported_locales:
 - en
 - ru
@@ -134,7 +135,8 @@ tools:
   output_schema:
     type: object
 - name: scan_sources
-  description: Reconcile SDK media resources from Media Server and legacy media_indexer into the durable catalog.
+  description: Reconcile SDK media resources from Media Server and legacy media_indexer
+    into the durable catalog.
   entry: handlers.main:scan_sources
   side_effects: local_write
   input_schema:
@@ -202,7 +204,8 @@ tools:
   output_schema:
     type: object
 - name: delete_root
-  description: Delete a configured folder, its catalog rows, and exact core media resource links without deleting source files.
+  description: Delete a configured folder, its catalog rows, and exact core media
+    resource links without deleting source files.
   entry: handlers.main:delete_root
   side_effects: local_write
   input_schema:
@@ -216,7 +219,8 @@ tools:
   output_schema:
     type: object
 - name: scan_roots
-  description: Register playable files from configured folders without copying media bytes.
+  description: Register playable files from configured folders without copying media
+    bytes.
   entry: handlers.main:scan_roots
   side_effects: local_write
   timeout_seconds: 600
@@ -261,7 +265,8 @@ tools:
   output_schema:
     type: object
 - name: library
-  description: Return a widget-ready catalog projection with items, summary, facets, and playback descriptors.
+  description: Return a widget-ready catalog projection with items, summary, facets,
+    and playback descriptors.
   entry: handlers.main:library
   side_effects: none
   input_schema:
@@ -346,15 +351,32 @@ tools:
   side_effects: none
   input_schema:
     type: object
-    required: [query]
+    required:
+    - query
     properties:
-      query: {type: string, minLength: 1, maxLength: 500}
-      profile_id: {type: string, default: default}
-      media_kind: {type: string, default: playable}
-      limit: {type: integer, minimum: 1, maximum: 30, default: 30}
-      max_agents: {type: integer, minimum: 1, maximum: 16, default: 4}
+      query:
+        type: string
+        minLength: 1
+        maxLength: 500
+      profile_id:
+        type: string
+        default: default
+      media_kind:
+        type: string
+        default: playable
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 30
+        default: 30
+      max_agents:
+        type: integer
+        minimum: 1
+        maximum: 16
+        default: 4
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: playback_queue
   description: Return the selected item first and at most ten playable queue entries.
   entry: handlers.main:playback_queue
@@ -388,7 +410,8 @@ tools:
   output_schema:
     type: object
 - name: playback_plan
-  description: Select a deterministic media variant and direct or routed delivery plan for one endpoint.
+  description: Select a deterministic media variant and direct or routed delivery
+    plan for one endpoint.
   entry: handlers.main:playback_plan
   side_effects: none
   input_schema:
@@ -419,24 +442,42 @@ tools:
   output_schema:
     type: object
 - name: ensure_rendition
-  description: Plan and queue one browser-compatible rendition on the source-owning agent.
+  description: Plan and queue one browser-compatible rendition on the source-owning
+    agent.
   entry: handlers.main:ensure_rendition
   side_effects: local_write
   timeout_seconds: 30
   input_schema:
     type: object
-    required: [item_id]
+    required:
+    - item_id
     properties:
-      item_id: {type: string, minLength: 1}
-      endpoint_capabilities: {type: object, additionalProperties: true}
-      profile_id: {type: string, default: default}
-      rendition_profile: {type: string, default: browser-mp4-v1}
-      priority: {type: integer, minimum: 0, maximum: 1000, default: 50}
-      force: {type: boolean, default: false}
+      item_id:
+        type: string
+        minLength: 1
+      endpoint_capabilities:
+        type: object
+        additionalProperties: true
+      profile_id:
+        type: string
+        default: default
+      rendition_profile:
+        type: string
+        default: browser-mp4-v1
+      priority:
+        type: integer
+        minimum: 0
+        maximum: 1000
+        default: 50
+      force:
+        type: boolean
+        default: false
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: build_playback_queue
-  description: Build up to 500 ordered playback plans from an item, work, collection, folder, or playlist.
+  description: Build up to 500 ordered playback plans from an item, work, collection,
+    folder, or playlist.
   entry: handlers.main:build_playback_queue
   side_effects: none
   input_schema:
@@ -447,7 +488,12 @@ tools:
     properties:
       source_type:
         type: string
-        enum: [item, work, collection, folder, playlist]
+        enum:
+        - item
+        - work
+        - collection
+        - folder
+        - playlist
       source_id:
         type: string
       profile_id:
@@ -494,17 +540,27 @@ tools:
   output_schema:
     type: object
 - name: sync_agent
-  description: Pull bounded idempotent source deltas from the local media library agent.
+  description: Pull bounded idempotent source deltas from the local media library
+    agent.
   entry: handlers.main:sync_agent
   side_effects: local_write
   timeout_seconds: 120
   input_schema:
     type: object
     properties:
-      max_pages: {type: integer, minimum: 1, maximum: 16, default: 4}
-      limit: {type: integer, minimum: 1, maximum: 1000, default: 500}
+      max_pages:
+        type: integer
+        minimum: 1
+        maximum: 16
+        default: 4
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 500
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: home
   description: Return bounded home shelves for one media profile.
   entry: handlers.main:home
@@ -512,11 +568,20 @@ tools:
   input_schema:
     type: object
     properties:
-      profile_id: {type: string, default: default}
-      limit: {type: integer, minimum: 1, maximum: 20, default: 12}
-      shared_surface: {type: boolean, default: false}
+      profile_id:
+        type: string
+        default: default
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 20
+        default: 12
+      shared_surface:
+        type: boolean
+        default: false
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: list_profiles
   description: List bounded Media Center profiles and their library policies.
   entry: handlers.main:list_profiles
@@ -524,9 +589,14 @@ tools:
   input_schema:
     type: object
     properties:
-      limit: {type: integer, minimum: 1, maximum: 50, default: 20}
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 20
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: get_profile
   description: Read one Media Center profile and its library policy.
   entry: handlers.main:get_profile
@@ -534,19 +604,30 @@ tools:
   input_schema:
     type: object
     properties:
-      profile_id: {type: string, default: default}
+      profile_id:
+        type: string
+        default: default
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: set_profile_policy
-  description: Revision-safely update media-kind, maturity, explicit-content, and shared-surface policy.
+  description: Revision-safely update media-kind, maturity, explicit-content, and
+    shared-surface policy.
   entry: handlers.main:set_profile_policy
   side_effects: local_write
   input_schema:
     type: object
-    required: [profile_id, expected_revision, values]
+    required:
+    - profile_id
+    - expected_revision
+    - values
     properties:
-      profile_id: {type: string, minLength: 1}
-      expected_revision: {type: integer, minimum: 1}
+      profile_id:
+        type: string
+        minLength: 1
+      expected_revision:
+        type: integer
+        minimum: 1
       values:
         type: object
         properties:
@@ -554,63 +635,144 @@ tools:
             type: array
             minItems: 1
             maxItems: 2
-            items: {type: string, enum: [audio, video]}
-          maximum_maturity_rating: {type: integer, minimum: 0, maximum: 21}
-          allow_explicit: {type: boolean}
-          show_history_on_shared_surface: {type: boolean}
-          recommendations_enabled: {type: boolean}
+            items:
+              type: string
+              enum:
+              - audio
+              - video
+          maximum_maturity_rating:
+            type: integer
+            minimum: 0
+            maximum: 21
+          allow_explicit:
+            type: boolean
+          show_history_on_shared_surface:
+            type: boolean
+          recommendations_enabled:
+            type: boolean
         additionalProperties: false
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: set_personal_state
   description: Set a profile-scoped rating or hidden flag for one catalog item.
   entry: handlers.main:set_personal_state
   side_effects: local_write
   input_schema:
     type: object
-    required: [item_id]
+    required:
+    - item_id
     properties:
-      item_id: {type: string, minLength: 1}
-      profile_id: {type: string, default: default}
-      rating: {type: integer, minimum: 0, maximum: 5}
-      hidden: {type: boolean}
+      item_id:
+        type: string
+        minLength: 1
+      profile_id:
+        type: string
+        default: default
+      rating:
+        type: integer
+        minimum: 0
+        maximum: 5
+      hidden:
+        type: boolean
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: recommendations
-  description: Return bounded profile-scoped recommendations with explainable local signals and opt-out.
+  description: Return bounded profile-scoped recommendations with explainable local
+    signals and opt-out.
   entry: handlers.main:recommendations
   side_effects: none
   input_schema:
     type: object
     properties:
-      profile_id: {type: string, default: default}
-      limit: {type: integer, minimum: 1, maximum: 20, default: 12}
+      profile_id:
+        type: string
+        default: default
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 20
+        default: 12
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: voice_request
-  description: Resolve structured voice discovery, collection, favorite, target, status, playback, and transport intents.
+  description: Resolve structured voice discovery, collection, favorite, target, status,
+    playback, and transport intents.
   entry: handlers.main:voice_request
   side_effects: local_write
   input_schema:
     type: object
     properties:
-      intent: {type: string, enum: ['', search, browse, play, favorite, unfavorite, collections, status, targets, control, compound]}
-      text: {type: string}
-      query: {type: string}
-      profile_id: {type: string, default: default}
-      room_id: {type: string}
-      target_id: {type: string}
-      item_id: {type: string}
-      focused_item_id: {type: string}
-      collection_kind: {type: string}
-      media_kind: {type: string, enum: [playable, audio, video], default: playable}
-      action: {type: string, enum: ['', play, pause, seek, volume, mute, next, previous, stop, handoff, tracks, rate, sleep_timer]}
-      arguments: {type: object}
-      dialog_context: {type: object}
-      actor_ref: {type: string}
-      limit: {type: integer, minimum: 1, maximum: 10, default: 5}
+      intent:
+        type: string
+        enum:
+        - ''
+        - search
+        - browse
+        - play
+        - favorite
+        - unfavorite
+        - collections
+        - status
+        - targets
+        - control
+        - compound
+      text:
+        type: string
+      query:
+        type: string
+      profile_id:
+        type: string
+        default: default
+      room_id:
+        type: string
+      target_id:
+        type: string
+      item_id:
+        type: string
+      focused_item_id:
+        type: string
+      collection_kind:
+        type: string
+      media_kind:
+        type: string
+        enum:
+        - playable
+        - audio
+        - video
+        default: playable
+      action:
+        type: string
+        enum:
+        - ''
+        - play
+        - pause
+        - seek
+        - volume
+        - mute
+        - next
+        - previous
+        - stop
+        - handoff
+        - tracks
+        - rate
+        - sleep_timer
+      arguments:
+        type: object
+      dialog_context:
+        type: object
+      actor_ref:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 10
+        default: 5
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: list_collections
   description: List typed media collections through an opaque cursor.
   entry: handlers.main:list_collections
@@ -618,11 +780,18 @@ tools:
   input_schema:
     type: object
     properties:
-      kind: {type: string}
-      limit: {type: integer, minimum: 1, maximum: 30, default: 30}
-      cursor: {type: string}
+      kind:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 30
+        default: 30
+      cursor:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: browse_folders
   description: Browse lazy folder children through an opaque cursor.
   entry: handlers.main:browse_folders
@@ -630,27 +799,53 @@ tools:
   input_schema:
     type: object
     properties:
-      agent_id: {type: string}
-      root_id: {type: string}
-      parent: {type: string}
-      limit: {type: integer, minimum: 1, maximum: 30, default: 30}
-      cursor: {type: string}
+      agent_id:
+        type: string
+      root_id:
+        type: string
+      parent:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 30
+        default: 30
+      cursor:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: create_playlist
   description: Create a profile-owned personal, household, or shared playlist.
   entry: handlers.main:create_playlist
   side_effects: local_write
   input_schema:
     type: object
-    required: [title]
+    required:
+    - title
     properties:
-      title: {type: string, minLength: 1, maxLength: 200}
-      profile_id: {type: string, default: default}
-      visibility: {type: string, enum: [private, household, shared], default: private}
-      item_ids: {type: array, maxItems: 500, items: {type: string}}
+      title:
+        type: string
+        minLength: 1
+        maxLength: 200
+      profile_id:
+        type: string
+        default: default
+      visibility:
+        type: string
+        enum:
+        - private
+        - household
+        - shared
+        default: private
+      item_ids:
+        type: array
+        maxItems: 500
+        items:
+          type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: list_playlists
   description: List playlists visible to one profile.
   entry: handlers.main:list_playlists
@@ -658,92 +853,164 @@ tools:
   input_schema:
     type: object
     properties:
-      profile_id: {type: string, default: default}
-      limit: {type: integer, minimum: 1, maximum: 30, default: 30}
-      cursor: {type: string}
+      profile_id:
+        type: string
+        default: default
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 30
+        default: 30
+      cursor:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: playlist_items
   description: Read one bounded playlist page.
   entry: handlers.main:playlist_items
   side_effects: none
   input_schema:
     type: object
-    required: [playlist_id]
+    required:
+    - playlist_id
     properties:
-      playlist_id: {type: string}
-      profile_id: {type: string, default: default}
-      limit: {type: integer, minimum: 1, maximum: 30, default: 30}
-      cursor: {type: string}
+      playlist_id:
+        type: string
+      profile_id:
+        type: string
+        default: default
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 30
+        default: 30
+      cursor:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: update_playlist
   description: Revision-safely replace playlist metadata and order.
   entry: handlers.main:update_playlist
   side_effects: local_write
   input_schema:
     type: object
-    required: [playlist_id, expected_revision]
+    required:
+    - playlist_id
+    - expected_revision
     properties:
-      playlist_id: {type: string}
-      profile_id: {type: string, default: default}
-      expected_revision: {type: integer, minimum: 1}
-      title: {type: string, minLength: 1, maxLength: 200}
-      visibility: {type: string, enum: [private, household, shared]}
-      item_ids: {type: array, maxItems: 500, items: {type: string}}
+      playlist_id:
+        type: string
+      profile_id:
+        type: string
+        default: default
+      expected_revision:
+        type: integer
+        minimum: 1
+      title:
+        type: string
+        minLength: 1
+        maxLength: 200
+      visibility:
+        type: string
+        enum:
+        - private
+        - household
+        - shared
+      item_ids:
+        type: array
+        maxItems: 500
+        items:
+          type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: delete_playlist
   description: Revision-safely remove a playlist without deleting media.
   entry: handlers.main:delete_playlist
   side_effects: local_write
   input_schema:
     type: object
-    required: [playlist_id, expected_revision]
+    required:
+    - playlist_id
+    - expected_revision
     properties:
-      playlist_id: {type: string}
-      profile_id: {type: string, default: default}
-      expected_revision: {type: integer, minimum: 1}
+      playlist_id:
+        type: string
+      profile_id:
+        type: string
+        default: default
+      expected_revision:
+        type: integer
+        minimum: 1
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: apply_correction
   description: Apply an audited reversible metadata, merge, split, or regroup correction.
   entry: handlers.main:apply_correction
   side_effects: local_write
   input_schema:
     type: object
-    required: [operation, subject_ref, values]
+    required:
+    - operation
+    - subject_ref
+    - values
     properties:
-      operation: {type: string, enum: [metadata, merge, split, regroup]}
-      subject_ref: {type: string}
-      values: {type: object}
-      actor_ref: {type: string, default: 'profile:default'}
+      operation:
+        type: string
+        enum:
+        - metadata
+        - merge
+        - split
+        - regroup
+      subject_ref:
+        type: string
+      values:
+        type: object
+      actor_ref:
+        type: string
+        default: profile:default
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: reverse_correction
   description: Reverse one audited catalog correction.
   entry: handlers.main:reverse_correction
   side_effects: local_write
   input_schema:
     type: object
-    required: [correction_id]
+    required:
+    - correction_id
     properties:
-      correction_id: {type: string}
-      actor_ref: {type: string, default: 'profile:default'}
+      correction_id:
+        type: string
+      actor_ref:
+        type: string
+        default: profile:default
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: metadata_claims
   description: List bounded metadata claims with provenance.
   entry: handlers.main:metadata_claims
   side_effects: none
   input_schema:
     type: object
-    required: [subject_ref]
+    required:
+    - subject_ref
     properties:
-      subject_ref: {type: string}
-      limit: {type: integer, minimum: 1, maximum: 100, default: 30}
+      subject_ref:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 30
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: duplicate_candidates
   description: Return non-destructive duplicate and variant candidates.
   entry: handlers.main:duplicate_candidates
@@ -751,37 +1018,69 @@ tools:
   input_schema:
     type: object
     properties:
-      limit: {type: integer, minimum: 1, maximum: 100, default: 30}
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 30
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: save_checkpoint
   description: Persist a profile-scoped resume checkpoint.
   entry: handlers.main:save_checkpoint
   side_effects: local_write
   input_schema:
     type: object
-    required: [item_id, position_ms]
+    required:
+    - item_id
+    - position_ms
     properties:
-      item_id: {type: string}
-      profile_id: {type: string, default: default}
-      position_ms: {type: integer, minimum: 0}
-      duration_ms: {type: integer, minimum: 0}
-      completed: {type: boolean, default: false}
+      item_id:
+        type: string
+      profile_id:
+        type: string
+        default: default
+      position_ms:
+        type: integer
+        minimum: 0
+      duration_ms:
+        type: integer
+        minimum: 0
+      completed:
+        type: boolean
+        default: false
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: queue_background_job
   description: Queue background enrichment or technical analysis.
   entry: handlers.main:queue_background_job
   side_effects: local_write
   input_schema:
     type: object
-    required: [kind, subject_ref]
+    required:
+    - kind
+    - subject_ref
     properties:
-      kind: {type: string, enum: [technical_probe, metadata_enrichment, thumbnail, fingerprint, embedding]}
-      subject_ref: {type: string}
-      priority: {type: integer, minimum: 1, maximum: 1000, default: 100}
+      kind:
+        type: string
+        enum:
+        - technical_probe
+        - metadata_enrichment
+        - thumbnail
+        - fingerprint
+        - embedding
+      subject_ref:
+        type: string
+      priority:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 100
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: operations
   description: List bounded observable background media operations.
   entry: handlers.main:operations
@@ -789,15 +1088,23 @@ tools:
   input_schema:
     type: object
     properties:
-      limit: {type: integer, minimum: 1, maximum: 100, default: 30}
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 30
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: dispose
   description: Stop the process-local enrichment worker.
   entry: handlers.main:dispose
   side_effects: local_write
-  input_schema: {type: object, additionalProperties: true}
-  output_schema: {type: object}
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: status
   description: Return compact media-center catalog status.
   entry: handlers.main:status
@@ -808,16 +1115,22 @@ tools:
   output_schema:
     type: object
 - name: diagnostic_export
-  description: Export bounded path- and secret-redacted operations diagnostics and reviewed repair proposals.
+  description: Export bounded path- and secret-redacted operations diagnostics and
+    reviewed repair proposals.
   entry: handlers.main:diagnostic_export
   side_effects: none
   input_schema:
     type: object
     properties:
-      deployment_id: {type: string, default: media-center-home}
-      browser_diagnostics: {type: object, additionalProperties: true}
+      deployment_id:
+        type: string
+        default: media-center-home
+      browser_diagnostics:
+        type: object
+        additionalProperties: true
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: deployment_status
   description: Return bounded Project deployment and per-node activation state.
   entry: handlers.main:deployment_status
@@ -825,168 +1138,300 @@ tools:
   input_schema:
     type: object
     properties:
-      deployment_id: {type: string, default: media-center-home}
-      limit: {type: integer, minimum: 1, maximum: 100, default: 50}
+      deployment_id:
+        type: string
+        default: media-center-home
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: configure_deployment
-  description: Persist desired placement and create a reviewed dry-run deployment plan.
+  description: Persist desired placement and create a reviewed dry-run deployment
+    plan.
   entry: handlers.main:configure_deployment
   side_effects: local_write
   input_schema:
     type: object
-    required: [release_digest, subnet_id]
+    required:
+    - release_digest
+    - subnet_id
     properties:
-      release_digest: {type: string, minLength: 1}
-      subnet_id: {type: string, minLength: 1}
-      coordinator_node_id: {type: string}
+      release_digest:
+        type: string
+        minLength: 1
+      subnet_id:
+        type: string
+        minLength: 1
+      coordinator_node_id:
+        type: string
       agent_node_ids:
         type: array
         maxItems: 32
-        items: {type: string, minLength: 1}
-      all_matching_agents: {type: boolean, default: false}
-      expected_revision: {type: integer, minimum: 0, default: 0}
-      allow_release_skew: {type: boolean, default: false}
-      reason: {type: string, maxLength: 300}
-      deployment_id: {type: string, default: media-center-home}
+        items:
+          type: string
+          minLength: 1
+      all_matching_agents:
+        type: boolean
+        default: false
+      expected_revision:
+        type: integer
+        minimum: 0
+        default: 0
+      allow_release_skew:
+        type: boolean
+        default: false
+      reason:
+        type: string
+        maxLength: 300
+      deployment_id:
+        type: string
+        default: media-center-home
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: apply_deployment
   description: Apply one explicitly reviewed immutable deployment plan.
   entry: handlers.main:apply_deployment
   side_effects: remote_write
   input_schema:
     type: object
-    required: [plan_digest]
+    required:
+    - plan_digest
     properties:
-      plan_digest: {type: string, minLength: 1}
-      idempotency_key: {type: string}
+      plan_digest:
+        type: string
+        minLength: 1
+      idempotency_key:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: deployment_operation_status
   description: Return one durable Project deployment operation by id.
   entry: handlers.main:deployment_operation_status
   side_effects: none
   input_schema:
     type: object
-    required: [operation_id]
+    required:
+    - operation_id
     properties:
-      operation_id: {type: string, minLength: 1}
+      operation_id:
+        type: string
+        minLength: 1
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: drain_activation
   description: Cordon and drain one component activation.
   entry: handlers.main:drain_activation
   side_effects: remote_write
   input_schema:
     type: object
-    required: [activation_id]
+    required:
+    - activation_id
     properties:
-      activation_id: {type: string, minLength: 1}
-      idempotency_key: {type: string}
+      activation_id:
+        type: string
+        minLength: 1
+      idempotency_key:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: remove_activation
   description: Remove one drained activation while retaining media and derived data.
   entry: handlers.main:remove_activation
   side_effects: remote_write
   input_schema:
     type: object
-    required: [activation_id]
+    required:
+    - activation_id
     properties:
-      activation_id: {type: string, minLength: 1}
-      idempotency_key: {type: string}
+      activation_id:
+        type: string
+        minLength: 1
+      idempotency_key:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: define_topology
-  description: Define logical Media Center service groups and datasets through the public SDK.
+  description: Define logical Media Center service groups and datasets through the
+    public SDK.
   entry: handlers.main:define_topology
   side_effects: local_write
   input_schema:
     type: object
-    required: [service_definition, service_group]
+    required:
+    - service_definition
+    - service_group
     properties:
-      service_definition: {type: object}
-      service_group: {type: object}
+      service_definition:
+        type: object
+      service_group:
+        type: object
       datasets:
         type: array
         maxItems: 20
-        items: {type: object}
-      expected_group_revision: {type: integer, minimum: 0, default: 0}
-      deployment_id: {type: string, minLength: 1, default: media-center-home}
+        items:
+          type: object
+      expected_group_revision:
+        type: integer
+        minimum: 0
+        default: 0
+      deployment_id:
+        type: string
+        minLength: 1
+        default: media-center-home
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: register_agent
-  description: Admit one exact deployed library-agent activation into the authority plane.
+  description: Admit one exact deployed library-agent activation into the authority
+    plane.
   entry: handlers.main:register_agent
   side_effects: local_write
   input_schema:
     type: object
-    required: [instance]
+    required:
+    - instance
     properties:
-      instance: {type: object}
-      expected_revision: {type: integer, minimum: 0, default: 0}
-      lease_seconds: {type: integer, minimum: 30, maximum: 600, default: 300}
+      instance:
+        type: object
+      expected_revision:
+        type: integer
+        minimum: 0
+        default: 0
+      lease_seconds:
+        type: integer
+        minimum: 30
+        maximum: 600
+        default: 300
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: renew_agent
   description: Renew one admitted library-agent membership in the authority plane.
   entry: handlers.main:renew_agent
   side_effects: local_write
   input_schema:
     type: object
-    required: [instance_id, expected_revision]
+    required:
+    - instance_id
+    - expected_revision
     properties:
-      instance_id: {type: string, minLength: 1}
-      expected_revision: {type: integer, minimum: 1}
-      readiness: {type: boolean, default: true}
-      status: {type: string, default: ready}
-      health: {type: object}
-      pressure: {type: object}
-      lease_seconds: {type: integer, minimum: 30, maximum: 600, default: 300}
+      instance_id:
+        type: string
+        minLength: 1
+      expected_revision:
+        type: integer
+        minimum: 1
+      readiness:
+        type: boolean
+        default: true
+      status:
+        type: string
+        default: ready
+      health:
+        type: object
+      pressure:
+        type: object
+      lease_seconds:
+        type: integer
+        minimum: 30
+        maximum: 600
+        default: 300
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: drain_agent
   description: Drain one admitted library agent from distributed routes.
   entry: handlers.main:drain_agent
   side_effects: local_write
   input_schema:
     type: object
-    required: [instance_id, expected_revision]
+    required:
+    - instance_id
+    - expected_revision
     properties:
-      instance_id: {type: string, minLength: 1}
-      expected_revision: {type: integer, minimum: 1}
+      instance_id:
+        type: string
+        minLength: 1
+      expected_revision:
+        type: integer
+        minimum: 1
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: observe_agent_topology
-  description: Ask an admitted agent to verify a local replica, then commit it in the authority plane.
+  description: Ask an admitted agent to verify a local replica, then commit it in
+    the authority plane.
   entry: handlers.main:observe_agent_topology
   side_effects: remote_write
   input_schema:
     type: object
-    required: [instance_id, partition, replica]
+    required:
+    - instance_id
+    - partition
+    - replica
     properties:
-      instance_id: {type: string, minLength: 1}
-      partition: {type: object}
-      replica: {type: object}
-      timeout_seconds: {type: number, minimum: 1, maximum: 600, default: 60}
+      instance_id:
+        type: string
+        minLength: 1
+      partition:
+        type: object
+      replica:
+        type: object
+      timeout_seconds:
+        type: number
+        minimum: 1
+        maximum: 600
+        default: 60
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: plan_topology_change
   description: Create and persist a reviewed immutable topology-change plan.
   entry: handlers.main:plan_topology_change
   side_effects: local_write
   input_schema:
     type: object
-    required: [partition_id, action]
+    required:
+    - partition_id
+    - action
     properties:
-      partition_id: {type: string, minLength: 1}
-      action: {type: string, enum: [create, move, rebuild, handoff, drain, remove, repair]}
-      source_instance_id: {type: string}
-      target_instance_id: {type: string}
-      replica_role: {type: string, enum: [authority, follower, derived, cache], default: follower}
+      partition_id:
+        type: string
+        minLength: 1
+      action:
+        type: string
+        enum:
+        - create
+        - move
+        - rebuild
+        - handoff
+        - drain
+        - remove
+        - repair
+      source_instance_id:
+        type: string
+      target_instance_id:
+        type: string
+      replica_role:
+        type: string
+        enum:
+        - authority
+        - follower
+        - derived
+        - cache
+        default: follower
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: apply_topology_change
   description: Apply one explicitly reviewed immutable topology-change plan.
   entry: handlers.main:apply_topology_change
@@ -994,39 +1439,67 @@ tools:
   timeout_seconds: 600
   input_schema:
     type: object
-    required: [plan_digest]
+    required:
+    - plan_digest
     properties:
-      plan_digest: {type: string, minLength: 1}
-      idempotency_key: {type: string}
+      plan_digest:
+        type: string
+        minLength: 1
+      idempotency_key:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: topology_operation_status
   description: Read one durable topology operation without scanning topology history.
   entry: handlers.main:topology_operation_status
   side_effects: none
   input_schema:
     type: object
-    required: [operation_id]
+    required:
+    - operation_id
     properties:
-      operation_id: {type: string, minLength: 1}
+      operation_id:
+        type: string
+        minLength: 1
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: handoff_authority
-  description: Perform one explicit fenced authority handoff with expected revision and epoch.
+  description: Perform one explicit fenced authority handoff with expected revision
+    and epoch.
   entry: handlers.main:handoff_authority
   side_effects: remote_write
   input_schema:
     type: object
-    required: [partition_id, target_instance_id, expected_partition_revision, expected_epoch]
+    required:
+    - partition_id
+    - target_instance_id
+    - expected_partition_revision
+    - expected_epoch
     properties:
-      partition_id: {type: string, minLength: 1}
-      target_instance_id: {type: string, minLength: 1}
-      expected_partition_revision: {type: integer, minimum: 1}
-      expected_epoch: {type: integer, minimum: 0}
-      operation_id: {type: string}
-      lease_seconds: {type: integer, minimum: 30, maximum: 300, default: 120}
+      partition_id:
+        type: string
+        minLength: 1
+      target_instance_id:
+        type: string
+        minLength: 1
+      expected_partition_revision:
+        type: integer
+        minimum: 1
+      expected_epoch:
+        type: integer
+        minimum: 0
+      operation_id:
+        type: string
+      lease_seconds:
+        type: integer
+        minimum: 30
+        maximum: 300
+        default: 120
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: topology_status
   description: Return bounded generic distributed service and data topology state.
   entry: handlers.main:topology_status
@@ -1034,11 +1507,17 @@ tools:
   input_schema:
     type: object
     properties:
-      limit: {type: integer, minimum: 1, maximum: 100, default: 50}
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: explain_route
-  description: Explain route eligibility, freshness, and partial participation for source shards.
+  description: Explain route eligibility, freshness, and partial participation for
+    source shards.
   entry: handlers.main:explain_route
   side_effects: none
   input_schema:
@@ -1046,14 +1525,20 @@ tools:
     properties:
       dataset_id:
         type: string
-        enum: [media-catalog, media-catalog-authority, media-files]
+        enum:
+        - media-catalog
+        - media-catalog-authority
+        - media-files
         default: media-catalog-authority
       partition_ids:
         type: array
         maxItems: 100
-        items: {type: string, minLength: 1}
+        items:
+          type: string
+          minLength: 1
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: next_steps
   description: Return admitted MVP workflow steps and production roadmap boundary.
   entry: handlers.main:next_steps
@@ -1236,14 +1721,22 @@ data_routes:
   first_paint: one bounded collection page
   recovery: repeat list_collections with the current opaque cursor
   guard_visibility: catalog collection metadata only
-  budget: {max_payload_bytes: 524288, max_items: 30, snapshot_policy: manual}
+  budget:
+    max_payload_bytes: 524288
+    max_items: 30
+    snapshot_policy: manual
   read_policy:
     mode: explicit
-    triggers: [mount, explicit_refresh, state_dependency_changed, targeted_invalidation]
+    triggers:
+    - mount
+    - explicit_refresh
+    - state_dependency_changed
+    - targeted_invalidation
     cache_ttl_ms: 0
     max_request_hz: 2
     preserve_last_value: true
-    invalidation_tags: [media_center.catalog]
+    invalidation_tags:
+    - media_center.catalog
 - surface: widget:media-center-folders
   route: tool
   tool: browse_folders
@@ -1251,14 +1744,22 @@ data_routes:
   first_paint: one bounded folder page
   recovery: repeat browse_folders with the current opaque cursor
   guard_visibility: logical folder names and node identity; no source bytes
-  budget: {max_payload_bytes: 524288, max_items: 30, snapshot_policy: manual}
+  budget:
+    max_payload_bytes: 524288
+    max_items: 30
+    snapshot_policy: manual
   read_policy:
     mode: explicit
-    triggers: [mount, explicit_refresh, state_dependency_changed, targeted_invalidation]
+    triggers:
+    - mount
+    - explicit_refresh
+    - state_dependency_changed
+    - targeted_invalidation
     cache_ttl_ms: 0
     max_request_hz: 2
     preserve_last_value: true
-    invalidation_tags: [media_center.catalog]
+    invalidation_tags:
+    - media_center.catalog
 - surface: widget:media-center-playlists
   route: tool
   tool: list_playlists
@@ -1266,14 +1767,22 @@ data_routes:
   first_paint: one bounded profile-visible playlist page
   recovery: repeat list_playlists with the current opaque cursor
   guard_visibility: profile and household playlist metadata only
-  budget: {max_payload_bytes: 524288, max_items: 30, snapshot_policy: manual}
+  budget:
+    max_payload_bytes: 524288
+    max_items: 30
+    snapshot_policy: manual
   read_policy:
     mode: explicit
-    triggers: [mount, explicit_refresh, state_dependency_changed, targeted_invalidation]
+    triggers:
+    - mount
+    - explicit_refresh
+    - state_dependency_changed
+    - targeted_invalidation
     cache_ttl_ms: 0
     max_request_hz: 2
     preserve_last_value: true
-    invalidation_tags: [media_center.catalog]
+    invalidation_tags:
+    - media_center.catalog
 - surface: widget:media-center-queue-builder
   route: tool
   tool: build_playback_queue
@@ -1281,14 +1790,22 @@ data_routes:
   first_paint: first ten playback entries for the selected source
   recovery: repeat build_playback_queue after catalog invalidation
   guard_visibility: playback descriptors and safe route candidates only
-  budget: {max_payload_bytes: 1048576, max_items: 500, snapshot_policy: manual}
+  budget:
+    max_payload_bytes: 1048576
+    max_items: 500
+    snapshot_policy: manual
   read_policy:
     mode: explicit
-    triggers: [mount, explicit_refresh, state_dependency_changed, targeted_invalidation]
+    triggers:
+    - mount
+    - explicit_refresh
+    - state_dependency_changed
+    - targeted_invalidation
     cache_ttl_ms: 0
     max_request_hz: 2
     preserve_last_value: true
-    invalidation_tags: [media_center.catalog]
+    invalidation_tags:
+    - media_center.catalog
 - surface: widget:media-center-deployment
   route: tool/details
   tool: deployment_status
@@ -1296,14 +1813,21 @@ data_routes:
   first_paint: bounded deployment and agent participation status
   recovery: repeat deployment_status after a topology transition
   guard_visibility: deployment topology and health; no credentials
-  budget: {max_payload_bytes: 524288, max_items: 50, snapshot_policy: manual}
+  budget:
+    max_payload_bytes: 524288
+    max_items: 50
+    snapshot_policy: manual
   read_policy:
     mode: explicit
-    triggers: [mount, explicit_refresh, targeted_invalidation]
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
     cache_ttl_ms: 1000
     max_request_hz: 1
     preserve_last_value: true
-    invalidation_tags: [media_center.deployment]
+    invalidation_tags:
+    - media_center.deployment
 - surface: widget:media-center-profile
   route: tool/details
   tool: get_profile
@@ -1311,14 +1835,20 @@ data_routes:
   first_paint: selected profile and effective access policy
   recovery: repeat get_profile after a profile policy mutation
   guard_visibility: selected profile policy without another profile's history
-  budget: {max_payload_bytes: 65536, snapshot_policy: manual}
+  budget:
+    max_payload_bytes: 65536
+    snapshot_policy: manual
   read_policy:
     mode: explicit
-    triggers: [mount, state_dependency_changed, targeted_invalidation]
+    triggers:
+    - mount
+    - state_dependency_changed
+    - targeted_invalidation
     cache_ttl_ms: 0
     max_request_hz: 2
     preserve_last_value: true
-    invalidation_tags: [media_center.profile]
+    invalidation_tags:
+    - media_center.profile
 - surface: widget:media-center-operations
   route: stream
   receiver: media_center.operation_state
@@ -1326,10 +1856,16 @@ data_routes:
   first_paint: bounded recent enrichment and rendition operations
   recovery: request a fresh operation snapshot after stream reconnection
   guard_visibility: sanitized operation phases and machine error codes
-  budget: {max_payload_bytes: 262144, max_publish_hz: 1, max_items: 30, snapshot_policy: on_subscribe}
+  budget:
+    max_payload_bytes: 262144
+    max_publish_hz: 1
+    max_items: 30
+    snapshot_policy: on_subscribe
   read_policy:
     mode: live
-    triggers: [mount, reconnect]
+    triggers:
+    - mount
+    - reconnect
     max_request_hz: 1
     preserve_last_value: true
 - surface: widget:media-center-diagnostics
@@ -1339,14 +1875,21 @@ data_routes:
   first_paint: bounded sanitized component status and repair recommendations
   recovery: repeat diagnostic_export after a targeted invalidation
   guard_visibility: paths, credentials, media bytes, and unbounded logs are excluded
-  budget: {max_payload_bytes: 524288, max_items: 100, snapshot_policy: manual}
+  budget:
+    max_payload_bytes: 524288
+    max_items: 100
+    snapshot_policy: manual
   read_policy:
     mode: explicit
-    triggers: [mount, explicit_refresh, targeted_invalidation]
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
     cache_ttl_ms: 1000
     max_request_hz: 1
     preserve_last_value: true
-    invalidation_tags: [media_center.diagnostics]
+    invalidation_tags:
+    - media_center.diagnostics
 - surface: media-center catalog store
   route: skill-local
   path: data/db/media_center.sqlite3
@@ -1357,7 +1900,8 @@ data_routes:
   budget:
     max_payload_bytes: 1048576
 llm_hints:
-  description: Durable MVP media center catalog for local playback and future media-center workflows.
+  description: Durable MVP media center catalog for local playback and future media-center
+    workflows.
   aliases:
   - Media Center
   - media center
@@ -1407,13 +1951,29 @@ nlu_hints:
     media_center.voice:
       type: object
       properties:
-        intent: {type: string}
-        query: {type: string}
-        profile_id: {type: string}
-        room_id: {type: string}
-        target_id: {type: string}
-        focused_item_id: {type: string}
-        dialog_context: {type: object}
+        intent:
+          type: string
+        query:
+          type: string
+        profile_id:
+          type: string
+        room_id:
+          type: string
+        target_id:
+          type: string
+        focused_item_id:
+          type: string
+        dialog_context:
+          type: object
       additionalProperties: true
   entities: []
-updated_at: '2026-08-23T00:00:00+00:00'
+updated_at: '2026-08-23T12:58:56+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.917+5570.ca7e0369
+    recorded_at: '2026-08-23T12:58:57+00:00'
+    source: skill_push
+    min_commit: ca7e03694fbc2008747f5f1e73489d33d8ee99ab
+    min_short_commit: ca7e0369
+    build_date: '2026-08-23T14:20:05+03:00'
+
