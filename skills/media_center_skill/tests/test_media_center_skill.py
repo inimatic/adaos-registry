@@ -246,6 +246,32 @@ def test_catalog_scans_lists_and_plans_playback(monkeypatch, tmp_path):
     assert favorite["item"]["favorite"] is True
 
 
+def test_build_queue_keeps_legacy_reference_rows_playable(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    repository = MediaCenterRepository()
+    repository.scan_resources([_resource("legacy-reference.mp4")])
+    catalog = MediaCatalogCoordinator(repository)
+    item = catalog.list_items(media_kind="video")["items"][0]
+
+    queue = catalog.build_queue(
+        source_type="item",
+        source_id=item["id"],
+        limit=10,
+    )
+
+    assert queue["count"] == 1
+    assert queue["items"][0]["compatibility_mode"] == "legacy_catalog_row"
+    assert queue["items"][0]["content_path"] == (
+        "/api/node/media/files/content/legacy-reference.mp4"
+    )
+    assert queue["items"][0]["routed_content_path"] == (
+        "/media/files/content/legacy-reference.mp4"
+    )
+    assert queue["items"][0]["route"]["fallback"]["reason"] == (
+        "legacy_reference_source"
+    )
+
+
 def test_library_auto_scan_uses_sdk_discovery_boundary(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     monkeypatch.setattr(main, "_discover_resources", lambda source="all", limit=5000: ([_resource("song.mp3")], {"ok": True}))

@@ -3709,6 +3709,22 @@ class MediaCatalogCoordinator:
                 preferred_language=preferred_language,
                 profile_id=profile,
             )
+            if (
+                not plan.get("ok")
+                and plan.get("error") == "playback_source_unavailable"
+            ):
+                legacy = self.repository.playback_plan(item_id_value)
+                legacy_item = dict(legacy.get("item") or {})
+                if (
+                    legacy.get("ok")
+                    and not _text(legacy_item.get("work_id"))
+                    and not _text(legacy_item.get("variant_id"))
+                ):
+                    plan = self._legacy_playback_plan(
+                        legacy,
+                        endpoint_id=endpoint_id,
+                        endpoint_node_id=endpoint_node_id,
+                    )
             if not plan.get("ok"):
                 continue
             queue.append(
@@ -3730,6 +3746,11 @@ class MediaCatalogCoordinator:
                     "available": True,
                     "descriptor": plan["descriptor"],
                     "route": plan["route"],
+                    **(
+                        {"compatibility_mode": plan["compatibility_mode"]}
+                        if plan.get("compatibility_mode")
+                        else {}
+                    ),
                 }
             )
         queue_source = {"type": kind, "id": token, "ownership": ownership}
@@ -3756,6 +3777,73 @@ class MediaCatalogCoordinator:
             "limit": bounded,
             "bounded": True,
             "partial": self.participation()["partial"],
+        }
+
+    @staticmethod
+    def _legacy_playback_plan(
+        legacy: Mapping[str, Any],
+        *,
+        endpoint_id: str = "",
+        endpoint_node_id: str = "",
+    ) -> dict[str, Any]:
+        item = dict(legacy.get("item") or {})
+        resource = dict(legacy.get("resource") or item.get("resource") or {})
+        playback = dict(legacy.get("playback") or {})
+        item_id = _text(item.get("id"))
+        resource_id = _text(
+            resource.get("resource_id")
+            or resource.get("id")
+            or item.get("resource_id")
+        )
+        media_kind = _text(item.get("media_kind")) or "other"
+        mime_type = _text(item.get("mime_type")) or "application/octet-stream"
+        node_path = _public_content_path(
+            item.get("content_path")
+            or resource.get("content_path")
+            or playback.get("preferred_path")
+        )
+        routed_path = _public_content_path(
+            item.get("routed_content_path")
+            or resource.get("routed_content_path")
+            or playback.get("preferred_path")
+        )
+        route = {
+            "schema": "adaos.media_center.playback_route.v1",
+            "mode": "root_routed_http_relay",
+            "source_node_id": "",
+            "endpoint_id": _text(endpoint_id),
+            "endpoint_node_id": _text(endpoint_node_id),
+            "direct_candidates": [],
+            "routed_path": routed_path,
+            "node_path": node_path,
+            "resource_id": resource_id,
+            "fallback": {
+                "mode": "root_routed_http_relay",
+                "path": routed_path or node_path,
+                "target_node_id": "",
+                "reason": "legacy_reference_source",
+            },
+        }
+        return {
+            "ok": True,
+            "schema": PLAYBACK_PLAN_SCHEMA,
+            "item_id": item_id,
+            "work_id": "",
+            "variant_id": "",
+            "source_id": _text(item.get("source")) or resource_id,
+            "media_kind": media_kind,
+            "mime_type": mime_type,
+            "title": _text(item.get("title") or item.get("name")),
+            "quality": {},
+            "descriptor": _public_resource_descriptor(
+                resource,
+                resource_id=resource_id,
+                mime_type=mime_type,
+                content_path=node_path,
+                routed_content_path=routed_path,
+            ),
+            "route": route,
+            "compatibility_mode": "legacy_catalog_row",
         }
 
     def home(
