@@ -1640,13 +1640,28 @@ class MediaCatalogCoordinator:
     @staticmethod
     def _search_text(*, title: Any, name: Any, relative_path: Any, folder_path: Any, metadata: Mapping[str, Any]) -> str:
         values: list[str] = [_text(title), _text(name), _text(relative_path), _text(folder_path)]
-        for key in ("folder_segments", "tags", "artists", "people", "aliases"):
+        for key in (
+            "folder_segments", "tags", "genres", "categories", "artists",
+            "people", "actors", "directors", "countries", "aliases",
+        ):
             value = metadata.get(key)
             if isinstance(value, Iterable) and not isinstance(value, (str, bytes, Mapping)):
-                values.extend(_text(item) for item in value)
+                for item in list(value)[:100]:
+                    if isinstance(item, Mapping):
+                        values.extend(
+                            _text(item.get(field)) for field in ("name", "role")
+                        )
+                    else:
+                        values.append(_text(item))
             elif value:
                 values.append(_text(value))
-        values.extend([_text(metadata.get("album")), _text(metadata.get("series")), _text(metadata.get("root_label"))])
+        values.extend(
+            _text(metadata.get(key))
+            for key in (
+                "album", "series", "root_label", "plot", "overview", "tagline",
+                "original_title", "sort_title",
+            )
+        )
         return " ".join(part for part in values if part)
 
     def apply_agent_page(
@@ -3572,7 +3587,7 @@ class MediaCatalogCoordinator:
                             (
                                 SELECT value_json FROM metadata_claims mc
                                 WHERE mc.subject_ref='item:' || c.id
-                                    AND mc.field_name='text_embedding_v1'
+                                    AND mc.field_name IN ('semantic_embedding_v1','text_embedding_v1')
                                 ORDER BY mc.confidence DESC,mc.created_at DESC LIMIT 1
                             ) AS discovery_embedding
                         FROM catalog_items c
@@ -5327,6 +5342,8 @@ class MediaCatalogCoordinator:
             signals = [dict(item) for item in _signals]
         preferred_kinds: dict[str, int] = {}
         preferred_folders: dict[str, int] = {}
+        preferred_genres: dict[str, int] = {}
+        preferred_artists: dict[str, int] = {}
         for item in signals[:60]:
             kind = _text(item.get("media_kind"))
             if kind:
@@ -5336,6 +5353,14 @@ class MediaCatalogCoordinator:
                 preferred_folders[folder.casefold()] = (
                     preferred_folders.get(folder.casefold(), 0) + 1
                 )
+            for value in list(item.get("genres") or [])[:20]:
+                token = fold_text(value)
+                if token:
+                    preferred_genres[token] = preferred_genres.get(token, 0) + 1
+            for value in list(item.get("artists") or [])[:20]:
+                token = fold_text(value)
+                if token:
+                    preferred_artists[token] = preferred_artists.get(token, 0) + 1
         candidates: list[dict[str, Any]] = []
         cursor = ""
         for _page in range(3 if signals else 1):
@@ -5363,22 +5388,57 @@ class MediaCatalogCoordinator:
             if folder and preferred_folders.get(folder.casefold()):
                 score += min(30, preferred_folders[folder.casefold()] * 3)
                 reasons.append(f"related_library_section:{folder}")
+            matched_genres = [
+                _text(value)
+                for value in list(item.get("genres") or [])[:20]
+                if preferred_genres.get(fold_text(value))
+            ]
+            if matched_genres:
+                score += min(
+                    40,
+                    sum(preferred_genres[fold_text(value)] for value in matched_genres) * 4,
+                )
+                reasons.append(f"preferred_genre:{matched_genres[0]}")
+            matched_artists = [
+                _text(value)
+                for value in list(item.get("artists") or [])[:20]
+                if preferred_artists.get(fold_text(value))
+            ]
+            if matched_artists:
+                score += min(
+                    40,
+                    sum(preferred_artists[fold_text(value)] for value in matched_artists) * 5,
+                )
+                reasons.append(f"preferred_artist:{matched_artists[0]}")
             if not reasons:
                 reasons.append("unplayed_library_item")
             scored.append((score, _text(item.get("title")).casefold(), item, reasons))
         scored.sort(key=lambda value: (-value[0], value[1], _text(value[2].get("id"))))
-        items = [
-            dict(item)
-            | {
+        items: list[dict[str, Any]] = []
+        diversity: dict[str, int] = {}
+        for score, _title, item, reasons in scored:
+            diversity_key = fold_text(
+                item.get("series")
+                or item.get("album")
+                or next(iter(item.get("genres") or []), "")
+                or item.get("folder_path")
+            )
+            if diversity_key and diversity.get(diversity_key, 0) >= 2:
+                continue
+            if diversity_key:
+                diversity[diversity_key] = diversity.get(diversity_key, 0) + 1
+            items.append(
+                dict(item) | {
                 "recommendation": {
-                    "algorithm": "bounded_household_signals_v1",
+                    "algorithm": "bounded_profile_metadata_v2",
                     "score": score,
                     "reasons": reasons,
                     "uses_external_profile": False,
                 }
-            }
-            for score, _title, item, reasons in scored[:bounded]
-        ]
+                }
+            )
+            if len(items) >= bounded:
+                break
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
@@ -5387,7 +5447,7 @@ class MediaCatalogCoordinator:
             "items": items,
             "count": len(items),
             "partial": self.participation()["partial"],
-            "algorithm": "bounded_household_signals_v1",
+            "algorithm": "bounded_profile_metadata_v2",
             "privacy": {
                 "profile_scoped": True,
                 "external_provider": False,

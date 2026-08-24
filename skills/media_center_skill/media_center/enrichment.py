@@ -12,7 +12,7 @@ from typing import Any, Callable, Mapping, Protocol
 import requests
 
 from .coordinator import MediaCatalogCoordinator
-from .discovery import fold_text, text_embedding
+from .discovery import fold_text, semantic_embedding
 
 
 _log = logging.getLogger("adaos.skill.media_center.enrichment")
@@ -121,11 +121,20 @@ class DeterministicLocalProvider:
                         search_parts.extend(str(item) for item in value)
                     elif value:
                         search_parts.append(str(value))
+            vector, backend = semantic_embedding(" ".join(search_parts))
             claims.append(
                 {
                     "subject_ref": subject_ref,
-                    "field_name": "text_embedding_v1",
-                    "value": text_embedding(" ".join(search_parts)),
+                    "field_name": "semantic_embedding_v1",
+                    "value": vector,
+                    "confidence": 1.0,
+                }
+            )
+            claims.append(
+                {
+                    "subject_ref": subject_ref,
+                    "field_name": "semantic_embedding_backend",
+                    "value": backend,
                     "confidence": 1.0,
                 }
             )

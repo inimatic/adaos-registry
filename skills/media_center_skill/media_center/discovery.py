@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import os
 import re
 import unicodedata
 from collections.abc import Iterable
@@ -46,6 +47,19 @@ _CYRILLIC = str.maketrans(
         "э": "e",
         "ю": "yu",
         "я": "ya",
+    }
+)
+# Keep this source-level mapping explicit: a previous generated registry copy
+# contained mojibake keys and silently broke real Cyrillic transliteration.
+_CYRILLIC = str.maketrans(
+    {
+        "а": "a", "б": "b", "в": "v", "г": "g", "д": "d",
+        "е": "e", "ё": "e", "ж": "zh", "з": "z", "и": "i",
+        "й": "i", "к": "k", "л": "l", "м": "m", "н": "n",
+        "о": "o", "п": "p", "р": "r", "с": "s", "т": "t",
+        "у": "u", "ф": "f", "х": "h", "ц": "ts", "ч": "ch",
+        "ш": "sh", "щ": "sch", "ъ": "", "ы": "y", "ь": "",
+        "э": "e", "ю": "yu", "я": "ya",
     }
 )
 _PHONETIC_GROUPS = {
@@ -118,6 +132,35 @@ def text_embedding(value: Any, *, dimensions: int = EMBEDDING_DIMENSIONS) -> lis
     return list(_text_embedding(str(value or ""), bounded_dimensions))
 
 
+@lru_cache(maxsize=1)
+def _semantic_model() -> tuple[Any | None, str]:
+    model_name = str(os.environ.get("MEDIA_CENTER_SEMANTIC_MODEL") or "").strip()
+    if not model_name:
+        return None, "deterministic_hash_v1"
+    try:
+        from sentence_transformers import SentenceTransformer
+
+        return (
+            SentenceTransformer(model_name, local_files_only=True),
+            f"sentence_transformers:{model_name}",
+        )
+    except Exception:
+        return None, "deterministic_hash_v1"
+
+
+def semantic_embedding(value: Any) -> tuple[list[float], str]:
+    model, backend = _semantic_model()
+    if model is None:
+        return text_embedding(value), backend
+    try:
+        vector = model.encode(
+            [str(value or "")[:4096]], normalize_embeddings=True
+        )[0]
+        return [round(float(item), 7) for item in vector], backend
+    except Exception:
+        return text_embedding(value), "deterministic_hash_v1"
+
+
 def cosine_similarity(left: Iterable[Any], right: Iterable[Any]) -> float:
     try:
         left_values = [float(value) for value in left]
@@ -164,10 +207,11 @@ def discovery_score(
     trigram_overlap = len(query_trigrams & candidate_trigrams) / max(
         1, len(query_trigrams | candidate_trigrams)
     )
-    semantic = max(
-        0.0,
-        cosine_similarity(text_embedding(query_text), candidate_embedding),
-    )
+    candidate_vector = list(candidate_embedding)
+    query_vector, _backend = semantic_embedding(query_text)
+    if candidate_vector and len(query_vector) != len(candidate_vector):
+        query_vector = text_embedding(query_text, dimensions=len(candidate_vector))
+    semantic = max(0.0, cosine_similarity(query_vector, candidate_vector))
     substring = 1.0 if query_text in candidate_text else 0.0
     score = min(
         1.0,
@@ -198,5 +242,6 @@ __all__ = [
     "fold_text",
     "phonetic_code",
     "phonetic_terms",
+    "semantic_embedding",
     "text_embedding",
 ]
