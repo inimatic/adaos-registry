@@ -213,6 +213,36 @@ def test_schema_lock_never_falls_through_to_full_migration(monkeypatch, tmp_path
     assert calls == 1
 
 
+def test_repository_connect_keeps_default_sync_during_lock(monkeypatch, tmp_path) -> None:
+    statements: list[str] = []
+
+    class Connection:
+        row_factory = None
+        closed = False
+
+        def execute(self, statement, *_args):
+            statements.append(statement)
+            if statement == "PRAGMA synchronous=NORMAL":
+                raise catalog_module.sqlite3.OperationalError("database is locked")
+            return self
+
+        def close(self):
+            self.closed = True
+
+    connection = Connection()
+    monkeypatch.setattr(
+        catalog_module.sqlite3,
+        "connect",
+        lambda *_args, **_kwargs: connection,
+    )
+    repository = object.__new__(MediaCenterRepository)
+    repository.db_path = tmp_path / "media_center.sqlite3"
+
+    assert repository.connect() is connection
+    assert connection.closed is False
+    assert statements[-1] == "PRAGMA synchronous=NORMAL"
+
+
 def test_coordinator_cache_fast_path_does_not_repeat_schema_check(
     monkeypatch, tmp_path
 ) -> None:
@@ -4237,6 +4267,32 @@ def test_enrichment_start_defers_maintenance_to_worker_thread() -> None:
     assert worker.ensure_started() is True
     assert recovered.wait(1.0) is True
     release.set()
+    assert worker.dispose(timeout=2.0)["stopped"] is True
+
+
+def test_enrichment_loop_retries_transient_repository_lock() -> None:
+    retried = threading.Event()
+    calls = 0
+
+    class Coordinator:
+        def recover_stale_background_jobs(self):
+            return {"ok": True}
+
+        def claim_background_job(self):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise catalog_module.sqlite3.OperationalError("database is locked")
+            retried.set()
+            return None
+
+    worker = MediaEnrichmentWorker(Coordinator(), providers=(), poll_seconds=0.2)
+
+    assert worker.ensure_started() is True
+    assert retried.wait(2.0) is True
+    status = worker.status()
+    assert status["state"] == "running"
+    assert status["loop_failure_count"] == 1
     assert worker.dispose(timeout=2.0)["stopped"] is True
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import threading
@@ -12,6 +13,9 @@ import requests
 
 from .coordinator import MediaCatalogCoordinator
 from .discovery import text_embedding
+
+
+_log = logging.getLogger("adaos.skill.media_center.enrichment")
 
 
 class MetadataProvider(Protocol):
@@ -421,6 +425,9 @@ class MediaEnrichmentWorker:
         self._wake = threading.Event()
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
+        self._loop_failure_count = 0
+        self._last_loop_error = ""
+        self._last_loop_error_at = 0.0
 
     def ensure_started(self) -> bool:
         with self._lock:
@@ -530,7 +537,11 @@ class MediaEnrichmentWorker:
         return result
 
     def status(self) -> dict[str, Any]:
-        thread = self._thread
+        with self._lock:
+            thread = self._thread
+            loop_failure_count = self._loop_failure_count
+            last_loop_error = self._last_loop_error
+            last_loop_error_at = self._last_loop_error_at
         providers = []
         for provider in self.providers:
             status = getattr(provider, "status", None)
@@ -550,6 +561,9 @@ class MediaEnrichmentWorker:
             "poll_seconds": self.poll_seconds,
             "work_interval_seconds": self.work_interval_seconds,
             "publish_interval_seconds": self.publish_interval_seconds,
+            "loop_failure_count": loop_failure_count,
+            "last_error": last_loop_error,
+            "last_error_at": last_loop_error_at,
         }
 
     def _loop(self) -> None:
@@ -558,7 +572,25 @@ class MediaEnrichmentWorker:
         except Exception:
             pass
         while not self._stop.is_set():
-            result = self.run_once()
+            try:
+                result = self.run_once()
+            except Exception as exc:
+                with self._lock:
+                    self._loop_failure_count += 1
+                    failure_count = self._loop_failure_count
+                    self._last_loop_error = f"{type(exc).__name__}: {str(exc)[:300]}"
+                    self._last_loop_error_at = time.time()
+                if failure_count == 1 or failure_count % 30 == 0:
+                    _log.warning(
+                        "media enrichment loop retry failure_count=%s error=%s",
+                        failure_count,
+                        self._last_loop_error,
+                    )
+                self._wake.wait(min(5.0, self.poll_seconds))
+                self._wake.clear()
+                continue
+            with self._lock:
+                self._last_loop_error = ""
             if result is None:
                 if self._worked_since_idle:
                     if self.publish:

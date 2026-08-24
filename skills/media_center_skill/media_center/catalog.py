@@ -72,7 +72,12 @@ class MediaCenterRepository:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA busy_timeout=30000")
-        connection.execute("PRAGMA synchronous=NORMAL")
+        try:
+            connection.execute("PRAGMA synchronous=NORMAL")
+        except sqlite3.OperationalError as exc:
+            if not any(token in str(exc).lower() for token in ("locked", "busy")):
+                connection.close()
+                raise
         return connection
 
     def _schema_is_current(self) -> bool:
