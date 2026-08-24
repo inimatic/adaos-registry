@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import logging
 import os
 import re
 import sqlite3
@@ -33,7 +32,7 @@ COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
 COORDINATOR_SCHEMA_REVISION = "2026-08-24.2"
 SEARCH_ROWID_REVISION = "1"
 AUDIO_CONTEXT_IDENTITY_REVISION = "1"
-VIDEO_SERIES_IDENTITY_REVISION = "1"
+VIDEO_SERIES_IDENTITY_REVISION = "2"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
 WORK_SCHEMA = "adaos.media_center.media_work.v1"
 COLLECTION_SCHEMA = "adaos.media_center.media_collection.v1"
@@ -57,13 +56,6 @@ HOME_SHELF_ORDER = (
     "playlists",
     "folders",
 )
-
-
-def _bound_filename_parser_logging() -> None:
-    for name in ("guessit", "rebulk"):
-        logger = logging.getLogger(name)
-        if logger.getEffectiveLevel() < logging.WARNING:
-            logger.setLevel(logging.WARNING)
 
 
 def _default_profile_policy(kind: str = "personal") -> dict[str, Any]:
@@ -134,33 +126,27 @@ def _normalize_title(value: Any) -> str:
 
 @lru_cache(maxsize=2048)
 def _episode_filename_evidence(name: str) -> dict[str, Any]:
-    if not _SEASON_EPISODE.search(name):
+    match = _SEASON_EPISODE.search(name)
+    if not match:
         return {}
+    stem = Path(name).stem
+    stem_match = _SEASON_EPISODE.search(stem)
+    if stem_match is None:
+        return {}
+    title = re.sub(r"[._\-]+", " ", stem[: stem_match.start()]).strip()
+    title = " ".join(title.split())
     try:
-        _bound_filename_parser_logging()
-        from guessit import guessit  # type: ignore[import-not-found]
-
-        parsed = guessit(name, options={"no_user_config": True})
-    except Exception:
-        return {}
-    if _text(parsed.get("type")).lower() != "episode":
-        return {}
-    try:
-        season = int(parsed.get("season") or 0)
-        episode_value = parsed.get("episode")
-        if isinstance(episode_value, (list, tuple)):
-            episode_value = episode_value[0] if episode_value else 0
-        episode = int(episode_value or 0)
+        season = int(stem_match.group("season") or 0)
+        episode = int(stem_match.group("episode") or 0)
     except (TypeError, ValueError):
         return {}
-    title = _text(parsed.get("title"))
     if not title or season <= 0 or episode <= 0:
         return {}
     return {
         "title": title[:300],
         "season": season,
         "episode": episode,
-        "parser": "guessit-4",
+        "parser": "sxe-basename-v1",
     }
 
 
@@ -1112,27 +1098,26 @@ class MediaCatalogCoordinator:
             )
             collection_id = collection_ids[-1] if collection_ids else ""
             variant_id = str(row["variant_id"])
-            if (
+            classification_changed = not (
                 str(row["work_id"]) == work_id
                 and str(row["collection_id"]) == collection_id
-            ):
-                continue
-            connection.execute(
-                """
-                UPDATE media_variants SET work_id=?,revision=revision+1
-                WHERE node_id=? AND (source_id=? OR exact_source_id=?)
-                """,
-                (
-                    work_id,
-                    str(row["node_id"]),
-                    str(row["source_id"]),
-                    str(row["source_id"]),
-                ),
             )
+            if classification_changed:
+                connection.execute(
+                    """
+                    UPDATE media_variants SET work_id=?,revision=revision+1
+                    WHERE node_id=? AND (source_id=? OR exact_source_id=?)
+                    """,
+                    (
+                        work_id,
+                        str(row["node_id"]),
+                        str(row["source_id"]),
+                        str(row["source_id"]),
+                    ),
+                )
             connection.execute(
-                "DELETE FROM collection_memberships "
-                "WHERE work_id=? AND variant_id=?",
-                (str(row["work_id"]), variant_id),
+                "DELETE FROM collection_memberships WHERE variant_id=?",
+                (variant_id,),
             )
             for membership_collection_id in collection_ids:
                 connection.execute(
@@ -1155,11 +1140,12 @@ class MediaCatalogCoordinator:
                         membership.get("chapter_number"),
                     ),
                 )
-            connection.execute(
-                "UPDATE catalog_items SET work_id=?,collection_id=? WHERE id=?",
-                (work_id, collection_id, str(row["id"])),
-            )
-            repaired += 1
+            if classification_changed:
+                connection.execute(
+                    "UPDATE catalog_items SET work_id=?,collection_id=? WHERE id=?",
+                    (work_id, collection_id, str(row["id"])),
+                )
+                repaired += 1
         removed_collections = 0
         for _depth in range(8):
             removed = connection.execute(
@@ -1794,6 +1780,10 @@ class MediaCatalogCoordinator:
                     int(derived.get("exact_source_revision") or 0),
                 ),
             )
+        connection.execute(
+            "DELETE FROM collection_memberships WHERE variant_id=?",
+            (variant_id,),
+        )
         for membership_collection_id in collection_ids:
             connection.execute(
                 """

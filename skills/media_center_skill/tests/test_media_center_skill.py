@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextvars
 import json
-import logging
 import sqlite3
 import sys
 import threading
@@ -952,6 +951,50 @@ def test_collection_uses_a_ready_member_artwork_when_first_episode_has_none(
     assert collection["artwork"]["url"] == "/media/show-episode-2.jpg"
 
 
+def test_artwork_revision_preserves_series_identity_and_replaces_membership(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "series-artwork-revision.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    first = _agent_delta(
+        1,
+        "Black.Mirror.S07.1080p/Black.Mirror.S07E01.Common.People.mkv",
+        kind="video",
+    )
+    second = _agent_delta(
+        2,
+        "Black.Mirror.S07.1080p/Black.Mirror.S07E02.Bete.Noire.mkv",
+        kind="video",
+    )
+    catalog.apply_agent_page(_agent_page(first, second))
+    before = catalog.collections(kind="series")["items"][0]
+    updated = json.loads(json.dumps(first))
+    updated.update({"id": "delta-3-2", "sequence": 3, "source_revision": 2})
+    updated["source"].update({"revision": 2})
+    updated["source"]["metadata"]["artwork"] = {
+        "schema": "adaos.media.artwork.v1",
+        "state": "ready",
+        "provider_id": "media_library_agent.video_frame.v1",
+        "source_kind": "generated_frame",
+        "exact_source_revision": 1,
+        "exact_source_fingerprint": "fingerprint-1-1",
+        "width": 720,
+        "height": 405,
+        "descriptor": {"browser_path": "/media/black-mirror.jpg"},
+    }
+
+    catalog.apply_agent_page(_agent_page(updated))
+
+    series = catalog.collections(kind="series")["items"]
+    assert len(series) == 1
+    assert series[0]["id"] == before["id"]
+    assert series[0]["title"] == "Black Mirror"
+    assert series[0]["item_count"] == 2
+    assert series[0]["artwork"]["url"] == "/media/black-mirror.jpg"
+
+
 def test_filename_evidence_groups_inconsistently_named_season_folders(
     monkeypatch, tmp_path
 ):
@@ -985,11 +1028,7 @@ def test_filename_evidence_groups_inconsistently_named_season_folders(
     }
 
 
-def test_filename_parser_bounds_dependency_debug_logging(monkeypatch):
-    logger = logging.getLogger("rebulk")
-    root_logger = logging.getLogger()
-    monkeypatch.setattr(logger, "level", logging.NOTSET)
-    monkeypatch.setattr(root_logger, "level", logging.DEBUG)
+def test_filename_parser_is_deterministic_without_optional_dependencies():
     coordinator_module.clear_filename_evidence_cache()
 
     evidence = coordinator_module._episode_filename_evidence(
@@ -997,7 +1036,9 @@ def test_filename_parser_bounds_dependency_debug_logging(monkeypatch):
     )
 
     assert evidence["title"] == "Black Mirror"
-    assert logger.level == logging.WARNING
+    assert evidence["season"] == 7
+    assert evidence["episode"] == 1
+    assert evidence["parser"] == "sxe-basename-v1"
 
 
 def test_schema_migration_repairs_legacy_folder_scoped_series_identity(

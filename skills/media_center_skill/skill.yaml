@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.54
+version: 0.8.55
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -35,7 +35,6 @@ capabilities:
 - distributed.service.invoke
 - distributed.replica.observe
 dependencies:
-- guessit>=4.1.0,<5
 - requests>=2.31.0
 events:
   subscribe:
@@ -2043,4 +2042,3 @@ compatibility:
     min_commit: 60ba2e20101127f458457d9c30eb6a91f6249556
     min_short_commit: 60ba2e20
     build_date: '2026-08-24T15:15:48+03:00'
-
