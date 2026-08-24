@@ -6,6 +6,11 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.69` makes collection totals reflect available logical works. It
+ships `media_center_skill@0.8.60` and keeps the remaining `0.6.68` component
+set. Offline compatibility-agent records and multiple playable renditions stay
+durable, but no longer duplicate series, season, or album counts in the UI.
+
 Release `0.6.68` makes large-catalog identity reads sequential. It ships
 `media_center_skill@0.8.59` and keeps the remaining `0.6.67` component set.
 Repair scans explicitly avoid the selective media-kind index and unnecessary
