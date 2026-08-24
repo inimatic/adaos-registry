@@ -741,6 +741,28 @@ def test_coordinator_builds_typed_collections_and_bounded_cursor_pages(monkeypat
     assert collections["items"][0]["item_count"] == 35
     assert all(item["work_id"] and item["variant_id"] and item["collection_id"] for item in first["items"])
 
+    series = collections["items"][0]
+    contents = catalog.collection_contents(series["id"], limit=30)
+    continued = catalog.collection_contents(
+        series["id"], limit=30, cursor=contents["pagination"]["next_cursor"]
+    )
+
+    assert contents["collection"]["id"] == series["id"]
+    assert contents["count"] == 30
+    assert contents["pagination"]["has_more"] is True
+    assert continued["count"] == 5
+    assert contents["children"][0]["kind"] == "season"
+    assert contents["breadcrumbs"] == [
+        {
+            "id": series["id"],
+            "title": "Series Name",
+            "kind": "series",
+        }
+    ]
+    assert {item["id"] for item in contents["items"]}.isdisjoint(
+        {item["id"] for item in continued["items"]}
+    )
+
 
 def test_personal_state_is_profile_scoped_and_revisioned(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))

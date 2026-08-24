@@ -2495,6 +2495,31 @@ def list_collections(kind: str = "", limit: int = 30, cursor: str = "", **_: Any
         return _skill_error("invalid_media_catalog_cursor", message="The collection page changed. Refresh the list.")
 
 
+@tool(
+    summary="Browse one collection, its child collections, and a bounded item page.",
+    side_effects="none",
+)
+def collection_contents(
+    collection_id: str = "",
+    profile_id: str = "default",
+    limit: int = 30,
+    cursor: str = "",
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _coordinator().collection_contents(
+            collection_id,
+            profile_id=profile_id,
+            limit=limit,
+            cursor=cursor,
+        )
+    except ValueError:
+        return _skill_error(
+            "invalid_media_catalog_cursor",
+            message="The collection page changed. Refresh the list.",
+        )
+
+
 @tool(summary="Browse bounded catalog folders through an opaque cursor.", side_effects="none")
 def browse_folders(
     agent_id: str = "",

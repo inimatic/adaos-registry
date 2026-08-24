@@ -45,6 +45,7 @@
       "inputs": {
         "variant": "toolbar",
         "size": "small",
+        "stretch": true,
         "buttons": [
           {
             "id": "open",
@@ -63,19 +64,11 @@
             }
           },
           {
-            "id": "play",
-            "icon": "play-outline",
-            "label": "Play",
+            "id": "toggle",
+            "icon": "play-circle-outline",
+            "label": "Play / Pause",
             "label_i18n": {
-              "key": "runtime.media_control.ui.play"
-            }
-          },
-          {
-            "id": "pause",
-            "icon": "pause-outline",
-            "label": "Pause",
-            "label_i18n": {
-              "key": "runtime.media_control.ui.pause"
+              "key": "runtime.media_control.ui.play_pause"
             }
           },
           {
@@ -84,6 +77,14 @@
             "label": "Next",
             "label_i18n": {
               "key": "runtime.media_control.ui.next"
+            }
+          },
+          {
+            "id": "stop",
+            "icon": "stop-outline",
+            "label": "Stop",
+            "label_i18n": {
+              "key": "runtime.media_control.ui.stop"
             }
           }
         ]
@@ -111,23 +112,11 @@
           ]
         },
         {
-          "on": "click:play",
+          "on": "click:toggle",
           "type": "callSkill",
           "target": "media_control_skill.voice_command",
           "params": {
-            "action": "play",
-            "profile_id": "default"
-          },
-          "invalidates": [
-            "media_control.sessions"
-          ]
-        },
-        {
-          "on": "click:pause",
-          "type": "callSkill",
-          "target": "media_control_skill.voice_command",
-          "params": {
-            "action": "pause",
+            "action": "toggle",
             "profile_id": "default"
           },
           "invalidates": [
@@ -140,6 +129,18 @@
           "target": "media_control_skill.voice_command",
           "params": {
             "action": "next",
+            "profile_id": "default"
+          },
+          "invalidates": [
+            "media_control.sessions"
+          ]
+        },
+        {
+          "on": "click:stop",
+          "type": "callSkill",
+          "target": "media_control_skill.voice_command",
+          "params": {
+            "action": "stop",
             "profile_id": "default"
           },
           "invalidates": [
@@ -256,6 +257,7 @@
               "inputs": {
                 "variant": "toolbar",
                 "size": "small",
+                "stretch": true,
                 "buttons": [
                   {
                     "id": "previous",
@@ -266,19 +268,11 @@
                     }
                   },
                   {
-                    "id": "play",
-                    "icon": "play-outline",
-                    "label": "Play",
+                    "id": "toggle",
+                    "icon": "play-circle-outline",
+                    "label": "Play / Pause",
                     "label_i18n": {
-                      "key": "runtime.media_control.ui.play"
-                    }
-                  },
-                  {
-                    "id": "pause",
-                    "icon": "pause-outline",
-                    "label": "Pause",
-                    "label_i18n": {
-                      "key": "runtime.media_control.ui.pause"
+                      "key": "runtime.media_control.ui.play_pause"
                     }
                   },
                   {
@@ -314,24 +308,11 @@
                   ]
                 },
                 {
-                  "on": "click:play",
+                  "on": "click:toggle",
                   "type": "callSkill",
                   "target": "media_control_skill.voice_command",
                   "params": {
-                    "action": "play",
-                    "profile_id": "default",
-                    "target_id": "$state.mediaControlTargetId"
-                  },
-                  "invalidates": [
-                    "media_control.sessions"
-                  ]
-                },
-                {
-                  "on": "click:pause",
-                  "type": "callSkill",
-                  "target": "media_control_skill.voice_command",
-                  "params": {
-                    "action": "pause",
+                    "action": "toggle",
                     "profile_id": "default",
                     "target_id": "$state.mediaControlTargetId"
                   },

@@ -15,5 +15,6 @@
   "runtime.media_control.ui.play": "Play",
   "runtime.media_control.ui.pause": "Pause",
   "runtime.media_control.ui.next": "Next",
-  "runtime.media_control.ui.stop": "Stop"
+  "runtime.media_control.ui.stop": "Stop",
+  "runtime.media_control.ui.play_pause": "Play / Pause"
 }

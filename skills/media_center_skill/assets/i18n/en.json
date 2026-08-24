@@ -121,5 +121,12 @@
   "runtime.media_center.ui.nothing_is_playing_on_this_device": "Nothing is playing on this device.",
   "runtime.media_center.ui.metadata_activity": "Metadata activity",
   "runtime.media_center.ui.background_operations": "Background operations",
-  "runtime.media_center.ui.artwork_generation": "Artwork generation"
+  "runtime.media_center.ui.artwork_generation": "Artwork generation",
+  "runtime.media_center.ui.collection": "Collection",
+  "runtime.media_center.ui.all_collections": "All collections",
+  "runtime.media_center.ui.play_all": "Play all",
+  "runtime.media_center.ui.seasons_and_parts": "Seasons and parts",
+  "runtime.media_center.ui.collection_items": "Collection items",
+  "runtime.media_center.ui.no_playable_items_in_this_collection": "No playable items in this collection.",
+  "runtime.media_center.ui.play_pause": "Play / Pause"
 }

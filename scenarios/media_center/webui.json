@@ -18,6 +18,8 @@
             "mediaDisplay": "rail",
             "mediaKind": "playable",
             "mediaCollectionKind": "",
+            "mediaCollectionId": "",
+            "mediaCollectionTitle": "",
             "mediaSearch": "",
             "mediaCursor": "",
             "mediaPageSize": 30,
@@ -424,6 +426,8 @@
                     "mediaSection": "$event.mediaSection",
                     "mediaKind": "$event.mediaKind",
                     "mediaCollectionKind": "$event.mediaCollectionKind",
+                    "mediaCollectionId": "",
+                    "mediaCollectionTitle": "",
                     "mediaFavoritesOnly": "$event.mediaFavoritesOnly",
                     "mediaSort": "$event.mediaSort",
                     "mediaFolderParent": "",
@@ -532,6 +536,7 @@
               "visibleIf": "$state.surfaceProfile == 'mobile_control'",
               "inputs": {
                 "variant": "toolbar",
+                "stretch": true,
                 "buttons": [
                   {
                     "id": "previous",
@@ -542,19 +547,11 @@
                     }
                   },
                   {
-                    "id": "play",
-                    "icon": "play-outline",
-                    "label": "Play",
+                    "id": "toggle",
+                    "icon": "play-circle-outline",
+                    "label": "Play / Pause",
                     "label_i18n": {
-                      "key": "runtime.media_center.ui.play"
-                    }
-                  },
-                  {
-                    "id": "pause",
-                    "icon": "pause-outline",
-                    "label": "Pause",
-                    "label_i18n": {
-                      "key": "runtime.media_center.ui.pause"
+                      "key": "runtime.media_center.ui.play_pause"
                     }
                   },
                   {
@@ -590,24 +587,11 @@
                   ]
                 },
                 {
-                  "on": "click:play",
+                  "on": "click:toggle",
                   "type": "callSkill",
                   "target": "media_control_skill.voice_command",
                   "params": {
-                    "action": "play",
-                    "profile_id": "$state.profileId",
-                    "target_id": "$state.selectedPlaybackTargetId"
-                  },
-                  "invalidates": [
-                    "media_control.sessions"
-                  ]
-                },
-                {
-                  "on": "click:pause",
-                  "type": "callSkill",
-                  "target": "media_control_skill.voice_command",
-                  "params": {
-                    "action": "pause",
+                    "action": "toggle",
                     "profile_id": "$state.profileId",
                     "target_id": "$state.selectedPlaybackTargetId"
                   },
@@ -839,17 +823,14 @@
                 "on": "select:collection",
                 "type": "updateState",
                 "params": {
+                  "mediaSection": "collection",
+                  "mediaCollectionId": "$event.queue_source_id",
+                  "mediaCollectionTitle": "$event.title",
+                  "mediaCursor": "",
                   "playbackSourceType": "$event.queue_source_type",
                   "playbackSourceId": "$event.queue_source_id",
                   "selectedMediaItemId": "$event.id",
                   "selectedMediaFavorite": "$event.favorite"
-                }
-              },
-              {
-                "on": "select:collection",
-                "type": "openModal",
-                "params": {
-                  "modalId": "media_center_player"
                 }
               },
               {
@@ -988,10 +969,233 @@
                   "on": "select",
                   "type": "updateState",
                   "params": {
+                    "mediaSection": "collection",
+                    "mediaCollectionId": "$event.id",
+                    "mediaCollectionTitle": "$event.title",
+                    "mediaCursor": "",
                     "playbackSourceType": "collection",
                     "playbackSourceId": "$event.id",
                     "selectedMediaItemId": null,
                     "selectedMediaFavorite": false
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_center.ui.collections"
+              }
+            },
+            {
+              "id": "media-collection-toolbar",
+              "type": "ui.actions",
+              "area": "main",
+              "title": "Collection",
+              "visibleIf": "$state.mediaSection == 'collection'",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "back",
+                    "label": "All collections",
+                    "icon": "arrow-back-outline",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.all_collections"
+                    }
+                  },
+                  {
+                    "id": "play-all",
+                    "label": "Play all",
+                    "icon": "play-outline",
+                    "kind": "primary",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.play_all"
+                    }
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:back",
+                  "type": "updateState",
+                  "params": {
+                    "mediaSection": "collections",
+                    "mediaCollectionId": "",
+                    "mediaCollectionTitle": "",
+                    "mediaCursor": ""
+                  }
+                },
+                {
+                  "on": "click:play-all",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "media_center_player"
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_center.ui.collection"
+              }
+            },
+            {
+              "id": "media-collection-breadcrumbs",
+              "type": "ui.list",
+              "area": "main",
+              "visibleIf": "$state.mediaSection == 'collection'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "media_center_skill.collection_contents",
+                "params": {
+                  "collection_id": "$state.mediaCollectionId",
+                  "profile_id": "$state.profileId",
+                  "limit": "$state.mediaPageSize",
+                  "cursor": "$state.mediaCursor"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "media_center.catalog"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 2
+              },
+              "collection": {
+                "display": "rail",
+                "focusGroup": "media-collection-breadcrumbs",
+                "virtualized": false,
+                "cursor": {
+                  "enabled": false,
+                  "stateKey": "mediaCursor"
+                }
+              },
+              "inputs": {
+                "collectionKey": "breadcrumbs",
+                "titleKey": "title",
+                "hideTitle": true,
+                "cardMinWidth": 120,
+                "emptyText": ""
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "mediaCollectionId": "$event.id",
+                    "mediaCollectionTitle": "$event.title",
+                    "playbackSourceType": "collection",
+                    "playbackSourceId": "$event.id",
+                    "mediaCursor": ""
+                  }
+                }
+              ]
+            },
+            {
+              "id": "media-collection-children",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Seasons and parts",
+              "visibleIf": "$state.mediaSection == 'collection'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "media_center_skill.collection_contents",
+                "params": {
+                  "collection_id": "$state.mediaCollectionId",
+                  "profile_id": "$state.profileId",
+                  "limit": "$state.mediaPageSize",
+                  "cursor": "$state.mediaCursor"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "media_center.catalog"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 2
+              },
+              "collection": {
+                "display": "cards",
+                "displayModeStateKey": "mediaDisplay",
+                "focusGroup": "media-collection-children",
+                "virtualized": true,
+                "cursor": {
+                  "enabled": false,
+                  "stateKey": "mediaCursor"
+                }
+              },
+              "inputs": {
+                "collectionKey": "children",
+                "titleKey": "title",
+                "subtitleKey": "kind",
+                "badgeKey": "item_count",
+                "imageKey": "artwork.url",
+                "emptyText": ""
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "mediaCollectionId": "$event.id",
+                    "mediaCollectionTitle": "$event.title",
+                    "playbackSourceType": "collection",
+                    "playbackSourceId": "$event.id",
+                    "mediaCursor": ""
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_center.ui.seasons_and_parts"
+              }
+            },
+            {
+              "id": "media-collection-items",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Collection items",
+              "visibleIf": "$state.mediaSection == 'collection'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "media_center_skill.collection_contents",
+                "params": {
+                  "collection_id": "$state.mediaCollectionId",
+                  "profile_id": "$state.profileId",
+                  "limit": "$state.mediaPageSize",
+                  "cursor": "$state.mediaCursor"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "media_center.catalog"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 2
+              },
+              "collection": {
+                "display": "cards",
+                "displayModeStateKey": "mediaDisplay",
+                "focusGroup": "media-collection-items",
+                "virtualized": true,
+                "cursor": {
+                  "enabled": true,
+                  "stateKey": "mediaCursor"
+                }
+              },
+              "inputs": {
+                "collectionKey": "items",
+                "titleKey": "title",
+                "subtitleKey": "folder_path",
+                "badgeKey": "media_kind",
+                "imageKey": "artwork.url",
+                "emptyText": "No playable items in this collection.",
+                "emptyText_i18n": {
+                  "key": "runtime.media_center.ui.no_playable_items_in_this_collection"
+                }
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "playbackSourceType": "item",
+                    "playbackSourceId": "$event.id",
+                    "selectedMediaItemId": "$event.id",
+                    "selectedMediaFavorite": "$event.favorite"
                   }
                 },
                 {
@@ -1003,7 +1207,7 @@
                 }
               ],
               "title_i18n": {
-                "key": "runtime.media_center.ui.collections"
+                "key": "runtime.media_center.ui.collection_items"
               }
             },
             {
@@ -1487,6 +1691,7 @@
                 "title": "Transport",
                 "inputs": {
                   "variant": "toolbar",
+                  "stretch": true,
                   "buttons": [
                     {
                       "id": "previous",
@@ -1497,19 +1702,11 @@
                       }
                     },
                     {
-                      "id": "play",
-                      "icon": "play-outline",
-                      "label": "Play",
+                      "id": "toggle",
+                      "icon": "play-circle-outline",
+                      "label": "Play / Pause",
                       "label_i18n": {
-                        "key": "runtime.media_center.ui.play"
-                      }
-                    },
-                    {
-                      "id": "pause",
-                      "icon": "pause-outline",
-                      "label": "Pause",
-                      "label_i18n": {
-                        "key": "runtime.media_center.ui.pause"
+                        "key": "runtime.media_center.ui.play_pause"
                       }
                     },
                     {
@@ -1545,24 +1742,11 @@
                     ]
                   },
                   {
-                    "on": "click:play",
+                    "on": "click:toggle",
                     "type": "callSkill",
                     "target": "media_control_skill.voice_command",
                     "params": {
-                      "action": "play",
-                      "profile_id": "$state.profileId",
-                      "target_id": "$state.selectedPlaybackTargetId"
-                    },
-                    "invalidates": [
-                      "media_control.sessions"
-                    ]
-                  },
-                  {
-                    "on": "click:pause",
-                    "type": "callSkill",
-                    "target": "media_control_skill.voice_command",
-                    "params": {
-                      "action": "pause",
+                      "action": "toggle",
                       "profile_id": "$state.profileId",
                       "target_id": "$state.selectedPlaybackTargetId"
                     },
@@ -1600,29 +1784,6 @@
                 "title_i18n": {
                   "key": "runtime.media_center.ui.transport"
                 }
-              },
-              {
-                "id": "media-remote-close",
-                "type": "ui.actions",
-                "area": "main",
-                "inputs": {
-                  "buttons": [
-                    {
-                      "id": "close",
-                      "label": "Close",
-                      "icon": "close-outline",
-                      "label_i18n": {
-                        "key": "runtime.media_center.ui.close"
-                      }
-                    }
-                  ]
-                },
-                "actions": [
-                  {
-                    "on": "click:close",
-                    "type": "closeModal"
-                  }
-                ]
               }
             ],
             "title_i18n": {

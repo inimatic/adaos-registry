@@ -265,6 +265,27 @@ def test_voice_control_requires_clarification_for_multiple_sessions():
     assert len(result["clarification"]["options"]) == 2
 
 
+def test_voice_toggle_resolves_to_revisioned_play_and_pause_commands():
+    repository = MediaControlRepository()
+    session = _session(repository)
+
+    played = main.voice_command(
+        action="toggle",
+        session_id=session["id"],
+        actor_ref="profile:alice",
+    )
+    paused = main.voice_command(
+        action="toggle",
+        session_id=session["id"],
+        actor_ref="profile:alice",
+    )
+
+    assert played["command"]["command"] == "play"
+    assert played["session"]["state"] == "playing"
+    assert paused["command"]["command"] == "pause"
+    assert paused["session"]["state"] == "paused"
+
+
 def test_public_playback_contracts_validate_strictly():
     jsonschema = pytest.importorskip("jsonschema")
     repository = MediaControlRepository()
@@ -526,6 +547,21 @@ def test_media_remote_surfaces_are_owned_by_media_control_skill():
     assert widgets["media-control-transport"]["actions"][1]["target"] == (
         "media_control_skill.voice_command"
     )
+    assert [
+        button["id"]
+        for button in widgets["media-control-transport"]["inputs"]["buttons"]
+    ] == ["previous", "toggle", "next", "stop"]
+    assert widgets["media-control-transport"]["actions"][1]["params"]["action"] == (
+        "toggle"
+    )
+    compact = webui["widgets"][0]
+    assert [button["id"] for button in compact["inputs"]["buttons"]] == [
+        "open",
+        "previous",
+        "toggle",
+        "next",
+        "stop",
+    ]
 
 
 def test_media_control_runtime_uses_only_public_adaos_sdk() -> None:

@@ -7,8 +7,11 @@ Controllers may live in a different webspace from the playback target. Commands 
 The skill owns its controller surfaces as well as the control-plane methods. Its
 Web UI contribution installs a Media Remote desktop app and a compact transport
 widget. The modal combines one playback-device selector, one bounded Now
-Playing projection, and one transport row. Media Center can consume the same
-methods and stream without owning or duplicating the desktop contribution.
+Playing projection, and one transport row. The single Play/Pause intent is
+resolved against the current revision into an ordinary `play` or `pause`
+command, so endpoints receive no ambiguous transport operation. Media Center
+can consume the same methods and stream without owning or duplicating the
+desktop contribution.
 
 `open_endpoint_session()` is the endpoint admission boundary used by the app shell. It registers the browser/TV identity and creates the new queue session in one tool call while atomically retiring any older active session for that target. Command pulls can be scoped to the exact session, so a restarted endpoint never replays historical commands from a prior playback run.
 

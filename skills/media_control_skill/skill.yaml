@@ -1,5 +1,5 @@
 name: media_control_skill
-version: 0.2.5
+version: 0.2.6
 description: Persistent Media Center control plane for playback targets, sessions,
   queues, commands, checkpoints, and settings.
 supported_locales:
@@ -255,6 +255,7 @@ tools:
         enum:
         - play
         - pause
+        - toggle
         - seek
         - volume
         - mute
@@ -727,4 +728,3 @@ compatibility:
     min_commit: ca7e03694fbc2008747f5f1e73489d33d8ee99ab
     min_short_commit: ca7e0369
     build_date: '2026-08-23T14:20:05+03:00'
-

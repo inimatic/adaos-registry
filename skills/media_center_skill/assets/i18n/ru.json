@@ -121,5 +121,12 @@
   "runtime.media_center.ui.nothing_is_playing_on_this_device": "На этом устройстве ничего не воспроизводится.",
   "runtime.media_center.ui.metadata_activity": "Обработка метаданных",
   "runtime.media_center.ui.background_operations": "Фоновые операции",
-  "runtime.media_center.ui.artwork_generation": "Создание обложек"
+  "runtime.media_center.ui.artwork_generation": "Создание обложек",
+  "runtime.media_center.ui.collection": "Коллекция",
+  "runtime.media_center.ui.all_collections": "Все коллекции",
+  "runtime.media_center.ui.play_all": "Воспроизвести все",
+  "runtime.media_center.ui.seasons_and_parts": "Сезоны и части",
+  "runtime.media_center.ui.collection_items": "Содержимое коллекции",
+  "runtime.media_center.ui.no_playable_items_in_this_collection": "В этой коллекции нет доступных для воспроизведения элементов.",
+  "runtime.media_center.ui.play_pause": "Воспроизведение / пауза"
 }

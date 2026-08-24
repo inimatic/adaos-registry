@@ -76,6 +76,10 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
         "media-home",
         "media-catalog",
         "media-collections",
+        "media-collection-toolbar",
+        "media-collection-breadcrumbs",
+        "media-collection-children",
+        "media-collection-items",
         "media-folder-breadcrumbs",
         "media-folders",
         "media-playlists",
@@ -153,7 +157,10 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
         action["on"]
         for action in widgets["media-home"]["actions"]
         if action["type"] == "openModal"
-    } == {"select:item", "select:collection", "select:playlist"}
+    } == {"select:item", "select:playlist"}
+    assert home_actions["select:collection"]["params"]["mediaSection"] == (
+        "collection"
+    )
     assert widgets["media-home"]["inputs"]["loadingStatusKey"] == "state"
     empty_text_by_state = widgets["media-home"]["inputs"]["emptyTextByState"]
     assert {
@@ -195,7 +202,48 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     assert widgets["media-mobile-targets"]["dataSource"]["name"] == (
         "media_control_skill.list_targets"
     )
-    assert len(widgets["media-mobile-transport"]["actions"]) == 5
+    assert [
+        button["id"]
+        for button in widgets["media-mobile-transport"]["inputs"]["buttons"]
+    ] == ["previous", "toggle", "next", "stop"]
+    assert widgets["media-mobile-transport"]["actions"][1]["params"]["action"] == (
+        "toggle"
+    )
+
+    collection_widgets = {
+        widget_id: widgets[widget_id]
+        for widget_id in (
+            "media-collection-toolbar",
+            "media-collection-breadcrumbs",
+            "media-collection-children",
+            "media-collection-items",
+        )
+    }
+    assert all(
+        widget["visibleIf"] == "$state.mediaSection == 'collection'"
+        for widget in collection_widgets.values()
+    )
+    for widget_id in (
+        "media-collection-breadcrumbs",
+        "media-collection-children",
+        "media-collection-items",
+    ):
+        source = collection_widgets[widget_id]["dataSource"]
+        assert source["name"] == "media_center_skill.collection_contents"
+        assert source["params"]["limit"] == "$state.mediaPageSize"
+        assert source["params"]["cursor"] == "$state.mediaCursor"
+    assert collection_widgets["media-collection-items"]["collection"] == {
+        "display": "cards",
+        "displayModeStateKey": "mediaDisplay",
+        "focusGroup": "media-collection-items",
+        "virtualized": True,
+        "cursor": {"enabled": True, "stateKey": "mediaCursor"},
+    }
+    assert [
+        action["type"]
+        for action in collection_widgets["media-collection-items"]["actions"]
+        if action["on"] == "select"
+    ] == ["updateState", "openModal"]
 
 
 def test_media_center_human_text_is_localized_by_skill_owned_dictionaries() -> None:
@@ -371,6 +419,11 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     assert remote["media-now-playing"]["dataSource"]["receiver"] == "media_control.now_playing"
     assert remote["media-now-playing"]["inputs"]["titleKey"] == "title"
     assert remote["media-remote-transport"]["actions"][1]["target"] == "media_control_skill.voice_command"
+    assert [
+        button["id"]
+        for button in remote["media-remote-transport"]["inputs"]["buttons"]
+    ] == ["previous", "toggle", "next", "stop"]
+    assert "media-remote-close" not in remote
 
 
 def test_media_center_skill_data_source_params_use_supported_scalar_state_refs() -> None:

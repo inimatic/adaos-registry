@@ -15,6 +15,7 @@ from .catalog import (
     _json_dumps,
     _json_loads,
     _media_kind,
+    _public_artwork,
     _public_content_path,
     _public_direct_url,
     _public_item,
@@ -2381,7 +2382,11 @@ class MediaCatalogCoordinator:
             filters.append("c.source=?")
             params.append(_text(source))
         if _text(collection_id):
-            filters.append("c.collection_id=?")
+            filters.append(
+                "EXISTS (SELECT 1 FROM collection_memberships cm "
+                "WHERE cm.collection_id=? AND cm.work_id=c.work_id "
+                "AND cm.variant_id=c.variant_id)"
+            )
             params.append(_text(collection_id))
         fts_query = ""
         if query_token:
@@ -2864,17 +2869,130 @@ class MediaCatalogCoordinator:
             total = int(connection.execute(f"SELECT COUNT(*) FROM media_collections c {where}", tuple(params)).fetchone()[0])
             rows = connection.execute(
                 f"""
-                SELECT c.*, COUNT(m.work_id) AS item_count
+                SELECT c.*, COUNT(m.work_id) AS item_count,
+                    (
+                        SELECT ci.metadata_json
+                        FROM collection_memberships preview_membership
+                        JOIN catalog_items ci
+                            ON ci.work_id=preview_membership.work_id
+                            AND ci.variant_id=preview_membership.variant_id
+                        WHERE preview_membership.collection_id=c.id
+                            AND ci.missing=0
+                        ORDER BY preview_membership.season_number,
+                            preview_membership.episode_number,
+                            preview_membership.ordinal,ci.id LIMIT 1
+                    ) AS representative_metadata_json
                 FROM media_collections c LEFT JOIN collection_memberships m ON m.collection_id=c.id
                 {where} GROUP BY c.id ORDER BY lower(c.title), c.id LIMIT ? OFFSET ?
                 """,
                 (*params, bounded, offset),
             ).fetchall()
-        items = [dict(row) | {"schema": COLLECTION_SCHEMA, "item_count": int(row["item_count"])} for row in rows]
+        items = [self._public_collection(row) for row in rows]
         next_offset = offset + len(items)
         return {
             "ok": True, "schema": COORDINATOR_SCHEMA, "items": items, "total_count": total,
             "pagination": {"limit": bounded, "cursor": _encode_cursor(offset, signature), "next_cursor": _encode_cursor(next_offset, signature) if next_offset < total else None, "has_more": next_offset < total},
+        }
+
+    @staticmethod
+    def _public_collection(row: sqlite3.Row) -> dict[str, Any]:
+        value = dict(row)
+        metadata = _json_loads(value.pop("representative_metadata_json", ""))
+        return value | {
+            "schema": COLLECTION_SCHEMA,
+            "item_count": int(row["item_count"]),
+            "artwork": _public_artwork(
+                metadata if isinstance(metadata, Mapping) else {}
+            ),
+        }
+
+    def collection_contents(
+        self,
+        collection_id: str,
+        *,
+        profile_id: str = "default",
+        limit: int = 30,
+        cursor: str = "",
+    ) -> dict[str, Any]:
+        token = _text(collection_id)
+        if not token:
+            return {"ok": False, "error": "collection_id_required"}
+        with self.repository.connect() as connection:
+            collection = connection.execute(
+                "SELECT * FROM media_collections WHERE id=?", (token,)
+            ).fetchone()
+            if collection is None:
+                return {
+                    "ok": False,
+                    "error": "collection_not_found",
+                    "collection_id": token,
+                }
+            child_rows = connection.execute(
+                """
+                SELECT c.*,COUNT(m.work_id) AS item_count,
+                    (
+                        SELECT ci.metadata_json
+                        FROM collection_memberships preview_membership
+                        JOIN catalog_items ci
+                            ON ci.work_id=preview_membership.work_id
+                            AND ci.variant_id=preview_membership.variant_id
+                        WHERE preview_membership.collection_id=c.id
+                            AND ci.missing=0
+                        ORDER BY preview_membership.season_number,
+                            preview_membership.episode_number,
+                            preview_membership.ordinal,ci.id LIMIT 1
+                    ) AS representative_metadata_json
+                FROM media_collections c
+                LEFT JOIN collection_memberships m ON m.collection_id=c.id
+                WHERE c.parent_id=?
+                GROUP BY c.id ORDER BY lower(c.title),c.id LIMIT 30
+                """,
+                (token,),
+            ).fetchall()
+            breadcrumbs: list[dict[str, Any]] = []
+            current = collection
+            for _depth in range(8):
+                breadcrumbs.append(
+                    {
+                        "id": str(current["id"]),
+                        "title": str(current["title"]),
+                        "kind": str(current["kind"]),
+                    }
+                )
+                parent_id = str(current["parent_id"] or "")
+                if not parent_id:
+                    break
+                parent = connection.execute(
+                    "SELECT * FROM media_collections WHERE id=?", (parent_id,)
+                ).fetchone()
+                if parent is None:
+                    break
+                current = parent
+        page = self.list_items(
+            media_kind="playable",
+            profile_id=profile_id,
+            collection_id=token,
+            limit=limit,
+            cursor=cursor,
+            sort="title",
+        )
+        children = [self._public_collection(row) for row in child_rows]
+        collection_value = dict(collection) | {
+            "schema": COLLECTION_SCHEMA,
+            "item_count": page["total_count_lower_bound"],
+            "artwork": (
+                children[0]["artwork"]
+                if children
+                else (page["items"][0]["artwork"] if page["items"] else _public_artwork({}))
+            ),
+        }
+        return {
+            **page,
+            "schema": COORDINATOR_SCHEMA,
+            "collection": collection_value,
+            "breadcrumbs": list(reversed(breadcrumbs)),
+            "children": children,
+            "child_count": len(children),
         }
 
     def folders(

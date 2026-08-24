@@ -8,7 +8,8 @@
     "kind": {"enum": ["series", "season", "album", "audiobook", "folder", "playlist"]}, "title": {"type": "string"},
     "parent_id": {"type": "string"}, "ownership": {"enum": ["derived", "source", "user"]}, "metadata_json": {"type": "string"},
     "revision": {"type": "integer", "minimum": 1}, "created_at": {"type": "string"}, "updated_at": {"type": "string"},
-    "item_count": {"type": "integer", "minimum": 0}, "schema": {"type": "string"}
+    "item_count": {"type": "integer", "minimum": 0}, "schema": {"type": "string"},
+    "artwork": {"type": "object"}
   },
   "additionalProperties": false
 }

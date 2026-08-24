@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.47
+version: 0.8.48
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -65,6 +65,7 @@ exports:
   - import_folder
   - library
   - list_items
+  - collection_contents
   - deep_search
   - get_item
   - playback_queue
@@ -783,6 +784,31 @@ tools:
     properties:
       kind:
         type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 30
+        default: 30
+      cursor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: collection_contents
+  description: Browse one collection, its children, and one bounded item page.
+  entry: handlers.main:collection_contents
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - collection_id
+    properties:
+      collection_id:
+        type: string
+        minLength: 1
+      profile_id:
+        type: string
+        default: default
       limit:
         type: integer
         minimum: 1
@@ -1722,6 +1748,29 @@ data_routes:
   first_paint: one bounded collection page
   recovery: repeat list_collections with the current opaque cursor
   guard_visibility: catalog collection metadata only
+  budget:
+    max_payload_bytes: 524288
+    max_items: 30
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - state_dependency_changed
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - media_center.catalog
+- surface: widget:media-center-collection-contents
+  route: tool
+  tool: collection_contents
+  owner: skill:media_center_skill
+  first_paint: bounded collection breadcrumbs, children, and one item page
+  recovery: repeat collection_contents with the current opaque cursor
+  guard_visibility: profile-admitted collection metadata and safe artwork paths only
   budget:
     max_payload_bytes: 524288
     max_items: 30

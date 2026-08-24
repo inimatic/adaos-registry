@@ -701,6 +701,56 @@ def _normalize_resource(resource: Mapping[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _public_artwork(metadata: Mapping[str, Any]) -> dict[str, Any]:
+    artwork = metadata.get("artwork")
+    if isinstance(artwork, Mapping):
+        artwork_descriptor = artwork.get("descriptor")
+        artwork_descriptor = (
+            artwork_descriptor if isinstance(artwork_descriptor, Mapping) else {}
+        )
+        raw_url = _text(
+            artwork_descriptor.get("routed_content_path")
+            or artwork_descriptor.get("browser_path")
+            or artwork_descriptor.get("browser_url")
+            or artwork_descriptor.get("content_path")
+            or artwork.get("url")
+        )
+        url = _public_content_path(raw_url) or _public_direct_url(raw_url)
+        state = _text(artwork.get("state")) or "unavailable"
+        if state == "ready" and not url:
+            state = "failed"
+        return {
+            "schema": "adaos.media.artwork.v1",
+            "state": state,
+            "url": url,
+            "provider_id": _text(artwork.get("provider_id")),
+            "source_kind": _text(artwork.get("source_kind")),
+            "source_revision": _int(artwork.get("exact_source_revision")),
+            "source_fingerprint": _text(
+                artwork.get("exact_source_fingerprint")
+            )[:128],
+            "width": _int(artwork.get("width")),
+            "height": _int(artwork.get("height")),
+            "error_code": (
+                "artwork_route_unavailable"
+                if state == "failed" and not url
+                else _text(artwork.get("error_code"))
+            ),
+        }
+    return {
+        "schema": "adaos.media.artwork.v1",
+        "state": "missing",
+        "url": "",
+        "provider_id": "",
+        "source_kind": "fallback",
+        "source_revision": 0,
+        "source_fingerprint": "",
+        "width": 0,
+        "height": 0,
+        "error_code": "",
+    }
+
+
 def _public_item(row: sqlite3.Row) -> dict[str, Any]:
     descriptor = _json_loads(row["descriptor_json"])
     metadata = _json_loads(row["metadata_json"])
@@ -742,54 +792,7 @@ def _public_item(row: sqlite3.Row) -> dict[str, Any]:
         "playable": bool(str(row["content_path"] or "") or str(row["routed_content_path"] or "")),
     }
     item["preview"] = item["subtitle"]
-    artwork = metadata.get("artwork")
-    if isinstance(artwork, Mapping):
-        artwork_descriptor = artwork.get("descriptor")
-        artwork_descriptor = (
-            artwork_descriptor if isinstance(artwork_descriptor, Mapping) else {}
-        )
-        raw_url = _text(
-            artwork_descriptor.get("routed_content_path")
-            or artwork_descriptor.get("browser_path")
-            or artwork_descriptor.get("browser_url")
-            or artwork_descriptor.get("content_path")
-            or artwork.get("url")
-        )
-        url = _public_content_path(raw_url) or _public_direct_url(raw_url)
-        state = _text(artwork.get("state")) or "unavailable"
-        if state == "ready" and not url:
-            state = "failed"
-        item["artwork"] = {
-            "schema": "adaos.media.artwork.v1",
-            "state": state,
-            "url": url,
-            "provider_id": _text(artwork.get("provider_id")),
-            "source_kind": _text(artwork.get("source_kind")),
-            "source_revision": _int(artwork.get("exact_source_revision")),
-            "source_fingerprint": _text(
-                artwork.get("exact_source_fingerprint")
-            )[:128],
-            "width": _int(artwork.get("width")),
-            "height": _int(artwork.get("height")),
-            "error_code": (
-                "artwork_route_unavailable"
-                if state == "failed" and not url
-                else _text(artwork.get("error_code"))
-            ),
-        }
-    else:
-        item["artwork"] = {
-            "schema": "adaos.media.artwork.v1",
-            "state": "missing",
-            "url": "",
-            "provider_id": "",
-            "source_kind": "fallback",
-            "source_revision": 0,
-            "source_fingerprint": "",
-            "width": 0,
-            "height": 0,
-            "error_code": "",
-        }
+    item["artwork"] = _public_artwork(metadata)
     return item
 
 

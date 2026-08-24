@@ -422,13 +422,23 @@ def voice_command(
     current = repository.get_session(resolved_session)
     if not current.get("ok"):
         return _result_or_error(current)
+    requested_action = text(action).lower()
+    resolved_action = requested_action
+    if requested_action == "toggle":
+        resolved_action = (
+            "pause"
+            if text(current["session"].get("state")).lower()
+            in {"playing", "loading", "buffering"}
+            else "play"
+        )
     return command(
         session_id=resolved_session,
-        command=action,
+        command=resolved_action,
         arguments=arguments,
         actor_ref=actor_ref or f"profile:{profile_id}",
         expected_revision=current["session"]["revision"],
-        idempotency_key=idempotency_key or f"voice:{resolved_session}:{action}:{current['session']['revision']}",
+        idempotency_key=idempotency_key
+        or f"voice:{resolved_session}:{requested_action}:{current['session']['revision']}",
     )
 
 
