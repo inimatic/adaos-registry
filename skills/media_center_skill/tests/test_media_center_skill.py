@@ -275,6 +275,8 @@ def test_build_queue_keeps_legacy_reference_rows_playable(monkeypatch, tmp_path)
     assert queue["items"][0]["routed_content_path"] == (
         "/media/files/content/legacy-reference.mp4"
     )
+    assert queue["items"][0]["size_bytes"] == 1024
+    assert queue["items"][0]["modified_at"] == "2026-08-11T10:00:00+00:00"
     assert queue["items"][0]["route"]["fallback"]["reason"] == (
         "legacy_reference_source"
     )
@@ -746,6 +748,19 @@ def test_coordinator_projects_safe_versioned_artwork_url(monkeypatch, tmp_path):
         "schema": "adaos.media.artwork.v1",
         "state": "ready",
         "url": "/media/album-cover.jpg",
+        "descriptor": {
+            "schema": "adaos.media.resource.v1",
+            "id": "",
+            "resource_id": "",
+            "name": "",
+            "mime_type": "",
+            "size_bytes": 0,
+            "modified_at": "",
+            "content_path": "",
+            "routed_content_path": "/media/album-cover.jpg",
+            "playback_id": "",
+            "metadata": None,
+        },
         "provider_id": "media_library_agent.folder_artwork.v1",
         "source_kind": "folder",
         "source_revision": 1,
@@ -755,6 +770,49 @@ def test_coordinator_projects_safe_versioned_artwork_url(monkeypatch, tmp_path):
         "error_code": "",
     }
     assert "/mnt/private" not in str(artwork)
+
+
+def test_playback_observation_updates_profile_recent_once_per_bucket(monkeypatch):
+    checkpoints = []
+    published = []
+    catalog = SimpleNamespace(
+        checkpoint=lambda item_id, **kwargs: (
+            checkpoints.append((item_id, kwargs))
+            or {"ok": True}
+        )
+    )
+    monkeypatch.setattr(main, "_coordinator", lambda: catalog)
+    monkeypatch.setattr(
+        main,
+        "_publish_library_snapshot",
+        lambda *_args, **kwargs: published.append(kwargs),
+    )
+    main._PLAYBACK_OBSERVATION_CACHE.clear()
+    event = {
+        "item_id": "movie-1",
+        "profile_id": "alice",
+        "position_ms": 16_000,
+        "duration_ms": 120_000,
+        "state": "playing",
+        "webspace_id": "desktop",
+    }
+
+    main.on_playback_observed(event)
+    main.on_playback_observed({**event, "position_ms": 17_000})
+    main.on_playback_observed({**event, "state": "stopped"})
+
+    assert len(checkpoints) == 2
+    assert checkpoints[0] == (
+        "movie-1",
+        {
+            "profile_id": "alice",
+            "position_ms": 16_000,
+            "duration_ms": 120_000,
+            "completed": False,
+        },
+    )
+    assert checkpoints[1][1]["position_ms"] == 16_000
+    assert len(published) == 2
 
 
 def test_coordinator_builds_typed_collections_and_bounded_cursor_pages(monkeypatch, tmp_path):

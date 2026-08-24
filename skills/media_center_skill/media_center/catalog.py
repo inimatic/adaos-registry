@@ -719,10 +719,34 @@ def _public_artwork(metadata: Mapping[str, Any]) -> dict[str, Any]:
         state = _text(artwork.get("state")) or "unavailable"
         if state == "ready" and not url:
             state = "failed"
+        descriptor = _public_resource_descriptor(
+            artwork_descriptor,
+            resource_id=_text(
+                artwork_descriptor.get("resource_id")
+                or artwork_descriptor.get("id")
+                or artwork_descriptor.get("filename")
+            ),
+            name=_text(
+                artwork_descriptor.get("name")
+                or artwork_descriptor.get("filename")
+            ),
+            mime_type=_text(
+                artwork_descriptor.get("mime_type")
+                or artwork_descriptor.get("mime")
+            ),
+            size_bytes=_int(artwork_descriptor.get("size_bytes")),
+            modified_at=_text(artwork_descriptor.get("modified_at")),
+            content_path=artwork_descriptor.get("content_path"),
+            routed_content_path=(
+                artwork_descriptor.get("routed_content_path")
+                or artwork_descriptor.get("browser_path")
+            ),
+        )
         return {
             "schema": "adaos.media.artwork.v1",
             "state": state,
             "url": url,
+            "descriptor": descriptor,
             "provider_id": _text(artwork.get("provider_id")),
             "source_kind": _text(artwork.get("source_kind")),
             "source_revision": _int(artwork.get("exact_source_revision")),
@@ -741,6 +765,7 @@ def _public_artwork(metadata: Mapping[str, Any]) -> dict[str, Any]:
         "schema": "adaos.media.artwork.v1",
         "state": "missing",
         "url": "",
+        "descriptor": {},
         "provider_id": "",
         "source_kind": "fallback",
         "source_revision": 0,

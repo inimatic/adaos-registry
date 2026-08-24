@@ -27,6 +27,24 @@
         "schema": {"const": "adaos.media.artwork.v1"},
         "state": {"enum": ["missing", "ready", "unavailable", "failed"]},
         "url": {"type": "string"},
+        "descriptor": {
+          "type": "object",
+          "properties": {
+            "schema": {"type": "string"},
+            "id": {"type": "string"},
+            "resource_id": {"type": "string"},
+            "name": {"type": "string"},
+            "mime_type": {"type": "string"},
+            "size_bytes": {"type": "integer", "minimum": 0},
+            "modified_at": {"type": "string"},
+            "content_path": {"type": "string"},
+            "routed_content_path": {"type": "string"},
+            "playback_id": {"type": "string"},
+            "metadata": {"type": ["object", "null"]},
+            "delivery": {"type": "object"}
+          },
+          "additionalProperties": false
+        },
         "provider_id": {"type": "string"},
         "source_kind": {"type": "string"},
         "source_revision": {"type": "integer", "minimum": 0},

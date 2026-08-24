@@ -4062,6 +4062,12 @@ class MediaCatalogCoordinator:
                     "name": plan["title"],
                     "media_kind": plan["media_kind"],
                     "mime_type": plan["mime_type"],
+                    "size_bytes": int(
+                        plan["descriptor"].get("size_bytes") or 0
+                    ),
+                    "modified_at": _text(
+                        plan["descriptor"].get("modified_at")
+                    ),
                     "resource_id": _text(plan["descriptor"].get("resource_id")),
                     "content_path": _text(plan["route"].get("node_path")),
                     "routed_content_path": _text(plan["route"].get("routed_path")),

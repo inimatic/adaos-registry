@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.51
+version: 0.8.52
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -41,6 +41,7 @@ events:
   - sys.ready
   - webio.stream.snapshot.requested
   - media_library_agent.catalog.changed
+  - media_control.playback.observed
   publish:
   - io.out.stream.publish
 lifecycle:
@@ -2026,4 +2027,3 @@ compatibility:
     min_commit: 911c461a668e20d510ac7d746dda3324b4b53ce2
     min_short_commit: 911c461a
     build_date: '2026-08-24T11:12:47+03:00'
-

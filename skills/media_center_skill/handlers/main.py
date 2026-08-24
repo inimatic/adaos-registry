@@ -6,6 +6,7 @@ import mimetypes
 import re
 import sys
 import threading
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Mapping
@@ -17,6 +18,10 @@ from adaos.sdk.data.i18n import _
 _SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
+
+
+_PLAYBACK_OBSERVATION_CACHE: dict[str, tuple[int, str, float]] = {}
+_PLAYBACK_OBSERVATION_LIMIT = 256
 
 from media_center.background import background_runtime  # noqa: E402
 from media_center.catalog import (  # noqa: E402
@@ -815,6 +820,45 @@ def on_agent_catalog_changed(event: Any) -> None:
     _agent_sync_runtime(catalog).ensure_started(wake=True)
 
 
+@subscribe("media_control.playback.observed")
+def on_playback_observed(event: Any) -> None:
+    payload = _event_payload(event)
+    item_id = str(payload.get("item_id") or "").strip()
+    profile_id = str(payload.get("profile_id") or "default").strip() or "default"
+    if not item_id:
+        return
+    position_ms = max(0, int(payload.get("position_ms") or 0))
+    duration_ms = max(position_ms, int(payload.get("duration_ms") or 0))
+    state = str(payload.get("state") or "paused").strip().lower()
+    bucket = position_ms // 15_000
+    cache_key = f"{profile_id}:{item_id}"
+    previous = _PLAYBACK_OBSERVATION_CACHE.get(cache_key)
+    terminal = state in {"stopped", "ended", "error"}
+    if previous and previous[0] == bucket and previous[1] == state and not terminal:
+        return
+    _PLAYBACK_OBSERVATION_CACHE[cache_key] = (bucket, state, time.monotonic())
+    while len(_PLAYBACK_OBSERVATION_CACHE) > _PLAYBACK_OBSERVATION_LIMIT:
+        oldest = min(
+            _PLAYBACK_OBSERVATION_CACHE,
+            key=lambda key: _PLAYBACK_OBSERVATION_CACHE[key][2],
+        )
+        _PLAYBACK_OBSERVATION_CACHE.pop(oldest, None)
+    catalog = _coordinator()
+    result = catalog.checkpoint(
+        item_id,
+        profile_id=profile_id,
+        position_ms=position_ms,
+        duration_ms=duration_ms,
+        completed=_bool(payload.get("completed"), state == "ended"),
+    )
+    if result.get("ok"):
+        _publish_library_snapshot(
+            catalog,
+            profile_id=profile_id,
+            webspace_id=str(payload.get("webspace_id") or ""),
+        )
+
+
 @tool(summary="Pull bounded idempotent deltas from ready library agents.", side_effects="local_write")
 def sync_agent(max_pages: int = 4, limit: int = 500, **_: Any) -> dict[str, Any]:
     catalog = _coordinator()
@@ -930,7 +974,11 @@ def delete_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
 
 @tool(summary="Register playable files from configured folders without copying media bytes.", side_effects="local_write")
 def scan_roots(root_id: str = "", path: str = "", limit: int = 1000, **_: Any) -> dict[str, Any]:
-    arguments = {"root_id": root_id, "mode": "incremental"}
+    arguments = {
+        "root_id": root_id,
+        "mode": "incremental",
+        "webspace_id": str(_.get("webspace_id") or ""),
+    }
     agent, _error = _invoke_agent("start_scan", arguments)
     if agent is not None:
         agent["owner"] = "media_library_agent"
@@ -1029,7 +1077,12 @@ def _scan_roots(repo: MediaCenterRepository, *, root_id: str = "", path: str = "
 def import_folder(path: str = "", label: str = "", include_images: bool = False, limit: int = 1000, **_: Any) -> dict[str, Any]:
     agent, _error = _invoke_agent(
         "import_folder",
-        {"path": path, "label": label, "include_images": _bool(include_images, False)},
+        {
+            "path": path,
+            "label": label,
+            "include_images": _bool(include_images, False),
+            "webspace_id": str(_.get("webspace_id") or ""),
+        },
     )
     if agent is not None:
         agent["owner"] = "media_library_agent"
