@@ -28,6 +28,8 @@ session. It exposes the queue title, target label/kind, media kind, and artwork
 descriptor next to the revisioned session state. Controllers therefore show a
 human title rather than an opaque item identifier and do not query the catalog
 or move media bytes. EN/RU labels for the app, widget, and modal are packaged in
-this skill's `webui.json` resources.
+this skill's `webui.json` resources. Version `0.2.7` stores those dictionaries
+under the platform browser-asset boundary, so core publishes immutable URLs
+instead of leaking package-relative paths to the browser.
 
 QoE accepts a fixed metric vocabulary for planning, first frame, seek, rebuffer, route changes, interruption, and completion. `qoe_summary()` returns bounded recent evidence plus count/average/maximum/total aggregates for a session or target; raw source paths and media bytes are excluded.

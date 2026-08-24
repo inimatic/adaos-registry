@@ -529,8 +529,10 @@ def test_declared_stream_subscriptions_have_runtime_handlers():
 def test_media_remote_surfaces_are_owned_by_media_control_skill():
     webui = json.loads((SKILL_ROOT / "webui.json").read_text(encoding="utf-8"))
 
-    assert webui["resources"]["media_control.i18n.en"]["path"] == "i18n/en.json"
-    assert webui["resources"]["media_control.i18n.ru"]["path"] == "i18n/ru.json"
+    assert webui["resources"]["media_control.i18n.en"]["path"] == "assets/i18n/en.json"
+    assert webui["resources"]["media_control.i18n.ru"]["path"] == "assets/i18n/ru.json"
+    assert (SKILL_ROOT / "assets" / "i18n" / "en.json").is_file()
+    assert (SKILL_ROOT / "assets" / "i18n" / "ru.json").is_file()
     assert webui["apps"][0]["id"] == "media_remote_app"
     assert webui["widgets"][0]["id"] == "media_remote_compact"
     assert {
