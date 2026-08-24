@@ -6,6 +6,12 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.68` makes large-catalog identity reads sequential. It ships
+`media_center_skill@0.8.59` and keeps the remaining `0.6.67` component set.
+Repair scans explicitly avoid the selective media-kind index and unnecessary
+temporary ordering: one sequential catalog pass replaces thousands of random
+row lookups on slow disks.
+
 Release `0.6.67` completes the bounded activation contract. It ships
 `media_center_skill@0.8.58` and keeps the remaining `0.6.66` component set.
 The lifecycle receipt reads only the scalar catalog revision; legacy full-table
