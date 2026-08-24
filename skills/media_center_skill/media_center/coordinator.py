@@ -3232,8 +3232,16 @@ class MediaCatalogCoordinator:
                     LIMIT ? OFFSET ?
                 )
                 SELECT c.*,
-                    (SELECT COUNT(*) FROM collection_memberships m
-                     WHERE m.collection_id=c.id) AS item_count,
+                    (SELECT COUNT(DISTINCT m.work_id)
+                     FROM collection_memberships m
+                     WHERE m.collection_id=c.id
+                         AND EXISTS (
+                             SELECT 1 FROM catalog_items available
+                                 INDEXED BY idx_media_center_catalog_work_variant
+                             WHERE available.work_id=m.work_id
+                                 AND available.variant_id=m.variant_id
+                                 AND available.missing=0
+                         )) AS item_count,
                     (
                         SELECT ci.metadata_json
                         FROM collection_memberships preview_membership
@@ -3289,8 +3297,16 @@ class MediaCatalogCoordinator:
             collection = connection.execute(
                 """
                 SELECT c.*,
-                    (SELECT COUNT(*) FROM collection_memberships m
-                     WHERE m.collection_id=c.id) AS item_count
+                    (SELECT COUNT(DISTINCT m.work_id)
+                     FROM collection_memberships m
+                     WHERE m.collection_id=c.id
+                         AND EXISTS (
+                             SELECT 1 FROM catalog_items available
+                                 INDEXED BY idx_media_center_catalog_work_variant
+                             WHERE available.work_id=m.work_id
+                                 AND available.variant_id=m.variant_id
+                                 AND available.missing=0
+                         )) AS item_count
                 FROM media_collections c WHERE c.id=?
                 """,
                 (token,),
@@ -3303,7 +3319,17 @@ class MediaCatalogCoordinator:
                 }
             child_rows = connection.execute(
                 """
-                SELECT c.*,COUNT(m.work_id) AS item_count,
+                SELECT c.*,
+                    (SELECT COUNT(DISTINCT child_membership.work_id)
+                     FROM collection_memberships child_membership
+                     WHERE child_membership.collection_id=c.id
+                         AND EXISTS (
+                             SELECT 1 FROM catalog_items available
+                                 INDEXED BY idx_media_center_catalog_work_variant
+                             WHERE available.work_id=child_membership.work_id
+                                 AND available.variant_id=child_membership.variant_id
+                                 AND available.missing=0
+                         )) AS item_count,
                     (
                         SELECT ci.metadata_json
                         FROM collection_memberships preview_membership
@@ -3322,9 +3348,8 @@ class MediaCatalogCoordinator:
                             preview_membership.ordinal,ci.id LIMIT 1
                     ) AS representative_metadata_json
                 FROM media_collections c
-                LEFT JOIN collection_memberships m ON m.collection_id=c.id
                 WHERE c.parent_id=?
-                GROUP BY c.id ORDER BY lower(c.title),c.id LIMIT 30
+                ORDER BY lower(c.title),c.id LIMIT 30
                 """,
                 (token,),
             ).fetchall()

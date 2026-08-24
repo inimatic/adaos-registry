@@ -999,6 +999,37 @@ def test_artwork_revision_preserves_series_identity_and_replaces_membership(
     assert series[0]["artwork"]["url"] == "/media/black-mirror.jpg"
 
 
+def test_collection_counts_only_available_logical_works_after_agent_rebind(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "series-agent-rebind.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    delta = _agent_delta(
+        1,
+        "Black Mirror/Season 07/Black.Mirror.S07E01.Common.People.mkv",
+        kind="video",
+    )
+    compatibility_page = _agent_page(delta)
+    compatibility_page["agent"] = {"id": "agent-local", "node_id": "local"}
+    catalog.apply_agent_page(compatibility_page)
+
+    canonical_page = _agent_page(delta)
+    canonical_page["agent"] = {"id": "agent-node-a", "node_id": "node-a"}
+    catalog.apply_agent_page(canonical_page)
+    catalog.retire_unbound_agent_states(["agent-node-a"])
+
+    series = catalog.collections(kind="series")["items"][0]
+    contents = catalog.collection_contents(series["id"])
+
+    assert series["item_count"] == 1
+    assert contents["collection"]["item_count"] == 1
+    assert contents["children"][0]["item_count"] == 1
+    assert contents["count"] == 1
+    assert contents["items"][0]["agent_id"] == "agent-node-a"
+
+
 def test_filename_evidence_groups_inconsistently_named_season_folders(
     monkeypatch, tmp_path
 ):
