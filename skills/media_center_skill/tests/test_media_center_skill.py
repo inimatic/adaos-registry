@@ -87,7 +87,7 @@ def test_background_runtime_reuses_and_disposes_process_owned_workers() -> None:
     assert receipt["stopped"] is True
 
 
-def test_rehydrate_defers_agent_catchup_to_bounded_background_worker(monkeypatch) -> None:
+def test_rehydrate_defers_runtime_workers_until_sys_ready(monkeypatch) -> None:
     started: list[str] = []
 
     class Worker:
@@ -127,9 +127,13 @@ def test_rehydrate_defers_agent_catchup_to_bounded_background_worker(monkeypatch
 
     result = main.rehydrate()
 
-    assert started == ["sync", "enrichment"]
+    assert started == []
     assert result["agent_sync"]["deferred"] is True
     assert result["agent_sync"]["mode"] == "background_cursor_catchup"
+    assert result["agent_sync"]["activation"] == "sys.ready"
+    assert result["agent_sync"]["worker_started"] is False
+    assert result["enrichment"]["activation"] == "sys.ready"
+    assert result["enrichment"]["worker_started"] is False
     assert result["catalog_revision"] == 42
 
 

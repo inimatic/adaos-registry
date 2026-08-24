@@ -606,15 +606,6 @@ def ensure_schema(**_: Any) -> dict[str, Any]:
 def rehydrate(**_: Any) -> dict[str, Any]:
     repo = _repository()
     catalog = _coordinator(repo)
-    sync_worker = _agent_sync_runtime(catalog)
-    sync_started = sync_worker.ensure_started()
-    enrichment = _enrichment_runtime(catalog)
-    enrichment_started = enrichment.ensure_started()
-    _publish_library_snapshot(
-        catalog,
-        profile_id=str(_.get("profile_id") or "default"),
-        webspace_id=str(_.get("webspace_id") or ""),
-    )
     return {
         "ok": True,
         "schema": COORDINATOR_SCHEMA,
@@ -625,12 +616,15 @@ def rehydrate(**_: Any) -> dict[str, Any]:
             "ok": True,
             "deferred": True,
             "mode": "background_cursor_catchup",
-            "worker_started": sync_started,
-            "status": sync_worker.status(),
+            "activation": "sys.ready",
+            "worker_started": False,
+            "status": {"state": "deferred", "revision": 0},
         },
         "enrichment": {
-            "running": True,
-            "worker_started": enrichment_started,
+            "running": False,
+            "deferred": True,
+            "activation": "sys.ready",
+            "worker_started": False,
         },
     }
 
