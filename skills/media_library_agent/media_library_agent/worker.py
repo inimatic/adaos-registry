@@ -356,6 +356,24 @@ class MediaLibraryAgentWorker:
                         if is_artwork
                         else {}
                     ),
+                    **(
+                        {
+                            "rendition_decision": text(result.get("decision")),
+                            "rendition_packaging": text(result.get("packaging")),
+                            "video_encoder": text(result.get("video_encoder")),
+                            "hardware_accelerated": bool(
+                                result.get("hardware_accelerated")
+                            ),
+                            "hardware_backend": text(
+                                result.get("hardware_backend")
+                            ),
+                            "software_fallback_used": bool(
+                                result.get("software_fallback_used")
+                            ),
+                        }
+                        if not is_artwork
+                        else {}
+                    ),
                 }
             )
             descriptor["metadata"] = descriptor_metadata
@@ -383,10 +401,13 @@ class MediaLibraryAgentWorker:
                 job_id, code or "rendition_failed", detail
             )
         finally:
-            target_path.unlink(missing_ok=True)
-            target_path.with_suffix(target_path.suffix + ".partial").unlink(
-                missing_ok=True
-            )
+            if target_path.name == "master.m3u8":
+                shutil.rmtree(target_path.parent, ignore_errors=True)
+            else:
+                target_path.unlink(missing_ok=True)
+                target_path.with_suffix(target_path.suffix + ".partial").unlink(
+                    missing_ok=True
+                )
 
     def _wait_for_rendition_resources(self, job_id: str) -> None:
         waiting = False
@@ -490,13 +511,23 @@ class MediaLibraryAgentWorker:
             )
         ):
             return
-        path = Path(text(descriptor.get("path")))
-        if not path.name or path.name != filename:
-            return
-        try:
-            path.unlink(missing_ok=True)
-        except OSError:
-            return
+        resources = [
+            dict(item)
+            for item in metadata.get("resources") or []
+            if isinstance(item, Mapping)
+        ]
+        candidates = resources or [dict(descriptor)]
+        for candidate in candidates:
+            candidate_name = text(
+                candidate.get("filename") or candidate.get("resource_id")
+            )
+            path = Path(text(candidate.get("path")))
+            if not path.name or path.name != candidate_name:
+                continue
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                continue
 
     def _contained_source_path(self, source: Mapping[str, Any]) -> Path:
         descriptor = dict(source.get("descriptor") or {})

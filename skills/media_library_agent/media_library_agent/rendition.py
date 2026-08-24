@@ -4,6 +4,7 @@ import hashlib
 import io
 import mimetypes
 import os
+import platform
 import shutil
 import subprocess
 import time
@@ -18,6 +19,7 @@ ARTWORK_PROFILE = "artwork-card-v1"
 ARTWORK_SELECTION_ALGORITHM = "informative-frame-v2"
 ARTWORK_NAMES = ("cover", "folder", "front", "poster", "album", "artwork")
 ARTWORK_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
+_FFMPEG_CAPABILITY_CACHE: dict[tuple[str, str], dict[str, Any]] = {}
 
 
 def _ffmpeg_executable() -> tuple[str | None, str]:
@@ -107,9 +109,13 @@ def _preferred_audio(
     return default or (streams[0] if streams else {})
 
 
-def _abr_ladder(maximum_height: int, maximum_bitrate: int) -> list[dict[str, int]]:
+def _abr_ladder(
+    maximum_height: int, maximum_bitrate: int, source_height: int
+) -> list[dict[str, int]]:
     presets = ((360, 800_000), (480, 1_400_000), (720, 3_000_000), (1080, 6_000_000), (2160, 16_000_000))
-    ceiling_height = maximum_height or 1080
+    ceiling_height = min(
+        value for value in (maximum_height, source_height, 1080) if value > 0
+    )
     ceiling_bitrate = maximum_bitrate or 8_000_000
     ladder = [
         {"height": height, "video_bitrate": min(bitrate, ceiling_bitrate)}
@@ -200,8 +206,23 @@ def rendition_plan(
     else:
         decision = "transcode"
     hls = decision == "prepared_hls"
+    requested_profile = text(profile) or "browser-mp4-v1"
+    default_profile = {
+        "remux": "browser-remux-mp4-v1",
+        "prepared_hls": "browser-hls-cmaf-v1",
+        "transcode": "browser-mp4-v1",
+    }.get(decision, requested_profile)
+    target_profile = (
+        default_profile if requested_profile == "browser-mp4-v1" else requested_profile
+    )
+    profile_parts = [target_profile]
+    if decision != "remux" and maximum_height:
+        profile_parts.append(f"{maximum_height}p")
+    if text(audio.get("language")):
+        profile_parts.append(text(audio.get("language")).lower())
     target = {
-        "profile": text(profile) or "browser-mp4-v1",
+        "profile": "-".join(profile_parts),
+        "decision": decision,
         "packaging": "hls_cmaf_vod" if hls else "single_file",
         "container": "cmaf" if hls else ("mp4" if kind == "video" else "m4a"),
         "mime_type": (
@@ -214,7 +235,15 @@ def rendition_plan(
         "max_width": max(0, int(capabilities.get("max_video_width") or 0)),
         "max_height": maximum_height,
         "max_bitrate": maximum_bitrate,
-        "abr_ladder": _abr_ladder(maximum_height, maximum_bitrate) if hls else [],
+        "abr_ladder": (
+            _abr_ladder(maximum_height, maximum_bitrate, height) if hls else []
+        ),
+        "selected_tracks": {
+            "video_index": int(video.get("index") or 0) if video else -1,
+            "audio_index": int(audio.get("index") or 0) if audio else -1,
+            "audio_language": text(audio.get("language")),
+            "has_audio": bool(audio),
+        },
     }
     return {
         "schema": RENDITION_PLAN_SCHEMA,
@@ -653,6 +682,7 @@ def derived_workspace(db_path: Path) -> Path:
 
 
 def output_path(db_path: Path, job: Mapping[str, Any]) -> Path:
+    target = dict(job.get("target") or {})
     suffix = (
         ".jpg"
         if text(job.get("profile")) == ARTWORK_PROFILE
@@ -661,13 +691,17 @@ def output_path(db_path: Path, job: Mapping[str, Any]) -> Path:
     digest = hashlib.sha256(
         f"{text(job.get('id'))}:{text(job.get('source_fingerprint'))}".encode("utf-8")
     ).hexdigest()[:24]
+    if text(target.get("packaging")) == "hls_cmaf_vod":
+        package = derived_workspace(db_path) / f"rendition-{digest}"
+        package.mkdir(parents=True, exist_ok=True)
+        return package / "master.m3u8"
     return derived_workspace(db_path) / f"rendition-{digest}{suffix}"
 
 
 def current_disk_usage(db_path: Path) -> int:
     root = derived_workspace(db_path)
     total = 0
-    for candidate in root.glob("rendition-*"):
+    for candidate in root.rglob("*"):
         try:
             if candidate.is_file():
                 total += int(candidate.stat().st_size)
@@ -693,59 +727,133 @@ def process_rss_mb(process_id: int) -> float | None:
     return None
 
 
-def transcode_with_ffmpeg(
-    source_path: Path,
-    target_path: Path,
-    job: Mapping[str, Any],
-    *,
-    cancelled: CancelCallback,
-) -> dict[str, Any]:
+def ffmpeg_capabilities() -> dict[str, Any]:
     executable, _source = _ffmpeg_executable()
     if not executable:
-        raise RuntimeError("rendition_backend_unavailable")
-    limits = rendition_limits()
-    partial = target_path.with_suffix(target_path.suffix + ".partial")
-    partial.unlink(missing_ok=True)
-    target = dict(job.get("target") or {})
-    command = [
-        executable,
-        "-nostdin",
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-protocol_whitelist",
-        "file,pipe",
-        "-y",
-        "-i",
-        str(source_path),
-    ]
-    if text(job.get("media_kind")) == "video":
-        command.extend(["-map", "0:v:0", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "22"])
-        max_width = max(0, int(target.get("max_width") or 0))
-        max_height = max(0, int(target.get("max_height") or 0))
-        if max_width or max_height:
-            width = max_width or 16384
-            height = max_height or 16384
-            command.extend(["-vf", f"scale='min(iw,{width})':'min(ih,{height})':force_original_aspect_ratio=decrease"])
-    else:
-        command.extend(["-map", "0:a:0", "-vn"])
-    command.extend(
-        [
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
-            "-threads",
-            str(limits["threads"]),
-            "-movflags",
-            "+faststart",
-            "-fs",
-            str(limits["max_output_bytes"]),
-            "-f",
-            "mp4",
-            str(partial),
-        ]
+        return {
+            "schema": "adaos.media_library.ffmpeg_capabilities.v1",
+            "available": False,
+            "source": _source,
+            "hardware_acceleration": "unavailable",
+            "selected_video_encoder": "",
+            "encoders": [],
+            "hwaccels": [],
+        }
+    policy = text(
+        os.environ.get("MEDIA_LIBRARY_AGENT_HARDWARE_ACCELERATION") or "auto"
+    ).lower()
+    if policy not in {"auto", "software", "nvenc", "qsv", "amf", "vaapi", "videotoolbox"}:
+        policy = "auto"
+    cache_key = (executable, policy)
+    cached = _FFMPEG_CAPABILITY_CACHE.get(cache_key)
+    if cached is not None:
+        return dict(cached)
+    try:
+        encoder_probe = subprocess.run(
+            [executable, "-hide_banner", "-encoders"],
+            capture_output=True,
+            check=False,
+            timeout=8,
+            text=True,
+        )
+        acceleration_probe = subprocess.run(
+            [executable, "-hide_banner", "-hwaccels"],
+            capture_output=True,
+            check=False,
+            timeout=8,
+            text=True,
+        )
+        encoder_output = encoder_probe.stdout + encoder_probe.stderr
+        acceleration_output = acceleration_probe.stdout + acceleration_probe.stderr
+    except (OSError, subprocess.SubprocessError):
+        encoder_output = ""
+        acceleration_output = ""
+    encoder_names = {
+        "nvenc": "h264_nvenc",
+        "qsv": "h264_qsv",
+        "amf": "h264_amf",
+        "vaapi": "h264_vaapi",
+        "videotoolbox": "h264_videotoolbox",
+    }
+    available_encoders = sorted(
+        name for name in {"libx264", *encoder_names.values()} if name in encoder_output
     )
+    available_hwaccels = sorted(
+        name
+        for name in ("cuda", "qsv", "d3d11va", "dxva2", "vaapi", "videotoolbox")
+        if name in acceleration_output.lower()
+    )
+    preferred = {
+        "Windows": ("nvenc", "qsv", "amf"),
+        "Linux": ("vaapi", "qsv", "nvenc"),
+        "Darwin": ("videotoolbox",),
+    }.get(platform.system(), ("nvenc", "qsv", "vaapi"))
+    selected = "libx264"
+    selected_backend = "software"
+    requested = preferred if policy == "auto" else (() if policy == "software" else (policy,))
+    for backend in requested:
+        candidate = encoder_names[backend]
+        if candidate in available_encoders:
+            selected = candidate
+            selected_backend = backend
+            break
+    result = {
+        "schema": "adaos.media_library.ffmpeg_capabilities.v1",
+        "available": True,
+        "source": _source,
+        "policy": policy,
+        "hardware_acceleration": selected_backend,
+        "selected_video_encoder": selected,
+        "software_fallback": "libx264" in available_encoders,
+        "encoders": available_encoders,
+        "hwaccels": available_hwaccels,
+    }
+    _FFMPEG_CAPABILITY_CACHE[cache_key] = result
+    return dict(result)
+
+
+def _encoder_options(encoder: str) -> list[str]:
+    if encoder == "h264_nvenc":
+        return ["-preset", "p4"]
+    if encoder == "h264_qsv":
+        return ["-preset", "veryfast"]
+    if encoder == "h264_amf":
+        return ["-quality", "speed"]
+    if encoder == "h264_videotoolbox":
+        return ["-realtime", "true"]
+    if encoder == "h264_vaapi":
+        return ["-quality", "6"]
+    return ["-preset", "veryfast", "-crf", "22"]
+
+
+def _output_bytes(path: Path) -> int:
+    if path.is_file():
+        return int(path.stat().st_size)
+    if path.is_dir():
+        return sum(
+            int(candidate.stat().st_size)
+            for candidate in path.rglob("*")
+            if candidate.is_file()
+        )
+    return 0
+
+
+def _clear_materialized_output(path: Path) -> None:
+    target = path.parent if path.name == "master.m3u8" else path
+    if target.is_dir():
+        shutil.rmtree(target, ignore_errors=True)
+    else:
+        target.unlink(missing_ok=True)
+        target.with_suffix(target.suffix + ".partial").unlink(missing_ok=True)
+
+
+def _run_ffmpeg(
+    command: list[str],
+    *,
+    output_root: Path,
+    limits: Mapping[str, Any],
+    cancelled: CancelCallback,
+) -> None:
     process = subprocess.Popen(
         command,
         stdout=subprocess.DEVNULL,
@@ -765,34 +873,301 @@ def transcode_with_ffmpeg(
             if rss is not None and rss > int(limits["max_rss_mb"]):
                 process.terminate()
                 raise RuntimeError("rendition_rss_limit_exceeded")
-            if partial.exists() and partial.stat().st_size > int(limits["max_output_bytes"]):
+            if _output_bytes(output_root) > int(limits["max_output_bytes"]):
                 process.terminate()
                 raise RuntimeError("rendition_output_limit_exceeded")
             time.sleep(0.1)
         _stdout, error = process.communicate(timeout=2)
         if process.returncode != 0:
-            detail = error.decode("utf-8", errors="replace")[-1000:]
+            detail = error.decode("utf-8", errors="replace")[-1000:].strip()
             raise RuntimeError(f"rendition_backend_failed:{detail}")
-        if not partial.exists() or partial.stat().st_size <= 0:
-            raise RuntimeError("rendition_output_empty")
-        partial.replace(target_path)
-        return {
-            "size_bytes": int(target_path.stat().st_size),
-            "mime_type": text(target.get("mime_type"))
-            or mimetypes.guess_type(target_path.name)[0]
-            or "application/octet-stream",
-        }
     finally:
         if process.poll() is None:
             process.kill()
             process.wait(timeout=2)
-        partial.unlink(missing_ok=True)
+
+
+def _single_file_command(
+    executable: str,
+    source_path: Path,
+    partial: Path,
+    job: Mapping[str, Any],
+    *,
+    encoder: str,
+    limits: Mapping[str, Any],
+) -> list[str]:
+    target = dict(job.get("target") or {})
+    tracks = dict(target.get("selected_tracks") or {})
+    kind = text(job.get("media_kind"))
+    decision = text(target.get("decision")) or "transcode"
+    command = [
+        executable,
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-protocol_whitelist",
+        "file,pipe",
+        "-y",
+        "-i",
+        str(source_path),
+    ]
+    if kind == "video":
+        video_index = int(tracks.get("video_index") or 0)
+        command.extend(["-map", f"0:{video_index}"])
+        audio_index = int(
+            tracks.get("audio_index")
+            if tracks.get("audio_index") is not None
+            else -1
+        )
+        command.extend(["-map", f"0:{audio_index}" if audio_index >= 0 else "0:a:0?"])
+        if decision == "remux":
+            command.extend(["-c:v", "copy", "-c:a", "copy"])
+        else:
+            command.extend(["-c:v", encoder, *_encoder_options(encoder)])
+            max_width = max(0, int(target.get("max_width") or 0))
+            max_height = max(0, int(target.get("max_height") or 0))
+            if max_width or max_height:
+                width = max_width or 16384
+                height = max_height or 16384
+                command.extend(
+                    [
+                        "-vf",
+                        f"scale=w='min(iw,{width})':h='min(ih,{height})':"
+                        "force_original_aspect_ratio=decrease:force_divisible_by=2",
+                    ]
+                )
+            command.extend(["-c:a", "aac", "-b:a", "192k"])
+    else:
+        audio_index = int(tracks.get("audio_index") or 0)
+        command.extend(["-map", f"0:{audio_index}", "-vn"])
+        command.extend(["-c:a", "copy" if decision == "remux" else "aac"])
+        if decision != "remux":
+            command.extend(["-b:a", "192k"])
+    command.extend(
+        [
+            "-sn",
+            "-map_metadata",
+            "0",
+            "-threads",
+            str(limits["threads"]),
+            "-movflags",
+            "+faststart",
+            "-fs",
+            str(limits["max_output_bytes"]),
+            "-f",
+            "mp4",
+            str(partial),
+        ]
+    )
+    return command
+
+
+def _hls_command(
+    executable: str,
+    source_path: Path,
+    target_path: Path,
+    job: Mapping[str, Any],
+    *,
+    encoder: str,
+    limits: Mapping[str, Any],
+) -> list[str]:
+    target = dict(job.get("target") or {})
+    tracks = dict(target.get("selected_tracks") or {})
+    ladder = [
+        dict(item)
+        for item in target.get("abr_ladder") or []
+        if isinstance(item, Mapping)
+    ][:3]
+    if not ladder:
+        raise RuntimeError("rendition_hls_ladder_empty")
+    output_directory = target_path.parent
+    output_directory.mkdir(parents=True, exist_ok=True)
+    video_index = int(tracks.get("video_index") or 0)
+    has_audio = bool(tracks.get("has_audio"))
+    audio_index = int(
+        tracks.get("audio_index")
+        if tracks.get("audio_index") is not None
+        else -1
+    )
+    split_outputs = "".join(f"[vin{index}]" for index in range(len(ladder)))
+    filters = [f"[0:{video_index}]split={len(ladder)}{split_outputs}"]
+    for index, rung in enumerate(ladder):
+        height = max(240, int(rung.get("height") or 720))
+        filters.append(
+            f"[vin{index}]scale=w=-2:h={height}:"
+            f"force_original_aspect_ratio=decrease:force_divisible_by=2[v{index}]"
+        )
+    command = [
+        executable,
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-protocol_whitelist",
+        "file,pipe",
+        "-y",
+        "-i",
+        str(source_path),
+        "-filter_complex",
+        ";".join(filters),
+    ]
+    stream_map: list[str] = []
+    for index, rung in enumerate(ladder):
+        command.extend(["-map", f"[v{index}]"])
+        if has_audio and audio_index >= 0:
+            command.extend(["-map", f"0:{audio_index}"])
+        command.extend(
+            [
+                f"-c:v:{index}",
+                encoder,
+                *_encoder_options(encoder),
+                f"-b:v:{index}",
+                str(max(300_000, int(rung.get("video_bitrate") or 3_000_000))),
+            ]
+        )
+        if has_audio and audio_index >= 0:
+            command.extend([f"-c:a:{index}", "aac", f"-b:a:{index}", "160k"])
+            stream_map.append(f"v:{index},a:{index},name:{int(rung['height'])}p")
+        else:
+            stream_map.append(f"v:{index},name:{int(rung['height'])}p")
+    command.extend(
+        [
+            "-sn",
+            "-threads",
+            str(limits["threads"]),
+            "-f",
+            "hls",
+            "-hls_time",
+            "6",
+            "-hls_playlist_type",
+            "vod",
+            "-hls_segment_type",
+            "fmp4",
+            "-hls_flags",
+            "independent_segments+temp_file",
+            "-hls_fmp4_init_filename",
+            "init-%v.mp4",
+            "-hls_segment_filename",
+            str(output_directory / "v%v-segment-%06d.m4s"),
+            "-master_pl_name",
+            target_path.name,
+            "-var_stream_map",
+            " ".join(stream_map),
+            str(output_directory / "v%v.m3u8"),
+        ]
+    )
+    return command
+
+
+def transcode_with_ffmpeg(
+    source_path: Path,
+    target_path: Path,
+    job: Mapping[str, Any],
+    *,
+    cancelled: CancelCallback,
+) -> dict[str, Any]:
+    executable, _source = _ffmpeg_executable()
+    if not executable:
+        raise RuntimeError("rendition_backend_unavailable")
+    limits = rendition_limits()
+    target = dict(job.get("target") or {})
+    packaging = text(target.get("packaging")) or "single_file"
+    decision = text(target.get("decision")) or "transcode"
+    capabilities = ffmpeg_capabilities()
+    selected_encoder = text(capabilities.get("selected_video_encoder")) or "libx264"
+    candidates = [selected_encoder]
+    if selected_encoder != "libx264" and bool(capabilities.get("software_fallback")):
+        candidates.append("libx264")
+    if text(job.get("media_kind")) != "video" or decision == "remux":
+        candidates = ["copy"]
+    failures: list[str] = []
+    for encoder in candidates:
+        _clear_materialized_output(target_path)
+        if packaging == "hls_cmaf_vod":
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            command = _hls_command(
+                executable,
+                source_path,
+                target_path,
+                job,
+                encoder=encoder,
+                limits=limits,
+            )
+            output_root = target_path.parent
+        else:
+            partial = target_path.with_suffix(target_path.suffix + ".partial")
+            command = _single_file_command(
+                executable,
+                source_path,
+                partial,
+                job,
+                encoder=encoder,
+                limits=limits,
+            )
+            output_root = partial
+        try:
+            _run_ffmpeg(
+                command,
+                output_root=output_root,
+                limits=limits,
+                cancelled=cancelled,
+            )
+            if packaging == "hls_cmaf_vod":
+                if not target_path.is_file() or not list(
+                    target_path.parent.glob("*.m4s")
+                ):
+                    raise RuntimeError("rendition_output_empty")
+            else:
+                partial = target_path.with_suffix(target_path.suffix + ".partial")
+                if not partial.is_file() or partial.stat().st_size <= 0:
+                    raise RuntimeError("rendition_output_empty")
+                partial.replace(target_path)
+            return {
+                "size_bytes": _output_bytes(
+                    target_path.parent if packaging == "hls_cmaf_vod" else target_path
+                ),
+                "mime_type": text(target.get("mime_type"))
+                or mimetypes.guess_type(target_path.name)[0]
+                or "application/octet-stream",
+                "decision": decision,
+                "packaging": packaging,
+                "video_encoder": encoder,
+                "hardware_accelerated": encoder not in {"copy", "libx264"},
+                "hardware_backend": text(capabilities.get("hardware_acceleration")),
+                "software_fallback_used": bool(
+                    failures and encoder == "libx264"
+                ),
+                "attempt_failures": failures[-2:],
+            }
+        except RuntimeError as exc:
+            failures.append(text(exc)[-1000:])
+            if encoder == candidates[-1] or text(exc).startswith(
+                ("rendition_canceled", "rendition_timeout", "rendition_output_limit")
+            ):
+                raise
+    raise RuntimeError("rendition_backend_failed")
 
 
 def publish_derived_resource(
     path: Path, job: Mapping[str, Any]
 ) -> Mapping[str, Any]:
-    from adaos.sdk.io.media import publish_media_file
+    from adaos.sdk.io.media import publish_media_file, publish_media_package
+
+    target = dict(job.get("target") or {})
+    if text(target.get("packaging")) == "hls_cmaf_vod":
+        return publish_media_package(
+            path.parent,
+            manifest=path.name,
+            content_ref=(
+                f"rendition:{text(job.get('source_id'))}:"
+                f"{int(job.get('source_revision') or 0)}:{text(job.get('profile'))}"
+            ),
+            namespace="media-library-rendition",
+            variant=text(job.get("profile")) or "browser-hls-cmaf-v1",
+            mime="application/vnd.apple.mpegurl",
+            max_bytes=int(rendition_limits()["max_output_bytes"]),
+        )
 
     return publish_media_file(
         path,

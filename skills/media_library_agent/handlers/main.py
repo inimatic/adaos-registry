@@ -28,6 +28,7 @@ from media_library_agent.rendition import (  # noqa: E402
     ARTWORK_PROFILE,
     artwork_capabilities,
     artwork_plan,
+    ffmpeg_capabilities,
     rendition_limits,
     rendition_plan,
 )
@@ -787,7 +788,7 @@ def plan_rendition(
         }
     queued = repository.create_rendition_job(
         source_id,
-        profile=text(profile) or "browser-mp4-v1",
+        profile=text(plan["target"].get("profile")) or "browser-mp4-v1",
         target=plan["target"],
         priority=priority,
         force=bool(force),
@@ -874,6 +875,7 @@ def status(**_: Any) -> dict[str, Any]:
             "watch": worker.watch_status(),
             "progress_publisher": _progress_publisher_status(),
             "artwork": worker.artwork_status(),
+            "transcoding": ffmpeg_capabilities(),
         },
         "limits": {
             "max_files_per_scan": int(

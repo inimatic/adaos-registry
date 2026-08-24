@@ -23,9 +23,10 @@
     },
     "target": {
       "type": "object",
-      "required": ["profile", "packaging", "container", "mime_type", "video_codec", "audio_codec", "max_width", "max_height", "max_bitrate", "abr_ladder"],
+      "required": ["profile", "decision", "packaging", "container", "mime_type", "video_codec", "audio_codec", "max_width", "max_height", "max_bitrate", "abr_ladder", "selected_tracks"],
       "properties": {
         "profile": {"type": "string", "minLength": 1},
+        "decision": {"enum": ["direct", "remux", "prepared_hls", "transcode", "unsupported"]},
         "packaging": {"enum": ["single_file", "hls_cmaf_vod"]},
         "container": {"enum": ["mp4", "m4a", "cmaf"]},
         "mime_type": {"enum": ["video/mp4", "audio/mp4", "application/vnd.apple.mpegurl"]},
@@ -34,7 +35,18 @@
         "max_width": {"type": "integer", "minimum": 0},
         "max_height": {"type": "integer", "minimum": 0},
         "max_bitrate": {"type": "integer", "minimum": 0},
-        "abr_ladder": {"type": "array", "maxItems": 6, "items": {"type": "object"}}
+        "abr_ladder": {"type": "array", "maxItems": 6, "items": {"type": "object"}},
+        "selected_tracks": {
+          "type": "object",
+          "required": ["video_index", "audio_index", "audio_language", "has_audio"],
+          "properties": {
+            "video_index": {"type": "integer", "minimum": -1},
+            "audio_index": {"type": "integer", "minimum": -1},
+            "audio_language": {"type": "string"},
+            "has_audio": {"type": "boolean"}
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },

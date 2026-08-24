@@ -1573,6 +1573,7 @@ def ensure_rendition(
     endpoint_capabilities: Mapping[str, Any] | None = None,
     profile_id: str = "default",
     rendition_profile: str = "browser-mp4-v1",
+    preferred_language: str = "",
     priority: int = 50,
     force: bool = False,
     **_: Any,
@@ -1582,14 +1583,25 @@ def ensure_rendition(
         item_id,
         endpoint_capabilities=endpoint_capabilities,
         profile_id=profile_id,
+        preferred_language=preferred_language,
     )
     if not plan.get("ok"):
         return plan
-    if bool((plan.get("decision") or {}).get("derived")):
+    compatibility = dict(plan.get("compatibility") or {})
+    if bool(compatibility.get("ready")):
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
             "status": "ready",
+            "playback_plan": plan,
+            "rendition": None,
+        }
+    if str(compatibility.get("mode") or "") == "unsupported":
+        return {
+            "ok": False,
+            "schema": COORDINATOR_SCHEMA,
+            "status": "unsupported",
+            "error": "endpoint_media_unsupported",
             "playback_plan": plan,
             "rendition": None,
         }
@@ -1600,6 +1612,7 @@ def ensure_rendition(
         "source_id": str(plan.get("source_id") or ""),
         "endpoint_capabilities": dict(endpoint_capabilities or {}),
         "profile": rendition_profile,
+        "preferred_audio_language": preferred_language,
         "priority": max(0, min(1000, int(priority or 50))),
         "force": bool(force),
     }

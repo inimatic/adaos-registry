@@ -482,6 +482,9 @@ tools:
       rendition_profile:
         type: string
         default: browser-mp4-v1
+      preferred_language:
+        type: string
+        default: ''
       priority:
         type: integer
         minimum: 0
@@ -2042,4 +2045,3 @@ compatibility:
     min_commit: 6ec1f110ffc010624f0f59326d30a08661b84160
     min_short_commit: 6ec1f110
     build_date: '2026-08-24T20:59:08+03:00'
-

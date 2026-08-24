@@ -1501,6 +1501,109 @@ def _rendition_source(repository, worker, library: Path) -> dict:
     return page["items"][0]["source"]
 
 
+def test_rendition_plan_distinguishes_lossless_remux_and_prepared_hls():
+    source = {
+        "id": "source-tracks",
+        "revision": 4,
+        "fingerprint": "fingerprint-tracks",
+        "name": "episode.mkv",
+        "media_kind": "video",
+        "mime_type": "video/x-matroska",
+        "metadata": {
+            "technical": {
+                "schema": "adaos.media.technical_descriptor.v2",
+                "file_container": "mkv",
+                "container": "matroska",
+                "height": 1080,
+                "bitrate": 8_000_000,
+                "streams": [
+                    {"index": 0, "kind": "video", "codec": "h264", "height": 1080},
+                    {"index": 1, "kind": "audio", "codec": "aac", "language": "eng"},
+                    {
+                        "index": 2,
+                        "kind": "audio",
+                        "codec": "aac",
+                        "language": "rus",
+                        "disposition": {"default": True},
+                    },
+                ],
+            }
+        },
+    }
+
+    remux = rendition_plan(
+        source,
+        endpoint_capabilities={
+            "codecs": ["h264", "aac"],
+            "containers": ["mp4"],
+            "mime_types": ["video/mp4"],
+        },
+        preferred_audio_language="eng",
+    )
+    hls_source = {
+        **source,
+        "metadata": {
+            "technical": {
+                **source["metadata"]["technical"],
+                "streams": [
+                    {"index": 0, "kind": "video", "codec": "hevc", "height": 1080},
+                    *source["metadata"]["technical"]["streams"][1:],
+                ],
+            }
+        },
+    }
+    prepared = rendition_plan(
+        hls_source,
+        endpoint_capabilities={
+            "codecs": ["h264", "aac"],
+            "containers": ["mp4"],
+            "mime_types": ["video/mp4"],
+            "hls": True,
+            "max_video_height": 1080,
+        },
+        preferred_audio_language="rus",
+    )
+
+    assert remux["decision"] == "remux"
+    assert remux["target"]["profile"].startswith("browser-remux-mp4-v1")
+    assert remux["selected_tracks"]["audio_index"] == 1
+    assert prepared["decision"] == "prepared_hls"
+    assert prepared["target"]["packaging"] == "hls_cmaf_vod"
+    assert prepared["target"]["selected_tracks"]["audio_index"] == 2
+    assert [item["height"] for item in prepared["target"]["abr_ladder"]] == [
+        480,
+        720,
+        1080,
+    ]
+
+
+def test_ffmpeg_capabilities_selects_hardware_with_software_fallback(
+    monkeypatch,
+):
+    rendition_module._FFMPEG_CAPABILITY_CACHE.clear()
+    monkeypatch.setattr(
+        rendition_module, "_ffmpeg_executable", lambda: ("ffmpeg", "fixture")
+    )
+    monkeypatch.setattr(rendition_module.platform, "system", lambda: "Windows")
+
+    def probe(command, **_kwargs):
+        output = (
+            " V....D h264_nvenc NVIDIA NVENC H.264 encoder\n"
+            " V....D libx264 libx264 H.264 encoder\n"
+            if "-encoders" in command
+            else "Hardware acceleration methods:\ncuda\nd3d11va\n"
+        )
+        return SimpleNamespace(stdout=output, stderr="", returncode=0)
+
+    monkeypatch.setattr(rendition_module.subprocess, "run", probe)
+
+    capabilities = rendition_module.ffmpeg_capabilities()
+
+    assert capabilities["selected_video_encoder"] == "h264_nvenc"
+    assert capabilities["hardware_acceleration"] == "nvenc"
+    assert capabilities["software_fallback"] is True
+
+
 def test_rendition_is_bounded_derived_and_tied_to_exact_source(tmp_path):
     library = tmp_path / "library"
     library.mkdir()
@@ -1592,11 +1695,11 @@ def test_rendition_is_bounded_derived_and_tied_to_exact_source(tmp_path):
 
     Draft202012Validator(
         json.loads(
-                (schema_dir / "media-library-rendition-plan.v2.schema.json").read_text(
-                    encoding="utf-8"
-                )
+            (schema_dir / "media-library-rendition-plan.v2.schema.json").read_text(
+                encoding="utf-8"
             )
-        ).validate(plan)
+        )
+    ).validate(plan)
     Draft202012Validator(
         json.loads(
             (schema_dir / "media-library-rendition-job.v1.schema.json").read_text(
