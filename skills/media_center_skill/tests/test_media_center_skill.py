@@ -4113,6 +4113,65 @@ def test_enrichment_worker_persists_provider_claims_and_terminal_progress(
     }
 
 
+def test_local_nfo_claims_drive_public_metadata_search_and_precedence(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    delta = _agent_delta(1, "Movies/opaque-file.mkv", kind="video")
+    delta["source"]["metadata"].update(
+        {
+            "title": "NFO Canonical Title",
+            "year": 2024,
+            "genres": ["Science Fiction", "Drama"],
+            "rating": 8.1,
+            "local_nfo": {
+                "schema": "adaos.media.local_nfo.v1",
+                "state": "ready",
+                "values": {
+                    "title": "NFO Canonical Title",
+                    "year": 2024,
+                    "genres": ["Science Fiction", "Drama"],
+                    "rating": 8.1,
+                },
+            },
+        }
+    )
+    catalog.apply_agent_page(_agent_page(delta))
+
+    nfo_item = catalog.list_items(query="Canonical", media_kind="video")["items"][0]
+    assert nfo_item["title"] == "NFO Canonical Title"
+    assert nfo_item["year"] == 2024
+    assert nfo_item["genres"] == ["Science Fiction", "Drama"]
+    assert nfo_item["metadata_provenance"]["title"] == (
+        "media_library_agent.local_nfo.v1"
+    )
+
+    catalog.record_metadata_claim(
+        subject_ref=f"item:{nfo_item['id']}",
+        field_name="title",
+        value="External Lower Priority",
+        provenance="media_center.tmdb.v1",
+        confidence=1.0,
+    )
+    assert catalog.list_items(media_kind="video")["items"][0]["title"] == (
+        "NFO Canonical Title"
+    )
+    catalog.record_metadata_claim(
+        subject_ref=f"item:{nfo_item['id']}",
+        field_name="title",
+        value="User Preferred Title",
+        provenance="profile:default",
+        confidence=0.5,
+        preferred=True,
+    )
+    resolved = catalog.list_items(query="Preferred", media_kind="video")["items"][0]
+    assert resolved["title"] == "User Preferred Title"
+    assert resolved["metadata_provenance"]["title"] == "profile:default"
+
+
 def test_tmdb_provider_sends_only_normalized_search_evidence_and_caches():
     class Response:
         status_code = 200

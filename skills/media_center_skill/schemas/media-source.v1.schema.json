@@ -16,6 +16,17 @@
     "routed_content_path": {"type": "string"}, "playback_id": {"type": "string"}, "source_path": {"type": "string"},
     "favorite": {"type": "boolean"}, "play_count": {"type": "integer", "minimum": 0}, "tags": {"type": "array"},
     "playable": {"type": "boolean"}, "preview": {"type": "string"},
+    "metadata": {"type": "object"}, "metadata_provenance": {"type": "object"},
+    "metadata_revision": {"type": "integer", "minimum": 0},
+    "year": {"type": ["integer", "null"]}, "release_date": {"type": "string"},
+    "rating": {"type": ["number", "null"]},
+    "critic_rating": {"type": ["number", "null"]},
+    "audience_rating": {"type": ["number", "null"]},
+    "content_rating": {"type": "string"},
+    "duration_ms": {"type": "integer", "minimum": 0},
+    "genres": {"type": "array", "items": {"type": "string"}},
+    "artists": {"type": "array", "items": {"type": "string"}},
+    "album": {"type": "string"}, "series": {"type": "string"},
     "artwork": {
       "type": "object",
       "required": [

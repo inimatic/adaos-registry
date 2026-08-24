@@ -21,6 +21,7 @@ if str(SKILL_ROOT) not in sys.path:
 from media_library_agent.repository import MediaLibraryAgentRepository  # noqa: E402
 import media_library_agent.rendition as rendition_module  # noqa: E402
 from media_library_agent.rendition import artwork_plan, rendition_plan  # noqa: E402
+from media_library_agent.sidecars import read_local_nfo  # noqa: E402
 import media_library_agent.technical as technical_module  # noqa: E402
 from media_library_agent.technical import probe_media  # noqa: E402
 import media_library_agent.topology as topology_module  # noqa: E402
@@ -165,6 +166,58 @@ def test_terminal_scan_progress_keeps_durable_diagnostic(tmp_path):
         "detail": "network share unavailable",
     }
     assert published[0][1] == "desktop"
+
+
+def test_local_nfo_is_bounded_and_refreshes_unchanged_media_source(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    media = library / "Example Movie.mkv"
+    media.write_bytes(b"media")
+    nfo = library / "Example Movie.nfo"
+    nfo.write_text(
+        "<movie><title>Example</title><year>2024</year><genre>Drama</genre>"
+        "<uniqueid type='tmdb'>42</uniqueid><actor><name>Ada Actor</name>"
+        "<role>Lead</role></actor></movie>",
+        encoding="utf-8",
+    )
+    repository = MediaLibraryAgentRepository(tmp_path / "nfo.sqlite3", node_id="node-a")
+
+    def register(path, _root, metadata):
+        return {
+            "resource_id": f"resource-{path.name}",
+            "path": str(path),
+            "source_path": str(path),
+            "mime_type": "video/x-matroska",
+            "metadata": dict(metadata),
+        }
+
+    worker = MediaLibraryAgentWorker(repository, register=register)
+    root = repository.add_root(str(library))["root"]
+    first_job = repository.create_job(root["id"], mode="full")["job"]
+    assert worker.run_once()["id"] == first_job["id"]
+    source = repository.source_by_path(root["id"], media.name)
+
+    assert source["metadata"]["title"] == "Example"
+    assert source["metadata"]["year"] == 2024
+    assert source["metadata"]["genres"] == ["Drama"]
+    assert source["metadata"]["local_nfo"]["values"]["external_ids"] == {
+        "tmdb": "42"
+    }
+    assert source["metadata"]["local_nfo"]["values"]["actors"][0]["role"] == "Lead"
+    first_revision = source["revision"]
+
+    nfo.write_text(
+        "<movie><title>Example Director Cut</title><year>2025</year></movie>",
+        encoding="utf-8",
+    )
+    second_job = repository.create_job(root["id"], mode="full")["job"]
+    assert worker.run_once()["id"] == second_job["id"]
+    changed = repository.source_by_path(root["id"], media.name)
+
+    assert changed["fingerprint"] == source["fingerprint"]
+    assert changed["revision"] > first_revision
+    assert changed["metadata"]["title"] == "Example Director Cut"
+    assert read_local_nfo(media)["state"] == "ready"
 
 
 def test_start_scan_publishes_queued_state_before_worker_pickup(monkeypatch, tmp_path):

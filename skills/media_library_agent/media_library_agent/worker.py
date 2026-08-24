@@ -38,6 +38,7 @@ from .rendition import (
     transcode_with_ffmpeg,
 )
 from .repository import MediaLibraryAgentRepository
+from .sidecars import nfo_witness, read_local_nfo
 from .technical import basic_descriptor, probe_media
 
 
@@ -726,7 +727,16 @@ class MediaLibraryAgentWorker:
                     previous_metadata = (
                         dict(previous.get("metadata") or {}) if previous else {}
                     )
-                    if previous and previous["fingerprint"] == source_fingerprint and previous["present"]:
+                    local_nfo_witness = nfo_witness(path)
+                    nfo_unchanged = (
+                        previous_metadata.get("local_nfo_witness")
+                        == local_nfo_witness
+                    )
+                    if (
+                        previous
+                        and previous["fingerprint"] == source_fingerprint
+                        and previous["present"]
+                    ):
                         descriptor = previous.get("descriptor") or {}
                         metadata = previous_metadata
                     else:
@@ -744,6 +754,16 @@ class MediaLibraryAgentWorker:
                         }
                         descriptor = self._register(path, root, metadata)
                         metadata = dict(descriptor.get("metadata") or metadata)
+                    if not nfo_unchanged or "local_nfo" not in metadata:
+                        local_nfo = read_local_nfo(path)
+                        if local_nfo is None:
+                            metadata.pop("local_nfo", None)
+                        else:
+                            metadata["local_nfo"] = local_nfo
+                            values = local_nfo.get("values")
+                            if isinstance(values, Mapping):
+                                metadata.update(dict(values))
+                    metadata["local_nfo_witness"] = local_nfo_witness
                     witness = folder_artwork_witness(path)
                     prior_witness = previous_metadata.get("artwork_folder_witness")
                     if prior_witness != witness:

@@ -20,6 +20,7 @@ from .catalog import (
     _public_content_path,
     _public_direct_url,
     _public_item,
+    _public_metadata,
     _public_resource_descriptor,
     _text,
     _title_from_name,
@@ -30,7 +31,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-24.3"
+COORDINATOR_SCHEMA_REVISION = "2026-08-25.1"
 SEARCH_ROWID_REVISION = "1"
 AUDIO_CONTEXT_IDENTITY_REVISION = "1"
 VIDEO_SERIES_IDENTITY_REVISION = "2"
@@ -393,6 +394,39 @@ class MediaCatalogCoordinator:
                 );
                 CREATE INDEX IF NOT EXISTS idx_media_center_claim_lookup
                     ON metadata_claims(subject_ref,field_name,confidence DESC,created_at DESC);
+                CREATE TABLE IF NOT EXISTS catalog_metadata_projection (
+                    item_id TEXT PRIMARY KEY REFERENCES catalog_items(id) ON DELETE CASCADE,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    provenance_json TEXT NOT NULL DEFAULT '{}',
+                    title TEXT NOT NULL DEFAULT '',
+                    year INTEGER,
+                    release_date TEXT NOT NULL DEFAULT '',
+                    rating REAL,
+                    critic_rating REAL,
+                    audience_rating REAL,
+                    content_rating TEXT NOT NULL DEFAULT '',
+                    duration_ms INTEGER NOT NULL DEFAULT 0,
+                    genres_json TEXT NOT NULL DEFAULT '[]',
+                    artists_json TEXT NOT NULL DEFAULT '[]',
+                    album TEXT NOT NULL DEFAULT '',
+                    series TEXT NOT NULL DEFAULT '',
+                    revision INTEGER NOT NULL DEFAULT 1,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_media_center_metadata_year
+                    ON catalog_metadata_projection(year,item_id);
+                CREATE INDEX IF NOT EXISTS idx_media_center_metadata_rating
+                    ON catalog_metadata_projection(rating,item_id);
+                CREATE TABLE IF NOT EXISTS catalog_metadata_facets (
+                    item_id TEXT NOT NULL REFERENCES catalog_items(id) ON DELETE CASCADE,
+                    field_name TEXT NOT NULL,
+                    normalized_value TEXT NOT NULL,
+                    display_value TEXT NOT NULL,
+                    numeric_value REAL,
+                    PRIMARY KEY(item_id,field_name,normalized_value)
+                );
+                CREATE INDEX IF NOT EXISTS idx_media_center_metadata_facet_lookup
+                    ON catalog_metadata_facets(field_name,normalized_value,item_id);
                 CREATE TABLE IF NOT EXISTS catalog_aliases (
                     alias_id TEXT PRIMARY KEY,
                     canonical_id TEXT NOT NULL,
@@ -693,6 +727,7 @@ class MediaCatalogCoordinator:
             self._rebuild_folder_nodes(connection)
             self._backfill_search(connection)
             self._ensure_search_rowids(connection)
+            self._backfill_metadata_projections(connection)
             connection.execute(
                 "INSERT OR REPLACE INTO coordinator_meta(key, value) "
                 "VALUES ('coordinator_schema_revision', ?)",
@@ -1327,6 +1362,206 @@ class MediaCatalogCoordinator:
             ("search_rowid_revision", SEARCH_ROWID_REVISION),
         )
 
+    @staticmethod
+    def _claim_priority(row: Mapping[str, Any]) -> tuple[int, float, str]:
+        provenance = _text(row["provenance"]).lower()
+        if bool(row["preferred"]):
+            rank = 1000
+        elif provenance.startswith(("profile:", "user:", "actor:")):
+            rank = 900
+        elif "local_nfo" in provenance:
+            rank = 800
+        elif any(token in provenance for token in ("tmdb", "musicbrainz", "audiodb")):
+            rank = 600
+        elif "deterministic_local" in provenance:
+            rank = 200
+        else:
+            rank = 400
+        return rank, float(row["confidence"] or 0.0), _text(row["created_at"])
+
+    @staticmethod
+    def _numeric(value: Any, default: float | None = None) -> float | None:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _resolved_metadata(
+        self,
+        connection: sqlite3.Connection,
+        item_id: str,
+        base_metadata: Mapping[str, Any],
+        *,
+        work_id: str = "",
+    ) -> tuple[dict[str, Any], dict[str, str]]:
+        metadata = dict(base_metadata)
+        provenance = {
+            str(key): "media_library_agent.source_metadata.v1"
+            for key, value in metadata.items()
+            if value not in (None, "", [], {})
+        }
+        subjects = [f"item:{item_id}"]
+        if _text(work_id):
+            subjects.append(f"work:{_text(work_id)}")
+        placeholders = ",".join("?" for _ in subjects)
+        rows = connection.execute(
+            f"SELECT * FROM metadata_claims WHERE subject_ref IN ({placeholders})",
+            tuple(subjects),
+        ).fetchall()
+        winners: dict[str, sqlite3.Row] = {}
+        aliases = {"canonical_title": "title", "vote_average": "rating"}
+        for row in rows:
+            field = aliases.get(str(row["field_name"]), str(row["field_name"]))
+            previous = winners.get(field)
+            if previous is None or self._claim_priority(row) > self._claim_priority(previous):
+                winners[field] = row
+        for field, row in winners.items():
+            value = _json_loads(row["value_json"])
+            if value not in (None, "", [], {}):
+                metadata[field] = value
+                provenance[field] = str(row["provenance"])
+        return metadata, provenance
+
+    def _refresh_metadata_projection(
+        self, connection: sqlite3.Connection, item_id: str
+    ) -> None:
+        row = connection.execute(
+            "SELECT id,name,source_path,folder_path,metadata_json,work_id,title "
+            "FROM catalog_items WHERE id=?",
+            (_text(item_id),),
+        ).fetchone()
+        if row is None:
+            return
+        base = _json_loads(row["metadata_json"])
+        metadata, provenance = self._resolved_metadata(
+            connection,
+            str(row["id"]),
+            base if isinstance(base, Mapping) else {},
+            work_id=str(row["work_id"]),
+        )
+        title = _text(metadata.get("title")) or str(row["title"])
+        year_number = self._numeric(metadata.get("year") or metadata.get("release_year"))
+        year = int(year_number) if year_number is not None else None
+        rating = self._numeric(metadata.get("rating") or metadata.get("vote_average"))
+        critic_rating = self._numeric(metadata.get("critic_rating"))
+        audience_rating = self._numeric(metadata.get("audience_rating"))
+        duration_ms_number = self._numeric(metadata.get("duration_ms"), 0.0) or 0.0
+        if duration_ms_number <= 0:
+            duration_seconds = self._numeric(metadata.get("duration_seconds"), 0.0) or 0.0
+            duration_ms_number = duration_seconds * 1000.0
+        genres = metadata.get("genres") or metadata.get("categories") or []
+        artists = metadata.get("artists") or metadata.get("artist") or []
+        if isinstance(genres, str):
+            genres = [genres]
+        if isinstance(artists, str):
+            artists = [artists]
+        genres = [_text(value) for value in list(genres)[:100] if _text(value)]
+        artists = [_text(value) for value in list(artists)[:100] if _text(value)]
+        previous = connection.execute(
+            "SELECT revision FROM catalog_metadata_projection WHERE item_id=?",
+            (str(row["id"]),),
+        ).fetchone()
+        revision = int(previous["revision"] or 0) + 1 if previous else 1
+        connection.execute(
+            """
+            INSERT INTO catalog_metadata_projection(
+                item_id,metadata_json,provenance_json,title,year,release_date,
+                rating,critic_rating,audience_rating,content_rating,duration_ms,
+                genres_json,artists_json,album,series,revision,updated_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(item_id) DO UPDATE SET
+                metadata_json=excluded.metadata_json,
+                provenance_json=excluded.provenance_json,title=excluded.title,
+                year=excluded.year,release_date=excluded.release_date,
+                rating=excluded.rating,critic_rating=excluded.critic_rating,
+                audience_rating=excluded.audience_rating,
+                content_rating=excluded.content_rating,
+                duration_ms=excluded.duration_ms,genres_json=excluded.genres_json,
+                artists_json=excluded.artists_json,album=excluded.album,
+                series=excluded.series,revision=excluded.revision,
+                updated_at=excluded.updated_at
+            """,
+            (
+                str(row["id"]), _json_dumps(metadata), _json_dumps(provenance),
+                title, year, _text(metadata.get("release_date")), rating,
+                critic_rating, audience_rating, _text(metadata.get("content_rating")),
+                max(0, int(duration_ms_number)), _json_dumps(genres),
+                _json_dumps(artists), _text(metadata.get("album")),
+                _text(metadata.get("series")), revision, now_iso(),
+            ),
+        )
+        connection.execute(
+            "DELETE FROM catalog_metadata_facets WHERE item_id=?", (str(row["id"]),)
+        )
+        facet_rows: list[tuple[Any, ...]] = []
+        for field, values in (
+            ("genre", genres),
+            ("artist", artists),
+            ("tag", metadata.get("tags") or []),
+            ("country", metadata.get("countries") or []),
+            ("director", metadata.get("directors") or []),
+        ):
+            if isinstance(values, str):
+                values = [values]
+            for value in list(values)[:100]:
+                display = _text(value)
+                normalized = fold_text(display)
+                if display and normalized:
+                    facet_rows.append((str(row["id"]), field, normalized, display, None))
+        for field, value in (
+            ("year", year),
+            ("content_rating", _text(metadata.get("content_rating"))),
+            ("album", _text(metadata.get("album"))),
+            ("series", _text(metadata.get("series"))),
+        ):
+            if value not in (None, ""):
+                facet_rows.append(
+                    (str(row["id"]), field, fold_text(value), _text(value), self._numeric(value))
+                )
+        if facet_rows:
+            connection.executemany(
+                "INSERT OR REPLACE INTO catalog_metadata_facets(" 
+                "item_id,field_name,normalized_value,display_value,numeric_value) "
+                "VALUES (?,?,?,?,?)",
+                facet_rows,
+            )
+        search_text = self._search_text(
+            title=title,
+            name=row["name"],
+            relative_path=row["source_path"],
+            folder_path=row["folder_path"],
+            metadata=metadata,
+        )
+        connection.execute(
+            "UPDATE catalog_items SET title=?,search_text=? WHERE id=?",
+            (title, search_text, str(row["id"])),
+        )
+        self._replace_search(connection, str(row["id"]), search_text)
+
+    def _backfill_metadata_projections(self, connection: sqlite3.Connection) -> None:
+        rows = connection.execute(
+            "SELECT id FROM catalog_items WHERE id NOT IN "
+            "(SELECT item_id FROM catalog_metadata_projection) ORDER BY id"
+        ).fetchall()
+        for row in rows:
+            self._refresh_metadata_projection(connection, str(row["id"]))
+
+    @staticmethod
+    def _metadata_projection_map(
+        connection: sqlite3.Connection, item_ids: Iterable[str]
+    ) -> dict[str, sqlite3.Row]:
+        tokens = [str(value) for value in item_ids if _text(value)]
+        if not tokens:
+            return {}
+        placeholders = ",".join("?" for _ in tokens)
+        return {
+            str(row["item_id"]): row
+            for row in connection.execute(
+                f"SELECT * FROM catalog_metadata_projection WHERE item_id IN ({placeholders})",
+                tuple(tokens),
+            ).fetchall()
+        }
+
     def refresh_search_index(self, *, force_legacy: bool = False) -> dict[str, Any]:
         with self.repository.connect() as connection:
             if force_legacy:
@@ -1568,7 +1803,11 @@ class MediaCatalogCoordinator:
         )
         mime_type = _text(source.get("mime_type") or descriptor.get("mime_type") or descriptor.get("mime")) or "application/octet-stream"
         kind = _text(source.get("media_kind")) or _media_kind(mime_type, name)
-        title = _text(descriptor.get("title")) or _title_from_name(name)
+        title = (
+            _text(metadata.get("title"))
+            or _text(descriptor.get("title"))
+            or _title_from_name(name)
+        )
         work, collections, membership = self._classify_source(
             name, kind, folder_path, metadata
         )
@@ -1828,6 +2067,28 @@ class MediaCatalogCoordinator:
                 ),
             )
         subject_ref = f"item:{item_id}"
+        connection.execute(
+            "DELETE FROM metadata_claims WHERE subject_ref=? AND provenance=?",
+            (subject_ref, "media_library_agent.local_nfo.v1"),
+        )
+        local_nfo = metadata.get("local_nfo")
+        local_nfo_values = (
+            local_nfo.get("values") if isinstance(local_nfo, Mapping) else None
+        )
+        if isinstance(local_nfo_values, Mapping):
+            for field_name, value in list(local_nfo_values.items())[:100]:
+                if value in (None, "", [], {}):
+                    continue
+                self._record_metadata_claim_connection(
+                    connection,
+                    subject_ref=subject_ref,
+                    field_name=str(field_name),
+                    value=value,
+                    provenance="media_library_agent.local_nfo.v1",
+                    confidence=0.98,
+                    preferred=False,
+                )
+        self._refresh_metadata_projection(connection, item_id)
         for job_kind, priority in (
             ("metadata_enrichment", 200),
             ("embedding", 600),
@@ -3066,9 +3327,17 @@ class MediaCatalogCoordinator:
                     """,
                     query_params,
                 ).fetchall()
+            projections = self._metadata_projection_map(
+                connection, (str(row["id"]) for row in rows)
+            )
         has_more = len(rows) > page_size
         visible_rows = rows[:page_size]
-        items = [self._public_coordinator_item(row, profile) for row in visible_rows]
+        items = [
+            self._public_coordinator_item(
+                row, profile, projections.get(str(row["id"]))
+            )
+            for row in visible_rows
+        ]
         next_offset = resolved_offset + len(items)
         total_count = next_offset + (1 if has_more else 0)
         next_anchor: list[Any] | None = None
@@ -3289,7 +3558,11 @@ class MediaCatalogCoordinator:
         }
 
     @staticmethod
-    def _public_coordinator_item(row: sqlite3.Row, profile_id: str) -> dict[str, Any]:
+    def _public_coordinator_item(
+        row: sqlite3.Row,
+        profile_id: str,
+        projection: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         item = _public_item(row)
         item.update(
             {
@@ -3308,6 +3581,33 @@ class MediaCatalogCoordinator:
                 },
             }
         )
+        if projection is not None:
+            metadata = _json_loads(projection["metadata_json"])
+            provenance = _json_loads(projection["provenance_json"])
+            public_metadata = _public_metadata(metadata)
+            item["metadata"] = (
+                public_metadata if isinstance(public_metadata, Mapping) else {}
+            )
+            item["metadata_provenance"] = (
+                provenance if isinstance(provenance, Mapping) else {}
+            )
+            item["title"] = _text(projection["title"]) or item["title"]
+            item["year"] = projection["year"]
+            item["release_date"] = _text(projection["release_date"])
+            item["rating"] = projection["rating"]
+            item["critic_rating"] = projection["critic_rating"]
+            item["audience_rating"] = projection["audience_rating"]
+            item["content_rating"] = _text(projection["content_rating"])
+            item["duration_ms"] = int(projection["duration_ms"] or 0)
+            item["genres"] = _json_loads(projection["genres_json"]) or []
+            item["artists"] = _json_loads(projection["artists_json"]) or []
+            item["album"] = _text(projection["album"])
+            item["series"] = _text(projection["series"])
+            item["metadata_revision"] = int(projection["revision"] or 0)
+            if isinstance(metadata, Mapping):
+                projected_artwork = _public_artwork(metadata)
+                if projected_artwork.get("state") == "ready":
+                    item["artwork"] = projected_artwork
         return item
 
     def set_favorite(self, item_id: str, *, profile_id: str, favorite: bool) -> dict[str, Any]:
@@ -5611,8 +5911,9 @@ class MediaCatalogCoordinator:
             connection.commit()
         return {"ok": True, "job_id": token, "status": status, "attempts": attempts}
 
-    def record_metadata_claim(
+    def _record_metadata_claim_connection(
         self,
+        connection: sqlite3.Connection,
         *,
         subject_ref: str,
         field_name: str,
@@ -5629,35 +5930,67 @@ class MediaCatalogCoordinator:
         claim_id = _stable_id(
             "claim", subject, field, _json_dumps(value), provider, size=24
         )
-        with self.repository.connect() as connection:
-            previous = connection.execute(
-                "SELECT revision FROM metadata_claims WHERE id=?", (claim_id,)
-            ).fetchone()
-            revision = int(previous["revision"] or 0) + 1 if previous else 1
-            connection.execute(
-                """
-                INSERT INTO metadata_claims(
-                    id,subject_ref,field_name,value_json,provenance,confidence,
-                    preferred,revision,created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET confidence=excluded.confidence,
-                    preferred=excluded.preferred, revision=excluded.revision,
-                    created_at=excluded.created_at
-                """,
-                (
-                    claim_id,
-                    subject,
-                    field,
-                    _json_dumps(value),
-                    provider,
-                    max(0.0, min(1.0, float(confidence))),
-                    int(preferred),
-                    revision,
-                    now_iso(),
-                ),
-            )
-            connection.commit()
+        previous = connection.execute(
+            "SELECT revision FROM metadata_claims WHERE id=?", (claim_id,)
+        ).fetchone()
+        revision = int(previous["revision"] or 0) + 1 if previous else 1
+        connection.execute(
+            """
+            INSERT INTO metadata_claims(
+                id,subject_ref,field_name,value_json,provenance,confidence,
+                preferred,revision,created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET confidence=excluded.confidence,
+                preferred=excluded.preferred, revision=excluded.revision,
+                created_at=excluded.created_at
+            """,
+            (
+                claim_id,
+                subject,
+                field,
+                _json_dumps(value),
+                provider,
+                max(0.0, min(1.0, float(confidence))),
+                int(preferred),
+                revision,
+                now_iso(),
+            ),
+        )
         return {"ok": True, "claim_id": claim_id, "revision": revision}
+
+    def record_metadata_claim(
+        self,
+        *,
+        subject_ref: str,
+        field_name: str,
+        value: Any,
+        provenance: str,
+        confidence: float,
+        preferred: bool = False,
+    ) -> dict[str, Any]:
+        with self.repository.connect() as connection:
+            result = self._record_metadata_claim_connection(
+                connection,
+                subject_ref=subject_ref,
+                field_name=field_name,
+                value=value,
+                provenance=provenance,
+                confidence=confidence,
+                preferred=preferred,
+            )
+            if result.get("ok") and _text(subject_ref).startswith("item:"):
+                self._refresh_metadata_projection(
+                    connection, _text(subject_ref).removeprefix("item:")
+                )
+            elif result.get("ok") and _text(subject_ref).startswith("work:"):
+                work_id = _text(subject_ref).removeprefix("work:")
+                item_rows = connection.execute(
+                    "SELECT id FROM catalog_items WHERE work_id=?", (work_id,)
+                ).fetchall()
+                for row in item_rows:
+                    self._refresh_metadata_projection(connection, str(row["id"]))
+            connection.commit()
+        return result
 
     def enrichment_subject(self, subject_ref: str) -> dict[str, Any] | None:
         subject = _text(subject_ref)
