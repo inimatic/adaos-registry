@@ -36,7 +36,7 @@ two seconds.
 - `import_folder` and `start_scan` return in seconds with durable job identifiers.
 - The persistent service process is the single owner of background work in production. Root-runtime tools only mutate the shared durable queue. Standalone development may opt into an in-process worker with `MEDIA_LIBRARY_AGENT_EMBEDDED_WORKER=1`.
 - Jobs survive process restart. Only the service owner requeues interrupted work, preventing root/service fencing races; incremental fingerprints avoid re-registering unchanged files.
-- Progress is persisted and published as the bounded replace-mode stream variable `media_library_agent.progress` at no more than 2 Hz.
+- Progress is persisted and published as the bounded replace-mode stream variable `media_library_agent.progress` at no more than 2 Hz. Snapshot replay includes the root label, and a terminal update retains the durable structured error, so a reconnecting Settings surface can distinguish queued, running, completed, and failed scans without polling or parsing logs.
 - Terminal job transitions publish `media_library_agent.catalog.changed`, allowing the coordinator to pull bounded deltas without polling from the browser.
 - `set_resource_pressure(playback)` persists pressure in the shared agent database. The service observes it within its one-second poll interval and pauses scanning or rendition work so playback retains priority.
 - Images are excluded unless enabled for a root. Symlinks are not followed by default; exclusions and periodic reconciliation are root policy.

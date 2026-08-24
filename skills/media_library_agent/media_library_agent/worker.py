@@ -912,9 +912,12 @@ class MediaLibraryAgentWorker:
             "wait_reason": self._wait_reason,
             "updated_at": now_iso(),
         }
+        job = self.repository.get_job(job_id) or {}
+        if job.get("error"):
+            payload["error"] = dict(job["error"])
         if self._publish_callback:
             try:
-                self._publish_callback(payload, text((self.repository.get_job(job_id) or {}).get("webspace_id")))
+                self._publish_callback(payload, text(job.get("webspace_id")))
             except Exception:
                 pass
 

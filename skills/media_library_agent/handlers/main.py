@@ -133,11 +133,6 @@ def _deliver_progress(payload: Mapping[str, Any], webspace_id: str) -> None:
             if is_rendition
             else "media_library_agent.current_scan"
         ),
-        seq=(
-            int(payload.get("revision") or 0)
-            if is_rendition
-            else int((payload.get("progress") or {}).get("processed_count") or 0)
-        ),
         ttl_ms=120000,
         _meta=meta,
     )
@@ -351,6 +346,7 @@ def on_progress_snapshot_requested(event: Any) -> None:
         return
     jobs = repository.list_jobs(limit=1).get("items") or []
     job = dict(jobs[0]) if jobs else {}
+    root = repository.get_root(text(job.get("root_id"))) if job else None
     progress = dict(job.get("progress") or {})
     progress.update(
         {
@@ -366,7 +362,7 @@ def on_progress_snapshot_requested(event: Any) -> None:
         "agent_id": repository.agent_id,
         "node_id": repository.node_id,
         "root_id": text(job.get("root_id")),
-        "root_label": "",
+        "root_label": text((root or {}).get("label")),
         "status": text(job.get("status")) or "idle",
         "progress": progress,
         "current_path": text((job.get("progress") or {}).get("current_path"))[-500:],
@@ -374,6 +370,8 @@ def on_progress_snapshot_requested(event: Any) -> None:
         "wait_reason": "",
         "updated_at": now_iso(),
     }
+    if job.get("error"):
+        snapshot["error"] = dict(job["error"])
     _publish_progress(snapshot, text(payload.get("webspace_id")))
 
 
@@ -472,6 +470,25 @@ def start_scan(
             }
         jobs.append(dict(result["job"]))
         accepted += int(bool(result.get("accepted")))
+        root = repository.get_root(candidate) or {}
+        job = dict(result["job"])
+        _publish_progress(
+            {
+                "schema": PROGRESS_SCHEMA,
+                "job_id": text(job.get("id")),
+                "agent_id": repository.agent_id,
+                "node_id": repository.node_id,
+                "root_id": text(candidate),
+                "root_label": text(root.get("label")),
+                "status": text(job.get("status")) or "queued",
+                "progress": dict(job.get("progress") or {}),
+                "current_path": "",
+                "resource_pressure": worker.resource_pressure,
+                "wait_reason": "",
+                "updated_at": now_iso(),
+            },
+            webspace_id,
+        )
     _ensure_worker_if_owned(worker)
     return {
         "ok": True,

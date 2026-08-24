@@ -132,6 +132,66 @@ def test_progress_publication_is_nonblocking_bounded_and_coalesced(monkeypatch):
     assert [item[0]["sequence"] for item in delivered] == [1, 101]
 
 
+def test_terminal_scan_progress_keeps_durable_diagnostic(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "progress-error.sqlite3", node_id="node-a"
+    )
+    root = repository.add_root(str(library))["root"]
+    job = repository.create_job(root["id"], webspace_id="desktop")["job"]
+    repository.update_job(
+        job["id"],
+        status="failed",
+        error_code="scan_failed",
+        error_detail="network share unavailable",
+    )
+    published = []
+    worker = MediaLibraryAgentWorker(
+        repository,
+        publish=lambda payload, webspace_id: published.append(
+            (dict(payload), webspace_id)
+        ),
+    )
+
+    worker._publish_progress(
+        job["id"], root, {}, "", status="failed", force=True
+    )
+
+    assert published[0][0]["error"] == {
+        "code": "scan_failed",
+        "detail": "network share unavailable",
+    }
+    assert published[0][1] == "desktop"
+
+
+def test_start_scan_publishes_queued_state_before_worker_pickup(monkeypatch, tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "queued-progress.sqlite3", node_id="node-a"
+    )
+    root = repository.add_root(str(library), label="Network video")["root"]
+    worker = SimpleNamespace(resource_pressure="normal")
+    published = []
+    monkeypatch.setattr(main, "_runtime", lambda: (repository, worker))
+    monkeypatch.setattr(main, "_ensure_worker_if_owned", lambda _worker: None)
+    monkeypatch.setattr(
+        main,
+        "_publish_progress",
+        lambda payload, webspace_id: published.append((dict(payload), webspace_id)),
+    )
+
+    result = main.start_scan(root_id=root["id"], webspace_id="desktop")
+
+    assert result["ok"] is True
+    assert result["asynchronous"] is True
+    assert published[0][0]["job_id"] == result["job"]["id"]
+    assert published[0][0]["status"] == "queued"
+    assert published[0][0]["root_label"] == "Network video"
+    assert published[0][1] == "desktop"
+
+
 def test_agent_reports_local_topology_without_writing_control_plane(tmp_path):
     source = (SKILL_ROOT / "media_library_agent" / "topology.py").read_text(
         encoding="utf-8"
