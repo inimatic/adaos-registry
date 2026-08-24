@@ -6,6 +6,12 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.65` makes the identity migration scale with library size. It ships
+`media_center_skill@0.8.57` and keeps the remaining `0.6.64` component set.
+Exact-source variants now have a dedicated lookup index, and migration/removal
+updates use separate indexed source and exact-source statements. This removes
+the repeated full-table scans observed while repairing a 68,000-item catalog.
+
 Release `0.6.64` makes activation bounded on slow library storage. It ships
 `media_center_skill@0.8.56` and keeps the remaining `0.6.63` component set.
 The lifecycle `rehydrate` hook now validates durable catalog state without
