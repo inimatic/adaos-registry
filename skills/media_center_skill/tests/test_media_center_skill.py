@@ -1090,7 +1090,18 @@ def test_schema_migration_repairs_legacy_folder_scoped_series_identity(
             str(row["name"])
             for row in connection.execute("PRAGMA index_list(media_variants)")
         }
+        plan = connection.execute(
+            """
+            EXPLAIN QUERY PLAN
+            SELECT id,name,folder_path,metadata_json,node_id,source_id,
+                work_id,variant_id,collection_id
+            FROM catalog_items NOT INDEXED
+            WHERE agent_id<>'' AND media_kind='video'
+            """
+        ).fetchall()
     assert "idx_media_center_variant_exact_source" in indexes
+    assert any("SCAN catalog_items" in str(row["detail"]) for row in plan)
+    assert all("TEMP B-TREE" not in str(row["detail"]) for row in plan)
 
 
 def test_personal_state_is_profile_scoped_and_revisioned(monkeypatch, tmp_path):

@@ -845,9 +845,8 @@ class MediaCatalogCoordinator:
             """
             SELECT id,name,folder_path,metadata_json,node_id,source_id,
                 work_id,variant_id,collection_id
-            FROM catalog_items
+            FROM catalog_items NOT INDEXED
             WHERE agent_id<>'' AND media_kind='audio'
-            ORDER BY id
             """
         ).fetchall()
         now = now_iso()
@@ -1087,9 +1086,8 @@ class MediaCatalogCoordinator:
             """
             SELECT id,name,folder_path,metadata_json,node_id,source_id,
                 work_id,variant_id,collection_id
-            FROM catalog_items
+            FROM catalog_items NOT INDEXED
             WHERE agent_id<>'' AND media_kind='video'
-            ORDER BY id
             """
         ).fetchall()
         repaired = 0
