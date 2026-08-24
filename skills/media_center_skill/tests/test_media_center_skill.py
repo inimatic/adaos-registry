@@ -21,7 +21,11 @@ if str(SKILL_ROOT) not in sys.path:
 from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION  # noqa: E402
 from media_center.background import MediaCenterBackgroundRuntime  # noqa: E402
 from media_center.coordinator import MediaCatalogCoordinator  # noqa: E402
-from media_center.enrichment import MediaEnrichmentWorker  # noqa: E402
+from media_center.enrichment import (  # noqa: E402
+    MediaEnrichmentWorker,
+    TmdbMetadataProvider,
+    default_metadata_providers,
+)
 from media_center.sync import MediaAgentSyncWorker  # noqa: E402
 from media_center.topology import MediaCenterTopology  # noqa: E402
 
@@ -3370,6 +3374,142 @@ def test_enrichment_worker_persists_provider_claims_and_terminal_progress(
     assert {item["field_name"] for item in claims["items"]} >= {
         "title",
         "folder_keywords",
+    }
+
+
+def test_tmdb_provider_sends_only_normalized_search_evidence_and_caches():
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            return {
+                "results": [
+                    {
+                        "id": 671,
+                        "title": "Harry Potter and the Philosopher's Stone",
+                        "original_title": "Harry Potter and the Philosopher's Stone",
+                        "release_date": "2001-11-16",
+                        "poster_path": "/poster.jpg",
+                    }
+                ]
+            }
+
+    class Session:
+        def __init__(self):
+            self.calls = []
+
+        def get(self, url, **kwargs):
+            self.calls.append((url, kwargs))
+            return Response()
+
+    session = Session()
+    provider = TmdbMetadataProvider(
+        read_access_token="secret-token",
+        session=session,
+        minimum_interval_seconds=0.1,
+    )
+    subject = {
+        "subject_ref": "item:item-a",
+        "title": "Harry.Potter.2001.1080p.BluRay.mkv",
+        "media_kind": "video",
+        "folder_path": "/private/movies/Harry Potter",
+        "descriptor": {"path": "/private/movies/Harry Potter/movie.mkv"},
+        "metadata": {},
+    }
+
+    first = provider.claims(subject, job_kind="metadata_enrichment")
+    second = provider.claims(subject, job_kind="metadata_enrichment")
+
+    assert first == second
+    assert len(session.calls) == 1
+    url, request = session.calls[0]
+    assert url.endswith("/search/movie")
+    assert request["params"] == {
+        "query": "Harry Potter",
+        "language": "en-US",
+        "include_adult": "false",
+        "page": 1,
+        "year": 2001,
+    }
+    assert "/private" not in repr(request)
+    assert request["headers"]["Authorization"] == "Bearer secret-token"
+    assert {claim["field_name"] for claim in first} >= {
+        "tmdb_id",
+        "title",
+        "poster_path",
+    }
+    assert provider.status()["cache_hit_count"] == 1
+
+
+def test_external_metadata_provider_is_strictly_opt_in(monkeypatch):
+    monkeypatch.setenv("MEDIA_CENTER_TMDB_READ_ACCESS_TOKEN", "token")
+    monkeypatch.delenv("MEDIA_CENTER_METADATA_EXTERNAL_ENABLED", raising=False)
+    assert [provider.provider_id for provider in default_metadata_providers()] == [
+        "media_center.deterministic_local.v1"
+    ]
+
+    monkeypatch.setenv("MEDIA_CENTER_METADATA_EXTERNAL_ENABLED", "1")
+    assert [provider.provider_id for provider in default_metadata_providers()] == [
+        "media_center.deterministic_local.v1",
+        "media_center.tmdb.v1",
+    ]
+
+
+def test_enrichment_worker_runs_all_eligible_providers(monkeypatch, tmp_path):
+    class ExternalProvider:
+        provider_id = "test.external.v1"
+        supported_jobs = frozenset({"metadata_enrichment"})
+
+        @staticmethod
+        def claims(subject, *, job_kind):
+            assert job_kind == "metadata_enrichment"
+            return [
+                {
+                    "subject_ref": subject["subject_ref"],
+                    "field_name": "external_id",
+                    "value": "external-1",
+                    "confidence": 0.8,
+                }
+            ]
+
+        @staticmethod
+        def status():
+            return {
+                "provider_id": "test.external.v1",
+                "enabled": True,
+                "state": "ready",
+            }
+
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Movies/Movie.mp4")))
+    subject_ref = catalog.operations(limit=10)["items"][0]["subject_ref"]
+    worker = MediaEnrichmentWorker(
+        catalog,
+        providers=(
+            default_metadata_providers()[0],
+            ExternalProvider(),
+        ),
+    )
+
+    result = worker.run_once()
+    claims = catalog.metadata_claims(subject_ref, limit=30)
+    operation = catalog.operations(limit=10)["items"][0]
+
+    assert result["status"] == "completed"
+    assert operation["provider_id"] == (
+        "media_center.deterministic_local.v1,test.external.v1"
+    )
+    assert {item["provenance"] for item in claims["items"]} == {
+        "media_center.deterministic_local.v1",
+        "test.external.v1",
     }
 
 
