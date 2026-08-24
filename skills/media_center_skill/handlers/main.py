@@ -52,6 +52,7 @@ AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".aac", ".opus", ".ogg"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
 LEGACY_MANAGED_COPY_RE = re.compile(r"^media-center-[0-9a-f]{24}-import\.[^.]+$", re.IGNORECASE)
 _coordinator_lock = threading.Lock()
+_coordinator_init_lock = threading.Lock()
 _coordinator_path = ""
 _coordinator_cached: MediaCatalogCoordinator | None = None
 _log = logging.getLogger("adaos.skill.media_center")
@@ -72,7 +73,16 @@ def _coordinator(repository: MediaCenterRepository | None = None) -> MediaCatalo
         with _coordinator_lock:
             if _coordinator_cached is not None and _coordinator_path == path:
                 return _coordinator_cached
-        repo = MediaCenterRepository(path)
+        with _coordinator_init_lock:
+            with _coordinator_lock:
+                if _coordinator_cached is not None and _coordinator_path == path:
+                    return _coordinator_cached
+            repo = MediaCenterRepository(path)
+            coordinator = MediaCatalogCoordinator(repo)
+            with _coordinator_lock:
+                _coordinator_cached = coordinator
+                _coordinator_path = path
+                return coordinator
     else:
         repo = repository
         path = str(repo.db_path.resolve())
@@ -904,7 +914,16 @@ def on_media_center_snapshot_requested(event: Any) -> None:
 
 @subscribe("media_library_agent.catalog.changed")
 def on_agent_catalog_changed(event: Any) -> None:
-    catalog = _coordinator()
+    path = str(default_db_path().resolve())
+    with _coordinator_lock:
+        catalog = (
+            _coordinator_cached
+            if _coordinator_cached is not None and _coordinator_path == path
+            else None
+        )
+    if catalog is None:
+        background_runtime().ensure_bootstrap_started(path, _start_live_runtime)
+        return
     _agent_sync_runtime(catalog).ensure_started(wake=True)
 
 

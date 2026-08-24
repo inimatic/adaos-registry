@@ -24,6 +24,7 @@ from .catalog import (
     _text,
     _title_from_name,
     now_iso,
+    schema_revision_is_current,
 )
 from .discovery import discovery_score, fold_text
 
@@ -228,19 +229,13 @@ class MediaCatalogCoordinator:
         self.ensure_schema()
 
     def _schema_is_current(self) -> bool:
-        if not self.repository.db_path.exists():
-            return False
-        try:
-            with sqlite3.connect(
-                str(self.repository.db_path), timeout=1
-            ) as connection:
-                row = connection.execute(
-                    "SELECT value FROM coordinator_meta "
-                    "WHERE key='coordinator_schema_revision'"
-                ).fetchone()
-        except sqlite3.Error:
-            return False
-        return bool(row and str(row[0]) == COORDINATOR_SCHEMA_REVISION)
+        return schema_revision_is_current(
+            self.repository.db_path,
+            table="coordinator_meta",
+            key="coordinator_schema_revision",
+            expected=COORDINATOR_SCHEMA_REVISION,
+            unavailable_error="media_center_coordinator_schema_state_unavailable",
+        )
 
     def ensure_schema(self, *, force: bool = False) -> dict[str, Any]:
         if not force and self._schema_is_current():

@@ -19,6 +19,9 @@ SKILL_NAME = "media_center_skill"
 MAX_LIST_LIMIT = 500
 DEFAULT_LIST_LIMIT = 100
 PLAYABLE_KINDS = {"video", "audio"}
+_SCHEMA_READ_ATTEMPTS = 4
+_SCHEMA_READ_TIMEOUT_SECONDS = 1.0
+_SCHEMA_READ_RETRY_SECONDS = (0.05, 0.15, 0.35)
 
 
 class _ClosingConnection(sqlite3.Connection):
@@ -57,6 +60,41 @@ def default_db_path() -> Path:
     return db_dir / "media_center.sqlite3"
 
 
+def schema_revision_is_current(
+    db_path: str | Path,
+    *,
+    table: str,
+    key: str,
+    expected: str,
+    unavailable_error: str,
+) -> bool:
+    path = Path(db_path)
+    if not path.exists():
+        return False
+    for attempt in range(_SCHEMA_READ_ATTEMPTS):
+        try:
+            with closing(
+                sqlite3.connect(str(path), timeout=_SCHEMA_READ_TIMEOUT_SECONDS)
+            ) as connection:
+                row = connection.execute(
+                    f"SELECT value FROM {table} WHERE key=?",
+                    (key,),
+                ).fetchone()
+        except sqlite3.OperationalError as exc:
+            message = str(exc).lower()
+            if "no such table" in message:
+                return False
+            transient = any(token in message for token in ("locked", "busy"))
+            if transient and attempt + 1 < _SCHEMA_READ_ATTEMPTS:
+                time.sleep(_SCHEMA_READ_RETRY_SECONDS[attempt])
+                continue
+            raise RuntimeError(unavailable_error) from exc
+        except sqlite3.DatabaseError as exc:
+            raise RuntimeError(unavailable_error) from exc
+        return bool(row and str(row[0]) == expected)
+    raise RuntimeError(unavailable_error)
+
+
 class MediaCenterRepository:
     def __init__(self, db_path: str | Path | None = None):
         self.db_path = Path(db_path) if db_path is not None else default_db_path()
@@ -81,20 +119,13 @@ class MediaCenterRepository:
         return connection
 
     def _schema_is_current(self) -> bool:
-        if not self.db_path.exists():
-            return False
-        try:
-            with closing(sqlite3.connect(str(self.db_path), timeout=1)) as connection:
-                row = connection.execute(
-                    "SELECT value FROM meta WHERE key='catalog_schema_revision'"
-                ).fetchone()
-        except sqlite3.OperationalError as exc:
-            if "no such table" in str(exc).lower():
-                return False
-            raise RuntimeError("media_center_schema_state_unavailable") from exc
-        except sqlite3.DatabaseError as exc:
-            raise RuntimeError("media_center_schema_state_unavailable") from exc
-        return bool(row and str(row[0]) == CATALOG_SCHEMA_REVISION)
+        return schema_revision_is_current(
+            self.db_path,
+            table="meta",
+            key="catalog_schema_revision",
+            expected=CATALOG_SCHEMA_REVISION,
+            unavailable_error="media_center_schema_state_unavailable",
+        )
 
     def ensure_schema(self, *, force: bool = False) -> dict[str, Any]:
         if not force and self._schema_is_current():

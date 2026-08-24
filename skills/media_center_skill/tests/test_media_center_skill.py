@@ -195,6 +195,34 @@ def test_sys_ready_schedules_catalog_bootstrap_without_running_it_inline(
     assert started == ["library", "operations", "sync", "enrichment"]
 
 
+def test_catalog_change_during_bootstrap_does_not_open_the_catalog(
+    monkeypatch, tmp_path
+) -> None:
+    scheduled: list[tuple[str, object]] = []
+
+    class Runtime:
+        def ensure_bootstrap_started(self, key, callback) -> bool:
+            scheduled.append((key, callback))
+            return False
+
+    db_path = (tmp_path / "catalog.sqlite3").resolve()
+    monkeypatch.setattr(main, "_coordinator_cached", None)
+    monkeypatch.setattr(main, "_coordinator_path", "")
+    monkeypatch.setattr(main, "default_db_path", lambda: db_path)
+    monkeypatch.setattr(main, "background_runtime", lambda: Runtime())
+    monkeypatch.setattr(
+        main,
+        "_coordinator",
+        lambda *_args, **_kwargs: pytest.fail(
+            "catalog event must not race runtime bootstrap"
+        ),
+    )
+
+    main.on_agent_catalog_changed(None)
+
+    assert scheduled == [(str(db_path), main._start_live_runtime)]
+
+
 def test_schema_lock_never_falls_through_to_full_migration(monkeypatch, tmp_path) -> None:
     db_path = tmp_path / "media_center.sqlite3"
     db_path.write_bytes(b"catalog")
@@ -210,7 +238,38 @@ def test_schema_lock_never_falls_through_to_full_migration(monkeypatch, tmp_path
     with pytest.raises(RuntimeError, match="media_center_schema_state_unavailable"):
         MediaCenterRepository(db_path)
 
-    assert calls == 1
+    assert calls == 4
+
+
+def test_coordinator_schema_lock_never_falls_through_to_migration(
+    monkeypatch, tmp_path
+) -> None:
+    db_path = tmp_path / "media_center.sqlite3"
+    db_path.write_bytes(b"catalog")
+    repository = object.__new__(MediaCenterRepository)
+    repository.db_path = db_path
+    migration_attempted = False
+
+    def locked_connect(*_args, **_kwargs):
+        raise catalog_module.sqlite3.OperationalError("database is locked")
+
+    def repository_connect():
+        nonlocal migration_attempted
+        migration_attempted = True
+        pytest.fail("schema uncertainty must not start coordinator migration")
+
+    monkeypatch.setattr(catalog_module.sqlite3, "connect", locked_connect)
+    repository.connect = repository_connect
+    coordinator = object.__new__(MediaCatalogCoordinator)
+    coordinator.repository = repository
+
+    with pytest.raises(
+        RuntimeError,
+        match="media_center_coordinator_schema_state_unavailable",
+    ):
+        coordinator.ensure_schema()
+
+    assert migration_attempted is False
 
 
 def test_repository_connect_keeps_default_sync_during_lock(monkeypatch, tmp_path) -> None:
