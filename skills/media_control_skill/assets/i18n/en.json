@@ -9,6 +9,8 @@
   "runtime.media_control.ui.control_active_playback": "Control active playback",
   "runtime.media_control.ui.remote": "Remote",
   "runtime.media_control.ui.control_device": "Control device",
+  "runtime.media_control.ui.authorized": "Authorized",
+  "runtime.media_control.ui.guest": "Guest",
   "runtime.media_control.ui.now_playing": "Now Playing",
   "runtime.media_control.ui.playback": "Playback",
   "runtime.media_control.ui.previous": "Previous",

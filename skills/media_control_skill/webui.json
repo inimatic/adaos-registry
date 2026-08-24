@@ -191,9 +191,11 @@
               },
               "inputs": {
                 "value": "$state.mediaControlTargetId",
-                "optionLabelPath": "label",
+                "optionLabelPath": "display_label",
                 "optionValuePath": "id",
                 "optionMetaPaths": [
+                  "authorization_label",
+                  "endpoint_label",
                   "kind",
                   "status"
                 ],

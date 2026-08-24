@@ -26,6 +26,9 @@ _HANDLER_SPEC.loader.exec_module(main)
 @pytest.fixture(autouse=True)
 def isolated_db(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CONTROL_DB_PATH", str(tmp_path / "media_control.sqlite3"))
+    main._ACTIVE_NOW_PLAYING_PROJECTIONS.clear()
+    yield
+    main._ACTIVE_NOW_PLAYING_PROJECTIONS.clear()
 
 
 def _queue(count: int = 3) -> list[dict]:
@@ -90,6 +93,88 @@ def test_now_playing_exposes_human_titles_and_target_labels():
     assert projection["items"][0]["title"] == "Episode 0"
     assert projection["items"][0]["target_label"] == "Living room TV"
     assert projection["items"][0]["target_kind"] == "tv"
+
+
+def test_target_projection_exposes_device_endpoint_and_authorization_labels():
+    repository = MediaControlRepository()
+    repository.register_target(
+        "browser-desktop",
+        webspace_id="desktop",
+        label="Chrome on Windows",
+        kind="browser",
+        capabilities={
+            "device_display_name": "My PC",
+            "endpoint_display_name": "Chrome on Windows",
+            "authorization_state": "authorized",
+            "authorized": True,
+        },
+    )
+
+    target = main.list_targets(limit=1)["items"][0]
+
+    assert target["display_label"] == "My PC"
+    assert target["device_label"] == "My PC"
+    assert target["endpoint_label"] == "Chrome on Windows"
+    assert target["authorization_state"] == "authorized"
+    assert target["authorization_label"]
+    assert target["authorization_label_i18n"] == {
+        "key": "runtime.media_control.ui.authorized"
+    }
+
+
+def test_parameterized_now_playing_projection_is_ready_and_kept_current(monkeypatch):
+    repository = MediaControlRepository()
+    session = _session(repository)
+    published = []
+
+    import adaos.sdk.io as sdk_io
+
+    monkeypatch.setattr(main, "_repository", lambda: repository)
+    monkeypatch.setattr(
+        sdk_io,
+        "stream_variable_publish",
+        lambda receiver, value, **kwargs: published.append((receiver, value, kwargs)),
+    )
+    params = {"profile_id": "alice", "target_id": session["target_id"]}
+
+    main.on_now_playing_subscription_changed(
+        {
+            "receiver": "media_control.now_playing",
+            "action": "subscribed",
+            "webspace_id": "desktop",
+            "params": params,
+        }
+    )
+
+    assert published[-1][1]["count"] == 1
+    assert published[-1][2]["_meta"] == {
+        "webspace_id": "desktop",
+        "params": params,
+    }
+
+    repository.command(
+        session["id"],
+        command="play",
+        arguments={},
+        actor_ref="profile:alice",
+        expected_revision=session["revision"],
+        idempotency_key="projection-play",
+    )
+    main._publish_updates(repository)
+
+    assert published[-1][1]["items"][0]["state"] == "playing"
+    assert published[-1][2]["_meta"]["params"] == params
+
+
+def test_now_playing_projection_registry_is_bounded():
+    for index in range(main._ACTIVE_PROJECTION_LIMIT + 7):
+        main._remember_projection(
+            f"desktop-{index}",
+            {"profile_id": "alice", "target_id": f"target-{index}"},
+        )
+
+    assert len(main._ACTIVE_NOW_PLAYING_PROJECTIONS) == main._ACTIVE_PROJECTION_LIMIT
+    assert all("desktop-0" not in key for key in main._ACTIVE_NOW_PLAYING_PROJECTIONS)
 
 
 def test_endpoint_open_retires_previous_session_and_scopes_command_pull():
@@ -523,6 +608,7 @@ def test_declared_stream_subscriptions_have_runtime_handlers():
 
     assert '@subscribe("sys.ready")' in source
     assert '"webio.stream.snapshot.requested"' in source
+    assert '"webio.stream.subscription.changed"' in source
     assert 'receivers=("media_control.now_playing",)' in source
 
 
@@ -545,6 +631,11 @@ def test_media_remote_surfaces_are_owned_by_media_control_skill():
     modal = webui["registry"]["modals"]["media_control_remote_modal"]
     widgets = {item["id"]: item for item in modal["schema"]["widgets"]}
     assert widgets["media-control-target"]["type"] == "input.selector"
+    assert widgets["media-control-target"]["inputs"]["optionLabelPath"] == "display_label"
+    assert widgets["media-control-target"]["inputs"]["optionMetaPaths"][:2] == [
+        "authorization_label",
+        "endpoint_label",
+    ]
     assert widgets["media-control-now-playing"]["inputs"]["titleKey"] == "title"
     assert widgets["media-control-transport"]["actions"][1]["target"] == (
         "media_control_skill.voice_command"

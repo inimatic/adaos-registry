@@ -4,6 +4,8 @@
   "properties": {
     "schema": {"const": "adaos.media_control.playback_target.v1"}, "id": {"type": "string"}, "endpoint_id": {"type": "string"},
     "webspace_id": {"type": "string"}, "node_id": {"type": "string"}, "label": {"type": "string"},
+    "display_label": {"type": "string"}, "device_label": {"type": "string"}, "endpoint_label": {"type": "string"},
+    "authorization_state": {"enum": ["authorized", "guest"]},
     "kind": {"enum": ["browser", "tv", "mobile", "speaker", "native"]}, "capabilities": {"type": "object"},
     "status": {"enum": ["available", "unavailable", "draining"]}, "last_seen_at": {"type": "string"}, "revision": {"type": "integer", "minimum": 1}
   }, "additionalProperties": false

@@ -1197,6 +1197,7 @@ class MediaControlRepository:
                 SELECT s.*,
                        t.label AS target_label,
                        t.kind AS target_kind,
+                       t.capabilities_json AS target_capabilities_json,
                        q.title AS active_title,
                        q.descriptor_json AS active_descriptor_json
                 FROM playback_sessions AS s
@@ -1213,6 +1214,10 @@ class MediaControlRepository:
         for row in rows:
             item = self._public_session(row)
             descriptor = loads(row["active_descriptor_json"], {})
+            target_capabilities = loads(row["target_capabilities_json"], {})
+            target_device_label = text(
+                target_capabilities.get("device_display_name")
+            ) or text(row["target_label"])
             item.update(
                 {
                     "title": text(row["active_title"]) or item["active_item_id"],
@@ -1220,7 +1225,19 @@ class MediaControlRepository:
                         descriptor.get("media_kind") or descriptor.get("kind")
                     ),
                     "artwork": dict(descriptor.get("artwork") or {}),
-                    "target_label": text(row["target_label"]) or item["target_id"],
+                    "target_label": target_device_label or item["target_id"],
+                    "target_endpoint_label": text(
+                        target_capabilities.get("endpoint_display_name")
+                    )
+                    or text(row["target_label"]),
+                    "target_authorization_state": text(
+                        target_capabilities.get("authorization_state")
+                    )
+                    or (
+                        "authorized"
+                        if bool(target_capabilities.get("authorized"))
+                        else "guest"
+                    ),
                     "target_kind": text(row["target_kind"]),
                 }
             )
@@ -1294,7 +1311,30 @@ class MediaControlRepository:
 
     @staticmethod
     def _public_target(row: sqlite3.Row) -> dict[str, Any]:
-        return {"schema": TARGET_SCHEMA, "id": str(row["id"]), "endpoint_id": str(row["endpoint_id"]), "webspace_id": str(row["webspace_id"]), "node_id": str(row["node_id"]), "label": str(row["label"]), "kind": str(row["kind"]), "capabilities": loads(row["capabilities_json"], {}), "status": str(row["status"]), "last_seen_at": str(row["last_seen_at"]), "revision": int(row["revision"])}
+        capabilities = loads(row["capabilities_json"], {})
+        label = str(row["label"])
+        device_label = text(capabilities.get("device_display_name")) or label
+        endpoint_label = text(capabilities.get("endpoint_display_name")) or label
+        authorization_state = text(capabilities.get("authorization_state")) or (
+            "authorized" if bool(capabilities.get("authorized")) else "guest"
+        )
+        return {
+            "schema": TARGET_SCHEMA,
+            "id": str(row["id"]),
+            "endpoint_id": str(row["endpoint_id"]),
+            "webspace_id": str(row["webspace_id"]),
+            "node_id": str(row["node_id"]),
+            "label": label,
+            "display_label": device_label,
+            "device_label": device_label,
+            "endpoint_label": endpoint_label,
+            "authorization_state": authorization_state,
+            "kind": str(row["kind"]),
+            "capabilities": capabilities,
+            "status": str(row["status"]),
+            "last_seen_at": str(row["last_seen_at"]),
+            "revision": int(row["revision"]),
+        }
 
     @staticmethod
     def _public_session(row: sqlite3.Row) -> dict[str, Any]:

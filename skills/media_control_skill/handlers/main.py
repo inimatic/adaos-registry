@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import sys
+import time
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -12,7 +14,17 @@ _SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from media_control.repository import SCHEMA_VERSION, MediaControlRepository, text  # noqa: E402
+from media_control.repository import (  # noqa: E402
+    SCHEMA_VERSION,
+    MediaControlRepository,
+    stable_id,
+    text,
+)
+
+
+_ACTIVE_NOW_PLAYING_PROJECTIONS: dict[str, dict[str, Any]] = {}
+_ACTIVE_PROJECTION_LIMIT = 128
+_ACTIVE_PROJECTION_TTL_SECONDS = 15 * 60
 
 
 def _repository() -> MediaControlRepository:
@@ -35,20 +47,137 @@ def _error(code: str, fallback: str, **extra: Any) -> dict[str, Any]:
     }
 
 
-def _publish_snapshot(repository: MediaControlRepository, *, webspace_id: str = "") -> None:
+def _projection_params(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        return {}
+    params: dict[str, Any] = {}
+    for key in ("profile_id", "target_id"):
+        if key in value:
+            params[key] = text(value.get(key))
+    if "limit" in value:
+        try:
+            params["limit"] = max(1, min(50, int(value.get("limit") or 20)))
+        except (TypeError, ValueError):
+            params["limit"] = 20
+    return params
+
+
+def _projection_key(webspace_id: str, params: Mapping[str, Any]) -> str:
+    return json.dumps(
+        {"webspace_id": text(webspace_id), "params": dict(params)},
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _remember_projection(webspace_id: str, params: Mapping[str, Any]) -> None:
+    normalized = _projection_params(params)
+    key = _projection_key(webspace_id, normalized)
+    _ACTIVE_NOW_PLAYING_PROJECTIONS[key] = {
+        "webspace_id": text(webspace_id),
+        "params": normalized,
+        "seen_at": time.monotonic(),
+    }
+    while len(_ACTIVE_NOW_PLAYING_PROJECTIONS) > _ACTIVE_PROJECTION_LIMIT:
+        oldest = next(iter(_ACTIVE_NOW_PLAYING_PROJECTIONS))
+        _ACTIVE_NOW_PLAYING_PROJECTIONS.pop(oldest, None)
+
+
+def _localized_text(key: str, fallback: str) -> str:
+    try:
+        translated = text(_(key))
+    except Exception:
+        translated = ""
+    return translated if translated and translated != key else fallback
+
+
+def _target_for_ui(target: Mapping[str, Any]) -> dict[str, Any]:
+    item = dict(target)
+    authorization_state = text(item.get("authorization_state")).lower()
+    if authorization_state == "authorized":
+        key = "runtime.media_control.ui.authorized"
+        item["authorization_label"] = _localized_text(key, "Authorized")
+    else:
+        key = "runtime.media_control.ui.guest"
+        item["authorization_label"] = _localized_text(key, "Guest")
+    item["authorization_label_i18n"] = {"key": key}
+    return item
+
+
+def _forget_projection(webspace_id: str, params: Mapping[str, Any]) -> None:
+    _ACTIVE_NOW_PLAYING_PROJECTIONS.pop(
+        _projection_key(webspace_id, _projection_params(params)),
+        None,
+    )
+
+
+def _active_projections() -> list[dict[str, Any]]:
+    now = time.monotonic()
+    for key, projection in list(_ACTIVE_NOW_PLAYING_PROJECTIONS.items()):
+        if now - float(projection.get("seen_at") or 0) > _ACTIVE_PROJECTION_TTL_SECONDS:
+            _ACTIVE_NOW_PLAYING_PROJECTIONS.pop(key, None)
+    return list(_ACTIVE_NOW_PLAYING_PROJECTIONS.values())
+
+
+def _publish_snapshot(
+    repository: MediaControlRepository,
+    *,
+    webspace_id: str = "",
+    params: Mapping[str, Any] | None = None,
+) -> None:
     try:
         from adaos.sdk.io import stream_variable_publish
 
-        snapshot = repository.now_playing(limit=20)
+        normalized = _projection_params(params)
+        snapshot = repository.now_playing(
+            profile_id=text(normalized.get("profile_id")),
+            target_id=text(normalized.get("target_id")),
+            limit=int(normalized.get("limit") or 20),
+        )
+        meta: dict[str, Any] = {}
+        if webspace_id:
+            meta["webspace_id"] = webspace_id
+        if normalized:
+            meta["params"] = normalized
         stream_variable_publish(
             "media_control.now_playing",
             snapshot,
-            var_id="media_control.sessions",
-            ttl_ms=120000,
-            _meta={"webspace_id": webspace_id} if webspace_id else None,
+            var_id=stable_id(
+                "media_control_sessions",
+                text(webspace_id),
+                json.dumps(normalized, sort_keys=True, separators=(",", ":")),
+                size=24,
+            ),
+            ttl_ms=300000,
+            _meta=meta or None,
         )
     except Exception:
         return
+
+
+def _publish_updates(
+    repository: MediaControlRepository,
+    *,
+    webspace_id: str = "",
+) -> None:
+    published: set[str] = set()
+    if webspace_id:
+        _publish_snapshot(repository, webspace_id=webspace_id)
+        published.add(_projection_key(webspace_id, {}))
+    for projection in _active_projections():
+        key = _projection_key(
+            text(projection.get("webspace_id")),
+            _projection_params(projection.get("params")),
+        )
+        if key in published:
+            continue
+        _publish_snapshot(
+            repository,
+            webspace_id=text(projection.get("webspace_id")),
+            params=_projection_params(projection.get("params")),
+        )
+        published.add(key)
 
 
 def _result_or_error(result: dict[str, Any]) -> dict[str, Any]:
@@ -100,9 +229,30 @@ def on_now_playing_snapshot_requested(event: Any) -> None:
     payload = _event_payload(event)
     if text(payload.get("receiver")) != "media_control.now_playing":
         return
+    params = _projection_params(payload.get("params"))
+    webspace_id = text(payload.get("webspace_id"))
+    _remember_projection(webspace_id, params)
     _publish_snapshot(
-        _repository(), webspace_id=text(payload.get("webspace_id"))
+        _repository(), webspace_id=webspace_id, params=params
     )
+
+
+@subscribe(
+    "webio.stream.subscription.changed",
+    receivers=("media_control.now_playing",),
+)
+def on_now_playing_subscription_changed(event: Any) -> None:
+    payload = _event_payload(event)
+    if text(payload.get("receiver")) != "media_control.now_playing":
+        return
+    webspace_id = text(payload.get("webspace_id"))
+    params = _projection_params(payload.get("params"))
+    action = text(payload.get("action")).lower() or "subscribed"
+    if action in {"unsubscribed", "removed", "release"}:
+        _forget_projection(webspace_id, params)
+        return
+    _remember_projection(webspace_id, params)
+    _publish_snapshot(_repository(), webspace_id=webspace_id, params=params)
 
 
 @tool(summary="Ensure the durable Media Center control-plane schema.", side_effects="local_write")
@@ -113,7 +263,7 @@ def ensure_schema(**_: Any) -> dict[str, Any]:
 @tool(summary="Rehydrate bounded now-playing state after activation.", side_effects="none")
 def rehydrate(webspace_id: str = "", **_: Any) -> dict[str, Any]:
     repository = _repository()
-    _publish_snapshot(repository, webspace_id=webspace_id)
+    _publish_updates(repository, webspace_id=webspace_id)
     return repository.diagnostics()
 
 
@@ -140,7 +290,11 @@ def register_target(
 
 @tool(summary="List bounded playback targets visible to a controller.", side_effects="none")
 def list_targets(include_unavailable: bool = False, limit: int = 50, **_: Any) -> dict[str, Any]:
-    return _repository().list_targets(include_unavailable=bool(include_unavailable), limit=limit)
+    result = _repository().list_targets(
+        include_unavailable=bool(include_unavailable), limit=limit
+    )
+    result["items"] = [_target_for_ui(item) for item in result.get("items") or []]
+    return result
 
 
 @tool(summary="Create a persistent playback session with a bounded queue.", side_effects="local_write")
@@ -168,7 +322,7 @@ def create_session(
         lease_seconds=lease_seconds,
     )
     if result.get("ok"):
-        _publish_snapshot(repository, webspace_id=webspace_id)
+        _publish_updates(repository, webspace_id=webspace_id)
     return _result_or_error(result)
 
 
@@ -217,7 +371,7 @@ def open_endpoint_session(
     )
     if result.get("ok"):
         result["target"] = target
-        _publish_snapshot(repository, webspace_id=webspace_id)
+        _publish_updates(repository, webspace_id=webspace_id)
     return _result_or_error(result)
 
 
@@ -255,7 +409,7 @@ def command(
     except ValueError as exc:
         result = {"ok": False, "error": str(exc)}
     if result.get("ok"):
-        _publish_snapshot(repository, webspace_id=webspace_id)
+        _publish_updates(repository, webspace_id=webspace_id)
     return _result_or_error(result)
 
 
@@ -276,7 +430,7 @@ def update_queue(
         actor_ref=actor_ref,
     )
     if result.get("ok"):
-        _publish_snapshot(repository, webspace_id=webspace_id)
+        _publish_updates(repository, webspace_id=webspace_id)
     return _result_or_error(result)
 
 
@@ -301,7 +455,7 @@ def checkpoint(
         expected_revision=expected_revision,
     )
     if result.get("ok"):
-        _publish_snapshot(repository, webspace_id=webspace_id)
+        _publish_updates(repository, webspace_id=webspace_id)
     return _result_or_error(result)
 
 
@@ -352,7 +506,7 @@ def reconcile_endpoint(
         authority=authority,
     )
     if result.get("ok"):
-        _publish_snapshot(repository, webspace_id=webspace_id)
+        _publish_updates(repository, webspace_id=webspace_id)
     return _result_or_error(result)
 
 

@@ -21,15 +21,16 @@ Queues support at most 500 durable entries and are read in pages of at most 30; 
 
 `autoplay` and `auto_fullscreen` default to true and are scoped by profile plus target. Target settings inherit profile defaults until explicitly overridden. Browser background audio, video close policy, playback rate, language preferences, checkpoint cadence, track selection, and reconnect policy are explicit settings. Sleep timers become durable pause commands, so an endpoint that reconnects after the deadline still converges to paused state. Native process-suspension guarantees remain deferred to Android Media3 and Apple AVAudioSession.
 
-The app shell owns the media element and consumes the generic `adaos.playback.endpoint_control.v1` descriptor returned with a queue. The descriptor names the control skill and its open, pull, and reconcile methods; the generic client does not embed a Media Center skill name. The shell publishes state changes and 15-second checkpoints, polls only the exact active session for revisioned commands, and applies each command id once. Controllers subscribe to `media_control.now_playing`; the skill implements both declared ready and snapshot-request subscriptions, so reconnect has a bounded state seed. High-frequency position remains local rather than entering UI/Yjs synchronization.
+The app shell owns the media element and consumes the generic `adaos.playback.endpoint_control.v1` descriptor returned with a queue. The descriptor names the control skill and its open, pull, and reconcile methods; the generic client does not embed a Media Center skill name. The shell publishes state changes and 15-second checkpoints, polls only the exact active session for revisioned commands, and applies each command id once. Controllers subscribe to `media_control.now_playing`; the skill immediately seeds each exact webspace/profile/target subscription, remembers a bounded active-projection set, and republishes those projections after every authoritative session mutation. Snapshot requests and rehydrate remain recovery paths rather than the ordinary freshness mechanism. High-frequency position remains local rather than entering UI/Yjs synchronization.
 
 `now_playing()` joins only control-plane records already stored with the
-session. It exposes the queue title, target label/kind, media kind, and artwork
-descriptor next to the revisioned session state. Controllers therefore show a
-human title rather than an opaque item identifier and do not query the catalog
-or move media bytes. EN/RU labels for the app, widget, and modal are packaged in
-this skill's `webui.json` resources. Version `0.2.7` stores those dictionaries
-under the platform browser-asset boundary, so core publishes immutable URLs
-instead of leaking package-relative paths to the browser.
+session. It exposes the queue title, target device name, endpoint name,
+authorization state, target kind, media kind, and artwork descriptor next to
+the revisioned session state. Controllers therefore show a human title and a
+recognizable device/endpoint identity rather than opaque identifiers, and do
+not query the catalog or move media bytes. EN/RU labels for the app, widget,
+modal, and authorization state are packaged in this skill's `webui.json`
+resources. Core publishes those dictionaries through immutable browser-asset
+URLs without owning Media Control wording.
 
 QoE accepts a fixed metric vocabulary for planning, first frame, seek, rebuffer, route changes, interruption, and completion. `qoe_summary()` returns bounded recent evidence plus count/average/maximum/total aggregates for a session or target; raw source paths and media bytes are excluded.

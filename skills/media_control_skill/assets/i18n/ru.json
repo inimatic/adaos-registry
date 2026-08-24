@@ -9,6 +9,8 @@
   "runtime.media_control.ui.control_active_playback": "Управление текущим воспроизведением",
   "runtime.media_control.ui.remote": "Пульт",
   "runtime.media_control.ui.control_device": "Устройство управления",
+  "runtime.media_control.ui.authorized": "Авторизованный",
+  "runtime.media_control.ui.guest": "Гостевой",
   "runtime.media_control.ui.now_playing": "Сейчас играет",
   "runtime.media_control.ui.playback": "Воспроизведение",
   "runtime.media_control.ui.previous": "Назад",
