@@ -11,6 +11,7 @@
     "state",
     "reasons",
     "target",
+    "capabilities",
     "resource_policy"
   ],
   "properties": {
@@ -44,6 +45,24 @@
       "additionalProperties": false
     },
     "artwork": {"type": ["object", "null"]},
+    "capabilities": {
+      "type": "object",
+      "required": [
+        "schema", "local_images", "embedded_audio", "video_frames",
+        "ffmpeg_source", "witness"
+      ],
+      "properties": {
+        "schema": {"const": "adaos.media_library.artwork_capabilities.v1"},
+        "local_images": {"type": "boolean"},
+        "embedded_audio": {"type": "boolean"},
+        "video_frames": {"type": "boolean"},
+        "ffmpeg_source": {
+          "enum": ["configured", "system", "imageio_ffmpeg", "unavailable"]
+        },
+        "witness": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
     "resource_policy": {
       "type": "object",
       "required": ["max_concurrent", "timeout_seconds", "max_output_bytes", "max_input_bytes"],

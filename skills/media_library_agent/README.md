@@ -2,8 +2,9 @@
 
 `media_library_agent` is the node-local data-plane component of Media Center. It owns media roots, asynchronous filesystem discovery, reference registration, durable scan and rendition jobs, folder navigation, technical deep search, and ordered source deltas. It does not own the global catalog, grouping, personalization, playback sessions, or deployment policy.
 
-Version `0.6.23` is a provenance-only package revision for Project `0.6.48`;
-runtime behavior is unchanged from `0.6.21`.
+Version `0.6.27` adds durable, bounded artwork backfill for sources that were
+indexed before artwork extraction existed. Capability evidence makes terminal
+`unavailable` results retryable when an FFmpeg backend later appears.
 
 ## Storage boundary
 
@@ -47,6 +48,7 @@ two seconds.
 - The worker writes a `.partial` temporary file, atomically closes it, rechecks the source witness, publishes the derived resource, and atomically advertises it in a new source delta. A source change before or after publication invalidates the job and removes the generated resource.
 - `media_library_agent.rendition_progress` publishes the latest durable job at a bounded rate. Restart recovery requeues interrupted work; queued cancellation is immediately terminal.
 - Artwork uses the same durable queue with the low-priority `artwork-card-v1` profile. The agent tries embedded tags, a bounded folder-cover lookup, then a bounded video-frame extraction. It emits a maximum 720x1080 JPEG of at most 4 MiB with provider provenance and exact-source evidence; missing backends or artwork fail as observable jobs instead of blocking scans.
+- Existing sources are inspected through a durable cursor and a small bounded queue. Pillow, Mutagen, and a packaged `imageio-ffmpeg` fallback make local artwork extraction independent of host packages; `MEDIA_LIBRARY_AGENT_FFMPEG_PATH` may select an operator-managed binary instead. Backfill progress, capability evidence, and source counts by artwork state are exposed by `status`.
 - Queued scans run before automatic artwork work. An unchanged rescan preserves ready artwork and does not enqueue a duplicate; a changed source fingerprint or folder-cover witness invalidates the corresponding projection.
 - `search_sources` uses node-local Unicode FTS over names, folders, embedded metadata, and technical probe fields. Coordinator search remains the fast first stage; this endpoint is a bounded federated deep-search stage.
 

@@ -26,6 +26,7 @@ from media_library_agent.contracts import (  # noqa: E402
 )
 from media_library_agent.rendition import (  # noqa: E402
     ARTWORK_PROFILE,
+    artwork_capabilities,
     artwork_plan,
     rendition_limits,
     rendition_plan,
@@ -711,6 +712,15 @@ def plan_artwork(
             "Artwork extraction could not be queued.",
             source_id=text(source_id),
         )
+    job = queued.get("job")
+    if isinstance(job, Mapping) and (
+        bool(queued.get("created")) or text(job.get("status")) == "queued"
+    ):
+        repository.mark_artwork_pending(
+            text(job.get("id")),
+            capability_witness=text(artwork_capabilities().get("witness")),
+        )
+        queued["job"] = repository.get_rendition_job(text(job.get("id")))
     _ensure_worker_if_owned(worker)
     return {
         "ok": True,
@@ -843,6 +853,7 @@ def status(**_: Any) -> dict[str, Any]:
             "max_concurrent_scans": 1,
             "watch": worker.watch_status(),
             "progress_publisher": _progress_publisher_status(),
+            "artwork": worker.artwork_status(),
         },
         "limits": {
             "max_files_per_scan": int(

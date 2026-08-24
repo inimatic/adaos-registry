@@ -27,6 +27,7 @@ from .contracts import (
 )
 from .rendition import (
     ARTWORK_PROFILE,
+    artwork_capabilities,
     artwork_plan,
     current_disk_usage,
     folder_artwork_witness,
@@ -146,7 +147,106 @@ class MediaLibraryAgentWorker:
             claimed_rendition = self.repository.claim_rendition_job(rendition["id"])
             if claimed_rendition is not None:
                 return self._run_rendition_job(claimed_rendition)
+        self._enqueue_artwork_backfill()
+        rendition = self.repository.next_queued_rendition_job()
+        if rendition is not None:
+            claimed_rendition = self.repository.claim_rendition_job(rendition["id"])
+            if claimed_rendition is not None:
+                return self._run_rendition_job(claimed_rendition)
         return None
+
+    def _enqueue_artwork_backfill(self) -> int:
+        active = self.repository.active_artwork_job_count()
+        maximum_active = max(
+            1,
+            min(
+                16,
+                int(os.environ.get("MEDIA_LIBRARY_AGENT_ARTWORK_BACKFILL_QUEUE") or 4),
+            ),
+        )
+        if active >= maximum_active:
+            return 0
+        configured_batch_size = max(
+            1,
+            min(
+                100,
+                int(os.environ.get("MEDIA_LIBRARY_AGENT_ARTWORK_BACKFILL_BATCH") or 64),
+            ),
+        )
+        interval = max(
+            300,
+            min(
+                604800,
+                int(
+                    os.environ.get(
+                        "MEDIA_LIBRARY_AGENT_ARTWORK_BACKFILL_INTERVAL_SECONDS"
+                    )
+                    or 21600
+                ),
+            ),
+        )
+        queued = 0
+        examined = 0
+        while examined < configured_batch_size and active + queued < maximum_active:
+            batch = self.repository.artwork_backfill_batch(
+                limit=min(
+                    configured_batch_size - examined,
+                    maximum_active - active - queued,
+                ),
+                cycle_interval_seconds=interval,
+            )
+            items = list(batch.get("items") or [])
+            if not items:
+                break
+            examined += len(items)
+            for source in items:
+                queued += int(self._queue_artwork_for_source(source, priority=700))
+                if active + queued >= maximum_active:
+                    break
+        self.repository.record_artwork_backfill_queued(queued)
+        return queued
+
+    def _queue_artwork_for_source(
+        self,
+        source: Mapping[str, Any],
+        *,
+        priority: int,
+    ) -> bool:
+        capabilities = artwork_capabilities()
+        plan = artwork_plan(source, capabilities=capabilities)
+        if not plan["required"]:
+            return False
+        metadata = (
+            dict(source.get("metadata") or {})
+            if isinstance(source.get("metadata"), Mapping)
+            else {}
+        )
+        if (
+            text(source.get("media_kind")) == "video"
+            and not bool(capabilities.get("video_frames"))
+            and not bool(metadata.get("artwork_folder_witness"))
+        ):
+            self.repository.record_source_artwork_unavailable(
+                text(source.get("id")),
+                error_code="artwork_video_backend_unavailable",
+                capability_witness=text(capabilities.get("witness")),
+            )
+            return False
+        queued = self.repository.create_rendition_job(
+            text(source.get("id")),
+            profile=ARTWORK_PROFILE,
+            target=plan["target"],
+            priority=priority,
+        )
+        job = queued.get("job") if isinstance(queued, Mapping) else None
+        if isinstance(job, Mapping) and (
+            bool(queued.get("created")) or text(job.get("status")) == "queued"
+        ):
+            self.repository.mark_artwork_pending(
+                text(job.get("id")),
+                capability_witness=text(capabilities.get("witness")),
+            )
+        return bool(queued.get("created"))
 
     def _run_rendition_job(self, job: Mapping[str, Any]) -> dict[str, Any]:
         job_id = text(job.get("id"))
@@ -288,6 +388,7 @@ class MediaLibraryAgentWorker:
         *,
         status: str = "failed",
     ) -> dict[str, Any]:
+        job = self.repository.get_rendition_job(job_id)
         result = self.repository.update_rendition_job(
             job_id,
             status=status,
@@ -295,6 +396,27 @@ class MediaLibraryAgentWorker:
             error_code=text(code),
             error_detail=text(detail)[:2000],
         )
+        if (
+            job is not None
+            and text(job.get("profile")) == ARTWORK_PROFILE
+            and status == "failed"
+        ):
+            capabilities = artwork_capabilities()
+            self.repository.record_artwork_failure(
+                job_id,
+                error_code=text(code) or "artwork_failed",
+                capability_witness=text(capabilities.get("witness")),
+                state=(
+                    "unavailable"
+                    if text(code)
+                    in {
+                        "artwork_not_found",
+                        "artwork_video_backend_unavailable",
+                        "artwork_input_limit_exceeded",
+                    }
+                    else "failed"
+                ),
+            )
         self._publish_rendition(job_id)
         return result or {}
 
@@ -493,6 +615,12 @@ class MediaLibraryAgentWorker:
             "mode": "bounded_polling_with_periodic_reconcile",
         }
 
+    def artwork_status(self) -> dict[str, Any]:
+        return {
+            **self.repository.artwork_backfill_status(),
+            "capabilities": artwork_capabilities(),
+        }
+
     def _run_job(self, job: Mapping[str, Any]) -> dict[str, Any]:
         job_id = text(job.get("id"))
         root = self.repository.get_root(text(job.get("root_id")))
@@ -587,10 +715,8 @@ class MediaLibraryAgentWorker:
                     )
                     plan = artwork_plan(stored_source)
                     if operation != "unchanged" and plan["required"]:
-                        self.repository.create_rendition_job(
-                            stored_source["id"],
-                            profile=ARTWORK_PROFILE,
-                            target=plan["target"],
+                        self._queue_artwork_for_source(
+                            stored_source,
                             priority=350,
                         )
                     if operation == "added":

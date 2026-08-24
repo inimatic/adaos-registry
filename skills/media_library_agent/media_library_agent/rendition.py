@@ -19,6 +19,53 @@ ARTWORK_NAMES = ("cover", "folder", "front", "poster", "album", "artwork")
 ARTWORK_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
 
 
+def _ffmpeg_executable() -> tuple[str | None, str]:
+    explicit = text(os.environ.get("MEDIA_LIBRARY_AGENT_FFMPEG_PATH"))
+    if explicit and Path(explicit).is_file():
+        return explicit, "configured"
+    system = shutil.which("ffmpeg")
+    if system:
+        return system, "system"
+    try:
+        from imageio_ffmpeg import get_ffmpeg_exe  # type: ignore[import-not-found]
+
+        bundled = text(get_ffmpeg_exe())
+        if bundled and Path(bundled).is_file():
+            return bundled, "imageio_ffmpeg"
+    except Exception:
+        pass
+    return None, "unavailable"
+
+
+def artwork_capabilities() -> dict[str, Any]:
+    executable, source = _ffmpeg_executable()
+    try:
+        from PIL import Image  # noqa: F401
+
+        image_backend = True
+    except Exception:
+        image_backend = False
+    try:
+        from mutagen import File as MutagenFile  # noqa: F401
+
+        embedded_audio = True
+    except Exception:
+        embedded_audio = False
+    witness = hashlib.sha256(
+        f"image:{int(image_backend)}|embedded:{int(embedded_audio)}|ffmpeg:{source}".encode(
+            "utf-8"
+        )
+    ).hexdigest()[:20]
+    return {
+        "schema": "adaos.media_library.artwork_capabilities.v1",
+        "local_images": image_backend,
+        "embedded_audio": embedded_audio,
+        "video_frames": bool(executable),
+        "ffmpeg_source": source,
+        "witness": witness,
+    }
+
+
 def _tokens(value: Any) -> set[str]:
     if not isinstance(value, (list, tuple, set, frozenset)):
         return set()
@@ -118,7 +165,13 @@ def rendition_limits() -> dict[str, Any]:
     }
 
 
-def artwork_plan(source: Mapping[str, Any], *, force: bool = False) -> dict[str, Any]:
+def artwork_plan(
+    source: Mapping[str, Any],
+    *,
+    force: bool = False,
+    capabilities: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    capability_state = dict(capabilities or artwork_capabilities())
     metadata = dict(source.get("metadata") or {})
     artwork = (
         dict(metadata.get("artwork") or {})
@@ -134,6 +187,10 @@ def artwork_plan(source: Mapping[str, Any], *, force: bool = False) -> dict[str,
         artwork.get("state") in {"unavailable", "failed"}
         and text(artwork.get("exact_source_fingerprint"))
         == text(source.get("fingerprint"))
+        and (
+            text(artwork.get("capability_witness"))
+            in {"", text(capability_state.get("witness"))}
+        )
     )
     return {
         "schema": ARTWORK_PLAN_SCHEMA,
@@ -157,6 +214,7 @@ def artwork_plan(source: Mapping[str, Any], *, force: bool = False) -> dict[str,
             "max_output_bytes": 4 * 1024**2,
         },
         "artwork": artwork or None,
+        "capabilities": capability_state,
         "resource_policy": {
             "max_concurrent": 1,
             "timeout_seconds": 45,
@@ -286,7 +344,7 @@ def _video_frame_artwork(
     timeout_seconds: int,
     maximum_output_bytes: int,
 ) -> dict[str, Any]:
-    executable = shutil.which("ffmpeg")
+    executable, _source = _ffmpeg_executable()
     if not executable:
         raise RuntimeError("artwork_video_backend_unavailable")
     partial = target_path.with_suffix(target_path.suffix + ".partial")
@@ -453,7 +511,7 @@ def transcode_with_ffmpeg(
     *,
     cancelled: CancelCallback,
 ) -> dict[str, Any]:
-    executable = shutil.which("ffmpeg")
+    executable, _source = _ffmpeg_executable()
     if not executable:
         raise RuntimeError("rendition_backend_unavailable")
     limits = rendition_limits()

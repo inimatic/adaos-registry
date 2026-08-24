@@ -484,6 +484,176 @@ class MediaLibraryAgentRepository:
         token = text(row["value"] if row else "normal").lower()
         return token if token in {"normal", "playback", "critical"} else "normal"
 
+    @staticmethod
+    def _meta_values(
+        connection: sqlite3.Connection, keys: Iterable[str]
+    ) -> dict[str, str]:
+        tokens = tuple(text(item) for item in keys if text(item))
+        if not tokens:
+            return {}
+        placeholders = ",".join("?" for _item in tokens)
+        return {
+            str(row["key"]): str(row["value"])
+            for row in connection.execute(
+                f"SELECT key,value FROM agent_meta WHERE key IN ({placeholders})",
+                tokens,
+            ).fetchall()
+        }
+
+    @staticmethod
+    def _set_meta(connection: sqlite3.Connection, key: str, value: Any) -> None:
+        connection.execute(
+            "INSERT OR REPLACE INTO agent_meta(key,value) VALUES (?,?)",
+            (text(key), str(value)),
+        )
+
+    def artwork_backfill_batch(
+        self,
+        *,
+        limit: int = 8,
+        cycle_interval_seconds: int = 21600,
+    ) -> dict[str, Any]:
+        bounded = max(1, min(100, int(limit or 8)))
+        interval = max(300, min(604800, int(cycle_interval_seconds or 21600)))
+        now = time.time()
+        with self.connect() as connection:
+            meta = self._meta_values(
+                connection,
+                (
+                    "artwork_backfill_cursor",
+                    "artwork_backfill_next_at",
+                    "artwork_backfill_cycle",
+                    "artwork_backfill_examined",
+                    "artwork_backfill_queued",
+                ),
+            )
+            try:
+                next_at = float(meta.get("artwork_backfill_next_at") or 0)
+            except ValueError:
+                next_at = 0.0
+            if next_at > now:
+                return {
+                    "ok": True,
+                    "state": "idle",
+                    "items": [],
+                    "next_at": next_at,
+                    "cursor": text(meta.get("artwork_backfill_cursor")),
+                }
+            cursor = text(meta.get("artwork_backfill_cursor"))
+            rows = connection.execute(
+                """
+                SELECT * FROM sources
+                WHERE present=1 AND id>?
+                ORDER BY id LIMIT ?
+                """,
+                (cursor, bounded),
+            ).fetchall()
+            if not rows:
+                cycle = max(0, int(meta.get("artwork_backfill_cycle") or 0)) + 1
+                self._set_meta(connection, "artwork_backfill_cursor", "")
+                self._set_meta(connection, "artwork_backfill_next_at", now + interval)
+                self._set_meta(connection, "artwork_backfill_cycle", cycle)
+                self._set_meta(connection, "artwork_backfill_last_completed_at", now_iso())
+                connection.commit()
+                return {
+                    "ok": True,
+                    "state": "idle",
+                    "items": [],
+                    "cycle_completed": True,
+                    "cycle": cycle,
+                    "next_at": now + interval,
+                    "cursor": "",
+                }
+            examined = max(0, int(meta.get("artwork_backfill_examined") or 0)) + len(
+                rows
+            )
+            next_cursor = str(rows[-1]["id"])
+            self._set_meta(connection, "artwork_backfill_cursor", next_cursor)
+            self._set_meta(connection, "artwork_backfill_next_at", 0)
+            self._set_meta(connection, "artwork_backfill_examined", examined)
+            self._set_meta(connection, "artwork_backfill_last_run_at", now_iso())
+            connection.commit()
+        return {
+            "ok": True,
+            "state": "running",
+            "items": [self._public_source(row) for row in rows],
+            "count": len(rows),
+            "cursor": next_cursor,
+            "examined": examined,
+        }
+
+    def record_artwork_backfill_queued(self, count: int) -> None:
+        increment = max(0, int(count or 0))
+        if not increment:
+            return
+        with self.connect() as connection:
+            values = self._meta_values(connection, ("artwork_backfill_queued",))
+            total = max(0, int(values.get("artwork_backfill_queued") or 0)) + increment
+            self._set_meta(connection, "artwork_backfill_queued", total)
+            connection.commit()
+
+    def artwork_backfill_status(self) -> dict[str, Any]:
+        with self.connect() as connection:
+            meta = self._meta_values(
+                connection,
+                (
+                    "artwork_backfill_cursor",
+                    "artwork_backfill_next_at",
+                    "artwork_backfill_cycle",
+                    "artwork_backfill_examined",
+                    "artwork_backfill_queued",
+                    "artwork_backfill_last_run_at",
+                    "artwork_backfill_last_completed_at",
+                ),
+            )
+            states = connection.execute(
+                """
+                SELECT COUNT(*) AS total,
+                    SUM(CASE WHEN json_extract(metadata_json,'$.artwork.state')='pending' THEN 1 ELSE 0 END) AS pending,
+                    SUM(CASE WHEN json_extract(metadata_json,'$.artwork.state')='ready' THEN 1 ELSE 0 END) AS ready,
+                    SUM(CASE WHEN json_extract(metadata_json,'$.artwork.state')='unavailable' THEN 1 ELSE 0 END) AS unavailable,
+                    SUM(CASE WHEN json_extract(metadata_json,'$.artwork.state')='failed' THEN 1 ELSE 0 END) AS failed
+                FROM sources WHERE present=1
+                """
+            ).fetchone()
+        try:
+            next_at = float(meta.get("artwork_backfill_next_at") or 0)
+        except ValueError:
+            next_at = 0.0
+        return {
+            "schema": "adaos.media_library.artwork_backfill.v1",
+            "state": "idle" if next_at > time.time() else "running",
+            "cursor": text(meta.get("artwork_backfill_cursor")),
+            "cycle": max(0, int(meta.get("artwork_backfill_cycle") or 0)),
+            "examined_count": max(
+                0, int(meta.get("artwork_backfill_examined") or 0)
+            ),
+            "queued_count": max(0, int(meta.get("artwork_backfill_queued") or 0)),
+            "last_run_at": text(meta.get("artwork_backfill_last_run_at")),
+            "last_completed_at": text(
+                meta.get("artwork_backfill_last_completed_at")
+            ),
+            "next_at": next_at or None,
+            "sources": {
+                "total": int(states["total"] or 0),
+                "pending": int(states["pending"] or 0),
+                "ready": int(states["ready"] or 0),
+                "unavailable": int(states["unavailable"] or 0),
+                "failed": int(states["failed"] or 0),
+            },
+        }
+
+    def active_artwork_job_count(self) -> int:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT COUNT(*) AS total FROM rendition_jobs
+                WHERE profile='artwork-card-v1'
+                  AND status IN ('queued','running','waiting_resources','canceling')
+                """
+            ).fetchone()
+        return int(row["total"] or 0)
+
     def add_root(
         self,
         path: str,
@@ -975,6 +1145,221 @@ class MediaLibraryAgentRepository:
                 "SELECT * FROM rendition_jobs WHERE id=?", (text(job_id),)
             ).fetchone()
         return self._public_rendition_job(row) if row else None
+
+    def mark_artwork_pending(
+        self,
+        job_id: str,
+        *,
+        capability_witness: str,
+    ) -> dict[str, Any]:
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            job = connection.execute(
+                "SELECT * FROM rendition_jobs WHERE id=?", (text(job_id),)
+            ).fetchone()
+            if job is None or str(job["profile"]) != "artwork-card-v1":
+                connection.rollback()
+                return {"ok": False, "error": "artwork_job_not_found"}
+            source = connection.execute(
+                "SELECT * FROM sources WHERE id=?", (str(job["source_id"]),)
+            ).fetchone()
+            if not source or not bool(source["present"]):
+                connection.rollback()
+                return {"ok": False, "error": "source_not_found"}
+            if str(source["fingerprint"]) != str(job["source_fingerprint"]):
+                connection.rollback()
+                return {"ok": False, "error": "source_changed"}
+            metadata = json_loads(source["metadata_json"], {})
+            if not isinstance(metadata, dict):
+                metadata = {}
+            existing = metadata.get("artwork")
+            if (
+                isinstance(existing, Mapping)
+                and text(existing.get("state")) == "pending"
+                and text(existing.get("job_id")) == str(job["id"])
+            ):
+                connection.commit()
+                return {
+                    "ok": True,
+                    "changed": False,
+                    "source": self._public_source(source),
+                    "job": self._public_rendition_job(job),
+                }
+            next_revision = int(source["revision"]) + 1
+            metadata["artwork"] = {
+                "schema": "adaos.media.artwork.v1",
+                "state": "pending",
+                "profile": str(job["profile"]),
+                "job_id": str(job["id"]),
+                "exact_source_id": str(source["id"]),
+                "exact_source_revision": next_revision,
+                "exact_source_fingerprint": str(source["fingerprint"]),
+                "capability_witness": text(capability_witness),
+                "updated_at": now_iso(),
+            }
+            connection.execute(
+                "UPDATE sources SET metadata_json=?,revision=?,last_seen_at=? WHERE id=?",
+                (
+                    json_dumps(metadata),
+                    next_revision,
+                    now_iso(),
+                    str(source["id"]),
+                ),
+            )
+            connection.execute(
+                "UPDATE rendition_jobs SET source_revision=?,revision=revision+1 WHERE id=?",
+                (next_revision, str(job["id"])),
+            )
+            changed = connection.execute(
+                "SELECT * FROM sources WHERE id=?", (str(source["id"]),)
+            ).fetchone()
+            changed_job = connection.execute(
+                "SELECT * FROM rendition_jobs WHERE id=?", (str(job["id"]),)
+            ).fetchone()
+            public_source = self._public_source(changed)
+            self._insert_delta(
+                connection, "updated", public_source, job_id=str(job["id"])
+            )
+            connection.commit()
+        return {
+            "ok": True,
+            "changed": True,
+            "source": public_source,
+            "job": self._public_rendition_job(changed_job),
+        }
+
+    def record_artwork_failure(
+        self,
+        job_id: str,
+        *,
+        error_code: str,
+        capability_witness: str,
+        state: str,
+    ) -> dict[str, Any]:
+        state_token = text(state).lower()
+        if state_token not in {"unavailable", "failed"}:
+            raise ValueError("artwork_failure_state_invalid")
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            job = connection.execute(
+                "SELECT * FROM rendition_jobs WHERE id=?", (text(job_id),)
+            ).fetchone()
+            if job is None or str(job["profile"]) != "artwork-card-v1":
+                connection.rollback()
+                return {"ok": False, "error": "artwork_job_not_found"}
+            source = connection.execute(
+                "SELECT * FROM sources WHERE id=?", (str(job["source_id"]),)
+            ).fetchone()
+            if (
+                not source
+                or not bool(source["present"])
+                or str(source["fingerprint"]) != str(job["source_fingerprint"])
+            ):
+                connection.rollback()
+                return {"ok": False, "error": "source_changed"}
+            metadata = json_loads(source["metadata_json"], {})
+            if not isinstance(metadata, dict):
+                metadata = {}
+            next_revision = int(source["revision"]) + 1
+            metadata["artwork"] = {
+                "schema": "adaos.media.artwork.v1",
+                "state": state_token,
+                "profile": str(job["profile"]),
+                "job_id": str(job["id"]),
+                "exact_source_id": str(source["id"]),
+                "exact_source_revision": next_revision,
+                "exact_source_fingerprint": str(source["fingerprint"]),
+                "provider_id": "media_library_agent.local_artwork.v1",
+                "capability_witness": text(capability_witness),
+                "error_code": text(error_code),
+                "updated_at": now_iso(),
+            }
+            connection.execute(
+                "UPDATE sources SET metadata_json=?,revision=?,last_seen_at=? WHERE id=?",
+                (
+                    json_dumps(metadata),
+                    next_revision,
+                    now_iso(),
+                    str(source["id"]),
+                ),
+            )
+            changed = connection.execute(
+                "SELECT * FROM sources WHERE id=?", (str(source["id"]),)
+            ).fetchone()
+            public_source = self._public_source(changed)
+            self._insert_delta(
+                connection, "updated", public_source, job_id=str(job["id"])
+            )
+            connection.commit()
+        return {"ok": True, "source": public_source}
+
+    def record_source_artwork_unavailable(
+        self,
+        source_id: str,
+        *,
+        error_code: str,
+        capability_witness: str,
+    ) -> dict[str, Any]:
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            source = connection.execute(
+                "SELECT * FROM sources WHERE id=?", (text(source_id),)
+            ).fetchone()
+            if source is None or not bool(source["present"]):
+                connection.rollback()
+                return {"ok": False, "error": "source_not_found"}
+            metadata = json_loads(source["metadata_json"], {})
+            if not isinstance(metadata, dict):
+                metadata = {}
+            current = metadata.get("artwork")
+            if (
+                isinstance(current, Mapping)
+                and text(current.get("state")) == "unavailable"
+                and text(current.get("exact_source_fingerprint"))
+                == str(source["fingerprint"])
+                and text(current.get("capability_witness"))
+                == text(capability_witness)
+            ):
+                connection.commit()
+                return {
+                    "ok": True,
+                    "changed": False,
+                    "source": self._public_source(source),
+                }
+            next_revision = int(source["revision"]) + 1
+            metadata["artwork"] = {
+                "schema": "adaos.media.artwork.v1",
+                "state": "unavailable",
+                "profile": "artwork-card-v1",
+                "exact_source_id": str(source["id"]),
+                "exact_source_revision": next_revision,
+                "exact_source_fingerprint": str(source["fingerprint"]),
+                "provider_id": "media_library_agent.local_artwork.v1",
+                "capability_witness": text(capability_witness),
+                "error_code": text(error_code),
+                "updated_at": now_iso(),
+            }
+            connection.execute(
+                "UPDATE sources SET metadata_json=?,revision=?,last_seen_at=? WHERE id=?",
+                (
+                    json_dumps(metadata),
+                    next_revision,
+                    now_iso(),
+                    str(source["id"]),
+                ),
+            )
+            changed = connection.execute(
+                "SELECT * FROM sources WHERE id=?", (str(source["id"]),)
+            ).fetchone()
+            public_source = self._public_source(changed)
+            self._insert_delta(
+                connection,
+                "updated",
+                public_source,
+                job_id="artwork-capability",
+            )
+            connection.commit()
+        return {"ok": True, "changed": True, "source": public_source}
 
     def next_queued_rendition_job(self) -> dict[str, Any] | None:
         with self.connect() as connection:

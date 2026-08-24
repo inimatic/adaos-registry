@@ -476,14 +476,22 @@ def test_import_is_async_reference_only_and_excludes_images(tmp_path):
     assert job["status"] == "completed"
     assert job["progress"]["processed_count"] == 1
     deltas = main.pull_deltas(limit=10)
-    assert [item["source"]["name"] for item in deltas["items"]] == ["01.mp3"]
-    assert deltas["items"][0]["source"]["metadata"]["folder_segments"] == [
+    assert [item["source"]["name"] for item in deltas["items"]] == [
+        "01.mp3",
+        "01.mp3",
+    ]
+    added = deltas["items"][0]
+    artwork_update = deltas["items"][1]
+    assert added["operation"] == "added"
+    assert artwork_update["operation"] == "updated"
+    assert artwork_update["source"]["metadata"]["artwork"]["state"] == "pending"
+    assert added["source"]["metadata"]["folder_segments"] == [
         "Artist",
         "Album",
     ]
-    assert deltas["items"][0]["source"]["metadata"]["technical"]["probe"] == "basic"
+    assert added["source"]["metadata"]["technical"]["probe"] == "basic"
     assert (
-        deltas["items"][0]["source"]["descriptor"]["metadata"]["storage_mode"]
+        added["source"]["descriptor"]["metadata"]["storage_mode"]
         == "reference"
     )
     assert song.read_bytes() == b"audio-data"
@@ -499,27 +507,42 @@ def test_incremental_scan_emits_only_changes_and_tombstones(tmp_path):
     imported = main.import_folder(path=str(library))
     _wait(imported["job"]["id"])
     first = main.pull_deltas(limit=10)
-    assert [item["operation"] for item in first["items"]] == ["added"]
+    assert [item["operation"] for item in first["items"]] == ["added", "updated"]
+    assert first["items"][-1]["source"]["metadata"]["artwork"]["state"] in {
+        "pending",
+        "unavailable",
+    }
 
     unchanged = main.start_scan(root_id=imported["root"]["id"])
     _wait(unchanged["job"]["id"])
     replay = main.pull_deltas(cursor=first["next_cursor"], limit=10)
-    assert replay["items"] == []
+    assert all(
+        item["source"]["fingerprint"]
+        == first["items"][-1]["source"]["fingerprint"]
+        and item["source"]["metadata"].get("artwork", {}).get("state")
+        in {"ready", "unavailable", "failed"}
+        for item in replay["items"]
+    )
+    stable_cursor = replay["next_cursor"]
 
     time.sleep(0.01)
     song.write_bytes(b"version-two")
     changed = main.start_scan(root_id=imported["root"]["id"])
     _wait(changed["job"]["id"])
-    update = main.pull_deltas(cursor=first["next_cursor"], limit=10)
-    assert [item["operation"] for item in update["items"]] == ["updated"]
-    assert update["items"][0]["source_revision"] == 2
+    update = main.pull_deltas(cursor=stable_cursor, limit=10)
+    assert update["items"]
+    assert all(item["operation"] == "updated" for item in update["items"])
+    assert update["items"][-1]["source_revision"] > first["items"][-1]["source_revision"]
 
     song.unlink()
     removed = main.start_scan(root_id=imported["root"]["id"], mode="reconcile")
     _wait(removed["job"]["id"])
     tombstone = main.pull_deltas(cursor=update["next_cursor"], limit=10)
-    assert [item["operation"] for item in tombstone["items"]] == ["removed"]
-    assert tombstone["items"][0]["source"]["present"] is False
+    removed_items = [
+        item for item in tombstone["items"] if item["operation"] == "removed"
+    ]
+    assert len(removed_items) == 1
+    assert removed_items[0]["source"]["present"] is False
 
 
 def test_disabling_root_tombstones_sources_without_deleting_files(tmp_path):
@@ -533,7 +556,13 @@ def test_disabling_root_tombstones_sources_without_deleting_files(tmp_path):
     imported = main.import_folder(path=str(library))
     _wait(imported["job"]["id"])
     added = main.pull_deltas(limit=10)
-    assert [item["operation"] for item in added["items"]] == ["added", "added"]
+    assert [
+        item["operation"] for item in added["items"] if item["operation"] == "added"
+    ] == ["added", "added"]
+    assert {item["source"]["name"] for item in added["items"]} == {
+        "01.mp3",
+        "02.mp3",
+    }
 
     disabled = main.remove_root(root_id=imported["root"]["id"])
 
@@ -545,11 +574,11 @@ def test_disabling_root_tombstones_sources_without_deleting_files(tmp_path):
     assert main.list_roots()["items"] == []
     assert len(main.list_roots(include_disabled=True)["items"]) == 1
     tombstones = main.pull_deltas(cursor=added["next_cursor"], limit=10)
-    assert [item["operation"] for item in tombstones["items"]] == [
-        "removed",
-        "removed",
+    removed_items = [
+        item for item in tombstones["items"] if item["operation"] == "removed"
     ]
-    assert all(item["source"]["present"] is False for item in tombstones["items"])
+    assert len(removed_items) == 2
+    assert all(item["source"]["present"] is False for item in removed_items)
     assert first_song.read_bytes() == b"first"
     assert second_song.read_bytes() == b"second"
 
@@ -1488,7 +1517,7 @@ def test_rendition_is_bounded_derived_and_tied_to_exact_source(tmp_path):
     changed = repository.get_source(source["id"])
     rendition = changed["metadata"]["derived_renditions"][0]
     assert rendition["exact_source_id"] == source["id"]
-    assert rendition["exact_source_revision"] == source["revision"]
+    assert rendition["exact_source_revision"] == queued["job"]["source_revision"]
     assert rendition["exact_source_fingerprint"] == source["fingerprint"]
     assert rendition["descriptor"]["metadata"]["storage_mode"] == "derived_copy"
     assert published.read_bytes() == b"browser-compatible"
@@ -1571,7 +1600,7 @@ def test_folder_artwork_is_bounded_published_and_tied_to_exact_source(tmp_path):
     assert artwork["provider_id"] == "media_library_agent.folder_artwork.v1"
     assert artwork["source_kind"] == "folder"
     assert artwork["exact_source_id"] == source["id"]
-    assert artwork["exact_source_revision"] == source["revision"]
+    assert artwork["exact_source_revision"] == queued["source_revision"]
     assert artwork["exact_source_fingerprint"] == source["fingerprint"]
     assert artwork["descriptor"]["browser_path"] == "/media/album-cover.jpg"
     assert 0 < artwork["width"] <= 720
@@ -1596,6 +1625,78 @@ def test_folder_artwork_is_bounded_published_and_tied_to_exact_source(tmp_path):
             ).read_text(encoding="utf-8")
         )
     ).validate(artwork_plan(changed))
+
+
+def test_artwork_backfill_queues_preexisting_sources_with_durable_cursor(
+    monkeypatch, tmp_path
+):
+    library = tmp_path / "library"
+    library.mkdir()
+    (library / "legacy.mp3").write_bytes(b"audio")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "artwork-backfill.sqlite3", node_id="node-a"
+    )
+    worker = MediaLibraryAgentWorker(
+        repository,
+        register=lambda path, _root, metadata: {
+            "resource_id": "legacy-audio",
+            "path": str(path),
+            "source_path": str(path),
+            "mime_type": "audio/mpeg",
+            "metadata": metadata,
+        },
+    )
+    monkeypatch.setattr(worker, "_queue_artwork_for_source", lambda *_a, **_k: False)
+    source = _rendition_source(repository, worker, library)
+    assert source["metadata"].get("artwork") is None
+
+    backfill_worker = MediaLibraryAgentWorker(repository)
+    assert backfill_worker._enqueue_artwork_backfill() == 1
+    queued = repository.next_queued_rendition_job()
+    changed = repository.get_source(source["id"])
+    status = backfill_worker.artwork_status()
+
+    assert queued is not None and queued["profile"] == "artwork-card-v1"
+    assert changed["metadata"]["artwork"]["state"] == "pending"
+    assert status["queued_count"] == 1
+    assert status["sources"]["pending"] == 1
+    assert status["cursor"] == ""
+    assert status["cycle"] == 1
+
+
+def test_artwork_terminal_result_is_replanned_only_after_capability_change():
+    source = {
+        "id": "source-a",
+        "revision": 4,
+        "fingerprint": "fingerprint-a",
+        "media_kind": "video",
+        "metadata": {
+            "artwork": {
+                "state": "unavailable",
+                "exact_source_fingerprint": "fingerprint-a",
+                "capability_witness": "capabilities-a",
+            }
+        },
+    }
+    unavailable = {
+        "schema": "adaos.media_library.artwork_capabilities.v1",
+        "local_images": True,
+        "embedded_audio": True,
+        "video_frames": False,
+        "ffmpeg_source": "unavailable",
+        "witness": "capabilities-a",
+    }
+    available = {
+        **unavailable,
+        "video_frames": True,
+        "ffmpeg_source": "imageio_ffmpeg",
+        "witness": "capabilities-b",
+    }
+
+    assert artwork_plan(source, capabilities=unavailable)["required"] is False
+    plan = artwork_plan(source, capabilities=available)
+    assert plan["required"] is True
+    assert plan["capabilities"]["witness"] == "capabilities-b"
 
 
 def test_rendition_source_change_after_publish_is_not_advertised_and_is_cleaned(
@@ -1691,7 +1792,11 @@ def test_queued_rendition_cancellation_is_terminal_without_worker(tmp_path):
     assert canceled["job"]["status"] == "canceled"
     assert canceled["job"]["finished_at"]
     remaining = repository.next_queued_rendition_job()
-    assert remaining is not None and remaining["profile"] == "artwork-card-v1"
+    assert remaining is None or remaining["profile"] == "artwork-card-v1"
+    assert repository.get_source(source["id"])["metadata"]["artwork"]["state"] in {
+        "pending",
+        "unavailable",
+    }
 
 
 def test_agent_deep_search_covers_unicode_folders_and_technical_metadata(tmp_path):
