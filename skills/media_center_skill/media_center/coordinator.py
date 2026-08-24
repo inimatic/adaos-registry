@@ -5156,7 +5156,7 @@ class MediaCatalogCoordinator:
         else:
             configured = None
 
-        summary = self.repository.summary()
+        summary = self.repository.compact_summary()
         available_count = int(summary.get("available_count") or 0)
         background_counts = self.background_job_counts()
         coordinator_active = sum(
@@ -5519,7 +5519,9 @@ class MediaCatalogCoordinator:
             "updated_at": now_iso(),
         }
 
-    def diagnostics(self) -> dict[str, Any]:
+    def diagnostics(
+        self, *, summary: Mapping[str, Any] | None = None
+    ) -> dict[str, Any]:
         with self.repository.connect() as connection:
             works = int(connection.execute("SELECT COUNT(*) FROM media_works").fetchone()[0])
             variants = int(connection.execute("SELECT COUNT(*) FROM media_variants").fetchone()[0])
@@ -5549,11 +5551,11 @@ class MediaCatalogCoordinator:
                     """
                 ).fetchall()
             ]
-        summary = self.repository.summary()
+        compact_summary = dict(summary or self.repository.compact_summary())
         # FTS5 COUNT(*) scans every indexed token payload and can take minutes
         # for large libraries. Search rows have a strict one-to-one catalog
         # rowid invariant, so the ordinary catalog count is the bounded witness.
-        search_rows = int(summary["total_count"])
+        search_rows = int(compact_summary["total_count"])
         recommendations: list[dict[str, Any]] = []
         if not agents:
             recommendations.append(
@@ -5600,7 +5602,7 @@ class MediaCatalogCoordinator:
             )
         return {
             "ok": True, "schema": COORDINATOR_SCHEMA, "catalog_revision": self.catalog_revision(),
-            "counts": {"sources": summary["total_count"], "works": works, "variants": variants, "collections": collections},
+            "counts": {"sources": compact_summary["total_count"], "works": works, "variants": variants, "collections": collections},
             "participation": self.participation(),
             "budgets": {"catalog_page": MAX_PAGE_SIZE, "player_queue": 10, "agent_delta_page": 1000},
             "storage": {"media_bytes": "external", "catalog": "skill_local_relational"},

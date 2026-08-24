@@ -1669,12 +1669,13 @@ def set_favorite(item_id: str = "", favorite: bool = True, **_: Any) -> dict[str
 def status(**_: Any) -> dict[str, Any]:
     repo = _repository()
     catalog = _coordinator(repo)
+    summary = repo.compact_summary()
     return {
         "ok": True,
         "schema": COORDINATOR_SCHEMA,
-        "summary": repo.summary(),
+        "summary": summary,
         "facets": repo.facets(),
-        "coordinator": catalog.diagnostics(),
+        "coordinator": catalog.diagnostics(summary=summary),
         "agent_sync": _agent_sync_status(),
         "enrichment": _enrichment_runtime(catalog).status(),
     }
@@ -1690,7 +1691,8 @@ def diagnostic_export(
     **_: Any,
 ) -> dict[str, Any]:
     catalog = _coordinator()
-    components: dict[str, Any] = {"coordinator": catalog.diagnostics()}
+    coordinator_diagnostics = catalog.diagnostics()
+    components: dict[str, Any] = {"coordinator": coordinator_diagnostics}
     failures: list[dict[str, Any]] = []
     probes = (
         (
@@ -1734,7 +1736,7 @@ def diagnostic_export(
         "failures": _sanitize_diagnostic(failures),
         "partial": bool(failures),
         "repair_recommendations": _sanitize_diagnostic(
-            catalog.diagnostics().get("repair_recommendations") or []
+            coordinator_diagnostics.get("repair_recommendations") or []
         ),
         "privacy": {
             "paths": "redacted",

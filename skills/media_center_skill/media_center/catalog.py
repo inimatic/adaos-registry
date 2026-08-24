@@ -634,6 +634,39 @@ class MediaCenterRepository:
             "last_scan": dict(last_scan) if last_scan else None,
         }
 
+    def compact_summary(self) -> dict[str, Any]:
+        """Return first-paint counters without reading wide catalog rows."""
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM catalog_items
+                        INDEXED BY idx_media_center_recent) AS total,
+                    (SELECT COUNT(*) FROM catalog_items
+                        INDEXED BY idx_media_center_recent
+                        WHERE missing=0) AS available
+                """
+            ).fetchone()
+            last_scan = connection.execute(
+                "SELECT * FROM scan_runs ORDER BY started_at DESC LIMIT 1"
+            ).fetchone()
+        available = int(row["available"] or 0) if row else 0
+        total = int(row["total"] or 0) if row else 0
+        return {
+            "title": "Media Center",
+            "value": available,
+            "subtitle": f"{available} available / {total} cataloged",
+            "details": "Media bytes remain at their source",
+            "schema": SCHEMA_VERSION,
+            "total_count": total,
+            "available_count": available,
+            "missing_count": max(0, total - available),
+            "total_bytes": 0,
+            "total_bytes_exact": False,
+            "indexed_at": _text(last_scan["finished_at"] if last_scan else ""),
+            "last_scan": dict(last_scan) if last_scan else None,
+        }
+
     def facets(self) -> dict[str, list[dict[str, Any]]]:
         with self.connect() as connection:
             kind_rows = connection.execute(

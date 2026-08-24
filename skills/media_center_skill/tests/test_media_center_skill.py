@@ -1492,6 +1492,42 @@ def test_diagnostics_never_count_scans_the_fts_virtual_table(monkeypatch, tmp_pa
     )
 
 
+def test_status_and_collection_state_avoid_wide_catalog_summary(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "compact-status.sqlite3")
+    )
+    repository = MediaCenterRepository()
+    catalog = MediaCatalogCoordinator(repository)
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Movies/Example/movie.mp4", kind="video"))
+    )
+
+    def fail_wide_summary():
+        raise AssertionError("wide catalog summary must not run on status paths")
+
+    monkeypatch.setattr(repository, "summary", fail_wide_summary)
+    monkeypatch.setattr(main, "_repository", lambda: repository)
+    monkeypatch.setattr(main, "_coordinator", lambda _repository=None: catalog)
+    monkeypatch.setattr(main, "_agent_sync_status", lambda: {"state": "idle"})
+    monkeypatch.setattr(
+        main,
+        "_enrichment_runtime",
+        lambda _catalog: SimpleNamespace(status=lambda: {"state": "idle"}),
+    )
+
+    compact = repository.compact_summary()
+    state = catalog.collection_state(agent_sync={"state": "idle"})
+    diagnostics = catalog.diagnostics()
+    result = main.status()
+
+    assert compact["available_count"] == 1
+    assert compact["total_bytes_exact"] is False
+    assert state["available_count"] == 1
+    assert diagnostics["counts"]["sources"] == 1
+    assert result["summary"]["available_count"] == 1
+    assert result["coordinator"]["counts"]["sources"] == 1
+
+
 def test_search_rowid_migration_rebuilds_legacy_fts_rows(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repository = MediaCenterRepository()
