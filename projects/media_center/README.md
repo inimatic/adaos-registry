@@ -7,7 +7,7 @@ dependency and remains the owner of core media resource registration and byte
 delivery.
 
 Release `0.6.74` makes catalog startup single-flight under real storage
-contention. It ships `media_center_skill@0.8.65` and keeps the remaining
+contention. It ships `media_center_skill@0.8.67` and keeps the remaining
 `0.6.73` component set. Bounded schema-revision reads absorb short SQLite locks;
 an uncertain catalog or coordinator revision is never treated as permission
 for a migration. Agent catalog events received during bootstrap only wake the
