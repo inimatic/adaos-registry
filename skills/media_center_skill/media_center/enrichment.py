@@ -428,8 +428,6 @@ class MediaEnrichmentWorker:
                 self._wake.set()
                 return False
             self._stop.clear()
-            self.coordinator.recover_stale_background_jobs()
-            self.coordinator.prune_terminal_background_jobs()
             self._thread = threading.Thread(
                 target=self._loop,
                 name="media-center-enrichment",
@@ -515,7 +513,7 @@ class MediaEnrichmentWorker:
         self._completed_since_maintenance += 1
         if self._completed_since_maintenance >= self.maintenance_interval_jobs:
             try:
-                self.coordinator.prune_terminal_background_jobs()
+                self.coordinator.prune_terminal_background_jobs(batch_size=250)
             finally:
                 self._completed_since_maintenance = 0
         publish_at = time.monotonic()
@@ -555,6 +553,10 @@ class MediaEnrichmentWorker:
         }
 
     def _loop(self) -> None:
+        try:
+            self.coordinator.recover_stale_background_jobs()
+        except Exception:
+            pass
         while not self._stop.is_set():
             result = self.run_once()
             if result is None:

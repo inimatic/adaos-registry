@@ -20,6 +20,7 @@ if str(SKILL_ROOT) not in sys.path:
 
 from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION  # noqa: E402
 from media_center.background import MediaCenterBackgroundRuntime  # noqa: E402
+import media_center.catalog as catalog_module  # noqa: E402
 import media_center.coordinator as coordinator_module  # noqa: E402
 from media_center.coordinator import MediaCatalogCoordinator  # noqa: E402
 from media_center.enrichment import (  # noqa: E402
@@ -87,6 +88,27 @@ def test_background_runtime_reuses_and_disposes_process_owned_workers() -> None:
     assert receipt["stopped"] is True
 
 
+def test_background_runtime_bootstrap_is_async_and_process_owned() -> None:
+    runtime = MediaCenterBackgroundRuntime()
+    entered = threading.Event()
+    release = threading.Event()
+
+    def bootstrap() -> None:
+        entered.set()
+        release.wait(2.0)
+
+    assert runtime.ensure_bootstrap_started("catalog-a", bootstrap) is True
+    assert entered.wait(1.0) is True
+    assert runtime.bootstrap_status()["running"] is True
+    assert runtime.ensure_bootstrap_started("catalog-a", bootstrap) is False
+
+    release.set()
+    receipt = runtime.dispose(timeout=2.0)
+
+    assert receipt["stopped"] is True
+    assert receipt["bootstrap"]["stopped"] is True
+
+
 def test_rehydrate_defers_runtime_workers_until_sys_ready(monkeypatch) -> None:
     started: list[str] = []
 
@@ -135,6 +157,60 @@ def test_rehydrate_defers_runtime_workers_until_sys_ready(monkeypatch) -> None:
     assert result["enrichment"]["activation"] == "sys.ready"
     assert result["enrichment"]["worker_started"] is False
     assert result["catalog_revision"] == 42
+
+
+def test_sys_ready_schedules_catalog_bootstrap_without_running_it_inline(
+    monkeypatch, tmp_path
+) -> None:
+    scheduled: list[tuple[str, object]] = []
+    started: list[str] = []
+
+    class Runtime:
+        def ensure_bootstrap_started(self, key, callback) -> bool:
+            scheduled.append((key, callback))
+            return True
+
+    class Worker:
+        def __init__(self, name: str):
+            self.name = name
+
+        def ensure_started(self) -> bool:
+            started.append(self.name)
+            return True
+
+    catalog = object()
+    monkeypatch.setattr(main, "background_runtime", lambda: Runtime())
+    monkeypatch.setattr(main, "default_db_path", lambda: tmp_path / "catalog.sqlite3")
+    monkeypatch.setattr(main, "_coordinator", lambda: catalog)
+    monkeypatch.setattr(main, "_agent_sync_runtime", lambda _catalog=None: Worker("sync"))
+    monkeypatch.setattr(main, "_enrichment_runtime", lambda _catalog=None: Worker("enrichment"))
+    monkeypatch.setattr(main, "_publish_library_snapshot", lambda *_args: started.append("library"))
+    monkeypatch.setattr(main, "_publish_operation_snapshot", lambda *_args: started.append("operations"))
+
+    main.on_sys_ready(None)
+
+    assert started == []
+    assert len(scheduled) == 1
+    scheduled[0][1]()
+    assert started == ["library", "operations", "sync", "enrichment"]
+
+
+def test_schema_lock_never_falls_through_to_full_migration(monkeypatch, tmp_path) -> None:
+    db_path = tmp_path / "media_center.sqlite3"
+    db_path.write_bytes(b"catalog")
+    calls = 0
+
+    def locked_connect(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        raise catalog_module.sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(catalog_module.sqlite3, "connect", locked_connect)
+
+    with pytest.raises(RuntimeError, match="media_center_schema_state_unavailable"):
+        MediaCenterRepository(db_path)
+
+    assert calls == 1
 
 
 def _resource(resource_id: str = "clip.mp4", *, source: str = "media_server") -> dict:
@@ -4121,6 +4197,30 @@ def test_enrichment_worker_publishes_full_snapshot_only_when_queue_settles(
 
     assert progress
     assert settled == ["settled"]
+
+
+def test_enrichment_start_defers_maintenance_to_worker_thread() -> None:
+    recovered = threading.Event()
+    release = threading.Event()
+
+    class Coordinator:
+        def recover_stale_background_jobs(self):
+            recovered.set()
+            release.wait(2.0)
+            return {"ok": True}
+
+        def prune_terminal_background_jobs(self, **_kwargs):
+            pytest.fail("startup must not prune terminal jobs")
+
+        def claim_background_job(self):
+            return None
+
+    worker = MediaEnrichmentWorker(Coordinator(), providers=(), poll_seconds=30)
+
+    assert worker.ensure_started() is True
+    assert recovered.wait(1.0) is True
+    release.set()
+    assert worker.dispose(timeout=2.0)["stopped"] is True
 
 
 def test_background_job_indexes_recovery_and_exact_active_count(monkeypatch, tmp_path):

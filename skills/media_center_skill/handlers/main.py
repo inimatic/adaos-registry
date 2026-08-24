@@ -34,6 +34,7 @@ from media_center.background import background_runtime  # noqa: E402
 from media_center.catalog import (  # noqa: E402
     MediaCenterRepository,
     SCHEMA_VERSION,
+    default_db_path,
     now_iso,
 )
 from media_center.coordinator import (  # noqa: E402
@@ -845,11 +846,18 @@ def _sync_agents(
 
 @subscribe("sys.ready")
 def on_sys_ready(_: Any) -> None:
+    background_runtime().ensure_bootstrap_started(
+        str(default_db_path().resolve()),
+        _start_live_runtime,
+    )
+
+
+def _start_live_runtime() -> None:
     catalog = _coordinator()
-    _agent_sync_runtime(catalog).ensure_started()
-    _enrichment_runtime(catalog).ensure_started()
     _publish_library_snapshot(catalog)
     _publish_operation_snapshot(catalog)
+    _agent_sync_runtime(catalog).ensure_started()
+    _enrichment_runtime(catalog).ensure_started()
 
 
 @subscribe(
@@ -1677,6 +1685,7 @@ def status(**_: Any) -> dict[str, Any]:
         "facets": repo.facets(),
         "coordinator": catalog.diagnostics(summary=summary),
         "agent_sync": _agent_sync_status(),
+        "runtime_bootstrap": background_runtime().bootstrap_status(),
         "enrichment": _enrichment_runtime(catalog).status(),
     }
 

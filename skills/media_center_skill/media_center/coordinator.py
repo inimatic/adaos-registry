@@ -5313,7 +5313,7 @@ class MediaCatalogCoordinator:
         }
 
     def prune_terminal_background_jobs(
-        self, *, retain: int = 10000, batch_size: int = 5000
+        self, *, retain: int = 10000, batch_size: int = 250
     ) -> dict[str, Any]:
         retained = max(1000, min(int(retain), 100000))
         bounded_batch = max(1, min(int(batch_size), 5000))

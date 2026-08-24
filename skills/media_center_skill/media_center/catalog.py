@@ -83,8 +83,12 @@ class MediaCenterRepository:
                 row = connection.execute(
                     "SELECT value FROM meta WHERE key='catalog_schema_revision'"
                 ).fetchone()
-        except sqlite3.Error:
-            return False
+        except sqlite3.OperationalError as exc:
+            if "no such table" in str(exc).lower():
+                return False
+            raise RuntimeError("media_center_schema_state_unavailable") from exc
+        except sqlite3.DatabaseError as exc:
+            raise RuntimeError("media_center_schema_state_unavailable") from exc
         return bool(row and str(row[0]) == CATALOG_SCHEMA_REVISION)
 
     def ensure_schema(self, *, force: bool = False) -> dict[str, Any]:
