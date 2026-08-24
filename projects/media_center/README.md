@@ -8,7 +8,7 @@ delivery.
 
 Release `0.6.60` is the locally verified single-node closure. It ships
 `media_center_skill@0.8.53`, `media_library_agent@0.6.30`,
-`media_control_skill@0.2.9`, scenario `media_center@0.6.18`, and client
+`media_control_skill@0.2.9`, scenario `media_center@0.6.19`, and client
 `0.0.371`. A monotonic per-profile projection revision makes Favorites and
 Recent converge across browsers, while bounded home caching, limit-first
 collection queries, membership-first artwork lookup, and coalesced playback
