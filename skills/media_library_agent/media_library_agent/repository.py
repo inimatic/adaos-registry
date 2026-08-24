@@ -1550,6 +1550,15 @@ class MediaLibraryAgentRepository:
                     "provider_id": text(artwork.get("provider_id")),
                     "source_kind": text(artwork.get("source_kind")),
                     "source_name": text(artwork.get("source_name")),
+                    "selection_algorithm": text(
+                        artwork.get("selection_algorithm")
+                    ),
+                    "sample_seek_seconds": float(
+                        artwork.get("sample_seek_seconds") or 0
+                    ),
+                    "information_score": float(
+                        artwork.get("information_score") or 0
+                    ),
                     "width": max(0, int(artwork.get("width") or 0)),
                     "height": max(0, int(artwork.get("height") or 0)),
                     "size_bytes": max(0, int(output_bytes)),

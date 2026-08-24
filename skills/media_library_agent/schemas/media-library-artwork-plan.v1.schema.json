@@ -40,7 +40,8 @@
         "max_width": {"type": "integer", "minimum": 64, "maximum": 1920},
         "max_height": {"type": "integer", "minimum": 64, "maximum": 1920},
         "quality": {"type": "integer", "minimum": 50, "maximum": 92},
-        "max_output_bytes": {"type": "integer", "minimum": 65536, "maximum": 4194304}
+        "max_output_bytes": {"type": "integer", "minimum": 65536, "maximum": 4194304},
+        "sample_duration_seconds": {"type": "number", "minimum": 0, "maximum": 604800}
       },
       "additionalProperties": false
     },

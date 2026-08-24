@@ -15,6 +15,7 @@ from .contracts import ARTWORK_PLAN_SCHEMA, RENDITION_PLAN_SCHEMA, text
 
 CancelCallback = Callable[[], bool]
 ARTWORK_PROFILE = "artwork-card-v1"
+ARTWORK_SELECTION_ALGORITHM = "informative-frame-v2"
 ARTWORK_NAMES = ("cover", "folder", "front", "poster", "album", "artwork")
 ARTWORK_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
 
@@ -52,7 +53,7 @@ def artwork_capabilities() -> dict[str, Any]:
     except Exception:
         embedded_audio = False
     witness = hashlib.sha256(
-        f"image:{int(image_backend)}|embedded:{int(embedded_audio)}|ffmpeg:{source}".encode(
+        f"image:{int(image_backend)}|embedded:{int(embedded_audio)}|ffmpeg:{source}|selector:{ARTWORK_SELECTION_ALGORITHM}".encode(
             "utf-8"
         )
     ).hexdigest()[:20]
@@ -178,10 +179,15 @@ def artwork_plan(
         if isinstance(metadata.get("artwork"), Mapping)
         else {}
     )
+    generated_frame_current = bool(
+        text(artwork.get("source_kind")) != "generated_frame"
+        or text(artwork.get("selection_algorithm")) == ARTWORK_SELECTION_ALGORITHM
+    )
     current = bool(
         artwork.get("state") == "ready"
         and text(artwork.get("exact_source_fingerprint"))
         == text(source.get("fingerprint"))
+        and generated_frame_current
     )
     terminal = bool(
         artwork.get("state") in {"unavailable", "failed"}
@@ -212,6 +218,14 @@ def artwork_plan(
             "max_height": 1080,
             "quality": 84,
             "max_output_bytes": 4 * 1024**2,
+            "sample_duration_seconds": max(
+                0.0,
+                float(
+                    ((metadata.get("technical") or {}).get("duration_seconds") or 0)
+                    if isinstance(metadata.get("technical"), Mapping)
+                    else 0
+                ),
+            ),
         },
         "artwork": artwork or None,
         "capabilities": capability_state,
@@ -336,6 +350,47 @@ def _render_artwork(
     }
 
 
+def _frame_information(path: Path) -> dict[str, Any]:
+    from PIL import Image, ImageStat  # type: ignore[import-not-found]
+
+    with Image.open(path) as image:
+        sample = image.convert("L")
+        sample.thumbnail((96, 96))
+        entropy = float(sample.entropy())
+        stats = ImageStat.Stat(sample)
+        mean = float(stats.mean[0])
+        deviation = float(stats.stddev[0])
+        histogram = sample.histogram()
+        pixels = max(1, sum(histogram))
+        clipped = float(sum(histogram[:5]) + sum(histogram[251:])) / pixels
+    acceptable = bool(
+        8.0 <= mean <= 247.0
+        and clipped < 0.985
+        and (entropy >= 2.0 or deviation >= 14.0)
+    )
+    return {
+        "acceptable": acceptable,
+        "score": round(entropy + deviation / 32.0 - clipped, 6),
+        "entropy": round(entropy, 6),
+        "luminance_mean": round(mean, 3),
+        "luminance_deviation": round(deviation, 3),
+        "clipped_ratio": round(clipped, 6),
+    }
+
+
+def _artwork_sample_positions(duration_seconds: float) -> tuple[float, ...]:
+    duration = max(0.0, float(duration_seconds or 0))
+    if duration >= 20.0:
+        maximum = max(0.0, duration - 2.0)
+        values = [
+            max(2.0, min(maximum, duration * fraction))
+            for fraction in (0.18, 0.48, 0.72)
+        ]
+    else:
+        values = [5.0, 30.0, 90.0]
+    return tuple(dict.fromkeys(round(value, 3) for value in values))[:3]
+
+
 def _video_frame_artwork(
     source_path: Path,
     target_path: Path,
@@ -343,14 +398,22 @@ def _video_frame_artwork(
     cancelled: CancelCallback,
     timeout_seconds: int,
     maximum_output_bytes: int,
+    duration_seconds: float = 0,
 ) -> dict[str, Any]:
     executable, _source = _ffmpeg_executable()
     if not executable:
         raise RuntimeError("artwork_video_backend_unavailable")
-    partial = target_path.with_suffix(target_path.suffix + ".partial")
     started = time.monotonic()
     errors: list[str] = []
-    for seek_seconds in ("5", "0"):
+    candidates: list[tuple[float, Path, dict[str, Any]]] = []
+    sample_positions = [*_artwork_sample_positions(duration_seconds), 0.0]
+    for index, seek_value in enumerate(sample_positions):
+        if seek_value == 0.0 and candidates:
+            break
+        seek_seconds = f"{seek_value:g}"
+        partial = target_path.with_suffix(
+            target_path.suffix + f".candidate-{index}.partial"
+        )
         partial.unlink(missing_ok=True)
         command = [
             executable, "-nostdin", "-hide_banner", "-loglevel", "error",
@@ -380,23 +443,44 @@ def _video_frame_artwork(
             if process.returncode == 0 and partial.exists():
                 if partial.stat().st_size > maximum_output_bytes:
                     raise RuntimeError("artwork_output_limit_exceeded")
-                partial.replace(target_path)
                 from PIL import Image  # type: ignore[import-not-found]
-                with Image.open(target_path) as image:
+                with Image.open(partial) as image:
                     width, height = image.size
-                return {
-                    "size_bytes": int(target_path.stat().st_size),
-                    "mime_type": "image/jpeg",
-                    "width": int(width),
-                    "height": int(height),
-                }
+                information = _frame_information(partial)
+                if information["acceptable"]:
+                    candidates.append(
+                        (
+                            float(information["score"]),
+                            partial,
+                            {
+                                "size_bytes": int(partial.stat().st_size),
+                                "mime_type": "image/jpeg",
+                                "width": int(width),
+                                "height": int(height),
+                                "sample_seek_seconds": seek_value,
+                                "information_score": float(information["score"]),
+                                "selection_algorithm": ARTWORK_SELECTION_ALGORITHM,
+                            },
+                        )
+                    )
+                    continue
+                errors.append(f"uninformative frame at {seek_seconds}s")
             detail = error.decode("utf-8", errors="replace")[-1000:].strip()
-            errors.append(detail or f"no frame at {seek_seconds}s")
+            if not partial.exists():
+                errors.append(detail or f"no frame at {seek_seconds}s")
         finally:
             if process.poll() is None:
                 process.kill()
                 process.wait(timeout=2)
-            partial.unlink(missing_ok=True)
+            if not any(path == partial for _score, path, _result in candidates):
+                partial.unlink(missing_ok=True)
+    if candidates:
+        _score, selected_path, result = max(candidates, key=lambda item: item[0])
+        selected_path.replace(target_path)
+        for _candidate_score, candidate_path, _candidate_result in candidates:
+            if candidate_path != selected_path:
+                candidate_path.unlink(missing_ok=True)
+        return result
     raise RuntimeError(f"artwork_video_frame_failed:{errors[-1]}")
 
 
@@ -454,6 +538,7 @@ def materialize_artwork(
                 cancelled=cancelled,
                 timeout_seconds=45,
                 maximum_output_bytes=maximum_output,
+                duration_seconds=float(target.get("sample_duration_seconds") or 0),
             ),
             "provider_id": "media_library_agent.video_frame.v1",
             "source_kind": "generated_frame",

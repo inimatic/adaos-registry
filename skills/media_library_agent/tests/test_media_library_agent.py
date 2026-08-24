@@ -1772,7 +1772,7 @@ def test_video_frame_artwork_uses_full_range_jpeg_pixel_format(
 
         def __init__(self, command, **_kwargs):
             captured["command"] = list(command)
-            Image.new("RGB", (32, 18), color=(20, 40, 60)).save(
+            Image.effect_noise((32, 18), 80).convert("RGB").save(
                 Path(command[-1]), "JPEG"
             )
 
@@ -1820,7 +1820,7 @@ def test_video_frame_artwork_retries_from_start_for_short_video(
             commands.append(list(command))
             seek = command[command.index("-ss") + 1]
             if seek == "0":
-                Image.new("RGB", (32, 18), color=(20, 40, 60)).save(
+                Image.effect_noise((32, 18), 80).convert("RGB").save(
                     Path(command[-1]), "JPEG"
                 )
 
@@ -1846,8 +1846,65 @@ def test_video_frame_artwork_retries_from_start_for_short_video(
         maximum_output_bytes=1024 * 1024,
     )
 
-    assert [command[command.index("-ss") + 1] for command in commands] == ["5", "0"]
+    assert [command[command.index("-ss") + 1] for command in commands] == [
+        "5",
+        "30",
+        "90",
+        "0",
+    ]
     assert result["mime_type"] == "image/jpeg"
+    assert target.is_file()
+
+
+def test_video_frame_artwork_rejects_black_samples_and_keeps_informative_frame(
+    monkeypatch, tmp_path
+):
+    from PIL import Image
+
+    commands: list[list[str]] = []
+
+    class CompletedProcess:
+        returncode = 0
+
+        def __init__(self, command, **_kwargs):
+            commands.append(list(command))
+            seek = command[command.index("-ss") + 1]
+            image = (
+                Image.effect_noise((64, 36), 90).convert("RGB")
+                if seek == "90"
+                else Image.new("RGB", (64, 36), color="black")
+            )
+            image.save(Path(command[-1]), "JPEG")
+
+        def poll(self):
+            return self.returncode
+
+        def communicate(self, timeout=None):
+            return b"", b""
+
+    monkeypatch.setattr(
+        rendition_module, "_ffmpeg_executable", lambda: ("ffmpeg", "configured")
+    )
+    monkeypatch.setattr(rendition_module.subprocess, "Popen", CompletedProcess)
+    source = tmp_path / "dark-intro.mp4"
+    target = tmp_path / "artwork.jpg"
+    source.write_bytes(b"source")
+
+    result = rendition_module._video_frame_artwork(
+        source,
+        target,
+        cancelled=lambda: False,
+        timeout_seconds=30,
+        maximum_output_bytes=1024 * 1024,
+    )
+
+    assert [command[command.index("-ss") + 1] for command in commands] == [
+        "5",
+        "30",
+        "90",
+    ]
+    assert result["sample_seek_seconds"] == 90
+    assert result["selection_algorithm"] == "informative-frame-v2"
     assert target.is_file()
 
 
