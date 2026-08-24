@@ -64,6 +64,11 @@ Playback observations in `loading` or `buffering` state do not create history. F
 
 The local public-tool invocation and old Media Server discovery methods remain bounded compatibility fallbacks when no distributed agent instance is registered or the handler is exercised outside an AdaOS skill context. In a Project deployment, exact service-instance invocation is authoritative; root and scan commands return asynchronous job identifiers.
 
+Project closure references one published workspace revision for the scenario,
+coordinator, control plane, and agent. Process-local state is excluded from both
+that source boundary and package construction; a corrected closure receives a
+new Project version instead of replacing an immutable release digest.
+
 ## User-Facing Errors
 
 Tools return stable machine codes and may include `human_message_i18n`. Media Center error and UI translations live in this skill's `assets/i18n/*.json` resources, not in core, the scenario, or the client. The UI-as-data scenario references those keys and retains English fallbacks. Core browser-asset publication turns the dictionaries into immutable content-addressed URLs during materialization. `human_message` remains a fallback for clients that have not loaded the runtime dictionary.
