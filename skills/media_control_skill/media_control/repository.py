@@ -1179,7 +1179,7 @@ class MediaControlRepository:
 
     def now_playing(self, *, profile_id: str = "", target_id: str = "", limit: int = 20) -> dict[str, Any]:
         self.apply_due_sleep_timers()
-        filters = ["s.state NOT IN ('stopped','ended')"]
+        filters = ["s.state NOT IN ('stopped','ended','error')"]
         params: list[Any] = []
         if text(profile_id):
             filters.append("s.profile_id=?")

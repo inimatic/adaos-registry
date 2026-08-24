@@ -1,5 +1,5 @@
 name: media_control_skill
-version: 0.2.8
+version: 0.2.9
 description: Persistent Media Center control plane for playback targets, sessions,
   queues, commands, checkpoints, and settings.
 supported_locales:
@@ -20,6 +20,7 @@ events:
   - webio.stream.subscription.changed
   publish:
   - io.out.stream.publish
+  - media_control.playback.observed
 lifecycle:
   after_activate: ensure_schema
   rehydrate: rehydrate
@@ -730,4 +731,3 @@ compatibility:
     min_commit: 911c461a668e20d510ac7d746dda3324b4b53ce2
     min_short_commit: 911c461a
     build_date: '2026-08-24T11:12:47+03:00'
-

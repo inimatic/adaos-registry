@@ -95,6 +95,49 @@ def test_now_playing_exposes_human_titles_and_target_labels():
     assert projection["items"][0]["target_kind"] == "tv"
 
 
+def test_terminal_and_error_sessions_leave_now_playing():
+    repository = MediaControlRepository()
+    session = _session(repository)
+    with repository.connect() as connection:
+        connection.execute(
+            "UPDATE playback_sessions SET state='error' WHERE id=?",
+            (session["id"],),
+        )
+        connection.commit()
+
+    assert repository.now_playing(profile_id="alice")["items"] == []
+
+
+def test_checkpoint_handler_publishes_profile_observation(monkeypatch):
+    repository = MediaControlRepository()
+    session = _session(repository)
+    published = []
+    monkeypatch.setattr(main, "_repository", lambda: repository)
+    monkeypatch.setattr(main, "_publish_updates", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        "adaos.sdk.data.events.publish",
+        lambda kind, payload, **kwargs: published.append((kind, payload, kwargs)),
+    )
+
+    result = main.checkpoint(
+        session_id=session["id"],
+        position_ms=42_000,
+        duration_ms=120_000,
+        state="paused",
+        expected_revision=session["revision"],
+        webspace_id="desktop",
+    )
+
+    assert result["ok"] is True
+    assert published[0][0] == "media_control.playback.observed"
+    assert published[0][1]["position_ms"] == 42_000
+    assert published[0][1]["duration_ms"] == 120_000
+    assert published[0][1]["session_revision"] == session["revision"] + 1
+    assert published[0][1]["profile_id"] == "alice"
+    assert published[0][1]["item_id"] == "item-0"
+    assert published[0][1]["webspace_id"] == "desktop"
+
+
 def test_target_projection_exposes_device_endpoint_and_authorization_labels():
     repository = MediaControlRepository()
     repository.register_target(

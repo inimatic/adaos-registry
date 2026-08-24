@@ -31,6 +31,47 @@ def _repository() -> MediaControlRepository:
     return MediaControlRepository()
 
 
+def _publish_playback_observation(
+    result: Mapping[str, Any], *, webspace_id: str = ""
+) -> None:
+    session = result.get("session")
+    if not isinstance(session, Mapping):
+        return
+    item_id = text(session.get("active_item_id"))
+    if not item_id:
+        return
+    from adaos.sdk.data.events import publish as publish_event
+
+    position_ms = max(0, int(session.get("position_ms") or 0))
+    duration_ms = max(position_ms, int(session.get("duration_ms") or 0))
+    state = text(session.get("state")) or "paused"
+    try:
+        publish_event(
+            "media_control.playback.observed",
+            {
+                "schema": "adaos.media_control.playback_observed.v1",
+                "session_id": text(session.get("id")),
+                "target_id": text(session.get("target_id")),
+                "profile_id": text(session.get("profile_id")) or "default",
+                "item_id": item_id,
+                "position_ms": position_ms,
+                "duration_ms": duration_ms,
+                "state": state,
+                "completed": bool(
+                    state == "ended"
+                    or (duration_ms > 0 and position_ms >= duration_ms * 0.95)
+                ),
+                "session_revision": int(session.get("revision") or 0),
+                "webspace_id": text(webspace_id),
+            },
+            source="media_control_skill",
+        )
+    except Exception:
+        # The session mutation is durable; a transient projection failure must
+        # not make the applied playback command appear to have failed.
+        return
+
+
 def _error(code: str, fallback: str, **extra: Any) -> dict[str, Any]:
     key = f"runtime.media_control.error.{code}"
     try:
@@ -323,6 +364,7 @@ def create_session(
     )
     if result.get("ok"):
         _publish_updates(repository, webspace_id=webspace_id)
+        _publish_playback_observation(result, webspace_id=webspace_id)
     return _result_or_error(result)
 
 
@@ -372,6 +414,7 @@ def open_endpoint_session(
     if result.get("ok"):
         result["target"] = target
         _publish_updates(repository, webspace_id=webspace_id)
+        _publish_playback_observation(result, webspace_id=webspace_id)
     return _result_or_error(result)
 
 
@@ -410,6 +453,7 @@ def command(
         result = {"ok": False, "error": str(exc)}
     if result.get("ok"):
         _publish_updates(repository, webspace_id=webspace_id)
+        _publish_playback_observation(result, webspace_id=webspace_id)
     return _result_or_error(result)
 
 
@@ -431,6 +475,7 @@ def update_queue(
     )
     if result.get("ok"):
         _publish_updates(repository, webspace_id=webspace_id)
+        _publish_playback_observation(result, webspace_id=webspace_id)
     return _result_or_error(result)
 
 
@@ -456,6 +501,7 @@ def checkpoint(
     )
     if result.get("ok"):
         _publish_updates(repository, webspace_id=webspace_id)
+        _publish_playback_observation(result, webspace_id=webspace_id)
     return _result_or_error(result)
 
 
@@ -507,6 +553,7 @@ def reconcile_endpoint(
     )
     if result.get("ok"):
         _publish_updates(repository, webspace_id=webspace_id)
+        _publish_playback_observation(result, webspace_id=webspace_id)
     return _result_or_error(result)
 
 
