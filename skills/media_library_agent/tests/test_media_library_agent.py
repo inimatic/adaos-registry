@@ -1746,6 +1746,51 @@ def test_video_frame_artwork_uses_full_range_jpeg_pixel_format(
     assert target.is_file()
 
 
+def test_video_frame_artwork_retries_from_start_for_short_video(
+    monkeypatch, tmp_path
+):
+    from PIL import Image
+
+    commands: list[list[str]] = []
+
+    class CompletedProcess:
+        returncode = 0
+
+        def __init__(self, command, **_kwargs):
+            commands.append(list(command))
+            seek = command[command.index("-ss") + 1]
+            if seek == "0":
+                Image.new("RGB", (32, 18), color=(20, 40, 60)).save(
+                    Path(command[-1]), "JPEG"
+                )
+
+        def poll(self):
+            return self.returncode
+
+        def communicate(self, timeout=None):
+            return b"", b""
+
+    monkeypatch.setattr(
+        rendition_module, "_ffmpeg_executable", lambda: ("ffmpeg", "configured")
+    )
+    monkeypatch.setattr(rendition_module.subprocess, "Popen", CompletedProcess)
+    source = tmp_path / "short.mp4"
+    target = tmp_path / "artwork.jpg"
+    source.write_bytes(b"source")
+
+    result = rendition_module._video_frame_artwork(
+        source,
+        target,
+        cancelled=lambda: False,
+        timeout_seconds=30,
+        maximum_output_bytes=1024 * 1024,
+    )
+
+    assert [command[command.index("-ss") + 1] for command in commands] == ["5", "0"]
+    assert result["mime_type"] == "image/jpeg"
+    assert target.is_file()
+
+
 def test_rendition_source_change_after_publish_is_not_advertised_and_is_cleaned(
     tmp_path,
 ):

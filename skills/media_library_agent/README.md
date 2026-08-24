@@ -7,7 +7,9 @@ indexed before artwork extraction existed. Capability evidence makes terminal
 `unavailable` results retryable when an FFmpeg backend later appears. Version
 `0.6.28` emits video-frame JPEGs as full-range `yuvj420p`, which is required by
 current FFmpeg MJPEG encoders and remains compatible with older supported
-versions.
+versions. Version `0.6.29` retries extraction at the start of a video when the
+preferred five-second poster position is beyond a short clip, under the same
+bounded timeout and output limits.
 
 ## Storage boundary
 

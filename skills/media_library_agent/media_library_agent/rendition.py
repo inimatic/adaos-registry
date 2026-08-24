@@ -348,53 +348,56 @@ def _video_frame_artwork(
     if not executable:
         raise RuntimeError("artwork_video_backend_unavailable")
     partial = target_path.with_suffix(target_path.suffix + ".partial")
-    partial.unlink(missing_ok=True)
-    command = [
-        executable, "-nostdin", "-hide_banner", "-loglevel", "error",
-        "-protocol_whitelist", "file,pipe", "-ss", "5", "-i", str(source_path),
-        "-map", "0:v:0", "-frames:v", "1",
-        "-vf", "scale=w='min(720,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease",
-        "-pix_fmt", "yuvj420p", "-threads", "1", "-q:v", "3",
-        "-f", "image2", str(partial),
-    ]
-    process = subprocess.Popen(
-        command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
-    )
     started = time.monotonic()
-    error = b""
-    try:
-        while process.poll() is None:
-            if cancelled():
-                process.terminate()
-                raise RuntimeError("rendition_canceled")
-            if time.monotonic() - started > timeout_seconds:
-                process.terminate()
-                raise RuntimeError("artwork_timeout")
-            if partial.exists() and partial.stat().st_size > maximum_output_bytes:
-                process.terminate()
-                raise RuntimeError("artwork_output_limit_exceeded")
-            time.sleep(0.1)
-        _stdout, error = process.communicate(timeout=2)
-        if process.returncode != 0 or not partial.exists():
-            detail = error.decode("utf-8", errors="replace")[-1000:]
-            raise RuntimeError(f"artwork_video_frame_failed:{detail}")
-        if partial.stat().st_size > maximum_output_bytes:
-            raise RuntimeError("artwork_output_limit_exceeded")
-        partial.replace(target_path)
-        from PIL import Image  # type: ignore[import-not-found]
-        with Image.open(target_path) as image:
-            width, height = image.size
-        return {
-            "size_bytes": int(target_path.stat().st_size),
-            "mime_type": "image/jpeg",
-            "width": int(width),
-            "height": int(height),
-        }
-    finally:
-        if process.poll() is None:
-            process.kill()
-            process.wait(timeout=2)
+    errors: list[str] = []
+    for seek_seconds in ("5", "0"):
         partial.unlink(missing_ok=True)
+        command = [
+            executable, "-nostdin", "-hide_banner", "-loglevel", "error",
+            "-protocol_whitelist", "file,pipe", "-ss", seek_seconds,
+            "-i", str(source_path), "-map", "0:v:0", "-frames:v", "1",
+            "-vf", "scale=w='min(720,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease",
+            "-pix_fmt", "yuvj420p", "-threads", "1", "-q:v", "3",
+            "-f", "image2", str(partial),
+        ]
+        process = subprocess.Popen(
+            command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+        )
+        error = b""
+        try:
+            while process.poll() is None:
+                if cancelled():
+                    process.terminate()
+                    raise RuntimeError("rendition_canceled")
+                if time.monotonic() - started > timeout_seconds:
+                    process.terminate()
+                    raise RuntimeError("artwork_timeout")
+                if partial.exists() and partial.stat().st_size > maximum_output_bytes:
+                    process.terminate()
+                    raise RuntimeError("artwork_output_limit_exceeded")
+                time.sleep(0.1)
+            _stdout, error = process.communicate(timeout=2)
+            if process.returncode == 0 and partial.exists():
+                if partial.stat().st_size > maximum_output_bytes:
+                    raise RuntimeError("artwork_output_limit_exceeded")
+                partial.replace(target_path)
+                from PIL import Image  # type: ignore[import-not-found]
+                with Image.open(target_path) as image:
+                    width, height = image.size
+                return {
+                    "size_bytes": int(target_path.stat().st_size),
+                    "mime_type": "image/jpeg",
+                    "width": int(width),
+                    "height": int(height),
+                }
+            detail = error.decode("utf-8", errors="replace")[-1000:].strip()
+            errors.append(detail or f"no frame at {seek_seconds}s")
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=2)
+            partial.unlink(missing_ok=True)
+    raise RuntimeError(f"artwork_video_frame_failed:{errors[-1]}")
 
 
 def materialize_artwork(
