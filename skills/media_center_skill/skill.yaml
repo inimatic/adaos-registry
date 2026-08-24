@@ -50,6 +50,12 @@ lifecycle:
   dispose: dispose
 memory_budget:
   expected_rss_mb: 192
+  caches:
+  - name: playback_observation_cache
+    route: process
+    max_items: 256
+    ttl_seconds: 900
+    cleanup_hook: dispose
   background_workers:
     max_threads: 2
     cleanup_hook: dispose

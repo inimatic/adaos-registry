@@ -832,17 +832,18 @@ def on_playback_observed(event: Any) -> None:
     state = str(payload.get("state") or "paused").strip().lower()
     bucket = position_ms // 15_000
     cache_key = f"{profile_id}:{item_id}"
-    previous = _PLAYBACK_OBSERVATION_CACHE.get(cache_key)
-    terminal = state in {"stopped", "ended", "error"}
-    if previous and previous[0] == bucket and previous[1] == state and not terminal:
-        return
-    _PLAYBACK_OBSERVATION_CACHE[cache_key] = (bucket, state, time.monotonic())
-    while len(_PLAYBACK_OBSERVATION_CACHE) > _PLAYBACK_OBSERVATION_LIMIT:
-        oldest = min(
-            _PLAYBACK_OBSERVATION_CACHE,
-            key=lambda key: _PLAYBACK_OBSERVATION_CACHE[key][2],
-        )
-        _PLAYBACK_OBSERVATION_CACHE.pop(oldest, None)
+    with _coordinator_lock:
+        previous = _PLAYBACK_OBSERVATION_CACHE.get(cache_key)
+        terminal = state in {"stopped", "ended", "error"}
+        if previous and previous[0] == bucket and previous[1] == state and not terminal:
+            return
+        _PLAYBACK_OBSERVATION_CACHE[cache_key] = (bucket, state, time.monotonic())
+        while len(_PLAYBACK_OBSERVATION_CACHE) > _PLAYBACK_OBSERVATION_LIMIT:
+            oldest = min(
+                _PLAYBACK_OBSERVATION_CACHE,
+                key=lambda key: _PLAYBACK_OBSERVATION_CACHE[key][2],
+            )
+            _PLAYBACK_OBSERVATION_CACHE.pop(oldest, None)
     catalog = _coordinator()
     result = catalog.checkpoint(
         item_id,
@@ -2814,6 +2815,7 @@ def dispose(**_: Any) -> dict[str, Any]:
     if background.get("stopped") is not True:
         raise RuntimeError("media_center_background_drain_timeout")
     with _coordinator_lock:
+        _PLAYBACK_OBSERVATION_CACHE.clear()
         _coordinator_cached = None
         _coordinator_path = ""
     return {
