@@ -1477,7 +1477,7 @@ def build_playback_queue(
     preferred_language: str = "",
     **_: Any,
 ) -> dict[str, Any]:
-    return _coordinator().build_queue(
+    result = _coordinator().build_queue(
         source_type=source_type,
         source_id=source_id,
         profile_id=profile_id,
@@ -1488,6 +1488,22 @@ def build_playback_queue(
         preferred_quality=preferred_quality,
         preferred_language=preferred_language,
     )
+    if not result.get("ok"):
+        return result
+    settings_result, _settings_error = _invoke_skill(
+        "media_control_skill",
+        "get_settings",
+        {"profile_id": profile_id or "default", "target_id": endpoint_id},
+        timeout=3.0,
+    )
+    settings = dict((settings_result or {}).get("settings") or {})
+    playback_control = dict(result.get("playback_control") or {})
+    playback_control["settings"] = {
+        "autoplay": bool(settings.get("autoplay", True)),
+        "auto_fullscreen": bool(settings.get("auto_fullscreen", True)),
+    }
+    result["playback_control"] = playback_control
+    return result
 
 
 @tool(summary="Mark or unmark one media-center item as favorite.", side_effects="local_write")

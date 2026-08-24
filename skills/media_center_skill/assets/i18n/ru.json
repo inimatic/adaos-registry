@@ -95,6 +95,7 @@
   "runtime.media_center.ui.reviewed_plan_digest": "Дайджест проверенного плана",
   "runtime.media_center.ui.scan_folders": "Сканировать папки",
   "runtime.media_center.ui.search": "Поиск",
+  "runtime.media_center.ui.reset_search": "Сбросить поиск",
   "runtime.media_center.ui.section": "Раздел",
   "runtime.media_center.ui.select_activation": "Выбрать активацию",
   "runtime.media_center.ui.series": "Сериалы",

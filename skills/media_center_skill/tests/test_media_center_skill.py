@@ -280,6 +280,39 @@ def test_build_queue_keeps_legacy_reference_rows_playable(monkeypatch, tmp_path)
     )
 
 
+def test_playback_queue_includes_effective_control_settings(monkeypatch):
+    queue = {
+        "ok": True,
+        "playback_control": {"schema": "adaos.playback.endpoint_control.v1"},
+        "items": [{"id": "movie-1"}],
+    }
+    monkeypatch.setattr(
+        main,
+        "_coordinator",
+        lambda: SimpleNamespace(build_queue=lambda **_kwargs: dict(queue)),
+    )
+    monkeypatch.setattr(
+        main,
+        "_invoke_skill",
+        lambda *args, **kwargs: (
+            {"ok": True, "settings": {"autoplay": False, "auto_fullscreen": True}},
+            "",
+        ),
+    )
+
+    result = main.build_playback_queue(
+        source_type="item",
+        source_id="movie-1",
+        profile_id="alice",
+        limit=10,
+    )
+
+    assert result["playback_control"]["settings"] == {
+        "autoplay": False,
+        "auto_fullscreen": True,
+    }
+
+
 def test_library_auto_scan_uses_sdk_discovery_boundary(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     monkeypatch.setattr(main, "_discover_resources", lambda source="all", limit=5000: ([_resource("song.mp3")], {"ok": True}))

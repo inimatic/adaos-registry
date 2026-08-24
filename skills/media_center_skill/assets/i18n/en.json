@@ -95,6 +95,7 @@
   "runtime.media_center.ui.reviewed_plan_digest": "Reviewed plan digest",
   "runtime.media_center.ui.scan_folders": "Scan folders",
   "runtime.media_center.ui.search": "Search",
+  "runtime.media_center.ui.reset_search": "Reset search",
   "runtime.media_center.ui.section": "Section",
   "runtime.media_center.ui.select_activation": "Select activation",
   "runtime.media_center.ui.series": "Series",
