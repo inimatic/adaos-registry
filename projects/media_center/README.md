@@ -6,6 +6,25 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.62` is the locally verified collection and playback-quality
+closure. It ships `media_center_skill@0.8.54`,
+`media_library_agent@0.6.32`, `media_control_skill@0.2.10`, scenario
+`media_center@0.6.20`, and client `0.0.373`. Collection cards inherit a ready
+representative artwork resource from their members. Generated video artwork
+uses the `informative-frame-v2` recipe: up to three deterministic samples are
+scored for entropy, contrast, luminance, and clipping before the best frame is
+published. Episodic filenames are parsed into a stable series identity, so
+season folder labels no longer split one show into several series.
+
+Playback history now requires decoded media data or an advancing media
+position. Browser-incompatible AVI is rejected before opening a playback
+session, leaves fullscreen with a durable retry diagnostic, and does not create
+a new Recent entry. The app-shell mini-player exposes separate fullscreen and
+Picture-in-Picture commands; platforms without usable PiP retain the fullscreen
+path. Local acceptance covered Black Mirror artwork regeneration, unified MLP
+season grouping, collection artwork projection, successful fullscreen and
+mini-player playback, and terminal AVI failure.
+
 Release `0.6.61` is the locally verified single-node closure. It ships
 `media_center_skill@0.8.53`, `media_library_agent@0.6.31`,
 `media_control_skill@0.2.9`, scenario `media_center@0.6.19`, and client
