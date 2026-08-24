@@ -1604,6 +1604,59 @@ def test_rendition_is_bounded_derived_and_tied_to_exact_source(tmp_path):
     ).validate(result)
 
 
+def test_claimed_rendition_exception_is_terminal_and_observable(
+    monkeypatch, tmp_path
+):
+    library = tmp_path / "library"
+    library.mkdir()
+    (library / "episode.mkv").write_bytes(b"media")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "claimed-rendition.sqlite3", node_id="node-a"
+    )
+    worker = MediaLibraryAgentWorker(repository)
+    source = _rendition_source(repository, worker, library)
+    queued = repository.create_rendition_job(
+        source["id"],
+        profile="browser-mp4-v1",
+        target={"kind": "video", "container": "mp4"},
+    )["job"]
+
+    def fail_source_path(_source):
+        raise RuntimeError("fixture_failure")
+
+    monkeypatch.setattr(worker, "_contained_source_path", fail_source_path)
+
+    result = worker.run_once()
+
+    assert result and result["id"] == queued["id"]
+    assert result["status"] == "failed"
+    assert result["error"]["code"] == "worker_unhandled_exception"
+    assert "fixture_failure" in result["error"]["detail"]
+
+
+def test_claimed_scan_exception_is_terminal_and_observable(monkeypatch, tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "claimed-scan.sqlite3", node_id="node-a"
+    )
+    root = repository.add_root(str(library))["root"]
+    queued = repository.create_job(root["id"], mode="full")["job"]
+    worker = MediaLibraryAgentWorker(repository)
+
+    def fail_scan(_job):
+        raise RuntimeError("fixture_failure")
+
+    monkeypatch.setattr(worker, "_run_job", fail_scan)
+
+    result = worker.run_once()
+
+    assert result and result["id"] == queued["id"]
+    assert result["status"] == "failed"
+    assert result["error"]["code"] == "worker_unhandled_exception"
+    assert "fixture_failure" in result["error"]["detail"]
+
+
 def test_folder_artwork_is_bounded_published_and_tied_to_exact_source(tmp_path):
     from PIL import Image
     from jsonschema import Draft202012Validator

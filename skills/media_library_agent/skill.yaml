@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.32
+version: 0.6.33
 description: Distributed node-local media discovery and bounded rendition agent with
   durable jobs and ordered catalog deltas.
 supported_locales:
@@ -740,4 +740,3 @@ compatibility:
     min_commit: 60ba2e20101127f458457d9c30eb6a91f6249556
     min_short_commit: 60ba2e20
     build_date: '2026-08-24T15:15:48+03:00'
-

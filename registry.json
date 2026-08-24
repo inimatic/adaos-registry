@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-24T13:39:19+00:00",
+  "updated_at": "2026-08-24T13:38:20+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -445,7 +445,7 @@
       "kind": "skill",
       "id": "media_library_agent",
       "name": "media_library_agent",
-      "version": "0.6.32",
+      "version": "0.6.33",
       "updated_at": "2026-08-24T13:38:20+00:00",
       "path": "skills/media_library_agent",
       "manifest": "skills/media_library_agent/skill.yaml",

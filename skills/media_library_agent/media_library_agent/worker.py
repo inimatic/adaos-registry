@@ -3,6 +3,7 @@ from __future__ import annotations
 import fnmatch
 import hashlib
 import json
+import logging
 import mimetypes
 import os
 import shutil
@@ -45,6 +46,9 @@ PublishCallback = Callable[[Mapping[str, Any], str], None]
 TranscodeCallback = Callable[..., Mapping[str, Any]]
 ArtworkCallback = Callable[..., Mapping[str, Any]]
 PublishDerivedCallback = Callable[[Path, Mapping[str, Any]], Mapping[str, Any]]
+
+
+logger = logging.getLogger(__name__)
 
 
 class MediaLibraryAgentWorker:
@@ -138,22 +142,48 @@ class MediaLibraryAgentWorker:
         if rendition is not None and not artwork_waits_for_scan:
             claimed_rendition = self.repository.claim_rendition_job(rendition["id"])
             if claimed_rendition is not None:
-                return self._run_rendition_job(claimed_rendition)
+                return self._run_claimed_rendition_job(claimed_rendition)
         if queued is not None:
             claimed = self.repository.claim_job(queued["id"])
             if claimed is not None:
-                return self._run_job(claimed)
+                return self._run_claimed_scan_job(claimed)
         if rendition is not None:
             claimed_rendition = self.repository.claim_rendition_job(rendition["id"])
             if claimed_rendition is not None:
-                return self._run_rendition_job(claimed_rendition)
+                return self._run_claimed_rendition_job(claimed_rendition)
         self._enqueue_artwork_backfill()
         rendition = self.repository.next_queued_rendition_job()
         if rendition is not None:
             claimed_rendition = self.repository.claim_rendition_job(rendition["id"])
             if claimed_rendition is not None:
-                return self._run_rendition_job(claimed_rendition)
+                return self._run_claimed_rendition_job(claimed_rendition)
         return None
+
+    def _run_claimed_rendition_job(
+        self, job: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        try:
+            return self._run_rendition_job(job)
+        except Exception as exc:
+            logger.exception("claimed rendition job failed id=%s", text(job.get("id")))
+            return self._finish_rendition_failed(
+                text(job.get("id")),
+                "worker_unhandled_exception",
+                f"{type(exc).__name__}: {exc}",
+            )
+
+    def _run_claimed_scan_job(self, job: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            return self._run_job(job)
+        except Exception as exc:
+            logger.exception("claimed scan job failed id=%s", text(job.get("id")))
+            root = self.repository.get_root(text(job.get("root_id")))
+            return self._finish_failed(
+                text(job.get("id")),
+                "worker_unhandled_exception",
+                f"{type(exc).__name__}: {exc}",
+                root=root,
+            )
 
     def _enqueue_artwork_backfill(self) -> int:
         active = self.repository.active_artwork_job_count()
@@ -490,6 +520,7 @@ class MediaLibraryAgentWorker:
             try:
                 result = self.run_once()
             except Exception:
+                logger.exception("media-library worker iteration failed")
                 result = None
             if result is None:
                 self._wake.wait(self._poll_seconds)
