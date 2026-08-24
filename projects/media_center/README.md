@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.54` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.55` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -23,6 +23,11 @@ durable repository to the canonical SDK node identity. A one-time migration
 rewrites legacy `local` root, source, and delta identities in place while
 preserving root/source identifiers and external media references; a database
 already bound to another concrete node fails closed.
+
+The `0.6.55` release carries the `0.6.54` product closure with
+`media_library_agent@0.6.28`. Its video-frame extractor explicitly requests a
+full-range JPEG pixel format, verified against the packaged FFmpeg 7.1 binary,
+so automatic posters do not become terminal failures on current runtimes.
 
 The `0.6.54` release completes the single-node metadata and collection path.
 `media_library_agent@0.6.27` resumes a bounded durable artwork backfill and
