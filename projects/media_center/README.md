@@ -6,6 +6,13 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.73` makes enrichment resilient to transient catalog contention. It
+ships `media_center_skill@0.8.64` and keeps the remaining `0.6.72` component
+set. A locked per-connection `synchronous=NORMAL` preference retains SQLite's
+stricter default instead of aborting connection setup, and the enrichment loop
+reports and retries any remaining transient repository failure without losing
+its process-owned worker thread.
+
 Release `0.6.72` reuses the process-cached live coordinator for event and tool
 traffic. It ships `media_center_skill@0.8.63` and keeps the remaining `0.6.71`
 component set. High-rate agent catalog notifications no longer reconstruct a
