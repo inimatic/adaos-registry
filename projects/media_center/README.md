@@ -6,6 +6,13 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.70` bounds catalog status reads on large and contended libraries.
+It ships `media_center_skill@0.8.61` and keeps the remaining `0.6.69` component
+set. Status, diagnostics, and collection-state streams reuse one compact
+covering-index projection instead of scanning wide catalog rows. Exact byte
+aggregation remains available as an explicit heavyweight administrative path;
+the interactive projection reports that media bytes remain at their source.
+
 Release `0.6.69` makes collection totals reflect available logical works. It
 ships `media_center_skill@0.8.60` and keeps the remaining `0.6.68` component
 set. Offline compatibility-agent records and multiple playable renditions stay
