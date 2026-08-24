@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.52
+version: 0.8.53
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -54,6 +54,11 @@ memory_budget:
   - name: playback_observation_cache
     route: process
     max_items: 256
+    ttl_seconds: 900
+    cleanup_hook: dispose
+  - name: home_snapshot_cache
+    route: process
+    max_items: 32
     ttl_seconds: 900
     cleanup_hook: dispose
   background_workers:

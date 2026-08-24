@@ -22,6 +22,13 @@ if str(_SKILL_ROOT) not in sys.path:
 
 _PLAYBACK_OBSERVATION_CACHE: dict[str, tuple[int, str, float]] = {}
 _PLAYBACK_OBSERVATION_LIMIT = 256
+_HOME_SNAPSHOT_CACHE: dict[
+    tuple[str, str, bool], tuple[tuple[int, int], dict[str, Any], float]
+] = {}
+_HOME_SNAPSHOT_CACHE_LIMIT = 32
+_HOME_SNAPSHOT_CACHE_TTL_SECONDS = 15 * 60
+_home_snapshot_cache_lock = threading.Lock()
+_home_snapshot_build_lock = threading.Lock()
 
 from media_center.background import background_runtime  # noqa: E402
 from media_center.catalog import (  # noqa: E402
@@ -188,6 +195,74 @@ def _compact_home_snapshot(
     }
 
 
+def _cached_home_snapshot(
+    catalog: MediaCatalogCoordinator,
+    *,
+    profile_id: str,
+    shared_surface: bool,
+    catalog_revision: int,
+    personal_revision: int,
+    collection_state: Mapping[str, Any],
+) -> dict[str, Any]:
+    cache_key = (
+        str(catalog.repository.db_path.resolve()),
+        profile_id,
+        shared_surface,
+    )
+    signature = (catalog_revision, personal_revision)
+    now = time.monotonic()
+    with _home_snapshot_cache_lock:
+        cached = _HOME_SNAPSHOT_CACHE.get(cache_key)
+        if (
+            cached is not None
+            and cached[0] == signature
+            and now - cached[2] <= _HOME_SNAPSHOT_CACHE_TTL_SECONDS
+        ):
+            home = dict(cached[1])
+            _HOME_SNAPSHOT_CACHE[cache_key] = (cached[0], cached[1], now)
+        else:
+            home = {}
+    if not home:
+        with _home_snapshot_build_lock:
+            with _home_snapshot_cache_lock:
+                cached = _HOME_SNAPSHOT_CACHE.get(cache_key)
+                if (
+                    cached is not None
+                    and cached[0] == signature
+                    and now - cached[2] <= _HOME_SNAPSHOT_CACHE_TTL_SECONDS
+                ):
+                    home = dict(cached[1])
+            if not home:
+                home = _compact_home_snapshot(
+                    catalog.home(
+                        profile_id=profile_id,
+                        limit=6,
+                        shared_surface=shared_surface,
+                    ),
+                    collection_state=collection_state,
+                )
+                with _home_snapshot_cache_lock:
+                    _HOME_SNAPSHOT_CACHE[cache_key] = (signature, dict(home), now)
+                    while len(_HOME_SNAPSHOT_CACHE) > _HOME_SNAPSHOT_CACHE_LIMIT:
+                        oldest = min(
+                            _HOME_SNAPSHOT_CACHE,
+                            key=lambda key: _HOME_SNAPSHOT_CACHE[key][2],
+                        )
+                        _HOME_SNAPSHOT_CACHE.pop(oldest, None)
+    state = dict(collection_state)
+    home.update(
+        {
+            "state": str(state.get("state") or "loading"),
+            "configured": state.get("configured"),
+            "root_count": int(state.get("root_count") or 0),
+            "available_count": int(state.get("available_count") or 0),
+            "active_operation_count": int(state.get("active_operation_count") or 0),
+            "updated_at": str(state.get("updated_at") or now_iso()),
+        }
+    )
+    return home
+
+
 def _publish_library_snapshot(
     catalog: MediaCatalogCoordinator,
     *,
@@ -202,19 +277,21 @@ def _publish_library_snapshot(
         surface_is_shared = _bool(shared_surface, False)
         agent_sync = _agent_sync_status()
         collection_state = catalog.collection_state(agent_sync=agent_sync)
-        home = _compact_home_snapshot(
-            catalog.home(
-                profile_id=profile,
-                limit=6,
-                shared_surface=surface_is_shared,
-            ),
+        catalog_revision = catalog.catalog_revision()
+        personal_revision = catalog.profile_revision(profile)
+        home = _cached_home_snapshot(
+            catalog,
+            profile_id=profile,
+            shared_surface=surface_is_shared,
+            catalog_revision=catalog_revision,
+            personal_revision=personal_revision,
             collection_state=collection_state,
         )
         snapshot = {
             "schema": "adaos.media_center.library_state.v1",
             "profile_id": profile,
-            "catalog_revision": catalog.catalog_revision(),
-            "personal_revision": catalog.profile_revision(profile),
+            "catalog_revision": catalog_revision,
+            "personal_revision": personal_revision,
             "participation": catalog.participation(),
             "collection_state": collection_state,
             "home": home,
@@ -980,6 +1057,8 @@ def scan_roots(root_id: str = "", path: str = "", limit: int = 1000, **_: Any) -
         "mode": "incremental",
         "webspace_id": str(_.get("webspace_id") or ""),
     }
+
+
     agent, _error = _invoke_agent("start_scan", arguments)
     if agent is not None:
         agent["owner"] = "media_library_agent"
@@ -2818,6 +2897,8 @@ def dispose(**_: Any) -> dict[str, Any]:
         _PLAYBACK_OBSERVATION_CACHE.clear()
         _coordinator_cached = None
         _coordinator_path = ""
+    with _home_snapshot_cache_lock:
+        _HOME_SNAPSHOT_CACHE.clear()
     return {
         "ok": True,
         "schema": COORDINATOR_SCHEMA,

@@ -28,7 +28,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-23.1"
+COORDINATOR_SCHEMA_REVISION = "2026-08-24.1"
 SEARCH_ROWID_REVISION = "1"
 AUDIO_CONTEXT_IDENTITY_REVISION = "1"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
@@ -342,8 +342,17 @@ class MediaCatalogCoordinator:
                 );
                 CREATE INDEX IF NOT EXISTS idx_media_center_collection_parent
                     ON media_collections(parent_id);
+                CREATE INDEX IF NOT EXISTS idx_media_center_collection_kind_title
+                    ON media_collections(kind, title COLLATE NOCASE, id);
                 CREATE INDEX IF NOT EXISTS idx_media_center_membership_work
                     ON collection_memberships(work_id);
+                CREATE INDEX IF NOT EXISTS idx_media_center_membership_preview
+                    ON collection_memberships(
+                        collection_id, season_number, episode_number, ordinal,
+                        work_id, variant_id
+                    );
+                CREATE INDEX IF NOT EXISTS idx_media_center_catalog_work_variant
+                    ON catalog_items(work_id, variant_id, missing, id);
                 CREATE TABLE IF NOT EXISTS metadata_claims (
                     id TEXT PRIMARY KEY,
                     subject_ref TEXT NOT NULL,
@@ -611,6 +620,23 @@ class MediaCatalogCoordinator:
                             str(profile_row["id"]),
                         ),
                     )
+                profile_id = str(profile_row["id"])
+                personal_revision = connection.execute(
+                    "SELECT COALESCE(MAX(revision),0) FROM personal_media_state "
+                    "WHERE profile_id=?",
+                    (profile_id,),
+                ).fetchone()[0]
+                profile_revision = connection.execute(
+                    "SELECT revision FROM media_profiles WHERE id=?",
+                    (profile_id,),
+                ).fetchone()[0]
+                connection.execute(
+                    "INSERT OR IGNORE INTO coordinator_meta(key,value) VALUES (?,?)",
+                    (
+                        self._profile_revision_key(profile_id),
+                        str(max(int(personal_revision or 0), int(profile_revision or 0))),
+                    ),
+                )
             identity_repair = self._repair_contextual_audio_identity(connection)
             connection.execute("INSERT OR REPLACE INTO coordinator_meta(key, value) VALUES ('schema_version', ?)", (COORDINATOR_SCHEMA,))
             retired_legacy_count = connection.execute(
@@ -2045,10 +2071,57 @@ class MediaCatalogCoordinator:
         profile = _text(profile_id) or "default"
         with self.repository.connect() as connection:
             row = connection.execute(
-                "SELECT COALESCE(MAX(revision),0) AS revision FROM personal_media_state WHERE profile_id=?",
+                "SELECT value FROM coordinator_meta WHERE key=?",
+                (self._profile_revision_key(profile),),
+            ).fetchone()
+            if row is not None:
+                return int(row["value"] or 0)
+            personal = connection.execute(
+                "SELECT COALESCE(MAX(revision),0) AS revision "
+                "FROM personal_media_state WHERE profile_id=?",
                 (profile,),
             ).fetchone()
-        return int(row["revision"] or 0)
+            profile_row = connection.execute(
+                "SELECT revision FROM media_profiles WHERE id=?", (profile,)
+            ).fetchone()
+        return max(
+            int(personal["revision"] or 0),
+            int(profile_row["revision"] or 0) if profile_row else 0,
+        )
+
+    @staticmethod
+    def _profile_revision_key(profile_id: str) -> str:
+        return f"profile_revision:{_text(profile_id) or 'default'}"
+
+    def _next_profile_revision(
+        self, connection: sqlite3.Connection, profile_id: str
+    ) -> int:
+        key = self._profile_revision_key(profile_id)
+        row = connection.execute(
+            "SELECT value FROM coordinator_meta WHERE key=?", (key,)
+        ).fetchone()
+        if row is None:
+            personal = connection.execute(
+                "SELECT COALESCE(MAX(revision),0) FROM personal_media_state "
+                "WHERE profile_id=?",
+                (_text(profile_id) or "default",),
+            ).fetchone()[0]
+            profile = connection.execute(
+                "SELECT revision FROM media_profiles WHERE id=?",
+                (_text(profile_id) or "default",),
+            ).fetchone()
+            current = max(
+                int(personal or 0),
+                int(profile["revision"] or 0) if profile else 0,
+            )
+        else:
+            current = int(row["value"] or 0)
+        revision = current + 1
+        connection.execute(
+            "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+            (key, str(revision)),
+        )
+        return revision
 
     def list_profiles(self, *, limit: int = 20) -> dict[str, Any]:
         bounded = max(1, min(50, int(limit or 20)))
@@ -2083,6 +2156,10 @@ class MediaCatalogCoordinator:
                     ) VALUES (?,?,'personal',?,?,?)
                     """,
                     (token, label[:100], _json_dumps(_default_profile_policy()), now, now),
+                )
+                connection.execute(
+                    "INSERT OR IGNORE INTO coordinator_meta(key,value) VALUES (?, '0')",
+                    (self._profile_revision_key(token),),
                 )
                 connection.commit()
                 row = connection.execute(
@@ -2220,6 +2297,7 @@ class MediaCatalogCoordinator:
                 """,
                 (_json_dumps(policy), now_iso(), token),
             )
+            self._next_profile_revision(connection, token)
             connection.commit()
         return self.get_profile(token)
 
@@ -2276,6 +2354,7 @@ class MediaCatalogCoordinator:
                     f"UPDATE personal_media_state SET {assignments} WHERE profile_id=? AND item_id=?",
                     (*updates.values(), profile, token),
                 )
+                self._next_profile_revision(connection, profile)
             row = connection.execute(
                 "SELECT * FROM personal_media_state WHERE profile_id=? AND item_id=?",
                 (profile, token),
@@ -2839,6 +2918,7 @@ class MediaCatalogCoordinator:
             )
             if profile == "default":
                 connection.execute("UPDATE catalog_items SET favorite=? WHERE id=?", (int(favorite), token))
+            self._next_profile_revision(connection, profile)
             row = connection.execute("SELECT revision FROM personal_media_state WHERE profile_id=? AND item_id=?", (profile, token)).fetchone()
             connection.commit()
         item_result = self.repository.get_item(token)
@@ -2880,6 +2960,7 @@ class MediaCatalogCoordinator:
                 (profile, token, 0 if done else position, duration, int(done), now_iso(), now_iso()),
             )
             row = connection.execute("SELECT * FROM personal_media_state WHERE profile_id=? AND item_id=?", (profile, token)).fetchone()
+            self._next_profile_revision(connection, profile)
             connection.commit()
         return {"ok": True, "schema": PERSONAL_SCHEMA, "state": dict(row) | {"completed": bool(row["completed"]), "favorite": bool(row["favorite"])}}
 
@@ -2891,13 +2972,26 @@ class MediaCatalogCoordinator:
         params: list[Any] = []
         where = ""
         if kind_token:
-            where = "WHERE c.kind=?"
+            where = "WHERE kind=?"
             params.append(kind_token)
         with self.repository.connect() as connection:
-            total = int(connection.execute(f"SELECT COUNT(*) FROM media_collections c {where}", tuple(params)).fetchone()[0])
+            total = int(
+                connection.execute(
+                    f"SELECT COUNT(*) FROM media_collections {where}",
+                    tuple(params),
+                ).fetchone()[0]
+            )
             rows = connection.execute(
                 f"""
-                SELECT c.*, COUNT(m.work_id) AS item_count,
+                WITH selected AS (
+                    SELECT * FROM media_collections
+                    {where}
+                    ORDER BY title COLLATE NOCASE,id
+                    LIMIT ? OFFSET ?
+                )
+                SELECT c.*,
+                    (SELECT COUNT(*) FROM collection_memberships m
+                     WHERE m.collection_id=c.id) AS item_count,
                     (
                         SELECT ci.metadata_json
                         FROM collection_memberships preview_membership
@@ -2910,8 +3004,7 @@ class MediaCatalogCoordinator:
                             preview_membership.episode_number,
                             preview_membership.ordinal,ci.id LIMIT 1
                     ) AS representative_metadata_json
-                FROM media_collections c LEFT JOIN collection_memberships m ON m.collection_id=c.id
-                {where} GROUP BY c.id ORDER BY lower(c.title), c.id LIMIT ? OFFSET ?
+                FROM selected c ORDER BY c.title COLLATE NOCASE,c.id
                 """,
                 (*params, bounded, offset),
             ).fetchall()

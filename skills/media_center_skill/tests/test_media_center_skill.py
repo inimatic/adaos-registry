@@ -2498,6 +2498,67 @@ def test_library_snapshot_sequence_advances_across_revision_planes(monkeypatch, 
     assert published[1][2]["seq"] > published[0][2]["seq"]
 
 
+def test_profile_revision_advances_for_changes_to_distinct_items(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(1, "Music/first.mp3"),
+            _agent_delta(2, "Music/second.mp3"),
+        )
+    )
+    items = catalog.list_items(media_kind="audio", limit=10)["items"]
+
+    catalog.set_favorite(items[0]["id"], profile_id="alice", favorite=True)
+    first_revision = catalog.profile_revision("alice")
+    catalog.set_favorite(items[1]["id"], profile_id="alice", favorite=True)
+
+    assert first_revision == 1
+    assert catalog.profile_revision("alice") == 2
+
+
+def test_home_snapshot_cache_reuses_ready_projection_and_refreshes_status(tmp_path):
+    calls = []
+
+    class Catalog:
+        repository = SimpleNamespace(db_path=tmp_path / "media_center.sqlite3")
+
+        def home(self, **kwargs):
+            calls.append(kwargs)
+            return {
+                "ok": True,
+                "profile_id": kwargs["profile_id"],
+                "shared_surface": kwargs["shared_surface"],
+                "items": [{"id": "item-1", "title": "Movie"}],
+            }
+
+    main._HOME_SNAPSHOT_CACHE.clear()
+    catalog = Catalog()
+    first = main._cached_home_snapshot(
+        catalog,
+        profile_id="alice",
+        shared_surface=False,
+        catalog_revision=4,
+        personal_revision=2,
+        collection_state={"state": "updating", "active_operation_count": 3},
+    )
+    second = main._cached_home_snapshot(
+        catalog,
+        profile_id="alice",
+        shared_surface=False,
+        catalog_revision=4,
+        personal_revision=2,
+        collection_state={"state": "ready", "active_operation_count": 0},
+    )
+
+    assert len(calls) == 1
+    assert first["state"] == "updating"
+    assert second["state"] == "ready"
+    assert second["items"] == [{"id": "item-1", "title": "Movie"}]
+
+
 def test_library_snapshot_request_preserves_receiver_params(monkeypatch):
     published = []
     coordinator = object()
