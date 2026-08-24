@@ -6,6 +6,18 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.57` is the locally accepted playback and controller convergence
+closure. It ships `media_center_skill@0.8.51`,
+`media_library_agent@0.6.29`, `media_control_skill@0.2.8`, and scenario
+`media_center@0.6.17`, with client `0.0.369`. Search now has an explicit Reset
+that clears the authoritative query. Effective autoplay and auto-fullscreen
+settings travel with the playback plan; video enters stable modal fullscreen
+and requests native browser fullscreen. Media Remote consumes an immediately
+seeded, mutation-maintained profile/target projection instead of waiting for a
+coincidental refresh. Device choices expose device, endpoint, authorization,
+kind and availability through skill-owned EN/RU data fields and the client's
+generic dynamic-option i18n resolver.
+
 Release `0.6.56` is the locally accepted single-node product closure. It ships
 `media_center_skill@0.8.50`, `media_library_agent@0.6.29`,
 `media_control_skill@0.2.7`, and scenario `media_center@0.6.16`. Root browsing
