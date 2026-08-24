@@ -815,6 +815,38 @@ def test_playback_observation_updates_profile_recent_once_per_bucket(monkeypatch
     assert len(published) == 2
 
 
+def test_playback_observation_ignores_loading_and_coalesces_home_projection(monkeypatch):
+    checkpoints = []
+    published = []
+    catalog = SimpleNamespace(
+        checkpoint=lambda item_id, **kwargs: (
+            checkpoints.append((item_id, kwargs)) or {"ok": True}
+        )
+    )
+    monkeypatch.setattr(main, "_coordinator", lambda: catalog)
+    monkeypatch.setattr(
+        main,
+        "_publish_library_snapshot",
+        lambda *_args, **kwargs: published.append(kwargs),
+    )
+    main._PLAYBACK_OBSERVATION_CACHE.clear()
+    base = {
+        "item_id": "movie-1",
+        "profile_id": "alice",
+        "duration_ms": 180_000,
+        "webspace_id": "desktop",
+    }
+
+    main.on_playback_observed({**base, "state": "loading", "position_ms": 0})
+    for position_ms in (15_000, 30_000, 45_000, 60_000):
+        main.on_playback_observed(
+            {**base, "state": "playing", "position_ms": position_ms}
+        )
+
+    assert len(checkpoints) == 4
+    assert len(published) == 2
+
+
 def test_coordinator_builds_typed_collections_and_bounded_cursor_pages(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())

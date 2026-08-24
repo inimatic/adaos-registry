@@ -58,6 +58,8 @@ Compatible rolling upgrades use `adaos.distributed.service_definition.v2`. Befor
 
 Distributed catalog catch-up is cursor-based and lifecycle-managed. The coordinator adapts an oversized agent page down to the core service-invocation envelope, keeps the accepted cursor unchanged while retrying, and continues incomplete catch-up in one single-flight background worker. Ordinary reads ensure the worker exists without waking it, and an unchanged idle poll does not republish the full Home projection. Catalog-change events explicitly wake the worker. The worker inherits the admitted skill execution context with `contextvars.copy_context()`, so SDK capability checks remain active off the invocation thread. `dispose()` stops both the sync and enrichment workers; UI reads only bootstrap synchronously when the coordinator catalog is empty.
 
+Playback observations in `loading` or `buffering` state do not create history. Fifteen-second resume checkpoints remain durable, while Home projection publication is coalesced to state transitions, terminal observations, and one-minute position buckets. This keeps a playing item current without rerendering every rail on every endpoint tick.
+
 ## Compatibility
 
 The local public-tool invocation and old Media Server discovery methods remain bounded compatibility fallbacks when no distributed agent instance is registered or the handler is exercised outside an AdaOS skill context. In a Project deployment, exact service-instance invocation is authoritative; root and scan commands return asynchronous job identifiers.

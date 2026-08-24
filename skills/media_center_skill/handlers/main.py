@@ -907,13 +907,21 @@ def on_playback_observed(event: Any) -> None:
     position_ms = max(0, int(payload.get("position_ms") or 0))
     duration_ms = max(position_ms, int(payload.get("duration_ms") or 0))
     state = str(payload.get("state") or "paused").strip().lower()
+    if state not in {"playing", "paused", "stopped", "ended", "error"}:
+        return
     bucket = position_ms // 15_000
     cache_key = f"{profile_id}:{item_id}"
     with _coordinator_lock:
         previous = _PLAYBACK_OBSERVATION_CACHE.get(cache_key)
         terminal = state in {"stopped", "ended", "error"}
-        if previous and previous[0] == bucket and previous[1] == state and not terminal:
+        if previous and previous[0] == bucket and previous[1] == state:
             return
+        publish_required = bool(
+            previous is None
+            or previous[1] != state
+            or terminal
+            or bucket % 4 == 0
+        )
         _PLAYBACK_OBSERVATION_CACHE[cache_key] = (bucket, state, time.monotonic())
         while len(_PLAYBACK_OBSERVATION_CACHE) > _PLAYBACK_OBSERVATION_LIMIT:
             oldest = min(
@@ -929,7 +937,7 @@ def on_playback_observed(event: Any) -> None:
         duration_ms=duration_ms,
         completed=_bool(payload.get("completed"), state == "ended"),
     )
-    if result.get("ok"):
+    if result.get("ok") and publish_required:
         _publish_library_snapshot(
             catalog,
             profile_id=profile_id,

@@ -2995,7 +2995,9 @@ class MediaCatalogCoordinator:
                     (
                         SELECT ci.metadata_json
                         FROM collection_memberships preview_membership
-                        JOIN catalog_items ci
+                            INDEXED BY idx_media_center_membership_preview
+                        CROSS JOIN catalog_items ci
+                            INDEXED BY idx_media_center_catalog_work_variant
                             ON ci.work_id=preview_membership.work_id
                             AND ci.variant_id=preview_membership.variant_id
                         WHERE preview_membership.collection_id=c.id
@@ -3060,7 +3062,9 @@ class MediaCatalogCoordinator:
                     (
                         SELECT ci.metadata_json
                         FROM collection_memberships preview_membership
-                        JOIN catalog_items ci
+                            INDEXED BY idx_media_center_membership_preview
+                        CROSS JOIN catalog_items ci
+                            INDEXED BY idx_media_center_catalog_work_variant
                             ON ci.work_id=preview_membership.work_id
                             AND ci.variant_id=preview_membership.variant_id
                         WHERE preview_membership.collection_id=c.id
