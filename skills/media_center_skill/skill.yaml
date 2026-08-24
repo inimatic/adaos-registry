@@ -35,6 +35,7 @@ capabilities:
 - distributed.service.invoke
 - distributed.replica.observe
 dependencies:
+- guessit>=4.1.0,<5
 - requests>=2.31.0
 events:
   subscribe:
@@ -60,6 +61,10 @@ memory_budget:
     route: process
     max_items: 32
     ttl_seconds: 900
+    cleanup_hook: dispose
+  - name: filename_evidence_cache
+    route: process
+    max_items: 2048
     cleanup_hook: dispose
   background_workers:
     max_threads: 2

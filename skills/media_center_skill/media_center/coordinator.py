@@ -7,6 +7,7 @@ import os
 import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -28,9 +29,10 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-24.1"
+COORDINATOR_SCHEMA_REVISION = "2026-08-24.2"
 SEARCH_ROWID_REVISION = "1"
 AUDIO_CONTEXT_IDENTITY_REVISION = "1"
+VIDEO_SERIES_IDENTITY_REVISION = "1"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
 WORK_SCHEMA = "adaos.media_center.media_work.v1"
 COLLECTION_SCHEMA = "adaos.media_center.media_collection.v1"
@@ -120,6 +122,41 @@ def _normalize_title(value: Any) -> str:
     token = _LEADING_NUMBER.sub("", token)
     token = re.sub(r"[._\-]+", " ", token)
     return " ".join(token.split()).strip() or _title_from_name(_text(value))
+
+
+@lru_cache(maxsize=2048)
+def _episode_filename_evidence(name: str) -> dict[str, Any]:
+    if not _SEASON_EPISODE.search(name):
+        return {}
+    try:
+        from guessit import guessit  # type: ignore[import-not-found]
+
+        parsed = guessit(name, options={"no_user_config": True})
+    except Exception:
+        return {}
+    if _text(parsed.get("type")).lower() != "episode":
+        return {}
+    try:
+        season = int(parsed.get("season") or 0)
+        episode_value = parsed.get("episode")
+        if isinstance(episode_value, (list, tuple)):
+            episode_value = episode_value[0] if episode_value else 0
+        episode = int(episode_value or 0)
+    except (TypeError, ValueError):
+        return {}
+    title = _text(parsed.get("title"))
+    if not title or season <= 0 or episode <= 0:
+        return {}
+    return {
+        "title": title[:300],
+        "season": season,
+        "episode": episode,
+        "parser": "guessit-4",
+    }
+
+
+def clear_filename_evidence_cache() -> None:
+    _episode_filename_evidence.cache_clear()
 
 
 def _cursor_signature(payload: Mapping[str, Any]) -> str:
@@ -637,7 +674,10 @@ class MediaCatalogCoordinator:
                         str(max(int(personal_revision or 0), int(profile_revision or 0))),
                     ),
                 )
-            identity_repair = self._repair_contextual_audio_identity(connection)
+            identity_repair = {
+                "audio": self._repair_contextual_audio_identity(connection),
+                "video_series": self._repair_video_series_identity(connection),
+            }
             connection.execute("INSERT OR REPLACE INTO coordinator_meta(key, value) VALUES ('schema_version', ?)", (COORDINATOR_SCHEMA,))
             retired_legacy_count = connection.execute(
                 """
@@ -1015,6 +1055,155 @@ class MediaCatalogCoordinator:
             "audio_items": len(rows),
             "repaired_items": len(catalog_updates),
             "rebuilt_memberships": len(membership_records),
+            "removed_collections": removed_collections,
+            "removed_works": max(0, int(removed_works or 0)),
+        }
+
+    def _repair_video_series_identity(
+        self, connection: sqlite3.Connection
+    ) -> dict[str, int]:
+        marker = connection.execute(
+            "SELECT value FROM coordinator_meta "
+            "WHERE key='video_series_identity_revision'"
+        ).fetchone()
+        if marker and str(marker["value"]) == VIDEO_SERIES_IDENTITY_REVISION:
+            return {
+                "migration_applied": 0,
+                "episode_items": 0,
+                "repaired_items": 0,
+                "removed_collections": 0,
+                "removed_works": 0,
+            }
+        rows = connection.execute(
+            """
+            SELECT id,name,folder_path,metadata_json,node_id,source_id,
+                work_id,variant_id,collection_id
+            FROM catalog_items
+            WHERE agent_id<>'' AND media_kind='video'
+            ORDER BY id
+            """
+        ).fetchall()
+        repaired = 0
+        episodes = 0
+        for row in rows:
+            if not _SEASON_EPISODE.search(str(row["name"])):
+                continue
+            episodes += 1
+            metadata = _json_loads(row["metadata_json"])
+            work, collections, membership = self._classify_source(
+                str(row["name"]),
+                "video",
+                str(row["folder_path"]),
+                metadata if isinstance(metadata, Mapping) else {},
+            )
+            if not collections or _text(collections[0].get("kind")) != "series":
+                continue
+            work_id, collection_ids = self._upsert_classification(
+                connection, work, collections
+            )
+            collection_id = collection_ids[-1] if collection_ids else ""
+            variant_id = str(row["variant_id"])
+            if (
+                str(row["work_id"]) == work_id
+                and str(row["collection_id"]) == collection_id
+            ):
+                continue
+            connection.execute(
+                """
+                UPDATE media_variants SET work_id=?,revision=revision+1
+                WHERE node_id=? AND (source_id=? OR exact_source_id=?)
+                """,
+                (
+                    work_id,
+                    str(row["node_id"]),
+                    str(row["source_id"]),
+                    str(row["source_id"]),
+                ),
+            )
+            connection.execute(
+                "DELETE FROM collection_memberships "
+                "WHERE work_id=? AND variant_id=?",
+                (str(row["work_id"]), variant_id),
+            )
+            for membership_collection_id in collection_ids:
+                connection.execute(
+                    """
+                    INSERT OR REPLACE INTO collection_memberships(
+                        collection_id,work_id,variant_id,ordinal,season_number,
+                        episode_number,disc_number,track_number,chapter_number,
+                        revision
+                    ) VALUES (?,?,?,?,?,?,?,?,?,1)
+                    """,
+                    (
+                        membership_collection_id,
+                        work_id,
+                        variant_id,
+                        int(membership.get("ordinal") or 0),
+                        membership.get("season_number"),
+                        membership.get("episode_number"),
+                        membership.get("disc_number"),
+                        membership.get("track_number"),
+                        membership.get("chapter_number"),
+                    ),
+                )
+            connection.execute(
+                "UPDATE catalog_items SET work_id=?,collection_id=? WHERE id=?",
+                (work_id, collection_id, str(row["id"])),
+            )
+            repaired += 1
+        removed_collections = 0
+        for _depth in range(8):
+            removed = connection.execute(
+                """
+                DELETE FROM media_collections
+                WHERE NOT EXISTS (
+                        SELECT 1 FROM catalog_items c
+                        WHERE c.collection_id=media_collections.id
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM collection_memberships m
+                        WHERE m.collection_id=media_collections.id
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM media_collections child
+                        WHERE child.parent_id=media_collections.id
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM metadata_claims claim
+                        WHERE claim.subject_ref='collection:' || media_collections.id
+                    )
+                """
+            ).rowcount
+            removed_collections += max(0, int(removed or 0))
+            if not removed:
+                break
+        removed_works = connection.execute(
+            """
+            DELETE FROM media_works
+            WHERE NOT EXISTS (
+                    SELECT 1 FROM catalog_items c WHERE c.work_id=media_works.id
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM media_variants v WHERE v.work_id=media_works.id
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM collection_memberships m
+                    WHERE m.work_id=media_works.id
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM metadata_claims claim
+                    WHERE claim.subject_ref='work:' || media_works.id
+                )
+            """
+        ).rowcount
+        connection.execute(
+            "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+            ("video_series_identity_revision", VIDEO_SERIES_IDENTITY_REVISION),
+        )
+        return {
+            "migration_applied": 1,
+            "episode_items": episodes,
+            "repaired_items": repaired,
             "removed_collections": removed_collections,
             "removed_works": max(0, int(removed_works or 0)),
         }
@@ -1677,15 +1866,35 @@ class MediaCatalogCoordinator:
     ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
         parts = [part for part in folder_path.split("/") if part]
         match = _SEASON_EPISODE.search(name)
+        episode_evidence = (
+            _episode_filename_evidence(name) if media_kind == "video" else {}
+        )
         membership: dict[str, Any] = {"ordinal": 0}
         collections: list[dict[str, Any]] = []
         canonical_title = _normalize_title(name)
-        if media_kind == "video" and match:
-            season = int(match.group("season"))
-            episode = int(match.group("episode"))
-            series_title = parts[-2] if len(parts) >= 2 and _SEASON_FOLDER.match(parts[-1]) else (parts[-1] if parts else canonical_title)
-            series_parts = parts[:-1] if parts and _SEASON_FOLDER.match(parts[-1]) else parts
-            series_identity = "/".join(series_parts) or series_title
+        if media_kind == "video" and (match or episode_evidence):
+            season = int(
+                episode_evidence.get("season")
+                or (match.group("season") if match else 0)
+            )
+            episode = int(
+                episode_evidence.get("episode")
+                or (match.group("episode") if match else 0)
+            )
+            fallback_title = (
+                parts[-2]
+                if len(parts) >= 2 and _SEASON_FOLDER.match(parts[-1])
+                else (parts[-1] if parts else canonical_title)
+            )
+            series_title = _text(episode_evidence.get("title")) or fallback_title
+            series_parts = (
+                parts[:-1] if parts and _SEASON_FOLDER.match(parts[-1]) else parts
+            )
+            series_identity = (
+                f"filename:{fold_text(series_title)}"
+                if episode_evidence
+                else ("/".join(series_parts) or series_title)
+            )
             canonical_title = f"{series_title} S{season:02d}E{episode:02d}"
             collections = [
                 {
@@ -1694,6 +1903,10 @@ class MediaCatalogCoordinator:
                     "parent_id": "",
                     "ownership": "derived",
                     "identity_key": series_identity,
+                    "metadata": {
+                        "identity_basis": _text(episode_evidence.get("parser"))
+                        or "folder",
+                    },
                 },
                 {
                     "kind": "season",

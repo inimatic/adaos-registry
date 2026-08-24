@@ -36,7 +36,11 @@ from media_center.catalog import (  # noqa: E402
     SCHEMA_VERSION,
     now_iso,
 )
-from media_center.coordinator import COORDINATOR_SCHEMA, MediaCatalogCoordinator  # noqa: E402
+from media_center.coordinator import (  # noqa: E402
+    COORDINATOR_SCHEMA,
+    MediaCatalogCoordinator,
+    clear_filename_evidence_cache,
+)
 from media_center.enrichment import MediaEnrichmentWorker  # noqa: E402
 from media_center.sync import MediaAgentSyncWorker  # noqa: E402
 from media_center.topology import MediaCenterTopology  # noqa: E402
@@ -2913,6 +2917,7 @@ def dispose(**_: Any) -> dict[str, Any]:
         _coordinator_path = ""
     with _home_snapshot_cache_lock:
         _HOME_SNAPSHOT_CACHE.clear()
+    clear_filename_evidence_cache()
     return {
         "ok": True,
         "schema": COORDINATOR_SCHEMA,

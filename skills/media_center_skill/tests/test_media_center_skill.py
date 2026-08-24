@@ -20,6 +20,7 @@ if str(SKILL_ROOT) not in sys.path:
 
 from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION  # noqa: E402
 from media_center.background import MediaCenterBackgroundRuntime  # noqa: E402
+import media_center.coordinator as coordinator_module  # noqa: E402
 from media_center.coordinator import MediaCatalogCoordinator  # noqa: E402
 from media_center.enrichment import (  # noqa: E402
     MediaEnrichmentWorker,
@@ -948,6 +949,81 @@ def test_collection_uses_a_ready_member_artwork_when_first_episode_has_none(
 
     assert collection["artwork"]["state"] == "ready"
     assert collection["artwork"]["url"] == "/media/show-episode-2.jpg"
+
+
+def test_filename_evidence_groups_inconsistently_named_season_folders(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "series-filename-evidence.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(
+                1,
+                "MLP FIM 1 720p Dub/mlp fim s01e01 web dl rus.mkv",
+                kind="video",
+            ),
+            _agent_delta(
+                2,
+                "MLP FIM 3 720p Dub/mlp fim s03e01 web dl rus.mkv",
+                kind="video",
+            ),
+        )
+    )
+
+    series = catalog.collections(kind="series")["items"]
+    contents = catalog.collection_contents(series[0]["id"])
+
+    assert len(series) == 1
+    assert series[0]["title"].casefold() == "mlp fim"
+    assert {item["title"] for item in contents["children"]} == {
+        "Season 1",
+        "Season 3",
+    }
+
+
+def test_schema_migration_repairs_legacy_folder_scoped_series_identity(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "series-identity-migration.sqlite3")
+    )
+    original_parser = coordinator_module._episode_filename_evidence
+    monkeypatch.setattr(
+        coordinator_module, "_episode_filename_evidence", lambda _name: {}
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(
+                1,
+                "MLP FIM 1 720p Dub/mlp fim s01e01 web dl rus.mkv",
+                kind="video",
+            ),
+            _agent_delta(
+                2,
+                "MLP FIM 3 720p Dub/mlp fim s03e01 web dl rus.mkv",
+                kind="video",
+            ),
+        )
+    )
+    assert len(catalog.collections(kind="series")["items"]) == 2
+    monkeypatch.setattr(
+        coordinator_module, "_episode_filename_evidence", original_parser
+    )
+    with catalog.repository.connect() as connection:
+        connection.execute(
+            "UPDATE coordinator_meta SET value='legacy' "
+            "WHERE key='video_series_identity_revision'"
+        )
+        connection.commit()
+
+    result = catalog.ensure_schema(force=True)
+
+    assert result["identity_repair"]["video_series"]["repaired_items"] == 2
+    assert len(catalog.collections(kind="series")["items"]) == 1
 
 
 def test_personal_state_is_profile_scoped_and_revisioned(monkeypatch, tmp_path):
