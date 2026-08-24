@@ -6,6 +6,17 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.64` makes activation bounded on slow library storage. It ships
+`media_center_skill@0.8.56` and keeps the remaining `0.6.63` component set.
+The lifecycle `rehydrate` hook now validates durable catalog state without
+starting process-local catalog sync or enrichment workers. Those workers and
+their UI snapshot publications start once, in the long-lived Hub runtime, on
+`sys.ready`. This prevents activation-time catch-up and enrichment from
+contending with schema migration and control queries against the same SQLite
+catalog. Coordinator schema revision `2026-08-24.3` also makes the series
+identity revision-2 repair part of the activation gate instead of allowing the
+schema fast path to skip it.
+
 Release `0.6.63` is the identity and durable-worker follow-up. It ships
 `media_center_skill@0.8.55`, `media_library_agent@0.6.33`,
 `media_control_skill@0.2.10`, scenario `media_center@0.6.20`, and client
