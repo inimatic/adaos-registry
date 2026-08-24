@@ -748,9 +748,16 @@ def test_coordinator_builds_typed_collections_and_bounded_cursor_pages(monkeypat
     )
 
     assert contents["collection"]["id"] == series["id"]
+    assert contents["collection"]["item_count"] == 35
     assert contents["count"] == 30
     assert contents["pagination"]["has_more"] is True
     assert continued["count"] == 5
+    assert [item["name"] for item in contents["items"][:3]] == [
+        "Series.Name.S01E01.mp4",
+        "Series.Name.S01E02.mp4",
+        "Series.Name.S01E03.mp4",
+    ]
+    assert continued["items"][-1]["name"] == "Series.Name.S01E35.mp4"
     assert contents["children"][0]["kind"] == "season"
     assert contents["breadcrumbs"] == [
         {

@@ -2402,6 +2402,7 @@ class MediaCatalogCoordinator:
         )
         if query_token:
             order = "catalog_rank,c.rowid"
+            order_params: list[Any] = []
         else:
             sort_contracts = {
                 "title": (
@@ -2436,6 +2437,20 @@ class MediaCatalogCoordinator:
                 ),
             }
             order, sort_keys = sort_contracts.get(sort_token, sort_contracts["recent"])
+            order_params = []
+            if sort_token == "collection" and _text(collection_id):
+                order_params.append(_text(collection_id))
+                order = (
+                    "COALESCE((SELECT printf('%010d:%010d:%010d',"
+                    "COALESCE(cm_order.season_number,0),"
+                    "COALESCE(cm_order.episode_number,0),cm_order.ordinal) "
+                    "FROM collection_memberships cm_order "
+                    "WHERE cm_order.collection_id=? "
+                    "AND cm_order.work_id=c.work_id "
+                    "AND cm_order.variant_id=c.variant_id LIMIT 1),"
+                    "'9999999999:9999999999:9999999999'),"
+                    "c.title COLLATE NOCASE,c.id"
+                )
         if cursor_anchor is not None and not query_token:
             keyset_filter, keyset_params = _keyset_predicate(sort_keys, cursor_anchor)
             filters.append(keyset_filter)
@@ -2443,7 +2458,11 @@ class MediaCatalogCoordinator:
             where = f"WHERE {' AND '.join(filters)}"
         use_offset = not query_token and cursor_anchor is None and resolved_offset > 0
         query_suffix = "LIMIT ? OFFSET ?" if use_offset else "LIMIT ?"
-        query_params = (*params, page_size + 1, resolved_offset) if use_offset else (*params, page_size + 1)
+        query_params = (
+            (*params, *order_params, page_size + 1, resolved_offset)
+            if use_offset
+            else (*params, *order_params, page_size + 1)
+        )
         try:
             search_candidate_limit = int(
                 os.environ.get("MEDIA_CENTER_SEARCH_CANDIDATE_LIMIT") or 192
@@ -2574,8 +2593,17 @@ class MediaCatalogCoordinator:
                 next_anchor = [last["source"], str(last["title"]).lower(), last["id"]]
             elif sort_token == "favorite":
                 next_anchor = [last["profile_favorite"], last["title"], last["id"]]
+            elif sort_token == "collection":
+                next_anchor = None
             else:
                 next_anchor = [last["profile_last_played_at"] or last["modified_at"], last["id"]]
+        next_cursor = None
+        if has_more:
+            next_cursor = (
+                _encode_cursor(next_offset, signature)
+                if sort_token == "collection" and not query_token
+                else _encode_cursor(next_offset, signature, next_anchor)
+            )
         participation = self.participation()
         return {
             "ok": True,
@@ -2603,7 +2631,7 @@ class MediaCatalogCoordinator:
                 "offset": resolved_offset,
                 "cursor": cursor or _encode_cursor(resolved_offset, signature),
                 "next_offset": next_offset if has_more else None,
-                "next_cursor": _encode_cursor(next_offset, signature, next_anchor) if next_anchor is not None else None,
+                "next_cursor": next_cursor,
                 "has_more": has_more,
             },
             "profile_policy": policy,
@@ -2919,7 +2947,13 @@ class MediaCatalogCoordinator:
             return {"ok": False, "error": "collection_id_required"}
         with self.repository.connect() as connection:
             collection = connection.execute(
-                "SELECT * FROM media_collections WHERE id=?", (token,)
+                """
+                SELECT c.*,
+                    (SELECT COUNT(*) FROM collection_memberships m
+                     WHERE m.collection_id=c.id) AS item_count
+                FROM media_collections c WHERE c.id=?
+                """,
+                (token,),
             ).fetchone()
             if collection is None:
                 return {
@@ -2974,12 +3008,12 @@ class MediaCatalogCoordinator:
             collection_id=token,
             limit=limit,
             cursor=cursor,
-            sort="title",
+            sort="collection",
         )
         children = [self._public_collection(row) for row in child_rows]
         collection_value = dict(collection) | {
             "schema": COLLECTION_SCHEMA,
-            "item_count": page["total_count_lower_bound"],
+            "item_count": int(collection["item_count"]),
             "artwork": (
                 children[0]["artwork"]
                 if children
