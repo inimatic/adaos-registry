@@ -2374,6 +2374,39 @@ def test_personal_mutation_publishes_subscription_snapshot(monkeypatch, tmp_path
     }
 
 
+def test_library_snapshot_sequence_advances_across_revision_planes(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/first.mp3")))
+    item_id = catalog.list_items(media_kind="audio")["items"][0]["id"]
+    catalog.set_favorite(item_id, profile_id="alice", favorite=True)
+    catalog.set_favorite(item_id, profile_id="alice", favorite=False)
+    published = []
+
+    import adaos.sdk.io as sdk_io
+
+    monkeypatch.setattr(
+        sdk_io,
+        "stream_variable_publish",
+        lambda receiver, value, **kwargs: published.append(
+            (receiver, value, kwargs)
+        ),
+    )
+    monkeypatch.setattr(main, "_agent_sync_status", lambda: {"state": "idle"})
+
+    main._publish_library_snapshot(catalog, profile_id="alice")
+    catalog.apply_agent_page(_agent_page(_agent_delta(2, "Music/second.mp3")))
+    main._publish_library_snapshot(catalog, profile_id="alice")
+
+    assert published[0][1]["catalog_revision"] == 1
+    assert published[0][1]["personal_revision"] == 2
+    assert published[1][1]["catalog_revision"] == 2
+    assert published[1][1]["personal_revision"] == 2
+    assert published[1][2]["seq"] > published[0][2]["seq"]
+
+
 def test_library_snapshot_request_preserves_receiver_params(monkeypatch):
     published = []
     coordinator = object()

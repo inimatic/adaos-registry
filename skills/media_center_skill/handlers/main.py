@@ -222,9 +222,12 @@ def _publish_library_snapshot(
                 f"media_center.library.{profile}."
                 f"{'shared' if surface_is_shared else 'personal'}"
             ),
-            seq=max(
-                int(snapshot["catalog_revision"]),
-                int(snapshot["personal_revision"]),
+            # Both revisions are monotonic but advance independently. Their sum
+            # advances whenever either plane changes; max() can repeat and make
+            # clients reject a fresh replacement as stale.
+            seq=(
+                int(snapshot["catalog_revision"])
+                + int(snapshot["personal_revision"])
             ),
             ttl_ms=120000,
             _meta={
