@@ -148,10 +148,20 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     assert home_actions["select:folder"]["params"] == {
         "mediaNavigation": "folders",
         "mediaSection": "folders",
+        "mediaFolderAgentId": "$event.agent_id",
+        "mediaFolderRootId": "$event.root_id",
         "mediaFolderParent": "$event.path",
         "mediaCursor": "",
         "selectedMediaItemId": None,
         "selectedMediaFavorite": False,
+    }
+    assert widgets["media-folders"]["dataSource"]["params"] == {
+        "agent_id": "$state.mediaFolderAgentId",
+        "root_id": "$state.mediaFolderRootId",
+        "parent": "$state.mediaFolderParent",
+        "profile_id": "$state.profileId",
+        "limit": "$state.mediaPageSize",
+        "cursor": "$state.mediaCursor",
     }
     assert {
         action["on"]

@@ -200,7 +200,11 @@ def _agent_delta(
                 "source_path": f"/mnt/library/{relative_path}",
                 "metadata": {"storage_mode": "reference", "folder_segments": list(Path(folder).parts)},
             },
-            "metadata": {"storage_mode": "reference", "folder_segments": list(Path(folder).parts)},
+            "metadata": {
+                "storage_mode": "reference",
+                "folder_segments": list(Path(folder).parts),
+                "media_library_root_path": "/mnt/library",
+            },
             "present": operation != "removed",
             "first_seen_at": "2026-08-19T00:00:00+00:00",
             "last_seen_at": "2026-08-19T00:00:00+00:00",
@@ -2462,25 +2466,49 @@ def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp
     )
 
     kinds = {item["kind"] for item in catalog.collections(limit=30)["items"]}
-    root = catalog.folders(limit=1)
-    second = catalog.folders(limit=1, cursor=root["pagination"]["next_cursor"])
-    nested = catalog.folders(parent="Shows/Example", limit=30)
-    leaf = catalog.folders(parent="Shows/Example/Season 2", limit=30)
+    roots = catalog.folders(limit=30)
+    root = catalog.folders(agent_id="agent-node-a", root_id="root-a", limit=1)
+    second = catalog.folders(
+        agent_id="agent-node-a",
+        root_id="root-a",
+        limit=1,
+        cursor=root["pagination"]["next_cursor"],
+    )
+    nested = catalog.folders(
+        agent_id="agent-node-a",
+        root_id="root-a",
+        parent="Shows/Example",
+        limit=30,
+    )
+    leaf = catalog.folders(
+        agent_id="agent-node-a",
+        root_id="root-a",
+        parent="Shows/Example/Season 2",
+        limit=30,
+    )
 
     assert {"series", "season", "album", "disc", "audiobook", "book_part"} <= kinds
+    assert roots["count"] == 1
+    assert roots["items"][0]["name"] == "library"
+    assert roots["items"][0]["path"] == "/"
+    assert roots["items"][0]["queue_ref"] == "agent-node-a:root-a:"
     assert root["count"] == 1
     assert root["pagination"]["has_more"] is True
     assert second["items"][0]["path"] != root["items"][0]["path"]
     assert nested["items"][0]["path"] == "Shows/Example/Season 2"
-    assert nested["items"][0]["queue_ref"] == "agent-node-a:Shows/Example/Season 2"
+    assert nested["items"][0]["queue_ref"] == "agent-node-a:root-a:Shows/Example/Season 2"
     assert nested["breadcrumbs"][0] == {
         "name": "Folders",
         "name_i18n": {"key": "runtime.media_center.ui.folders"},
+        "agent_id": "",
+        "root_id": "",
         "path": "",
         "root": True,
     }
     assert nested["breadcrumbs"][-1] == {
         "name": "Example",
+        "agent_id": "agent-node-a",
+        "root_id": "root-a",
         "path": "Shows/Example",
         "root": False,
     }
@@ -2501,7 +2529,12 @@ def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp
             )
         )
     )
-    removed_leaf = catalog.folders(parent="Shows/Example/Season 2", limit=30)
+    removed_leaf = catalog.folders(
+        agent_id="agent-node-a",
+        root_id="root-a",
+        parent="Shows/Example/Season 2",
+        limit=30,
+    )
     assert removed_leaf["items"] == []
     assert removed_leaf["total_count"] == 0
 

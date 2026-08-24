@@ -25,6 +25,8 @@
             "mediaPageSize": 30,
             "mediaFavoritesOnly": false,
             "mediaSort": "title",
+            "mediaFolderAgentId": "",
+            "mediaFolderRootId": "",
             "mediaFolderParent": "",
             "mediaRootPath": "",
             "selectedMediaRootId": null,
@@ -430,6 +432,8 @@
                     "mediaCollectionTitle": "",
                     "mediaFavoritesOnly": "$event.mediaFavoritesOnly",
                     "mediaSort": "$event.mediaSort",
+                    "mediaFolderAgentId": "",
+                    "mediaFolderRootId": "",
                     "mediaFolderParent": "",
                     "mediaCursor": ""
                   }
@@ -796,6 +800,8 @@
                 "params": {
                   "mediaNavigation": "folders",
                   "mediaSection": "folders",
+                  "mediaFolderAgentId": "$event.agent_id",
+                  "mediaFolderRootId": "$event.root_id",
                   "mediaFolderParent": "$event.path",
                   "mediaCursor": "",
                   "selectedMediaItemId": null,
@@ -1219,6 +1225,8 @@
                 "kind": "skill",
                 "name": "media_center_skill.browse_folders",
                 "params": {
+                  "agent_id": "$state.mediaFolderAgentId",
+                  "root_id": "$state.mediaFolderRootId",
                   "parent": "$state.mediaFolderParent",
                   "profile_id": "$state.profileId",
                   "limit": "$state.mediaPageSize",
@@ -1252,6 +1260,8 @@
                   "on": "select",
                   "type": "updateState",
                   "params": {
+                    "mediaFolderAgentId": "$event.agent_id",
+                    "mediaFolderRootId": "$event.root_id",
                     "mediaFolderParent": "$event.path",
                     "mediaCursor": ""
                   }
@@ -1268,6 +1278,8 @@
                 "kind": "skill",
                 "name": "media_center_skill.browse_folders",
                 "params": {
+                  "agent_id": "$state.mediaFolderAgentId",
+                  "root_id": "$state.mediaFolderRootId",
                   "parent": "$state.mediaFolderParent",
                   "profile_id": "$state.profileId",
                   "limit": "$state.mediaPageSize",
@@ -1306,6 +1318,8 @@
                   "on": "select:folder",
                   "type": "updateState",
                   "params": {
+                    "mediaFolderAgentId": "$event.agent_id",
+                    "mediaFolderRootId": "$event.root_id",
                     "mediaFolderParent": "$event.path",
                     "mediaCursor": "",
                     "selectedMediaItemId": null,

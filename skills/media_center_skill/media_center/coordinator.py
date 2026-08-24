@@ -3078,6 +3078,134 @@ class MediaCatalogCoordinator:
         if not bool(policy.get("allow_explicit", False)):
             filters.append("c.explicit=0")
         where = " AND ".join(filters)
+        if not root and not parent_path:
+            root_filters = ["c.agent_id<>''", "c.root_id<>''", where]
+            root_params = list(visibility_params)
+            if agent:
+                root_filters.append("c.agent_id=?")
+                root_params.append(agent)
+            root_where = " AND ".join(root_filters)
+            with self.repository.connect() as connection:
+                root_total = int(
+                    connection.execute(
+                        f"""
+                        SELECT COUNT(*) FROM (
+                            SELECT c.agent_id,c.root_id
+                            FROM catalog_items c
+                            LEFT JOIN personal_media_state ps
+                                ON ps.item_id=c.id AND ps.profile_id=?
+                            WHERE {root_where}
+                            GROUP BY c.agent_id,c.root_id
+                        )
+                        """,
+                        tuple(root_params),
+                    ).fetchone()[0]
+                )
+                root_rows = connection.execute(
+                    f"""
+                    SELECT c.agent_id,MAX(c.node_id) AS node_id,c.root_id,
+                        COUNT(*) AS source_count,
+                        MAX(c.catalog_revision) AS revision,
+                        MAX(COALESCE(json_extract(
+                            c.metadata_json,'$.media_library_root_path'
+                        ),'')) AS root_path,
+                        MAX(COALESCE(json_extract(
+                            c.metadata_json,'$.media_library_root_label'
+                        ),'')) AS root_label
+                    FROM catalog_items c
+                    LEFT JOIN personal_media_state ps
+                        ON ps.item_id=c.id AND ps.profile_id=?
+                    WHERE {root_where}
+                    GROUP BY c.agent_id,c.root_id
+                    ORDER BY root_label COLLATE NOCASE,root_path COLLATE NOCASE,
+                        c.agent_id,c.root_id
+                    LIMIT ? OFFSET ?
+                    """,
+                    (*root_params, bounded, offset),
+                ).fetchall()
+            items = []
+            for row in root_rows:
+                root_path = _text(row["root_path"]).replace("\\", "/").rstrip("/")
+                name = (
+                    _text(row["root_label"])
+                    or (root_path.rsplit("/", 1)[-1] if root_path else "")
+                    or str(row["root_id"])
+                )
+                items.append(
+                    {
+                        "schema": FOLDER_NODE_SCHEMA,
+                        "id": _stable_id(
+                            "folder-root",
+                            str(row["agent_id"]),
+                            str(row["root_id"]),
+                            size=24,
+                        ),
+                        "agent_id": str(row["agent_id"]),
+                        "node_id": str(row["node_id"]),
+                        "root_id": str(row["root_id"]),
+                        "path": "/",
+                        "queue_ref": (
+                            f"{row['agent_id']}:{row['root_id']}:"
+                        ),
+                        "parent": "",
+                        "name": name,
+                        "entry_type": "folder",
+                        "navigable": True,
+                        "icon": "folder-outline",
+                        "source_count": int(row["source_count"]),
+                        "revision": int(row["revision"]),
+                    }
+                )
+            next_offset = offset + len(items)
+            participation = self.participation()
+            return {
+                "ok": True,
+                "schema": COORDINATOR_SCHEMA,
+                "items": items,
+                "folders": items,
+                "files": [],
+                "count": len(items),
+                "folder_count": len(items),
+                "file_count": 0,
+                "total_count": root_total,
+                "parent": "",
+                "breadcrumbs": [
+                    {
+                        "name": "Folders",
+                        "name_i18n": {
+                            "key": "runtime.media_center.ui.folders"
+                        },
+                        "agent_id": "",
+                        "root_id": "",
+                        "path": "",
+                        "root": True,
+                    }
+                ],
+                "can_go_up": False,
+                "partial": participation["partial"],
+                "participation": participation,
+                "pagination": {
+                    "limit": bounded,
+                    "cursor": _encode_cursor(offset, signature),
+                    "next_cursor": (
+                        _encode_cursor(next_offset, signature)
+                        if next_offset < root_total
+                        else None
+                    ),
+                    "has_more": next_offset < root_total,
+                },
+            }
+        if not agent or not root:
+            return {
+                "ok": False,
+                "schema": COORDINATOR_SCHEMA,
+                "error": "folder_root_scope_required",
+                "items": [],
+                "folders": [],
+                "files": [],
+                "count": 0,
+                "total_count": 0,
+            }
         folder_filters = ["f.parent=?"]
         folder_params: list[Any] = [parent_path]
         if agent:
@@ -3176,7 +3304,9 @@ class MediaCatalogCoordinator:
                     "node_id": str(row["node_id"]),
                     "root_id": str(row["root_id"]),
                     "path": path,
-                    "queue_ref": f"{row['agent_id']}:{path}",
+                    "queue_ref": (
+                        f"{row['agent_id']}:{row['root_id']}:{path}"
+                    ),
                     "parent": parent_path,
                     "name": name,
                     "entry_type": "folder",
@@ -3204,16 +3334,49 @@ class MediaCatalogCoordinator:
             )
             items.append(item)
         next_offset = offset + len(items)
+        with self.repository.connect() as connection:
+            root_row = connection.execute(
+                """
+                SELECT MAX(COALESCE(json_extract(
+                    metadata_json,'$.media_library_root_path'
+                ),'')) AS root_path,
+                    MAX(COALESCE(json_extract(
+                        metadata_json,'$.media_library_root_label'
+                    ),'')) AS root_label
+                FROM catalog_items
+                WHERE agent_id=? AND root_id=? AND missing=0
+                """,
+                (agent, root),
+            ).fetchone()
+        root_path = _text(root_row["root_path"] if root_row else "").replace(
+            "\\", "/"
+        ).rstrip("/")
+        root_name = (
+            _text(root_row["root_label"] if root_row else "")
+            or (root_path.rsplit("/", 1)[-1] if root_path else "")
+            or root
+        )
         breadcrumbs = [
             {
                 "name": "Folders",
                 "name_i18n": {"key": "runtime.media_center.ui.folders"},
+                "agent_id": "",
+                "root_id": "",
                 "path": "",
                 "root": True,
-            }
+            },
+            {
+                "name": root_name,
+                "agent_id": agent,
+                "root_id": root,
+                "path": "/",
+                "root": False,
+            },
         ] + [
             {
                 "name": segment,
+                "agent_id": agent,
+                "root_id": root,
                 "path": "/".join(parent_path.split("/")[: index + 1]),
                 "root": False,
             }
@@ -3813,8 +3976,13 @@ class MediaCatalogCoordinator:
                 params.append(token)
                 order = "MIN(m.ordinal), catalog_items.work_id"
             else:
-                agent_id, separator, path = token.partition(":")
-                if not separator:
+                parts = token.split(":", 2)
+                if len(parts) == 3:
+                    agent_id, root_id, path = parts
+                elif len(parts) == 2:
+                    agent_id, path = parts
+                    root_id = ""
+                else:
                     return {"ok": False, "error": "playback_folder_ref_invalid"}
                 prefix = f"{path.rstrip('/')}/" if path else ""
                 filters.extend(
@@ -3824,6 +3992,9 @@ class MediaCatalogCoordinator:
                     ]
                 )
                 params.extend([agent_id, path, len(prefix), prefix])
+                if root_id:
+                    filters.append("root_id=?")
+                    params.append(root_id)
                 order = "folder_path, lower(title), id"
             with self.repository.connect() as connection:
                 if kind == "collection":
