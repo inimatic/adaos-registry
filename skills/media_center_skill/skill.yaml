@@ -80,6 +80,7 @@ exports:
   - scan_roots
   - import_folder
   - library
+  - metadata_facets
   - list_items
   - collection_contents
   - deep_search
@@ -333,10 +334,81 @@ tools:
         - size
         - source
         - favorite
+        - year
+        - release_date
+        - critic_rating
+        - audience_rating
+        - rating
+        - content_rating
+        - duration
+        - progress
+        - plays
+        - date_added
+        - date_viewed
+        - resolution
+        - bitrate
+        - random
         default: recent
+      sort_direction:
+        type: string
+        enum:
+        - ''
+        - asc
+        - desc
+      genre:
+        type: string
+      year:
+        type:
+        - integer
+        - 'null'
+      rating_min:
+        type:
+        - number
+        - 'null'
+      content_rating:
+        type: string
       auto_scan:
         type: boolean
         default: true
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: metadata_facets
+  description: Return bounded profile-aware categories for metadata navigation.
+  entry: handlers.main:metadata_facets
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      dimension:
+        type: string
+        enum:
+        - genre
+        - category
+        - year
+        - content_rating
+        - artist
+        - album
+        - series
+        - tag
+        - country
+        - director
+        default: genre
+      media_kind:
+        type: string
+        enum:
+        - playable
+        - video
+        - audio
+        default: playable
+      profile_id:
+        type: string
+        default: default
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
     additionalProperties: true
   output_schema:
     type: object

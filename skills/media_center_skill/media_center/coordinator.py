@@ -1520,7 +1520,7 @@ class MediaCatalogCoordinator:
                 )
         if facet_rows:
             connection.executemany(
-                "INSERT OR REPLACE INTO catalog_metadata_facets(" 
+                "INSERT OR REPLACE INTO catalog_metadata_facets("
                 "item_id,field_name,normalized_value,display_value,numeric_value) "
                 "VALUES (?,?,?,?,?)",
                 facet_rows,
@@ -3058,8 +3058,13 @@ class MediaCatalogCoordinator:
         history_only: bool = False,
         continue_only: bool = False,
         sort: str = "recent",
+        sort_direction: str = "",
         profile_id: str = "default",
         collection_id: str = "",
+        genre: str = "",
+        year: int | None = None,
+        rating_min: float | None = None,
+        content_rating: str = "",
     ) -> dict[str, Any]:
         page_size = max(1, min(MAX_PAGE_SIZE, int(limit or MAX_PAGE_SIZE)))
         profile = _text(profile_id) or "default"
@@ -3075,12 +3080,21 @@ class MediaCatalogCoordinator:
         }
         query_token = _text(query)
         sort_token = _text(sort).lower() or "recent"
+        direction_token = _text(sort_direction).lower()
+        direction = (
+            "asc"
+            if direction_token == "asc"
+            or (not direction_token and sort_token in {"title", "year", "release_date", "content_rating"})
+            else "desc"
+        )
         signature = _cursor_signature(
             {
                 "q": query_token.casefold(), "kind": media_kind, "source": source, "missing": bool(include_missing),
                 "favorites": bool(favorites_only), "sort": sort_token, "profile": profile,
                 "history": bool(history_only), "continue": bool(continue_only),
                 "profile_revision": int(profile_record["revision"]), "collection": collection_id,
+                "direction": direction, "genre": fold_text(genre), "year": year,
+                "rating_min": rating_min, "content_rating": fold_text(content_rating),
             }
         )
         if _text(cursor):
@@ -3140,6 +3154,41 @@ class MediaCatalogCoordinator:
                 "AND cm.variant_id=c.variant_id)"
             )
             params.append(_text(collection_id))
+        if _text(genre):
+            filters.append(
+                "EXISTS (SELECT 1 FROM catalog_metadata_facets mf "
+                "WHERE mf.item_id=c.id AND mf.field_name='genre' "
+                "AND mf.normalized_value=?)"
+            )
+            params.append(fold_text(genre))
+        if year not in (None, ""):
+            try:
+                resolved_year = int(year)
+            except (TypeError, ValueError):
+                resolved_year = 0
+            if 1000 <= resolved_year <= 3000:
+                filters.append(
+                    "EXISTS (SELECT 1 FROM catalog_metadata_projection mp "
+                    "WHERE mp.item_id=c.id AND mp.year=?)"
+                )
+                params.append(resolved_year)
+        if rating_min not in (None, ""):
+            try:
+                minimum_rating = max(0.0, min(10.0, float(rating_min)))
+            except (TypeError, ValueError):
+                minimum_rating = 0.0
+            filters.append(
+                "EXISTS (SELECT 1 FROM catalog_metadata_projection mp "
+                "WHERE mp.item_id=c.id AND mp.rating>=?)"
+            )
+            params.append(minimum_rating)
+        if _text(content_rating):
+            filters.append(
+                "EXISTS (SELECT 1 FROM catalog_metadata_facets mf "
+                "WHERE mf.item_id=c.id AND mf.field_name='content_rating' "
+                "AND mf.normalized_value=?)"
+            )
+            params.append(fold_text(content_rating))
         fts_query = ""
         if query_token:
             terms = [term for term in re.findall(r"[\w]+", query_token, flags=re.UNICODE) if term][:12]
@@ -3190,6 +3239,35 @@ class MediaCatalogCoordinator:
             }
             order, sort_keys = sort_contracts.get(sort_token, sort_contracts["recent"])
             order_params = []
+            metadata_sort_expressions = {
+                "year": "COALESCE((SELECT mp.year FROM catalog_metadata_projection mp WHERE mp.item_id=c.id),0)",
+                "release_date": "COALESCE((SELECT mp.release_date FROM catalog_metadata_projection mp WHERE mp.item_id=c.id),'')",
+                "critic_rating": "COALESCE((SELECT mp.critic_rating FROM catalog_metadata_projection mp WHERE mp.item_id=c.id),-1)",
+                "audience_rating": "COALESCE((SELECT mp.audience_rating FROM catalog_metadata_projection mp WHERE mp.item_id=c.id),-1)",
+                "rating": "COALESCE((SELECT mp.rating FROM catalog_metadata_projection mp WHERE mp.item_id=c.id),-1)",
+                "content_rating": "COALESCE((SELECT mp.content_rating FROM catalog_metadata_projection mp WHERE mp.item_id=c.id),'')",
+                "duration": "COALESCE((SELECT mp.duration_ms FROM catalog_metadata_projection mp WHERE mp.item_id=c.id),0)",
+                "progress": "CASE WHEN COALESCE(ps.duration_ms,0)>0 THEN CAST(ps.resume_ms AS REAL)/ps.duration_ms ELSE 0 END",
+                "plays": "COALESCE(ps.play_count,c.play_count,0)",
+                "date_added": "c.indexed_at",
+                "date_viewed": "COALESCE(ps.last_played_at,'')",
+                "resolution": "COALESCE(CAST(json_extract(c.quality_json,'$.height') AS INTEGER),0)",
+                "bitrate": "COALESCE(CAST(json_extract(c.quality_json,'$.bitrate') AS INTEGER),0)",
+            }
+            if sort_token == "title":
+                order = f"c.title COLLATE NOCASE {direction.upper()},c.id {direction.upper()}"
+                sort_keys = (
+                    ("c.title COLLATE NOCASE", direction), ("c.id", direction)
+                )
+            elif sort_token in metadata_sort_expressions:
+                order = (
+                    f"{metadata_sort_expressions[sort_token]} {direction.upper()},"
+                    f"c.title COLLATE NOCASE ASC,c.id ASC"
+                )
+                sort_keys = ()
+            elif sort_token == "random":
+                order = "((c.rowid * 1103515245 + 12345) & 2147483647),c.id"
+                sort_keys = ()
             if sort_token == "collection" and _text(collection_id):
                 order_params.append(_text(collection_id))
                 order = (
@@ -3203,7 +3281,7 @@ class MediaCatalogCoordinator:
                     "'9999999999:9999999999:9999999999'),"
                     "c.title COLLATE NOCASE,c.id"
                 )
-        if cursor_anchor is not None and not query_token:
+        if cursor_anchor is not None and not query_token and sort_keys:
             keyset_filter, keyset_params = _keyset_predicate(sort_keys, cursor_anchor)
             filters.append(keyset_filter)
             params.extend(keyset_params)
@@ -3353,7 +3431,7 @@ class MediaCatalogCoordinator:
                 next_anchor = [last["source"], str(last["title"]).lower(), last["id"]]
             elif sort_token == "favorite":
                 next_anchor = [last["profile_favorite"], last["title"], last["id"]]
-            elif sort_token == "collection":
+            elif sort_token == "collection" or not sort_keys:
                 next_anchor = None
             else:
                 next_anchor = [last["profile_last_played_at"] or last["modified_at"], last["id"]]
@@ -3361,7 +3439,7 @@ class MediaCatalogCoordinator:
         if has_more:
             next_cursor = (
                 _encode_cursor(next_offset, signature)
-                if sort_token == "collection" and not query_token
+                if not query_token and (sort_token == "collection" or not sort_keys)
                 else _encode_cursor(next_offset, signature, next_anchor)
             )
         participation = self.participation()
@@ -5631,6 +5709,89 @@ class MediaCatalogCoordinator:
                 for row in rows
             ],
             "count": len(rows),
+        }
+
+    def metadata_facets(
+        self,
+        *,
+        dimension: str = "genre",
+        media_kind: str = "playable",
+        profile_id: str = "default",
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        field = _text(dimension).lower() or "genre"
+        if field == "category":
+            field = "genre"
+        allowed_fields = {
+            "genre", "year", "content_rating", "artist", "album", "series",
+            "tag", "country", "director",
+        }
+        if field not in allowed_fields:
+            return {"ok": False, "error": "metadata_facet_dimension_invalid"}
+        profile = self.get_profile(_text(profile_id) or "default")["profile"]
+        policy = dict(profile.get("policy") or {})
+        allowed_kinds = {
+            _text(value).lower()
+            for value in policy.get("allowed_media_kinds") or []
+            if _text(value)
+        }
+        requested_kind = _text(media_kind).lower()
+        admitted = (
+            sorted(allowed_kinds & {"audio", "video"})
+            if requested_kind == "playable"
+            else sorted({requested_kind} & allowed_kinds)
+        )
+        if not admitted:
+            return {
+                "ok": True, "schema": COORDINATOR_SCHEMA, "dimension": field,
+                "items": [], "count": 0, "bounded": True,
+            }
+        placeholders = ",".join("?" for _ in admitted)
+        bounded = max(1, min(100, int(limit or 50)))
+        maximum_rating = max(
+            0, min(21, int(policy.get("maximum_maturity_rating") or 0))
+        )
+        explicit_filter = "" if bool(policy.get("allow_explicit", False)) else "AND c.explicit=0"
+        with self.repository.connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT mf.normalized_value,mf.display_value,mf.numeric_value,
+                    COUNT(DISTINCT mf.item_id) AS item_count
+                FROM catalog_metadata_facets mf
+                JOIN catalog_items c ON c.id=mf.item_id
+                LEFT JOIN personal_media_state ps
+                    ON ps.item_id=c.id AND ps.profile_id=?
+                WHERE mf.field_name=? AND c.missing=0
+                    AND c.media_kind IN ({placeholders})
+                    AND c.maturity_rating<=? AND COALESCE(ps.hidden,0)=0
+                    {explicit_filter}
+                GROUP BY mf.normalized_value,mf.display_value,mf.numeric_value
+                ORDER BY CASE WHEN ?='year' THEN mf.numeric_value END DESC,
+                    item_count DESC,mf.display_value COLLATE NOCASE
+                LIMIT ?
+                """,
+                (
+                    _text(profile_id) or "default", field, *admitted,
+                    maximum_rating, field, bounded,
+                ),
+            ).fetchall()
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "dimension": field,
+            "media_kind": requested_kind,
+            "items": [
+                {
+                    "value": str(row["display_value"]),
+                    "normalized_value": str(row["normalized_value"]),
+                    "numeric_value": row["numeric_value"],
+                    "count": int(row["item_count"]),
+                }
+                for row in rows
+            ],
+            "count": len(rows),
+            "bounded": True,
+            "limit": bounded,
         }
 
     def participation(self) -> dict[str, Any]:

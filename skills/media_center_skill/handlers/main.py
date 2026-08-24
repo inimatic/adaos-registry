@@ -1240,8 +1240,13 @@ def library(
     include_missing: bool = False,
     favorites_only: bool = False,
     sort: str = "recent",
+    sort_direction: str = "",
     profile_id: str = "default",
     collection_id: str = "",
+    genre: str = "",
+    year: int | None = None,
+    rating_min: float | None = None,
+    content_rating: str = "",
     auto_scan: bool = True,
     **_: Any,
 ) -> dict[str, Any]:
@@ -1274,8 +1279,13 @@ def library(
             include_missing=_bool(include_missing, False),
             favorites_only=_bool(favorites_only, False),
             sort=sort,
+            sort_direction=sort_direction,
             profile_id=profile_id,
             collection_id=collection_id,
+            genre=genre,
+            year=year,
+            rating_min=rating_min,
+            content_rating=content_rating,
         )
     except ValueError:
         return _skill_error(
@@ -1305,6 +1315,22 @@ def library(
         "enrichment": {"status": "background_jobs"},
     }
     return payload
+
+
+@tool(summary="Return bounded profile-aware metadata navigation facets.", side_effects="none")
+def metadata_facets(
+    dimension: str = "genre",
+    media_kind: str = "playable",
+    profile_id: str = "default",
+    limit: int = 50,
+    **_: Any,
+) -> dict[str, Any]:
+    return _coordinator().metadata_facets(
+        dimension=dimension,
+        media_kind=media_kind,
+        profile_id=profile_id,
+        limit=limit,
+    )
 
 
 @tool(summary="List media-center catalog rows.", side_effects="none")

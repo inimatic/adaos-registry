@@ -4172,6 +4172,54 @@ def test_local_nfo_claims_drive_public_metadata_search_and_precedence(
     assert resolved["metadata_provenance"]["title"] == "profile:default"
 
 
+def test_metadata_facets_filters_and_plex_style_sorts_are_server_bounded(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    deltas = []
+    for sequence, title, year, rating, genres in (
+        (1, "Old Drama", 2001, 7.0, ["Drama"]),
+        (2, "New Science", 2022, 9.2, ["Science Fiction"]),
+        (3, "Newer Drama", 2015, 8.4, ["Drama"]),
+    ):
+        delta = _agent_delta(sequence, f"Movies/{title}.mp4", kind="video")
+        delta["source"]["metadata"].update(
+            {"title": title, "year": year, "rating": rating, "genres": genres}
+        )
+        deltas.append(delta)
+    catalog.apply_agent_page(_agent_page(*deltas))
+
+    facets = catalog.metadata_facets(
+        dimension="genre", media_kind="video", profile_id="default"
+    )
+    assert {item["value"]: item["count"] for item in facets["items"]} == {
+        "Drama": 2,
+        "Science Fiction": 1,
+    }
+    drama = catalog.list_items(
+        media_kind="video", genre="Drama", sort="year", sort_direction="desc"
+    )
+    assert [item["title"] for item in drama["items"]] == [
+        "Newer Drama",
+        "Old Drama",
+    ]
+    first = catalog.list_items(media_kind="video", sort="rating", limit=2)
+    second = catalog.list_items(
+        media_kind="video",
+        sort="rating",
+        limit=2,
+        cursor=first["pagination"]["next_cursor"],
+    )
+    assert [item["title"] for item in first["items"]] == [
+        "New Science",
+        "Newer Drama",
+    ]
+    assert [item["title"] for item in second["items"]] == ["Old Drama"]
+
+
 def test_tmdb_provider_sends_only_normalized_search_evidence_and_caches():
     class Response:
         status_code = 200
