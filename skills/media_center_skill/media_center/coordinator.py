@@ -529,6 +529,10 @@ class MediaCatalogCoordinator:
                 "ON media_variants(work_id,derived,id)"
             )
             connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_media_center_variant_exact_source "
+                "ON media_variants(exact_source_id,node_id)"
+            )
+            connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_media_center_background_subject "
                 "ON media_background_jobs(subject_ref,kind,status,updated_at DESC,id)"
             )
@@ -918,7 +922,7 @@ class MediaCatalogCoordinator:
                 continue
             source_id = str(row["source_id"])
             variant_updates.append(
-                (work_id, str(row["node_id"]), source_id, source_id, work_id)
+                (work_id, str(row["node_id"]), source_id, work_id)
             )
             catalog_updates.append((work_id, collection_id, str(row["id"])))
             if not variant_id:
@@ -968,10 +972,20 @@ class MediaCatalogCoordinator:
         connection.executemany(
             """
             UPDATE media_variants SET work_id=?,revision=revision+1
-            WHERE node_id=? AND (source_id=? OR exact_source_id=?)
-                AND work_id<>?
+            WHERE node_id=? AND source_id=? AND work_id<>?
             """,
             variant_updates,
+        )
+        connection.executemany(
+            """
+            UPDATE media_variants SET work_id=?,revision=revision+1
+            WHERE node_id=? AND exact_source_id=? AND source_id<>?
+                AND work_id<>?
+            """,
+            [
+                (work_id, node_id, source_id, source_id, current_work_id)
+                for work_id, node_id, source_id, current_work_id in variant_updates
+            ],
         )
         connection.executemany(
             "UPDATE catalog_items SET work_id=?,collection_id=? WHERE id=?",
@@ -1106,7 +1120,18 @@ class MediaCatalogCoordinator:
                 connection.execute(
                     """
                     UPDATE media_variants SET work_id=?,revision=revision+1
-                    WHERE node_id=? AND (source_id=? OR exact_source_id=?)
+                    WHERE node_id=? AND source_id=?
+                    """,
+                    (
+                        work_id,
+                        str(row["node_id"]),
+                        str(row["source_id"]),
+                    ),
+                )
+                connection.execute(
+                    """
+                    UPDATE media_variants SET work_id=?,revision=revision+1
+                    WHERE node_id=? AND exact_source_id=? AND source_id<>?
                     """,
                     (
                         work_id,
@@ -1520,7 +1545,14 @@ class MediaCatalogCoordinator:
                 connection.execute(
                     """
                     UPDATE media_variants SET available=0,revision=revision+1
-                    WHERE node_id=? AND (source_id=? OR exact_source_id=?)
+                    WHERE node_id=? AND source_id=?
+                    """,
+                    (node_id, source_id),
+                )
+                connection.execute(
+                    """
+                    UPDATE media_variants SET available=0,revision=revision+1
+                    WHERE node_id=? AND exact_source_id=? AND source_id<>?
                     """,
                     (node_id, source_id, source_id),
                 )

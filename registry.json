@@ -380,7 +380,7 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.8.56",
+      "version": "0.8.57",
       "updated_at": "2026-08-24T13:38:39+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",

@@ -1085,6 +1085,12 @@ def test_schema_migration_repairs_legacy_folder_scoped_series_identity(
 
     assert result["identity_repair"]["video_series"]["repaired_items"] == 2
     assert len(catalog.collections(kind="series")["items"]) == 1
+    with catalog.repository.connect() as connection:
+        indexes = {
+            str(row["name"])
+            for row in connection.execute("PRAGMA index_list(media_variants)")
+        }
+    assert "idx_media_center_variant_exact_source" in indexes
 
 
 def test_personal_state_is_profile_scoped_and_revisioned(monkeypatch, tmp_path):
