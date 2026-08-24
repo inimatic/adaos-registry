@@ -853,11 +853,13 @@ def _run_ffmpeg(
     output_root: Path,
     limits: Mapping[str, Any],
     cancelled: CancelCallback,
+    cwd: Path | None = None,
 ) -> None:
     process = subprocess.Popen(
         command,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
+        cwd=str(cwd) if cwd is not None else None,
     )
     started = time.monotonic()
     error = b""
@@ -1049,12 +1051,12 @@ def _hls_command(
             "-hls_fmp4_init_filename",
             "init-%v.mp4",
             "-hls_segment_filename",
-            str(output_directory / "v%v-segment-%06d.m4s"),
+            "v%v-segment-%06d.m4s",
             "-master_pl_name",
             target_path.name,
             "-var_stream_map",
             " ".join(stream_map),
-            str(output_directory / "v%v.m3u8"),
+            "v%v.m3u8",
         ]
     )
     return command
@@ -1112,6 +1114,7 @@ def transcode_with_ffmpeg(
                 output_root=output_root,
                 limits=limits,
                 cancelled=cancelled,
+                cwd=(target_path.parent if packaging == "hls_cmaf_vod" else None),
             )
             if packaging == "hls_cmaf_vod":
                 if not target_path.is_file() or not list(
