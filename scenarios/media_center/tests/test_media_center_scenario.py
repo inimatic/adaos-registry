@@ -88,6 +88,8 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
 
     assert widgets["media-search"]["inputs"]["commitMode"] == "manual"
     assert widgets["media-search"]["inputs"]["saveLabel"] == "Search"
+    assert widgets["media-search"]["inputs"]["clearable"] is True
+    assert widgets["media-search"]["inputs"]["clearLabel"] == "Reset"
     toolbar = widgets["media-browse-toolbar"]
     assert toolbar["inputs"]["variant"] == "adaptiveToolbar"
     assert toolbar["visibleIf"] == "$state.surfaceProfile != 'mobile_control'"
@@ -426,6 +428,11 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     }
     assert remote["media-targets"]["type"] == "input.selector"
     assert remote["media-targets"]["dataSource"]["name"] == "media_control_skill.list_targets"
+    assert remote["media-targets"]["inputs"]["optionLabelPath"] == "display_label"
+    assert remote["media-targets"]["inputs"]["optionMetaPaths"][:2] == [
+        "authorization_label",
+        "endpoint_label",
+    ]
     assert remote["media-now-playing"]["dataSource"]["receiver"] == "media_control.now_playing"
     assert remote["media-now-playing"]["inputs"]["titleKey"] == "title"
     assert remote["media-remote-transport"]["actions"][1]["target"] == "media_control_skill.voice_command"

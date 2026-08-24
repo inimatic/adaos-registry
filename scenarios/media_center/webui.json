@@ -702,11 +702,16 @@
                 "initialValue": "",
                 "commitMode": "manual",
                 "saveLabel": "Search",
+                "clearable": true,
+                "clearLabel": "Reset",
                 "placeholder_i18n": {
                   "key": "runtime.media_center.ui.title_filename_folder_artist_or_series"
                 },
                 "saveLabel_i18n": {
                   "key": "runtime.media_center.ui.search"
+                },
+                "clearLabel_i18n": {
+                  "key": "runtime.media_center.ui.reset_search"
                 }
               },
               "actions": [
@@ -1630,9 +1635,11 @@
                 },
                 "inputs": {
                   "value": "$state.selectedPlaybackTargetId",
-                  "optionLabelPath": "label",
+                  "optionLabelPath": "display_label",
                   "optionValuePath": "id",
                   "optionMetaPaths": [
+                    "authorization_label",
+                    "endpoint_label",
                     "kind",
                     "status"
                   ],
