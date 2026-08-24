@@ -213,6 +213,23 @@ def test_schema_lock_never_falls_through_to_full_migration(monkeypatch, tmp_path
     assert calls == 1
 
 
+def test_coordinator_cache_fast_path_does_not_repeat_schema_check(
+    monkeypatch, tmp_path
+) -> None:
+    db_path = (tmp_path / "media_center.sqlite3").resolve()
+    cached = object()
+    monkeypatch.setattr(main, "_coordinator_cached", cached)
+    monkeypatch.setattr(main, "_coordinator_path", str(db_path))
+    monkeypatch.setattr(main, "default_db_path", lambda: db_path)
+    monkeypatch.setattr(
+        main,
+        "MediaCenterRepository",
+        lambda *_args, **_kwargs: pytest.fail("cached coordinator must be reused"),
+    )
+
+    assert main._coordinator() is cached
+
+
 def _resource(resource_id: str = "clip.mp4", *, source: str = "media_server") -> dict:
     suffix = Path(resource_id).suffix.lower()
     mime = "audio/mpeg" if suffix == ".mp3" else "image/jpeg" if suffix in {".jpg", ".jpeg"} else "video/mp4"

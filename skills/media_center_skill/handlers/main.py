@@ -67,8 +67,15 @@ def _repository() -> MediaCenterRepository:
 
 def _coordinator(repository: MediaCenterRepository | None = None) -> MediaCatalogCoordinator:
     global _coordinator_cached, _coordinator_path
-    repo = repository or _repository()
-    path = str(repo.db_path.resolve())
+    if repository is None:
+        path = str(default_db_path().resolve())
+        with _coordinator_lock:
+            if _coordinator_cached is not None and _coordinator_path == path:
+                return _coordinator_cached
+        repo = MediaCenterRepository(path)
+    else:
+        repo = repository
+        path = str(repo.db_path.resolve())
     with _coordinator_lock:
         if _coordinator_cached is None or _coordinator_path != path:
             _coordinator_cached = MediaCatalogCoordinator(repo)
