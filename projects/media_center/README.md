@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.53` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.54` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -23,6 +23,18 @@ durable repository to the canonical SDK node identity. A one-time migration
 rewrites legacy `local` root, source, and delta identities in place while
 preserving root/source identifiers and external media references; a database
 already bound to another concrete node fails closed.
+
+The `0.6.54` release completes the single-node metadata and collection path.
+`media_library_agent@0.6.27` resumes a bounded durable artwork backfill and
+extracts embedded or representative video frames at the storage node without
+copying source media. `media_center_skill@0.8.48` exposes the pipeline state,
+supports an explicitly enabled and privacy-bounded TMDb provider, projects
+safe artwork URLs, and browses albums, audiobooks, series, seasons, and parts
+in natural track or episode order through 30-item cursor pages. The collection
+detail surface enters child collections instead of opening an arbitrary file.
+`media_control_skill@0.2.6` supplies one compact remote surface with target,
+now-playing state, and Previous/Play-Pause/Next/Stop controls. Scenario
+`media_center@0.6.15` consumes these contracts through UI-as-data.
 
 The `0.6.53` release polishes the colocated single-node product surface.
 Carousel arrows now move bounded rails on pointer and mobile layouts; typed
