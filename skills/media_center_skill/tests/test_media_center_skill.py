@@ -25,6 +25,7 @@ import media_center.coordinator as coordinator_module  # noqa: E402
 from media_center.coordinator import MediaCatalogCoordinator  # noqa: E402
 from media_center.enrichment import (  # noqa: E402
     MediaEnrichmentWorker,
+    MusicBrainzMetadataProvider,
     TmdbMetadataProvider,
     default_metadata_providers,
 )
@@ -4220,7 +4221,7 @@ def test_metadata_facets_filters_and_plex_style_sorts_are_server_bounded(
     assert [item["title"] for item in second["items"]] == ["Old Drama"]
 
 
-def test_tmdb_provider_sends_only_normalized_search_evidence_and_caches():
+def test_tmdb_provider_sends_only_normalized_evidence_and_caches_details():
     class Response:
         status_code = 200
 
@@ -4228,19 +4229,11 @@ def test_tmdb_provider_sends_only_normalized_search_evidence_and_caches():
         def raise_for_status():
             return None
 
-        @staticmethod
-        def json():
-            return {
-                "results": [
-                    {
-                        "id": 671,
-                        "title": "Harry Potter and the Philosopher's Stone",
-                        "original_title": "Harry Potter and the Philosopher's Stone",
-                        "release_date": "2001-11-16",
-                        "poster_path": "/poster.jpg",
-                    }
-                ]
-            }
+        def __init__(self, payload):
+            self.payload = payload
+
+        def json(self):
+            return self.payload
 
     class Session:
         def __init__(self):
@@ -4248,7 +4241,28 @@ def test_tmdb_provider_sends_only_normalized_search_evidence_and_caches():
 
         def get(self, url, **kwargs):
             self.calls.append((url, kwargs))
-            return Response()
+            if "/search/" in url:
+                return Response({"results": [{
+                    "id": 671,
+                    "title": "Harry Potter and the Philosopher's Stone",
+                    "original_title": "Harry Potter and the Philosopher's Stone",
+                    "release_date": "2001-11-16",
+                    "poster_path": "/poster.jpg",
+                    "popularity": 100,
+                }]})
+            return Response({
+                "id": 671,
+                "title": "Harry Potter and the Philosopher's Stone",
+                "release_date": "2001-11-16",
+                "poster_path": "/poster.jpg",
+                "genres": [{"name": "Fantasy"}],
+                "runtime": 152,
+                "vote_average": 7.9,
+                "credits": {"cast": [{"name": "Daniel Radcliffe", "character": "Harry", "order": 0}]},
+                "videos": {"results": [{"site": "YouTube", "type": "Trailer", "key": "trailer-1"}]},
+                "external_ids": {"imdb_id": "tt0241527"},
+                "release_dates": {"results": []},
+            })
 
     session = Session()
     provider = TmdbMetadataProvider(
@@ -4269,7 +4283,7 @@ def test_tmdb_provider_sends_only_normalized_search_evidence_and_caches():
     second = provider.claims(subject, job_kind="metadata_enrichment")
 
     assert first == second
-    assert len(session.calls) == 1
+    assert len(session.calls) == 2
     url, request = session.calls[0]
     assert url.endswith("/search/movie")
     assert request["params"] == {
@@ -4284,9 +4298,58 @@ def test_tmdb_provider_sends_only_normalized_search_evidence_and_caches():
     assert {claim["field_name"] for claim in first} >= {
         "tmdb_id",
         "title",
-        "poster_path",
+        "genres",
+        "actors",
+        "trailers",
+        "artwork_candidates",
     }
-    assert provider.status()["cache_hit_count"] == 1
+    assert provider.status()["cache_hit_count"] == 2
+
+
+def test_musicbrainz_provider_is_rate_limited_cached_and_audio_only():
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            return {"recordings": [{
+                "id": "recording-1", "title": "Track", "score": 100,
+                "artist-credit": [{"artist": {"name": "Artist"}}],
+                "releases": [{"id": "release-1", "title": "Album", "date": "2020"}],
+                "genres": [{"name": "Rock"}],
+            }]}
+
+    class Session:
+        def __init__(self):
+            self.calls = []
+
+        def get(self, url, **kwargs):
+            self.calls.append((url, kwargs))
+            return Response()
+
+    session = Session()
+    provider = MusicBrainzMetadataProvider(
+        session=session, minimum_interval_seconds=1.0
+    )
+    subject = {
+        "subject_ref": "item:audio-a",
+        "title": "Track.mp3",
+        "media_kind": "audio",
+        "metadata": {"artists": ["Artist"], "album": "Album"},
+    }
+    first = provider.claims(subject, job_kind="metadata_enrichment")
+    second = provider.claims(subject, job_kind="metadata_enrichment")
+
+    assert first == second
+    assert len(session.calls) == 1
+    assert session.calls[0][1]["headers"]["User-Agent"].startswith("AdaOS-MediaCenter")
+    assert {claim["field_name"] for claim in first} >= {
+        "title", "artists", "album", "genres", "artwork_candidates",
+    }
 
 
 def test_external_metadata_provider_is_strictly_opt_in(monkeypatch):
@@ -4300,6 +4363,7 @@ def test_external_metadata_provider_is_strictly_opt_in(monkeypatch):
     assert [provider.provider_id for provider in default_metadata_providers()] == [
         "media_center.deterministic_local.v1",
         "media_center.tmdb.v1",
+        "media_center.musicbrainz.v1",
     ]
 
 

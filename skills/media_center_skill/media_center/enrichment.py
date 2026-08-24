@@ -12,7 +12,7 @@ from typing import Any, Callable, Mapping, Protocol
 import requests
 
 from .coordinator import MediaCatalogCoordinator
-from .discovery import text_embedding
+from .discovery import fold_text, text_embedding
 
 
 _log = logging.getLogger("adaos.skill.media_center.enrichment")
@@ -214,6 +214,11 @@ def _external_subject(subject: Mapping[str, Any]) -> dict[str, Any]:
         "year": year,
         "media_kind": str(subject.get("media_kind") or ""),
         "tmdb_kind": "tv" if series else "movie",
+        "artists": evidence.get("artists") or evidence.get("artist") or [],
+        "album": str(evidence.get("album") or "")[:300],
+        "external_ids": dict(evidence.get("external_ids") or {})
+        if isinstance(evidence.get("external_ids"), Mapping)
+        else {},
     }
 
 
@@ -248,51 +253,37 @@ class TmdbMetadataProvider:
         self._session = session or requests.Session()
         self._lock = threading.Lock()
         self._last_request_monotonic = 0.0
-        self._cache: OrderedDict[str, tuple[float, list[dict[str, Any]]]] = (
-            OrderedDict()
-        )
+        self._cache: OrderedDict[str, tuple[float, Any]] = OrderedDict()
         self._requests = 0
         self._cache_hits = 0
         self._failures = 0
         self._last_error = ""
         self._last_success_at = 0.0
 
-    def _search(self, evidence: Mapping[str, Any]) -> list[dict[str, Any]]:
-        kind = str(evidence.get("tmdb_kind") or "movie")
-        title = str(evidence.get("title") or "").strip()
-        if not title:
-            return []
-        year = evidence.get("year")
-        cache_key = f"{kind}|{self.language}|{year or ''}|{title.casefold()}"
+    def _request_json(
+        self, path: str, *, params: Mapping[str, Any], cache_key: str
+    ) -> dict[str, Any]:
         now = time.monotonic()
         with self._lock:
             cached = self._cache.get(cache_key)
             if cached and now - cached[0] <= self.cache_ttl_seconds:
                 self._cache.move_to_end(cache_key)
                 self._cache_hits += 1
-                return list(cached[1])
+                return dict(cached[1])
             wait = self.minimum_interval_seconds - (
                 now - self._last_request_monotonic
             )
             if wait > 0:
                 time.sleep(wait)
             self._last_request_monotonic = time.monotonic()
-        params: dict[str, Any] = {
-            "query": title,
-            "language": self.language,
-            "include_adult": "false",
-            "page": 1,
-        }
-        if year:
-            params["first_air_date_year" if kind == "tv" else "year"] = int(year)
         try:
             response = self._session.get(
-                f"{self.api_base}/search/{kind}",
+                f"{self.api_base}/{path.lstrip('/')}",
                 headers={
                     "Authorization": f"Bearer {self._token}",
                     "Accept": "application/json",
                 },
-                params=params,
+                params=dict(params),
                 timeout=self.timeout_seconds,
             )
             self._requests += 1
@@ -304,8 +295,7 @@ class TmdbMetadataProvider:
                 raise MetadataProviderError("tmdb_upstream_unavailable", retryable=True)
             response.raise_for_status()
             payload = response.json()
-            results = payload.get("results") if isinstance(payload, Mapping) else []
-            bounded = [dict(item) for item in list(results or [])[:3] if isinstance(item, Mapping)]
+            bounded = dict(payload) if isinstance(payload, Mapping) else {}
         except MetadataProviderError as exc:
             self._failures += 1
             self._last_error = exc.code
@@ -323,6 +313,65 @@ class TmdbMetadataProvider:
             self._last_success_at = time.time()
         return bounded
 
+    def _search(self, evidence: Mapping[str, Any]) -> list[dict[str, Any]]:
+        kind = str(evidence.get("tmdb_kind") or "movie")
+        title = str(evidence.get("title") or "").strip()
+        if not title:
+            return []
+        year = evidence.get("year")
+        params: dict[str, Any] = {
+            "query": title,
+            "language": self.language,
+            "include_adult": "false",
+            "page": 1,
+        }
+        if year:
+            params["first_air_date_year" if kind == "tv" else "year"] = int(year)
+        payload = self._request_json(
+            f"search/{kind}",
+            params=params,
+            cache_key=f"search|{kind}|{self.language}|{year or ''}|{fold_text(title)}",
+        )
+        results = payload.get("results") if isinstance(payload, Mapping) else []
+        return [
+            dict(item)
+            for item in list(results or [])[:10]
+            if isinstance(item, Mapping)
+        ]
+
+    def _details(self, kind: str, external_id: Any) -> dict[str, Any]:
+        return self._request_json(
+            f"{kind}/{int(external_id)}",
+            params={
+                "language": self.language,
+                "append_to_response": (
+                    "credits,videos,images,external_ids,alternative_titles,"
+                    + ("content_ratings" if kind == "tv" else "release_dates")
+                ),
+                "include_image_language": f"{self.language.split('-', 1)[0]},en,null",
+            },
+            cache_key=f"details|{kind}|{self.language}|{int(external_id)}",
+        )
+
+    @staticmethod
+    def _match_score(result: Mapping[str, Any], evidence: Mapping[str, Any]) -> float:
+        expected = fold_text(evidence.get("title"))
+        actual = fold_text(result.get("title") or result.get("name"))
+        original = fold_text(
+            result.get("original_title") or result.get("original_name")
+        )
+        score = 0.0
+        if expected and expected in {actual, original}:
+            score += 5.0
+        elif expected and (expected in actual or actual in expected):
+            score += 2.0
+        expected_year = evidence.get("year")
+        date = str(result.get("release_date") or result.get("first_air_date") or "")
+        if expected_year and date.startswith(str(expected_year)):
+            score += 3.0
+        score += min(1.0, float(result.get("popularity") or 0.0) / 100.0)
+        return score
+
     def claims(
         self, subject: Mapping[str, Any], *, job_kind: str
     ) -> list[dict[str, Any]]:
@@ -331,11 +380,91 @@ class TmdbMetadataProvider:
         evidence = _external_subject(subject)
         if evidence["media_kind"] != "video":
             return []
-        results = self._search(evidence)
-        if not results:
-            return []
-        result = results[0]
+        exact_id = evidence["external_ids"].get("tmdb")
+        if exact_id:
+            selected = {"id": exact_id}
+            confidence = 0.99
+        else:
+            results = self._search(evidence)
+            if not results:
+                return []
+            selected = max(results, key=lambda item: self._match_score(item, evidence))
+            confidence = min(0.95, 0.7 + self._match_score(selected, evidence) / 20.0)
+        kind = str(evidence["tmdb_kind"])
+        details = self._details(kind, selected.get("id"))
+        result = {**selected, **details}
         subject_ref = str(evidence["subject_ref"])
+        genres = [
+            str(item.get("name"))
+            for item in list(result.get("genres") or [])[:30]
+            if isinstance(item, Mapping) and item.get("name")
+        ]
+        credits = result.get("credits") if isinstance(result.get("credits"), Mapping) else {}
+        actors = [
+            {
+                "name": str(item.get("name") or "")[:200],
+                "role": str(item.get("character") or "")[:200],
+                "order": int(item.get("order") or 0),
+                "tmdb_id": item.get("id"),
+            }
+            for item in list(credits.get("cast") or [])[:20]
+            if isinstance(item, Mapping) and item.get("name")
+        ]
+        directors = [
+            str(item.get("name"))
+            for item in list(credits.get("crew") or [])[:100]
+            if isinstance(item, Mapping)
+            and str(item.get("job") or "").lower() in {"director", "series director"}
+            and item.get("name")
+        ][:20]
+        videos = result.get("videos") if isinstance(result.get("videos"), Mapping) else {}
+        trailers = [
+            {
+                "name": str(item.get("name") or "")[:200],
+                "provider": "youtube",
+                "key": str(item.get("key") or "")[:100],
+                "official": bool(item.get("official")),
+            }
+            for item in list(videos.get("results") or [])[:30]
+            if isinstance(item, Mapping)
+            and str(item.get("site") or "").lower() == "youtube"
+            and str(item.get("type") or "").lower() in {"trailer", "teaser"}
+            and item.get("key")
+        ][:10]
+        artwork_candidates = []
+        for artwork_kind, path_key in (("poster", "poster_path"), ("backdrop", "backdrop_path")):
+            path = str(result.get(path_key) or "")
+            if path.startswith("/"):
+                artwork_candidates.append(
+                    {
+                        "kind": artwork_kind,
+                        "url": f"https://image.tmdb.org/t/p/original{path}",
+                        "provider": "tmdb",
+                        "language": self.language,
+                    }
+                )
+        external_ids = {
+            key.removesuffix("_id"): value
+            for key, value in dict(result.get("external_ids") or {}).items()
+            if key.endswith("_id") and value not in (None, "")
+        }
+        external_ids["tmdb"] = result.get("id")
+        content_rating = ""
+        ratings_key = "content_ratings" if kind == "tv" else "release_dates"
+        ratings = result.get(ratings_key) if isinstance(result.get(ratings_key), Mapping) else {}
+        for entry in list(ratings.get("results") or [])[:50]:
+            if not isinstance(entry, Mapping) or str(entry.get("iso_3166_1") or "") not in {"US", "RU"}:
+                continue
+            if kind == "tv":
+                content_rating = str(entry.get("rating") or "")
+            else:
+                dates = entry.get("release_dates") or []
+                content_rating = next(
+                    (str(value.get("certification") or "") for value in dates if isinstance(value, Mapping) and value.get("certification")),
+                    "",
+                )
+            if content_rating:
+                break
         fields = {
             "tmdb_id": result.get("id"),
             "title": result.get("title") or result.get("name"),
@@ -344,10 +473,19 @@ class TmdbMetadataProvider:
             "overview": result.get("overview"),
             "release_date": result.get("release_date")
             or result.get("first_air_date"),
-            "poster_path": result.get("poster_path"),
-            "backdrop_path": result.get("backdrop_path"),
+            "genres": genres,
+            "runtime_minutes": result.get("runtime") or next(iter(result.get("episode_run_time") or []), None),
+            "content_rating": content_rating,
+            "actors": actors,
+            "directors": directors,
+            "trailers": trailers,
+            "artwork_candidates": artwork_candidates,
+            "external_ids": external_ids,
             "popularity": result.get("popularity"),
             "vote_average": result.get("vote_average"),
+            "vote_count": result.get("vote_count"),
+            "tagline": result.get("tagline"),
+            "status": result.get("status"),
             "external_media_kind": str(evidence["tmdb_kind"]),
         }
         return [
@@ -355,11 +493,11 @@ class TmdbMetadataProvider:
                 "subject_ref": subject_ref,
                 "field_name": field_name,
                 "value": value,
-                "confidence": 0.85 if field_name == "title" else 0.8,
+                "confidence": confidence if field_name == "title" else max(0.7, confidence - 0.05),
             }
             for field_name, value in fields.items()
             if value not in (None, "", [])
-        ][:20]
+        ][:100]
 
     def status(self) -> dict[str, Any]:
         return {
@@ -378,6 +516,179 @@ class TmdbMetadataProvider:
         }
 
 
+class MusicBrainzMetadataProvider:
+    provider_id = "media_center.musicbrainz.v1"
+    supported_jobs = frozenset({"metadata_enrichment"})
+
+    def __init__(
+        self,
+        *,
+        api_base: str = "https://musicbrainz.org/ws/2",
+        timeout_seconds: float = 10.0,
+        minimum_interval_seconds: float = 1.05,
+        cache_ttl_seconds: float = 86400.0,
+        session: requests.Session | None = None,
+    ) -> None:
+        self.api_base = str(api_base).rstrip("/")
+        self.timeout_seconds = max(2.0, min(float(timeout_seconds), 30.0))
+        self.minimum_interval_seconds = max(1.0, float(minimum_interval_seconds))
+        self.cache_ttl_seconds = max(60.0, min(float(cache_ttl_seconds), 604800.0))
+        self._session = session or requests.Session()
+        self._lock = threading.Lock()
+        self._last_request_monotonic = 0.0
+        self._cache: OrderedDict[str, tuple[float, dict[str, Any]]] = OrderedDict()
+        self._requests = 0
+        self._cache_hits = 0
+        self._failures = 0
+        self._last_error = ""
+
+    def _request(self, path: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        cache_key = f"{path}|{sorted(dict(params).items())!r}"
+        now = time.monotonic()
+        with self._lock:
+            cached = self._cache.get(cache_key)
+            if cached and now - cached[0] <= self.cache_ttl_seconds:
+                self._cache_hits += 1
+                return dict(cached[1])
+            wait = self.minimum_interval_seconds - (now - self._last_request_monotonic)
+            if wait > 0:
+                time.sleep(wait)
+            self._last_request_monotonic = time.monotonic()
+        try:
+            response = self._session.get(
+                f"{self.api_base}/{path.lstrip('/')}",
+                params=dict(params) | {"fmt": "json"},
+                headers={
+                    "Accept": "application/json",
+                    "User-Agent": "AdaOS-MediaCenter/1.0 (https://inimatic.com)",
+                },
+                timeout=self.timeout_seconds,
+            )
+            self._requests += 1
+            if response.status_code == 429:
+                raise MetadataProviderError("musicbrainz_rate_limited")
+            if response.status_code >= 500:
+                raise MetadataProviderError("musicbrainz_upstream_unavailable")
+            response.raise_for_status()
+            payload = response.json()
+            result = dict(payload) if isinstance(payload, Mapping) else {}
+        except MetadataProviderError as exc:
+            self._failures += 1
+            self._last_error = exc.code
+            raise
+        except (requests.RequestException, ValueError, TypeError) as exc:
+            self._failures += 1
+            self._last_error = type(exc).__name__
+            raise MetadataProviderError("musicbrainz_request_failed") from exc
+        self._cache[cache_key] = (time.monotonic(), result)
+        while len(self._cache) > 1000:
+            self._cache.popitem(last=False)
+        self._last_error = ""
+        return result
+
+    def claims(
+        self, subject: Mapping[str, Any], *, job_kind: str
+    ) -> list[dict[str, Any]]:
+        if job_kind not in self.supported_jobs:
+            raise LookupError("enrichment_provider_unavailable")
+        evidence = _external_subject(subject)
+        if evidence["media_kind"] != "audio":
+            return []
+        external_ids = evidence["external_ids"]
+        recording_id = external_ids.get("musicbrainz_recording") or external_ids.get("musicbrainz")
+        if recording_id:
+            recording = self._request(
+                f"recording/{recording_id}",
+                {"inc": "artists+releases+genres+tags"},
+            )
+            confidence = 0.99
+        else:
+            query = f'recording:"{str(evidence.get("title") or "")[:200]}"'
+            artists = evidence.get("artists") or []
+            if isinstance(artists, str):
+                artists = [artists]
+            if artists:
+                query += f' AND artist:"{str(artists[0])[:200]}"'
+            if evidence.get("album"):
+                query += f' AND release:"{str(evidence["album"])[:200]}"'
+            payload = self._request("recording", {"query": query, "limit": 5})
+            candidates = [
+                item for item in list(payload.get("recordings") or [])[:5]
+                if isinstance(item, Mapping)
+            ]
+            if not candidates:
+                return []
+            expected = fold_text(evidence.get("title"))
+            recording = max(
+                candidates,
+                key=lambda item: (
+                    int(fold_text(item.get("title")) == expected),
+                    int(item.get("score") or 0),
+                ),
+            )
+            confidence = min(0.95, max(0.6, float(recording.get("score") or 60) / 100.0))
+        artist_credit = recording.get("artist-credit") or []
+        artists = [
+            str((item.get("artist") or {}).get("name") or item.get("name") or "")
+            for item in list(artist_credit)[:20]
+            if isinstance(item, Mapping)
+        ]
+        releases = [
+            item for item in list(recording.get("releases") or [])[:20]
+            if isinstance(item, Mapping)
+        ]
+        genres = [
+            str(item.get("name")) for item in list(recording.get("genres") or [])[:30]
+            if isinstance(item, Mapping) and item.get("name")
+        ]
+        fields = {
+            "title": recording.get("title"),
+            "artists": [value for value in artists if value],
+            "album": releases[0].get("title") if releases else evidence.get("album"),
+            "release_date": releases[0].get("date") if releases else "",
+            "genres": genres,
+            "external_ids": {
+                **external_ids,
+                "musicbrainz_recording": recording.get("id"),
+                **(
+                    {"musicbrainz_release": releases[0].get("id")}
+                    if releases else {}
+                ),
+            },
+            "artwork_candidates": (
+                [{
+                    "kind": "cover",
+                    "url": f"https://coverartarchive.org/release/{releases[0].get('id')}/front-500",
+                    "provider": "cover_art_archive",
+                }]
+                if releases and releases[0].get("id") else []
+            ),
+        }
+        return [
+            {
+                "subject_ref": str(evidence["subject_ref"]),
+                "field_name": field,
+                "value": value,
+                "confidence": confidence,
+            }
+            for field, value in fields.items()
+            if value not in (None, "", [], {})
+        ][:100]
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "provider_id": self.provider_id,
+            "kind": "external",
+            "enabled": True,
+            "state": "degraded" if self._last_error else "ready",
+            "privacy": "normalized_audio_tags_only",
+            "request_count": self._requests,
+            "cache_hit_count": self._cache_hits,
+            "failure_count": self._failures,
+            "last_error": self._last_error,
+        }
+
+
 def default_metadata_providers() -> tuple[MetadataProvider, ...]:
     providers: list[MetadataProvider] = [DeterministicLocalProvider()]
     token = str(os.environ.get("MEDIA_CENTER_TMDB_READ_ACCESS_TOKEN") or "").strip()
@@ -388,6 +699,8 @@ def default_metadata_providers() -> tuple[MetadataProvider, ...]:
                 language=str(os.environ.get("MEDIA_CENTER_METADATA_LOCALE") or "en-US"),
             )
         )
+    if _enabled(os.environ.get("MEDIA_CENTER_METADATA_EXTERNAL_ENABLED")):
+        providers.append(MusicBrainzMetadataProvider())
     return tuple(providers)
 
 
