@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import fnmatch
 import hashlib
-import json
 import logging
 import mimetypes
 import os
@@ -39,6 +38,7 @@ from .rendition import (
     transcode_with_ffmpeg,
 )
 from .repository import MediaLibraryAgentRepository
+from .technical import basic_descriptor, probe_media
 
 
 RegisterCallback = Callable[[Path, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]
@@ -996,12 +996,7 @@ class MediaLibraryAgentWorker:
     @staticmethod
     def _technical_metadata(path: Path, *, stat: os.stat_result) -> dict[str, Any]:
         mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-        result: dict[str, Any] = {
-            "probe": "basic",
-            "container": path.suffix.lower().lstrip("."),
-            "mime_type": mime_type,
-            "size_bytes": int(stat.st_size),
-        }
+        result = basic_descriptor(path, stat=stat)
         perceptual_hash = MediaLibraryAgentWorker._perceptual_hash(
             path, mime_type=mime_type
         )
@@ -1013,59 +1008,17 @@ class MediaLibraryAgentWorker:
                 }
             )
         mode = text(os.environ.get("MEDIA_LIBRARY_AGENT_PROBE_MODE") or "basic").lower()
-        executable = shutil.which("ffprobe") if mode == "ffprobe" else None
-        if not executable:
+        if mode != "ffprobe":
             return result
-        try:
-            completed = subprocess.run(
-                [
-                    executable,
-                    "-v",
-                    "error",
-                    "-protocol_whitelist",
-                    "file,pipe",
-                    "-show_entries",
-                    "format=duration,bit_rate,format_name:stream=codec_type,codec_name,width,height,sample_rate,channels",
-                    "-of",
-                    "json",
-                    str(path),
-                ],
-                capture_output=True,
-                check=False,
-                timeout=max(
-                    1.0,
-                    min(
-                        float(
-                            os.environ.get("MEDIA_LIBRARY_AGENT_PROBE_TIMEOUT_SECONDS")
-                            or 5
-                        ),
-                        30.0,
-                    ),
-                ),
+        probed = probe_media(path, stat=stat)
+        if perceptual_hash:
+            probed.update(
+                {
+                    "perceptual_hash": perceptual_hash,
+                    "perceptual_hash_algorithm": "ffmpeg_sample_sha256_v1",
+                }
             )
-            if completed.returncode != 0 or len(completed.stdout) > 256 * 1024:
-                return result | {"probe_status": "failed"}
-            payload = json.loads(completed.stdout.decode("utf-8", errors="replace"))
-            streams = [item for item in payload.get("streams") or [] if isinstance(item, Mapping)]
-            primary = next(
-                (item for item in streams if item.get("codec_type") == "video"),
-                streams[0] if streams else {},
-            )
-            format_value = payload.get("format") if isinstance(payload.get("format"), Mapping) else {}
-            return result | {
-                "probe": "ffprobe",
-                "probe_status": "complete",
-                "codec": text(primary.get("codec_name")),
-                "width": int(primary.get("width") or 0),
-                "height": int(primary.get("height") or 0),
-                "sample_rate": int(primary.get("sample_rate") or 0),
-                "channels": int(primary.get("channels") or 0),
-                "duration_seconds": float(format_value.get("duration") or 0),
-                "bitrate": int(format_value.get("bit_rate") or 0),
-                "format": text(format_value.get("format_name")),
-            }
-        except Exception:
-            return result | {"probe_status": "failed"}
+        return probed
 
     @staticmethod
     def _perceptual_hash(path: Path, *, mime_type: str) -> str:

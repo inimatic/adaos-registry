@@ -3431,7 +3431,9 @@ def test_playback_plan_selects_endpoint_compatible_variant_and_route(
     assert plan["decision"]["candidate_count"] == 2
     assert override["source_id"] == "source-1"
     assert invalid_override["error"] == "playback_source_unavailable"
-    _validate_schema("playback-plan.v1.schema.json", plan)
+    assert plan["compatibility"]["mode"] == "direct"
+    assert plan["compatibility"]["ready"] is True
+    _validate_schema("playback-plan.v2.schema.json", plan)
     _validate_schema("playback-route.v1.schema.json", plan["route"])
 
 
@@ -3616,7 +3618,7 @@ def test_derived_rendition_is_a_hidden_exact_source_variant(monkeypatch, tmp_pat
     assert plan["decision"]["derived"] is True
     assert plan["decision"]["exact_source_id"] == "source-1"
     assert plan["decision"]["exact_source_revision"] == 1
-    _validate_schema("playback-plan.v1.schema.json", plan)
+    _validate_schema("playback-plan.v2.schema.json", plan)
 
 
 def test_federated_deep_search_is_bounded_policy_filtered_and_observable(

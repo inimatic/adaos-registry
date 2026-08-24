@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_library.rendition_plan.v2",
+  "type": "object",
+  "required": ["schema", "source_id", "source_revision", "source_fingerprint", "required", "decision", "reasons", "selected_tracks", "target", "resource_policy"],
+  "properties": {
+    "schema": {"const": "adaos.media_library.rendition_plan.v2"},
+    "source_id": {"type": "string", "minLength": 1},
+    "source_revision": {"type": "integer", "minimum": 1},
+    "source_fingerprint": {"type": "string", "minLength": 1},
+    "required": {"type": "boolean"},
+    "decision": {"enum": ["direct", "remux", "prepared_hls", "transcode", "unsupported"]},
+    "reasons": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"type": "string", "minLength": 1}},
+    "selected_tracks": {
+      "type": "object",
+      "required": ["video_index", "audio_index", "audio_language"],
+      "properties": {
+        "video_index": {"type": "integer", "minimum": -1},
+        "audio_index": {"type": "integer", "minimum": -1},
+        "audio_language": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "target": {
+      "type": "object",
+      "required": ["profile", "packaging", "container", "mime_type", "video_codec", "audio_codec", "max_width", "max_height", "max_bitrate", "abr_ladder"],
+      "properties": {
+        "profile": {"type": "string", "minLength": 1},
+        "packaging": {"enum": ["single_file", "hls_cmaf_vod"]},
+        "container": {"enum": ["mp4", "m4a", "cmaf"]},
+        "mime_type": {"enum": ["video/mp4", "audio/mp4", "application/vnd.apple.mpegurl"]},
+        "video_codec": {"type": "string"},
+        "audio_codec": {"type": "string"},
+        "max_width": {"type": "integer", "minimum": 0},
+        "max_height": {"type": "integer", "minimum": 0},
+        "max_bitrate": {"type": "integer", "minimum": 0},
+        "abr_ladder": {"type": "array", "maxItems": 6, "items": {"type": "object"}}
+      },
+      "additionalProperties": false
+    },
+    "resource_policy": {"type": "object"}
+  },
+  "additionalProperties": false
+}

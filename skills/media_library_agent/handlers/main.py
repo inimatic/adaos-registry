@@ -757,6 +757,7 @@ def plan_rendition(
     source_id: str = "",
     endpoint_capabilities: Mapping[str, Any] | None = None,
     profile: str = "browser-mp4-v1",
+    preferred_audio_language: str = "",
     priority: int = 50,
     force: bool = False,
     **_: Any,
@@ -773,14 +774,16 @@ def plan_rendition(
         source,
         endpoint_capabilities=endpoint_capabilities,
         profile=profile,
+        preferred_audio_language=preferred_audio_language,
     )
-    if not plan["required"]:
+    if not plan["required"] or plan["decision"] == "unsupported":
         return {
             "ok": True,
             "schema": SCHEMA_VERSION,
             "asynchronous": False,
             "plan": plan,
             "job": None,
+            "unsupported": plan["decision"] == "unsupported",
         }
     queued = repository.create_rendition_job(
         source_id,

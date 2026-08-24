@@ -21,6 +21,8 @@ if str(SKILL_ROOT) not in sys.path:
 from media_library_agent.repository import MediaLibraryAgentRepository  # noqa: E402
 import media_library_agent.rendition as rendition_module  # noqa: E402
 from media_library_agent.rendition import artwork_plan, rendition_plan  # noqa: E402
+import media_library_agent.technical as technical_module  # noqa: E402
+from media_library_agent.technical import probe_media  # noqa: E402
 import media_library_agent.topology as topology_module  # noqa: E402
 from media_library_agent.topology import LibraryAgentTopology  # noqa: E402
 from media_library_agent.worker import MediaLibraryAgentWorker  # noqa: E402
@@ -1564,7 +1566,7 @@ def test_rendition_is_bounded_derived_and_tied_to_exact_source(tmp_path):
     )
     assert plan["required"] is True
     assert set(plan["reasons"]) == {
-        "codec_not_supported",
+        "video_codec_not_supported",
         "mime_type_not_supported",
         "container_not_supported",
         "height_above_endpoint_limit",
@@ -1590,11 +1592,11 @@ def test_rendition_is_bounded_derived_and_tied_to_exact_source(tmp_path):
 
     Draft202012Validator(
         json.loads(
-            (schema_dir / "media-library-rendition-plan.v1.schema.json").read_text(
-                encoding="utf-8"
+                (schema_dir / "media-library-rendition-plan.v2.schema.json").read_text(
+                    encoding="utf-8"
+                )
             )
-        )
-    ).validate(plan)
+        ).validate(plan)
     Draft202012Validator(
         json.loads(
             (schema_dir / "media-library-rendition-job.v1.schema.json").read_text(
@@ -2120,3 +2122,90 @@ def test_perceptual_sampling_is_opt_in_bounded_and_never_publishes_bytes(
     )
     assert captured["command"][-1] == "pipe:1"
     assert source.read_bytes() == b"original-media"
+
+
+def test_technical_probe_v2_preserves_tracks_hdr_and_chapters(monkeypatch, tmp_path):
+    source = tmp_path / "feature.mkv"
+    source.write_bytes(b"source")
+    payload = {
+        "format": {
+            "format_name": "matroska,webm",
+            "format_long_name": "Matroska / WebM",
+            "duration": "120.5",
+            "bit_rate": "8500000",
+        },
+        "streams": [
+            {
+                "index": 0,
+                "codec_type": "video",
+                "codec_name": "hevc",
+                "profile": "Main 10",
+                "width": 3840,
+                "height": 2160,
+                "pix_fmt": "yuv420p10le",
+                "bits_per_raw_sample": "10",
+                "avg_frame_rate": "24000/1001",
+                "color_transfer": "smpte2084",
+                "color_primaries": "bt2020",
+                "disposition": {"default": 1},
+            },
+            {
+                "index": 1,
+                "codec_type": "audio",
+                "codec_name": "eac3",
+                "sample_rate": "48000",
+                "channels": 6,
+                "channel_layout": "5.1(side)",
+                "tags": {"language": "rus", "title": "Russian 5.1"},
+                "disposition": {"default": 1},
+            },
+            {
+                "index": 2,
+                "codec_type": "audio",
+                "codec_name": "aac",
+                "sample_rate": "48000",
+                "channels": 2,
+                "tags": {"language": "eng", "title": "Commentary"},
+                "disposition": {"comment": 1},
+            },
+            {
+                "index": 3,
+                "codec_type": "subtitle",
+                "codec_name": "subrip",
+                "tags": {"language": "eng"},
+                "disposition": {"forced": 1},
+            },
+        ],
+        "chapters": [
+            {"id": 0, "start_time": "0", "end_time": "60", "tags": {"title": "Part 1"}}
+        ],
+    }
+
+    monkeypatch.setattr(
+        technical_module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0, stdout=json.dumps(payload).encode("utf-8")
+        ),
+    )
+    result = probe_media(
+        source,
+        stat=source.stat(),
+        executable="ffprobe",
+        timeout_seconds=3,
+    )
+
+    assert result["schema"] == "adaos.media.technical_descriptor.v2"
+    assert result["containers"] == ["matroska", "webm"]
+    assert result["stream_counts"] == {
+        "video": 1,
+        "audio": 2,
+        "subtitle": 1,
+        "attachment": 0,
+    }
+    assert result["hdr_modes"] == ["hdr10"]
+    assert result["streams"][1]["language"] == "rus"
+    assert result["streams"][2]["disposition"] == {"comment": True}
+    assert result["streams"][3]["disposition"] == {"forced": True}
+    assert result["chapter_count"] == 1
+    assert result["chapters"][0]["title"] == "Part 1"

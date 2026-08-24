@@ -41,7 +41,7 @@ PERSONAL_SCHEMA = "adaos.media_center.personal_state.v1"
 FOLDER_NODE_SCHEMA = "adaos.media_center.folder_node.v1"
 PLAYLIST_SCHEMA = "adaos.media_center.playlist.v1"
 CORRECTION_SCHEMA = "adaos.media_center.catalog_correction.v1"
-PLAYBACK_PLAN_SCHEMA = "adaos.media_center.playback_plan.v1"
+PLAYBACK_PLAN_SCHEMA = "adaos.media_center.playback_plan.v2"
 PROFILE_SCHEMA = "adaos.media_center.profile.v1"
 MAX_PAGE_SIZE = 30
 HOME_SHELF_ORDER = (
@@ -1877,12 +1877,187 @@ class MediaCatalogCoordinator:
     @staticmethod
     def _quality(descriptor: Mapping[str, Any], metadata: Mapping[str, Any]) -> dict[str, Any]:
         technical = metadata.get("technical") if isinstance(metadata.get("technical"), Mapping) else {}
+        streams = [
+            dict(item)
+            for item in technical.get("streams") or []
+            if isinstance(item, Mapping)
+        ][:64]
+        video = next(
+            (item for item in streams if _text(item.get("kind")) == "video"), {}
+        )
+        audio_tracks = [
+            {
+                "index": int(item.get("index") or 0),
+                "codec": _text(item.get("codec")),
+                "language": _text(item.get("language")),
+                "title": _text(item.get("title")),
+                "channels": int(item.get("channels") or 0),
+                "channel_layout": _text(item.get("channel_layout")),
+                "disposition": dict(item.get("disposition") or {}),
+            }
+            for item in streams
+            if _text(item.get("kind")) == "audio"
+        ]
+        subtitle_tracks = [
+            {
+                "index": int(item.get("index") or 0),
+                "codec": _text(item.get("codec")),
+                "language": _text(item.get("language")),
+                "title": _text(item.get("title")),
+                "disposition": dict(item.get("disposition") or {}),
+            }
+            for item in streams
+            if _text(item.get("kind")) == "subtitle"
+        ]
         return {
-            "width": int(technical.get("width") or descriptor.get("width") or 0),
-            "height": int(technical.get("height") or descriptor.get("height") or 0),
+            "technical_schema": _text(technical.get("schema")),
+            "file_container": _text(technical.get("file_container")),
+            "container": _text(technical.get("container")),
+            "containers": list(technical.get("containers") or []),
+            "width": int(video.get("width") or technical.get("width") or descriptor.get("width") or 0),
+            "height": int(video.get("height") or technical.get("height") or descriptor.get("height") or 0),
             "bitrate": int(technical.get("bitrate") or descriptor.get("bitrate") or 0),
-            "codec": _text(technical.get("codec") or descriptor.get("codec")),
-            "language": _text(metadata.get("language")),
+            "codec": _text(video.get("codec") or technical.get("codec") or descriptor.get("codec")),
+            "profile": _text(video.get("profile")),
+            "bit_depth": int(video.get("bit_depth") or 0),
+            "frame_rate": float(video.get("frame_rate") or 0),
+            "hdr_modes": list(technical.get("hdr_modes") or []),
+            "language": _text(metadata.get("language") or (audio_tracks[0].get("language") if audio_tracks else "")),
+            "audio_tracks": audio_tracks,
+            "subtitle_tracks": subtitle_tracks,
+        }
+
+    @staticmethod
+    def _endpoint_compatibility(
+        quality: Mapping[str, Any],
+        *,
+        media_kind: str,
+        mime_type: str,
+        capabilities: Mapping[str, Any],
+        preferred_language: str,
+    ) -> dict[str, Any]:
+        def tokens(value: Any) -> set[str]:
+            if not isinstance(value, (list, tuple, set, frozenset)):
+                return set()
+            return {_text(item).lower() for item in value if _text(item)}
+
+        supported_codecs = tokens(capabilities.get("codecs"))
+        supported_containers = tokens(capabilities.get("containers"))
+        supported_mime_types = {
+            item.split(";", 1)[0].strip()
+            for item in tokens(capabilities.get("mime_types"))
+        }
+        audio_tracks = [
+            dict(item)
+            for item in quality.get("audio_tracks") or []
+            if isinstance(item, Mapping)
+        ]
+        language = _text(preferred_language).lower()
+        selected_audio = next(
+            (
+                item
+                for item in audio_tracks
+                if language
+                and _text(item.get("language")).lower() in {language, language[:2]}
+            ),
+            None,
+        )
+        selected_audio = selected_audio or next(
+            (
+                item
+                for item in audio_tracks
+                if bool((item.get("disposition") or {}).get("default"))
+            ),
+            None,
+        )
+        selected_audio = selected_audio or (audio_tracks[0] if audio_tracks else {})
+        source_codec = _text(quality.get("codec")).lower()
+        audio_codec = _text(selected_audio.get("codec")).lower()
+        source_container = _text(
+            quality.get("file_container") or quality.get("container")
+        ).lower()
+        source_mime = _text(mime_type).lower().split(";", 1)[0].strip()
+        reasons: list[str] = []
+        if supported_codecs and source_codec and source_codec not in supported_codecs:
+            reasons.append(
+                "video_codec_not_supported"
+                if media_kind == "video"
+                else "audio_codec_not_supported"
+            )
+        if (
+            media_kind == "video"
+            and supported_codecs
+            and audio_codec
+            and audio_codec not in supported_codecs
+        ):
+            reasons.append("audio_codec_not_supported")
+        if (
+            supported_containers
+            and source_container
+            and source_container not in supported_containers
+        ):
+            reasons.append("container_not_supported")
+        if supported_mime_types and source_mime not in supported_mime_types:
+            reasons.append("mime_type_not_supported")
+        maximum_height = max(0, int(capabilities.get("max_video_height") or 0))
+        if maximum_height and int(quality.get("height") or 0) > maximum_height:
+            reasons.append("height_above_endpoint_limit")
+        maximum_bitrate = max(0, int(capabilities.get("max_bitrate") or 0))
+        if maximum_bitrate and int(quality.get("bitrate") or 0) > maximum_bitrate:
+            reasons.append("bitrate_above_endpoint_limit")
+        source_hdr = {
+            _text(item).lower()
+            for item in quality.get("hdr_modes") or []
+            if _text(item) and _text(item).lower() != "sdr"
+        }
+        endpoint_hdr = tokens(capabilities.get("hdr_modes"))
+        hdr_unsupported = bool(
+            source_hdr and endpoint_hdr and source_hdr.isdisjoint(endpoint_hdr)
+        )
+        if hdr_unsupported:
+            reasons.append("hdr_tone_mapping_deferred")
+        restrictive = bool(
+            supported_codecs
+            or supported_containers
+            or supported_mime_types
+            or maximum_height
+            or maximum_bitrate
+            or endpoint_hdr
+        )
+        if not restrictive:
+            reasons = ["endpoint_capabilities_not_restrictive"]
+            mode = "direct"
+        elif not reasons:
+            reasons = ["direct_compatible"]
+            mode = "direct"
+        elif hdr_unsupported:
+            mode = "unsupported"
+        elif set(reasons).issubset(
+            {"container_not_supported", "mime_type_not_supported"}
+        ):
+            mode = "remux"
+        elif bool(capabilities.get("hls")) and media_kind == "video":
+            mode = "prepared_hls"
+        else:
+            mode = "transcode"
+        return {
+            "schema": "adaos.playback.compatibility_decision.v1",
+            "mode": mode,
+            "ready": mode == "direct",
+            "requires_preparation": mode in {"remux", "prepared_hls", "transcode"},
+            "reasons": reasons,
+            "selected_tracks": {
+                "video_index": 0 if media_kind == "video" else -1,
+                "audio_index": (
+                    int(selected_audio.get("index") or 0) if selected_audio else -1
+                ),
+                "audio_language": _text(selected_audio.get("language")),
+            },
+            "endpoint_profile": {
+                "schema": _text(capabilities.get("schema")),
+                "revision": max(0, int(capabilities.get("revision") or 0)),
+                "evidence": dict(capabilities.get("evidence") or {}),
+            },
         }
 
     def _classify_source(
@@ -4143,7 +4318,15 @@ class MediaCatalogCoordinator:
         language_preference = _text(preferred_language).lower()
         override = _text(variant_id)
         selected_item_variant = str(selected_item["variant_id"])
-        ranked: list[tuple[float, sqlite3.Row, dict[str, Any], list[str]]] = []
+        ranked: list[
+            tuple[
+                float,
+                sqlite3.Row,
+                dict[str, Any],
+                list[str],
+                dict[str, Any],
+            ]
+        ] = []
         for row in rows:
             quality = _json_loads(row["variant_quality_json"]) or {}
             reasons: list[str] = []
@@ -4198,7 +4381,23 @@ class MediaCatalogCoordinator:
             if endpoint_node_id and str(row["selected_node_id"]) == _text(endpoint_node_id):
                 score += 25.0
                 reasons.append("source_colocated_with_endpoint")
-            ranked.append((score, row, quality, reasons))
+            compatibility = self._endpoint_compatibility(
+                quality,
+                media_kind=str(row["selected_media_kind"]),
+                mime_type=str(row["selected_mime_type"]),
+                capabilities=capabilities,
+                preferred_language=language_preference,
+            )
+            compatibility_score = {
+                "direct": 300.0,
+                "remux": 120.0,
+                "prepared_hls": 80.0,
+                "transcode": -300.0,
+                "unsupported": -5000.0,
+            }.get(_text(compatibility.get("mode")), -5000.0)
+            score += compatibility_score
+            reasons.append(f"compatibility_{compatibility['mode']}")
+            ranked.append((score, row, quality, reasons, compatibility))
         ranked.sort(
             key=lambda item: (-item[0], str(item[1]["selected_variant_id"]))
         )
@@ -4208,7 +4407,7 @@ class MediaCatalogCoordinator:
                 "error": "playback_source_unavailable",
                 "item_id": token,
             }
-        score, selected, quality, reasons = ranked[0]
+        score, selected, quality, reasons, compatibility = ranked[0]
         descriptor = _json_loads(selected["variant_descriptor_json"]) or {}
         if not descriptor:
             descriptor = _json_loads(selected["catalog_descriptor_json"]) or {}
@@ -4274,8 +4473,9 @@ class MediaCatalogCoordinator:
                 routed_content_path=routed_path,
             ),
             "route": route,
+            "compatibility": compatibility,
             "decision": {
-                "policy": "deterministic_variant_route_v1",
+                "policy": "deterministic_variant_route_v2",
                 "score": round(score, 3),
                 "reasons": reasons,
                 "candidate_count": len(ranked),
@@ -4440,10 +4640,10 @@ class MediaCatalogCoordinator:
                     "available": True,
                     "descriptor": plan["descriptor"],
                     "route": plan["route"],
-                    **(
-                        {"compatibility_mode": plan["compatibility_mode"]}
-                        if plan.get("compatibility_mode")
-                        else {}
+                    "compatibility": dict(plan.get("compatibility") or {}),
+                    "compatibility_mode": _text(
+                        plan.get("compatibility_mode")
+                        or (plan.get("compatibility") or {}).get("mode")
                     ),
                 }
             )
@@ -4528,6 +4728,7 @@ class MediaCatalogCoordinator:
             "media_kind": media_kind,
             "mime_type": mime_type,
             "title": _text(item.get("title") or item.get("name")),
+            "profile_id": "default",
             "quality": {},
             "descriptor": _public_resource_descriptor(
                 resource,
@@ -4537,6 +4738,19 @@ class MediaCatalogCoordinator:
                 routed_content_path=routed_path,
             ),
             "route": route,
+            "compatibility": {
+                "schema": "adaos.playback.compatibility_decision.v1",
+                "mode": "direct",
+                "ready": True,
+                "requires_preparation": False,
+                "reasons": ["legacy_reference_source"],
+                "selected_tracks": {
+                    "video_index": 0 if media_kind == "video" else -1,
+                    "audio_index": 0 if media_kind == "audio" else -1,
+                    "audio_language": "",
+                },
+                "endpoint_profile": {"schema": "", "revision": 0, "evidence": {}},
+            },
             "compatibility_mode": "legacy_catalog_row",
         }
 

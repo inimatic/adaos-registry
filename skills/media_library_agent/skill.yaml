@@ -407,6 +407,9 @@ tools:
       profile:
         type: string
         default: browser-mp4-v1
+      preferred_audio_language:
+        type: string
+        default: ''
       priority:
         type: integer
         minimum: 0

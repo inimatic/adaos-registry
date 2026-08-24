@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "adaos.media_center.playback_plan.v1",
+  "$id": "adaos.media_center.playback_plan.v2",
   "type": "object",
-  "required": ["ok", "schema", "item_id", "work_id", "variant_id", "source_id", "profile_id", "descriptor", "route", "decision"],
+  "required": ["ok", "schema", "item_id", "work_id", "variant_id", "source_id", "profile_id", "descriptor", "route", "compatibility", "decision"],
   "properties": {
     "ok": {"const": true},
-    "schema": {"const": "adaos.media_center.playback_plan.v1"},
+    "schema": {"const": "adaos.media_center.playback_plan.v2"},
     "item_id": {"type": "string"},
     "work_id": {"type": "string"},
     "variant_id": {"type": "string"},
@@ -20,11 +20,25 @@
       "type": "object",
       "required": ["schema", "mode", "source_node_id", "direct_candidates", "fallback"]
     },
+    "compatibility": {
+      "type": "object",
+      "required": ["schema", "mode", "ready", "requires_preparation", "reasons", "selected_tracks", "endpoint_profile"],
+      "properties": {
+        "schema": {"const": "adaos.playback.compatibility_decision.v1"},
+        "mode": {"enum": ["direct", "remux", "prepared_hls", "transcode", "unsupported"]},
+        "ready": {"type": "boolean"},
+        "requires_preparation": {"type": "boolean"},
+        "reasons": {"type": "array", "items": {"type": "string"}},
+        "selected_tracks": {"type": "object"},
+        "endpoint_profile": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
     "decision": {
       "type": "object",
       "required": ["policy", "score", "reasons", "candidate_count"],
       "properties": {
-        "policy": {"const": "deterministic_variant_route_v1"},
+        "policy": {"const": "deterministic_variant_route_v2"},
         "score": {"type": "number"},
         "reasons": {"type": "array", "items": {"type": "string"}},
         "candidate_count": {"type": "integer", "minimum": 1},

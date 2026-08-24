@@ -73,11 +73,65 @@ def _tokens(value: Any) -> set[str]:
     return {text(item).lower() for item in value if text(item)}
 
 
+def _mime_tokens(value: Any) -> set[str]:
+    return {item.split(";", 1)[0].strip() for item in _tokens(value)}
+
+
+def _technical_streams(technical: Mapping[str, Any], kind: str) -> list[dict[str, Any]]:
+    return [
+        dict(item)
+        for item in technical.get("streams") or []
+        if isinstance(item, Mapping) and text(item.get("kind")).lower() == kind
+    ]
+
+
+def _preferred_audio(
+    streams: list[dict[str, Any]], preferred_language: str
+) -> dict[str, Any]:
+    language = text(preferred_language).lower()
+    if language:
+        match = next(
+            (item for item in streams if text(item.get("language")).lower() == language),
+            None,
+        )
+        if match:
+            return match
+    default = next(
+        (
+            item
+            for item in streams
+            if bool((item.get("disposition") or {}).get("default"))
+        ),
+        None,
+    )
+    return default or (streams[0] if streams else {})
+
+
+def _abr_ladder(maximum_height: int, maximum_bitrate: int) -> list[dict[str, int]]:
+    presets = ((360, 800_000), (480, 1_400_000), (720, 3_000_000), (1080, 6_000_000), (2160, 16_000_000))
+    ceiling_height = maximum_height or 1080
+    ceiling_bitrate = maximum_bitrate or 8_000_000
+    ladder = [
+        {"height": height, "video_bitrate": min(bitrate, ceiling_bitrate)}
+        for height, bitrate in presets
+        if height <= ceiling_height and bitrate <= ceiling_bitrate
+    ]
+    if not ladder:
+        ladder.append(
+            {
+                "height": max(240, min(ceiling_height, 1080)),
+                "video_bitrate": max(300_000, ceiling_bitrate),
+            }
+        )
+    return ladder[-3:]
+
+
 def rendition_plan(
     source: Mapping[str, Any],
     *,
     endpoint_capabilities: Mapping[str, Any] | None = None,
     profile: str = "browser-mp4-v1",
+    preferred_audio_language: str = "",
 ) -> dict[str, Any]:
     capabilities = dict(endpoint_capabilities or {})
     metadata = dict(source.get("metadata") or {})
@@ -88,39 +142,79 @@ def rendition_plan(
     )
     kind = text(source.get("media_kind")).lower()
     mime_type = text(source.get("mime_type")).lower()
-    codec = text(technical.get("codec")).lower()
+    video_streams = _technical_streams(technical, "video")
+    audio_streams = _technical_streams(technical, "audio")
+    video = video_streams[0] if video_streams else {}
+    audio = _preferred_audio(audio_streams, preferred_audio_language)
+    codec = text(video.get("codec") or audio.get("codec") or technical.get("codec")).lower()
+    audio_codec = text(audio.get("codec")).lower()
     codecs = _tokens(capabilities.get("codecs"))
-    mime_types = _tokens(capabilities.get("mime_types"))
+    mime_types = _mime_tokens(capabilities.get("mime_types"))
     containers = _tokens(capabilities.get("containers"))
     container = text(technical.get("container") or Path(text(source.get("name"))).suffix.lstrip(".")).lower()
     reasons: list[str] = []
-    if codecs and codec and codec not in codecs:
-        reasons.append("codec_not_supported")
+    codec_incompatible = bool(codecs and codec and codec not in codecs)
+    audio_incompatible = bool(codecs and audio_codec and audio_codec not in codecs)
+    if codec_incompatible:
+        reasons.append("video_codec_not_supported" if kind == "video" else "audio_codec_not_supported")
+    if kind == "video" and audio_incompatible:
+        reasons.append("audio_codec_not_supported")
     if mime_types and mime_type and mime_type not in mime_types:
         reasons.append("mime_type_not_supported")
     if containers and container and container not in containers:
         reasons.append("container_not_supported")
     maximum_height = max(0, int(capabilities.get("max_video_height") or 0))
-    height = max(0, int(technical.get("height") or 0))
+    height = max(0, int(video.get("height") or technical.get("height") or 0))
     if kind == "video" and maximum_height and height > maximum_height:
         reasons.append("height_above_endpoint_limit")
     maximum_bitrate = max(0, int(capabilities.get("max_bitrate") or 0))
     bitrate = max(0, int(technical.get("bitrate") or 0))
     if maximum_bitrate and bitrate > maximum_bitrate:
         reasons.append("bitrate_above_endpoint_limit")
+    source_hdr = {
+        text(item)
+        for item in technical.get("hdr_modes") or []
+        if text(item) and text(item) != "sdr"
+    }
+    endpoint_hdr = _tokens(capabilities.get("hdr_modes"))
+    hdr_unsupported = bool(source_hdr and endpoint_hdr and source_hdr.isdisjoint(endpoint_hdr))
+    if hdr_unsupported:
+        reasons.append("hdr_tone_mapping_deferred")
     required = bool(reasons)
     if not (codecs or mime_types or containers or maximum_height or maximum_bitrate):
         required = False
         reasons = ["endpoint_capabilities_not_restrictive"]
+    elif not required and not reasons:
+        reasons = ["direct_compatible"]
+    container_only = bool(reasons) and set(reasons).issubset(
+        {"container_not_supported", "mime_type_not_supported"}
+    )
+    if hdr_unsupported:
+        decision = "unsupported"
+    elif not required:
+        decision = "direct"
+    elif container_only:
+        decision = "remux"
+    elif bool(capabilities.get("hls")) and kind == "video":
+        decision = "prepared_hls"
+    else:
+        decision = "transcode"
+    hls = decision == "prepared_hls"
     target = {
         "profile": text(profile) or "browser-mp4-v1",
-        "container": "mp4" if kind == "video" else "m4a",
-        "mime_type": "video/mp4" if kind == "video" else "audio/mp4",
+        "packaging": "hls_cmaf_vod" if hls else "single_file",
+        "container": "cmaf" if hls else ("mp4" if kind == "video" else "m4a"),
+        "mime_type": (
+            "application/vnd.apple.mpegurl"
+            if hls
+            else ("video/mp4" if kind == "video" else "audio/mp4")
+        ),
         "video_codec": "h264" if kind == "video" else "",
         "audio_codec": "aac",
         "max_width": max(0, int(capabilities.get("max_video_width") or 0)),
         "max_height": maximum_height,
         "max_bitrate": maximum_bitrate,
+        "abr_ladder": _abr_ladder(maximum_height, maximum_bitrate) if hls else [],
     }
     return {
         "schema": RENDITION_PLAN_SCHEMA,
@@ -128,7 +222,13 @@ def rendition_plan(
         "source_revision": int(source.get("revision") or 0),
         "source_fingerprint": text(source.get("fingerprint")),
         "required": required,
+        "decision": decision,
         "reasons": reasons,
+        "selected_tracks": {
+            "video_index": int(video.get("index") or 0) if video else -1,
+            "audio_index": int(audio.get("index") or 0) if audio else -1,
+            "audio_language": text(audio.get("language")),
+        },
         "target": target,
         "resource_policy": rendition_limits(),
     }
