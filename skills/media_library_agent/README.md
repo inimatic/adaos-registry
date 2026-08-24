@@ -4,7 +4,10 @@
 
 Version `0.6.27` adds durable, bounded artwork backfill for sources that were
 indexed before artwork extraction existed. Capability evidence makes terminal
-`unavailable` results retryable when an FFmpeg backend later appears.
+`unavailable` results retryable when an FFmpeg backend later appears. Version
+`0.6.28` emits video-frame JPEGs as full-range `yuvj420p`, which is required by
+current FFmpeg MJPEG encoders and remains compatible with older supported
+versions.
 
 ## Storage boundary
 

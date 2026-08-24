@@ -354,7 +354,8 @@ def _video_frame_artwork(
         "-protocol_whitelist", "file,pipe", "-ss", "5", "-i", str(source_path),
         "-map", "0:v:0", "-frames:v", "1",
         "-vf", "scale=w='min(720,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease",
-        "-threads", "1", "-q:v", "3", "-f", "image2", str(partial),
+        "-pix_fmt", "yuvj420p", "-threads", "1", "-q:v", "3",
+        "-f", "image2", str(partial),
     ]
     process = subprocess.Popen(
         command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE

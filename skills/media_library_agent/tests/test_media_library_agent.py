@@ -19,6 +19,7 @@ if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 from media_library_agent.repository import MediaLibraryAgentRepository  # noqa: E402
+import media_library_agent.rendition as rendition_module  # noqa: E402
 from media_library_agent.rendition import artwork_plan, rendition_plan  # noqa: E402
 import media_library_agent.topology as topology_module  # noqa: E402
 from media_library_agent.topology import LibraryAgentTopology  # noqa: E402
@@ -1697,6 +1698,52 @@ def test_artwork_terminal_result_is_replanned_only_after_capability_change():
     plan = artwork_plan(source, capabilities=available)
     assert plan["required"] is True
     assert plan["capabilities"]["witness"] == "capabilities-b"
+
+
+def test_video_frame_artwork_uses_full_range_jpeg_pixel_format(
+    monkeypatch, tmp_path
+):
+    from PIL import Image
+
+    captured: dict[str, list[str]] = {}
+
+    class CompletedProcess:
+        returncode = 0
+
+        def __init__(self, command, **_kwargs):
+            captured["command"] = list(command)
+            Image.new("RGB", (32, 18), color=(20, 40, 60)).save(
+                Path(command[-1]), "JPEG"
+            )
+
+        def poll(self):
+            return self.returncode
+
+        def communicate(self, timeout=None):
+            return b"", b""
+
+    monkeypatch.setattr(
+        rendition_module, "_ffmpeg_executable", lambda: ("ffmpeg", "configured")
+    )
+    monkeypatch.setattr(rendition_module.subprocess, "Popen", CompletedProcess)
+    source = tmp_path / "movie.mp4"
+    target = tmp_path / "artwork.jpg"
+    source.write_bytes(b"source")
+
+    result = rendition_module._video_frame_artwork(
+        source,
+        target,
+        cancelled=lambda: False,
+        timeout_seconds=30,
+        maximum_output_bytes=1024 * 1024,
+    )
+
+    pixel_format = captured["command"].index("-pix_fmt")
+    assert captured["command"][pixel_format + 1] == "yuvj420p"
+    assert result["mime_type"] == "image/jpeg"
+    assert result["width"] == 32
+    assert result["height"] == 18
+    assert target.is_file()
 
 
 def test_rendition_source_change_after_publish_is_not_advertised_and_is_cleaned(
