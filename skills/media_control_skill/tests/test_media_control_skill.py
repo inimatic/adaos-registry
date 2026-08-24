@@ -108,6 +108,28 @@ def test_terminal_and_error_sessions_leave_now_playing():
     assert repository.now_playing(profile_id="alice")["items"] == []
 
 
+def test_stale_endpoint_session_is_not_projected_as_now_playing():
+    repository = MediaControlRepository()
+    session = _session(repository)
+    with repository.connect() as connection:
+        connection.execute(
+            """
+            UPDATE playback_sessions
+            SET state='playing',created_at='2000-01-01T00:00:00+00:00',
+                endpoint_last_seen_at='2000-01-01T00:00:01+00:00'
+            WHERE id=?
+            """,
+            (session["id"],),
+        )
+        connection.commit()
+
+    projection = repository.now_playing(profile_id="alice")
+
+    assert projection["items"] == []
+    assert projection["freshness_seconds"] == 300
+    assert repository.get_session(session["id"])["session"]["state"] == "playing"
+
+
 def test_checkpoint_handler_publishes_profile_observation(monkeypatch):
     repository = MediaControlRepository()
     session = _session(repository)

@@ -6,7 +6,7 @@ import json
 import os
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -1179,8 +1179,24 @@ class MediaControlRepository:
 
     def now_playing(self, *, profile_id: str = "", target_id: str = "", limit: int = 20) -> dict[str, Any]:
         self.apply_due_sleep_timers()
-        filters = ["s.state NOT IN ('stopped','ended','error')"]
-        params: list[Any] = []
+        try:
+            configured_freshness = int(
+                os.environ.get("MEDIA_CONTROL_NOW_PLAYING_FRESHNESS_SECONDS") or 300
+            )
+        except (TypeError, ValueError):
+            configured_freshness = 300
+        freshness_seconds = max(
+            30,
+            min(3600, configured_freshness),
+        )
+        freshness_cutoff = (
+            datetime.now(tz=timezone.utc) - timedelta(seconds=freshness_seconds)
+        ).isoformat()
+        filters = [
+            "s.state NOT IN ('stopped','ended','error')",
+            "COALESCE(NULLIF(s.endpoint_last_seen_at,''),s.created_at)>=?",
+        ]
+        params: list[Any] = [freshness_cutoff]
         if text(profile_id):
             filters.append("s.profile_id=?")
             params.append(text(profile_id))
@@ -1242,7 +1258,14 @@ class MediaControlRepository:
                 }
             )
             items.append(item)
-        return {"ok": True, "schema": SCHEMA_VERSION, "items": items, "count": len(items), "updated_at": now_iso()}
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "items": items,
+            "count": len(items),
+            "freshness_seconds": freshness_seconds,
+            "updated_at": now_iso(),
+        }
 
     def diagnostics(self) -> dict[str, Any]:
         with self.connect() as connection:
