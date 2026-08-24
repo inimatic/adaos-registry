@@ -1,4 +1,8 @@
 skills/.runtime/
+skills/.devtime/
+skills/*/.skill_state/
+scenario/.runtime/
+scenario/.devtime/
 .adaos/
 __pycache__/
 *.py[cod]
