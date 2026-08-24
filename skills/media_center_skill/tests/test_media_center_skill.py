@@ -847,6 +847,30 @@ def test_playback_observation_ignores_loading_and_coalesces_home_projection(monk
     assert len(published) == 2
 
 
+def test_playback_observation_ignores_failure_before_media_started(monkeypatch):
+    checkpoints = []
+    catalog = SimpleNamespace(
+        checkpoint=lambda item_id, **kwargs: (
+            checkpoints.append((item_id, kwargs)) or {"ok": True}
+        )
+    )
+    monkeypatch.setattr(main, "_coordinator", lambda: catalog)
+    main._PLAYBACK_OBSERVATION_CACHE.clear()
+
+    main.on_playback_observed(
+        {
+            "item_id": "unsupported-video",
+            "profile_id": "alice",
+            "position_ms": 0,
+            "duration_ms": 0,
+            "state": "error",
+            "playback_confirmed": False,
+        }
+    )
+
+    assert checkpoints == []
+
+
 def test_coordinator_builds_typed_collections_and_bounded_cursor_pages(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
@@ -896,6 +920,34 @@ def test_coordinator_builds_typed_collections_and_bounded_cursor_pages(monkeypat
     assert {item["id"] for item in contents["items"]}.isdisjoint(
         {item["id"] for item in continued["items"]}
     )
+
+
+def test_collection_uses_a_ready_member_artwork_when_first_episode_has_none(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "collection-artwork.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    first = _agent_delta(1, "Show/Season 01/Show.S01E01.mp4", kind="video")
+    second = _agent_delta(2, "Show/Season 01/Show.S01E02.mp4", kind="video")
+    second["source"]["metadata"]["artwork"] = {
+        "schema": "adaos.media.artwork.v1",
+        "state": "ready",
+        "provider_id": "media_library_agent.video_frame.v1",
+        "source_kind": "generated_frame",
+        "exact_source_revision": 1,
+        "exact_source_fingerprint": "fingerprint-2-1",
+        "width": 720,
+        "height": 405,
+        "descriptor": {"browser_path": "/media/show-episode-2.jpg"},
+    }
+    catalog.apply_agent_page(_agent_page(first, second))
+
+    collection = catalog.collections(kind="series")["items"][0]
+
+    assert collection["artwork"]["state"] == "ready"
+    assert collection["artwork"]["url"] == "/media/show-episode-2.jpg"
 
 
 def test_personal_state_is_profile_scoped_and_revisioned(monkeypatch, tmp_path):

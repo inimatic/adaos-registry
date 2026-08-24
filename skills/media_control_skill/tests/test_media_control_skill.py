@@ -158,6 +158,7 @@ def test_checkpoint_handler_publishes_profile_observation(monkeypatch):
     assert published[0][1]["profile_id"] == "alice"
     assert published[0][1]["item_id"] == "item-0"
     assert published[0][1]["webspace_id"] == "desktop"
+    assert published[0][1]["playback_confirmed"] is True
 
 
 def test_target_projection_exposes_device_endpoint_and_authorization_labels():

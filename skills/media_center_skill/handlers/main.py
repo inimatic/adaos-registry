@@ -909,6 +909,12 @@ def on_playback_observed(event: Any) -> None:
     state = str(payload.get("state") or "paused").strip().lower()
     if state not in {"playing", "paused", "stopped", "ended", "error"}:
         return
+    playback_confirmed = _bool(
+        payload.get("playback_confirmed"),
+        position_ms > 0 or state == "ended",
+    )
+    if not playback_confirmed:
+        return
     bucket = position_ms // 15_000
     cache_key = f"{profile_id}:{item_id}"
     with _coordinator_lock:

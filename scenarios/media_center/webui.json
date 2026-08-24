@@ -974,6 +974,7 @@
                 "titleKey": "title",
                 "subtitleKey": "kind",
                 "badgeKey": "item_count",
+                "imageKey": "artwork",
                 "emptyText": "No collections found.",
                 "emptyText_i18n": {
                   "key": "runtime.media_center.ui.no_collections_found"

@@ -3002,7 +3002,10 @@ class MediaCatalogCoordinator:
                             AND ci.variant_id=preview_membership.variant_id
                         WHERE preview_membership.collection_id=c.id
                             AND ci.missing=0
-                        ORDER BY preview_membership.season_number,
+                        ORDER BY CASE
+                                WHEN json_extract(ci.metadata_json, '$.artwork.state')='ready'
+                                THEN 0 ELSE 1 END,
+                            preview_membership.season_number,
                             preview_membership.episode_number,
                             preview_membership.ordinal,ci.id LIMIT 1
                     ) AS representative_metadata_json
@@ -3069,7 +3072,10 @@ class MediaCatalogCoordinator:
                             AND ci.variant_id=preview_membership.variant_id
                         WHERE preview_membership.collection_id=c.id
                             AND ci.missing=0
-                        ORDER BY preview_membership.season_number,
+                        ORDER BY CASE
+                                WHEN json_extract(ci.metadata_json, '$.artwork.state')='ready'
+                                THEN 0 ELSE 1 END,
+                            preview_membership.season_number,
                             preview_membership.episode_number,
                             preview_membership.ordinal,ci.id LIMIT 1
                     ) AS representative_metadata_json

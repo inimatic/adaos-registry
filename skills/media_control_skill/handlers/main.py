@@ -47,6 +47,14 @@ def _publish_playback_observation(
     position_ms = max(0, int(session.get("position_ms") or 0))
     duration_ms = max(position_ms, int(session.get("duration_ms") or 0))
     state = text(session.get("state")) or "paused"
+    endpoint_state = session.get("endpoint_state")
+    if not isinstance(endpoint_state, Mapping):
+        endpoint_state = {}
+    playback_confirmed = bool(
+        endpoint_state.get("playback_confirmed")
+        or position_ms > 0
+        or state == "ended"
+    )
     try:
         publish_event(
             "media_control.playback.observed",
@@ -59,6 +67,13 @@ def _publish_playback_observation(
                 "position_ms": position_ms,
                 "duration_ms": duration_ms,
                 "state": state,
+                "playback_confirmed": playback_confirmed,
+                "media_ready_state": max(
+                    0, int(endpoint_state.get("media_ready_state") or 0)
+                ),
+                "media_error_code": max(
+                    0, int(endpoint_state.get("media_error_code") or 0)
+                ),
                 "completed": bool(
                     state == "ended"
                     or (duration_ms > 0 and position_ms >= duration_ms * 0.95)
