@@ -6,6 +6,21 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.56` is the locally accepted single-node product closure. It ships
+`media_center_skill@0.8.50`, `media_library_agent@0.6.29`,
+`media_control_skill@0.2.7`, and scenario `media_center@0.6.16`. Root browsing
+is restricted to configured agent-owned roots and every drill-down/queue keeps
+agent plus root identity, so legacy Media Server rows stay searchable without
+flattening the folder tree. Metadata and artwork run as bounded observable jobs
+at the storage node; embedded art and representative frames produce derived
+JPEGs while original video/audio bytes remain external references. The
+optional TMDb provider is explicit, paced, privacy-bounded, and disabled
+without credentials. Library stream sequencing composes catalog and personal
+revisions so a file scan, favorite, Recent, or profile change cannot be rejected
+as stale merely because the other revision plane is ahead. Skill-localized
+remote assets, ordered collection playback, compact controls, app-shell
+mini-player Close, and rail navigation complete the browser compatibility set.
+
 Release `0.6.55` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
