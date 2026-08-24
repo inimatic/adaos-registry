@@ -103,10 +103,10 @@ def test_rehydrate_defers_runtime_workers_until_sys_ready(monkeypatch) -> None:
 
     class Repository:
         def summary(self) -> dict[str, object]:
-            return {"total_count": 20_000}
+            pytest.fail("rehydrate must not scan the catalog summary")
 
         def facets(self) -> dict[str, object]:
-            return {"media_kind": []}
+            pytest.fail("rehydrate must not scan catalog facets")
 
     class Catalog:
         def catalog_revision(self) -> int:

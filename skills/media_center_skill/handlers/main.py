@@ -609,8 +609,6 @@ def rehydrate(**_: Any) -> dict[str, Any]:
     return {
         "ok": True,
         "schema": COORDINATOR_SCHEMA,
-        "summary": repo.summary(),
-        "facets": repo.facets(),
         "catalog_revision": catalog.catalog_revision(),
         "agent_sync": {
             "ok": True,
