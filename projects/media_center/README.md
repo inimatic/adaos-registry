@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.60` is the locally verified single-node closure. It ships
+Release `0.6.61` is the locally verified single-node closure. It ships
 `media_center_skill@0.8.53`, `media_library_agent@0.6.31`,
 `media_control_skill@0.2.9`, scenario `media_center@0.6.19`, and client
 `0.0.371`. A monotonic per-profile projection revision makes Favorites and
@@ -19,6 +19,11 @@ acceptance covered the 3716-file UNC library: its full scan retained a durable
 appears in Recent, terminal sessions leave Remote, and artwork reaches the DOM
 as an object URL produced by the AdaOS media plane rather than a direct
 page-origin file request.
+
+Release `0.6.60` was not promoted. Its immutable local receipt references a
+source revision that still tracked process-local agent state, although the
+package builder excluded that directory from component bytes. `0.6.61` is the
+first release whose source revision and package boundary both exclude it.
 
 Release `0.6.59` closes single-node scan, playback-failure, history, and artwork
 transport gaps. It ships `media_center_skill@0.8.52`,
