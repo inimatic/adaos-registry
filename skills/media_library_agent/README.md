@@ -15,6 +15,10 @@ bounded timeout and output limits.
 
 Original media bytes remain at their original paths. The agent calls `adaos.sdk.io.media.register_media_file`, which records an allowlisted reference for range playback; it never copies the source into `.adaos`. Removing or draining the skill retains external media by design. Browser-compatible renditions and normalized artwork are explicitly derived data: their exact source revision and fingerprint are recorded, and only generated outputs may be copied to managed media storage.
 
+Process-local `.skill_state` is development/runtime data, not package source.
+The workspace ignores it and the Project package builder excludes it, so a
+release cannot embed a scanner database, local paths, or scan history.
+
 The service declares `service.membership` instead of implementing a private
 heartbeat. AdaOS binds membership to the exact active Project component,
 registers a stable node/activation instance, renews its lease from the service
