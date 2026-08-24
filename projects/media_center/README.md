@@ -6,6 +6,11 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.67` completes the bounded activation contract. It ships
+`media_center_skill@0.8.58` and keeps the remaining `0.6.66` component set.
+The lifecycle receipt reads only the scalar catalog revision; legacy full-table
+summary and facet projections are published later by the long-lived runtime.
+
 Release `0.6.66` republishes the `0.6.65` component set with its immutable
 source pinned by the complete 40-character registry revision.
 
