@@ -1478,7 +1478,7 @@
                 "type": "ui.actions",
                 "area": "main",
                 "inputs": {
-                  "variant": "toolbar",
+                  "variant": "adaptiveToolbar",
                   "size": "small",
                   "buttons": [
                     {

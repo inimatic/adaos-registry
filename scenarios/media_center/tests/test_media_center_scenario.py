@@ -364,6 +364,13 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "media-center-player-unfavorite",
         "media-center-player-profile",
     } <= set(player_widgets)
+    player_profile = player_widgets["media-center-player-profile"]
+    assert player_profile["inputs"]["variant"] == "adaptiveToolbar"
+    assert [option["value"] for option in player_profile["inputs"]["buttons"][0]["options"]] == [
+        "default",
+        "household",
+        "kids",
+    ]
 
     filter_widgets = {
         widget["id"]: widget
