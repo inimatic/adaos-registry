@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sys
 import time
 from pathlib import Path
@@ -25,6 +26,7 @@ from media_control.repository import (  # noqa: E402
 _ACTIVE_NOW_PLAYING_PROJECTIONS: dict[str, dict[str, Any]] = {}
 _ACTIVE_PROJECTION_LIMIT = 128
 _ACTIVE_PROJECTION_TTL_SECONDS = 15 * 60
+_log = logging.getLogger("adaos.skill.media_control")
 
 
 def _repository() -> MediaControlRepository:
@@ -66,9 +68,14 @@ def _publish_playback_observation(
             },
             source="media_control_skill",
         )
-    except Exception:
+    except Exception as exc:
         # The session mutation is durable; a transient projection failure must
         # not make the applied playback command appear to have failed.
+        _log.warning(
+            "playback observation publish failed session=%s error=%s",
+            text(session.get("id")),
+            f"{type(exc).__name__}: {exc}"[:300],
+        )
         return
 
 
