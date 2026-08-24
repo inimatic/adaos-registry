@@ -7,7 +7,7 @@ dependency and remains the owner of core media resource registration and byte
 delivery.
 
 Release `0.6.60` is the locally verified single-node closure. It ships
-`media_center_skill@0.8.53`, `media_library_agent@0.6.30`,
+`media_center_skill@0.8.53`, `media_library_agent@0.6.31`,
 `media_control_skill@0.2.9`, scenario `media_center@0.6.19`, and client
 `0.0.371`. A monotonic per-profile projection revision makes Favorites and
 Recent converge across browsers, while bounded home caching, limit-first
