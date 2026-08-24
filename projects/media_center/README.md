@@ -6,6 +6,18 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.63` is the identity and durable-worker follow-up. It ships
+`media_center_skill@0.8.55`, `media_library_agent@0.6.33`,
+`media_control_skill@0.2.10`, scenario `media_center@0.6.20`, and client
+`0.0.373`. Episode identity now comes from the deterministic basename prefix
+before `SxxEyy`, independent of optional imports. Incremental artwork updates
+replace variant memberships atomically, and migration revision 2 removes
+stale duplicate memberships and orphaned provisional collections. Claimed
+scan/rendition exceptions become durable terminal diagnostics instead of
+leaving invisible `running` jobs. An online backup of the real local catalog
+migrated to one 6-item Black Mirror series and one 92-item MLP series, both
+with representative artwork.
+
 Release `0.6.62` is the locally verified collection and playback-quality
 closure. It ships `media_center_skill@0.8.54`,
 `media_library_agent@0.6.32`, `media_control_skill@0.2.10`, scenario
