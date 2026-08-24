@@ -6,6 +6,15 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.71` removes catalog startup work from the Hub event loop. It ships
+`media_center_skill@0.8.62` and keeps the remaining `0.6.70` component set.
+The runtime bootstrap is process-owned, retryable, observable, and drained on
+slot disposal. An uncertain schema read now fails transiently instead of being
+misclassified as permission for a full migration, while terminal-job pruning
+runs only in bounded background batches. This closes the `.30` failure where
+`sys.ready` held one handler for 240.7 seconds and the first library-agent
+process then exceeded its 300-second health deadline.
+
 Release `0.6.70` bounds catalog status reads on large and contended libraries.
 It ships `media_center_skill@0.8.61` and keeps the remaining `0.6.69` component
 set. Status, diagnostics, and collection-state streams reuse one compact
