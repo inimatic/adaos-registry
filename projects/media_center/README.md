@@ -6,6 +6,13 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.72` reuses the process-cached live coordinator for event and tool
+traffic. It ships `media_center_skill@0.8.63` and keeps the remaining `0.6.71`
+component set. High-rate agent catalog notifications no longer reconstruct a
+repository or repeat the schema gate; the transient schema uncertainty exposed
+by the `0.6.71` stand run therefore cannot crash an otherwise initialized
+`catalog.changed` handler.
+
 Release `0.6.71` removes catalog startup work from the Hub event loop. It ships
 `media_center_skill@0.8.62` and keeps the remaining `0.6.70` component set.
 The runtime bootstrap is process-owned, retryable, observable, and drained on
