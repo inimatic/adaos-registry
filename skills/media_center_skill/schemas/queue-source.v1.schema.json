@@ -34,12 +34,16 @@
         },
         "profile_id": {"type": "string", "minLength": 1},
         "queue_source": {"type": "object"},
+        "initial_item_id": {"type": "string"},
+        "initial_index": {"type": "integer", "minimum": 0, "maximum": 499},
         "authority": {"enum": ["endpoint_preferred", "coordinator_preferred"]},
         "checkpoint_interval_seconds": {"type": "integer", "minimum": 5, "maximum": 300},
         "command_poll_interval_ms": {"type": "integer", "minimum": 1000, "maximum": 30000}
       },
       "additionalProperties": false
     },
+    "initial_item_id": {"type": "string"},
+    "initial_index": {"type": "integer", "minimum": 0, "maximum": 499},
     "items": {"type": "array", "maxItems": 500, "items": {"type": "object"}},
     "count": {"type": "integer", "minimum": 0, "maximum": 500},
     "limit": {"type": "integer", "minimum": 1, "maximum": 500},

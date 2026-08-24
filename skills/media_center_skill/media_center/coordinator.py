@@ -4895,6 +4895,7 @@ class MediaCatalogCoordinator:
         endpoint_capabilities: Mapping[str, Any] | None = None,
         preferred_quality: str = "auto",
         preferred_language: str = "",
+        start_item_id: str = "",
     ) -> dict[str, Any]:
         kind = _text(source_type).lower()
         token = _text(source_id)
@@ -5041,10 +5042,24 @@ class MediaCatalogCoordinator:
                 }
             )
         queue_source = {"type": kind, "id": token, "ownership": ownership}
+        requested_start = _text(start_item_id)
+        initial_index = next(
+            (
+                index
+                for index, item in enumerate(queue)
+                if _text(item.get("item_id")) == requested_start
+            ),
+            0,
+        )
+        initial_item_id = (
+            _text(queue[initial_index].get("item_id")) if queue else ""
+        )
         return {
             "ok": True,
             "schema": "adaos.media_center.queue_source.v1",
             "source": queue_source,
+            "initial_item_id": initial_item_id,
+            "initial_index": initial_index,
             "playback_control": {
                 "schema": "adaos.playback.endpoint_control.v1",
                 "adapter": {
@@ -5055,6 +5070,8 @@ class MediaCatalogCoordinator:
                 },
                 "profile_id": profile,
                 "queue_source": queue_source,
+                "initial_item_id": initial_item_id,
+                "initial_index": initial_index,
                 "authority": "endpoint_preferred",
                 "checkpoint_interval_seconds": 15,
                 "command_poll_interval_ms": 2000,

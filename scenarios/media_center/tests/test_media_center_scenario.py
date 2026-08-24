@@ -94,7 +94,9 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     assert toolbar["inputs"]["variant"] == "adaptiveToolbar"
     assert toolbar["visibleIf"] == "$state.surfaceProfile != 'mobile_control'"
     toolbar_buttons = {button["id"]: button for button in toolbar["inputs"]["buttons"]}
-    assert list(toolbar_buttons) == ["remote", "profile", "section", "layout", "settings"]
+    assert list(toolbar_buttons) == [
+        "remote", "profile", "section", "layout", "filters", "settings"
+    ]
     assert toolbar_buttons["profile"]["selectedStateKey"] == "profileId"
     assert toolbar_buttons["section"]["selectedStateKey"] == "mediaNavigation"
     navigation_ids = [option["id"] for option in toolbar_buttons["section"]["options"]]
@@ -108,7 +110,7 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     assert toolbar_buttons["layout"]["options"][2]["label"] == "Carousel"
     assert {action["on"] for action in toolbar["actions"]} == {
         "click:remote", "select:profile", "select:section", "select:layout",
-        "click:settings",
+        "click:filters", "click:settings",
     }
 
     catalog = widgets["media-catalog"]
@@ -256,6 +258,11 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
         for action in collection_widgets["media-collection-items"]["actions"]
         if action["on"] == "select"
     ] == ["updateState", "openModal"]
+    collection_select = collection_widgets["media-collection-items"]["actions"][0]
+    assert collection_select["params"]["playbackSourceType"] == "collection"
+    assert collection_select["params"]["playbackSourceId"] == (
+        "$state.mediaCollectionId"
+    )
 
 
 def test_media_center_human_text_is_localized_by_skill_owned_dictionaries() -> None:
@@ -331,6 +338,7 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         for modal_id, modal in modals.items()
     } == {
         "media_center_player": "workspace",
+        "media_center_filters": "workspace",
         "media_center_remote": "workspace",
         "media_center_settings": "workspace",
         "media_center_metadata": "workspace",
@@ -344,14 +352,30 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     assert player["dataSource"]["scope"] == "workspace"
     assert player["dataSource"]["params"]["source_type"] == "$state.playbackSourceType"
     assert player["dataSource"]["params"]["source_id"] == "$state.playbackSourceId"
-    assert player["dataSource"]["params"]["limit"] == 10
+    assert player["dataSource"]["params"]["limit"] == 500
+    assert player["dataSource"]["params"]["start_item_id"] == (
+        "$state.selectedMediaItemId"
+    )
     assert player["inputs"]["playlistLimit"] == 10
     assert player["inputs"]["autoSelectFirst"] is True
     assert player["inputs"]["showDiagnostics"] is False
     assert {
         "media-center-player-favorite",
         "media-center-player-unfavorite",
+        "media-center-player-profile",
     } <= set(player_widgets)
+
+    filter_widgets = {
+        widget["id"]: widget
+        for widget in modals["media_center_filters"]["schema"]["widgets"]
+    }
+    assert filter_widgets["media-filter-genre"]["dataSource"]["name"] == (
+        "media_center_skill.metadata_facets"
+    )
+    assert filter_widgets["media-filter-year"]["dataSource"]["params"][
+        "dimension"
+    ] == "year"
+    assert len(filter_widgets["media-sort-order"]["inputs"]["options"]) == 15
 
     settings_ids = {
         widget["id"]

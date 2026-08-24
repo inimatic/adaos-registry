@@ -609,6 +609,8 @@ tools:
         default: auto
       preferred_language:
         type: string
+      start_item_id:
+        type: string
     additionalProperties: true
   output_schema:
     type: object
@@ -1744,6 +1746,28 @@ data_routes:
     - targeted_invalidation
     cache_ttl_ms: 0
     max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - media_center.catalog
+- surface: modal:media-center-filters
+  route: tool
+  tool: metadata_facets
+  owner: skill:media_center_skill
+  first_paint: bounded metadata categories for the active profile and media kind
+  recovery: repeat metadata_facets after catalog invalidation
+  guard_visibility: selected public metadata values and counts only
+  budget:
+    max_payload_bytes: 65536
+    max_items: 100
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - state_dependency_changed
+    - targeted_invalidation
+    cache_ttl_ms: 5000
+    max_request_hz: 1
     preserve_last_value: true
     invalidation_tags:
     - media_center.catalog

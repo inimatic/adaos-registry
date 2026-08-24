@@ -3814,6 +3814,13 @@ def test_queue_builder_preserves_large_playlist_order_and_bounds_sources(
     collection_queue = catalog.build_queue(
         source_type="collection", source_id=collection["id"], limit=500
     )
+    selected_episode = collection_queue["items"][20]["item_id"]
+    selected_collection_queue = catalog.build_queue(
+        source_type="collection",
+        source_id=collection["id"],
+        limit=500,
+        start_item_id=selected_episode,
+    )
     folder_queue = catalog.build_queue(
         source_type="folder",
         source_id="agent-node-a:Shows/Example/Season 01",
@@ -3823,6 +3830,8 @@ def test_queue_builder_preserves_large_playlist_order_and_bounds_sources(
     assert playlist_queue["count"] == 35
     assert [item["item_id"] for item in playlist_queue["items"]] == ordered
     assert collection_queue["count"] == 35
+    assert selected_collection_queue["initial_item_id"] == selected_episode
+    assert selected_collection_queue["initial_index"] == 20
     assert folder_queue["count"] == 5
     assert folder_queue["limit"] == 5
     _validate_schema("queue-source.v1.schema.json", playlist_queue)

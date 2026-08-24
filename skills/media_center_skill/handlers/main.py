@@ -1691,6 +1691,7 @@ def build_playback_queue(
     endpoint_capabilities: Mapping[str, Any] | None = None,
     preferred_quality: str = "auto",
     preferred_language: str = "",
+    start_item_id: str = "",
     **_: Any,
 ) -> dict[str, Any]:
     result = _coordinator().build_queue(
@@ -1703,6 +1704,7 @@ def build_playback_queue(
         endpoint_capabilities=endpoint_capabilities,
         preferred_quality=preferred_quality,
         preferred_language=preferred_language,
+        start_item_id=start_item_id,
     )
     if not result.get("ok"):
         return result

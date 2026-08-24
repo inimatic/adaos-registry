@@ -9,6 +9,8 @@ player. Breadcrumbs navigate back without materializing a directory tree.
 
 ## Surfaces
 
+The adaptive UI-as-data toolbar includes a compact Filter and sort modal. It navigates server-provided genre and year facets, applies a minimum rating, and exposes title/date/rating/duration/progress/play-count/resolution/bitrate/random orders for list, grid, and carousel layouts.
+
 The Project entrypoints declare explicit `desktop`, `tv`, `mobile_control`, and `embedded` presentation profiles independently of viewport width. The client selects the profile from `surfaceProfile` (or the `presentation_profile` entrypoint query), applies stable density/overscan/input semantics, and keeps the same catalog and control contracts. TV uses content rails and D-pad focus; mobile control puts Now Playing, target selection, and transport first while retaining Browse/Search below them.
 
 The main page follows familiar media-center navigation: Home, Movies, Series, Music, Audiobooks, Folders, Playlists, Favorites, and Recent. A single adaptive UI-as-data toolbar combines Remote, profile, section, layout, and Settings without media-specific client code. Its native buttons and menus work with pointer, touch, keyboard, and TV D-pad input; the mobile-control profile keeps its transport-first surface. Search is explicit-submit and has an explicit Reset action that clears both the query field and authoritative catalog filter. Every catalog read uses opaque server cursors with 30 records per page. Selecting a series, album, or audiobook opens a bounded collection browser with breadcrumbs, child seasons/parts, representative artwork, and explicit Play All; selecting it never materializes an unbounded queue in the page. The universal `ui.list` renderer switches between list, grid, and carousel layouts, uses browser rendering virtualization, and provides deterministic spatial keyboard/D-pad focus. Carousel arrows move one bounded viewport while retaining focus on the arrow, so repeated TV-remote clicks remain stable.
@@ -18,8 +20,12 @@ Home consumes the subscription-backed `media_center.library_state` snapshot. It 
 Selecting an item, collection, or playlist opens the playback modal. Selecting
 a folder enters that folder; selecting a direct media file inside it opens the
 player. `build_playback_queue` returns endpoint-independent variant/route plans;
-the modal exposes only ten entries, while the control plane can persist a full
-bounded queue of 500. Closing the modal leaves the app-shell media element alive
+the modal exposes only a ten-entry window around the selected item, while the
+app-shell coordinator and control plane retain the full bounded queue of 500.
+Opening an episode or track preserves its current collection as queue ownership
+and starts at that exact item. The modal profile selector keeps personal,
+household, and kids policy visible while playback is being initiated. Closing
+the modal leaves the app-shell media element alive
 in the mini-player. Stop remains explicit. The mini-player exposes separate
 Stop and Close commands: Stop resets playback but leaves the source ready,
 while Close persists the resumable position, unloads the source, and removes
