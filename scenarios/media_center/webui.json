@@ -7,6 +7,10 @@
         "pageSchema": {
           "id": "media_center",
           "title": "Media Center",
+          "title_i18n": {
+            "key": "scenario.media_center.title",
+            "fallback": "Media Center"
+          },
           "surfaceClass": "workspace",
           "interaction": {
             "initialFocus": "widget:media-search"
@@ -762,7 +766,7 @@
                 "collectionKey": "items",
                 "titleKey": "title",
                 "subtitleKey": "media_kind",
-                "imageKey": "artwork.url",
+                "imageKey": "artwork",
                 "badgeKey": "quality.height",
                 "selectEventKey": "queue_source_type",
                 "groupBy": "shelf_id",
@@ -905,7 +909,7 @@
               "inputs": {
                 "titleKey": "title",
                 "subtitleKey": "folder_path",
-                "imageKey": "artwork.url",
+                "imageKey": "artwork",
                 "badgeKey": "media_kind",
                 "emptyText": "No matching playable media.",
                 "emptyText_i18n": {
@@ -1135,7 +1139,7 @@
                 "titleKey": "title",
                 "subtitleKey": "kind",
                 "badgeKey": "item_count",
-                "imageKey": "artwork.url",
+                "imageKey": "artwork",
                 "emptyText": ""
               },
               "actions": [
@@ -1192,7 +1196,7 @@
                 "titleKey": "title",
                 "subtitleKey": "folder_path",
                 "badgeKey": "media_kind",
-                "imageKey": "artwork.url",
+                "imageKey": "artwork",
                 "emptyText": "No playable items in this collection.",
                 "emptyText_i18n": {
                   "key": "runtime.media_center.ui.no_playable_items_in_this_collection"
@@ -1507,7 +1511,9 @@
                       "profile_id": "$state.profileId"
                     },
                     "invalidates": [
-                      "media_center.catalog"
+                      "media_center.catalog",
+                      "media_center.agent",
+                      "media_center.roots"
                     ]
                   },
                   {
@@ -1695,7 +1701,7 @@
                   "titleKey": "title",
                   "subtitleKey": "target_label",
                   "badgeKey": "state",
-                  "imageKey": "artwork.url",
+                  "imageKey": "artwork",
                   "emptyText": "Nothing is playing on this device.",
                   "emptyText_i18n": {
                     "key": "runtime.media_center.ui.nothing_is_playing_on_this_device"
@@ -1902,7 +1908,8 @@
                     },
                     "invalidates": [
                       "media_center.catalog",
-                      "media_center.roots"
+                      "media_center.roots",
+                      "media_center.agent"
                     ]
                   },
                   {
@@ -1946,6 +1953,73 @@
                 },
                 "title_i18n": {
                   "key": "runtime.media_center.ui.catalog"
+                }
+              },
+              {
+                "id": "media-scan-progress",
+                "type": "item.details",
+                "area": "main",
+                "title": "Scan activity",
+                "dataSource": {
+                  "kind": "stream",
+                  "receiver": "media_library_agent.progress",
+                  "scope": "workspace"
+                },
+                "inputs": {
+                  "presentation": "body",
+                  "fields": [
+                    {
+                      "key": "status",
+                      "label": "Status",
+                      "path": "status",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.status"
+                      }
+                    },
+                    {
+                      "key": "root_label",
+                      "label": "Folder",
+                      "path": "root_label",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.folder"
+                      }
+                    },
+                    {
+                      "key": "processed",
+                      "label": "Processed",
+                      "value": "{progress.processed_count} files / {progress.processed_bytes} bytes",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.processed"
+                      }
+                    },
+                    {
+                      "key": "changes",
+                      "label": "Changes",
+                      "value": "added {progress.added_count}, updated {progress.updated_count}, removed {progress.removed_count}",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.changes"
+                      }
+                    },
+                    {
+                      "key": "current_path",
+                      "label": "Current file",
+                      "path": "current_path",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.current_file"
+                      }
+                    },
+                    {
+                      "key": "error",
+                      "label": "Diagnostic",
+                      "value": "{error.code}: {error.detail}",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.diagnostic"
+                      }
+                    }
+                  ]
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.scan_activity"
                 }
               },
               {
@@ -2037,6 +2111,15 @@
                       "width": "110px",
                       "label_i18n": {
                         "key": "runtime.media_center.ui.status"
+                      }
+                    },
+                    {
+                      "key": "last_scan_at",
+                      "label": "Last scan",
+                      "width": "180px",
+                      "kind": "datetime",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.last_scan"
                       }
                     },
                     {

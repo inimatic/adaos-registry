@@ -266,6 +266,12 @@ def test_media_center_human_text_is_localized_by_skill_owned_dictionaries() -> N
     russian = json.loads(
         (SKILL_ROOT / "assets" / "i18n" / "ru.json").read_text(encoding="utf-8")
     )
+    scenario_english = json.loads(
+        (SCENARIO_ROOT / "assets" / "i18n" / "en.json").read_text(encoding="utf-8")
+    )
+    scenario_russian = json.loads(
+        (SCENARIO_ROOT / "assets" / "i18n" / "ru.json").read_text(encoding="utf-8")
+    )
     technical_placeholders = {
         "/mnt/media", "activation-id", "home", "node-id", "sha256:...",
     }
@@ -283,8 +289,13 @@ def test_media_center_human_text_is_localized_by_skill_owned_dictionaries() -> N
             spec = item.get(f"{field}_i18n")
             assert isinstance(spec, dict), f"missing {field}_i18n for {fallback!r}"
             key = spec.get("key")
-            assert isinstance(key, str) and key.startswith("runtime.media_center.ui.")
-            referenced.add(key)
+            assert isinstance(key, str)
+            if key.startswith("scenario.media_center."):
+                assert key in scenario_english
+                assert key in scenario_russian
+            else:
+                assert key.startswith("runtime.media_center.ui.")
+                referenced.add(key)
         for field, spec in item.items():
             if not field.endswith("_i18n") or not isinstance(spec, dict):
                 continue
@@ -302,6 +313,13 @@ def test_media_center_human_text_is_localized_by_skill_owned_dictionaries() -> N
         any("\u0400" <= character <= "\u04ff" for character in russian[key])
         for key in referenced
     ) >= len(referenced) - 5
+    manifest = yaml.safe_load(
+        (SCENARIO_ROOT / "scenario.yaml").read_text(encoding="utf-8")
+    )
+    assert manifest["title_i18n"] == {
+        "fallback": "Media Center",
+        "key": "scenario.media_center.title",
+    }
 
 
 def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
@@ -342,6 +360,7 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     assert {
         "media-settings-actions",
         "media-center-summary",
+        "media-scan-progress",
         "media-root-path",
         "media-roots-table",
         "media-autoplay-settings",
@@ -418,6 +437,19 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     delete_column = next(column for column in roots["inputs"]["columns"] if column.get("kind") == "buttons")
     assert delete_column["buttons"][0]["id"] == "delete"
     assert roots["actions"][1]["params"]["modalId"] == "media_center_delete_root"
+    scan_progress = settings_widgets["media-scan-progress"]
+    assert scan_progress["dataSource"] == {
+        "kind": "stream",
+        "receiver": "media_library_agent.progress",
+        "scope": "workspace",
+    }
+    assert {field["key"] for field in scan_progress["inputs"]["fields"]} == {
+        "status", "root_label", "processed", "changes", "current_path", "error",
+    }
+    assert any(
+        column["key"] == "last_scan_at"
+        for column in roots["inputs"]["columns"]
+    )
 
     delete_actions = modals["media_center_delete_root"]["schema"]["widgets"][1]["actions"]
     assert delete_actions[0]["target"] == "media_center_skill.delete_root"
