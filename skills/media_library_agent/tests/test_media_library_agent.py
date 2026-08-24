@@ -1633,7 +1633,7 @@ def test_rendition_plan_distinguishes_lossless_remux_and_prepared_hls():
 def test_ffmpeg_capabilities_selects_hardware_with_software_fallback(
     monkeypatch,
 ):
-    rendition_module._FFMPEG_CAPABILITY_CACHE.clear()
+    rendition_module._probe_ffmpeg_capabilities.cache_clear()
     monkeypatch.setattr(
         rendition_module, "_ffmpeg_executable", lambda: ("ffmpeg", "fixture")
     )

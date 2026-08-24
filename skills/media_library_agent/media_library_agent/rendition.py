@@ -8,6 +8,7 @@ import platform
 import shutil
 import subprocess
 import time
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -19,7 +20,6 @@ ARTWORK_PROFILE = "artwork-card-v1"
 ARTWORK_SELECTION_ALGORITHM = "informative-frame-v2"
 ARTWORK_NAMES = ("cover", "folder", "front", "poster", "album", "artwork")
 ARTWORK_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
-_FFMPEG_CAPABILITY_CACHE: dict[tuple[str, str], dict[str, Any]] = {}
 
 
 def _ffmpeg_executable() -> tuple[str | None, str]:
@@ -727,27 +727,12 @@ def process_rss_mb(process_id: int) -> float | None:
     return None
 
 
-def ffmpeg_capabilities() -> dict[str, Any]:
-    executable, _source = _ffmpeg_executable()
-    if not executable:
-        return {
-            "schema": "adaos.media_library.ffmpeg_capabilities.v1",
-            "available": False,
-            "source": _source,
-            "hardware_acceleration": "unavailable",
-            "selected_video_encoder": "",
-            "encoders": [],
-            "hwaccels": [],
-        }
-    policy = text(
-        os.environ.get("MEDIA_LIBRARY_AGENT_HARDWARE_ACCELERATION") or "auto"
-    ).lower()
-    if policy not in {"auto", "software", "nvenc", "qsv", "amf", "vaapi", "videotoolbox"}:
-        policy = "auto"
-    cache_key = (executable, policy)
-    cached = _FFMPEG_CAPABILITY_CACHE.get(cache_key)
-    if cached is not None:
-        return dict(cached)
+@lru_cache(maxsize=8)
+def _probe_ffmpeg_capabilities(
+    executable: str,
+    source: str,
+    policy: str,
+) -> dict[str, Any]:
     try:
         encoder_probe = subprocess.run(
             [executable, "-hide_banner", "-encoders"],
@@ -800,7 +785,7 @@ def ffmpeg_capabilities() -> dict[str, Any]:
     result = {
         "schema": "adaos.media_library.ffmpeg_capabilities.v1",
         "available": True,
-        "source": _source,
+        "source": source,
         "policy": policy,
         "hardware_acceleration": selected_backend,
         "selected_video_encoder": selected,
@@ -808,8 +793,27 @@ def ffmpeg_capabilities() -> dict[str, Any]:
         "encoders": available_encoders,
         "hwaccels": available_hwaccels,
     }
-    _FFMPEG_CAPABILITY_CACHE[cache_key] = result
     return dict(result)
+
+
+def ffmpeg_capabilities() -> dict[str, Any]:
+    executable, source = _ffmpeg_executable()
+    if not executable:
+        return {
+            "schema": "adaos.media_library.ffmpeg_capabilities.v1",
+            "available": False,
+            "source": source,
+            "hardware_acceleration": "unavailable",
+            "selected_video_encoder": "",
+            "encoders": [],
+            "hwaccels": [],
+        }
+    policy = text(
+        os.environ.get("MEDIA_LIBRARY_AGENT_HARDWARE_ACCELERATION") or "auto"
+    ).lower()
+    if policy not in {"auto", "software", "nvenc", "qsv", "amf", "vaapi", "videotoolbox"}:
+        policy = "auto"
+    return dict(_probe_ffmpeg_capabilities(executable, source, policy))
 
 
 def _encoder_options(encoder: str) -> list[str]:
