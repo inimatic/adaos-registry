@@ -6,6 +6,17 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.59` closes single-node scan, playback-failure, history, and artwork
+transport gaps. It ships `media_center_skill@0.8.52`,
+`media_library_agent@0.6.30`, `media_control_skill@0.2.9`, scenario
+`media_center@0.6.18`, and client `0.0.370`. Settings receives an immediate
+queued scan state followed by bounded durable progress and terminal diagnostics.
+Playback queues preserve source sizes; unsupported sources leave fullscreen and
+retain an endpoint-local retry verdict. Explicit mini-player close reconciles
+`stopped`, endpoint observations update profile Recent, and artwork is resolved
+from a sanitized resource descriptor through direct or authenticated routed
+AdaOS media transport. The scenario title now owns its EN/RU identity text.
+
 Release `0.6.58` is the locally accepted playback and controller convergence
 closure. It ships `media_center_skill@0.8.51`,
 `media_library_agent@0.6.29`, `media_control_skill@0.2.8`, and scenario
