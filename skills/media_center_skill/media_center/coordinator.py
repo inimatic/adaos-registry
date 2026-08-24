@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import logging
 import os
 import re
 import sqlite3
@@ -56,6 +57,13 @@ HOME_SHELF_ORDER = (
     "playlists",
     "folders",
 )
+
+
+def _bound_filename_parser_logging() -> None:
+    for name in ("guessit", "rebulk"):
+        logger = logging.getLogger(name)
+        if logger.getEffectiveLevel() < logging.WARNING:
+            logger.setLevel(logging.WARNING)
 
 
 def _default_profile_policy(kind: str = "personal") -> dict[str, Any]:
@@ -129,6 +137,7 @@ def _episode_filename_evidence(name: str) -> dict[str, Any]:
     if not _SEASON_EPISODE.search(name):
         return {}
     try:
+        _bound_filename_parser_logging()
         from guessit import guessit  # type: ignore[import-not-found]
 
         parsed = guessit(name, options={"no_user_config": True})

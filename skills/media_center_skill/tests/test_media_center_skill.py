@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextvars
 import json
+import logging
 import sqlite3
 import sys
 import threading
@@ -982,6 +983,21 @@ def test_filename_evidence_groups_inconsistently_named_season_folders(
         "Season 1",
         "Season 3",
     }
+
+
+def test_filename_parser_bounds_dependency_debug_logging(monkeypatch):
+    logger = logging.getLogger("rebulk")
+    root_logger = logging.getLogger()
+    monkeypatch.setattr(logger, "level", logging.NOTSET)
+    monkeypatch.setattr(root_logger, "level", logging.DEBUG)
+    coordinator_module.clear_filename_evidence_cache()
+
+    evidence = coordinator_module._episode_filename_evidence(
+        "Black.Mirror.S07E01.1080p.mkv"
+    )
+
+    assert evidence["title"] == "Black Mirror"
+    assert logger.level == logging.WARNING
 
 
 def test_schema_migration_repairs_legacy_folder_scoped_series_identity(
