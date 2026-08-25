@@ -42,6 +42,13 @@ DEFAULT_METADATA_SETTINGS = {
     "tmdb_enabled": True,
     "locale": "ru-RU",
 }
+
+
+def _file_size(path: Path) -> int:
+    try:
+        return path.stat().st_size
+    except FileNotFoundError:
+        return 0
 _IDENTITY_METADATA_FIELDS = (
     "title",
     "original_title",
@@ -7015,8 +7022,8 @@ class MediaCatalogCoordinator:
             )
         return {
             "schema": "adaos.media_center.storage_state.v1",
-            "db_bytes": db_path.stat().st_size if db_path.exists() else 0,
-            "wal_bytes": wal_path.stat().st_size if wal_path.exists() else 0,
+            "db_bytes": _file_size(db_path),
+            "wal_bytes": _file_size(wal_path),
             "allocated_bytes": page_size * page_count,
             "reclaimable_bytes": page_size * freelist_count,
             "page_size": page_size,

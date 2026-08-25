@@ -41,6 +41,13 @@ _DESCRIPTOR_METADATA_KEYS = "_media_library_source_metadata_keys"
 _DESCRIPTOR_SOURCE_FIELDS = "_media_library_source_fields"
 
 
+def _file_size(path: Path) -> int:
+    try:
+        return path.stat().st_size
+    except FileNotFoundError:
+        return 0
+
+
 def _compact_source_descriptor(
     descriptor: Mapping[str, Any], source: Mapping[str, Any]
 ) -> dict[str, Any]:
@@ -2515,8 +2522,8 @@ class MediaLibraryAgentRepository:
             "schema": "adaos.media_library.storage_state.v1",
             "mode": "external_reference",
             "media_bytes_copied": False,
-            "db_bytes": db_path.stat().st_size if db_path.exists() else 0,
-            "wal_bytes": wal_path.stat().st_size if wal_path.exists() else 0,
+            "db_bytes": _file_size(db_path),
+            "wal_bytes": _file_size(wal_path),
             "allocated_bytes": page_size * page_count,
             "reclaimable_bytes": reclaimable_bytes,
             "page_size": page_size,
