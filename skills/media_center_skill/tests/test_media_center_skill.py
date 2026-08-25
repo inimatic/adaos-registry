@@ -898,9 +898,15 @@ def test_playback_variant_lookup_has_durable_indexes(monkeypatch, tmp_path):
         variant_indexes = {
             row[1] for row in connection.execute("PRAGMA index_list(media_variants)")
         }
+        membership_indexes = {
+            row[1]
+            for row in connection.execute("PRAGMA index_list(collection_memberships)")
+        }
 
     assert "idx_media_center_catalog_variant" in catalog_indexes
+    assert "idx_media_center_root_visibility" in catalog_indexes
     assert "idx_media_center_variant_work" in variant_indexes
+    assert "idx_media_center_membership_variant" in membership_indexes
 
 
 def test_base_variant_reuses_catalog_descriptor_without_losing_playback(
@@ -1422,7 +1428,7 @@ def test_coordinator_applies_agent_deltas_and_searches_folder_segments(monkeypat
         "version": "deterministic-fts-v2",
         "query_mode": "explicit_submit",
         "candidate_window_bounded": True,
-        "candidate_limit": 192,
+        "candidate_limit": 96,
         "candidate_count": 1,
         "candidate_window_full": False,
     }
@@ -2379,6 +2385,23 @@ def test_search_rowid_migration_rebuilds_legacy_fts_rows(monkeypatch, tmp_path):
                 "WHERE catalog_fuzzy_search MATCH 'exa'"
             ).fetchone()[0]
         ) == catalog_rowid
+
+
+def test_current_search_schema_preserves_completed_rowid_revision(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    repository = MediaCenterRepository()
+    catalog = MediaCatalogCoordinator(repository)
+
+    with repository.connect() as connection:
+        before = connection.execute(
+            "SELECT value FROM coordinator_meta WHERE key='search_rowid_revision'"
+        ).fetchone()[0]
+        catalog._ensure_compact_search_schema(connection)
+        after = connection.execute(
+            "SELECT value FROM coordinator_meta WHERE key='search_rowid_revision'"
+        ).fetchone()[0]
+
+    assert after == before
 
 
 def test_media_topology_uses_public_sdk_and_builds_safe_default_placement(monkeypatch):
@@ -4754,8 +4777,8 @@ def test_catalog_search_bounds_broad_window_but_finds_rare_late_match(
         if not cursor:
             break
 
-    assert len(broad_ids) == 192
-    assert len(set(broad_ids)) == 192
+    assert len(broad_ids) == 96
+    assert len(set(broad_ids)) == 96
     assert first["ranking"]["candidate_window_full"] is True
     assert first["total_count_exact"] is False
 

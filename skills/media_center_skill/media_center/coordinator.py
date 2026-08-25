@@ -438,6 +438,11 @@ class MediaCatalogCoordinator:
                 CREATE INDEX IF NOT EXISTS idx_media_center_collection ON catalog_items(collection_id, missing);
                 CREATE INDEX IF NOT EXISTS idx_media_center_folder_browse
                     ON catalog_items(agent_id, root_id, folder_path, missing);
+                CREATE INDEX IF NOT EXISTS idx_media_center_root_visibility
+                    ON catalog_items(
+                        agent_id,root_id,missing,media_kind,
+                        maturity_rating,explicit
+                    );
                 CREATE TABLE IF NOT EXISTS catalog_folder_nodes (
                     agent_id TEXT NOT NULL,
                     node_id TEXT NOT NULL DEFAULT '',
@@ -524,6 +529,8 @@ class MediaCatalogCoordinator:
                     ON media_collections(kind, title COLLATE NOCASE, id);
                 CREATE INDEX IF NOT EXISTS idx_media_center_membership_work
                     ON collection_memberships(work_id);
+                CREATE INDEX IF NOT EXISTS idx_media_center_membership_variant
+                    ON collection_memberships(variant_id);
                 CREATE INDEX IF NOT EXISTS idx_media_center_membership_preview
                     ON collection_memberships(
                         collection_id, season_number, episode_number, ordinal,
@@ -1197,6 +1204,7 @@ class MediaCatalogCoordinator:
                 "removed_collections": 0,
                 "removed_works": 0,
             }
+        repair_started = time.perf_counter()
         rows = connection.execute(
             """
             SELECT id,name,folder_path,metadata_json,node_id,source_id,
@@ -1204,15 +1212,120 @@ class MediaCatalogCoordinator:
             FROM catalog_items NOT INDEXED
             WHERE agent_id<>'' AND media_kind='audio'
             """
-        ).fetchall()
+        )
         now = now_iso()
+        audio_items = 0
         work_records: dict[str, tuple[Any, ...]] = {}
         collection_records: dict[str, tuple[Any, ...]] = {}
         variant_updates: list[tuple[Any, ...]] = []
         catalog_updates: list[tuple[Any, ...]] = []
         membership_deletes: list[tuple[str]] = []
         membership_records: list[tuple[Any, ...]] = []
+        write_timing_ms = {
+            "works": 0.0,
+            "collections": 0.0,
+            "variants": 0.0,
+            "exact_variants": 0.0,
+            "catalog": 0.0,
+            "membership_delete": 0.0,
+            "membership_insert": 0.0,
+        }
+
+        def flush_updates() -> None:
+            started = time.perf_counter()
+            connection.executemany(
+                """
+                INSERT INTO media_works(
+                    id,schema_name,media_kind,canonical_title,sort_title,
+                    metadata_json,created_at,updated_at
+                ) VALUES (?,?,?,?,?,?,?,?)
+                ON CONFLICT(id) DO UPDATE SET
+                    metadata_json=excluded.metadata_json,
+                    updated_at=excluded.updated_at,
+                    revision=media_works.revision+1
+                """,
+                work_records.values(),
+            )
+            write_timing_ms["works"] += (time.perf_counter() - started) * 1000
+            started = time.perf_counter()
+            connection.executemany(
+                """
+                INSERT INTO media_collections(
+                    id,schema_name,kind,title,parent_id,ownership,metadata_json,
+                    created_at,updated_at
+                ) VALUES (?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(id) DO UPDATE SET
+                    title=excluded.title,metadata_json=excluded.metadata_json,
+                    updated_at=excluded.updated_at,
+                    revision=media_collections.revision+1
+                """,
+                collection_records.values(),
+            )
+            write_timing_ms["collections"] += (
+                time.perf_counter() - started
+            ) * 1000
+            started = time.perf_counter()
+            connection.executemany(
+                """
+                UPDATE media_variants SET work_id=?,revision=revision+1
+                WHERE node_id=? AND source_id=? AND work_id<>?
+                """,
+                variant_updates,
+            )
+            write_timing_ms["variants"] += (time.perf_counter() - started) * 1000
+            started = time.perf_counter()
+            connection.executemany(
+                """
+                UPDATE media_variants SET work_id=?,revision=revision+1
+                WHERE node_id=? AND exact_source_id=? AND source_id<>?
+                    AND work_id<>?
+                """,
+                [
+                    (work_id, node_id, source_id, source_id, current_work_id)
+                    for work_id, node_id, source_id, current_work_id in variant_updates
+                ],
+            )
+            write_timing_ms["exact_variants"] += (
+                time.perf_counter() - started
+            ) * 1000
+            started = time.perf_counter()
+            connection.executemany(
+                "UPDATE catalog_items SET work_id=?,collection_id=? WHERE id=?",
+                catalog_updates,
+            )
+            write_timing_ms["catalog"] += (time.perf_counter() - started) * 1000
+            started = time.perf_counter()
+            connection.executemany(
+                "DELETE FROM collection_memberships WHERE variant_id=?",
+                membership_deletes,
+            )
+            write_timing_ms["membership_delete"] += (
+                time.perf_counter() - started
+            ) * 1000
+            started = time.perf_counter()
+            connection.executemany(
+                """
+                INSERT INTO collection_memberships(
+                    collection_id,work_id,variant_id,ordinal,season_number,
+                    episode_number,disc_number,track_number,chapter_number,revision
+                ) VALUES (?,?,?,?,?,?,?,?,?,1)
+                """,
+                membership_records,
+            )
+            write_timing_ms["membership_insert"] += (
+                time.perf_counter() - started
+            ) * 1000
+            work_records.clear()
+            collection_records.clear()
+            variant_updates.clear()
+            catalog_updates.clear()
+            membership_deletes.clear()
+            membership_records.clear()
+
+        repaired_items = 0
+        rebuilt_memberships = 0
         for row in rows:
+            audio_items += 1
             metadata = _json_loads(row["metadata_json"])
             work, collections, membership = self._classify_source(
                 str(row["name"]),
@@ -1280,85 +1393,30 @@ class MediaCatalogCoordinator:
                 (work_id, str(row["node_id"]), source_id, work_id)
             )
             catalog_updates.append((work_id, collection_id, str(row["id"])))
-            if not variant_id:
-                continue
-            membership_deletes.append((variant_id,))
-            for membership_collection_id in collection_ids:
-                membership_records.append(
-                    (
-                        membership_collection_id,
-                        work_id,
-                        variant_id,
-                        int(membership.get("ordinal") or 0),
-                        membership.get("season_number"),
-                        membership.get("episode_number"),
-                        membership.get("disc_number"),
-                        membership.get("track_number"),
-                        membership.get("chapter_number"),
+            if variant_id:
+                membership_deletes.append((variant_id,))
+                for membership_collection_id in collection_ids:
+                    membership_records.append(
+                        (
+                            membership_collection_id,
+                            work_id,
+                            variant_id,
+                            int(membership.get("ordinal") or 0),
+                            membership.get("season_number"),
+                            membership.get("episode_number"),
+                            membership.get("disc_number"),
+                            membership.get("track_number"),
+                            membership.get("chapter_number"),
+                        )
                     )
-                )
-
-        connection.executemany(
-            """
-            INSERT INTO media_works(
-                id,schema_name,media_kind,canonical_title,sort_title,
-                metadata_json,created_at,updated_at
-            ) VALUES (?,?,?,?,?,?,?,?)
-            ON CONFLICT(id) DO UPDATE SET
-                metadata_json=excluded.metadata_json,
-                updated_at=excluded.updated_at,
-                revision=media_works.revision+1
-            """,
-            work_records.values(),
-        )
-        connection.executemany(
-            """
-            INSERT INTO media_collections(
-                id,schema_name,kind,title,parent_id,ownership,metadata_json,
-                created_at,updated_at
-            ) VALUES (?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(id) DO UPDATE SET
-                title=excluded.title,metadata_json=excluded.metadata_json,
-                updated_at=excluded.updated_at,
-                revision=media_collections.revision+1
-            """,
-            collection_records.values(),
-        )
-        connection.executemany(
-            """
-            UPDATE media_variants SET work_id=?,revision=revision+1
-            WHERE node_id=? AND source_id=? AND work_id<>?
-            """,
-            variant_updates,
-        )
-        connection.executemany(
-            """
-            UPDATE media_variants SET work_id=?,revision=revision+1
-            WHERE node_id=? AND exact_source_id=? AND source_id<>?
-                AND work_id<>?
-            """,
-            [
-                (work_id, node_id, source_id, source_id, current_work_id)
-                for work_id, node_id, source_id, current_work_id in variant_updates
-            ],
-        )
-        connection.executemany(
-            "UPDATE catalog_items SET work_id=?,collection_id=? WHERE id=?",
-            catalog_updates,
-        )
-        connection.executemany(
-            "DELETE FROM collection_memberships WHERE variant_id=?",
-            membership_deletes,
-        )
-        connection.executemany(
-            """
-            INSERT INTO collection_memberships(
-                collection_id,work_id,variant_id,ordinal,season_number,
-                episode_number,disc_number,track_number,chapter_number,revision
-            ) VALUES (?,?,?,?,?,?,?,?,?,1)
-            """,
-            membership_records,
-        )
+            if len(catalog_updates) >= 1000:
+                repaired_items += len(catalog_updates)
+                rebuilt_memberships += len(membership_records)
+                flush_updates()
+        repaired_items += len(catalog_updates)
+        rebuilt_memberships += len(membership_records)
+        flush_updates()
+        rebuild_finished = time.perf_counter()
 
         removed_collections = 0
         while True:
@@ -1386,6 +1444,7 @@ class MediaCatalogCoordinator:
             removed_collections += max(0, int(removed or 0))
             if not removed:
                 break
+        collections_finished = time.perf_counter()
         removed_works = connection.execute(
             """
             DELETE FROM media_works
@@ -1410,17 +1469,28 @@ class MediaCatalogCoordinator:
                 )
             """
         ).rowcount
+        works_finished = time.perf_counter()
         connection.execute(
             "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
             ("audio_context_identity_revision", AUDIO_CONTEXT_IDENTITY_REVISION),
         )
         return {
             "migration_applied": 1,
-            "audio_items": len(rows),
-            "repaired_items": len(catalog_updates),
-            "rebuilt_memberships": len(membership_records),
+            "audio_items": audio_items,
+            "repaired_items": repaired_items,
+            "rebuilt_memberships": rebuilt_memberships,
             "removed_collections": removed_collections,
             "removed_works": max(0, int(removed_works or 0)),
+            "timing_ms": {
+                "rebuild": round((rebuild_finished - repair_started) * 1000, 3),
+                "collection_gc": round(
+                    (collections_finished - rebuild_finished) * 1000, 3
+                ),
+                "work_gc": round((works_finished - collections_finished) * 1000, 3),
+                "writes": {
+                    key: round(value, 3) for key, value in write_timing_ms.items()
+                },
+            },
         }
 
     def _repair_video_series_identity(
@@ -1631,9 +1701,9 @@ class MediaCatalogCoordinator:
                 );
                 """
             )
-        connection.execute(
-            "DELETE FROM coordinator_meta WHERE key='search_rowid_revision'"
-        )
+            connection.execute(
+                "DELETE FROM coordinator_meta WHERE key='search_rowid_revision'"
+            )
 
     @staticmethod
     def _ensure_search_triggers(connection: sqlite3.Connection) -> None:
@@ -2125,12 +2195,174 @@ class MediaCatalogCoordinator:
         )
 
     def _backfill_metadata_projections(self, connection: sqlite3.Connection) -> None:
-        rows = connection.execute(
-            "SELECT id FROM catalog_items WHERE id NOT IN "
-            "(SELECT item_id FROM catalog_metadata_projection) ORDER BY id"
-        ).fetchall()
-        for row in rows:
-            self._refresh_metadata_projection(connection, str(row["id"]))
+        cursor = connection.execute(
+            "SELECT id,name,source_path,folder_path,metadata_json,work_id,title "
+            "FROM catalog_items WHERE NOT EXISTS ("
+            "SELECT 1 FROM catalog_metadata_projection projection "
+            "WHERE projection.item_id=catalog_items.id) ORDER BY id"
+        )
+        while True:
+            rows = cursor.fetchmany(250)
+            if not rows:
+                break
+            subject_to_item: dict[str, str] = {}
+            for row in rows:
+                item_id = str(row["id"])
+                subject_to_item[f"item:{item_id}"] = item_id
+                work_id = _text(row["work_id"])
+                if work_id:
+                    subject_to_item[f"work:{work_id}"] = item_id
+            subjects = tuple(subject_to_item)
+            placeholders = ",".join("?" for _ in subjects)
+            claimed_items: set[str] = set()
+            if subjects:
+                for table in ("metadata_claims", "metadata_rejections"):
+                    claimed_items.update(
+                        subject_to_item[str(value["subject_ref"])]
+                        for value in connection.execute(
+                            f"SELECT DISTINCT subject_ref FROM {table} "
+                            f"WHERE subject_ref IN ({placeholders})",
+                            subjects,
+                        ).fetchall()
+                        if str(value["subject_ref"]) in subject_to_item
+                    )
+
+            projection_rows: list[tuple[Any, ...]] = []
+            facet_rows: list[tuple[Any, ...]] = []
+            catalog_updates: list[tuple[str, str, str, str]] = []
+            updated_at = now_iso()
+            for row in rows:
+                item_id = str(row["id"])
+                if item_id in claimed_items:
+                    self._refresh_metadata_projection(connection, item_id)
+                    continue
+                loaded = _json_loads(row["metadata_json"])
+                metadata = dict(loaded) if isinstance(loaded, Mapping) else {}
+                provenance = {
+                    str(key): "media_library_agent.source_metadata.v1"
+                    for key, value in metadata.items()
+                    if value not in (None, "", [], {})
+                }
+                stored_metadata, stored_provenance = _projection_storage(
+                    metadata, provenance, metadata
+                )
+                title = _text(metadata.get("title")) or str(row["title"])
+                release_date = _text(metadata.get("release_date"))
+                release_year = (
+                    int(release_date[:4])
+                    if re.match(r"^(?:19|20)\d{2}", release_date)
+                    else None
+                )
+                year_number = self._numeric(
+                    metadata.get("year")
+                    or metadata.get("release_year")
+                    or release_year
+                )
+                year = int(year_number) if year_number is not None else None
+                rating = self._numeric(
+                    metadata.get("rating") or metadata.get("vote_average")
+                )
+                critic_rating = self._numeric(metadata.get("critic_rating"))
+                audience_rating = self._numeric(metadata.get("audience_rating"))
+                duration_ms = self._numeric(metadata.get("duration_ms"), 0.0) or 0.0
+                if duration_ms <= 0:
+                    duration_ms = (
+                        self._numeric(metadata.get("duration_seconds"), 0.0) or 0.0
+                    ) * 1000.0
+                genres = metadata.get("genres") or metadata.get("categories") or []
+                artists = metadata.get("artists") or metadata.get("artist") or []
+                if isinstance(genres, str):
+                    genres = [genres]
+                if isinstance(artists, str):
+                    artists = [artists]
+                genres = [_text(value) for value in list(genres)[:100] if _text(value)]
+                artists = [
+                    _text(value) for value in list(artists)[:100] if _text(value)
+                ]
+                projection_rows.append(
+                    (
+                        item_id,
+                        _json_dumps(stored_metadata),
+                        _json_dumps(stored_provenance),
+                        title,
+                        year,
+                        release_date,
+                        rating,
+                        critic_rating,
+                        audience_rating,
+                        _text(metadata.get("content_rating")),
+                        max(0, int(duration_ms)),
+                        _json_dumps(genres),
+                        _json_dumps(artists),
+                        _text(metadata.get("album")),
+                        _text(metadata.get("series")),
+                        1,
+                        updated_at,
+                    )
+                )
+                for field, values in (
+                    ("genre", genres),
+                    ("artist", artists),
+                    ("tag", metadata.get("tags") or []),
+                    ("country", metadata.get("countries") or []),
+                    ("director", metadata.get("directors") or []),
+                ):
+                    if isinstance(values, str):
+                        values = [values]
+                    for value in list(values)[:100]:
+                        display = _text(value)
+                        normalized = fold_text(display)
+                        if display and normalized:
+                            facet_rows.append(
+                                (item_id, field, normalized, display, None)
+                            )
+                for field, value in (
+                    ("year", year),
+                    ("content_rating", _text(metadata.get("content_rating"))),
+                    ("album", _text(metadata.get("album"))),
+                    ("series", _text(metadata.get("series"))),
+                ):
+                    if value not in (None, ""):
+                        facet_rows.append(
+                            (
+                                item_id,
+                                field,
+                                fold_text(value),
+                                _text(value),
+                                self._numeric(value),
+                            )
+                        )
+                search_text = self._search_text(
+                    title=title,
+                    name=row["name"],
+                    relative_path=row["source_path"],
+                    folder_path=row["folder_path"],
+                    metadata=metadata,
+                )
+                catalog_updates.append(
+                    (title, search_text, self._fuzzy_tokens(search_text), item_id)
+                )
+            connection.executemany(
+                """
+                INSERT INTO catalog_metadata_projection(
+                    item_id,metadata_json,provenance_json,title,year,release_date,
+                    rating,critic_rating,audience_rating,content_rating,duration_ms,
+                    genres_json,artists_json,album,series,revision,updated_at
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                projection_rows,
+            )
+            connection.executemany(
+                "INSERT OR REPLACE INTO catalog_metadata_facets("
+                "item_id,field_name,normalized_value,display_value,numeric_value) "
+                "VALUES (?,?,?,?,?)",
+                facet_rows,
+            )
+            connection.executemany(
+                "UPDATE catalog_items SET title=?,search_text=?,fuzzy_text=? "
+                "WHERE id=?",
+                catalog_updates,
+            )
 
     @staticmethod
     def _metadata_projection_map(
@@ -3949,13 +4181,18 @@ class MediaCatalogCoordinator:
         year: int | None = None,
         rating_min: float | None = None,
         content_rating: str = "",
+        _profile_record: Mapping[str, Any] | None = None,
+        _participation: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         page_size = max(1, min(MAX_PAGE_SIZE, int(limit or MAX_PAGE_SIZE)))
         profile = _text(profile_id) or "default"
-        profile_result = self.get_profile(profile)
-        if not profile_result.get("ok"):
-            return profile_result
-        profile_record = profile_result["profile"]
+        if isinstance(_profile_record, Mapping):
+            profile_record = dict(_profile_record)
+        else:
+            profile_result = self.get_profile(profile)
+            if not profile_result.get("ok"):
+                return profile_result
+            profile_record = profile_result["profile"]
         policy = dict(profile_record.get("policy") or {})
         allowed_kinds = {
             _text(item).lower()
@@ -4179,10 +4416,10 @@ class MediaCatalogCoordinator:
         )
         try:
             search_candidate_limit = int(
-                os.environ.get("MEDIA_CENTER_SEARCH_CANDIDATE_LIMIT") or 192
+                os.environ.get("MEDIA_CENTER_SEARCH_CANDIDATE_LIMIT") or 96
             )
         except ValueError:
-            search_candidate_limit = 192
+            search_candidate_limit = 96
         search_candidate_limit = max(64, min(10_000, search_candidate_limit))
         search_candidate_count = 0
         with self.repository.connect() as connection:
@@ -4324,7 +4561,11 @@ class MediaCatalogCoordinator:
                 if not query_token and (sort_token == "collection" or not sort_keys)
                 else _encode_cursor(next_offset, signature, next_anchor)
             )
-        participation = self.participation()
+        participation = (
+            dict(_participation)
+            if isinstance(_participation, Mapping)
+            else self.participation()
+        )
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
@@ -4405,15 +4646,19 @@ class MediaCatalogCoordinator:
         except ValueError:
             score_limit = 600
         score_limit = max(100, min(candidate_limit, score_limit, 5000))
-        compact_query = self._fuzzy_tokens(token)
-        query_trigrams = sorted(
-            {
-                compact_query[index : index + 3]
-                for index in range(max(0, len(compact_query) - 2))
-                if len(compact_query[index : index + 3]) == 3
-            }
-        )
-        if not query_trigrams:
+        query_groups: list[list[str]] = []
+        for query_part in re.findall(r"[\w]+", token, flags=re.UNICODE)[:12]:
+            compact_part = self._fuzzy_tokens(query_part)
+            trigrams = sorted(
+                {
+                    compact_part[index : index + 3]
+                    for index in range(max(0, len(compact_part) - 2))
+                    if len(compact_part[index : index + 3]) == 3
+                }
+            )[:24]
+            if trigrams:
+                query_groups.append(trigrams)
+        if not query_groups:
             return {
                 "ok": True,
                 "schema": COORDINATOR_SCHEMA,
@@ -4427,9 +4672,12 @@ class MediaCatalogCoordinator:
                 "partial": self.participation()["partial"],
                 "ranking": {"version": "local-discovery-v1"},
             }
-        expression = " OR ".join(
-            f'"{term.replace(chr(34), chr(34) * 2)}"'
-            for term in query_trigrams[:96]
+        expression = " AND ".join(
+            "(" + " OR ".join(
+                f'"{term.replace(chr(34), chr(34) * 2)}"'
+                for term in group
+            ) + ")"
+            for group in query_groups
         )
         rows: list[sqlite3.Row] = []
         with self.repository.connect() as connection:
@@ -5000,13 +5248,19 @@ class MediaCatalogCoordinator:
         profile_id: str = "default",
         limit: int = 30,
         cursor: str = "",
+        _profile_record: Mapping[str, Any] | None = None,
+        _participation: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         bounded = max(1, min(MAX_PAGE_SIZE, int(limit or MAX_PAGE_SIZE)))
         agent = _text(agent_id)
         root = _text(root_id)
         parent_path = _text(parent).replace("\\", "/").strip("/")
         profile = _text(profile_id) or "default"
-        profile_record = self.get_profile(profile)["profile"]
+        profile_record = (
+            dict(_profile_record)
+            if isinstance(_profile_record, Mapping)
+            else self.get_profile(profile)["profile"]
+        )
         policy = dict(profile_record.get("policy") or {})
         signature = _cursor_signature(
             {
@@ -5065,7 +5319,7 @@ class MediaCatalogCoordinator:
                         SELECT c.agent_id,MAX(c.node_id),c.root_id,
                             COUNT(*),MAX(c.catalog_revision)
                         FROM catalog_items c
-                            INDEXED BY idx_media_center_folder_browse
+                            INDEXED BY idx_media_center_folder_files
                         WHERE c.agent_id<>'' AND c.root_id<>''
                             AND c.folder_path='' AND c.missing=0
                             {direct_agent_filter}
@@ -5147,7 +5401,11 @@ class MediaCatalogCoordinator:
                 )
             next_offset = offset + len(items)
             root_total = next_offset + (1 if has_more else 0)
-            participation = self.participation()
+            participation = (
+                dict(_participation)
+                if isinstance(_participation, Mapping)
+                else self.participation()
+            )
             return {
                 "ok": True,
                 "schema": COORDINATOR_SCHEMA,
@@ -5382,7 +5640,11 @@ class MediaCatalogCoordinator:
             for index, segment in enumerate(parent_path.split("/"))
             if segment
         ]
-        participation = self.participation()
+        participation = (
+            dict(_participation)
+            if isinstance(_participation, Mapping)
+            else self.participation()
+        )
         folder_items = [item for item in items if item.get("entry_type") == "folder"]
         file_items = [item for item in items if item.get("entry_type") == "media"]
         return {
@@ -6359,6 +6621,7 @@ class MediaCatalogCoordinator:
     ) -> dict[str, Any]:
         bounded = max(1, min(20, int(limit or 12)))
         profile = self.get_profile(profile_id)["profile"]
+        participation = self.participation()
         show_shared_history = bool(
             profile["policy"].get("show_history_on_shared_surface", False)
         )
@@ -6381,7 +6644,13 @@ class MediaCatalogCoordinator:
                 "recent",
             }:
                 continue
-            page = self.list_items(profile_id=profile_id, limit=bounded, **options)
+            page = self.list_items(
+                profile_id=profile_id,
+                limit=bounded,
+                _profile_record=profile,
+                _participation=participation,
+                **options,
+            )
             if shelf_id in {"favorites", "recent"}:
                 recommendation_signals.extend(page["items"])
             shelves.append({"id": shelf_id, "title": title, "layout": "rail", "items": page["items"], "partial": page["partial"]})
@@ -6407,7 +6676,7 @@ class MediaCatalogCoordinator:
                     "title": title,
                     "layout": "rail",
                     "items": page["items"],
-                    "partial": self.participation()["partial"],
+                    "partial": participation["partial"],
                 }
             )
             flattened.extend(
@@ -6440,7 +6709,12 @@ class MediaCatalogCoordinator:
             }
             for item in playlist_page["items"]
         )
-        folder_page = self.folders(profile_id=profile_id, limit=bounded)
+        folder_page = self.folders(
+            profile_id=profile_id,
+            limit=bounded,
+            _profile_record=profile,
+            _participation=participation,
+        )
         shelves.append(
             {
                 "id": "folders",
@@ -6464,6 +6738,8 @@ class MediaCatalogCoordinator:
             profile_id=profile_id,
             limit=bounded,
             _signals=recommendation_signals,
+            _profile_record=profile,
+            _participation=participation,
         )
         if recommendation_page["enabled"]:
             shelves.append(
@@ -6513,9 +6789,20 @@ class MediaCatalogCoordinator:
         profile_id: str = "default",
         limit: int = 12,
         _signals: Iterable[Mapping[str, Any]] | None = None,
+        _profile_record: Mapping[str, Any] | None = None,
+        _participation: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         bounded = max(1, min(20, int(limit or 12)))
-        profile = self.get_profile(profile_id)["profile"]
+        profile = (
+            dict(_profile_record)
+            if isinstance(_profile_record, Mapping)
+            else self.get_profile(profile_id)["profile"]
+        )
+        participation = (
+            dict(_participation)
+            if isinstance(_participation, Mapping)
+            else self.participation()
+        )
         if not bool(profile["policy"].get("recommendations_enabled", True)):
             return {
                 "ok": True,
@@ -6524,7 +6811,7 @@ class MediaCatalogCoordinator:
                 "enabled": False,
                 "items": [],
                 "count": 0,
-                "partial": self.participation()["partial"],
+                "partial": participation["partial"],
                 "algorithm": "disabled_by_profile",
             }
         if _signals is None:
@@ -6533,12 +6820,16 @@ class MediaCatalogCoordinator:
                 favorites_only=True,
                 sort="favorite",
                 limit=MAX_PAGE_SIZE,
+                _profile_record=profile,
+                _participation=participation,
             )["items"]
             recent = self.list_items(
                 profile_id=profile["id"],
                 sort="recent",
                 history_only=True,
                 limit=MAX_PAGE_SIZE,
+                _profile_record=profile,
+                _participation=participation,
             )["items"]
             signals = favorites + [item for item in recent if item not in favorites]
         else:
@@ -6565,18 +6856,29 @@ class MediaCatalogCoordinator:
                 if token:
                     preferred_artists[token] = preferred_artists.get(token, 0) + 1
         candidates: list[dict[str, Any]] = []
-        cursor = ""
-        for _page in range(3 if signals else 1):
+        candidate_kinds = sorted(
+            {
+                _text(value).lower()
+                for value in profile["policy"].get("allowed_media_kinds") or []
+                if _text(value).lower() in {"audio", "video"}
+            },
+            key=lambda value: (-preferred_kinds.get(value, 0), value),
+        )
+        candidate_page_size = min(
+            MAX_PAGE_SIZE,
+            max(30, bounded * (8 if signals else 5))
+            // max(1, len(candidate_kinds)),
+        )
+        for candidate_kind in candidate_kinds:
             page = self.list_items(
                 profile_id=profile["id"],
+                media_kind=candidate_kind,
                 sort="title",
-                limit=MAX_PAGE_SIZE,
-                cursor=cursor,
+                limit=candidate_page_size,
+                _profile_record=profile,
+                _participation=participation,
             )
             candidates.extend(page["items"])
-            cursor = _text(page["pagination"].get("next_cursor"))
-            if not cursor:
-                break
         scored: list[tuple[int, str, dict[str, Any], list[str]]] = []
         for item in candidates:
             if item.get("favorite") or item.get("personal", {}).get("last_played_at"):
@@ -6649,7 +6951,7 @@ class MediaCatalogCoordinator:
             "enabled": True,
             "items": items,
             "count": len(items),
-            "partial": self.participation()["partial"],
+            "partial": participation["partial"],
             "algorithm": "bounded_profile_metadata_v2",
             "privacy": {
                 "profile_scoped": True,

@@ -111,6 +111,23 @@ class MediaCenterRepository:
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA busy_timeout=30000")
         try:
+            cache_mb = max(
+                8,
+                min(256, int(os.environ.get("MEDIA_CENTER_SQLITE_CACHE_MB") or 32)),
+            )
+        except ValueError:
+            cache_mb = 32
+        try:
+            mmap_mb = max(
+                0,
+                min(1024, int(os.environ.get("MEDIA_CENTER_SQLITE_MMAP_MB") or 256)),
+            )
+        except ValueError:
+            mmap_mb = 256
+        connection.execute(f"PRAGMA cache_size={-(cache_mb * 1024)}")
+        connection.execute(f"PRAGMA mmap_size={mmap_mb * 1024 * 1024}")
+        connection.execute("PRAGMA temp_store=MEMORY")
+        try:
             connection.execute("PRAGMA synchronous=NORMAL")
         except sqlite3.OperationalError as exc:
             if not any(token in str(exc).lower() for token in ("locked", "busy")):

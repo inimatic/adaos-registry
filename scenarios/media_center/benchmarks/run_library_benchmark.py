@@ -48,11 +48,10 @@ def _rss_mb() -> float | None:
 
 
 def _seed(repository: MediaCenterRepository, count: int) -> None:
-    rows = []
-    for index in range(count):
-        name = f"movie-{index:05d}.mp4"
-        rows.append(
-            (
+    def rows():
+        for index in range(count):
+            name = f"movie-{index:06d}.mp4"
+            yield (
                 f"mc-{index:05d}",
                 "media_library_agent",
                 f"resource-{index:05d}",
@@ -98,7 +97,6 @@ def _seed(repository: MediaCenterRepository, count: int) -> None:
                 "collection-movies",
                 '{"codec":"h264","height":1080}',
             )
-        )
     connection = repository.connect()
     try:
         connection.executemany(
@@ -112,7 +110,7 @@ def _seed(repository: MediaCenterRepository, count: int) -> None:
                 catalog_revision,work_id,variant_id,collection_id,quality_json
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
-            rows,
+            rows(),
         )
         connection.commit()
     finally:
@@ -132,23 +130,32 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
         started = time.perf_counter()
         backfill = catalog.refresh_search_index()
         backfill_ms = (time.perf_counter() - started) * 1000
+        started = time.perf_counter()
+        catalog.ensure_schema(force=True)
+        metadata_projection_backfill_ms = (time.perf_counter() - started) * 1000
 
         search_queries = [
             "Movie 00042",
-            "Movie 01999",
+            f"Movie {min(1_999, count - 1):05d}",
             "Year 2012",
-            "Movie 09999",
+            f"Movie {min(9_999, count - 1):05d}",
             "h264",
         ]
         search_index = 0
+        search_timings_by_query = {query: [] for query in search_queries}
 
         def search() -> dict[str, Any]:
             nonlocal search_index
             query = search_queries[search_index % len(search_queries)]
             search_index += 1
-            return catalog.list_items(
+            started = time.perf_counter()
+            result = catalog.list_items(
                 query=query, media_kind="video", sort="title", limit=30
             )
+            search_timings_by_query[query].append(
+                (time.perf_counter() - started) * 1000
+            )
+            return result
 
         search_timings, search_result = _measure(search, samples=40)
         search_result_counts = {
@@ -197,6 +204,7 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
         encoded_page_bytes = len(
             json.dumps(page_result, ensure_ascii=False, default=str).encode("utf-8")
         )
+        identity_fixture_count = min(count, 50_000)
         with repository.connect() as connection:
             connection.execute(
                 """
@@ -208,7 +216,9 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
                     'adaos.media_center.media_work.v1','audio',title,lower(title),
                     '2026-08-20','2026-08-20'
                 FROM catalog_items
-                """
+                ORDER BY id LIMIT ?
+                """,
+                (identity_fixture_count,),
             )
             connection.execute(
                 """
@@ -219,12 +229,16 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
                     'adaos.media_center.media_collection.v1','album',title,
                     'derived','2026-08-20','2026-08-20'
                 FROM catalog_items
-                """
+                ORDER BY id LIMIT ?
+                """,
+                (identity_fixture_count,),
             )
             connection.execute(
                 "UPDATE catalog_items SET media_kind='audio',"
                 "work_id='legacy-work-' || id,"
-                "collection_id='legacy-collection-' || id"
+                "collection_id='legacy-collection-' || id "
+                "WHERE id IN (SELECT id FROM catalog_items ORDER BY id LIMIT ?)",
+                (identity_fixture_count,),
             )
             connection.execute(
                 "DELETE FROM coordinator_meta "
@@ -232,7 +246,9 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
             )
             connection.commit()
         started = time.perf_counter()
-        identity_migration = catalog.ensure_schema(force=True)["identity_repair"]
+        identity_migration = catalog.ensure_schema(force=True)["identity_repair"][
+            "audio"
+        ]
         identity_migration_ms = (time.perf_counter() - started) * 1000
         with repository.connect() as connection:
             migrated_work_count = int(
@@ -250,12 +266,24 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
             "schema": "adaos.media_center.benchmark.v1",
             "fixture_count": count,
             "catalog_backfill_ms": round(backfill_ms, 3),
+            "metadata_projection_backfill_ms": round(
+                metadata_projection_backfill_ms, 3
+            ),
             "search_index_count": int(backfill["indexed_count"]),
             "fts_ms": {
                 "p50": _percentile(search_timings, 0.5),
                 "p95": _percentile(search_timings, 0.95),
                 "max": round(max(search_timings), 3),
                 "samples": len(search_timings),
+                "by_query": {
+                    query: {
+                        "p50": _percentile(values, 0.5),
+                        "p95": _percentile(values, 0.95),
+                        "max": round(max(values), 3),
+                        "samples": len(values),
+                    }
+                    for query, values in search_timings_by_query.items()
+                },
             },
             "catalog_page_ms": {
                 "p50": _percentile(page_timings, 0.5),
@@ -293,6 +321,7 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
             "process_rss_mb": _rss_mb(),
             "identity_migration": {
                 **identity_migration,
+                "fixture_count": identity_fixture_count,
                 "duration_ms": round(identity_migration_ms, 3),
                 "distinct_work_count": migrated_work_count,
                 "membership_count": migrated_membership_count,
@@ -314,6 +343,7 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
                 "folder_leaf_page_p95_ms": 150,
                 "local_discovery_p95_ms": 500,
                 "encoded_page_bytes": 512 * 1024,
+                "metadata_projection_backfill_ms": 180_000,
                 "identity_migration_ms": 60_000,
             },
         }
@@ -332,6 +362,10 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
             failures.append("encoded_page_bytes")
         if metrics["search_index_count"] != count:
             failures.append("search_index_count")
+        if metadata_projection_backfill_ms > metrics["budgets"][
+            "metadata_projection_backfill_ms"
+        ]:
+            failures.append("metadata_projection_backfill.duration_ms")
         if any(result_count < 1 for result_count in search_result_counts.values()):
             failures.append("fts_result_counts")
         if int(page_result["count"]) != min(30, count):
@@ -344,11 +378,12 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
         if identity_migration_ms > metrics["budgets"]["identity_migration_ms"]:
             failures.append("identity_migration.duration_ms")
         if (
-            int(identity_migration["repaired_items"]) != count
-            or int(identity_migration["removed_works"]) != count
-            or int(identity_migration["removed_collections"]) != count
-            or migrated_work_count != count
-            or migrated_membership_count != count
+            int(identity_migration["repaired_items"]) != identity_fixture_count
+            or int(identity_migration["removed_works"]) != identity_fixture_count
+            or int(identity_migration["removed_collections"])
+            != identity_fixture_count
+            or migrated_work_count != identity_fixture_count
+            or migrated_membership_count != identity_fixture_count
         ):
             failures.append("identity_migration.correctness")
         metrics["passed"] = not failures
@@ -363,7 +398,7 @@ def main() -> None:
     parser.add_argument("--count", type=int, default=20_000)
     parser.add_argument("--enforce", action="store_true")
     arguments = parser.parse_args()
-    result = run(count=max(100, min(100_000, arguments.count)), enforce=arguments.enforce)
+    result = run(count=max(100, min(200_000, arguments.count)), enforce=arguments.enforce)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

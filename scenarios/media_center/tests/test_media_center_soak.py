@@ -28,7 +28,7 @@ def test_short_soak_exercises_reads_during_agent_deltas() -> None:
 
 def test_acceptance_mode_rejects_short_or_small_runs() -> None:
     with pytest.raises(ValueError, match="duration"):
-        run(count=20_000, duration_seconds=10, acceptance=True)
+        run(count=50_000, duration_seconds=10, acceptance=True)
     with pytest.raises(ValueError, match="fixture"):
         run(count=1_000, duration_seconds=3_600, acceptance=True)
 

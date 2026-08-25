@@ -25,7 +25,8 @@ from run_library_benchmark import _seed  # noqa: E402
 
 
 ACCEPTANCE_DURATION_SECONDS = 3_600
-ACCEPTANCE_FIXTURE_COUNT = 20_000
+ACCEPTANCE_FIXTURE_COUNT = 50_000
+MAX_FIXTURE_COUNT = 200_000
 MAX_ERRORS = 100
 
 
@@ -164,7 +165,7 @@ def run(
     enforce: bool = False,
 ) -> dict[str, Any]:
     requested_duration = max(1.0, float(duration_seconds))
-    fixture_count = max(100, min(100_000, int(count)))
+    fixture_count = max(100, min(MAX_FIXTURE_COUNT, int(count)))
     if acceptance and requested_duration < ACCEPTANCE_DURATION_SECONDS:
         raise ValueError(
             f"acceptance duration must be at least {ACCEPTANCE_DURATION_SECONDS} seconds"

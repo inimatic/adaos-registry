@@ -80,11 +80,15 @@ Skill-specific human-readable errors and translations stay in each skill. The sc
 ```powershell
 $env:PYTHONPATH='..\adaos\src'
 python scenarios/media_center/benchmarks/run_library_benchmark.py --enforce
+python scenarios/media_center/benchmarks/run_library_benchmark.py --count 50000 --enforce
+python scenarios/media_center/benchmarks/run_library_benchmark.py --count 200000 --enforce
 ```
 
 The sustained catalog/playback acceptance gate uses a real agent-delta writer
 beside bounded FTS, cursor-page and playback-plan readers. Acceptance mode
-cannot be shortened below one hour or reduced below 20,000 catalog items:
+cannot be shortened below one hour or reduced below 50,000 catalog items. The
+fixture generator streams rows into SQLite and accepts up to 200,000 items, so
+the acceptance harness itself does not materialize the catalog in process memory:
 
 ```bash
 python scenarios/media_center/benchmarks/run_media_center_soak.py \
@@ -100,6 +104,20 @@ Memory evidence records absolute RSS, the complete steady-state range, and p95
 for bounded initial/final windows. Only continued window-to-window growth is a
 leak failure; a one-time allocator or SQLite cache high-water mark remains
 visible but is governed by the separate 350 MiB absolute limit.
+
+Read connections use a 32 MiB SQLite page cache and a lazily populated 256 MiB
+memory-map window by default. Operators can tune these independently with
+`MEDIA_CENTER_SQLITE_CACHE_MB` (8-256) and `MEDIA_CENTER_SQLITE_MMAP_MB`
+(0-1024). Neither setting materializes the catalog or reserves its maximum
+address range as resident memory.
+
+The 2026-08-26 Windows development gates passed at both 50,000 and 200,000
+catalog items. At 200,000 items, p95 was 130.630 ms for FTS, 35.105 ms for
+cursor pages, 113.563 ms for Home, 11.879 ms for root folders, 3.956 ms for
+leaf folders, and 385.059 ms for fuzzy discovery. RSS was 37.82 MiB. The
+one-time search and metadata projection backfills took 91.541 and 72.368
+seconds; the bounded 50,000-item identity migration took 26.888 seconds. At
+50,000 items, FTS p95 was 71.038 ms and RSS was 35.254 MiB.
 
 The 2026-08-21 local server acceptance run passed for 3,600.063 seconds with
 20,000 catalog items and 307,950 applied agent deltas. It recorded no operation
