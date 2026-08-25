@@ -616,8 +616,8 @@ tools:
   output_schema:
     type: object
 - name: build_playback_queue
-  description: Build up to 500 ordered playback plans from an item, work, collection,
-    folder, or playlist.
+  description: Build an ordered playback snapshot from an item, work, collection,
+    folder, playlist, or the current bounded catalog page.
   entry: handlers.main:build_playback_queue
   side_effects: none
   input_schema:
@@ -634,8 +634,12 @@ tools:
         - collection
         - folder
         - playlist
+        - catalog
       source_id:
         type: string
+      source_context:
+        type: object
+        additionalProperties: true
       profile_id:
         type: string
         default: default

@@ -127,6 +127,19 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
         "cursor": {"enabled": True, "stateKey": "mediaCursor"},
     }
     assert catalog["actions"][0]["params"]["selectedMediaFavorite"] == "$event.favorite"
+    assert catalog["actions"][0]["params"]["playbackSourceType"] == "catalog"
+    assert catalog["actions"][0]["params"]["playbackSourceContext"] == {
+        "query": "$state.mediaSearch",
+        "media_kind": "$state.mediaKind",
+        "favorites_only": "$state.mediaFavoritesOnly",
+        "sort": "$state.mediaSort",
+        "sort_direction": "$state.mediaSortDirection",
+        "genre": "$state.mediaGenre",
+        "year": "$state.mediaYear",
+        "rating_min": "$state.mediaRatingMin",
+        "content_rating": "$state.mediaContentRating",
+        "cursor": "$state.mediaCursor",
+    }
     assert [action["type"] for action in catalog["actions"] if action["on"] == "select"] == [
         "updateState",
         "openModal",
@@ -352,6 +365,9 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     assert player["dataSource"]["scope"] == "workspace"
     assert player["dataSource"]["params"]["source_type"] == "$state.playbackSourceType"
     assert player["dataSource"]["params"]["source_id"] == "$state.playbackSourceId"
+    assert player["dataSource"]["params"]["source_context"] == (
+        "$state.playbackSourceContext"
+    )
     assert player["dataSource"]["params"]["limit"] == 500
     assert player["dataSource"]["params"]["start_item_id"] == (
         "$state.selectedMediaItemId"

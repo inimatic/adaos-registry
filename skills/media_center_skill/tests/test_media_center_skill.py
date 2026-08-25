@@ -504,6 +504,59 @@ def test_playback_queue_includes_effective_control_settings(monkeypatch):
     }
 
 
+def test_catalog_page_queue_preserves_current_query_sort_and_start_item(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            *(
+                _agent_delta(index, f"Music/Album/Track {index:02d}.mp3")
+                for index in range(1, 36)
+            )
+        )
+    )
+    visible = catalog.list_items(
+        query="Track", media_kind="audio", sort="title", limit=30
+    )["items"]
+    start_item_id = visible[12]["id"]
+
+    queue = catalog.build_queue(
+        source_type="catalog",
+        source_id="current-page",
+        source_context={
+            "query": "Track",
+            "media_kind": "audio",
+            "sort": "title",
+            "sort_direction": "asc",
+        },
+        start_item_id=start_item_id,
+        limit=500,
+    )
+
+    assert queue["ok"] is True
+    assert queue["count"] == 30
+    assert [item["item_id"] for item in queue["items"]] == [
+        item["id"] for item in visible
+    ]
+    assert queue["initial_item_id"] == start_item_id
+    assert queue["initial_index"] == 12
+    assert queue["source"] == {
+        "type": "catalog",
+        "id": "current-page",
+        "ownership": "catalog_page_snapshot",
+        "context": {
+            "query": "Track",
+            "media_kind": "audio",
+            "sort": "title",
+            "sort_direction": "asc",
+        },
+    }
+
+
 def test_library_auto_scan_uses_sdk_discovery_boundary(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     monkeypatch.setattr(main, "_discover_resources", lambda source="all", limit=5000: ([_resource("song.mp3")], {"ok": True}))
@@ -3789,7 +3842,8 @@ def test_coordinator_queues_rendition_on_exact_source_agent(monkeypatch, tmp_pat
     monkeypatch.setattr(main, "_topology", lambda: Topology())
     result = main.ensure_rendition(
         item_id=item["id"],
-        endpoint_capabilities={"codecs": ["h264"], "containers": ["mp4"]},
+        endpoint_capabilities={"codecs": ["hevc"], "containers": ["mkv"]},
+        force=True,
     )
 
     assert result["status"] == "queued"
@@ -3800,6 +3854,7 @@ def test_coordinator_queues_rendition_on_exact_source_agent(monkeypatch, tmp_pat
     }
     assert captured["operation"] == "plan_rendition"
     assert captured["arguments"]["source_id"] == "source-1"
+    assert captured["arguments"]["force"] is True
 
 
 def test_profile_customizes_home_order_view_density_and_target(monkeypatch, tmp_path):

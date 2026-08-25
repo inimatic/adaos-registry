@@ -5177,6 +5177,7 @@ class MediaCatalogCoordinator:
         *,
         source_type: str,
         source_id: str,
+        source_context: Mapping[str, Any] | None = None,
         profile_id: str = "default",
         limit: int = 500,
         endpoint_id: str = "",
@@ -5190,7 +5191,14 @@ class MediaCatalogCoordinator:
         token = _text(source_id)
         bounded = max(1, min(500, int(limit or 500)))
         profile = _text(profile_id) or "default"
-        if kind not in {"item", "work", "collection", "folder", "playlist"}:
+        if kind not in {
+            "item",
+            "work",
+            "collection",
+            "folder",
+            "playlist",
+            "catalog",
+        }:
             return {"ok": False, "error": "playback_queue_source_invalid"}
         if kind == "playlist":
             access = self.get_playlist(token, profile_id=profile)
@@ -5209,6 +5217,34 @@ class MediaCatalogCoordinator:
                 ).fetchall()
             item_ids = [str(row["id"]) for row in rows]
             ownership = "user_playlist"
+        elif kind == "catalog":
+            context = dict(source_context or {})
+            page = self.list_items(
+                query=_text(context.get("query")),
+                media_kind=_text(context.get("media_kind")) or "playable",
+                source=_text(context.get("source")),
+                limit=min(bounded, MAX_PAGE_SIZE),
+                cursor=_text(context.get("cursor")),
+                favorites_only=bool(context.get("favorites_only")),
+                history_only=bool(context.get("history_only")),
+                continue_only=bool(context.get("continue_only")),
+                sort=_text(context.get("sort")) or "title",
+                sort_direction=_text(context.get("sort_direction")),
+                profile_id=profile,
+                collection_id=_text(context.get("collection_id")),
+                genre=_text(context.get("genre")),
+                year=context.get("year"),
+                rating_min=context.get("rating_min"),
+                content_rating=_text(context.get("content_rating")),
+            )
+            if not page.get("ok"):
+                return page
+            item_ids = [
+                _text(item.get("id"))
+                for item in page.get("items") or []
+                if isinstance(item, Mapping) and _text(item.get("id"))
+            ]
+            ownership = "catalog_page_snapshot"
         else:
             filters = ["missing=0", "media_kind IN ('audio','video')"]
             params: list[Any] = []
@@ -5331,6 +5367,29 @@ class MediaCatalogCoordinator:
                 }
             )
         queue_source = {"type": kind, "id": token, "ownership": ownership}
+        if kind == "catalog":
+            queue_source["context"] = {
+                key: value
+                for key, value in dict(source_context or {}).items()
+                if key
+                in {
+                    "query",
+                    "media_kind",
+                    "source",
+                    "cursor",
+                    "favorites_only",
+                    "history_only",
+                    "continue_only",
+                    "sort",
+                    "sort_direction",
+                    "collection_id",
+                    "genre",
+                    "year",
+                    "rating_min",
+                    "content_rating",
+                }
+                and value not in (None, "", False)
+            }
         requested_start = _text(start_item_id)
         initial_index = next(
             (

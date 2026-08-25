@@ -1870,7 +1870,7 @@ def ensure_rendition(
     if not plan.get("ok"):
         return plan
     compatibility = dict(plan.get("compatibility") or {})
-    if bool(compatibility.get("ready")):
+    if bool(compatibility.get("ready")) and not _bool(force, False):
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
@@ -1878,7 +1878,10 @@ def ensure_rendition(
             "playback_plan": plan,
             "rendition": None,
         }
-    if str(compatibility.get("mode") or "") == "unsupported":
+    if (
+        str(compatibility.get("mode") or "") == "unsupported"
+        and not _bool(force, False)
+    ):
         return {
             "ok": False,
             "schema": COORDINATOR_SCHEMA,
@@ -1940,6 +1943,7 @@ def ensure_rendition(
 def build_playback_queue(
     source_type: str = "item",
     source_id: str = "",
+    source_context: Mapping[str, Any] | None = None,
     profile_id: str = "default",
     limit: int = 500,
     endpoint_id: str = "",
@@ -1953,6 +1957,7 @@ def build_playback_queue(
     result = _coordinator().build_queue(
         source_type=source_type,
         source_id=source_id,
+        source_context=source_context,
         profile_id=profile_id,
         limit=limit,
         endpoint_id=endpoint_id,

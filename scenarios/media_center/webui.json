@@ -41,7 +41,9 @@
             "selectedMediaRootId": null,
             "playbackSourceType": "item",
             "playbackSourceId": "",
+            "playbackSourceContext": {},
             "selectedMediaItemId": null,
+            "selectedMediaKind": "",
             "selectedMediaFavorite": false,
             "selectedPlaybackTargetId": "",
             "deploymentReleaseDigest": "",
@@ -849,6 +851,7 @@
                   "playbackSourceType": "$event.queue_source_type",
                   "playbackSourceId": "$event.queue_source_id",
                   "selectedMediaItemId": "$event.id",
+                  "selectedMediaKind": "$event.media_kind",
                   "selectedMediaFavorite": "$event.favorite"
                 }
               },
@@ -870,6 +873,7 @@
                   "playbackSourceType": "$event.queue_source_type",
                   "playbackSourceId": "$event.queue_source_id",
                   "selectedMediaItemId": "$event.id",
+                  "selectedMediaKind": "$event.media_kind",
                   "selectedMediaFavorite": "$event.favorite"
                 }
               },
@@ -880,6 +884,7 @@
                   "playbackSourceType": "$event.queue_source_type",
                   "playbackSourceId": "$event.queue_source_id",
                   "selectedMediaItemId": "$event.id",
+                  "selectedMediaKind": "$event.media_kind",
                   "selectedMediaFavorite": "$event.favorite"
                 }
               },
@@ -952,9 +957,22 @@
                   "on": "select",
                   "type": "updateState",
                   "params": {
-                    "playbackSourceType": "item",
-                    "playbackSourceId": "$event.id",
+                    "playbackSourceType": "catalog",
+                    "playbackSourceId": "current-page",
+                    "playbackSourceContext": {
+                      "query": "$state.mediaSearch",
+                      "media_kind": "$state.mediaKind",
+                      "favorites_only": "$state.mediaFavoritesOnly",
+                      "sort": "$state.mediaSort",
+                      "sort_direction": "$state.mediaSortDirection",
+                      "genre": "$state.mediaGenre",
+                      "year": "$state.mediaYear",
+                      "rating_min": "$state.mediaRatingMin",
+                      "content_rating": "$state.mediaContentRating",
+                      "cursor": "$state.mediaCursor"
+                    },
                     "selectedMediaItemId": "$event.id",
+                    "selectedMediaKind": "$event.media_kind",
                     "selectedMediaFavorite": "$event.favorite"
                   }
                 },
@@ -1242,6 +1260,7 @@
                     "playbackSourceType": "collection",
                     "playbackSourceId": "$state.mediaCollectionId",
                     "selectedMediaItemId": "$event.id",
+                    "selectedMediaKind": "$event.media_kind",
                     "selectedMediaFavorite": "$event.favorite"
                   }
                 },
@@ -1374,6 +1393,7 @@
                     "playbackSourceType": "$event.queue_source_type",
                     "playbackSourceId": "$event.queue_source_id",
                     "selectedMediaItemId": "$event.id",
+                    "selectedMediaKind": "$event.media_kind",
                     "selectedMediaFavorite": "$event.favorite"
                   }
                 },
@@ -1522,6 +1542,7 @@
                   "params": {
                     "source_type": "$state.playbackSourceType",
                     "source_id": "$state.playbackSourceId",
+                    "source_context": "$state.playbackSourceContext",
                     "profile_id": "$state.profileId",
                     "limit": 500,
                     "start_item_id": "$state.selectedMediaItemId"
@@ -1538,7 +1559,10 @@
                   "readOnly": true,
                   "showDiagnostics": false,
                   "autoSelectFirst": true,
-                  "playlistLimit": 10
+                  "playlistLimit": 10,
+                  "prearmFullscreen": true,
+                  "selectedMediaKind": "$state.selectedMediaKind",
+                  "profileId": "$state.profileId"
                 },
                 "title_i18n": {
                   "key": "runtime.media_center.ui.now_playing"
