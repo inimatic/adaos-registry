@@ -5200,6 +5200,34 @@ def test_tmdb_secret_store_failure_is_not_reported_as_missing_credentials():
     assert providers["media_center.musicbrainz.v1"]["state"] == "ready"
 
 
+def test_tmdb_secret_cache_survives_transient_store_failure(monkeypatch):
+    import adaos.sdk.data.secrets as secrets
+
+    original_cache = main._tmdb_credential_cache
+    original_initialized = main._tmdb_credential_cache_initialized
+    try:
+        main._tmdb_credential_cache = ""
+        main._tmdb_credential_cache_initialized = False
+        monkeypatch.setattr(secrets, "get", lambda *_args, **_kwargs: "token")
+        assert main._read_tmdb_credential_state()["state"] == "ready"
+
+        def unavailable(*_args, **_kwargs):
+            raise RuntimeError("keyring unavailable")
+
+        monkeypatch.setattr(secrets, "get", unavailable)
+        state = main._read_tmdb_credential_state()
+
+        assert state == {
+            "value": "token",
+            "configured": True,
+            "state": "degraded",
+            "reason": "secret_store_temporarily_unavailable",
+        }
+    finally:
+        main._tmdb_credential_cache = original_cache
+        main._tmdb_credential_cache_initialized = original_initialized
+
+
 def test_tmdb_provider_sends_only_normalized_evidence_and_caches_details():
     class Response:
         status_code = 200

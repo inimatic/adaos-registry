@@ -7381,9 +7381,14 @@ class MediaCatalogCoordinator:
             item_id = subject.removeprefix("item:")
             with self.repository.connect() as connection:
                 row = connection.execute(
-                    "SELECT * FROM catalog_items WHERE id=?", (item_id,)
+                    "SELECT c.*,p.metadata_json AS projected_metadata_json "
+                    "FROM catalog_items c LEFT JOIN catalog_metadata_projection p "
+                    "ON p.item_id=c.id WHERE c.id=?",
+                    (item_id,),
                 ).fetchone()
             if row:
+                metadata = _json_loads(row["metadata_json"])
+                projected = _json_loads(row["projected_metadata_json"])
                 return {
                     "subject_ref": subject,
                     "kind": "item",
@@ -7393,7 +7398,10 @@ class MediaCatalogCoordinator:
                     "folder_path": str(row["folder_path"]),
                     "media_kind": str(row["media_kind"]),
                     "fingerprint": str(row["fingerprint"]),
-                    "metadata": _json_loads(row["metadata_json"]) or {},
+                    "metadata": {
+                        **(metadata if isinstance(metadata, Mapping) else {}),
+                        **(projected if isinstance(projected, Mapping) else {}),
+                    },
                     "descriptor": _json_loads(row["descriptor_json"]) or {},
                 }
         if subject.startswith("work:"):

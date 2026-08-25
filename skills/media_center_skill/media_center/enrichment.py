@@ -8,10 +8,11 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Mapping, Protocol
 
-import requests
-
+from .artwork_cache import ArtworkCacheError, ExternalArtworkCache
 from .coordinator import MediaCatalogCoordinator
 from .discovery import fold_text, semantic_embedding
+
+import requests
 
 
 _log = logging.getLogger("adaos.skill.media_center.enrichment")
@@ -110,7 +111,9 @@ class DeterministicLocalProvider:
                         )
         elif job_kind == "technical_probe":
             metadata = subject.get("metadata")
-            technical = metadata.get("technical") if isinstance(metadata, Mapping) else None
+            technical = (
+                metadata.get("technical") if isinstance(metadata, Mapping) else None
+            )
             if isinstance(technical, Mapping) and technical:
                 claims.append(
                     {
@@ -212,9 +215,7 @@ _TITLE_NOISE_RE = re.compile(
 )
 _EPISODE_RE = re.compile(r"\bS\d{1,2}E\d{1,3}\b", re.IGNORECASE)
 _YEAR_RE = re.compile(r"(?<!\d)(19\d{2}|20\d{2})(?!\d)")
-_AUDIOBOOK_PATH_RE = re.compile(
-    r"(?:audio[ ._\-]*books?|аудиокниг)", re.IGNORECASE
-)
+_AUDIOBOOK_PATH_RE = re.compile(r"(?:audio[ ._\-]*books?|аудиокниг)", re.IGNORECASE)
 
 
 def _enabled(value: Any) -> bool:
@@ -317,9 +318,7 @@ class TmdbMetadataProvider:
                 self._cache.move_to_end(cache_key)
                 self._cache_hits += 1
                 return dict(cached[1])
-            wait = self.minimum_interval_seconds - (
-                now - self._last_request_monotonic
-            )
+            wait = self.minimum_interval_seconds - (now - self._last_request_monotonic)
             if wait > 0:
                 time.sleep(wait)
             self._last_request_monotonic = time.monotonic()
@@ -338,7 +337,9 @@ class TmdbMetadataProvider:
             )
             self._requests += 1
             if response.status_code in {401, 403}:
-                raise MetadataProviderError("tmdb_authentication_failed", retryable=False)
+                raise MetadataProviderError(
+                    "tmdb_authentication_failed", retryable=False
+                )
             if response.status_code == 429:
                 raise MetadataProviderError("tmdb_rate_limited", retryable=True)
             if response.status_code >= 500:
@@ -384,9 +385,7 @@ class TmdbMetadataProvider:
         )
         results = payload.get("results") if isinstance(payload, Mapping) else []
         return [
-            dict(item)
-            for item in list(results or [])[:10]
-            if isinstance(item, Mapping)
+            dict(item) for item in list(results or [])[:10] if isinstance(item, Mapping)
         ]
 
     def _details(self, kind: str, external_id: Any) -> dict[str, Any]:
@@ -410,9 +409,7 @@ class TmdbMetadataProvider:
             cache_key="credential-validation",
         )
         if payload.get("success") is False:
-            raise MetadataProviderError(
-                "tmdb_authentication_failed", retryable=False
-            )
+            raise MetadataProviderError("tmdb_authentication_failed", retryable=False)
         return {
             "ok": True,
             "provider_id": self.provider_id,
@@ -466,7 +463,9 @@ class TmdbMetadataProvider:
             for item in list(result.get("genres") or [])[:30]
             if isinstance(item, Mapping) and item.get("name")
         ]
-        credits = result.get("credits") if isinstance(result.get("credits"), Mapping) else {}
+        credits = (
+            result.get("credits") if isinstance(result.get("credits"), Mapping) else {}
+        )
         actors = [
             {
                 "name": str(item.get("name") or "")[:200],
@@ -484,7 +483,9 @@ class TmdbMetadataProvider:
             and str(item.get("job") or "").lower() in {"director", "series director"}
             and item.get("name")
         ][:20]
-        videos = result.get("videos") if isinstance(result.get("videos"), Mapping) else {}
+        videos = (
+            result.get("videos") if isinstance(result.get("videos"), Mapping) else {}
+        )
         trailers = [
             {
                 "name": str(item.get("name") or "")[:200],
@@ -499,7 +500,10 @@ class TmdbMetadataProvider:
             and item.get("key")
         ][:10]
         artwork_candidates = []
-        for artwork_kind, path_key in (("poster", "poster_path"), ("backdrop", "backdrop_path")):
+        for artwork_kind, path_key in (
+            ("poster", "poster_path"),
+            ("backdrop", "backdrop_path"),
+        ):
             path = str(result.get(path_key) or "")
             if path.startswith("/"):
                 artwork_candidates.append(
@@ -518,16 +522,26 @@ class TmdbMetadataProvider:
         external_ids["tmdb"] = result.get("id")
         content_rating = ""
         ratings_key = "content_ratings" if kind == "tv" else "release_dates"
-        ratings = result.get(ratings_key) if isinstance(result.get(ratings_key), Mapping) else {}
+        ratings = (
+            result.get(ratings_key)
+            if isinstance(result.get(ratings_key), Mapping)
+            else {}
+        )
         for entry in list(ratings.get("results") or [])[:50]:
-            if not isinstance(entry, Mapping) or str(entry.get("iso_3166_1") or "") not in {"US", "RU"}:
+            if not isinstance(entry, Mapping) or str(
+                entry.get("iso_3166_1") or ""
+            ) not in {"US", "RU"}:
                 continue
             if kind == "tv":
                 content_rating = str(entry.get("rating") or "")
             else:
                 dates = entry.get("release_dates") or []
                 content_rating = next(
-                    (str(value.get("certification") or "") for value in dates if isinstance(value, Mapping) and value.get("certification")),
+                    (
+                        str(value.get("certification") or "")
+                        for value in dates
+                        if isinstance(value, Mapping) and value.get("certification")
+                    ),
                     "",
                 )
             if content_rating:
@@ -538,10 +552,10 @@ class TmdbMetadataProvider:
             "original_title": result.get("original_title")
             or result.get("original_name"),
             "overview": result.get("overview"),
-            "release_date": result.get("release_date")
-            or result.get("first_air_date"),
+            "release_date": result.get("release_date") or result.get("first_air_date"),
             "genres": genres,
-            "runtime_minutes": result.get("runtime") or next(iter(result.get("episode_run_time") or []), None),
+            "runtime_minutes": result.get("runtime")
+            or next(iter(result.get("episode_run_time") or []), None),
             "content_rating": content_rating,
             "actors": actors,
             "directors": directors,
@@ -560,7 +574,9 @@ class TmdbMetadataProvider:
                 "subject_ref": subject_ref,
                 "field_name": field_name,
                 "value": value,
-                "confidence": confidence if field_name == "title" else max(0.7, confidence - 0.05),
+                "confidence": confidence
+                if field_name == "title"
+                else max(0.7, confidence - 0.05),
             }
             for field_name, value in fields.items()
             if value not in (None, "", [])
@@ -592,9 +608,7 @@ class MusicBrainzMetadataProvider:
         return (
             job_kind in self.supported_jobs
             and str(subject.get("media_kind") or "").strip().lower() == "audio"
-            and not _AUDIOBOOK_PATH_RE.search(
-                str(subject.get("folder_path") or "")
-            )
+            and not _AUDIOBOOK_PATH_RE.search(str(subject.get("folder_path") or ""))
         )
 
     def __init__(
@@ -688,7 +702,9 @@ class MusicBrainzMetadataProvider:
         if evidence["media_kind"] != "audio":
             return []
         external_ids = evidence["external_ids"]
-        recording_id = external_ids.get("musicbrainz_recording") or external_ids.get("musicbrainz")
+        recording_id = external_ids.get("musicbrainz_recording") or external_ids.get(
+            "musicbrainz"
+        )
         if not recording_id and not re.search(
             r"[^\W\d_]", str(evidence.get("title") or ""), flags=re.UNICODE
         ):
@@ -710,7 +726,8 @@ class MusicBrainzMetadataProvider:
                 query += f' AND release:"{str(evidence["album"])[:200]}"'
             payload = self._request("recording", {"query": query, "limit": 5})
             candidates = [
-                item for item in list(payload.get("recordings") or [])[:5]
+                item
+                for item in list(payload.get("recordings") or [])[:5]
                 if isinstance(item, Mapping)
             ]
             if not candidates:
@@ -723,7 +740,9 @@ class MusicBrainzMetadataProvider:
                     int(item.get("score") or 0),
                 ),
             )
-            confidence = min(0.95, max(0.6, float(recording.get("score") or 60) / 100.0))
+            confidence = min(
+                0.95, max(0.6, float(recording.get("score") or 60) / 100.0)
+            )
         artist_credit = recording.get("artist-credit") or []
         artists = [
             str((item.get("artist") or {}).get("name") or item.get("name") or "")
@@ -731,7 +750,8 @@ class MusicBrainzMetadataProvider:
             if isinstance(item, Mapping)
         ]
         releases = [
-            item for item in list(recording.get("releases") or [])[:20]
+            item
+            for item in list(recording.get("releases") or [])[:20]
             if isinstance(item, Mapping)
         ]
         ranked_genres = [
@@ -763,18 +783,18 @@ class MusicBrainzMetadataProvider:
             "external_ids": {
                 **external_ids,
                 "musicbrainz_recording": recording.get("id"),
-                **(
-                    {"musicbrainz_release": releases[0].get("id")}
-                    if releases else {}
-                ),
+                **({"musicbrainz_release": releases[0].get("id")} if releases else {}),
             },
             "artwork_candidates": (
-                [{
-                    "kind": "cover",
-                    "url": f"https://coverartarchive.org/release/{releases[0].get('id')}/front-500",
-                    "provider": "cover_art_archive",
-                }]
-                if releases and releases[0].get("id") else []
+                [
+                    {
+                        "kind": "cover",
+                        "url": f"https://coverartarchive.org/release/{releases[0].get('id')}/front-500",
+                        "provider": "cover_art_archive",
+                    }
+                ]
+                if releases and releases[0].get("id")
+                else []
             ),
         }
         return [
@@ -835,7 +855,9 @@ def metadata_provider_configuration(
             "state": (
                 "ready"
                 if tmdb_ready
-                else "credentials_missing" if tmdb_enabled else "disabled"
+                else "credentials_missing"
+                if tmdb_enabled
+                else "disabled"
             ),
             "reason": (
                 "configured"
@@ -906,15 +928,14 @@ class MediaEnrichmentWorker:
         publish_interval_seconds: float = 2.0,
         maintenance_interval_jobs: int = 100,
         provider_configuration: Iterable[Mapping[str, Any]] | None = None,
+        artwork_cache: ExternalArtworkCache | None = None,
     ):
         self.coordinator = coordinator
         self.providers = providers or default_metadata_providers()
         self.publish = publish
         self.publish_settled = publish_settled
         self.poll_seconds = max(0.2, min(float(poll_seconds), 30.0))
-        self.work_interval_seconds = max(
-            0.02, min(float(work_interval_seconds), 5.0)
-        )
+        self.work_interval_seconds = max(0.02, min(float(work_interval_seconds), 5.0))
         self.publish_interval_seconds = max(
             1.0, min(float(publish_interval_seconds), 300.0)
         )
@@ -924,6 +945,7 @@ class MediaEnrichmentWorker:
         self.provider_configuration = tuple(
             dict(item) for item in (provider_configuration or ())
         )
+        self.artwork_cache = artwork_cache
         self._last_publish_monotonic = 0.0
         self._completed_since_maintenance = 0
         self._worked_since_idle = False
@@ -976,9 +998,7 @@ class MediaEnrichmentWorker:
             compacted = maintenance(limit=250)
             if isinstance(compacted, Mapping):
                 self._storage_maintenance_state = dict(compacted)
-                self._storage_maintenance_complete = bool(
-                    compacted.get("complete")
-                )
+                self._storage_maintenance_complete = bool(compacted.get("complete"))
         job = self.coordinator.claim_background_job()
         if job is None:
             return None
@@ -1005,6 +1025,7 @@ class MediaEnrichmentWorker:
         claim_count = 0
         provider_ids: list[str] = []
         provider_errors: list[dict[str, str]] = []
+        artwork_candidates: list[tuple[str, dict[str, Any]]] = []
         try:
             for provider in providers:
                 try:
@@ -1022,6 +1043,14 @@ class MediaEnrichmentWorker:
                         )
                     claim_count += len(claims[:100])
                     provider_ids.append(provider.provider_id)
+                    for claim in claims[:100]:
+                        if str(claim.get("field_name") or "") != "artwork_candidates":
+                            continue
+                        for candidate in list(claim.get("value") or [])[:10]:
+                            if isinstance(candidate, Mapping):
+                                artwork_candidates.append(
+                                    (provider.provider_id, dict(candidate))
+                                )
                 except MetadataProviderError as exc:
                     provider_errors.append(
                         {
@@ -1029,6 +1058,68 @@ class MediaEnrichmentWorker:
                             "error_code": exc.code,
                         }
                     )
+            current_artwork = (
+                (subject.get("metadata") or {}).get("artwork")
+                if isinstance(subject.get("metadata"), Mapping)
+                else None
+            )
+            already_cached = bool(
+                isinstance(current_artwork, Mapping)
+                and current_artwork.get("state") == "ready"
+                and current_artwork.get("source_kind") == "external_cached"
+            )
+            if (
+                self.artwork_cache is not None
+                and artwork_candidates
+                and not already_cached
+            ):
+                cached: list[dict[str, Any]] = []
+                cached_kinds: set[str] = set()
+                for provider_id, candidate in artwork_candidates:
+                    kind = str(candidate.get("kind") or "poster").strip().lower()
+                    if kind in cached_kinds or len(cached) >= 3:
+                        continue
+                    try:
+                        cached.append(
+                            self.artwork_cache.cache(
+                                subject,
+                                candidate,
+                                provider_id=provider_id,
+                            )
+                        )
+                        cached_kinds.add(kind)
+                    except ArtworkCacheError as exc:
+                        provider_errors.append(
+                            {
+                                "provider_id": "media_center.artwork_cache.v1",
+                                "error_code": exc.code,
+                            }
+                        )
+                if cached:
+                    primary = next(
+                        (
+                            item
+                            for item in cached
+                            if str(item.get("kind") or "") in {"poster", "cover"}
+                        ),
+                        cached[0],
+                    )
+                    self.coordinator.record_metadata_claim(
+                        subject_ref=str(job["subject_ref"]),
+                        field_name="artwork",
+                        value=primary,
+                        provenance="media_center.artwork_cache.v1",
+                        confidence=0.95,
+                    )
+                    self.coordinator.record_metadata_claim(
+                        subject_ref=str(job["subject_ref"]),
+                        field_name="artwork_set",
+                        value=cached,
+                        provenance="media_center.artwork_cache.v1",
+                        confidence=0.95,
+                    )
+                    claim_count += 2
+                    provider_ids.append("media_center.artwork_cache.v1")
             result = self.coordinator.finish_background_job(
                 job_id,
                 provider_id=",".join(provider_ids),
@@ -1081,9 +1172,7 @@ class MediaEnrichmentWorker:
                     "state": "unknown",
                 }
             )
-        active_provider_ids = {
-            str(item.get("provider_id") or "") for item in providers
-        }
+        active_provider_ids = {str(item.get("provider_id") or "") for item in providers}
         configured = self.provider_configuration or tuple(
             metadata_provider_configuration()
         )
@@ -1096,6 +1185,14 @@ class MediaEnrichmentWorker:
             "schema": "adaos.media_center.enrichment_runtime.v1",
             "state": "running" if thread is not None and thread.is_alive() else "idle",
             "providers": providers,
+            "artwork_cache": (
+                self.artwork_cache.status()
+                if self.artwork_cache is not None
+                else {
+                    "schema": "adaos.media_center.artwork_cache_status.v1",
+                    "state": "disabled",
+                }
+            ),
             "poll_seconds": self.poll_seconds,
             "work_interval_seconds": self.work_interval_seconds,
             "publish_interval_seconds": self.publish_interval_seconds,

@@ -38,6 +38,7 @@ _READY_LIBRARY_SNAPSHOT_CACHE: dict[tuple[str, str, bool], dict[str, Any]] = {}
 _ready_library_snapshot_cache_lock = threading.Lock()
 
 from media_center.background import background_runtime  # noqa: E402
+from media_center.artwork_cache import ExternalArtworkCache  # noqa: E402
 from media_center.catalog import (  # noqa: E402
     MediaCenterRepository,
     SCHEMA_VERSION,
@@ -74,6 +75,8 @@ _TMDB_CREDENTIAL_SECRET = "tmdb_api_credential"
 _tmdb_secret_error_lock = threading.Lock()
 _tmdb_secret_error_witness = ""
 _tmdb_secret_error_at = 0.0
+_tmdb_credential_cache = ""
+_tmdb_credential_cache_initialized = False
 
 
 class MediaRootOperationBusy(RuntimeError):
@@ -144,14 +147,31 @@ def _enrichment_runtime(
             coordinator,
             providers=default_metadata_providers(settings, tmdb_credential=credential),
             provider_configuration=configuration,
+            artwork_cache=ExternalArtworkCache(_external_artwork_cache_root()),
             publish=lambda: _publish_operation_snapshot(coordinator),
             publish_settled=lambda: _publish_library_snapshot(coordinator),
         ),
     )
 
 
+def _external_artwork_cache_root() -> Path:
+    try:
+        from adaos.sdk.data.skill_env import skill_data_root
+
+        return skill_data_root() / "files" / "artwork-cache"
+    except Exception:
+        return default_db_path().resolve().parent.parent / "files" / "artwork-cache"
+
+
 def _read_tmdb_credential() -> str:
     return str(_read_tmdb_credential_state().get("value") or "")
+
+
+def _cache_tmdb_credential(value: str) -> None:
+    global _tmdb_credential_cache, _tmdb_credential_cache_initialized
+    with _tmdb_secret_error_lock:
+        _tmdb_credential_cache = str(value or "").strip()
+        _tmdb_credential_cache_initialized = True
 
 
 def _read_tmdb_credential_state() -> dict[str, Any]:
@@ -160,6 +180,7 @@ def _read_tmdb_credential_state() -> dict[str, Any]:
         from adaos.sdk.data.secrets import get as secret_get
 
         value = str(secret_get(_TMDB_CREDENTIAL_SECRET, "") or "").strip()
+        _cache_tmdb_credential(value)
         return {
             "value": value,
             "configured": bool(value),
@@ -179,6 +200,16 @@ def _read_tmdb_credential_state() -> dict[str, Any]:
                 _tmdb_secret_error_at = now
         if should_log:
             _log.warning("TMDb credential store is unavailable: %s", witness)
+        with _tmdb_secret_error_lock:
+            cached = _tmdb_credential_cache
+            initialized = _tmdb_credential_cache_initialized
+        if initialized:
+            return {
+                "value": cached,
+                "configured": bool(cached),
+                "state": "degraded",
+                "reason": "secret_store_temporarily_unavailable",
+            }
         return {
             "value": "",
             "configured": None,
@@ -1875,6 +1906,7 @@ def set_metadata_settings(
     if _bool(clear_tmdb_credential, False):
         if credential_before:
             secret_delete(_TMDB_CREDENTIAL_SECRET)
+            _cache_tmdb_credential("")
             credential_changed = True
     elif credential_value:
         try:
@@ -1911,6 +1943,7 @@ def set_metadata_settings(
                 retryable=exc.retryable,
             )
         secret_set(_TMDB_CREDENTIAL_SECRET, credential_value)
+        _cache_tmdb_credential(credential_value)
         credential_changed = credential_value != credential_before
 
     updated = catalog.set_metadata_settings(
