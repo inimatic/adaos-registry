@@ -4411,9 +4411,12 @@ class MediaCatalogCoordinator:
             WHERE {' AND '.join(folder_filters)}
                 AND EXISTS (
                     SELECT 1 FROM catalog_items c
+                        INDEXED BY idx_media_center_folder_browse
                     LEFT JOIN personal_media_state ps
                         ON ps.item_id=c.id AND ps.profile_id=?
                     WHERE c.agent_id=f.agent_id AND c.root_id=f.root_id
+                        AND c.folder_path>=f.path
+                        AND c.folder_path<f.path || '0'
                         AND (c.folder_path=f.path OR
                             substr(c.folder_path,1,length(f.path)+1)=f.path || '/')
                         AND {where}
@@ -4531,14 +4534,16 @@ class MediaCatalogCoordinator:
         with self.repository.connect() as connection:
             root_row = connection.execute(
                 """
-                SELECT MAX(COALESCE(json_extract(
+                SELECT COALESCE(json_extract(
                     metadata_json,'$.media_library_root_path'
-                ),'')) AS root_path,
-                    MAX(COALESCE(json_extract(
+                ),'') AS root_path,
+                    COALESCE(json_extract(
                         metadata_json,'$.media_library_root_label'
-                    ),'')) AS root_label
+                    ),'') AS root_label
                 FROM catalog_items
+                    INDEXED BY idx_media_center_folder_browse
                 WHERE agent_id=? AND root_id=? AND missing=0
+                LIMIT 1
                 """,
                 (agent, root),
             ).fetchone()

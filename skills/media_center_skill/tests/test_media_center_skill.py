@@ -3200,6 +3200,7 @@ def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp
             _agent_delta(1, "Shows/Example/Season 2/Example.S02E03.mp4", kind="video"),
             _agent_delta(2, "Music/Album/Disc 2/04 Track.mp3"),
             _agent_delta(3, "Books/Novel/Part 1/001.mp3"),
+            _agent_delta(4, "Shows/Example Extras/Trailer.mp4", kind="video"),
         )
     )
 
@@ -3234,6 +3235,7 @@ def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp
     assert root["pagination"]["has_more"] is True
     assert second["items"][0]["path"] != root["items"][0]["path"]
     assert nested["items"][0]["path"] == "Shows/Example/Season 2"
+    assert nested["folder_count"] == 1
     assert nested["items"][0]["queue_ref"] == "agent-node-a:root-a:Shows/Example/Season 2"
     assert nested["breadcrumbs"][0] == {
         "name": "Folders",
