@@ -600,6 +600,8 @@ class MusicBrainzMetadataProvider:
         self._requests = 0
         self._cache_hits = 0
         self._failures = 0
+        self._consecutive_failures = 0
+        self._retry_after_monotonic = 0.0
         self._last_error = ""
         self._last_success_at = 0.0
 
@@ -611,10 +613,13 @@ class MusicBrainzMetadataProvider:
             if cached and now - cached[0] <= self.cache_ttl_seconds:
                 self._cache_hits += 1
                 return dict(cached[1])
+            if now < self._retry_after_monotonic:
+                raise MetadataProviderError("musicbrainz_temporarily_unavailable")
             wait = self.minimum_interval_seconds - (now - self._last_request_monotonic)
             if wait > 0:
                 time.sleep(wait)
             self._last_request_monotonic = time.monotonic()
+        self._requests += 1
         try:
             response = self._session.get(
                 f"{self.api_base}/{path.lstrip('/')}",
@@ -625,7 +630,6 @@ class MusicBrainzMetadataProvider:
                 },
                 timeout=self.timeout_seconds,
             )
-            self._requests += 1
             if response.status_code == 429:
                 raise MetadataProviderError("musicbrainz_rate_limited")
             if response.status_code >= 500:
@@ -635,16 +639,26 @@ class MusicBrainzMetadataProvider:
             result = dict(payload) if isinstance(payload, Mapping) else {}
         except MetadataProviderError as exc:
             self._failures += 1
+            self._consecutive_failures += 1
             self._last_error = exc.code
+            self._retry_after_monotonic = time.monotonic() + min(
+                900.0, 30.0 * (2 ** min(5, self._consecutive_failures - 1))
+            )
             raise
         except (requests.RequestException, ValueError, TypeError) as exc:
             self._failures += 1
+            self._consecutive_failures += 1
             self._last_error = type(exc).__name__
+            self._retry_after_monotonic = time.monotonic() + min(
+                900.0, 30.0 * (2 ** min(5, self._consecutive_failures - 1))
+            )
             raise MetadataProviderError("musicbrainz_request_failed") from exc
         self._cache[cache_key] = (time.monotonic(), result)
         while len(self._cache) > 1000:
             self._cache.popitem(last=False)
         self._last_error = ""
+        self._consecutive_failures = 0
+        self._retry_after_monotonic = 0.0
         self._last_success_at = time.time()
         return result
 
@@ -768,6 +782,9 @@ class MusicBrainzMetadataProvider:
             "cache_hit_count": self._cache_hits,
             "failure_count": self._failures,
             "last_error": self._last_error,
+            "retry_after_seconds": max(
+                0, int(self._retry_after_monotonic - time.monotonic())
+            ),
             "last_success_at": self._last_success_at or None,
         }
 
@@ -970,7 +987,7 @@ class MediaEnrichmentWorker:
             )
         claim_count = 0
         provider_ids: list[str] = []
-        provider_error: MetadataProviderError | None = None
+        provider_errors: list[dict[str, str]] = []
         try:
             for provider in providers:
                 try:
@@ -989,20 +1006,18 @@ class MediaEnrichmentWorker:
                     claim_count += len(claims[:100])
                     provider_ids.append(provider.provider_id)
                 except MetadataProviderError as exc:
-                    provider_error = exc
-                    break
-            if provider_error is not None:
-                result = self.coordinator.fail_background_job(
-                    job_id,
-                    error_code=provider_error.code,
-                    retryable=provider_error.retryable,
-                )
-            else:
-                result = self.coordinator.finish_background_job(
-                    job_id,
-                    provider_id=",".join(provider_ids),
-                    claim_count=claim_count,
-                )
+                    provider_errors.append(
+                        {
+                            "provider_id": provider.provider_id,
+                            "error_code": exc.code,
+                        }
+                    )
+            result = self.coordinator.finish_background_job(
+                job_id,
+                provider_id=",".join(provider_ids),
+                claim_count=claim_count,
+                provider_errors=provider_errors,
+            )
         except LookupError as exc:
             result = self.coordinator.fail_background_job(
                 job_id, error_code=str(exc), retryable=False

@@ -1927,7 +1927,7 @@ def ensure_rendition(
     except Exception as exc:
         return _skill_error(
             "rendition_agent_unavailable",
-            "The source agent could not prepare a compatible media version.",
+            message="The source agent could not prepare a compatible media version.",
             detail=str(exc),
             retryable=True,
         )
@@ -2011,7 +2011,7 @@ def play_on(
     if not target:
         return _skill_error(
             "playback_target_required",
-            "Choose an online playback device.",
+            message="Choose an online playback device.",
         )
     queue_result = build_playback_queue(
         source_type=source_type,
@@ -2029,7 +2029,9 @@ def play_on(
         if isinstance(item, Mapping)
     ][:500]
     if not queue:
-        return _skill_error("playback_queue_empty", "There is nothing to play.")
+        return _skill_error(
+            "playback_queue_empty", message="There is nothing to play."
+        )
     initial_index = max(
         0,
         min(len(queue) - 1, int(queue_result.get("initial_index") or 0)),
@@ -2066,7 +2068,7 @@ def play_on(
         if not updated or not updated.get("ok"):
             return _skill_error(
                 "playback_handoff_failed",
-                "The playback list could not be moved to that device.",
+                message="The playback list could not be moved to that device.",
                 detail=str(update_error or (updated or {}).get("error") or "queue_update_failed"),
                 retryable=True,
             )
@@ -2094,7 +2096,7 @@ def play_on(
         if not created or not created.get("ok"):
             return _skill_error(
                 "playback_handoff_failed",
-                "The playback session could not be opened on that device.",
+                message="The playback session could not be opened on that device.",
                 detail=str(create_error or (created or {}).get("error") or sessions_error or "session_create_failed"),
                 retryable=True,
             )
@@ -2121,7 +2123,7 @@ def play_on(
     if not commanded or not commanded.get("ok"):
         return _skill_error(
             "playback_handoff_failed",
-            "The playback command could not be sent to that device.",
+            message="The playback command could not be sent to that device.",
             detail=str(command_error or (commanded or {}).get("error") or "play_command_failed"),
             retryable=True,
         )
@@ -3356,7 +3358,9 @@ def update_item_metadata(
 ) -> dict[str, Any]:
     token = str(item_id or "").strip()
     if not token:
-        return _skill_error("item_id_required", "Choose a media item to correct.")
+        return _skill_error(
+            "item_id_required", message="Choose a media item to correct."
+        )
 
     def _list_value(value: str | list[str] | None) -> list[str]:
         source = value if isinstance(value, list) else str(value or "").split(",")
@@ -3380,7 +3384,9 @@ def update_item_metadata(
         try:
             values["year"] = max(0, min(9999, int(year)))
         except (TypeError, ValueError):
-            return _skill_error("metadata_year_invalid", "Enter a valid release year.")
+            return _skill_error(
+                "metadata_year_invalid", message="Enter a valid release year."
+            )
     catalog = _coordinator()
     result = catalog.apply_correction(
         operation="metadata",

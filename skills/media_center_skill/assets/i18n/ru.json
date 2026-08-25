@@ -1,4 +1,5 @@
 {
+  "runtime.media_center.ui.source": "Источник",
   "runtime.media_center.error.topology_plan_failed": "Не удалось создать план изменения топологии Media Center.",
   "runtime.media_center.error.topology_apply_failed": "Не удалось применить план изменения топологии Media Center.",
   "runtime.media_center.error.topology_status_failed": "Не удалось получить состояние операции топологии Media Center.",
@@ -130,6 +131,10 @@
   "runtime.media_center.ui.metadata_activity": "Обработка метаданных",
   "runtime.media_center.ui.background_operations": "Фоновые операции",
   "runtime.media_center.ui.artwork_generation": "Создание обложек",
+  "runtime.media_center.ui.conversion_operations": "Преобразование медиа",
+  "runtime.media_center.ui.current_conversion": "Текущее преобразование",
+  "runtime.media_center.ui.no_conversion_operations": "Нет операций преобразования.",
+  "runtime.media_center.ui.produced_bytes": "Создано байт",
   "runtime.media_center.ui.collection": "Коллекция",
   "runtime.media_center.ui.all_collections": "Все коллекции",
   "runtime.media_center.ui.play_all": "Воспроизвести все",

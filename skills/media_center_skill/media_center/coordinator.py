@@ -33,7 +33,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-25.7"
+COORDINATOR_SCHEMA_REVISION = "2026-08-25.8"
 SEARCH_ROWID_REVISION = "2"
 STORAGE_COMPACTION_REVISION = "2026-08-25.1"
 METADATA_SETTINGS_KEY = "metadata_provider_settings"
@@ -455,6 +455,8 @@ class MediaCatalogCoordinator:
                     ON catalog_items(missing,media_kind,size_bytes DESC,id);
                 CREATE INDEX IF NOT EXISTS idx_media_center_source_path
                     ON catalog_items(source_path,missing,agent_id);
+                CREATE INDEX IF NOT EXISTS idx_media_center_source_size
+                    ON catalog_items(size_bytes,missing,agent_id,source);
                 CREATE INDEX IF NOT EXISTS idx_media_center_catalog_variant
                     ON catalog_items(variant_id);
                 CREATE TABLE IF NOT EXISTS coordinator_meta (
@@ -880,23 +882,77 @@ class MediaCatalogCoordinator:
                 "video_series": self._repair_video_series_identity(connection),
             }
             connection.execute("INSERT OR REPLACE INTO coordinator_meta(key, value) VALUES ('schema_version', ?)", (COORDINATOR_SCHEMA,))
-            retired_legacy_count = connection.execute(
-                """
-                UPDATE catalog_items AS legacy
-                SET missing=1,last_seen_at=?
-                WHERE legacy.source='media_server'
-                    AND legacy.agent_id=''
-                    AND legacy.missing=0
-                    AND legacy.source_path<>''
-                    AND EXISTS (
-                        SELECT 1 FROM catalog_items AS agent
-                        WHERE agent.agent_id<>''
-                            AND agent.missing=0
-                            AND agent.source_path=legacy.source_path
+            has_alias_candidates = bool(
+                connection.execute(
+                    """
+                    SELECT
+                        EXISTS(SELECT 1 FROM catalog_items
+                            WHERE source='media_server' AND agent_id=''
+                                AND missing=0 LIMIT 1)
+                        AND EXISTS(SELECT 1 FROM catalog_items
+                            WHERE agent_id<>'' AND missing=0 LIMIT 1)
+                    """
+                ).fetchone()[0]
+            )
+            alias_candidates = (
+                connection.execute(
+                    """
+                    SELECT legacy_id,canonical_id,match_priority FROM (
+                        SELECT legacy.id AS legacy_id,
+                            agent.id AS canonical_id,0 AS match_priority
+                        FROM catalog_items AS legacy
+                        JOIN catalog_items AS agent
+                            ON agent.source_path=legacy.source_path
+                        WHERE legacy.source='media_server'
+                            AND legacy.agent_id='' AND legacy.missing=0
+                            AND legacy.source_path<>''
+                            AND agent.agent_id<>'' AND agent.missing=0
+                        UNION ALL
+                        SELECT legacy.id AS legacy_id,
+                            agent.id AS canonical_id,1 AS match_priority
+                        FROM catalog_items AS legacy
+                        JOIN catalog_items AS agent
+                            ON agent.size_bytes=legacy.size_bytes
+                        WHERE legacy.source='media_server'
+                            AND legacy.agent_id='' AND legacy.missing=0
+                            AND legacy.source_path<>'' AND legacy.size_bytes>0
+                            AND agent.agent_id<>'' AND agent.missing=0
+                            AND substr(
+                                lower(replace(legacy.source_path,char(92),'/')),
+                                -length(lower(
+                                    CASE WHEN agent.folder_path<>''
+                                        THEN agent.folder_path || '/'
+                                        ELSE '' END || agent.name
+                                ))
+                            )=lower(
+                                CASE WHEN agent.folder_path<>''
+                                    THEN agent.folder_path || '/'
+                                    ELSE '' END || agent.name
+                            )
                     )
-                """,
-                (now,),
-            ).rowcount
+                    ORDER BY legacy_id,match_priority,canonical_id
+                    """
+                ).fetchall()
+                if has_alias_candidates
+                else []
+            )
+            legacy_aliases: dict[str, str] = {}
+            for candidate in alias_candidates:
+                legacy_aliases.setdefault(
+                    str(candidate["legacy_id"]),
+                    str(candidate["canonical_id"]),
+                )
+            for legacy_id, canonical_id in legacy_aliases.items():
+                self._merge_legacy_item_state(
+                    connection,
+                    legacy_item_id=legacy_id,
+                    canonical_item_id=canonical_id,
+                )
+            connection.executemany(
+                "UPDATE catalog_items SET missing=1,last_seen_at=? WHERE id=?",
+                [(now, legacy_id) for legacy_id in legacy_aliases],
+            )
+            retired_legacy_count = len(legacy_aliases)
             self._rebuild_folder_nodes(connection)
             self._backfill_search(connection)
             self._ensure_search_rowids(connection)
@@ -936,6 +992,75 @@ class MediaCatalogCoordinator:
             "retired_legacy_count": max(0, int(retired_legacy_count or 0)),
             "identity_repair": identity_repair,
         }
+
+    def _merge_legacy_item_state(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        legacy_item_id: str,
+        canonical_item_id: str,
+    ) -> None:
+        if not legacy_item_id or not canonical_item_id:
+            return
+        profile_rows = connection.execute(
+            "SELECT DISTINCT profile_id FROM personal_media_state WHERE item_id=?",
+            (legacy_item_id,),
+        ).fetchall()
+        connection.execute(
+            """
+            INSERT INTO personal_media_state(
+                profile_id,item_id,favorite,resume_ms,duration_ms,completed,
+                rating,hidden,play_count,last_played_at,revision,updated_at
+            )
+            SELECT profile_id,?,favorite,resume_ms,duration_ms,completed,
+                rating,hidden,play_count,last_played_at,revision,updated_at
+            FROM personal_media_state WHERE item_id=?
+            ON CONFLICT(profile_id,item_id) DO UPDATE SET
+                favorite=max(personal_media_state.favorite,excluded.favorite),
+                resume_ms=max(personal_media_state.resume_ms,excluded.resume_ms),
+                duration_ms=max(personal_media_state.duration_ms,excluded.duration_ms),
+                completed=max(personal_media_state.completed,excluded.completed),
+                rating=CASE WHEN personal_media_state.rating<>0
+                    THEN personal_media_state.rating ELSE excluded.rating END,
+                hidden=max(personal_media_state.hidden,excluded.hidden),
+                play_count=max(personal_media_state.play_count,excluded.play_count),
+                last_played_at=max(
+                    personal_media_state.last_played_at,excluded.last_played_at
+                ),
+                revision=max(personal_media_state.revision,excluded.revision)+1,
+                updated_at=max(personal_media_state.updated_at,excluded.updated_at)
+            """,
+            (canonical_item_id, legacy_item_id),
+        )
+        connection.execute(
+            """
+            UPDATE catalog_items
+            SET favorite=max(favorite,COALESCE((
+                    SELECT favorite FROM catalog_items WHERE id=?
+                ),0)),
+                play_count=max(play_count,COALESCE((
+                    SELECT play_count FROM catalog_items WHERE id=?
+                ),0))
+            WHERE id=?
+            """,
+            (legacy_item_id, legacy_item_id, canonical_item_id),
+        )
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO user_playlist_items(
+                playlist_id,item_id,ordinal,added_by_profile_id,added_at
+            )
+            SELECT playlist_id,?,ordinal,added_by_profile_id,added_at
+            FROM user_playlist_items WHERE item_id=?
+            """,
+            (canonical_item_id, legacy_item_id),
+        )
+        connection.execute(
+            "DELETE FROM user_playlist_items WHERE item_id=?",
+            (legacy_item_id,),
+        )
+        for row in profile_rows:
+            self._next_profile_revision(connection, str(row["profile_id"]))
 
     @staticmethod
     def _rebuild_folder_nodes(connection: sqlite3.Connection) -> None:
@@ -2395,25 +2520,52 @@ class MediaCatalogCoordinator:
         content_path = _text(descriptor.get("content_path"))
         routed_path = _text(descriptor.get("routed_content_path") or descriptor.get("browser_path"))
         source_path = _text(descriptor.get("source_path") or descriptor.get("path"))
+        size_bytes = int(
+            source.get("size_bytes") or descriptor.get("size_bytes") or 0
+        )
         retired_legacy_rows: list[sqlite3.Row] = []
-        if source_path:
+        if source_path or relative_path:
             retired_legacy_rows = connection.execute(
                 """
-                SELECT agent_id,node_id,root_id,folder_path
+                SELECT id,agent_id,node_id,root_id,folder_path
                 FROM catalog_items
                 WHERE source='media_server' AND agent_id='' AND missing=0
-                    AND source_path=?
+                    AND (
+                        source_path=?
+                        OR (
+                            size_bytes=?
+                            AND substr(
+                                lower(replace(source_path,char(92),'/')),
+                                -length(?)
+                            )=lower(?)
+                        )
+                    )
                 """,
-                (source_path,),
+                (source_path, size_bytes, relative_path, relative_path),
             ).fetchall()
             connection.execute(
                 """
                 UPDATE catalog_items
                 SET missing=1,last_seen_at=?
                 WHERE source='media_server' AND agent_id='' AND missing=0
-                    AND source_path=?
+                    AND (
+                        source_path=?
+                        OR (
+                            size_bytes=?
+                            AND substr(
+                                lower(replace(source_path,char(92),'/')),
+                                -length(?)
+                            )=lower(?)
+                        )
+                    )
                 """,
-                (now_iso(), source_path),
+                (
+                    now_iso(),
+                    source_path,
+                    size_bytes,
+                    relative_path,
+                    relative_path,
+                ),
             )
         modified_ns = int(source.get("modified_ns") or 0)
         modified_at = _text(descriptor.get("modified_at")) or (str(modified_ns) if modified_ns else "")
@@ -2476,7 +2628,7 @@ class MediaCatalogCoordinator:
             """,
             (
                 item_id, f"agent:{agent_id}", _text(source.get("resource_id") or descriptor.get("resource_id") or descriptor.get("id")),
-                name, title, kind, mime_type, int(source.get("size_bytes") or descriptor.get("size_bytes") or 0),
+                name, title, kind, mime_type, size_bytes,
                 modified_at, content_path, routed_path, _text(descriptor.get("playback_id")), source_path,
                 _json_dumps(_compact_source_descriptor(descriptor)),
                 _json_dumps(_compact_source_metadata(metadata)),
@@ -2494,6 +2646,12 @@ class MediaCatalogCoordinator:
             str(previous["folder_path"]),
         ) if previous and not bool(previous["missing"]) else None
         current_scope = (agent_id, _text(source.get("root_id") or delta.get("root_id")), folder_path)
+        for legacy_row in retired_legacy_rows:
+            self._merge_legacy_item_state(
+                connection,
+                legacy_item_id=str(legacy_row["id"]),
+                canonical_item_id=item_id,
+            )
         if previous_scope and previous_scope != current_scope:
             self._adjust_folder_nodes(
                 connection,
@@ -7061,8 +7219,17 @@ class MediaCatalogCoordinator:
         *,
         provider_id: str,
         claim_count: int,
+        provider_errors: Iterable[Mapping[str, Any]] | None = None,
     ) -> dict[str, Any]:
         now = now_iso()
+        warnings = [
+            {
+                "provider_id": _text(item.get("provider_id")),
+                "error_code": _text(item.get("error_code")),
+            }
+            for item in (provider_errors or ())
+            if _text(item.get("provider_id")) and _text(item.get("error_code"))
+        ][:10]
         with self.repository.connect() as connection:
             changed = connection.execute(
                 """
@@ -7079,6 +7246,7 @@ class MediaCatalogCoordinator:
                             "completed": 1,
                             "total": 1,
                             "claim_count": max(0, int(claim_count)),
+                            "provider_warnings": warnings,
                         }
                     ),
                     now,
@@ -7086,7 +7254,12 @@ class MediaCatalogCoordinator:
                 ),
             ).rowcount
             connection.commit()
-        return {"ok": bool(changed), "job_id": _text(job_id), "status": "completed"}
+        return {
+            "ok": bool(changed),
+            "job_id": _text(job_id),
+            "status": "completed",
+            "provider_warnings": warnings,
+        }
 
     def fail_background_job(
         self, job_id: str, *, error_code: str, retryable: bool

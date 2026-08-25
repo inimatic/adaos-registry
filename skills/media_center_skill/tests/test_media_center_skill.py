@@ -11,6 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import requests
 import yaml
 
 
@@ -24,7 +25,9 @@ import media_center.catalog as catalog_module  # noqa: E402
 import media_center.coordinator as coordinator_module  # noqa: E402
 from media_center.coordinator import MediaCatalogCoordinator  # noqa: E402
 from media_center.enrichment import (  # noqa: E402
+    DeterministicLocalProvider,
     MediaEnrichmentWorker,
+    MetadataProviderError,
     MusicBrainzMetadataProvider,
     TmdbMetadataProvider,
     default_metadata_providers,
@@ -561,6 +564,17 @@ def test_play_on_creates_a_durable_remote_session_and_sends_play(monkeypatch):
     assert calls[2][2]["session_id"] == "session-tv"
 
 
+def test_play_on_requires_a_target_without_masking_the_skill_error():
+    result = main.play_on(target_id="", source_id="movie-1")
+
+    assert result == {
+        "ok": False,
+        "schema": main.SCHEMA_VERSION,
+        "error": "playback_target_required",
+        "message": "Choose an online playback device.",
+    }
+
+
 def test_play_on_selects_requested_item_in_existing_remote_session(monkeypatch):
     monkeypatch.setattr(
         main,
@@ -1067,6 +1081,98 @@ def test_agent_delta_retires_same_path_legacy_catalog_row(monkeypatch, tmp_path)
     assert available[0]["agent_id"] == "agent-node-a"
     assert len(all_items) == 2
     assert next(item for item in all_items if not item["agent_id"])["missing"] is True
+
+
+def test_agent_delta_retires_legacy_row_reached_through_path_alias(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    repo = MediaCenterRepository()
+    legacy = _resource("track-1.mp3")
+    legacy["size_bytes"] = 1001
+    legacy["source_path"] = r"\\server\music\Music\track-1.mp3"
+    legacy["path"] = legacy["source_path"]
+    repo.scan_resources([legacy], source="media_server", mark_missing=False)
+    legacy_item = repo.list_items(media_kind="audio", limit=1)["items"][0]
+    repo.set_favorite(legacy_item["id"], True)
+    catalog = MediaCatalogCoordinator(repo)
+
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Music/track-1.mp3"))
+    )
+    available = catalog.list_items(media_kind="audio", limit=30)["items"]
+
+    assert len(available) == 1
+    assert available[0]["source_id"] == "source-1"
+    assert available[0]["favorite"] is True
+
+
+def test_schema_migration_retires_path_alias_without_losing_personal_state(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    repo = MediaCenterRepository()
+    legacy = _resource("track-1.mp3")
+    legacy["size_bytes"] = 1001
+    legacy["source_path"] = r"\\server\music\Music\track-1.mp3"
+    legacy["path"] = legacy["source_path"]
+    repo.scan_resources([legacy], source="media_server", mark_missing=False)
+    catalog = MediaCatalogCoordinator(repo)
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Music/track-1.mp3"))
+    )
+    all_items = catalog.list_items(
+        media_kind="audio", include_missing=True, limit=30
+    )["items"]
+    legacy_id = next(item["id"] for item in all_items if not item["agent_id"])
+    canonical_id = next(item["id"] for item in all_items if item["agent_id"])
+    with repo.connect() as connection:
+        connection.execute(
+            "UPDATE catalog_items SET missing=0,favorite=1,play_count=5 WHERE id=?",
+            (legacy_id,),
+        )
+        connection.execute(
+            "UPDATE catalog_items SET favorite=0,play_count=0 WHERE id=?",
+            (canonical_id,),
+        )
+        connection.execute(
+            "INSERT INTO personal_media_state("
+            "profile_id,item_id,favorite,play_count,updated_at"
+            ") VALUES ('default',?,1,5,'2026-08-25T00:00:00Z')",
+            (legacy_id,),
+        )
+        connection.execute(
+            "INSERT INTO personal_media_state("
+            "profile_id,item_id,favorite,play_count,updated_at"
+            ") VALUES ('default',?,0,0,'2026-08-25T00:00:00Z')",
+            (canonical_id,),
+        )
+        connection.execute(
+            "UPDATE coordinator_meta SET value='previous' "
+            "WHERE key='coordinator_schema_revision'"
+        )
+        connection.commit()
+
+    migrated = MediaCatalogCoordinator(repo)
+    available = migrated.list_items(media_kind="audio", limit=30)["items"]
+
+    assert len(available) == 1
+    assert available[0]["id"] == canonical_id
+    assert available[0]["favorite"] is True
+    assert available[0]["play_count"] == 5
+    with repo.connect() as connection:
+        personal = connection.execute(
+            "SELECT favorite,play_count FROM personal_media_state "
+            "WHERE profile_id='default' AND item_id=?",
+            (canonical_id,),
+        ).fetchone()
+    assert personal is not None
+    assert bool(personal["favorite"]) is True
+    assert int(personal["play_count"]) == 5
 
 
 def test_import_folder_registers_playable_files_without_copying(monkeypatch, tmp_path):
@@ -4628,6 +4734,51 @@ def test_enrichment_worker_persists_provider_claims_and_terminal_progress(
     }
 
 
+def test_optional_provider_failure_completes_local_enrichment_with_warning(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+
+    class UnavailableProvider:
+        provider_id = "fixture.external.v1"
+        supported_jobs = frozenset({"metadata_enrichment"})
+
+        @staticmethod
+        def accepts(_subject, *, job_kind):
+            return job_kind == "metadata_enrichment"
+
+        @staticmethod
+        def claims(_subject, *, job_kind):
+            raise MetadataProviderError("fixture_upstream_unavailable")
+
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Music/Artist/Track.mp3"))
+    )
+    worker = MediaEnrichmentWorker(
+        catalog,
+        providers=[DeterministicLocalProvider(), UnavailableProvider()],
+        poll_seconds=0.2,
+    )
+
+    result = worker.run_once()
+    operation = catalog.operations(limit=1)["items"][0]
+
+    assert result["status"] == "completed"
+    assert result["provider_warnings"] == [
+        {
+            "provider_id": "fixture.external.v1",
+            "error_code": "fixture_upstream_unavailable",
+        }
+    ]
+    assert operation["status"] == "completed"
+    assert operation["progress"]["provider_warnings"] == result[
+        "provider_warnings"
+    ]
+
+
 def test_manual_metadata_override_rejects_and_reverses_an_external_match(
     monkeypatch, tmp_path
 ):
@@ -5015,6 +5166,37 @@ def test_musicbrainz_provider_is_rate_limited_cached_and_audio_only():
         },
         job_kind="metadata_enrichment",
     ) is False
+
+
+def test_musicbrainz_tls_failure_opens_a_bounded_circuit_breaker():
+    class Session:
+        def __init__(self):
+            self.calls = 0
+
+        def get(self, _url, **_kwargs):
+            self.calls += 1
+            raise requests.exceptions.SSLError("fixture handshake failed")
+
+    session = Session()
+    provider = MusicBrainzMetadataProvider(session=session)
+    subject = {
+        "subject_ref": "item:audio-a",
+        "title": "Bohemian Rhapsody.mp3",
+        "media_kind": "audio",
+        "metadata": {"artists": ["Queen"]},
+    }
+
+    with pytest.raises(MetadataProviderError) as first:
+        provider.claims(subject, job_kind="metadata_enrichment")
+    with pytest.raises(MetadataProviderError) as second:
+        provider.claims(subject, job_kind="metadata_enrichment")
+
+    assert first.value.code == "musicbrainz_request_failed"
+    assert second.value.code == "musicbrainz_temporarily_unavailable"
+    assert session.calls == 1
+    assert provider.status()["request_count"] == 1
+    assert provider.status()["state"] == "degraded"
+    assert provider.status()["retry_after_seconds"] > 0
 
 
 def test_external_metadata_providers_follow_managed_settings():

@@ -1,4 +1,5 @@
 {
+  "runtime.media_center.ui.source": "Source",
   "runtime.media_center.error.topology_plan_failed": "Could not create the Media Center topology plan.",
   "runtime.media_center.error.topology_apply_failed": "Could not apply the Media Center topology plan.",
   "runtime.media_center.error.topology_status_failed": "Could not read the Media Center topology operation.",
@@ -130,6 +131,10 @@
   "runtime.media_center.ui.metadata_activity": "Metadata activity",
   "runtime.media_center.ui.background_operations": "Background operations",
   "runtime.media_center.ui.artwork_generation": "Artwork generation",
+  "runtime.media_center.ui.conversion_operations": "Conversion operations",
+  "runtime.media_center.ui.current_conversion": "Current conversion",
+  "runtime.media_center.ui.no_conversion_operations": "No conversion operations.",
+  "runtime.media_center.ui.produced_bytes": "Produced bytes",
   "runtime.media_center.ui.collection": "Collection",
   "runtime.media_center.ui.all_collections": "All collections",
   "runtime.media_center.ui.play_all": "Play all",
