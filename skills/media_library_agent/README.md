@@ -48,6 +48,7 @@ two seconds.
 - Active roots may not overlap. Scan windows use node-local `HH:MM` times and weekday numbers (`0` is Monday); invalid windows fail closed.
 - `MEDIA_LIBRARY_AGENT_MAX_BYTES_PER_SECOND` optionally throttles scanner read throughput. Progress reports phase, elapsed time, throughput, wait reason, and checkpoint age in a replace-mode variable.
 - Every changed source receives a cheap basic technical descriptor. `MEDIA_LIBRARY_AGENT_PROBE_MODE=ffprobe` enables a bounded external probe when `ffprobe` is installed; `MEDIA_LIBRARY_AGENT_PROBE_TIMEOUT_SECONDS` is clamped to 1-30 seconds.
+- Audio tags are read locally with Mutagen and normalized into title, artists, album, album artist, genres, date/year, track/disc, language, and MusicBrainz identifiers. A revisioned bounded rescan backfills sources indexed before this extractor existed; original bytes and arbitrary tags never leave the source node.
 - `MEDIA_LIBRARY_AGENT_PERCEPTUAL_HASH_MODE=ffmpeg` optionally hashes a standardized bounded audio/video sample. It is off by default, uses one thread, emits at most 512 KiB, and has a 10-second default/30-second hard timeout. Only the hash enters catalog claims; sampled bytes are discarded and original files are unchanged.
 
 ## Rendition model

@@ -2269,7 +2269,7 @@
                 "inputs": {
                   "presentation": "body",
                   "fields": [
-                    {"key": "tmdb_key", "label": "TMDb key configured", "path": "settings.tmdb_token_configured", "label_i18n": {"key": "runtime.media_center.ui.tmdb_key_configured"}},
+                    {"key": "tmdb_key", "label": "TMDb credential configured", "path": "settings.tmdb_credential_configured", "label_i18n": {"key": "runtime.media_center.ui.tmdb_key_configured"}},
                     {"key": "locale", "label": "Metadata language", "path": "settings.locale", "label_i18n": {"key": "runtime.media_center.ui.metadata_language"}}
                   ]
                 },
@@ -2328,7 +2328,7 @@
                   "on": "change",
                   "type": "callSkill",
                   "target": "media_center_skill.set_metadata_settings",
-                  "timeoutMs": 60000,
+                  "timeoutMs": 300000,
                   "params": {"values": {"external_enabled": "$event.checked"}},
                   "invalidates": ["media_center.metadata_settings"]
                 }],
@@ -2357,7 +2357,7 @@
                   "on": "change",
                   "type": "callSkill",
                   "target": "media_center_skill.set_metadata_settings",
-                  "timeoutMs": 60000,
+                  "timeoutMs": 300000,
                   "params": {"values": {"musicbrainz_enabled": "$event.checked"}},
                   "invalidates": ["media_center.metadata_settings"]
                 }]
@@ -2378,23 +2378,46 @@
                 },
                 "inputs": {
                   "valuePath": "settings.tmdb_enabled",
-                  "description": "Enrich films and series using your free TMDb API Read Access Token.",
+                  "description": "Enrich films and series using your free TMDb API key or Read Access Token.",
                   "description_i18n": {"key": "runtime.media_center.ui.tmdb_description"}
                 },
                 "actions": [{
                   "on": "change",
                   "type": "callSkill",
                   "target": "media_center_skill.set_metadata_settings",
-                  "timeoutMs": 60000,
+                  "timeoutMs": 300000,
                   "params": {"values": {"tmdb_enabled": "$event.checked"}},
                   "invalidates": ["media_center.metadata_settings"]
+                }]
+              },
+              {
+                "id": "media-tmdb-connect-actions",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {
+                  "variant": "toolbar",
+                  "size": "small",
+                  "buttons": [{
+                    "id": "open-api-settings",
+                    "label": "Get a free TMDb key",
+                    "icon": "open-outline",
+                    "label_i18n": {"key": "runtime.media_center.ui.get_tmdb_key"}
+                  }]
+                },
+                "actions": [{
+                  "on": "click:open-api-settings",
+                  "type": "openUrl",
+                  "params": {
+                    "url": "https://www.themoviedb.org/settings/api",
+                    "target": "_blank"
+                  }
                 }]
               },
               {
                 "id": "media-tmdb-token",
                 "type": "input.text",
                 "area": "main",
-                "title": "TMDb API Read Access Token",
+                "title": "TMDb API key or Read Access Token",
                 "inputs": {
                   "initialValue": "",
                   "inputType": "password",
@@ -2402,19 +2425,19 @@
                   "commitMode": "manual",
                   "saveLabel": "Store key",
                   "saveLabel_i18n": {"key": "runtime.media_center.ui.store_key"},
-                  "placeholder": "TMDb API Read Access Token",
-                  "helper": "The stored key is never returned to the interface.",
+                  "placeholder": "TMDb API key or Read Access Token",
+                  "helper": "Sign in to TMDb, request a Developer API key, then paste API Key (v3 auth) or API Read Access Token. The stored credential is validated and never returned to the interface.",
                   "helper_i18n": {"key": "runtime.media_center.ui.tmdb_key_private_hint"}
                 },
                 "actions": [{
                   "on": "change",
                   "type": "callSkill",
                   "target": "media_center_skill.set_metadata_settings",
-                  "timeoutMs": 60000,
-                  "params": {"tmdb_token": "$event.value"},
+                  "timeoutMs": 300000,
+                  "params": {"tmdb_credential": "$event.value"},
                   "invalidates": ["media_center.metadata_settings"]
                 }],
-                "title_i18n": {"key": "runtime.media_center.ui.tmdb_api_read_access_token"}
+                "title_i18n": {"key": "runtime.media_center.ui.tmdb_credential"}
               },
               {
                 "id": "media-tmdb-token-actions",
@@ -2429,8 +2452,8 @@
                   "on": "click:clear",
                   "type": "callSkill",
                   "target": "media_center_skill.set_metadata_settings",
-                  "timeoutMs": 60000,
-                  "params": {"clear_tmdb_token": true},
+                  "timeoutMs": 300000,
+                  "params": {"clear_tmdb_credential": true},
                   "invalidates": ["media_center.metadata_settings"]
                 }]
               },

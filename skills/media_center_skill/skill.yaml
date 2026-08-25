@@ -430,7 +430,7 @@ tools:
   output_schema:
     type: object
 - name: set_metadata_settings
-  description: Update external metadata providers and the protected TMDb token.
+  description: Update external metadata providers and the protected TMDb credential.
   entry: handlers.main:set_metadata_settings
   side_effects: local_write
   input_schema:
@@ -449,11 +449,11 @@ tools:
             type: string
             maxLength: 20
         additionalProperties: false
-      tmdb_token:
+      tmdb_credential:
         type: string
         maxLength: 2048
         writeOnly: true
-      clear_tmdb_token:
+      clear_tmdb_credential:
         type: boolean
         default: false
     additionalProperties: true

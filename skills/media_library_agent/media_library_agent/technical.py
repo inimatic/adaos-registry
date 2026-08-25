@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import re
 import shutil
 import subprocess
 from fractions import Fraction
@@ -13,8 +14,92 @@ from .contracts import text
 
 
 TECHNICAL_DESCRIPTOR_SCHEMA = "adaos.media.technical_descriptor.v2"
+EMBEDDED_METADATA_REVISION = "1"
 MAX_STREAMS = 64
 MAX_CHAPTERS = 256
+
+
+def _tag_values(value: Any) -> list[str]:
+    values = value if isinstance(value, (list, tuple, set)) else [value]
+    return [
+        text(item)[:500]
+        for item in list(values)[:20]
+        if text(item)
+    ]
+
+
+def normalize_embedded_metadata(tags: Mapping[str, Any]) -> dict[str, Any]:
+    folded = {
+        text(key).lower().replace(" ", "_"): value
+        for key, value in list(tags.items())[:500]
+    }
+
+    def first(*keys: str) -> str:
+        for key in keys:
+            values = _tag_values(folded.get(key))
+            if values:
+                return values[0]
+        return ""
+
+    def many(*keys: str) -> list[str]:
+        for key in keys:
+            values = _tag_values(folded.get(key))
+            if values:
+                return values
+        return []
+
+    result: dict[str, Any] = {}
+    scalar_fields = {
+        "title": ("title",),
+        "album": ("album",),
+        "album_artist": ("albumartist", "album_artist"),
+        "composer": ("composer",),
+        "release_date": ("date", "originaldate", "original_date"),
+        "language": ("language",),
+    }
+    for field, keys in scalar_fields.items():
+        value = first(*keys)
+        if value:
+            result[field] = value
+    artists = many("artist", "artists")
+    if artists:
+        result["artists"] = artists
+    genres = many("genre", "genres")
+    if genres:
+        result["genres"] = genres
+    for field, keys in (
+        ("track_number", ("tracknumber", "track_number")),
+        ("disc_number", ("discnumber", "disc_number")),
+    ):
+        value = first(*keys).split("/", 1)[0].strip()
+        if value.isdigit():
+            result[field] = int(value)
+    date = text(result.get("release_date"))
+    year_match = re.match(r"^(?:19|20)\d{2}", date)
+    if year_match:
+        result["year"] = int(year_match.group(0))
+    external_ids = {
+        "musicbrainz_recording": first(
+            "musicbrainz_trackid", "musicbrainz_recordingid"
+        ),
+        "musicbrainz_release": first("musicbrainz_albumid"),
+        "musicbrainz_artist": first("musicbrainz_artistid"),
+    }
+    external_ids = {key: value for key, value in external_ids.items() if value}
+    if external_ids:
+        result["external_ids"] = external_ids
+    return result
+
+
+def read_embedded_metadata(path: Path) -> dict[str, Any]:
+    try:
+        from mutagen import File as MutagenFile  # type: ignore[import-not-found]
+
+        media = MutagenFile(path, easy=True)
+        tags = getattr(media, "tags", None)
+    except Exception:
+        return {}
+    return normalize_embedded_metadata(tags) if isinstance(tags, Mapping) else {}
 
 
 def _number(value: Any, *, integer: bool = False) -> int | float:
@@ -270,4 +355,11 @@ def probe_media(
     }
 
 
-__all__ = ["TECHNICAL_DESCRIPTOR_SCHEMA", "basic_descriptor", "probe_media"]
+__all__ = [
+    "EMBEDDED_METADATA_REVISION",
+    "TECHNICAL_DESCRIPTOR_SCHEMA",
+    "basic_descriptor",
+    "normalize_embedded_metadata",
+    "probe_media",
+    "read_embedded_metadata",
+]

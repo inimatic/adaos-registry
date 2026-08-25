@@ -48,6 +48,8 @@ from media_center.coordinator import (  # noqa: E402
 )
 from media_center.enrichment import (  # noqa: E402
     MediaEnrichmentWorker,
+    MetadataProviderError,
+    TmdbMetadataProvider,
     default_metadata_providers,
     metadata_provider_configuration,
 )
@@ -63,7 +65,7 @@ _coordinator_init_lock = threading.Lock()
 _coordinator_path = ""
 _coordinator_cached: MediaCatalogCoordinator | None = None
 _log = logging.getLogger("adaos.skill.media_center")
-_TMDB_TOKEN_SECRET = "tmdb_read_access_token"
+_TMDB_CREDENTIAL_SECRET = "tmdb_api_credential"
 
 
 class MediaRootOperationBusy(RuntimeError):
@@ -115,15 +117,17 @@ def _enrichment_runtime(
     coordinator = catalog or _coordinator()
     path = str(coordinator.repository.db_path.resolve())
     settings = dict(coordinator.metadata_settings()["settings"])
-    token = _read_tmdb_token()
+    credential = _read_tmdb_credential()
     configuration = metadata_provider_configuration(
-        settings, tmdb_token_configured=bool(token)
+        settings, tmdb_credential_configured=bool(credential)
     )
     return background_runtime().enrichment_worker(
         path,
         lambda: MediaEnrichmentWorker(
             coordinator,
-            providers=default_metadata_providers(settings, tmdb_token=token),
+            providers=default_metadata_providers(
+                settings, tmdb_credential=credential
+            ),
             provider_configuration=configuration,
             publish=lambda: _publish_operation_snapshot(coordinator),
             publish_settled=lambda: _publish_library_snapshot(coordinator),
@@ -131,11 +135,11 @@ def _enrichment_runtime(
     )
 
 
-def _read_tmdb_token() -> str:
+def _read_tmdb_credential() -> str:
     try:
         from adaos.sdk.data.secrets import get as secret_get
 
-        return str(secret_get(_TMDB_TOKEN_SECRET, "") or "").strip()
+        return str(secret_get(_TMDB_CREDENTIAL_SECRET, "") or "").strip()
     except Exception:
         return ""
 
@@ -1475,15 +1479,15 @@ def get_metadata_settings(**_: Any) -> dict[str, Any]:
     catalog = _coordinator()
     result = catalog.metadata_settings()
     settings = dict(result["settings"])
-    token_configured = bool(_read_tmdb_token())
+    credential_configured = bool(_read_tmdb_credential())
     return {
         **result,
         "settings": {
             **settings,
-            "tmdb_token_configured": token_configured,
+            "tmdb_credential_configured": credential_configured,
         },
         "providers": metadata_provider_configuration(
-            settings, tmdb_token_configured=token_configured
+            settings, tmdb_credential_configured=credential_configured
         ),
     }
 
@@ -1491,8 +1495,8 @@ def get_metadata_settings(**_: Any) -> dict[str, Any]:
 @tool(summary="Update managed external metadata provider settings.", side_effects="local_write")
 def set_metadata_settings(
     values: Mapping[str, Any] | None = None,
-    tmdb_token: str = "",
-    clear_tmdb_token: bool = False,
+    tmdb_credential: str = "",
+    clear_tmdb_credential: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
     from adaos.sdk.data.secrets import delete as secret_delete
@@ -1507,24 +1511,62 @@ def set_metadata_settings(
     if "locale" in requested and requested["locale"] is not None:
         normalized["locale"] = str(requested["locale"] or "").strip()
 
-    token_before = _read_tmdb_token()
-    token_value = str(tmdb_token or "").strip()
-    token_changed = False
-    if _bool(clear_tmdb_token, False):
-        if token_before:
-            secret_delete(_TMDB_TOKEN_SECRET)
-            token_changed = True
-    elif token_value:
-        secret_set(_TMDB_TOKEN_SECRET, token_value)
-        token_changed = token_value != token_before
+    credential_before = _read_tmdb_credential()
+    credential_value = str(tmdb_credential or "").strip()
+    credential_changed = False
+    validation: dict[str, Any] = {"ok": True, "skipped": True}
+    if _bool(clear_tmdb_credential, False):
+        if credential_before:
+            secret_delete(_TMDB_CREDENTIAL_SECRET)
+            credential_changed = True
+    elif credential_value:
+        try:
+            validation = TmdbMetadataProvider(
+                credential=credential_value,
+                language=str(
+                    normalized.get("locale")
+                    or catalog.metadata_settings()["settings"].get("locale")
+                    or "ru-RU"
+                ),
+            ).validate()
+        except MetadataProviderError as exc:
+            key = f"runtime.media_center.error.{exc.code}"
+            fallbacks = {
+                "tmdb_authentication_failed": (
+                    "TMDb rejected this API key or Read Access Token."
+                ),
+                "tmdb_rate_limited": (
+                    "TMDb is rate limiting requests. Try again later."
+                ),
+                "tmdb_upstream_unavailable": (
+                    "TMDb is temporarily unavailable. Try again later."
+                ),
+                "tmdb_request_failed": (
+                    "TMDb could not be reached. Check the connection and retry."
+                ),
+            }
+            return _skill_error(
+                exc.code,
+                human_message=_skill_text(
+                    key, fallbacks.get(exc.code, "TMDb validation failed.")
+                ),
+                i18n_key=key,
+                retryable=exc.retryable,
+            )
+        secret_set(_TMDB_CREDENTIAL_SECRET, credential_value)
+        credential_changed = credential_value != credential_before
 
-    updated = catalog.set_metadata_settings(normalized)
-    changed = bool(updated.get("changed")) or token_changed
+    updated = catalog.set_metadata_settings(
+        normalized, force_revision=credential_changed
+    )
+    changed = bool(updated.get("changed"))
     reset = {"stopped": True, "skipped": True}
+    requeue = {"ok": True, "queued_count": 0, "skipped": True}
     if changed:
         reset = background_runtime().reset_enrichment(timeout=30.0)
         if reset.get("stopped") is not True:
             raise RuntimeError("media_center_enrichment_restart_timeout")
+        requeue = catalog.requeue_metadata_enrichment()
         _enrichment_runtime(catalog).ensure_started()
         _publish_operation_snapshot(
             catalog,
@@ -1536,6 +1578,8 @@ def set_metadata_settings(
             "changed": changed,
             "worker_restarted": changed,
             "worker_reset": reset,
+            "requeue": requeue,
+            "credential_validation": validation,
         }
     )
     return current

@@ -169,8 +169,11 @@ agent plus root identity, so legacy Media Server rows stay searchable without
 flattening the folder tree. Metadata and artwork run as bounded observable jobs
 at the storage node; embedded art and representative frames produce derived
 JPEGs while original video/audio bytes remain external references. The
-optional TMDb provider is explicit, paced, privacy-bounded, and disabled
-without credentials. Library stream sequencing composes catalog and personal
+TMDb provider is explicit, paced, privacy-bounded, and reports
+`credentials_missing` until a user-supplied free API key or Read Access Token
+passes validation and enters the skill secret store. MusicBrainz is
+credential-free and uses locally extracted audio tags before filename evidence.
+Library stream sequencing composes catalog and personal
 revisions so a file scan, favorite, Recent, or profile change cannot be rejected
 as stale merely because the other revision plane is ahead. Skill-localized
 remote assets, ordered collection playback, compact controls, app-shell

@@ -200,7 +200,12 @@ def _external_subject(subject: Mapping[str, Any]) -> dict[str, Any]:
     metadata = subject.get("metadata")
     evidence = dict(metadata) if isinstance(metadata, Mapping) else {}
     raw_title = str(subject.get("title") or subject.get("name") or "").strip()
-    title = re.sub(r"\.(?:mkv|mp4|m4v|avi|mov|webm)$", "", raw_title, flags=re.I)
+    title = re.sub(
+        r"\.(?:aac|aiff?|alac|ape|avi|flac|m4[av]|mka|mkv|mov|mp[234]|mpeg|mpg|ogg|opus|wav|webm|wma|wmv)$",
+        "",
+        raw_title,
+        flags=re.I,
+    )
     title = _EPISODE_RE.sub(" ", title)
     title = _TITLE_NOISE_RE.sub("", title)
     title = re.sub(r"[._]+", " ", title)
@@ -237,7 +242,7 @@ class TmdbMetadataProvider:
     def __init__(
         self,
         *,
-        read_access_token: str,
+        credential: str,
         language: str = "en-US",
         api_base: str = "https://api.themoviedb.org/3",
         timeout_seconds: float = 10.0,
@@ -246,10 +251,13 @@ class TmdbMetadataProvider:
         cache_limit: int = 1000,
         session: requests.Session | None = None,
     ) -> None:
-        token = str(read_access_token or "").strip()
-        if not token:
-            raise ValueError("tmdb_read_access_token_required")
-        self._token = token
+        value = str(credential or "").strip()
+        if not value:
+            raise ValueError("tmdb_credential_required")
+        self._credential = value
+        self._credential_kind = (
+            "api_key" if re.fullmatch(r"[0-9a-fA-F]{32}", value) else "bearer"
+        )
         self.language = str(language or "en-US")[:20]
         self.api_base = str(api_base or "https://api.themoviedb.org/3").rstrip("/")
         self.timeout_seconds = max(2.0, min(float(timeout_seconds), 30.0))
@@ -285,13 +293,16 @@ class TmdbMetadataProvider:
                 time.sleep(wait)
             self._last_request_monotonic = time.monotonic()
         try:
+            request_params = dict(params)
+            headers = {"Accept": "application/json"}
+            if self._credential_kind == "api_key":
+                request_params["api_key"] = self._credential
+            else:
+                headers["Authorization"] = f"Bearer {self._credential}"
             response = self._session.get(
                 f"{self.api_base}/{path.lstrip('/')}",
-                headers={
-                    "Authorization": f"Bearer {self._token}",
-                    "Accept": "application/json",
-                },
-                params=dict(params),
+                headers=headers,
+                params=request_params,
                 timeout=self.timeout_seconds,
             )
             self._requests += 1
@@ -360,6 +371,23 @@ class TmdbMetadataProvider:
             },
             cache_key=f"details|{kind}|{self.language}|{int(external_id)}",
         )
+
+    def validate(self) -> dict[str, Any]:
+        payload = self._request_json(
+            "authentication",
+            params={},
+            cache_key="credential-validation",
+        )
+        if payload.get("success") is False:
+            raise MetadataProviderError(
+                "tmdb_authentication_failed", retryable=False
+            )
+        return {
+            "ok": True,
+            "provider_id": self.provider_id,
+            "state": "ready",
+            "credential_kind": self._credential_kind,
+        }
 
     @staticmethod
     def _match_score(result: Mapping[str, Any], evidence: Mapping[str, Any]) -> float:
@@ -515,6 +543,7 @@ class TmdbMetadataProvider:
             "state": "degraded" if self._last_error else "ready",
             "language": self.language,
             "privacy": "normalized_title_year_kind_only",
+            "credential_kind": self._credential_kind,
             "request_count": self._requests,
             "cache_hit_count": self._cache_hits,
             "failure_count": self._failures,
@@ -604,6 +633,10 @@ class MusicBrainzMetadataProvider:
             return []
         external_ids = evidence["external_ids"]
         recording_id = external_ids.get("musicbrainz_recording") or external_ids.get("musicbrainz")
+        if not recording_id and not re.search(
+            r"[^\W\d_]", str(evidence.get("title") or ""), flags=re.UNICODE
+        ):
+            return []
         if recording_id:
             recording = self._request(
                 f"recording/{recording_id}",
@@ -700,7 +733,7 @@ class MusicBrainzMetadataProvider:
 def metadata_provider_configuration(
     settings: Mapping[str, Any] | None = None,
     *,
-    tmdb_token_configured: bool = False,
+    tmdb_credential_configured: bool = False,
 ) -> list[dict[str, Any]]:
     values = dict(settings or {})
     external_enabled = _enabled(values.get("external_enabled"))
@@ -708,7 +741,7 @@ def metadata_provider_configuration(
     musicbrainz_enabled = external_enabled and _enabled(
         values.get("musicbrainz_enabled")
     )
-    tmdb_ready = tmdb_enabled and bool(tmdb_token_configured)
+    tmdb_ready = tmdb_enabled and bool(tmdb_credential_configured)
     return [
         {
             "provider_id": "media_center.deterministic_local.v1",
@@ -761,16 +794,16 @@ def metadata_provider_configuration(
 def default_metadata_providers(
     settings: Mapping[str, Any] | None = None,
     *,
-    tmdb_token: str = "",
+    tmdb_credential: str = "",
 ) -> tuple[MetadataProvider, ...]:
     values = dict(settings or {})
     external_enabled = _enabled(values.get("external_enabled"))
     providers: list[MetadataProvider] = [DeterministicLocalProvider()]
-    token = str(tmdb_token or "").strip()
-    if external_enabled and _enabled(values.get("tmdb_enabled")) and token:
+    credential = str(tmdb_credential or "").strip()
+    if external_enabled and _enabled(values.get("tmdb_enabled")) and credential:
         providers.append(
             TmdbMetadataProvider(
-                read_access_token=token,
+                credential=credential,
                 language=str(values.get("locale") or "ru-RU"),
             )
         )

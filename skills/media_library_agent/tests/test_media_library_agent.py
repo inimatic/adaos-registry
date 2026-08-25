@@ -26,6 +26,7 @@ import media_library_agent.technical as technical_module  # noqa: E402
 from media_library_agent.technical import probe_media  # noqa: E402
 import media_library_agent.topology as topology_module  # noqa: E402
 from media_library_agent.topology import LibraryAgentTopology  # noqa: E402
+import media_library_agent.worker as worker_module  # noqa: E402
 from media_library_agent.worker import MediaLibraryAgentWorker  # noqa: E402
 
 
@@ -218,6 +219,98 @@ def test_local_nfo_is_bounded_and_refreshes_unchanged_media_source(tmp_path):
     assert changed["revision"] > first_revision
     assert changed["metadata"]["title"] == "Example Director Cut"
     assert read_local_nfo(media)["state"] == "ready"
+
+
+def test_embedded_audio_tags_are_normalized_and_backfilled_on_rescan(
+    monkeypatch, tmp_path
+):
+    library = tmp_path / "library"
+    library.mkdir()
+    media = library / "01.mp3"
+    media.write_bytes(b"audio")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "tags.sqlite3", node_id="node-a"
+    )
+    monkeypatch.setattr(
+        worker_module,
+        "read_embedded_metadata",
+        lambda _path: {
+            "title": "First Track",
+            "artists": ["Artist"],
+            "album": "Album",
+            "genres": ["Rock"],
+            "year": 2024,
+            "track_number": 1,
+        },
+    )
+    worker = MediaLibraryAgentWorker(
+        repository,
+        register=lambda path, _root, metadata: {
+            "resource_id": path.name,
+            "path": str(path),
+            "mime_type": "audio/mpeg",
+            "metadata": dict(metadata),
+        },
+    )
+    root = repository.add_root(str(library))["root"]
+    first_job = repository.create_job(root["id"], mode="full")["job"]
+    assert worker.run_once()["id"] == first_job["id"]
+    source = repository.source_by_path(root["id"], media.name)
+    assert source["metadata"]["title"] == "First Track"
+    assert source["metadata"]["artists"] == ["Artist"]
+    first_revision = source["revision"]
+
+    stale = dict(source["metadata"])
+    for key in (
+        "embedded_metadata_revision",
+        "title",
+        "artists",
+        "album",
+        "genres",
+        "year",
+        "track_number",
+    ):
+        stale.pop(key, None)
+    with repository.connect() as connection:
+        connection.execute(
+            "UPDATE sources SET metadata_json=? WHERE id=?",
+            (json.dumps(stale, ensure_ascii=False, sort_keys=True), source["id"]),
+        )
+        connection.commit()
+    assert repository.roots_missing_embedded_metadata(
+        revision="1"
+    ) == [root["id"]]
+
+    second_job = repository.create_job(root["id"], mode="full")["job"]
+    assert worker.run_once()["id"] == second_job["id"]
+    refreshed = repository.source_by_path(root["id"], media.name)
+    assert refreshed["revision"] > first_revision
+    assert refreshed["metadata"]["embedded_metadata_revision"] == "1"
+    assert refreshed["metadata"]["album"] == "Album"
+    assert repository.roots_missing_embedded_metadata(revision="1") == []
+
+
+def test_embedded_tag_normalization_supports_musicbrainz_ids():
+    result = technical_module.normalize_embedded_metadata(
+        {
+            "title": ["Track"],
+            "artist": ["Artist"],
+            "album": ["Album"],
+            "date": ["2022-03-04"],
+            "tracknumber": ["2/12"],
+            "musicbrainz_trackid": ["recording-id"],
+        }
+    )
+
+    assert result == {
+        "title": "Track",
+        "album": "Album",
+        "release_date": "2022-03-04",
+        "artists": ["Artist"],
+        "track_number": 2,
+        "year": 2022,
+        "external_ids": {"musicbrainz_recording": "recording-id"},
+    }
 
 
 def test_start_scan_publishes_queued_state_before_worker_pickup(monkeypatch, tmp_path):

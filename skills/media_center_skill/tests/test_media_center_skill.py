@@ -4089,8 +4089,7 @@ def test_source_revision_coalesces_queued_enrichment_and_bounds_history(
 
     for kind in ("metadata_enrichment", "embedding", "fingerprint"):
         assert counts[(kind, "queued")] == 1
-        assert counts[(kind, "canceled")] == 8
-    assert sum(counts.values()) == 27
+    assert sum(counts.values()) == 3
 
 
 def test_catalog_corrections_are_audited_reversible_and_non_destructive(
@@ -4310,6 +4309,34 @@ def test_metadata_facets_filters_and_plex_style_sorts_are_server_bounded(
     assert [item["title"] for item in second["items"]] == ["Old Drama"]
 
 
+def test_release_date_claim_populates_year_projection_and_facet(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Movies/Movie.mp4", kind="video"))
+    )
+    item = catalog.list_items(media_kind="video")["items"][0]
+
+    catalog.record_metadata_claim(
+        subject_ref=f"item:{item['id']}",
+        field_name="release_date",
+        value="2001-11-16",
+        provenance="media_center.tmdb.v1",
+        confidence=0.9,
+    )
+
+    enriched = catalog.list_items(media_kind="video")["items"][0]
+    years = catalog.metadata_facets(
+        dimension="year", media_kind="video", include_all=False
+    )["items"]
+    assert enriched["year"] == 2001
+    assert years[0]["option_value"] == 2001
+
+
 def test_metadata_provider_configuration_explains_managed_provider_state():
     statuses = {
         item["provider_id"]: item
@@ -4320,7 +4347,7 @@ def test_metadata_provider_configuration_explains_managed_provider_state():
                 "tmdb_enabled": True,
                 "locale": "ru-RU",
             },
-            tmdb_token_configured=False,
+            tmdb_credential_configured=False,
         )
     }
 
@@ -4376,7 +4403,7 @@ def test_tmdb_provider_sends_only_normalized_evidence_and_caches_details():
 
     session = Session()
     provider = TmdbMetadataProvider(
-        read_access_token="secret-token",
+        credential="secret-token",
         session=session,
         minimum_interval_seconds=0.1,
     )
@@ -4414,6 +4441,22 @@ def test_tmdb_provider_sends_only_normalized_evidence_and_caches_details():
         "artwork_candidates",
     }
     assert provider.status()["cache_hit_count"] == 2
+
+    api_key_session = Session()
+    api_key_provider = TmdbMetadataProvider(
+        credential="0123456789abcdef0123456789abcdef",
+        session=api_key_session,
+        minimum_interval_seconds=0.1,
+    )
+    api_key_provider.claims(subject, job_kind="metadata_enrichment")
+    api_key_request = api_key_session.calls[0][1]
+    assert "Authorization" not in api_key_request["headers"]
+    assert api_key_request["params"]["api_key"] == (
+        "0123456789abcdef0123456789abcdef"
+    )
+    assert api_key_provider.validate()["ok"] is True
+    assert api_key_session.calls[-1][0].endswith("/authentication")
+    assert api_key_provider.status()["credential_kind"] == "api_key"
 
 
 def test_musicbrainz_provider_is_rate_limited_cached_and_audio_only():
@@ -4460,6 +4503,16 @@ def test_musicbrainz_provider_is_rate_limited_cached_and_audio_only():
     assert {claim["field_name"] for claim in first} >= {
         "title", "artists", "album", "genres", "artwork_candidates",
     }
+    assert provider.claims(
+        {
+            "subject_ref": "item:numeric",
+            "title": "3 08 01 04.mp3",
+            "media_kind": "audio",
+            "metadata": {},
+        },
+        job_kind="metadata_enrichment",
+    ) == []
+    assert len(session.calls) == 1
 
 
 def test_external_metadata_providers_follow_managed_settings():
@@ -4475,7 +4528,9 @@ def test_external_metadata_providers_follow_managed_settings():
     }
     assert [
         provider.provider_id
-        for provider in default_metadata_providers(settings, tmdb_token="token")
+        for provider in default_metadata_providers(
+            settings, tmdb_credential="token"
+        )
     ] == [
         "media_center.deterministic_local.v1",
         "media_center.tmdb.v1",
@@ -4506,6 +4561,34 @@ def test_metadata_settings_are_durable_and_default_to_managed_enrichment(
     assert restored["musicbrainz_enabled"] is False
     assert restored["locale"] == "en-US"
     assert restored["revision"] == 1
+
+
+def test_metadata_credential_revision_requeues_current_catalog_once(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    repository = MediaCenterRepository()
+    catalog = MediaCatalogCoordinator(repository)
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Movies/Movie.2024.mp4", kind="video"))
+    )
+
+    updated = catalog.set_metadata_settings({}, force_revision=True)
+    requeued = catalog.requeue_metadata_enrichment()
+
+    assert updated["changed"] is True
+    assert updated["settings"]["revision"] == 1
+    assert requeued["queued_count"] == 1
+    with repository.connect() as connection:
+        rows = connection.execute(
+            "SELECT status,COUNT(*) AS count FROM media_background_jobs "
+            "WHERE kind='metadata_enrichment' GROUP BY status"
+        ).fetchall()
+    assert {row["status"]: int(row["count"]) for row in rows} == {
+        "queued": 1
+    }
 
 
 def test_enrichment_worker_runs_all_eligible_providers(monkeypatch, tmp_path):

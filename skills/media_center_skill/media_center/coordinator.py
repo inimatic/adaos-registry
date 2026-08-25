@@ -31,7 +31,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-25.1"
+COORDINATOR_SCHEMA_REVISION = "2026-08-25.2"
 SEARCH_ROWID_REVISION = "1"
 METADATA_SETTINGS_KEY = "metadata_provider_settings"
 DEFAULT_METADATA_SETTINGS = {
@@ -40,6 +40,31 @@ DEFAULT_METADATA_SETTINGS = {
     "tmdb_enabled": True,
     "locale": "ru-RU",
 }
+_IDENTITY_METADATA_FIELDS = (
+    "title",
+    "original_title",
+    "sort_title",
+    "year",
+    "release_year",
+    "release_date",
+    "album",
+    "album_artist",
+    "artist",
+    "artists",
+    "series",
+    "season",
+    "episode",
+    "track",
+    "track_number",
+    "disc",
+    "disc_number",
+    "genres",
+    "categories",
+    "language",
+    "aliases",
+    "external_ids",
+    "local_nfo",
+)
 
 
 def _setting_bool(value: Any) -> bool:
@@ -1453,7 +1478,15 @@ class MediaCatalogCoordinator:
             work_id=str(row["work_id"]),
         )
         title = _text(metadata.get("title")) or str(row["title"])
-        year_number = self._numeric(metadata.get("year") or metadata.get("release_year"))
+        release_date = _text(metadata.get("release_date"))
+        release_year = (
+            int(release_date[:4])
+            if re.match(r"^(?:19|20)\d{2}", release_date)
+            else None
+        )
+        year_number = self._numeric(
+            metadata.get("year") or metadata.get("release_year") or release_year
+        )
         year = int(year_number) if year_number is not None else None
         rating = self._numeric(metadata.get("rating") or metadata.get("vote_average"))
         critic_rating = self._numeric(metadata.get("critic_rating"))
@@ -1496,7 +1529,7 @@ class MediaCatalogCoordinator:
             """,
             (
                 str(row["id"]), _json_dumps(metadata), _json_dumps(provenance),
-                title, year, _text(metadata.get("release_date")), rating,
+                title, year, release_date, rating,
                 critic_rating, audience_rating, _text(metadata.get("content_rating")),
                 max(0, int(duration_ms_number)), _json_dumps(genres),
                 _json_dumps(artists), _text(metadata.get("album")),
@@ -1765,6 +1798,141 @@ class MediaCatalogCoordinator:
             "has_more": bool(page.get("has_more")),
             "catalog_revision": self.catalog_revision(),
         }
+
+    @staticmethod
+    def _job_evidence_witness(
+        kind: str,
+        *,
+        title: str,
+        name: str,
+        media_kind: str,
+        folder_path: str,
+        fingerprint: str,
+        size_bytes: int,
+        modified_at: str,
+        metadata: Mapping[str, Any],
+        provider_revision: int = 0,
+    ) -> str:
+        if kind == "fingerprint":
+            technical = metadata.get("technical")
+            evidence: Mapping[str, Any] = {
+                "fingerprint": fingerprint,
+                "size_bytes": max(0, int(size_bytes)),
+                "modified_at": modified_at,
+                "perceptual_hash": (
+                    technical.get("perceptual_hash")
+                    if isinstance(technical, Mapping)
+                    else ""
+                ),
+            }
+        else:
+            identity = {
+                key: metadata.get(key)
+                for key in _IDENTITY_METADATA_FIELDS
+                if metadata.get(key) not in (None, "", [], {})
+            }
+            evidence = {
+                "title": title,
+                "name": name,
+                "media_kind": media_kind,
+                "folder_path": folder_path,
+                "metadata": identity,
+                "provider_revision": (
+                    max(0, int(provider_revision))
+                    if kind == "metadata_enrichment"
+                    else 0
+                ),
+            }
+        return hashlib.sha256(
+            _json_dumps(evidence).encode("utf-8", errors="replace")
+        ).hexdigest()
+
+    @staticmethod
+    def _metadata_settings_revision_connection(
+        connection: sqlite3.Connection,
+    ) -> int:
+        row = connection.execute(
+            "SELECT value FROM coordinator_meta WHERE key=?",
+            (METADATA_SETTINGS_KEY,),
+        ).fetchone()
+        stored = _json_loads(row["value"]) if row is not None else {}
+        if not isinstance(stored, Mapping):
+            return 0
+        return max(0, int(stored.get("revision") or 0))
+
+    def _queue_source_background_jobs(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        item_id: str,
+        title: str,
+        name: str,
+        media_kind: str,
+        folder_path: str,
+        fingerprint: str,
+        size_bytes: int,
+        modified_at: str,
+        metadata: Mapping[str, Any],
+        kinds: Iterable[str] = (
+            "metadata_enrichment",
+            "embedding",
+            "fingerprint",
+        ),
+        provider_revision: int | None = None,
+    ) -> int:
+        subject_ref = f"item:{item_id}"
+        effective_provider_revision = (
+            self._metadata_settings_revision_connection(connection)
+            if provider_revision is None
+            else max(0, int(provider_revision))
+        )
+        priorities = {
+            "metadata_enrichment": 200,
+            "embedding": 600,
+            "fingerprint": 500,
+        }
+        queued = 0
+        for job_kind in kinds:
+            witness = self._job_evidence_witness(
+                job_kind,
+                title=title,
+                name=name,
+                media_kind=media_kind,
+                folder_path=folder_path,
+                fingerprint=fingerprint,
+                size_bytes=size_bytes,
+                modified_at=modified_at,
+                metadata=metadata,
+                provider_revision=effective_provider_revision,
+            )
+            job_id = _stable_id(
+                "mediajob", job_kind, item_id, witness, size=24
+            )
+            # Superseded queued work never ran and is not useful audit history.
+            connection.execute(
+                "DELETE FROM media_background_jobs "
+                "WHERE subject_ref=? AND kind=? AND status='queued' AND id<>?",
+                (subject_ref, job_kind, job_id),
+            )
+            queued_at = now_iso()
+            queued += int(
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO media_background_jobs(
+                        id,kind,subject_ref,status,priority,created_at,updated_at
+                    ) VALUES (?, ?, ?, 'queued', ?, ?, ?)
+                    """,
+                    (
+                        job_id,
+                        job_kind,
+                        subject_ref,
+                        priorities[job_kind],
+                        queued_at,
+                        queued_at,
+                    ),
+                ).rowcount
+            )
+        return queued
 
     def _apply_delta(self, connection: sqlite3.Connection, delta: Mapping[str, Any], *, agent_id: str, node_id: str) -> str:
         source = delta.get("source") if isinstance(delta.get("source"), Mapping) else {}
@@ -2117,50 +2285,20 @@ class MediaCatalogCoordinator:
                     preferred=False,
                 )
         self._refresh_metadata_projection(connection, item_id)
-        for job_kind, priority in (
-            ("metadata_enrichment", 200),
-            ("embedding", 600),
-            ("fingerprint", 500),
-        ):
-            job_id = _stable_id(
-                "mediajob", job_kind, item_id, source_revision, size=24
-            )
-            queued_at = now_iso()
-            connection.execute(
-                """
-                UPDATE media_background_jobs
-                SET status='canceled', error_code='superseded_source_revision',
-                    finished_at=?, updated_at=?
-                WHERE subject_ref=? AND kind=? AND status='queued' AND id<>?
-                """,
-                (queued_at, queued_at, subject_ref, job_kind, job_id),
-            )
-            connection.execute(
-                """
-                INSERT OR IGNORE INTO media_background_jobs(
-                    id,kind,subject_ref,status,priority,created_at,updated_at
-                ) VALUES (?, ?, ?, 'queued', ?, ?, ?)
-                """,
-                (
-                    job_id,
-                    job_kind,
-                    subject_ref,
-                    priority,
-                    queued_at,
-                    queued_at,
-                ),
-            )
-            connection.execute(
-                """
-                DELETE FROM media_background_jobs WHERE id IN (
-                    SELECT id FROM media_background_jobs
-                    WHERE subject_ref=? AND kind=?
-                        AND status IN ('completed','failed','canceled')
-                    ORDER BY updated_at DESC,id DESC LIMIT -1 OFFSET 8
-                )
-                """,
-                (subject_ref, job_kind),
-            )
+        self._queue_source_background_jobs(
+            connection,
+            item_id=item_id,
+            title=title,
+            name=name,
+            media_kind=kind,
+            folder_path=folder_path,
+            fingerprint=_text(source.get("fingerprint")),
+            size_bytes=int(
+                source.get("size_bytes") or descriptor.get("size_bytes") or 0
+            ),
+            modified_at=modified_at,
+            metadata=metadata,
+        )
         return operation or "updated"
 
     @staticmethod
@@ -6519,9 +6657,14 @@ class MediaCatalogCoordinator:
             "settings": values,
         }
 
-    def set_metadata_settings(self, values: Mapping[str, Any]) -> dict[str, Any]:
+    def set_metadata_settings(
+        self,
+        values: Mapping[str, Any],
+        *,
+        force_revision: bool = False,
+    ) -> dict[str, Any]:
         current = dict(self.metadata_settings()["settings"])
-        changed = False
+        changed = bool(force_revision)
         for key in ("external_enabled", "musicbrainz_enabled", "tmdb_enabled"):
             if key not in values or values[key] is None:
                 continue
@@ -6547,6 +6690,53 @@ class MediaCatalogCoordinator:
             "schema": "adaos.media_center.metadata_settings.v1",
             "changed": changed,
             "settings": current,
+        }
+
+    def requeue_metadata_enrichment(self) -> dict[str, Any]:
+        settings = dict(self.metadata_settings()["settings"])
+        provider_revision = max(0, int(settings.get("revision") or 0))
+        queued = 0
+        with self.repository.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            removed = int(
+                connection.execute(
+                    "DELETE FROM media_background_jobs "
+                    "WHERE kind='metadata_enrichment' AND status='queued'"
+                ).rowcount
+            )
+            rows = connection.execute(
+                """
+                SELECT id,title,name,media_kind,folder_path,fingerprint,size_bytes,
+                    modified_at,metadata_json
+                FROM catalog_items WHERE missing=0
+                ORDER BY id
+                """
+            )
+            for row in rows:
+                metadata = _json_loads(row["metadata_json"])
+                queued += self._queue_source_background_jobs(
+                    connection,
+                    item_id=str(row["id"]),
+                    title=str(row["title"]),
+                    name=str(row["name"]),
+                    media_kind=str(row["media_kind"]),
+                    folder_path=str(row["folder_path"]),
+                    fingerprint=str(row["fingerprint"]),
+                    size_bytes=int(row["size_bytes"] or 0),
+                    modified_at=str(row["modified_at"]),
+                    metadata=(
+                        metadata if isinstance(metadata, Mapping) else {}
+                    ),
+                    kinds=("metadata_enrichment",),
+                    provider_revision=provider_revision,
+                )
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": "adaos.media_center.metadata_requeue.v1",
+            "provider_revision": provider_revision,
+            "removed_queued_count": removed,
+            "queued_count": queued,
         }
 
     def diagnostics(

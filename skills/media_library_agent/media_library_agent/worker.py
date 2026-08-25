@@ -39,7 +39,12 @@ from .rendition import (
 )
 from .repository import MediaLibraryAgentRepository
 from .sidecars import nfo_witness, read_local_nfo
-from .technical import basic_descriptor, probe_media
+from .technical import (
+    EMBEDDED_METADATA_REVISION,
+    basic_descriptor,
+    probe_media,
+    read_embedded_metadata,
+)
 
 
 RegisterCallback = Callable[[Path, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]
@@ -84,6 +89,7 @@ class MediaLibraryAgentWorker:
         self._wait_reason = ""
         self._watch_state: dict[str, tuple[str, float, bool]] = {}
         self._watch_pending: dict[str, tuple[float, bool]] = {}
+        self._embedded_metadata_backfill_complete = False
 
     def ensure_started(self) -> bool:
         with self._lock:
@@ -152,6 +158,12 @@ class MediaLibraryAgentWorker:
             claimed_rendition = self.repository.claim_rendition_job(rendition["id"])
             if claimed_rendition is not None:
                 return self._run_claimed_rendition_job(claimed_rendition)
+        if self._enqueue_embedded_metadata_backfill():
+            queued = self.repository.next_queued_job()
+            if queued is not None:
+                claimed = self.repository.claim_job(queued["id"])
+                if claimed is not None:
+                    return self._run_claimed_scan_job(claimed)
         self._enqueue_artwork_backfill()
         rendition = self.repository.next_queued_rendition_job()
         if rendition is not None:
@@ -159,6 +171,21 @@ class MediaLibraryAgentWorker:
             if claimed_rendition is not None:
                 return self._run_claimed_rendition_job(claimed_rendition)
         return None
+
+    def _enqueue_embedded_metadata_backfill(self) -> int:
+        if self._embedded_metadata_backfill_complete:
+            return 0
+        root_ids = self.repository.roots_missing_embedded_metadata(
+            revision=EMBEDDED_METADATA_REVISION,
+            limit=1,
+        )
+        if not root_ids:
+            self._embedded_metadata_backfill_complete = True
+            return 0
+        result = self.repository.create_job(
+            root_ids[0], mode="incremental", webspace_id=""
+        )
+        return int(bool(result.get("accepted")))
 
     def _run_claimed_rendition_job(
         self, job: Mapping[str, Any]
@@ -727,19 +754,33 @@ class MediaLibraryAgentWorker:
                     previous_metadata = (
                         dict(previous.get("metadata") or {}) if previous else {}
                     )
+                    source_unchanged = bool(
+                        previous
+                        and previous["fingerprint"] == source_fingerprint
+                        and previous["present"]
+                    )
                     local_nfo_witness = nfo_witness(path)
                     nfo_unchanged = (
                         previous_metadata.get("local_nfo_witness")
                         == local_nfo_witness
                     )
-                    if (
-                        previous
-                        and previous["fingerprint"] == source_fingerprint
-                        and previous["present"]
-                    ):
+                    if source_unchanged:
                         descriptor = previous.get("descriptor") or {}
                         metadata = previous_metadata
+                        if (
+                            text(metadata.get("embedded_metadata_revision"))
+                            != EMBEDDED_METADATA_REVISION
+                        ):
+                            technical = self._technical_metadata(path, stat=stat)
+                            metadata["technical"] = technical
+                            metadata.update(
+                                dict(technical.get("embedded_metadata") or {})
+                            )
+                            metadata["embedded_metadata_revision"] = (
+                                EMBEDDED_METADATA_REVISION
+                            )
                     else:
+                        technical = self._technical_metadata(path, stat=stat)
                         metadata = {
                             "media_library_agent_id": self.repository.agent_id,
                             "media_library_root_id": root["id"],
@@ -748,10 +789,14 @@ class MediaLibraryAgentWorker:
                             "folder_path": str(Path(relative_path).parent).replace("\\", "/").strip("."),
                             "folder_segments": folder_segments(relative_path),
                             "storage_mode": "reference",
-                            "technical": self._technical_metadata(
-                                path, stat=stat
+                            "technical": technical,
+                            "embedded_metadata_revision": (
+                                EMBEDDED_METADATA_REVISION
                             ),
                         }
+                        metadata.update(
+                            dict(technical.get("embedded_metadata") or {})
+                        )
                         descriptor = self._register(path, root, metadata)
                         metadata = dict(descriptor.get("metadata") or metadata)
                     if not nfo_unchanged or "local_nfo" not in metadata:
@@ -1048,6 +1093,9 @@ class MediaLibraryAgentWorker:
     def _technical_metadata(path: Path, *, stat: os.stat_result) -> dict[str, Any]:
         mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         result = basic_descriptor(path, stat=stat)
+        embedded_metadata = read_embedded_metadata(path)
+        if embedded_metadata:
+            result["embedded_metadata"] = embedded_metadata
         perceptual_hash = MediaLibraryAgentWorker._perceptual_hash(
             path, mime_type=mime_type
         )
@@ -1062,6 +1110,8 @@ class MediaLibraryAgentWorker:
         if mode != "ffprobe":
             return result
         probed = probe_media(path, stat=stat)
+        if embedded_metadata:
+            probed["embedded_metadata"] = embedded_metadata
         if perceptual_hash:
             probed.update(
                 {

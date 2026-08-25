@@ -800,6 +800,33 @@ class MediaLibraryAgentRepository:
             "node_id": self.node_id,
         }
 
+    def roots_missing_embedded_metadata(
+        self, *, revision: str, limit: int = 1
+    ) -> list[str]:
+        bounded = max(1, min(16, int(limit or 1)))
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT r.id
+                FROM roots r
+                WHERE r.enabled=1 AND EXISTS (
+                    SELECT 1 FROM sources s
+                    WHERE s.root_id=r.id AND s.present=1
+                        AND COALESCE(
+                            json_extract(
+                                s.metadata_json,
+                                '$.embedded_metadata_revision'
+                            ),
+                            ''
+                        )<>?
+                )
+                ORDER BY r.updated_at,r.id
+                LIMIT ?
+                """,
+                (text(revision), bounded),
+            ).fetchall()
+        return [str(row["id"]) for row in rows]
+
     def disable_root(self, root_id: str) -> dict[str, Any]:
         token = text(root_id)
         with self.connect() as connection:
