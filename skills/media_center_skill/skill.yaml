@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.69
+version: 0.8.70
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -119,6 +119,7 @@ exports:
   - duplicate_candidates
   - save_checkpoint
   - queue_background_job
+  - optimize_storage
   - operations
   - dispose
   - status
@@ -1249,6 +1250,19 @@ tools:
         minimum: 1
         maximum: 1000
         default: 100
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: optimize_storage
+  description: Optimize catalog indexes and optionally reclaim SQLite disk space after bounded logical compaction.
+  entry: handlers.main:optimize_storage
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      reclaim:
+        type: boolean
+        default: false
     additionalProperties: true
   output_schema:
     type: object

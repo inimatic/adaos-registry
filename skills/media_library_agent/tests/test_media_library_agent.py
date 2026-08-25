@@ -158,9 +158,7 @@ def test_terminal_scan_progress_keeps_durable_diagnostic(tmp_path):
         ),
     )
 
-    worker._publish_progress(
-        job["id"], root, {}, "", status="failed", force=True
-    )
+    worker._publish_progress(job["id"], root, {}, "", status="failed", force=True)
 
     assert published[0][0]["error"] == {
         "code": "scan_failed",
@@ -201,9 +199,7 @@ def test_local_nfo_is_bounded_and_refreshes_unchanged_media_source(tmp_path):
     assert source["metadata"]["title"] == "Example"
     assert source["metadata"]["year"] == 2024
     assert source["metadata"]["genres"] == ["Drama"]
-    assert source["metadata"]["local_nfo"]["values"]["external_ids"] == {
-        "tmdb": "42"
-    }
+    assert source["metadata"]["local_nfo"]["values"]["external_ids"] == {"tmdb": "42"}
     assert source["metadata"]["local_nfo"]["values"]["actors"][0]["role"] == "Lead"
     first_revision = source["revision"]
 
@@ -277,9 +273,7 @@ def test_embedded_audio_tags_are_normalized_and_backfilled_on_rescan(
             (json.dumps(stale, ensure_ascii=False, sort_keys=True), source["id"]),
         )
         connection.commit()
-    assert repository.roots_missing_embedded_metadata(
-        revision="1"
-    ) == [root["id"]]
+    assert repository.roots_missing_embedded_metadata(revision="1") == [root["id"]]
 
     second_job = repository.create_job(root["id"], mode="full")["job"]
     assert worker.run_once()["id"] == second_job["id"]
@@ -609,7 +603,7 @@ def test_repository_schema_initialization_is_concurrency_safe(tmp_path):
         results = list(executor.map(initialize, range(16)))
 
     assert all(result["ok"] is True for result in results)
-    assert {result["schema_revision"] for result in results} == {"3"}
+    assert {result["schema_revision"] for result in results} == {"4"}
     with sqlite3.connect(database) as connection:
         rows = dict(connection.execute("SELECT key,value FROM agent_meta").fetchall())
         indexes = {
@@ -617,7 +611,7 @@ def test_repository_schema_initialization_is_concurrency_safe(tmp_path):
             for row in connection.execute("PRAGMA index_list(sources)").fetchall()
         }
     assert rows["node_id"] == "node-a"
-    assert rows["database_schema_revision"] == "3"
+    assert rows["database_schema_revision"] == "4"
     assert "idx_media_agent_sources_folder" in indexes
 
 
@@ -634,8 +628,126 @@ def test_current_schema_check_does_not_require_sqlite_writer_lock(tmp_path):
         blocker.close()
 
     assert result["ok"] is True
-    assert result["schema_revision"] == "3"
+    assert result["schema_revision"] == "4"
     assert time.monotonic() - started < 1.0
+
+
+def test_repository_normalizes_source_storage_and_uses_contentless_fts(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "compact.sqlite3", node_id="node-a"
+    )
+    root = repository.add_root(str(library))["root"]
+    descriptor = {
+        "id": "media-ref",
+        "resource_id": "media-ref",
+        "filename": "01.mp3",
+        "name": "01.mp3",
+        "mime": "audio/mpeg",
+        "mime_type": "audio/mpeg",
+        "size_bytes": 5,
+        "route": "node_media_reference",
+        "metadata": {"storage_mode": "reference", "technical": {"codec": "mp3"}},
+    }
+    source_value = {
+        "root_id": root["id"],
+        "relative_path": "Album/01.mp3",
+        "folder_path": "Album",
+        "name": "01.mp3",
+        "media_kind": "audio",
+        "mime_type": "audio/mpeg",
+        "size_bytes": 5,
+        "modified_ns": 1,
+        "inode": 1,
+        "fingerprint": "fingerprint",
+        "resource_id": "media-ref",
+        "descriptor": descriptor,
+        "metadata": {
+            "storage_mode": "reference",
+            "technical": {"codec": "mp3"},
+            "album": "Before",
+        },
+    }
+
+    _operation, source = repository.upsert_source(source_value, job_id="job-1")
+
+    assert source["descriptor"] == descriptor
+    with sqlite3.connect(repository.db_path) as connection:
+        stored_descriptor = json.loads(
+            connection.execute("SELECT descriptor_json FROM sources").fetchone()[0]
+        )
+        search_schema = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE name='source_search'"
+        ).fetchone()[0]
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+    assert "content=''" in search_schema.replace(" ", "")
+    assert "source_search_content" not in tables
+    assert "metadata" not in stored_descriptor
+    assert stored_descriptor["_media_library_source_metadata_keys"] == [
+        "storage_mode",
+        "technical",
+    ]
+
+    changed = dict(source_value)
+    changed["metadata"] = {**source_value["metadata"], "album": "After"}
+    repository.upsert_source(changed, job_id="job-2")
+
+    assert repository.search_sources(query="Before")["items"] == []
+    assert repository.search_sources(query="After")["items"][0]["name"] == "01.mp3"
+
+
+def test_storage_compaction_retains_latest_replayable_source_snapshot(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "history.sqlite3", node_id="node-a"
+    )
+    root = repository.add_root(str(library))["root"]
+    source_value = {
+        "root_id": root["id"],
+        "relative_path": "Album/01.mp3",
+        "folder_path": "Album",
+        "name": "01.mp3",
+        "media_kind": "audio",
+        "mime_type": "audio/mpeg",
+        "size_bytes": 5,
+        "modified_ns": 1,
+        "inode": 1,
+        "fingerprint": "fingerprint",
+        "resource_id": "media-ref",
+        "descriptor": {"metadata": {"storage_mode": "reference"}},
+        "metadata": {"storage_mode": "reference", "album": "Before"},
+    }
+    repository.upsert_source(source_value, job_id="job-1")
+    repository.upsert_source(
+        {**source_value, "metadata": {**source_value["metadata"], "album": "After"}},
+        job_id="job-2",
+    )
+    with sqlite3.connect(repository.db_path) as connection:
+        connection.execute(
+            "UPDATE source_deltas SET created_at='2020-01-01T00:00:00+00:00'"
+        )
+        connection.commit()
+
+    for _ in range(10):
+        result = repository.compact_storage_batch(limit=25)
+        if result["complete"] and result["batch_deleted"] == 0:
+            break
+
+    page = repository.pull_deltas(limit=10)
+    assert result["complete"] is True
+    assert result["deleted"] == 1
+    assert len(page["items"]) == 1
+    assert page["items"][0]["source"]["metadata"]["album"] == "After"
+    assert page["items"][0]["source"]["descriptor"]["metadata"] == {
+        "storage_mode": "reference"
+    }
 
 
 def test_repository_context_closes_sqlite_connection(tmp_path):
@@ -699,10 +811,7 @@ def test_import_is_async_reference_only_and_excludes_images(tmp_path):
         "Album",
     ]
     assert added["source"]["metadata"]["technical"]["probe"] == "basic"
-    assert (
-        added["source"]["descriptor"]["metadata"]["storage_mode"]
-        == "reference"
-    )
+    assert added["source"]["descriptor"]["metadata"]["storage_mode"] == "reference"
     assert song.read_bytes() == b"audio-data"
     assert poster.read_bytes() == b"image-data"
     assert list(tmp_path.rglob("*.mp3")) == [song]
@@ -726,8 +835,7 @@ def test_incremental_scan_emits_only_changes_and_tombstones(tmp_path):
     _wait(unchanged["job"]["id"])
     replay = main.pull_deltas(cursor=first["next_cursor"], limit=10)
     assert all(
-        item["source"]["fingerprint"]
-        == first["items"][-1]["source"]["fingerprint"]
+        item["source"]["fingerprint"] == first["items"][-1]["source"]["fingerprint"]
         and item["source"]["metadata"].get("artwork", {}).get("state")
         in {"ready", "unavailable", "failed"}
         for item in replay["items"]
@@ -741,7 +849,9 @@ def test_incremental_scan_emits_only_changes_and_tombstones(tmp_path):
     update = main.pull_deltas(cursor=stable_cursor, limit=10)
     assert update["items"]
     assert all(item["operation"] == "updated" for item in update["items"])
-    assert update["items"][-1]["source_revision"] > first["items"][-1]["source_revision"]
+    assert (
+        update["items"][-1]["source_revision"] > first["items"][-1]["source_revision"]
+    )
 
     song.unlink()
     removed = main.start_scan(root_id=imported["root"]["id"], mode="reconcile")
@@ -1855,9 +1965,7 @@ def test_rendition_is_bounded_derived_and_tied_to_exact_source(tmp_path):
     ).validate(result)
 
 
-def test_claimed_rendition_exception_is_terminal_and_observable(
-    monkeypatch, tmp_path
-):
+def test_claimed_rendition_exception_is_terminal_and_observable(monkeypatch, tmp_path):
     library = tmp_path / "library"
     library.mkdir()
     (library / "episode.mkv").write_bytes(b"media")
@@ -2064,9 +2172,7 @@ def test_artwork_terminal_result_is_replanned_only_after_capability_change():
     assert plan["capabilities"]["witness"] == "capabilities-b"
 
 
-def test_video_frame_artwork_uses_full_range_jpeg_pixel_format(
-    monkeypatch, tmp_path
-):
+def test_video_frame_artwork_uses_full_range_jpeg_pixel_format(monkeypatch, tmp_path):
     from PIL import Image
 
     captured: dict[str, list[str]] = {}
@@ -2110,9 +2216,7 @@ def test_video_frame_artwork_uses_full_range_jpeg_pixel_format(
     assert target.is_file()
 
 
-def test_video_frame_artwork_retries_from_start_for_short_video(
-    monkeypatch, tmp_path
-):
+def test_video_frame_artwork_retries_from_start_for_short_video(monkeypatch, tmp_path):
     from PIL import Image
 
     commands: list[list[str]] = []

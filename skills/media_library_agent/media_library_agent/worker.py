@@ -47,7 +47,9 @@ from .technical import (
 )
 
 
-RegisterCallback = Callable[[Path, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]
+RegisterCallback = Callable[
+    [Path, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]
+]
 PublishCallback = Callable[[Mapping[str, Any], str], None]
 TranscodeCallback = Callable[..., Mapping[str, Any]]
 ArtworkCallback = Callable[..., Mapping[str, Any]]
@@ -97,7 +99,9 @@ class MediaLibraryAgentWorker:
                 self._wake.set()
                 return False
             self._stop.clear()
-            thread = threading.Thread(target=self._loop, name="media-library-agent", daemon=True)
+            thread = threading.Thread(
+                target=self._loop, name="media-library-agent", daemon=True
+            )
             self._thread = thread
             thread.start()
         return True
@@ -135,6 +139,9 @@ class MediaLibraryAgentWorker:
         return self._resource_pressure
 
     def run_once(self) -> dict[str, Any] | None:
+        if self.repository.storage_maintenance_active():
+            return None
+        maintenance = self.repository.compact_storage_batch(limit=500)
         self._refresh_resource_pressure(force=True)
         self._enqueue_due_schedules()
         self._poll_watch_schedules()
@@ -170,6 +177,12 @@ class MediaLibraryAgentWorker:
             claimed_rendition = self.repository.claim_rendition_job(rendition["id"])
             if claimed_rendition is not None:
                 return self._run_claimed_rendition_job(claimed_rendition)
+        if (
+            not bool(maintenance.get("complete"))
+            or int(maintenance.get("batch_deleted") or 0) > 0
+            or int(maintenance.get("batch_updated") or 0) > 0
+        ):
+            return maintenance
         return None
 
     def _enqueue_embedded_metadata_backfill(self) -> int:
@@ -187,9 +200,7 @@ class MediaLibraryAgentWorker:
         )
         return int(bool(result.get("accepted")))
 
-    def _run_claimed_rendition_job(
-        self, job: Mapping[str, Any]
-    ) -> dict[str, Any]:
+    def _run_claimed_rendition_job(self, job: Mapping[str, Any]) -> dict[str, Any]:
         try:
             return self._run_rendition_job(job)
         except Exception as exc:
@@ -311,17 +322,18 @@ class MediaLibraryAgentWorker:
         source = self.repository.get_source(text(job.get("source_id")))
         if source is None or not source.get("present"):
             return self._finish_rendition_failed(job_id, "source_not_found")
-        if (
-            int(source.get("revision") or 0) != int(job.get("source_revision") or 0)
-            or text(source.get("fingerprint")) != text(job.get("source_fingerprint"))
-        ):
+        if int(source.get("revision") or 0) != int(
+            job.get("source_revision") or 0
+        ) or text(source.get("fingerprint")) != text(job.get("source_fingerprint")):
             return self._finish_rendition_failed(
                 job_id, "source_changed", status="invalidated"
             )
         try:
             source_path = self._contained_source_path(source)
         except (OSError, ValueError) as exc:
-            return self._finish_rendition_failed(job_id, "source_path_invalid", str(exc))
+            return self._finish_rendition_failed(
+                job_id, "source_path_invalid", str(exc)
+            )
         target_path = output_path(self.repository.db_path, job)
         limits = rendition_limits()
         is_artwork = text(job.get("profile")) == ARTWORK_PROFILE
@@ -336,7 +348,9 @@ class MediaLibraryAgentWorker:
         if current_disk_usage(self.repository.db_path) + estimated > int(
             limits["disk_quota_bytes"]
         ):
-            return self._finish_rendition_failed(job_id, "rendition_disk_quota_exceeded")
+            return self._finish_rendition_failed(
+                job_id, "rendition_disk_quota_exceeded"
+            )
         self._publish_rendition(job_id)
         try:
             self._wait_for_rendition_resources(job_id)
@@ -392,9 +406,7 @@ class MediaLibraryAgentWorker:
                             "hardware_accelerated": bool(
                                 result.get("hardware_accelerated")
                             ),
-                            "hardware_backend": text(
-                                result.get("hardware_backend")
-                            ),
+                            "hardware_backend": text(result.get("hardware_backend")),
                             "software_fallback_used": bool(
                                 result.get("software_fallback_used")
                             ),
@@ -445,9 +457,7 @@ class MediaLibraryAgentWorker:
             if self._rendition_cancelled(job_id):
                 return
             if not waiting:
-                self.repository.update_rendition_job(
-                    job_id, status="waiting_resources"
-                )
+                self.repository.update_rendition_job(job_id, status="waiting_resources")
                 self._publish_rendition(job_id)
                 waiting = True
             self._wake.wait(0.5)
@@ -523,20 +533,17 @@ class MediaLibraryAgentWorker:
     def _cleanup_invalidated_renditions(self) -> None:
         for job in self.repository.invalidated_rendition_outputs(limit=10):
             self._cleanup_published_descriptor(job.get("output") or {})
-            self.repository.update_rendition_job(
-                job["id"], cleaned_at=now_iso()
-            )
+            self.repository.update_rendition_job(job["id"], cleaned_at=now_iso())
 
     @staticmethod
     def _cleanup_published_descriptor(descriptor: Mapping[str, Any]) -> None:
         metadata = dict(descriptor.get("metadata") or {})
         filename = text(descriptor.get("filename") or descriptor.get("resource_id"))
-        if (
-            text(metadata.get("namespace"))
-            not in {"media-library-rendition", "media-library-artwork"}
-            and not filename.startswith(
-                ("media-library-rendition-", "media-library-artwork-")
-            )
+        if text(metadata.get("namespace")) not in {
+            "media-library-rendition",
+            "media-library-artwork",
+        } and not filename.startswith(
+            ("media-library-rendition-", "media-library-artwork-")
         ):
             return
         resources = [
@@ -591,7 +598,9 @@ class MediaLibraryAgentWorker:
             if not root_id:
                 continue
             self.repository.create_job(root_id, mode="incremental")
-            next_run = datetime.now(tz=timezone.utc) + timedelta(seconds=int(schedule.get("interval_seconds") or 21600))
+            next_run = datetime.now(tz=timezone.utc) + timedelta(
+                seconds=int(schedule.get("interval_seconds") or 21600)
+            )
             self.repository.advance_schedule(root_id, next_run.isoformat())
 
     def _poll_watch_schedules(self, *, force: bool = False) -> None:
@@ -617,9 +626,7 @@ class MediaLibraryAgentWorker:
             self._watch_state.pop(root_id, None)
             self._watch_pending.pop(root_id, None)
 
-    def _enqueue_debounced_watch(
-        self, schedule: Mapping[str, Any], now: float
-    ) -> None:
+    def _enqueue_debounced_watch(self, schedule: Mapping[str, Any], now: float) -> None:
         root_id = text(schedule.get("root_id"))
         pending = self._watch_pending.get(root_id)
         if pending is None:
@@ -647,7 +654,10 @@ class MediaLibraryAgentWorker:
                 100,
                 min(
                     500_000,
-                    int(os.environ.get("MEDIA_LIBRARY_AGENT_WATCH_MAX_ENTRIES") or 50_000),
+                    int(
+                        os.environ.get("MEDIA_LIBRARY_AGENT_WATCH_MAX_ENTRIES")
+                        or 50_000
+                    ),
                 ),
             )
         except ValueError:
@@ -665,9 +675,13 @@ class MediaLibraryAgentWorker:
                 if identity in visited:
                     continue
                 visited.add(identity)
-                entries = sorted(os.scandir(directory), key=lambda item: item.name.casefold())
+                entries = sorted(
+                    os.scandir(directory), key=lambda item: item.name.casefold()
+                )
             except (OSError, PermissionError):
-                digest.update(f"unavailable:{directory}".encode("utf-8", errors="replace"))
+                digest.update(
+                    f"unavailable:{directory}".encode("utf-8", errors="replace")
+                )
                 continue
             for entry in entries:
                 path = Path(entry.path)
@@ -715,10 +729,14 @@ class MediaLibraryAgentWorker:
         job_id = text(job.get("id"))
         root = self.repository.get_root(text(job.get("root_id")))
         if root is None:
-            return self._finish_failed(job_id, "root_not_found", "The configured media root no longer exists.")
+            return self._finish_failed(
+                job_id, "root_not_found", "The configured media root no longer exists."
+            )
         root_path = Path(root["path"])
         if not root_path.exists() or not root_path.is_dir():
-            return self._finish_failed(job_id, "root_unavailable", f"Media root is unavailable: {root_path}")
+            return self._finish_failed(
+                job_id, "root_unavailable", f"Media root is unavailable: {root_path}"
+            )
 
         counters = {
             "discovered_count": 0,
@@ -738,9 +756,21 @@ class MediaLibraryAgentWorker:
             for path, relative_path, stat in self._walk(root_path, root):
                 current = self.repository.get_job(job_id)
                 if self._stop.is_set() or (current and current["cancel_requested"]):
-                    finished = self.repository.update_job(job_id, status="canceled", finished_at=now_iso(), current_path=current_path)
+                    finished = self.repository.update_job(
+                        job_id,
+                        status="canceled",
+                        finished_at=now_iso(),
+                        current_path=current_path,
+                    )
                     self.repository.mark_root_scan(root["id"], "canceled")
-                    self._publish_progress(job_id, root, counters, current_path, status="canceled", force=True)
+                    self._publish_progress(
+                        job_id,
+                        root,
+                        counters,
+                        current_path,
+                        status="canceled",
+                        force=True,
+                    )
                     return finished or {}
 
                 self._wait_for_resources(job_id, root, counters, current_path)
@@ -748,7 +778,9 @@ class MediaLibraryAgentWorker:
                 counters["discovered_count"] += 1
                 seen.add(relative_path)
                 try:
-                    source_fingerprint = fingerprint(path, relative_path=relative_path, stat=stat)
+                    source_fingerprint = fingerprint(
+                        path, relative_path=relative_path, stat=stat
+                    )
                     previous = self.repository.source_by_path(root["id"], relative_path)
                     descriptor: Mapping[str, Any]
                     previous_metadata = (
@@ -761,8 +793,7 @@ class MediaLibraryAgentWorker:
                     )
                     local_nfo_witness = nfo_witness(path)
                     nfo_unchanged = (
-                        previous_metadata.get("local_nfo_witness")
-                        == local_nfo_witness
+                        previous_metadata.get("local_nfo_witness") == local_nfo_witness
                     )
                     if source_unchanged:
                         descriptor = previous.get("descriptor") or {}
@@ -786,17 +817,15 @@ class MediaLibraryAgentWorker:
                             "media_library_root_id": root["id"],
                             "media_library_root_path": root["path"],
                             "relative_path": relative_path,
-                            "folder_path": str(Path(relative_path).parent).replace("\\", "/").strip("."),
+                            "folder_path": str(Path(relative_path).parent)
+                            .replace("\\", "/")
+                            .strip("."),
                             "folder_segments": folder_segments(relative_path),
                             "storage_mode": "reference",
                             "technical": technical,
-                            "embedded_metadata_revision": (
-                                EMBEDDED_METADATA_REVISION
-                            ),
+                            "embedded_metadata_revision": (EMBEDDED_METADATA_REVISION),
                         }
-                        metadata.update(
-                            dict(technical.get("embedded_metadata") or {})
-                        )
+                        metadata.update(dict(technical.get("embedded_metadata") or {}))
                         descriptor = self._register(path, root, metadata)
                         metadata = dict(descriptor.get("metadata") or metadata)
                     if not nfo_unchanged or "local_nfo" not in metadata:
@@ -821,11 +850,17 @@ class MediaLibraryAgentWorker:
                         if current_kind != "embedded":
                             metadata.pop("artwork", None)
                     metadata["artwork_folder_witness"] = witness
-                    mime_type = text(descriptor.get("mime_type") or descriptor.get("mime")) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+                    mime_type = (
+                        text(descriptor.get("mime_type") or descriptor.get("mime"))
+                        or mimetypes.guess_type(path.name)[0]
+                        or "application/octet-stream"
+                    )
                     source = {
                         "root_id": root["id"],
                         "relative_path": relative_path,
-                        "folder_path": str(Path(relative_path).parent).replace("\\", "/").strip("."),
+                        "folder_path": str(Path(relative_path).parent)
+                        .replace("\\", "/")
+                        .strip("."),
                         "name": path.name,
                         "media_kind": media_kind(path, mime_type),
                         "mime_type": mime_type,
@@ -833,7 +868,9 @@ class MediaLibraryAgentWorker:
                         "modified_ns": int(stat.st_mtime_ns),
                         "inode": int(getattr(stat, "st_ino", 0) or 0),
                         "fingerprint": source_fingerprint,
-                        "resource_id": text(descriptor.get("resource_id") or descriptor.get("id")),
+                        "resource_id": text(
+                            descriptor.get("resource_id") or descriptor.get("id")
+                        ),
                         "descriptor": dict(descriptor),
                         "metadata": metadata,
                     }
@@ -858,7 +895,9 @@ class MediaLibraryAgentWorker:
                 counters["processed_count"] += 1
                 self._checkpoint(job_id, root, counters, current_path)
 
-            removed = self.repository.mark_missing(root["id"], seen_relative_paths=seen, job_id=job_id)
+            removed = self.repository.mark_missing(
+                root["id"], seen_relative_paths=seen, job_id=job_id
+            )
             counters["removed_count"] = len(removed)
             finished = self.repository.update_job(
                 job_id,
@@ -868,13 +907,24 @@ class MediaLibraryAgentWorker:
                 **counters,
             )
             self.repository.mark_root_scan(root["id"], "completed")
-            self._publish_progress(job_id, root, counters, "", status="completed", force=True)
+            self._publish_progress(
+                job_id, root, counters, "", status="completed", force=True
+            )
             self._job_started.pop(job_id, None)
             return finished or {}
         except Exception as exc:
-            return self._finish_failed(job_id, "scan_failed", str(exc), root=root, counters=counters, current_path=current_path)
+            return self._finish_failed(
+                job_id,
+                "scan_failed",
+                str(exc),
+                root=root,
+                counters=counters,
+                current_path=current_path,
+            )
 
-    def _walk(self, root_path: Path, root: Mapping[str, Any]) -> Iterator[tuple[Path, str, os.stat_result]]:
+    def _walk(
+        self, root_path: Path, root: Mapping[str, Any]
+    ) -> Iterator[tuple[Path, str, os.stat_result]]:
         include_images = bool(root.get("include_images"))
         suffixes = set(VIDEO_EXTENSIONS) | set(AUDIO_EXTENSIONS)
         if include_images:
@@ -883,7 +933,13 @@ class MediaLibraryAgentWorker:
         follow_symlinks = bool(root.get("follow_symlinks"))
         stack = [root_path]
         visited_directories: set[tuple[int, int]] = set()
-        max_files = max(1, min(5_000_000, int(os.environ.get("MEDIA_LIBRARY_AGENT_MAX_FILES") or 1_000_000)))
+        max_files = max(
+            1,
+            min(
+                5_000_000,
+                int(os.environ.get("MEDIA_LIBRARY_AGENT_MAX_FILES") or 1_000_000),
+            ),
+        )
         yielded = 0
         while stack and yielded < max_files and not self._stop.is_set():
             directory = stack.pop()
@@ -926,7 +982,11 @@ class MediaLibraryAgentWorker:
     @staticmethod
     def _excluded(relative_path: str, patterns: list[str]) -> bool:
         normalized = relative_path.replace("\\", "/")
-        return any(fnmatch.fnmatch(normalized, pattern) or fnmatch.fnmatch(Path(normalized).name, pattern) for pattern in patterns)
+        return any(
+            fnmatch.fnmatch(normalized, pattern)
+            or fnmatch.fnmatch(Path(normalized).name, pattern)
+            for pattern in patterns
+        )
 
     def _wait_for_resources(
         self,
@@ -938,7 +998,9 @@ class MediaLibraryAgentWorker:
         waiting = False
         while not self._stop.is_set():
             pressure = self._refresh_resource_pressure()
-            if pressure not in {"playback", "critical"} and self._scan_window_open(root):
+            if pressure not in {"playback", "critical"} and self._scan_window_open(
+                root
+            ):
                 break
             current = self.repository.get_job(job_id)
             if current and current["cancel_requested"]:
@@ -950,7 +1012,14 @@ class MediaLibraryAgentWorker:
                     else "scan_window"
                 )
                 self.repository.update_job(job_id, status="waiting_resources")
-                self._publish_progress(job_id, root, counters, current_path, status="waiting_resources", force=True)
+                self._publish_progress(
+                    job_id,
+                    root,
+                    counters,
+                    current_path,
+                    status="waiting_resources",
+                    force=True,
+                )
                 waiting = True
             self._wake.wait(0.5)
             self._wake.clear()
@@ -958,10 +1027,19 @@ class MediaLibraryAgentWorker:
             self._wait_reason = ""
             self.repository.update_job(job_id, status="running")
 
-    def _checkpoint(self, job_id: str, root: Mapping[str, Any], counters: Mapping[str, int], current_path: str) -> None:
+    def _checkpoint(
+        self,
+        job_id: str,
+        root: Mapping[str, Any],
+        counters: Mapping[str, int],
+        current_path: str,
+    ) -> None:
         self._throttle_io(job_id, counters)
         now = time.monotonic()
-        if int(counters["processed_count"]) % 100 != 0 and now - self._last_publish_monotonic < 0.5:
+        if (
+            int(counters["processed_count"]) % 100 != 0
+            and now - self._last_publish_monotonic < 0.5
+        ):
             return
         self.repository.update_job(job_id, current_path=current_path, **dict(counters))
         self._publish_progress(job_id, root, counters, current_path)
@@ -988,7 +1066,9 @@ class MediaLibraryAgentWorker:
         )
         if root:
             self.repository.mark_root_scan(root["id"], "failed")
-            self._publish_progress(job_id, root, counters or {}, current_path, status="failed", force=True)
+            self._publish_progress(
+                job_id, root, counters or {}, current_path, status="failed", force=True
+            )
         self._job_started.pop(job_id, None)
         return finished or {}
 
@@ -1055,9 +1135,12 @@ class MediaLibraryAgentWorker:
             return True
         local = datetime.now().astimezone()
         days = window.get("days")
-        if isinstance(days, list) and days and local.weekday() not in {
-            int(item) for item in days if str(item).isdigit()
-        }:
+        if (
+            isinstance(days, list)
+            and days
+            and local.weekday()
+            not in {int(item) for item in days if str(item).isdigit()}
+        ):
             return False
         start = text(window.get("start"))
         end = text(window.get("end"))
@@ -1197,7 +1280,9 @@ class MediaLibraryAgentWorker:
         return hashlib.sha256(completed.stdout).hexdigest()
 
 
-def register_media_reference(path: Path, root: Mapping[str, Any], metadata: Mapping[str, Any]) -> Mapping[str, Any]:
+def register_media_reference(
+    path: Path, root: Mapping[str, Any], metadata: Mapping[str, Any]
+) -> Mapping[str, Any]:
     from adaos.sdk.io.media import register_media_file
 
     return register_media_file(

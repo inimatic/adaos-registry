@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.33
+version: 0.6.34
 description: Distributed node-local media discovery and bounded rendition agent with
   durable jobs and ordered catalog deltas.
 supported_locales:
@@ -75,6 +75,7 @@ exports:
   - rendition_status
   - list_rendition_jobs
   - cancel_rendition
+  - optimize_storage
   - status
   - observe_topology
   - distributed_topology_phase
@@ -489,6 +490,20 @@ tools:
       job_id:
         type: string
         minLength: 1
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: optimize_storage
+  entry: handlers.main:optimize_storage
+  description: Compact node-local catalog storage and optionally reclaim free pages.
+  side_effects: local_write
+  timeout_seconds: 600
+  input_schema:
+    type: object
+    properties:
+      reclaim:
+        type: boolean
+        default: false
     additionalProperties: true
   output_schema:
     type: object

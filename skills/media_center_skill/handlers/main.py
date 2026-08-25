@@ -2012,6 +2012,11 @@ def status(**_: Any) -> dict[str, Any]:
         "summary": summary,
         "facets": repo.facets(),
         "coordinator": catalog.diagnostics(summary=summary),
+        "storage": catalog.storage_status(),
+        "background_jobs": {
+            "counts": catalog.background_job_counts(),
+            "counts_by_kind": catalog.background_job_counts_by_kind(),
+        },
         "agent_sync": _agent_sync_status(),
         "runtime_bootstrap": background_runtime().bootstrap_status(),
         "enrichment": _enrichment_runtime(catalog).status(),
@@ -3229,6 +3234,41 @@ def queue_background_job(kind: str = "", subject_ref: str = "", priority: int = 
             webspace_id=str(_.get("webspace_id") or ""),
         )
     return result
+
+
+@tool(
+    summary="Optimize Media Center catalog storage and optionally reclaim disk space.",
+    side_effects="local_write",
+)
+def optimize_storage(reclaim: bool = False, **_: Any) -> dict[str, Any]:
+    catalog = _coordinator()
+    storage = catalog.storage_status()
+    logical = dict(storage.get("logical_compaction") or {})
+    if _bool(reclaim, False) and logical.get("phase") != "complete":
+        return _skill_error(
+            "media_center_logical_compaction_in_progress",
+            message=(
+                "Background catalog compaction must finish before physical "
+                "disk space can be reclaimed."
+            ),
+            retryable=True,
+            storage=storage,
+        )
+    runtime = background_runtime()
+    stopped = runtime.dispose(timeout=30.0)
+    if stopped.get("stopped") is not True:
+        return _skill_error(
+            "media_center_storage_workers_busy",
+            message="Media Center workers could not pause for storage maintenance.",
+            retryable=True,
+            background=stopped,
+        )
+    try:
+        return catalog.optimize_storage(reclaim=_bool(reclaim, False))
+    finally:
+        runtime.ensure_bootstrap_started(
+            str(default_db_path().resolve()), _start_live_runtime
+        )
 
 
 @tool(summary="List bounded background media operations.", side_effects="none")

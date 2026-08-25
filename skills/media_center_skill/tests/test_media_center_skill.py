@@ -758,6 +758,150 @@ def test_base_variant_reuses_catalog_descriptor_without_losing_playback(
     assert plan["route"]["routed_path"] or plan["route"]["node_path"]
 
 
+def test_coordinator_stores_source_routing_and_metadata_only_once(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "compact-catalog.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    delta = _agent_delta(1, "Movies/Example.mp4", kind="video")
+    delta["source"]["metadata"].update({"title": "Example", "year": 2024})
+    catalog.apply_agent_page(_agent_page(delta))
+    item = catalog.list_items(media_kind="video", limit=1)["items"][0]
+    catalog.record_metadata_claim(
+        subject_ref=f"item:{item['id']}",
+        field_name="text_embedding_v1",
+        value=[0.1] * 48,
+        provenance="media_center.deterministic_local.v1",
+        confidence=1.0,
+    )
+    catalog.record_metadata_claim(
+        subject_ref=f"item:{item['id']}",
+        field_name="overview",
+        value="External overview",
+        provenance="media_center.tmdb.v1",
+        confidence=0.9,
+    )
+
+    with catalog.repository.connect() as connection:
+        row = connection.execute(
+            "SELECT descriptor_json,metadata_json FROM catalog_items WHERE id=?",
+            (item["id"],),
+        ).fetchone()
+        projection = connection.execute(
+            "SELECT metadata_json,provenance_json "
+            "FROM catalog_metadata_projection WHERE item_id=?",
+            (item["id"],),
+        ).fetchone()
+    descriptor = json.loads(row["descriptor_json"])
+    metadata = json.loads(row["metadata_json"])
+    projected = json.loads(projection["metadata_json"])
+    details = catalog.item_details(item["id"])["item"]
+
+    assert "content_path" not in descriptor
+    assert "resource_id" not in descriptor
+    assert "storage_mode" not in metadata
+    assert "folder_segments" not in metadata
+    assert projected == {"overview": "External overview"}
+    assert "text_embedding_v1" not in projected
+    assert details["metadata"]["title"] == "Example"
+    assert details["metadata"]["overview"] == "External overview"
+    assert details["metadata_provenance"]["title"] == (
+        "media_library_agent.source_metadata.v1"
+    )
+    assert details["metadata_provenance"]["overview"] == "media_center.tmdb.v1"
+
+
+def test_storage_compaction_is_bounded_resumable_and_preserves_public_metadata(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "legacy-storage.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Movies/Legacy.mp4", kind="video"))
+    )
+    item = catalog.list_items(media_kind="video", limit=1)["items"][0]
+    with catalog.repository.connect() as connection:
+        connection.execute(
+            "UPDATE catalog_items SET descriptor_json=?,metadata_json=? WHERE id=?",
+            (
+                json.dumps(
+                    {
+                        "schema": "adaos.media.resource.v1",
+                        "resource_id": "duplicate-resource",
+                        "content_path": "/api/node/media/duplicate",
+                        "metadata": {"storage_mode": "reference"},
+                    }
+                ),
+                json.dumps(
+                    {
+                        "title": "Legacy",
+                        "folder_path": "Movies",
+                        "storage_mode": "reference",
+                    }
+                ),
+                item["id"],
+            ),
+        )
+        connection.execute(
+            "UPDATE catalog_metadata_projection "
+            "SET metadata_json=?,provenance_json=? WHERE item_id=?",
+            (
+                json.dumps(
+                    {
+                        "title": "Legacy",
+                        "folder_path": "Movies",
+                        "overview": "Preserved",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "title": "media_library_agent.source_metadata.v1",
+                        "folder_path": "media_library_agent.source_metadata.v1",
+                        "overview": "media_center.tmdb.v1",
+                    }
+                ),
+                item["id"],
+            ),
+        )
+        connection.execute(
+            "DELETE FROM coordinator_meta WHERE key='storage_compaction_state'"
+        )
+        connection.commit()
+
+    first = catalog.compact_storage_batch(limit=10)
+    second = catalog.compact_storage_batch(limit=10)
+    details = catalog.item_details(item["id"])["item"]
+    storage = catalog.storage_status()
+
+    assert first["phase"] == "projection"
+    assert first["batch_scanned"] == 1
+    assert second["complete"] is True
+    assert second["batch_scanned"] == 1
+    assert storage["logical_compaction"]["phase"] == "complete"
+    assert details["metadata"]["title"] == "Legacy"
+    assert details["metadata"]["overview"] == "Preserved"
+    with catalog.repository.connect() as connection:
+        descriptor = json.loads(
+            connection.execute(
+                "SELECT descriptor_json FROM catalog_items WHERE id=?",
+                (item["id"],),
+            ).fetchone()[0]
+        )
+        projection = json.loads(
+            connection.execute(
+                "SELECT metadata_json FROM catalog_metadata_projection "
+                "WHERE item_id=?",
+                (item["id"],),
+            ).fetchone()[0]
+        )
+    assert descriptor == {"schema": "adaos.media.resource.v1"}
+    assert projection == {"overview": "Preserved"}
+
+
 def test_agent_delta_retires_same_path_legacy_catalog_row(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
@@ -1704,13 +1848,14 @@ def test_search_indexes_use_catalog_rowids_for_addressed_updates(
         catalog_rowid = int(row["catalog_rowid"])
         assert int(
             connection.execute(
-                "SELECT rowid FROM catalog_search WHERE item_id=?", (str(row["id"]),)
+                "SELECT rowid FROM catalog_search "
+                "WHERE catalog_search MATCH 'example*'"
             ).fetchone()[0]
         ) == catalog_rowid
         assert int(
             connection.execute(
-                "SELECT rowid FROM catalog_fuzzy_search WHERE item_id=?",
-                (str(row["id"]),),
+                "SELECT rowid FROM catalog_fuzzy_search "
+                "WHERE catalog_fuzzy_search MATCH 'exa'",
             ).fetchone()[0]
         ) == catalog_rowid
 
@@ -1724,10 +1869,11 @@ def test_search_indexes_use_catalog_rowids_for_addressed_updates(
     assert updated["applied_count"] == 1
     with repository.connect() as connection:
         indexed = connection.execute(
-            "SELECT text FROM catalog_search WHERE item_id=?", (str(row["id"]),)
+            "SELECT search_text FROM catalog_search WHERE rowid=?",
+            (catalog_rowid,),
         ).fetchone()
         assert indexed is not None
-        assert "Example" in str(indexed["text"])
+        assert "Example" in str(indexed["search_text"])
         assert connection.execute(
             "SELECT COUNT(*) FROM catalog_search "
             "WHERE catalog_search MATCH 'example*'"
@@ -1740,6 +1886,17 @@ def test_search_indexes_use_catalog_rowids_for_addressed_updates(
         assert connection.execute(
             "SELECT COUNT(*) FROM catalog_fuzzy_search"
         ).fetchone()[0] == 1
+        definitions = {
+            str(row["name"]): str(row["sql"] or "")
+            for row in connection.execute(
+                "SELECT name,sql FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        assert "content='catalog_items'" in definitions["catalog_search"]
+        assert "content='catalog_items'" in definitions["catalog_fuzzy_search"]
+        assert "tokenize='trigram'" in definitions["catalog_fuzzy_search"]
+        assert "catalog_search_content" not in definitions
+        assert "catalog_fuzzy_search_content" not in definitions
 
 
 def test_diagnostics_never_count_scans_the_fts_virtual_table(monkeypatch, tmp_path):
@@ -1805,6 +1962,8 @@ def test_status_and_collection_state_avoid_wide_catalog_summary(monkeypatch, tmp
     assert diagnostics["counts"]["sources"] == 1
     assert result["summary"]["available_count"] == 1
     assert result["coordinator"]["counts"]["sources"] == 1
+    assert result["storage"]["db_bytes"] > 0
+    assert result["background_jobs"]["counts_by_kind"]
 
 
 def test_search_rowid_migration_rebuilds_legacy_fts_rows(monkeypatch, tmp_path):
@@ -1818,16 +1977,21 @@ def test_search_rowid_migration_rebuilds_legacy_fts_rows(monkeypatch, tmp_path):
         item = connection.execute(
             "SELECT id,search_text FROM catalog_items WHERE source_id='source-1'"
         ).fetchone()
-        connection.execute("DELETE FROM catalog_search")
-        connection.execute("DELETE FROM catalog_fuzzy_search")
         connection.execute(
-            "INSERT INTO catalog_search(rowid,item_id,text) VALUES (999999,?,?)",
-            (str(item["id"]), str(item["search_text"])),
+            "INSERT INTO catalog_search(catalog_search) VALUES ('delete-all')"
         )
         connection.execute(
-            "INSERT INTO catalog_fuzzy_search(rowid,item_id,tokens) "
-            "VALUES (999999,?,?)",
-            (str(item["id"]), "legacy"),
+            "INSERT INTO catalog_fuzzy_search(catalog_fuzzy_search) "
+            "VALUES ('delete-all')"
+        )
+        connection.execute(
+            "INSERT INTO catalog_search(rowid,search_text) VALUES (999999,?)",
+            (str(item["search_text"]),),
+        )
+        connection.execute(
+            "INSERT INTO catalog_fuzzy_search(rowid,fuzzy_text) "
+            "VALUES (999999,?)",
+            (str(item["search_text"]),),
         )
         connection.execute(
             "DELETE FROM coordinator_meta WHERE key='search_rowid_revision'"
@@ -1845,9 +2009,17 @@ def test_search_rowid_migration_rebuilds_legacy_fts_rows(monkeypatch, tmp_path):
                 "SELECT rowid FROM catalog_items WHERE source_id='source-1'"
             ).fetchone()[0]
         )
-        assert int(connection.execute("SELECT rowid FROM catalog_search").fetchone()[0]) == catalog_rowid
         assert int(
-            connection.execute("SELECT rowid FROM catalog_fuzzy_search").fetchone()[0]
+            connection.execute(
+                "SELECT rowid FROM catalog_search "
+                "WHERE catalog_search MATCH 'example*'"
+            ).fetchone()[0]
+        ) == catalog_rowid
+        assert int(
+            connection.execute(
+                "SELECT rowid FROM catalog_fuzzy_search "
+                "WHERE catalog_fuzzy_search MATCH 'exa'"
+            ).fetchone()[0]
         ) == catalog_rowid
 
 

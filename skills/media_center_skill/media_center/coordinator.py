@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
@@ -31,8 +32,9 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-25.4"
-SEARCH_ROWID_REVISION = "1"
+COORDINATOR_SCHEMA_REVISION = "2026-08-25.6"
+SEARCH_ROWID_REVISION = "2"
+STORAGE_COMPACTION_REVISION = "2026-08-25.1"
 METADATA_SETTINGS_KEY = "metadata_provider_settings"
 DEFAULT_METADATA_SETTINGS = {
     "external_enabled": True,
@@ -65,6 +67,84 @@ _IDENTITY_METADATA_FIELDS = (
     "external_ids",
     "local_nfo",
 )
+
+# These locator fields are already represented by typed catalog columns. The
+# source agent remains authoritative for the complete descriptor and metadata.
+_DESCRIPTOR_COLUMN_FIELDS = (
+    "browser_path",
+    "browser_route",
+    "browser_url",
+    "content_path",
+    "filename",
+    "id",
+    "metadata",
+    "mime",
+    "mime_type",
+    "modified_at",
+    "name",
+    "node_url",
+    "ok",
+    "path",
+    "playback_id",
+    "resource_id",
+    "route",
+    "routed_content_path",
+    "size_bytes",
+    "source",
+    "source_path",
+    "url",
+)
+_METADATA_COLUMN_FIELDS = (
+    "content_ref",
+    "folder_path",
+    "folder_segments",
+    "media_library_agent_id",
+    "media_library_root_id",
+    "namespace",
+    "reference_schema",
+    "relative_path",
+    "storage_mode",
+)
+_INTERNAL_PROJECTION_FIELDS = frozenset(
+    {
+        "semantic_embedding_v1",
+        "semantic_embedding_backend",
+        "text_embedding_v1",
+    }
+)
+
+
+def _without_fields(value: Mapping[str, Any], fields: Iterable[str]) -> dict[str, Any]:
+    excluded = set(fields)
+    return {str(key): item for key, item in value.items() if str(key) not in excluded}
+
+
+def _compact_source_descriptor(value: Mapping[str, Any]) -> dict[str, Any]:
+    return _without_fields(value, _DESCRIPTOR_COLUMN_FIELDS)
+
+
+def _compact_source_metadata(value: Mapping[str, Any]) -> dict[str, Any]:
+    return _without_fields(value, _METADATA_COLUMN_FIELDS)
+
+
+def _projection_storage(
+    resolved: Mapping[str, Any],
+    provenance: Mapping[str, Any],
+    base: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    excluded = _INTERNAL_PROJECTION_FIELDS | frozenset(_METADATA_COLUMN_FIELDS)
+    delta = {
+        str(key): item
+        for key, item in resolved.items()
+        if str(key) not in excluded
+        and (str(key) not in base or base.get(str(key)) != item)
+    }
+    return delta, {
+        str(key): item
+        for key, item in provenance.items()
+        if str(key) not in excluded
+        and item not in (None, "", "media_library_agent.source_metadata.v1")
+    }
 
 
 def _setting_bool(value: Any) -> bool:
@@ -295,6 +375,7 @@ class MediaCatalogCoordinator:
                 "source_revision": "INTEGER NOT NULL DEFAULT 0",
                 "folder_path": "TEXT NOT NULL DEFAULT ''",
                 "search_text": "TEXT NOT NULL DEFAULT ''",
+                "fuzzy_text": "TEXT NOT NULL DEFAULT ''",
                 "catalog_revision": "INTEGER NOT NULL DEFAULT 0",
                 "work_id": "TEXT NOT NULL DEFAULT ''",
                 "variant_id": "TEXT NOT NULL DEFAULT ''",
@@ -689,12 +770,7 @@ class MediaCatalogCoordinator:
                     connection.execute(
                         f"ALTER TABLE agent_catalog_state ADD COLUMN {name} {definition}"
                     )
-            connection.execute(
-                "CREATE VIRTUAL TABLE IF NOT EXISTS catalog_search USING fts5(item_id UNINDEXED, text, tokenize='unicode61 remove_diacritics 2')"
-            )
-            connection.execute(
-                "CREATE VIRTUAL TABLE IF NOT EXISTS catalog_fuzzy_search USING fts5(item_id UNINDEXED, tokens, tokenize='unicode61')"
-            )
+            self._ensure_compact_search_schema(connection)
             now = now_iso()
             default_profiles = (
                 ("default", "Personal", "personal", _default_profile_policy()),
@@ -788,6 +864,7 @@ class MediaCatalogCoordinator:
             self._rebuild_folder_nodes(connection)
             self._backfill_search(connection)
             self._ensure_search_rowids(connection)
+            self._ensure_search_triggers(connection)
             self._backfill_metadata_projections(connection)
             connection.execute(
                 "INSERT OR REPLACE INTO coordinator_meta(key, value) "
@@ -1317,17 +1394,286 @@ class MediaCatalogCoordinator:
             "removed_works": max(0, int(removed_works or 0)),
         }
 
+    @staticmethod
+    def _ensure_compact_search_schema(connection: sqlite3.Connection) -> None:
+        connection.executescript(
+            """
+            DROP TRIGGER IF EXISTS catalog_items_search_ai;
+            DROP TRIGGER IF EXISTS catalog_items_search_ad;
+            DROP TRIGGER IF EXISTS catalog_items_search_au;
+            """
+        )
+        definitions = {
+            str(row["name"]): str(row["sql"] or "").lower()
+            for row in connection.execute(
+                "SELECT name,sql FROM sqlite_master "
+                "WHERE type='table' AND name IN "
+                "('catalog_search','catalog_fuzzy_search')"
+            ).fetchall()
+        }
+        main_current = all(
+            token in definitions.get("catalog_search", "")
+            for token in ("content='catalog_items'", "content_rowid='rowid'")
+        )
+        fuzzy_current = all(
+            token in definitions.get("catalog_fuzzy_search", "")
+            for token in (
+                "content='catalog_items'",
+                "content_rowid='rowid'",
+                "fuzzy_text",
+                "tokenize='trigram'",
+            )
+        )
+        if not (main_current and fuzzy_current):
+            connection.executescript(
+                """
+                DROP TABLE IF EXISTS catalog_search;
+                DROP TABLE IF EXISTS catalog_fuzzy_search;
+                CREATE VIRTUAL TABLE catalog_search USING fts5(
+                    search_text,
+                    content='catalog_items',
+                    content_rowid='rowid',
+                    tokenize='unicode61 remove_diacritics 2'
+                );
+                CREATE VIRTUAL TABLE catalog_fuzzy_search USING fts5(
+                    fuzzy_text,
+                    content='catalog_items',
+                    content_rowid='rowid',
+                    tokenize='trigram'
+                );
+                """
+            )
+        connection.execute(
+            "DELETE FROM coordinator_meta WHERE key='search_rowid_revision'"
+        )
+
+    @staticmethod
+    def _ensure_search_triggers(connection: sqlite3.Connection) -> None:
+        connection.executescript(
+            """
+            CREATE TRIGGER IF NOT EXISTS catalog_items_search_ai
+            AFTER INSERT ON catalog_items BEGIN
+                INSERT INTO catalog_search(rowid,search_text)
+                    VALUES (new.rowid,new.search_text);
+                INSERT INTO catalog_fuzzy_search(rowid,fuzzy_text)
+                    VALUES (new.rowid,new.fuzzy_text);
+            END;
+            CREATE TRIGGER IF NOT EXISTS catalog_items_search_ad
+            AFTER DELETE ON catalog_items BEGIN
+                INSERT INTO catalog_search(catalog_search,rowid,search_text)
+                    VALUES ('delete',old.rowid,old.search_text);
+                INSERT INTO catalog_fuzzy_search(
+                    catalog_fuzzy_search,rowid,fuzzy_text
+                ) VALUES ('delete',old.rowid,old.fuzzy_text);
+            END;
+            CREATE TRIGGER IF NOT EXISTS catalog_items_search_au
+            AFTER UPDATE OF search_text,fuzzy_text ON catalog_items
+            WHEN old.search_text<>new.search_text
+                OR old.fuzzy_text<>new.fuzzy_text BEGIN
+                INSERT INTO catalog_search(catalog_search,rowid,search_text)
+                    VALUES ('delete',old.rowid,old.search_text);
+                INSERT INTO catalog_search(rowid,search_text)
+                    VALUES (new.rowid,new.search_text);
+                INSERT INTO catalog_fuzzy_search(
+                    catalog_fuzzy_search,rowid,fuzzy_text
+                ) VALUES ('delete',old.rowid,old.fuzzy_text);
+                INSERT INTO catalog_fuzzy_search(rowid,fuzzy_text)
+                    VALUES (new.rowid,new.fuzzy_text);
+            END;
+            """
+        )
+
+    def compact_storage_batch(self, *, limit: int = 250) -> dict[str, Any]:
+        bounded = max(10, min(int(limit or 250), 1000))
+        state_key = "storage_compaction_state"
+        with self.repository.connect() as connection:
+            row = connection.execute(
+                "SELECT value FROM coordinator_meta WHERE key=?", (state_key,)
+            ).fetchone()
+            state = _json_loads(row["value"]) if row is not None else {}
+            if not isinstance(state, Mapping) or _text(state.get("revision")) != (
+                STORAGE_COMPACTION_REVISION
+            ):
+                state = {
+                    "revision": STORAGE_COMPACTION_REVISION,
+                    "phase": "catalog",
+                    "cursor": "",
+                    "scanned": 0,
+                    "updated": 0,
+                }
+            phase = _text(state.get("phase")) or "catalog"
+            cursor = _text(state.get("cursor"))
+            scanned = 0
+            updated = 0
+            if phase == "catalog":
+                rows = connection.execute(
+                    """
+                    SELECT id,descriptor_json,metadata_json FROM catalog_items
+                    WHERE agent_id<>'' AND id>? ORDER BY id LIMIT ?
+                    """,
+                    (cursor, bounded),
+                ).fetchall()
+                updates: list[tuple[str, str, str]] = []
+                for item in rows:
+                    descriptor = _json_loads(item["descriptor_json"])
+                    metadata = _json_loads(item["metadata_json"])
+                    compact_descriptor = _json_dumps(
+                        _compact_source_descriptor(descriptor)
+                        if isinstance(descriptor, Mapping)
+                        else {}
+                    )
+                    compact_metadata = _json_dumps(
+                        _compact_source_metadata(metadata)
+                        if isinstance(metadata, Mapping)
+                        else {}
+                    )
+                    if (
+                        compact_descriptor != str(item["descriptor_json"])
+                        or compact_metadata != str(item["metadata_json"])
+                    ):
+                        updates.append(
+                            (compact_descriptor, compact_metadata, str(item["id"]))
+                        )
+                connection.executemany(
+                    "UPDATE catalog_items SET descriptor_json=?,metadata_json=? "
+                    "WHERE id=?",
+                    updates,
+                )
+                scanned = len(rows)
+                updated = len(updates)
+                if rows:
+                    cursor = str(rows[-1]["id"])
+                if len(rows) < bounded:
+                    phase = "projection"
+                    cursor = ""
+            elif phase == "projection":
+                rows = connection.execute(
+                    """
+                    SELECT p.item_id,p.metadata_json,p.provenance_json,
+                        c.metadata_json AS base_metadata_json
+                    FROM catalog_metadata_projection p
+                    JOIN catalog_items c ON c.id=p.item_id
+                    WHERE p.item_id>? ORDER BY p.item_id LIMIT ?
+                    """,
+                    (cursor, bounded),
+                ).fetchall()
+                updates = []
+                for item in rows:
+                    resolved = _json_loads(item["metadata_json"])
+                    provenance = _json_loads(item["provenance_json"])
+                    base = _json_loads(item["base_metadata_json"])
+                    delta, delta_provenance = _projection_storage(
+                        resolved if isinstance(resolved, Mapping) else {},
+                        provenance if isinstance(provenance, Mapping) else {},
+                        base if isinstance(base, Mapping) else {},
+                    )
+                    metadata_json = _json_dumps(delta)
+                    provenance_json = _json_dumps(delta_provenance)
+                    if (
+                        metadata_json != str(item["metadata_json"])
+                        or provenance_json != str(item["provenance_json"])
+                    ):
+                        updates.append(
+                            (metadata_json, provenance_json, str(item["item_id"]))
+                        )
+                connection.executemany(
+                    "UPDATE catalog_metadata_projection "
+                    "SET metadata_json=?,provenance_json=? WHERE item_id=?",
+                    updates,
+                )
+                scanned = len(rows)
+                updated = len(updates)
+                if rows:
+                    cursor = str(rows[-1]["item_id"])
+                if len(rows) < bounded:
+                    phase = "complete"
+                    cursor = ""
+            state = {
+                "revision": STORAGE_COMPACTION_REVISION,
+                "phase": phase,
+                "cursor": cursor,
+                "scanned": int(state.get("scanned") or 0) + scanned,
+                "updated": int(state.get("updated") or 0) + updated,
+                "updated_at": now_iso(),
+            }
+            connection.execute(
+                "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (state_key, _json_dumps(state)),
+            )
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": "adaos.media_center.storage_compaction.v1",
+            **state,
+            "batch_scanned": scanned,
+            "batch_updated": updated,
+            "complete": phase == "complete",
+        }
+
+    def optimize_storage(self, *, reclaim: bool = False) -> dict[str, Any]:
+        before = self.storage_status()
+        db_path = self.repository.db_path
+        required_bytes = max(
+            64 * 1024 * 1024,
+            int(before.get("allocated_bytes") or 0)
+            - int(before.get("reclaimable_bytes") or 0),
+        )
+        free_bytes = shutil.disk_usage(db_path.parent).free
+        if reclaim and free_bytes < required_bytes:
+            return {
+                "ok": False,
+                "error": "media_center_storage_compaction_space_insufficient",
+                "required_bytes": required_bytes,
+                "free_bytes": free_bytes,
+                "storage": before,
+            }
+        with self.repository.connect() as connection:
+            checkpoint = tuple(
+                int(value)
+                for value in connection.execute(
+                    "PRAGMA wal_checkpoint(TRUNCATE)"
+                ).fetchone()
+            )
+            if reclaim:
+                connection.execute("PRAGMA auto_vacuum=INCREMENTAL")
+                connection.execute("VACUUM")
+            post_vacuum_checkpoint = (
+                tuple(
+                    int(value)
+                    for value in connection.execute(
+                        "PRAGMA wal_checkpoint(TRUNCATE)"
+                    ).fetchone()
+                )
+                if reclaim
+                else checkpoint
+            )
+            connection.execute("PRAGMA optimize")
+        after = self.storage_status()
+        return {
+            "ok": True,
+            "schema": "adaos.media_center.storage_optimization.v1",
+            "reclaimed": bool(reclaim),
+            "checkpoint": list(checkpoint),
+            "post_vacuum_checkpoint": list(post_vacuum_checkpoint),
+            "before": before,
+            "after": after,
+            "reclaimed_bytes": max(
+                0,
+                int(before.get("db_bytes") or 0)
+                - int(after.get("db_bytes") or 0),
+            ),
+        }
+
     def _backfill_search(self, connection: sqlite3.Connection) -> None:
         rows = connection.execute(
             """
             SELECT rowid AS search_rowid,id,title,name,source_path,folder_path,
                 metadata_json
             FROM catalog_items
-            WHERE search_text=''
+            WHERE search_text='' OR fuzzy_text=''
             """
         ).fetchall()
-        updates: list[tuple[str, str]] = []
-        search_rows: list[tuple[int, str, str]] = []
+        updates: list[tuple[str, str, str]] = []
         for row in rows:
             metadata = _json_loads(row["metadata_json"])
             search_text = self._search_text(
@@ -1338,54 +1684,11 @@ class MediaCatalogCoordinator:
                 metadata=metadata if isinstance(metadata, Mapping) else {},
             )
             item_id = str(row["id"])
-            updates.append((search_text, item_id))
-            search_rows.append((int(row["search_rowid"]), item_id, search_text))
+            updates.append((search_text, self._fuzzy_tokens(search_text), item_id))
         if updates:
-            connection.executemany("UPDATE catalog_items SET search_text=? WHERE id=?", updates)
-            for start in range(0, len(search_rows), 400):
-                batch = search_rows[start : start + 400]
-                placeholders = ",".join("?" for _ in batch)
-                connection.execute(
-                    f"DELETE FROM catalog_search WHERE rowid IN ({placeholders})",
-                    tuple(rowid for rowid, _item_id, _value in batch),
-                )
-                connection.execute(
-                    f"DELETE FROM catalog_fuzzy_search WHERE rowid IN ({placeholders})",
-                    tuple(rowid for rowid, _item_id, _value in batch),
-                )
             connection.executemany(
-                "INSERT INTO catalog_search(rowid,item_id,text) VALUES (?,?,?)",
-                search_rows,
-            )
-            connection.executemany(
-                "INSERT INTO catalog_fuzzy_search(rowid,item_id,tokens) VALUES (?,?,?)",
-                [
-                    (rowid, item_id, self._fuzzy_tokens(search_text))
-                    for rowid, item_id, search_text in search_rows
-                ],
-            )
-        catalog_count = int(
-            connection.execute("SELECT COUNT(*) FROM catalog_items").fetchone()[0]
-        )
-        fuzzy_count = int(
-            connection.execute("SELECT COUNT(*) FROM catalog_fuzzy_search").fetchone()[0]
-        )
-        if catalog_count != fuzzy_count:
-            connection.execute("DELETE FROM catalog_fuzzy_search")
-            rows = connection.execute(
-                "SELECT rowid AS search_rowid,id,search_text "
-                "FROM catalog_items ORDER BY rowid"
-            ).fetchall()
-            connection.executemany(
-                "INSERT INTO catalog_fuzzy_search(rowid,item_id,tokens) VALUES (?,?,?)",
-                [
-                    (
-                        int(row["search_rowid"]),
-                        str(row["id"]),
-                        self._fuzzy_tokens(row["search_text"]),
-                    )
-                    for row in rows
-                ],
+                "UPDATE catalog_items SET search_text=?,fuzzy_text=? WHERE id=?",
+                updates,
             )
 
     def _ensure_search_rowids(self, connection: sqlite3.Connection) -> None:
@@ -1394,29 +1697,12 @@ class MediaCatalogCoordinator:
         ).fetchone()
         if marker and str(marker["value"]) == SEARCH_ROWID_REVISION:
             return
-        rows = connection.execute(
-            "SELECT rowid AS search_rowid,id,search_text "
-            "FROM catalog_items ORDER BY rowid"
-        ).fetchall()
-        connection.execute("DELETE FROM catalog_search")
-        connection.execute("DELETE FROM catalog_fuzzy_search")
-        connection.executemany(
-            "INSERT INTO catalog_search(rowid,item_id,text) VALUES (?,?,?)",
-            [
-                (int(row["search_rowid"]), str(row["id"]), str(row["search_text"]))
-                for row in rows
-            ],
+        connection.execute(
+            "INSERT INTO catalog_search(catalog_search) VALUES ('rebuild')"
         )
-        connection.executemany(
-            "INSERT INTO catalog_fuzzy_search(rowid,item_id,tokens) VALUES (?,?,?)",
-            [
-                (
-                    int(row["search_rowid"]),
-                    str(row["id"]),
-                    self._fuzzy_tokens(row["search_text"]),
-                )
-                for row in rows
-            ],
+        connection.execute(
+            "INSERT INTO catalog_fuzzy_search(catalog_fuzzy_search) "
+            "VALUES ('rebuild')"
         )
         connection.execute(
             "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
@@ -1500,6 +1786,11 @@ class MediaCatalogCoordinator:
             base if isinstance(base, Mapping) else {},
             work_id=str(row["work_id"]),
         )
+        stored_metadata, stored_provenance = _projection_storage(
+            metadata,
+            provenance,
+            base if isinstance(base, Mapping) else {},
+        )
         title = _text(metadata.get("title")) or str(row["title"])
         release_date = _text(metadata.get("release_date"))
         release_year = (
@@ -1551,7 +1842,8 @@ class MediaCatalogCoordinator:
                 updated_at=excluded.updated_at
             """,
             (
-                str(row["id"]), _json_dumps(metadata), _json_dumps(provenance),
+                str(row["id"]), _json_dumps(stored_metadata),
+                _json_dumps(stored_provenance),
                 title, year, release_date, rating,
                 critic_rating, audience_rating, _text(metadata.get("content_rating")),
                 max(0, int(duration_ms_number)), _json_dumps(genres),
@@ -1602,10 +1894,15 @@ class MediaCatalogCoordinator:
             metadata=metadata,
         )
         connection.execute(
-            "UPDATE catalog_items SET title=?,search_text=? WHERE id=?",
-            (title, search_text, str(row["id"])),
+            "UPDATE catalog_items SET title=?,search_text=?,fuzzy_text=? "
+            "WHERE id=?",
+            (
+                title,
+                search_text,
+                self._fuzzy_tokens(search_text),
+                str(row["id"]),
+            ),
         )
-        self._replace_search(connection, str(row["id"]), search_text)
 
     def _backfill_metadata_projections(self, connection: sqlite3.Connection) -> None:
         rows = connection.execute(
@@ -1669,42 +1966,8 @@ class MediaCatalogCoordinator:
         }
 
     @staticmethod
-    def _replace_search(connection: sqlite3.Connection, item_id: str, search_text: str) -> None:
-        row = connection.execute(
-            "SELECT rowid AS search_rowid FROM catalog_items WHERE id=?", (item_id,)
-        ).fetchone()
-        if row is None:
-            return
-        search_rowid = int(row["search_rowid"])
-        connection.execute("DELETE FROM catalog_search WHERE rowid=?", (search_rowid,))
-        connection.execute(
-            "INSERT INTO catalog_search(rowid,item_id,text) VALUES (?,?,?)",
-            (search_rowid, item_id, search_text),
-        )
-        connection.execute(
-            "DELETE FROM catalog_fuzzy_search WHERE rowid=?", (search_rowid,)
-        )
-        connection.execute(
-            "INSERT INTO catalog_fuzzy_search(rowid,item_id,tokens) VALUES (?,?,?)",
-            (
-                search_rowid,
-                item_id,
-                MediaCatalogCoordinator._fuzzy_tokens(search_text),
-            ),
-        )
-
-    @staticmethod
     def _fuzzy_tokens(value: Any) -> str:
-        compact = fold_text(value).replace(" ", "_")[:1024]
-        trigrams = {
-            compact[index : index + 3]
-            for index in range(max(0, len(compact) - 2))
-        }
-        return " ".join(
-            token.encode("ascii", errors="ignore").hex()
-            for token in sorted(trigrams)
-            if token
-        )
+        return fold_text(value)[:1024]
 
     @staticmethod
     def _search_text(*, title: Any, name: Any, relative_path: Any, folder_path: Any, metadata: Mapping[str, Any]) -> str:
@@ -2099,10 +2362,11 @@ class MediaCatalogCoordinator:
                 modified_at, content_path, routed_content_path, playback_id, source_path,
                 descriptor_json, metadata_json, fingerprint, indexed_at, last_seen_at,
                 missing, favorite, play_count, tags_json, agent_id, node_id, root_id,
-                source_id, source_revision, folder_path, search_text, catalog_revision,
+                source_id, source_revision, folder_path, search_text, fuzzy_text,
+                catalog_revision,
                 work_id, variant_id, collection_id, quality_json,
                 maturity_rating, explicit
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, '[]', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, '[]', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET source=excluded.source, resource_id=excluded.resource_id,
                 name=excluded.name, title=excluded.title, media_kind=excluded.media_kind,
                 mime_type=excluded.mime_type, size_bytes=excluded.size_bytes,
@@ -2114,7 +2378,8 @@ class MediaCatalogCoordinator:
                 missing=0, agent_id=excluded.agent_id, node_id=excluded.node_id,
                 root_id=excluded.root_id, source_id=excluded.source_id,
                 source_revision=excluded.source_revision, folder_path=excluded.folder_path,
-                search_text=excluded.search_text, catalog_revision=excluded.catalog_revision,
+                search_text=excluded.search_text,fuzzy_text=excluded.fuzzy_text,
+                catalog_revision=excluded.catalog_revision,
                 work_id=excluded.work_id, variant_id=excluded.variant_id,
                 collection_id=excluded.collection_id, quality_json=excluded.quality_json,
                 maturity_rating=excluded.maturity_rating,
@@ -2124,9 +2389,12 @@ class MediaCatalogCoordinator:
                 item_id, f"agent:{agent_id}", _text(source.get("resource_id") or descriptor.get("resource_id") or descriptor.get("id")),
                 name, title, kind, mime_type, int(source.get("size_bytes") or descriptor.get("size_bytes") or 0),
                 modified_at, content_path, routed_path, _text(descriptor.get("playback_id")), source_path,
-                _json_dumps(descriptor), _json_dumps(metadata), _text(source.get("fingerprint")), now_iso(), now_iso(),
+                _json_dumps(_compact_source_descriptor(descriptor)),
+                _json_dumps(_compact_source_metadata(metadata)),
+                _text(source.get("fingerprint")), now_iso(), now_iso(),
                 agent_id, node_id, _text(source.get("root_id") or delta.get("root_id")), source_id, source_revision,
-                folder_path, search_text, catalog_revision, work_id, variant_id, collection_id,
+                folder_path, search_text, self._fuzzy_tokens(search_text),
+                catalog_revision, work_id, variant_id, collection_id,
                 _json_dumps(self._quality(descriptor, metadata)),
                 maturity_rating, int(bool(explicit_value)),
             ),
@@ -2166,7 +2434,6 @@ class MediaCatalogCoordinator:
                 delta=-1,
                 revision=catalog_revision,
             )
-        self._replace_search(connection, item_id, search_text)
         connection.execute(
             """
             INSERT INTO media_variants(
@@ -3496,14 +3763,13 @@ class MediaCatalogCoordinator:
                     f"""
                     WITH search_input(query_label) AS (VALUES (?)),
                     search_candidates AS MATERIALIZED (
-                        SELECT catalog_search.rowid,catalog_search.item_id
+                        SELECT catalog_search.rowid
                         FROM catalog_search
                         CROSS JOIN catalog_items c
                             ON c.rowid=catalog_search.rowid
-                            AND c.id=catalog_search.item_id
                         LEFT JOIN personal_media_state ps
                             ON ps.item_id=c.id AND ps.profile_id=?
-                        WHERE catalog_search.text MATCH ?
+                        WHERE catalog_search.search_text MATCH ?
                             AND {' AND '.join(filters)}
                         LIMIT ?
                     ),
@@ -3520,7 +3786,7 @@ class MediaCatalogCoordinator:
                                 AS search_candidate_count
                         FROM search_candidates candidate
                         CROSS JOIN catalog_items c
-                            ON c.rowid=candidate.rowid AND c.id=candidate.item_id
+                            ON c.rowid=candidate.rowid
                         CROSS JOIN search_input
                         ORDER BY {order} LIMIT ? OFFSET ?
                     )
@@ -3563,10 +3829,9 @@ class MediaCatalogCoordinator:
                                 FROM catalog_search
                                 CROSS JOIN catalog_items c
                                     ON c.rowid=catalog_search.rowid
-                                    AND c.id=catalog_search.item_id
                                 LEFT JOIN personal_media_state ps
                                     ON ps.item_id=c.id AND ps.profile_id=?
-                                WHERE catalog_search.text MATCH ?
+                                WHERE catalog_search.search_text MATCH ?
                                     AND {' AND '.join(filters)}
                                 LIMIT ?
                             )
@@ -3712,7 +3977,14 @@ class MediaCatalogCoordinator:
         except ValueError:
             score_limit = 600
         score_limit = max(100, min(candidate_limit, score_limit, 5000))
-        query_trigrams = self._fuzzy_tokens(token).split()
+        compact_query = self._fuzzy_tokens(token)
+        query_trigrams = sorted(
+            {
+                compact_query[index : index + 3]
+                for index in range(max(0, len(compact_query) - 2))
+                if len(compact_query[index : index + 3]) == 3
+            }
+        )
         if not query_trigrams:
             return {
                 "ok": True,
@@ -3727,25 +3999,28 @@ class MediaCatalogCoordinator:
                 "partial": self.participation()["partial"],
                 "ranking": {"version": "local-discovery-v1"},
             }
-        expression = " OR ".join(query_trigrams[:96])
+        expression = " OR ".join(
+            f'"{term.replace(chr(34), chr(34) * 2)}"'
+            for term in query_trigrams[:96]
+        )
         rows: list[sqlite3.Row] = []
         with self.repository.connect() as connection:
             candidate_rows = connection.execute(
                 """
-                SELECT item_id,rank FROM catalog_fuzzy_search
+                SELECT rowid,rank FROM catalog_fuzzy_search
                 WHERE catalog_fuzzy_search MATCH ?
-                ORDER BY rank,item_id LIMIT ?
+                ORDER BY rank,rowid LIMIT ?
                 """,
                 (expression, score_limit + 1),
             ).fetchall()
-            candidate_ids = [str(row["item_id"]) for row in candidate_rows]
+            candidate_rowids = [int(row["rowid"]) for row in candidate_rows]
             admitted_values = sorted(admitted)
             admitted_placeholders = (
                 ",".join("?" for _ in admitted_values) or "''"
             )
-            for start in range(0, min(score_limit, len(candidate_ids)), 400):
-                batch = candidate_ids[start : start + 400]
-                id_placeholders = ",".join("?" for _ in batch)
+            for start in range(0, min(score_limit, len(candidate_rowids)), 400):
+                batch = candidate_rowids[start : start + 400]
+                rowid_placeholders = ",".join("?" for _ in batch)
                 rows.extend(
                     connection.execute(
                         f"""
@@ -3767,7 +4042,7 @@ class MediaCatalogCoordinator:
                         FROM catalog_items c
                         LEFT JOIN personal_media_state ps
                             ON ps.item_id=c.id AND ps.profile_id=?
-                        WHERE c.id IN ({id_placeholders}) AND c.missing=0
+                        WHERE c.rowid IN ({rowid_placeholders}) AND c.missing=0
                             AND COALESCE(ps.hidden,0)=0
                             AND c.media_kind IN ({admitted_placeholders})
                         """,
@@ -3849,8 +4124,32 @@ class MediaCatalogCoordinator:
             }
         )
         if projection is not None:
-            metadata = _json_loads(projection["metadata_json"])
-            provenance = _json_loads(projection["provenance_json"])
+            base_metadata = _json_loads(row["metadata_json"])
+            projected_metadata = _json_loads(projection["metadata_json"])
+            metadata = {
+                **(
+                    dict(base_metadata)
+                    if isinstance(base_metadata, Mapping)
+                    else {}
+                ),
+                **(
+                    dict(projected_metadata)
+                    if isinstance(projected_metadata, Mapping)
+                    else {}
+                ),
+            }
+            projected_provenance = _json_loads(projection["provenance_json"])
+            provenance = {
+                str(key): "media_library_agent.source_metadata.v1"
+                for key, value in (
+                    base_metadata.items()
+                    if isinstance(base_metadata, Mapping)
+                    else ()
+                )
+                if value not in (None, "", [], {})
+            }
+            if isinstance(projected_provenance, Mapping):
+                provenance.update(projected_provenance)
             public_metadata = _public_metadata(metadata)
             item["metadata"] = (
                 public_metadata if isinstance(public_metadata, Mapping) else {}
@@ -6705,6 +7004,15 @@ class MediaCatalogCoordinator:
             auto_vacuum = int(
                 connection.execute("PRAGMA auto_vacuum").fetchone()[0]
             )
+            compaction_row = connection.execute(
+                "SELECT value FROM coordinator_meta "
+                "WHERE key='storage_compaction_state'"
+            ).fetchone()
+            compaction = (
+                _json_loads(compaction_row["value"])
+                if compaction_row is not None
+                else {}
+            )
         return {
             "schema": "adaos.media_center.storage_state.v1",
             "db_bytes": db_path.stat().st_size if db_path.exists() else 0,
@@ -6714,6 +7022,15 @@ class MediaCatalogCoordinator:
             "page_size": page_size,
             "page_count": page_count,
             "freelist_count": freelist_count,
+            "reclaimable_ratio": round(
+                (freelist_count / page_count) if page_count else 0.0, 6
+            ),
+            "compaction_recommended": bool(
+                page_size * freelist_count >= 64 * 1024 * 1024
+            ),
+            "logical_compaction": (
+                dict(compaction) if isinstance(compaction, Mapping) else {}
+            ),
             "auto_vacuum": {0: "none", 1: "full", 2: "incremental"}.get(
                 auto_vacuum, "unknown"
             ),

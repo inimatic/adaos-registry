@@ -845,6 +845,39 @@ def cancel_rendition(job_id: str = "", **_: Any) -> dict[str, Any]:
     )
 
 
+@tool(
+    summary="Optimize node-local media catalog storage and optionally reclaim disk space.",
+    side_effects="local_write",
+)
+def optimize_storage(reclaim: bool = False, **_: Any) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    storage = repository.storage_status()
+    logical = dict(storage.get("logical_compaction") or {})
+    should_reclaim = bool(reclaim)
+    if should_reclaim and logical.get("phase") != "steady":
+        return _human_error(
+            "storage_compaction_in_progress",
+            "Background media-library compaction must finish before disk space can be reclaimed.",
+            retryable=True,
+            storage=storage,
+        )
+    repository.set_storage_maintenance(True)
+    try:
+        deadline = time.monotonic() + 30.0
+        while repository.executing_job_count() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        if repository.executing_job_count():
+            return _human_error(
+                "storage_workers_busy",
+                "Media-library workers could not pause for storage maintenance.",
+                retryable=True,
+                storage=repository.storage_status(),
+            )
+        return repository.optimize_storage(reclaim=should_reclaim)
+    finally:
+        repository.set_storage_maintenance(False)
+
+
 @tool(summary="Return compact agent health and capacity state.", side_effects="none")
 def status(**_: Any) -> dict[str, Any]:
     repository, worker = _runtime()

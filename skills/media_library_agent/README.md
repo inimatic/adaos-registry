@@ -35,6 +35,28 @@ and UI rehydration on slow storage. Worker transition tests use bounded
 slow-storage deadlines rather than assuming a local SSD completes a scan in
 two seconds.
 
+The agent database and the Media Center coordinator database are deliberately
+separate. This database is the node-local source of truth for roots, source
+witnesses, technical facts, rendition jobs, and replayable changes. The
+coordinator stores a compact federated read model for grouping, enrichment,
+search, personalization, and playback planning; it must not become a second
+copy of the complete agent descriptor.
+
+Source search uses a contentless FTS5 index, so searchable JSON is tokenized but
+is not retained a second time by the FTS content table. Full-state source deltas
+remain ordered and idempotent, while old intermediate revisions are collapsed
+after a one-hour grace period; the newest snapshot or tombstone for every source
+is always retained, so a new or delayed coordinator can still rebuild its read
+model. Descriptor fields represented by typed source columns or source metadata
+are normalized at rest and reconstructed at the public contract boundary.
+
+Logical compaction is resumable and runs in bounded worker batches. `status`
+reports its phase, counters, SQLite free pages, and retained delta count.
+`optimize_storage(reclaim=true)` is the explicit physical maintenance step: it
+pauses new local work, waits for executing jobs, checkpoints WAL, verifies free
+disk headroom, and rebuilds SQLite to return free pages to the filesystem.
+Original media and generated rendition lifecycle rules are unchanged.
+
 ## Scan model
 
 - `import_folder` and `start_scan` return in seconds with durable job identifiers.

@@ -16,5 +16,7 @@
   "runtime.media_library_agent.error.topology_join_failed": "Агент библиотеки не смог подключиться к топологии Media Center.",
   "runtime.media_library_agent.error.topology_renew_failed": "Агент библиотеки не смог продлить членство в Media Center.",
   "runtime.media_library_agent.error.topology_observe_failed": "Агент библиотеки не смог опубликовать состояние раздела.",
-  "runtime.media_library_agent.error.topology_drain_failed": "Агент библиотеки не смог выйти из топологии Media Center."
+  "runtime.media_library_agent.error.topology_drain_failed": "Агент библиотеки не смог выйти из топологии Media Center.",
+  "runtime.media_library_agent.error.storage_compaction_in_progress": "Фоновое уплотнение хранилища медиатеки еще не завершено.",
+  "runtime.media_library_agent.error.storage_workers_busy": "Не удалось приостановить обработчики медиатеки для обслуживания хранилища."
 }

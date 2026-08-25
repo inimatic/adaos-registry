@@ -4,10 +4,12 @@ import contextlib
 import hashlib
 import os
 import re
+import shutil
 import sqlite3
 import time
 import zlib
 from collections.abc import Iterator
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Iterable, Mapping
@@ -31,8 +33,127 @@ from .contracts import (
 ACTIVE_JOB_STATUSES = ("queued", "running", "waiting_resources", "canceling")
 TERMINAL_JOB_STATUSES = ("completed", "failed", "canceled")
 _CLOCK = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
-_DATABASE_SCHEMA_REVISION = "3"
+_DATABASE_SCHEMA_REVISION = "4"
+_STORAGE_COMPACTION_REVISION = "2026-08-25.1"
 _SCHEMA_LOCK_TIMEOUT_SECONDS = 300.0
+_CONTENTLESS_DELETE_SEARCH = sqlite3.sqlite_version_info >= (3, 43, 0)
+_DESCRIPTOR_METADATA_KEYS = "_media_library_source_metadata_keys"
+_DESCRIPTOR_SOURCE_FIELDS = "_media_library_source_fields"
+
+
+def _compact_source_descriptor(
+    descriptor: Mapping[str, Any], source: Mapping[str, Any]
+) -> dict[str, Any]:
+    compact = dict(descriptor)
+    source_metadata = source.get("metadata")
+    source_metadata = source_metadata if isinstance(source_metadata, Mapping) else {}
+    descriptor_metadata = compact.get("metadata")
+    if isinstance(descriptor_metadata, Mapping):
+        shared_keys = sorted(
+            str(key)
+            for key, value in descriptor_metadata.items()
+            if key in source_metadata and source_metadata.get(key) == value
+        )
+        distinct = {
+            str(key): value
+            for key, value in descriptor_metadata.items()
+            if str(key) not in shared_keys
+        }
+        if shared_keys:
+            compact[_DESCRIPTOR_METADATA_KEYS] = shared_keys
+        if distinct:
+            compact["metadata"] = distinct
+        else:
+            compact.pop("metadata", None)
+
+    omitted: list[str] = []
+    duplicate_fields = {
+        "filename": text(source.get("name")),
+        "name": text(source.get("name")),
+        "mime": text(source.get("mime_type")),
+        "mime_type": text(source.get("mime_type")),
+        "size_bytes": int(source.get("size_bytes") or 0),
+        "resource_id": text(source.get("resource_id")),
+        "id": text(source.get("resource_id")),
+    }
+    for key, expected in duplicate_fields.items():
+        if key in compact and compact.get(key) == expected:
+            compact.pop(key, None)
+            omitted.append(key)
+    if omitted:
+        compact[_DESCRIPTOR_SOURCE_FIELDS] = sorted(omitted)
+    return compact
+
+
+def _expand_source_descriptor(
+    descriptor: Mapping[str, Any], source: Mapping[str, Any]
+) -> dict[str, Any]:
+    expanded = dict(descriptor)
+    source_metadata = source.get("metadata")
+    source_metadata = source_metadata if isinstance(source_metadata, Mapping) else {}
+    shared_keys = expanded.pop(_DESCRIPTOR_METADATA_KEYS, [])
+    descriptor_metadata = expanded.get("metadata")
+    resolved_metadata = (
+        dict(descriptor_metadata) if isinstance(descriptor_metadata, Mapping) else {}
+    )
+    if isinstance(shared_keys, list):
+        for key in shared_keys:
+            token = text(key)
+            if token and token in source_metadata:
+                resolved_metadata[token] = source_metadata[token]
+    if resolved_metadata:
+        expanded["metadata"] = resolved_metadata
+    else:
+        expanded.pop("metadata", None)
+
+    omitted = expanded.pop(_DESCRIPTOR_SOURCE_FIELDS, [])
+    replacements = {
+        "filename": text(source.get("name")),
+        "name": text(source.get("name")),
+        "mime": text(source.get("mime_type")),
+        "mime_type": text(source.get("mime_type")),
+        "size_bytes": int(source.get("size_bytes") or 0),
+        "resource_id": text(source.get("resource_id")),
+        "id": text(source.get("resource_id")),
+    }
+    if isinstance(omitted, list):
+        for key in omitted:
+            token = text(key)
+            if token in replacements:
+                expanded[token] = replacements[token]
+    return expanded
+
+
+def _compact_source_payload(source: Mapping[str, Any]) -> dict[str, Any]:
+    compact = dict(source)
+    descriptor = compact.get("descriptor")
+    compact["descriptor"] = _compact_source_descriptor(
+        descriptor if isinstance(descriptor, Mapping) else {}, compact
+    )
+    return compact
+
+
+def _expand_source_payload(source: Mapping[str, Any]) -> dict[str, Any]:
+    expanded = dict(source)
+    descriptor = expanded.get("descriptor")
+    expanded["descriptor"] = _expand_source_descriptor(
+        descriptor if isinstance(descriptor, Mapping) else {}, expanded
+    )
+    return expanded
+
+
+def _source_search_text(source: Mapping[str, Any]) -> str:
+    metadata = source.get("metadata")
+    descriptor = source.get("descriptor")
+    return " ".join(
+        (
+            text(source.get("name")),
+            text(source.get("relative_path")),
+            text(source.get("folder_path")),
+            json_dumps(metadata if isinstance(metadata, Mapping) else {}),
+            json_dumps(descriptor if isinstance(descriptor, Mapping) else {}),
+        )
+    )
 
 
 class _ClosingConnection(sqlite3.Connection):
@@ -262,6 +383,7 @@ class MediaLibraryAgentRepository:
                     resource_id TEXT NOT NULL DEFAULT '',
                     descriptor_json TEXT NOT NULL DEFAULT '{}',
                     metadata_json TEXT NOT NULL DEFAULT '{}',
+                    search_rowid INTEGER,
                     present INTEGER NOT NULL DEFAULT 1,
                     first_seen_at TEXT NOT NULL,
                     last_seen_at TEXT NOT NULL,
@@ -272,11 +394,6 @@ class MediaLibraryAgentRepository:
                 CREATE INDEX IF NOT EXISTS idx_media_agent_sources_folder
                     ON sources(root_id, present, folder_path, revision);
                 CREATE INDEX IF NOT EXISTS idx_media_agent_sources_kind ON sources(media_kind, present);
-                CREATE VIRTUAL TABLE IF NOT EXISTS source_search USING fts5(
-                    source_id UNINDEXED,
-                    text,
-                    tokenize='unicode61 remove_diacritics 2'
-                );
                 CREATE TABLE IF NOT EXISTS source_deltas (
                     sequence INTEGER PRIMARY KEY AUTOINCREMENT,
                     id TEXT NOT NULL UNIQUE,
@@ -292,6 +409,8 @@ class MediaLibraryAgentRepository:
                     created_at TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_media_agent_deltas_root ON source_deltas(root_id, sequence);
+                CREATE INDEX IF NOT EXISTS idx_media_agent_deltas_source
+                    ON source_deltas(source_id, sequence DESC);
                 CREATE TABLE IF NOT EXISTS schedules (
                     root_id TEXT PRIMARY KEY REFERENCES roots(id) ON DELETE CASCADE,
                     enabled INTEGER NOT NULL DEFAULT 0,
@@ -371,6 +490,42 @@ class MediaLibraryAgentRepository:
                     connection.execute(
                         f"ALTER TABLE schedules ADD COLUMN {name} {definition}"
                     )
+            source_columns = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(sources)").fetchall()
+            }
+            if "search_rowid" not in source_columns:
+                connection.execute(
+                    "ALTER TABLE sources ADD COLUMN search_rowid INTEGER"
+                )
+            connection.execute(
+                "UPDATE sources SET search_rowid=rowid "
+                "WHERE search_rowid IS NULL OR search_rowid<=0"
+            )
+            connection.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_media_agent_sources_search_rowid "
+                "ON sources(search_rowid)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_media_agent_deltas_source "
+                "ON source_deltas(source_id, sequence DESC)"
+            )
+            search_schema = connection.execute(
+                "SELECT sql FROM sqlite_master "
+                "WHERE type='table' AND name='source_search'"
+            ).fetchone()
+            compact_search = text(
+                search_schema["sql"] if search_schema else ""
+            ).replace(" ", "")
+            rebuild_search = bool(
+                search_schema is None
+                or "source_id" in compact_search
+                or (
+                    _CONTENTLESS_DELETE_SEARCH
+                    and "contentless_delete=1" not in compact_search
+                )
+                or (not _CONTENTLESS_DELETE_SEARCH and "content=''" in compact_search)
+            )
             self._bind_node_identity(connection)
             connection.execute(
                 "INSERT OR REPLACE INTO agent_meta(key, value) VALUES ('schema_version', ?)",
@@ -380,33 +535,44 @@ class MediaLibraryAgentRepository:
                 "INSERT OR REPLACE INTO agent_meta(key, value) VALUES ('database_schema_revision', ?)",
                 (_DATABASE_SCHEMA_REVISION,),
             )
-            search_count = int(
-                connection.execute("SELECT COUNT(*) FROM source_search").fetchone()[0]
-            )
             source_count = int(
                 connection.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
             )
+            search_count = (
+                int(
+                    connection.execute("SELECT COUNT(*) FROM source_search").fetchone()[
+                        0
+                    ]
+                )
+                if search_schema is not None
+                else -1
+            )
             if search_count != source_count:
-                connection.execute("DELETE FROM source_search")
-                for source_row in connection.execute(
-                    "SELECT id,name,relative_path,folder_path,metadata_json,descriptor_json FROM sources"
-                ).fetchall():
-                    connection.execute(
-                        "INSERT INTO source_search(source_id,text) VALUES (?,?)",
-                        (
-                            str(source_row["id"]),
-                            " ".join(
-                                str(source_row[key] or "")
-                                for key in (
-                                    "name",
-                                    "relative_path",
-                                    "folder_path",
-                                    "metadata_json",
-                                    "descriptor_json",
-                                )
-                            ),
-                        ),
-                    )
+                rebuild_search = True
+            if rebuild_search:
+                connection.execute("DROP TABLE IF EXISTS source_search")
+                options = (
+                    ", content='', contentless_delete=1"
+                    if _CONTENTLESS_DELETE_SEARCH
+                    else ""
+                )
+                connection.execute(
+                    "CREATE VIRTUAL TABLE source_search USING fts5("
+                    "text, tokenize='unicode61 remove_diacritics 2'"
+                    f"{options})"
+                )
+                connection.execute(
+                    """
+                    INSERT INTO source_search(rowid,text)
+                    SELECT search_rowid,
+                        COALESCE(name,'') || ' ' ||
+                        COALESCE(relative_path,'') || ' ' ||
+                        COALESCE(folder_path,'') || ' ' ||
+                        COALESCE(metadata_json,'') || ' ' ||
+                        COALESCE(descriptor_json,'')
+                    FROM sources
+                    """
+                )
             connection.commit()
 
     def _bind_node_identity(self, connection: sqlite3.Connection) -> None:
@@ -553,7 +719,9 @@ class MediaLibraryAgentRepository:
                 self._set_meta(connection, "artwork_backfill_cursor", "")
                 self._set_meta(connection, "artwork_backfill_next_at", now + interval)
                 self._set_meta(connection, "artwork_backfill_cycle", cycle)
-                self._set_meta(connection, "artwork_backfill_last_completed_at", now_iso())
+                self._set_meta(
+                    connection, "artwork_backfill_last_completed_at", now_iso()
+                )
                 connection.commit()
                 return {
                     "ok": True,
@@ -625,14 +793,10 @@ class MediaLibraryAgentRepository:
             "state": "idle" if next_at > time.time() else "running",
             "cursor": text(meta.get("artwork_backfill_cursor")),
             "cycle": max(0, int(meta.get("artwork_backfill_cycle") or 0)),
-            "examined_count": max(
-                0, int(meta.get("artwork_backfill_examined") or 0)
-            ),
+            "examined_count": max(0, int(meta.get("artwork_backfill_examined") or 0)),
             "queued_count": max(0, int(meta.get("artwork_backfill_queued") or 0)),
             "last_run_at": text(meta.get("artwork_backfill_last_run_at")),
-            "last_completed_at": text(
-                meta.get("artwork_backfill_last_completed_at")
-            ),
+            "last_completed_at": text(meta.get("artwork_backfill_last_completed_at")),
             "next_at": next_at or None,
             "sources": {
                 "total": int(states["total"] or 0),
@@ -1344,8 +1508,7 @@ class MediaLibraryAgentRepository:
                 and text(current.get("state")) == "unavailable"
                 and text(current.get("exact_source_fingerprint"))
                 == str(source["fingerprint"])
-                and text(current.get("capability_witness"))
-                == text(capability_witness)
+                and text(current.get("capability_witness")) == text(capability_witness)
             ):
                 connection.commit()
                 return {
@@ -1577,15 +1740,11 @@ class MediaLibraryAgentRepository:
                     "provider_id": text(artwork.get("provider_id")),
                     "source_kind": text(artwork.get("source_kind")),
                     "source_name": text(artwork.get("source_name")),
-                    "selection_algorithm": text(
-                        artwork.get("selection_algorithm")
-                    ),
+                    "selection_algorithm": text(artwork.get("selection_algorithm")),
                     "sample_seek_seconds": float(
                         artwork.get("sample_seek_seconds") or 0
                     ),
-                    "information_score": float(
-                        artwork.get("information_score") or 0
-                    ),
+                    "information_score": float(artwork.get("information_score") or 0),
                     "width": max(0, int(artwork.get("width") or 0)),
                     "height": max(0, int(artwork.get("height") or 0)),
                     "size_bytes": max(0, int(output_bytes)),
@@ -1673,6 +1832,12 @@ class MediaLibraryAgentRepository:
         now = now_iso()
         descriptor = dict(source.get("descriptor") or {})
         metadata = dict(source.get("metadata") or {})
+        source_for_storage = {
+            **dict(source),
+            "descriptor": descriptor,
+            "metadata": metadata,
+        }
+        compact_descriptor = _compact_source_descriptor(descriptor, source_for_storage)
         with self.connect() as connection:
             root = connection.execute(
                 "SELECT enabled FROM roots WHERE id=?", (root_id,)
@@ -1684,11 +1849,15 @@ class MediaLibraryAgentRepository:
                 (root_id, relative_path),
             ).fetchone()
             operation = "added"
+            previous_public = (
+                self._public_source(previous) if previous is not None else None
+            )
             if previous is not None:
                 operation = "restored" if not bool(previous["present"]) else "updated"
                 if (
                     str(previous["fingerprint"]) == text(source.get("fingerprint"))
-                    and str(previous["descriptor_json"]) == json_dumps(descriptor)
+                    and json_dumps(previous_public.get("descriptor") or {})
+                    == json_dumps(descriptor)
                     and str(previous["metadata_json"]) == json_dumps(metadata)
                     and bool(previous["present"])
                 ):
@@ -1742,35 +1911,34 @@ class MediaLibraryAgentRepository:
                     int(source.get("inode") or 0),
                     text(source.get("fingerprint")),
                     text(source.get("resource_id")),
-                    json_dumps(descriptor),
+                    json_dumps(compact_descriptor),
                     json_dumps(metadata),
                     first_seen_at,
                     now,
                     revision,
                 ),
             )
+            connection.execute(
+                """
+                UPDATE sources SET search_rowid=(
+                    SELECT COALESCE(MAX(search_rowid),0)+1 FROM sources
+                ) WHERE id=? AND search_rowid IS NULL
+                """,
+                (source_id,),
+            )
             row = connection.execute(
                 "SELECT * FROM sources WHERE id=?", (source_id,)
             ).fetchone()
             public = self._public_source(row)
             if operation != "unchanged":
+                if previous is not None and previous_public is not None:
+                    connection.execute(
+                        "DELETE FROM source_search WHERE rowid=?",
+                        (int(previous["search_rowid"]),),
+                    )
                 connection.execute(
-                    "DELETE FROM source_search WHERE source_id=?", (source_id,)
-                )
-                connection.execute(
-                    "INSERT INTO source_search(source_id,text) VALUES (?,?)",
-                    (
-                        source_id,
-                        " ".join(
-                            (
-                                text(source.get("name")),
-                                relative_path,
-                                text(source.get("folder_path")),
-                                json_dumps(metadata),
-                                json_dumps(descriptor),
-                            )
-                        ),
-                    ),
+                    "INSERT INTO source_search(rowid,text) VALUES (?,?)",
+                    (int(row["search_rowid"]), _source_search_text(public)),
                 )
                 self._insert_delta(connection, operation, public, job_id=job_id)
             connection.commit()
@@ -1835,7 +2003,7 @@ class MediaLibraryAgentRepository:
                 operation,
                 int(source.get("revision") or 0),
                 text(job_id),
-                json_dumps(dict(source)),
+                json_dumps(_compact_source_payload(source)),
                 created_at,
             ),
         )
@@ -1907,8 +2075,9 @@ class MediaLibraryAgentRepository:
             rows = connection.execute(
                 """
                 SELECT s.*,bm25(source_search) AS rank
-                FROM source_search JOIN sources s ON s.id=source_search.source_id
-                WHERE source_search.text MATCH ? AND s.present=1
+                FROM source_search
+                JOIN sources s ON s.search_rowid=source_search.rowid
+                WHERE source_search MATCH ? AND s.present=1
                 ORDER BY rank,lower(s.name),s.id LIMIT ? OFFSET ?
                 """,
                 (expression, bounded + 1, offset),
@@ -2153,6 +2322,271 @@ class MediaLibraryAgentRepository:
             )
             connection.commit()
 
+    def storage_maintenance_active(self) -> bool:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT value FROM agent_meta WHERE key='storage_maintenance_active'"
+            ).fetchone()
+        return text(row["value"] if row else "").lower() in {"1", "true", "yes"}
+
+    def set_storage_maintenance(self, active: bool) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO agent_meta(key,value) VALUES "
+                "('storage_maintenance_active',?)",
+                ("1" if active else "0",),
+            )
+            connection.commit()
+
+    def executing_job_count(self) -> int:
+        with self.connect() as connection:
+            scan = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM scan_jobs "
+                    "WHERE status IN ('running','waiting_resources','canceling')"
+                ).fetchone()[0]
+            )
+            rendition = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM rendition_jobs "
+                    "WHERE status IN ('running','waiting_resources','canceling')"
+                ).fetchone()[0]
+            )
+        return scan + rendition
+
+    def compact_storage_batch(self, *, limit: int = 500) -> dict[str, Any]:
+        bounded = max(25, min(int(limit or 500), 2000))
+        grace_seconds = max(
+            60,
+            min(
+                86400,
+                int(os.environ.get("MEDIA_LIBRARY_AGENT_DELTA_GRACE_SECONDS") or 3600),
+            ),
+        )
+        cutoff = (
+            datetime.now(tz=timezone.utc) - timedelta(seconds=grace_seconds)
+        ).isoformat()
+        state_key = "storage_compaction_state"
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT value FROM agent_meta WHERE key=?", (state_key,)
+            ).fetchone()
+            state = json_loads(row["value"], {}) if row is not None else {}
+            if not isinstance(state, Mapping) or text(state.get("revision")) != (
+                _STORAGE_COMPACTION_REVISION
+            ):
+                state = {
+                    "revision": _STORAGE_COMPACTION_REVISION,
+                    "phase": "sources",
+                    "cursor": "",
+                    "scanned": 0,
+                    "updated": 0,
+                    "deleted": 0,
+                }
+            phase = text(state.get("phase")) or "sources"
+            cursor = text(state.get("cursor"))
+            scanned = 0
+            updated = 0
+            deleted = 0
+            if phase == "sources":
+                rows = connection.execute(
+                    "SELECT * FROM sources WHERE id>? ORDER BY id LIMIT ?",
+                    (cursor, bounded),
+                ).fetchall()
+                updates: list[tuple[str, str]] = []
+                for source_row in rows:
+                    public = self._public_source(source_row)
+                    compact = json_dumps(
+                        _compact_source_descriptor(
+                            public.get("descriptor") or {}, public
+                        )
+                    )
+                    if compact != str(source_row["descriptor_json"]):
+                        updates.append((compact, str(source_row["id"])))
+                connection.executemany(
+                    "UPDATE sources SET descriptor_json=? WHERE id=?", updates
+                )
+                scanned = len(rows)
+                updated = len(updates)
+                if rows:
+                    cursor = str(rows[-1]["id"])
+                if len(rows) < bounded:
+                    phase = "delta_history"
+                    cursor = ""
+            elif phase in {"delta_history", "steady"}:
+                rows = connection.execute(
+                    """
+                    SELECT d.sequence FROM source_deltas d
+                    WHERE d.created_at<? AND EXISTS (
+                        SELECT 1 FROM source_deltas newer
+                        WHERE newer.source_id=d.source_id
+                          AND newer.sequence>d.sequence
+                    )
+                    ORDER BY d.sequence LIMIT ?
+                    """,
+                    (cutoff, bounded),
+                ).fetchall()
+                sequences = [int(item["sequence"]) for item in rows]
+                if sequences:
+                    placeholders = ",".join("?" for _ in sequences)
+                    connection.execute(
+                        f"DELETE FROM source_deltas WHERE sequence IN ({placeholders})",
+                        tuple(sequences),
+                    )
+                scanned = len(sequences)
+                deleted = len(sequences)
+                if phase == "delta_history" and len(sequences) < bounded:
+                    phase = "deltas"
+                    cursor = ""
+            elif phase == "deltas":
+                rows = connection.execute(
+                    "SELECT sequence,payload_json FROM source_deltas "
+                    "WHERE sequence>? ORDER BY sequence LIMIT ?",
+                    (int(cursor or 0), bounded),
+                ).fetchall()
+                updates = []
+                for delta in rows:
+                    payload = json_loads(delta["payload_json"], {})
+                    compact = json_dumps(
+                        _compact_source_payload(payload)
+                        if isinstance(payload, Mapping)
+                        else {}
+                    )
+                    if compact != str(delta["payload_json"]):
+                        updates.append((compact, int(delta["sequence"])))
+                connection.executemany(
+                    "UPDATE source_deltas SET payload_json=? WHERE sequence=?", updates
+                )
+                scanned = len(rows)
+                updated = len(updates)
+                if rows:
+                    cursor = str(rows[-1]["sequence"])
+                if len(rows) < bounded:
+                    phase = "steady"
+                    cursor = ""
+            state = {
+                "revision": _STORAGE_COMPACTION_REVISION,
+                "phase": phase,
+                "cursor": cursor,
+                "scanned": int(state.get("scanned") or 0) + scanned,
+                "updated": int(state.get("updated") or 0) + updated,
+                "deleted": int(state.get("deleted") or 0) + deleted,
+                "grace_seconds": grace_seconds,
+                "updated_at": now_iso(),
+            }
+            connection.execute(
+                "INSERT OR REPLACE INTO agent_meta(key,value) VALUES (?,?)",
+                (state_key, json_dumps(state)),
+            )
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": "adaos.media_library.storage_compaction.v1",
+            **state,
+            "batch_scanned": scanned,
+            "batch_updated": updated,
+            "batch_deleted": deleted,
+            "complete": phase == "steady",
+        }
+
+    def storage_status(self) -> dict[str, Any]:
+        db_path = self.db_path
+        wal_path = Path(f"{db_path}-wal")
+        with self.connect() as connection:
+            page_size = int(connection.execute("PRAGMA page_size").fetchone()[0])
+            page_count = int(connection.execute("PRAGMA page_count").fetchone()[0])
+            freelist_count = int(
+                connection.execute("PRAGMA freelist_count").fetchone()[0]
+            )
+            auto_vacuum = int(connection.execute("PRAGMA auto_vacuum").fetchone()[0])
+            delta_count = int(
+                connection.execute("SELECT COUNT(*) FROM source_deltas").fetchone()[0]
+            )
+            compaction_row = connection.execute(
+                "SELECT value FROM agent_meta WHERE key='storage_compaction_state'"
+            ).fetchone()
+            compaction = (
+                json_loads(compaction_row["value"], {})
+                if compaction_row is not None
+                else {}
+            )
+        reclaimable_bytes = page_size * freelist_count
+        return {
+            "schema": "adaos.media_library.storage_state.v1",
+            "mode": "external_reference",
+            "media_bytes_copied": False,
+            "db_bytes": db_path.stat().st_size if db_path.exists() else 0,
+            "wal_bytes": wal_path.stat().st_size if wal_path.exists() else 0,
+            "allocated_bytes": page_size * page_count,
+            "reclaimable_bytes": reclaimable_bytes,
+            "page_size": page_size,
+            "page_count": page_count,
+            "freelist_count": freelist_count,
+            "reclaimable_ratio": round(
+                (freelist_count / page_count) if page_count else 0.0, 6
+            ),
+            "compaction_recommended": reclaimable_bytes >= 64 * 1024 * 1024,
+            "delta_count": delta_count,
+            "logical_compaction": (
+                dict(compaction) if isinstance(compaction, Mapping) else {}
+            ),
+            "auto_vacuum": {0: "none", 1: "full", 2: "incremental"}.get(
+                auto_vacuum, "unknown"
+            ),
+        }
+
+    def optimize_storage(self, *, reclaim: bool = False) -> dict[str, Any]:
+        before = self.storage_status()
+        required_bytes = max(
+            64 * 1024 * 1024,
+            int(before.get("allocated_bytes") or 0)
+            - int(before.get("reclaimable_bytes") or 0),
+        )
+        free_bytes = shutil.disk_usage(self.db_path.parent).free
+        if reclaim and free_bytes < required_bytes:
+            return {
+                "ok": False,
+                "error": "media_library_storage_compaction_space_insufficient",
+                "required_bytes": required_bytes,
+                "free_bytes": free_bytes,
+                "storage": before,
+            }
+        with self.connect() as connection:
+            checkpoint = tuple(
+                int(value)
+                for value in connection.execute(
+                    "PRAGMA wal_checkpoint(TRUNCATE)"
+                ).fetchone()
+            )
+            if reclaim:
+                connection.execute("PRAGMA auto_vacuum=INCREMENTAL")
+                connection.execute("VACUUM")
+            post_vacuum_checkpoint = (
+                tuple(
+                    int(value)
+                    for value in connection.execute(
+                        "PRAGMA wal_checkpoint(TRUNCATE)"
+                    ).fetchone()
+                )
+                if reclaim
+                else checkpoint
+            )
+            connection.execute("PRAGMA optimize")
+        after = self.storage_status()
+        return {
+            "ok": True,
+            "schema": "adaos.media_library.storage_optimization.v1",
+            "reclaimed": bool(reclaim),
+            "checkpoint": list(checkpoint),
+            "post_vacuum_checkpoint": list(post_vacuum_checkpoint),
+            "before": before,
+            "after": after,
+            "reclaimed_bytes": max(
+                0,
+                int(before.get("db_bytes") or 0) - int(after.get("db_bytes") or 0),
+            ),
+        }
+
     def summary(self) -> dict[str, Any]:
         with self.connect() as connection:
             roots = connection.execute(
@@ -2196,7 +2630,7 @@ class MediaLibraryAgentRepository:
                 "failed_count": int(rendition["failed"] or 0),
             },
             "delta_cursor": encode_cursor(int(delta["sequence"] or 0)),
-            "storage": {"mode": "external_reference", "media_bytes_copied": False},
+            "storage": self.storage_status(),
         }
 
     def topology_root_witness(self, root_id: str) -> dict[str, Any] | None:
@@ -2870,7 +3304,7 @@ class MediaLibraryAgentRepository:
         }
 
     def _public_source(self, row: sqlite3.Row) -> dict[str, Any]:
-        return {
+        source = {
             "schema": "adaos.media_library.source.v1",
             "id": str(row["id"]),
             "root_id": str(row["root_id"]),
@@ -2885,15 +3319,20 @@ class MediaLibraryAgentRepository:
             "inode": int(row["inode"]),
             "fingerprint": str(row["fingerprint"]),
             "resource_id": str(row["resource_id"]),
-            "descriptor": json_loads(row["descriptor_json"], {}),
             "metadata": json_loads(row["metadata_json"], {}),
             "present": bool(row["present"]),
             "first_seen_at": str(row["first_seen_at"]),
             "last_seen_at": str(row["last_seen_at"]),
             "revision": int(row["revision"]),
         }
+        descriptor = json_loads(row["descriptor_json"], {})
+        source["descriptor"] = _expand_source_descriptor(
+            descriptor if isinstance(descriptor, Mapping) else {}, source
+        )
+        return source
 
     def _public_delta(self, row: sqlite3.Row) -> dict[str, Any]:
+        payload = json_loads(row["payload_json"], {})
         return {
             "schema": DELTA_SCHEMA,
             "id": str(row["id"]),
@@ -2905,6 +3344,8 @@ class MediaLibraryAgentRepository:
             "operation": str(row["operation"]),
             "source_revision": int(row["source_revision"]),
             "job_id": str(row["job_id"]),
-            "source": json_loads(row["payload_json"], {}),
+            "source": _expand_source_payload(
+                payload if isinstance(payload, Mapping) else {}
+            ),
             "created_at": str(row["created_at"]),
         }

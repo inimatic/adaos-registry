@@ -878,6 +878,8 @@ class MediaEnrichmentWorker:
         self._loop_failure_count = 0
         self._last_loop_error = ""
         self._last_loop_error_at = 0.0
+        self._storage_maintenance_complete = False
+        self._storage_maintenance_state: dict[str, Any] = {}
 
     def ensure_started(self) -> bool:
         with self._lock:
@@ -908,6 +910,14 @@ class MediaEnrichmentWorker:
         return {"stopped": stopped, "worker": "enrichment"}
 
     def run_once(self) -> dict[str, Any] | None:
+        maintenance = getattr(self.coordinator, "compact_storage_batch", None)
+        if callable(maintenance) and not self._storage_maintenance_complete:
+            compacted = maintenance(limit=250)
+            if isinstance(compacted, Mapping):
+                self._storage_maintenance_state = dict(compacted)
+                self._storage_maintenance_complete = bool(
+                    compacted.get("complete")
+                )
         job = self.coordinator.claim_background_job()
         if job is None:
             return None
@@ -999,6 +1009,7 @@ class MediaEnrichmentWorker:
             loop_failure_count = self._loop_failure_count
             last_loop_error = self._last_loop_error
             last_loop_error_at = self._last_loop_error_at
+            storage_maintenance = dict(self._storage_maintenance_state)
         providers = []
         for provider in self.providers:
             status = getattr(provider, "status", None)
@@ -1032,6 +1043,7 @@ class MediaEnrichmentWorker:
             "loop_failure_count": loop_failure_count,
             "last_error": last_loop_error,
             "last_error_at": last_loop_error_at,
+            "storage_maintenance": storage_maintenance,
         }
 
     def _loop(self) -> None:
