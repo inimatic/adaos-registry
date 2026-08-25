@@ -55,9 +55,13 @@ Logical compaction is resumable and runs in bounded worker batches. The
 wall-clock budgets while a long scan is active. `status` reports its phase,
 counters, SQLite free pages, and retained delta count.
 `optimize_storage(reclaim=true)` is the explicit physical maintenance step: it
-pauses new local work, waits for executing jobs, checkpoints WAL, verifies free
-disk headroom, and rebuilds SQLite to return free pages to the filesystem.
-Original media and generated rendition lifecycle rules are unchanged.
+pauses new local work, cooperatively parks active scans at a file boundary,
+waits for non-interruptible rendition work, checkpoints WAL, verifies free disk
+headroom, and rebuilds SQLite to return free pages to the filesystem. Parked
+scans retain their durable progress and resume automatically. The quiescence
+deadline defaults to five minutes and can be overridden with
+`MEDIA_LIBRARY_AGENT_STORAGE_QUIESCE_SECONDS`. Original media and generated
+rendition lifecycle rules are unchanged.
 
 ## Scan model
 

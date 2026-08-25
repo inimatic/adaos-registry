@@ -904,7 +904,17 @@ def optimize_storage(reclaim: bool = False, **_: Any) -> dict[str, Any]:
         )
     repository.set_storage_maintenance(True)
     try:
-        deadline = time.monotonic() + 30.0
+        quiesce_seconds = max(
+            30.0,
+            min(
+                1800.0,
+                float(
+                    os.environ.get("MEDIA_LIBRARY_AGENT_STORAGE_QUIESCE_SECONDS")
+                    or 300.0
+                ),
+            ),
+        )
+        deadline = time.monotonic() + quiesce_seconds
         while repository.executing_job_count() and time.monotonic() < deadline:
             time.sleep(0.1)
         if repository.executing_job_count():

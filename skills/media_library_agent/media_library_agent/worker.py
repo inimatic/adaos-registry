@@ -773,7 +773,13 @@ class MediaLibraryAgentWorker:
                     )
                     return finished or {}
 
+                self._wait_for_storage_maintenance(
+                    job_id, root, counters, current_path
+                )
                 self._wait_for_resources(job_id, root, counters, current_path)
+                self._wait_for_storage_maintenance(
+                    job_id, root, counters, current_path
+                )
                 current_path = relative_path
                 counters["discovered_count"] += 1
                 seen.add(relative_path)
@@ -997,6 +1003,8 @@ class MediaLibraryAgentWorker:
     ) -> None:
         waiting = False
         while not self._stop.is_set():
+            if self.repository.storage_maintenance_active():
+                break
             pressure = self._refresh_resource_pressure()
             if pressure not in {"playback", "critical"} and self._scan_window_open(
                 root
@@ -1018,6 +1026,41 @@ class MediaLibraryAgentWorker:
                     counters,
                     current_path,
                     status="waiting_resources",
+                    force=True,
+                )
+                waiting = True
+            self._wake.wait(0.5)
+            self._wake.clear()
+        if waiting:
+            self._wait_reason = ""
+            self.repository.update_job(job_id, status="running")
+
+    def _wait_for_storage_maintenance(
+        self,
+        job_id: str,
+        root: Mapping[str, Any],
+        counters: Mapping[str, int],
+        current_path: str,
+    ) -> None:
+        waiting = False
+        while not self._stop.is_set() and self.repository.storage_maintenance_active():
+            current = self.repository.get_job(job_id)
+            if current and current["cancel_requested"]:
+                return
+            if not waiting:
+                self._wait_reason = "storage_maintenance"
+                self.repository.update_job(
+                    job_id,
+                    status="waiting_storage",
+                    current_path=current_path,
+                    **dict(counters),
+                )
+                self._publish_progress(
+                    job_id,
+                    root,
+                    counters,
+                    current_path,
+                    status="waiting_storage",
                     force=True,
                 )
                 waiting = True
@@ -1097,7 +1140,7 @@ class MediaLibraryAgentWorker:
                 ),
                 "phase": (
                     "waiting"
-                    if status == "waiting_resources"
+                    if status in {"waiting_resources", "waiting_storage"}
                     else "terminal"
                     if status in {"completed", "failed", "canceled"}
                     else "enumerating"

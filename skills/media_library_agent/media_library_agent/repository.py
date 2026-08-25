@@ -30,7 +30,13 @@ from .contracts import (
 )
 
 
-ACTIVE_JOB_STATUSES = ("queued", "running", "waiting_resources", "canceling")
+ACTIVE_JOB_STATUSES = (
+    "queued",
+    "running",
+    "waiting_resources",
+    "waiting_storage",
+    "canceling",
+)
 TERMINAL_JOB_STATUSES = ("completed", "failed", "canceled")
 _CLOCK = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 _DATABASE_SCHEMA_REVISION = "4"
@@ -820,7 +826,9 @@ class MediaLibraryAgentRepository:
                 """
                 SELECT COUNT(*) AS total FROM rendition_jobs
                 WHERE profile='artwork-card-v1'
-                  AND status IN ('queued','running','waiting_resources','canceling')
+                  AND status IN (
+                      'queued','running','waiting_resources','waiting_storage','canceling'
+                  )
                 """
             ).fetchone()
         return int(row["total"] or 0)
@@ -1158,7 +1166,9 @@ class MediaLibraryAgentRepository:
                 """
                 UPDATE scan_jobs SET status='queued', started_at='', finished_at='',
                     error_code='', error_detail='', revision=revision+1
-                WHERE status IN ('running', 'waiting_resources', 'canceling')
+                WHERE status IN (
+                    'running', 'waiting_resources', 'waiting_storage', 'canceling'
+                )
                 """
             ).rowcount
             count += connection.execute(
@@ -1166,7 +1176,9 @@ class MediaLibraryAgentRepository:
                 UPDATE rendition_jobs SET status='queued', started_at='',
                     finished_at='', error_code='', error_detail='',
                     revision=revision+1
-                WHERE status IN ('running', 'waiting_resources', 'canceling')
+                WHERE status IN (
+                    'running', 'waiting_resources', 'waiting_storage', 'canceling'
+                )
                 """
             ).rowcount
             connection.commit()
@@ -1278,7 +1290,10 @@ class MediaLibraryAgentRepository:
                     SELECT * FROM rendition_jobs
                     WHERE source_id=? AND source_fingerprint=? AND profile=?
                         AND target_json=?
-                        AND status IN ('queued','running','waiting_resources','canceling','completed')
+                        AND status IN (
+                            'queued','running','waiting_resources','waiting_storage',
+                            'canceling','completed'
+                        )
                     ORDER BY requested_at DESC LIMIT 1
                     """,
                     (
@@ -2603,7 +2618,8 @@ class MediaLibraryAgentRepository:
                 "SELECT COUNT(*) AS total, SUM(CASE WHEN present=1 THEN 1 ELSE 0 END) AS available, SUM(CASE WHEN present=1 THEN size_bytes ELSE 0 END) AS bytes FROM sources"
             ).fetchone()
             active = connection.execute(
-                "SELECT COUNT(*) AS count FROM scan_jobs WHERE status IN ('queued','running','waiting_resources','canceling')"
+                "SELECT COUNT(*) AS count FROM scan_jobs WHERE status IN "
+                "('queued','running','waiting_resources','waiting_storage','canceling')"
             ).fetchone()
             errors = connection.execute(
                 "SELECT COUNT(*) AS count FROM scan_jobs WHERE status='failed'"
@@ -2614,7 +2630,9 @@ class MediaLibraryAgentRepository:
             rendition = connection.execute(
                 """
                 SELECT COUNT(*) AS total,
-                    SUM(CASE WHEN status IN ('queued','running','waiting_resources','canceling') THEN 1 ELSE 0 END) AS active,
+                    SUM(CASE WHEN status IN (
+                        'queued','running','waiting_resources','waiting_storage','canceling'
+                    ) THEN 1 ELSE 0 END) AS active,
                     SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS completed,
                     SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed
                 FROM rendition_jobs

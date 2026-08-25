@@ -1037,6 +1037,56 @@ def test_resource_pressure_is_shared_across_agent_processes(tmp_path):
     worker.dispose()
 
 
+def test_storage_maintenance_cooperatively_pauses_active_scan(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    for index in range(20):
+        (library / f"track-{index:02d}.mp3").write_bytes(b"audio")
+    db_path = tmp_path / "shared-maintenance.sqlite3"
+    worker_repository = MediaLibraryAgentRepository(db_path, node_id="node-a")
+    controller_repository = MediaLibraryAgentRepository(db_path, node_id="node-a")
+    root = worker_repository.add_root(str(library))["root"]
+    job = worker_repository.create_job(root["id"])["job"]
+    first_file = threading.Event()
+
+    def register(path, _root, metadata):
+        first_file.set()
+        time.sleep(0.02)
+        return {
+            "id": f"ref-{path.name}",
+            "resource_id": f"ref-{path.name}",
+            "name": path.name,
+            "mime_type": "audio/mpeg",
+            "source_path": str(path),
+            "metadata": dict(metadata),
+        }
+
+    worker = MediaLibraryAgentWorker(
+        worker_repository, register=register, poll_seconds=0.01
+    )
+    worker.ensure_started()
+    assert first_file.wait(_WORKER_STATE_TIMEOUT_SECONDS)
+    controller_repository.set_storage_maintenance(True)
+    deadline = time.monotonic() + _WORKER_STATE_TIMEOUT_SECONDS
+    while (
+        time.monotonic() < deadline
+        and worker_repository.get_job(job["id"])["status"] != "waiting_storage"
+    ):
+        time.sleep(0.01)
+    assert worker_repository.get_job(job["id"])["status"] == "waiting_storage"
+    assert controller_repository.executing_job_count() == 0
+
+    controller_repository.set_storage_maintenance(False)
+    deadline = time.monotonic() + _WORKER_STATE_TIMEOUT_SECONDS
+    while (
+        time.monotonic() < deadline
+        and worker_repository.get_job(job["id"])["status"] != "completed"
+    ):
+        time.sleep(0.01)
+    assert worker_repository.get_job(job["id"])["status"] == "completed"
+    worker.dispose()
+
+
 def test_root_runtime_only_queues_service_owned_work(monkeypatch, tmp_path):
     monkeypatch.setenv("ADAOS_RUNTIME_PORT", "8777")
     monkeypatch.setenv("MEDIA_LIBRARY_AGENT_EMBEDDED_WORKER", "0")
