@@ -3047,6 +3047,51 @@ def test_home_snapshot_cache_reuses_ready_projection_and_refreshes_status(tmp_pa
     assert second["items"] == [{"id": "item-1", "title": "Movie"}]
 
 
+def test_home_stream_projection_keeps_routes_without_metadata_payload() -> None:
+    item = {
+        "id": "movie-1",
+        "title": "Movie",
+        "media_kind": "video",
+        "quality": {"height": 2160, "bitrate": 80_000_000, "codec": "hevc"},
+        "metadata": {"plot": "x" * 20_000},
+        "metadata_provenance": {"plot": {"witness": "y" * 20_000}},
+        "personal": {"resume_ms": 123_000, "history": ["z" * 20_000]},
+        "artwork": {
+            "state": "ready",
+            "url": "/media/files/content/poster.jpg",
+            "descriptor": {
+                "schema": "adaos.media.resource.v1",
+                "resource_id": "poster.jpg",
+                "name": "poster.jpg",
+                "mime_type": "image/jpeg",
+                "content_path": "/api/node/media/files/content/poster.jpg",
+                "routed_content_path": "/media/files/content/poster.jpg",
+                "metadata": {"provenance": "p" * 20_000},
+                "delivery": {"diagnostics": "d" * 20_000},
+            },
+            "source_fingerprint": "f" * 512,
+        },
+        "shelf_id": "movies",
+        "shelf_title": "Movies",
+        "queue_source_type": "item",
+        "queue_source_id": "movie-1",
+    }
+
+    compact = main._compact_home_item(item)
+
+    assert compact["quality"] == {"height": 2160}
+    assert compact["artwork"]["descriptor"] == {
+        "resource_id": "poster.jpg",
+        "name": "poster.jpg",
+        "mime_type": "image/jpeg",
+        "content_path": "/api/node/media/files/content/poster.jpg",
+        "routed_content_path": "/media/files/content/poster.jpg",
+    }
+    assert "metadata" not in compact
+    assert "personal" not in compact
+    assert len(json.dumps(compact, separators=(",", ":")).encode("utf-8")) < 750
+
+
 def test_library_snapshot_request_preserves_receiver_params(monkeypatch):
     published = []
     coordinator = object()

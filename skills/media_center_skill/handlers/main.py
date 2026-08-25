@@ -160,35 +160,61 @@ def _event_payload(event: Any) -> dict[str, Any]:
     return dict(nested) if isinstance(nested, Mapping) else {}
 
 
-def _compact_home_item(item: Mapping[str, Any]) -> dict[str, Any]:
-    fields = (
-        "id",
-        "title",
-        "name",
-        "subtitle",
-        "media_kind",
-        "kind",
-        "icon",
-        "mime_type",
-        "favorite",
-        "play_count",
-        "folder_path",
-        "work_id",
-        "variant_id",
-        "collection_id",
-        "quality",
-        "artwork",
-        "personal",
-        "recommendation",
-        "path",
-        "queue_ref",
-        "item_count",
-        "shelf_id",
-        "shelf_title",
-        "queue_source_type",
-        "queue_source_id",
+def _compact_home_artwork(value: Any) -> dict[str, Any]:
+    artwork = value if isinstance(value, Mapping) else {}
+    descriptor = (
+        artwork.get("descriptor")
+        if isinstance(artwork.get("descriptor"), Mapping)
+        else {}
     )
-    return {field: item[field] for field in fields if field in item}
+    compact_descriptor = {
+        field: descriptor[field]
+        for field in (
+            "resource_id",
+            "name",
+            "mime_type",
+            "content_path",
+            "routed_content_path",
+        )
+        if descriptor.get(field) not in (None, "")
+    }
+    return {
+        "state": str(artwork.get("state") or "missing"),
+        "url": str(artwork.get("url") or ""),
+        "descriptor": compact_descriptor,
+    }
+
+
+def _compact_home_item(item: Mapping[str, Any]) -> dict[str, Any]:
+    compact = {
+        field: item[field]
+        for field in (
+            "id",
+            "title",
+            "name",
+            "media_kind",
+            "kind",
+            "icon",
+            "favorite",
+            "item_count",
+            "shelf_id",
+            "shelf_title",
+            "queue_source_type",
+            "queue_source_id",
+        )
+        if item.get(field) not in (None, "")
+    }
+    quality = item.get("quality") if isinstance(item.get("quality"), Mapping) else {}
+    try:
+        quality_height = max(0, int(quality.get("height") or 0))
+    except (TypeError, ValueError):
+        quality_height = 0
+    if quality_height:
+        compact["quality"] = {"height": quality_height}
+    artwork = _compact_home_artwork(item.get("artwork"))
+    if artwork["state"] != "missing" or artwork["url"] or artwork["descriptor"]:
+        compact["artwork"] = artwork
+    return compact
 
 
 def _compact_home_snapshot(
