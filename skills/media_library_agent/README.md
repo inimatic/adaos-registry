@@ -11,6 +11,13 @@ versions. Version `0.6.29` retries extraction at the start of a video when the
 preferred five-second poster position is beyond a short clip, under the same
 bounded timeout and output limits.
 
+Version `0.6.38` prevents an automatic artwork backlog from starving the
+revisioned embedded-tag backfill. Missing-tag roots enter the durable scan queue
+before artwork admission; explicit browser compatibility renditions still run
+first. The ordinary scan progress projection therefore exposes the root, file
+and counters for this maintenance instead of leaving genres, artists and albums
+silently pending.
+
 ## Storage boundary
 
 Original media bytes remain at their original paths. The agent calls `adaos.sdk.io.media.register_media_file`, which records an allowlisted reference for range playback; it never copies the source into `.adaos`. Removing or draining the skill retains external media by design. Browser-compatible renditions and normalized artwork are explicitly derived data: their exact source revision and fingerprint are recorded, and only generated outputs may be copied to managed media storage.

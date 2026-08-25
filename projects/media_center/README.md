@@ -6,6 +6,17 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+The unreleased 2026-08-25 local candidate combines
+`media_center_skill@0.8.74`, `media_library_agent@0.6.38`,
+`media_control_skill@0.2.11`, scenario `media_center@0.6.23`, and client
+`9310ca1`. It adds durable queue auto-advance and endpoint selection, compact
+fullscreen/PiP/Play On controls, playlists, reviewed metadata correction,
+provider rejection, source identity and rendition visibility. Existing-library
+embedded tags are backfilled before automatic artwork work, and MusicBrainz
+does not consume its network budget on recognized audiobook chapters. This is
+local validation evidence only; no ProjectRelease or stand acceptance is
+claimed.
+
 Release `0.6.75` makes catalog startup single-flight under real storage
 contention. It ships `media_center_skill@0.8.67` and keeps the remaining
 `0.6.74` component set. Bounded schema-revision reads absorb short SQLite locks;
