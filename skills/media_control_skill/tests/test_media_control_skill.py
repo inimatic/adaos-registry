@@ -69,7 +69,7 @@ def test_session_queue_is_persistent_and_server_paged():
 
     page = repository.get_session(session["id"], queue_limit=100)["session"]
 
-    assert page["state"] == "ready"
+    assert page["state"] == "requested"
     assert page["autoplay"] is True
     assert page["auto_fullscreen"] is True
     assert page["route"]["source_node_id"] == "node-a"

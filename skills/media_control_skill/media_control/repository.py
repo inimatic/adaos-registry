@@ -378,7 +378,7 @@ class MediaControlRepository:
                     id,profile_id,target_id,state,active_queue_index,active_item_id,work_id,
                     variant_id,source_id,route_json,rate,autoplay,auto_fullscreen,queue_source_json,control_actor_ref,
                     control_lease_expires_at,created_at,updated_at
-                ) VALUES (?,?,?,'ready',?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ) VALUES (?,?,?,'requested',?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     session_id, profile, target["id"], index, text(active.get("item_id") or active.get("id")),
@@ -1223,7 +1223,7 @@ class MediaControlRepository:
             datetime.now(tz=timezone.utc) - timedelta(seconds=freshness_seconds)
         ).isoformat()
         filters = [
-            "s.state NOT IN ('stopped','ended','error')",
+            "s.state NOT IN ('stopped','ended','error','failed')",
             "COALESCE(NULLIF(s.endpoint_last_seen_at,''),s.created_at)>=?",
         ]
         params: list[Any] = [freshness_cutoff]

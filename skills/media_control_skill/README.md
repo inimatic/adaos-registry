@@ -1,6 +1,6 @@
 # Media Control Skill
 
-`media_control_skill` is the persistent control plane for Media Center playback. It owns target registration, session identity, revisioned queues and commands, control leases, checkpoints, per-profile settings, and bounded QoE evidence. It never proxies media bytes.
+`media_control_skill` is the persistent control plane for Media Center playback. It owns target registration, session identity, revisioned queues and commands, control leases, checkpoints, per-profile settings, and bounded QoE evidence. It never proxies media bytes. A new endpoint session starts as `requested`; endpoint observations then publish the actual `loading`, `buffering`, `playing`, `paused`, `stopped`, or `failed` state. An undecoded browser load is not projected as playing, so Remote and resource-pressure decisions consume endpoint-owned facts.
 
 Controllers may live in a different webspace from the playback target. Commands are optimistic, idempotent, and lease-guarded. The endpoint pulls an ordered command stream and acknowledges application; stale controllers receive an explicit revision conflict. A phone therefore controls a TV without becoming part of the source-to-TV data path.
 
