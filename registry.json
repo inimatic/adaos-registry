@@ -380,8 +380,8 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.8.67",
-      "updated_at": "2026-08-24T18:57:11+00:00",
+      "version": "0.8.73",
+      "updated_at": "2026-08-25T13:12:02+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
       "source": {
@@ -396,7 +396,7 @@
       "description": "Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 64
+      "tools_count": 71
     },
     {
       "kind": "skill",
@@ -445,8 +445,8 @@
       "kind": "skill",
       "id": "media_library_agent",
       "name": "media_library_agent",
-      "version": "0.6.33",
-      "updated_at": "2026-08-24T13:38:20+00:00",
+      "version": "0.6.37",
+      "updated_at": "2026-08-25T13:12:02+00:00",
       "path": "skills/media_library_agent",
       "manifest": "skills/media_library_agent/skill.yaml",
       "source": {
@@ -460,7 +460,7 @@
       },
       "description": "Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.",
       "runtime_python": "3.11",
-      "tools_count": 26
+      "tools_count": 28
     },
     {
       "kind": "skill",
@@ -1238,8 +1238,8 @@
       "kind": "scenario",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.6.20",
-      "updated_at": "2026-08-24T13:39:19+00:00",
+      "version": "0.6.22",
+      "updated_at": "2026-08-25T13:12:02+00:00",
       "path": "scenarios/media_center",
       "manifest": "scenarios/media_center/scenario.yaml",
       "source": {
