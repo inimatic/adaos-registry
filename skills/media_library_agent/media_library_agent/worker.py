@@ -146,6 +146,9 @@ class MediaLibraryAgentWorker:
         self._enqueue_due_schedules()
         self._poll_watch_schedules()
         self._cleanup_invalidated_renditions()
+        # Existing libraries must receive source-local tags before the bounded
+        # artwork backlog can consume the worker indefinitely.
+        self._enqueue_embedded_metadata_backfill()
         rendition = self.repository.next_queued_rendition_job()
         queued = self.repository.next_queued_job()
         artwork_waits_for_scan = bool(
@@ -165,12 +168,6 @@ class MediaLibraryAgentWorker:
             claimed_rendition = self.repository.claim_rendition_job(rendition["id"])
             if claimed_rendition is not None:
                 return self._run_claimed_rendition_job(claimed_rendition)
-        if self._enqueue_embedded_metadata_backfill():
-            queued = self.repository.next_queued_job()
-            if queued is not None:
-                claimed = self.repository.claim_job(queued["id"])
-                if claimed is not None:
-                    return self._run_claimed_scan_job(claimed)
         self._enqueue_artwork_backfill()
         rendition = self.repository.next_queued_rendition_job()
         if rendition is not None:

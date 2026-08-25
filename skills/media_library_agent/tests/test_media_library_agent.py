@@ -284,6 +284,55 @@ def test_embedded_audio_tags_are_normalized_and_backfilled_on_rescan(
     assert repository.roots_missing_embedded_metadata(revision="1") == []
 
 
+def test_embedded_metadata_backfill_precedes_artwork_backlog(monkeypatch, tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    media = library / "01.mp3"
+    media.write_bytes(b"audio")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "backfill-priority.sqlite3", node_id="node-a"
+    )
+    monkeypatch.setattr(
+        worker_module,
+        "read_embedded_metadata",
+        lambda _path: {"artists": ["Artist"], "genres": ["Rock"]},
+    )
+    worker = MediaLibraryAgentWorker(
+        repository,
+        register=lambda path, _root, metadata: {
+            "resource_id": path.name,
+            "path": str(path),
+            "mime_type": "audio/mpeg",
+            "metadata": dict(metadata),
+        },
+    )
+    root = repository.add_root(str(library))["root"]
+    first_job = repository.create_job(root["id"], mode="full")["job"]
+    assert worker.run_once()["id"] == first_job["id"]
+    source = repository.source_by_path(root["id"], media.name)
+    assert repository.next_queued_rendition_job()["profile"] == "artwork-card-v1"
+
+    stale = dict(source["metadata"])
+    stale.pop("embedded_metadata_revision", None)
+    stale.pop("genres", None)
+    with repository.connect() as connection:
+        connection.execute(
+            "UPDATE sources SET metadata_json=? WHERE id=?",
+            (json.dumps(stale, ensure_ascii=False, sort_keys=True), source["id"]),
+        )
+        connection.commit()
+
+    backfill_worker = MediaLibraryAgentWorker(
+        repository,
+        register=worker._register,
+    )
+    result = backfill_worker.run_once()
+
+    assert result and result["root_id"] == root["id"]
+    assert repository.get_source(source["id"])["metadata"]["genres"] == ["Rock"]
+    assert repository.next_queued_rendition_job()["profile"] == "artwork-card-v1"
+
+
 def test_embedded_tag_normalization_supports_musicbrainz_ids():
     result = technical_module.normalize_embedded_metadata(
         {

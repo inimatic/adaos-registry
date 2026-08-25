@@ -1644,8 +1644,7 @@
                     {"key": "enrichment_providers", "label": "Enrichment providers", "path": "enrichment.providers", "label_i18n": {"key": "runtime.media_center.ui.providers"}},
                     {"key": "enrichment_operations", "label": "Enrichment operations", "path": "enrichment.operations", "label_i18n": {"key": "runtime.media_center.ui.background_operations"}}
                   ]
-                },
-                "title_i18n": {"key": "runtime.media_center.ui.media_details"}
+                }
               },
               {
                 "id": "media-center-player-favorite",
