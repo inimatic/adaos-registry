@@ -443,6 +443,11 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     provider_list = settings_widgets["media-metadata-settings-providers"]
     assert "path" not in provider_list["dataSource"]
     assert provider_list["inputs"]["collectionKey"] == "providers"
+    assert provider_list["inputs"]["titleKey"] == "provider_id"
+    assert provider_list["inputs"]["subtitleKey"] == "state"
+    assert not {"primaryKey", "secondaryKey", "metaKey"} & set(
+        provider_list["inputs"]
+    )
     assert settings_widgets["media-tmdb-token"]["inputs"]["inputType"] == (
         "password"
     )

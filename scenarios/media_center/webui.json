@@ -532,8 +532,8 @@
               },
               "inputs": {
                 "itemKey": "id",
-                "primaryKey": "label",
-                "secondaryKey": "kind",
+                "titleKey": "label",
+                "subtitleKey": "kind",
                 "emptyText": "No playback targets are available.",
                 "emptyText_i18n": {
                   "key": "runtime.media_center.ui.no_playback_targets_are_available"
@@ -2294,9 +2294,9 @@
                 "inputs": {
                   "collectionKey": "providers",
                   "itemKey": "provider_id",
-                  "primaryKey": "provider_id",
-                  "secondaryKey": "state",
-                  "metaKey": "reason",
+                  "titleKey": "provider_id",
+                  "subtitleKey": "state",
+                  "meta": [{"key": "reason"}],
                   "emptyText": "No metadata providers are registered.",
                   "emptyText_i18n": {"key": "runtime.media_center.ui.no_metadata_providers"}
                 },
@@ -3220,9 +3220,9 @@
                 },
                 "inputs": {
                   "itemKey": "provider_id",
-                  "primaryKey": "provider_id",
-                  "secondaryKey": "state",
-                  "metaKey": "reason",
+                  "titleKey": "provider_id",
+                  "subtitleKey": "state",
+                  "meta": [{"key": "reason"}],
                   "emptyText": "No metadata providers are registered.",
                   "emptyText_i18n": {"key": "runtime.media_center.ui.no_metadata_providers"}
                 },
@@ -3246,9 +3246,9 @@
                 },
                 "inputs": {
                   "itemKey": "id",
-                  "primaryKey": "kind",
-                  "secondaryKey": "status",
-                  "metaKey": "error_code",
+                  "titleKey": "kind",
+                  "subtitleKey": "status",
+                  "meta": [{"key": "error_code"}],
                   "emptyText": "No background operations.",
                   "emptyText_i18n": {
                     "key": "runtime.media_center.ui.no_background_operations"
