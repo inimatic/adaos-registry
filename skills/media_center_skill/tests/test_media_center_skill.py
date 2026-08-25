@@ -4310,22 +4310,25 @@ def test_metadata_facets_filters_and_plex_style_sorts_are_server_bounded(
     assert [item["title"] for item in second["items"]] == ["Old Drama"]
 
 
-def test_metadata_provider_configuration_explains_disabled_external_sources(
-    monkeypatch,
-):
-    monkeypatch.delenv("MEDIA_CENTER_METADATA_EXTERNAL_ENABLED", raising=False)
-    monkeypatch.delenv("MEDIA_CENTER_TMDB_READ_ACCESS_TOKEN", raising=False)
-
+def test_metadata_provider_configuration_explains_managed_provider_state():
     statuses = {
-        item["provider_id"]: item for item in metadata_provider_configuration()
+        item["provider_id"]: item
+        for item in metadata_provider_configuration(
+            {
+                "external_enabled": True,
+                "musicbrainz_enabled": True,
+                "tmdb_enabled": True,
+                "locale": "ru-RU",
+            },
+            tmdb_token_configured=False,
+        )
     }
 
     assert statuses["media_center.deterministic_local.v1"]["enabled"] is True
     assert statuses["media_center.tmdb.v1"]["enabled"] is False
-    assert statuses["media_center.tmdb.v1"]["reason"] == (
-        "external_metadata_disabled"
-    )
-    assert statuses["media_center.musicbrainz.v1"]["enabled"] is False
+    assert statuses["media_center.tmdb.v1"]["reason"] == "credentials_missing"
+    assert statuses["media_center.tmdb.v1"]["language"] == "ru-RU"
+    assert statuses["media_center.musicbrainz.v1"]["enabled"] is True
 
 
 def test_tmdb_provider_sends_only_normalized_evidence_and_caches_details():
@@ -4459,19 +4462,50 @@ def test_musicbrainz_provider_is_rate_limited_cached_and_audio_only():
     }
 
 
-def test_external_metadata_provider_is_strictly_opt_in(monkeypatch):
-    monkeypatch.setenv("MEDIA_CENTER_TMDB_READ_ACCESS_TOKEN", "token")
-    monkeypatch.delenv("MEDIA_CENTER_METADATA_EXTERNAL_ENABLED", raising=False)
+def test_external_metadata_providers_follow_managed_settings():
     assert [provider.provider_id for provider in default_metadata_providers()] == [
         "media_center.deterministic_local.v1"
     ]
 
-    monkeypatch.setenv("MEDIA_CENTER_METADATA_EXTERNAL_ENABLED", "1")
-    assert [provider.provider_id for provider in default_metadata_providers()] == [
+    settings = {
+        "external_enabled": True,
+        "musicbrainz_enabled": True,
+        "tmdb_enabled": True,
+        "locale": "ru-RU",
+    }
+    assert [
+        provider.provider_id
+        for provider in default_metadata_providers(settings, tmdb_token="token")
+    ] == [
         "media_center.deterministic_local.v1",
         "media_center.tmdb.v1",
         "media_center.musicbrainz.v1",
     ]
+
+
+def test_metadata_settings_are_durable_and_default_to_managed_enrichment(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+
+    initial = catalog.metadata_settings()["settings"]
+    assert initial["external_enabled"] is True
+    assert initial["musicbrainz_enabled"] is True
+    assert initial["tmdb_enabled"] is True
+
+    updated = catalog.set_metadata_settings(
+        {"musicbrainz_enabled": False, "locale": "en-US"}
+    )
+    assert updated["changed"] is True
+    restored = MediaCatalogCoordinator(
+        MediaCenterRepository()
+    ).metadata_settings()["settings"]
+    assert restored["musicbrainz_enabled"] is False
+    assert restored["locale"] == "en-US"
+    assert restored["revision"] == 1
 
 
 def test_enrichment_worker_runs_all_eligible_providers(monkeypatch, tmp_path):

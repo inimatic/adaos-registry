@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Callable, Iterable, Mapping, Protocol
 
 import requests
 
@@ -698,13 +697,18 @@ class MusicBrainzMetadataProvider:
         }
 
 
-def metadata_provider_configuration() -> list[dict[str, Any]]:
-    external_enabled = _enabled(
-        os.environ.get("MEDIA_CENTER_METADATA_EXTERNAL_ENABLED")
+def metadata_provider_configuration(
+    settings: Mapping[str, Any] | None = None,
+    *,
+    tmdb_token_configured: bool = False,
+) -> list[dict[str, Any]]:
+    values = dict(settings or {})
+    external_enabled = _enabled(values.get("external_enabled"))
+    tmdb_enabled = external_enabled and _enabled(values.get("tmdb_enabled"))
+    musicbrainz_enabled = external_enabled and _enabled(
+        values.get("musicbrainz_enabled")
     )
-    tmdb_token = str(
-        os.environ.get("MEDIA_CENTER_TMDB_READ_ACCESS_TOKEN") or ""
-    ).strip()
+    tmdb_ready = tmdb_enabled and bool(tmdb_token_configured)
     return [
         {
             "provider_id": "media_center.deterministic_local.v1",
@@ -717,46 +721,60 @@ def metadata_provider_configuration() -> list[dict[str, Any]]:
         {
             "provider_id": "media_center.tmdb.v1",
             "kind": "external",
-            "enabled": bool(external_enabled and tmdb_token),
-            "state": "ready" if external_enabled and tmdb_token else "disabled",
+            "enabled": tmdb_ready,
+            "state": "ready" if tmdb_ready else "disabled",
             "reason": (
                 "configured"
-                if external_enabled and tmdb_token
+                if tmdb_ready
                 else (
                     "credentials_missing"
-                    if external_enabled
-                    else "external_metadata_disabled"
+                    if tmdb_enabled
+                    else (
+                        "provider_disabled"
+                        if external_enabled
+                        else "external_metadata_disabled"
+                    )
                 )
             ),
-            "language": str(
-                os.environ.get("MEDIA_CENTER_METADATA_LOCALE") or "en-US"
-            ),
+            "language": str(values.get("locale") or "ru-RU"),
             "privacy": "normalized_title_year_kind_only",
         },
         {
             "provider_id": "media_center.musicbrainz.v1",
             "kind": "external",
-            "enabled": external_enabled,
-            "state": "ready" if external_enabled else "disabled",
+            "enabled": musicbrainz_enabled,
+            "state": "ready" if musicbrainz_enabled else "disabled",
             "reason": (
-                "configured" if external_enabled else "external_metadata_disabled"
+                "configured"
+                if musicbrainz_enabled
+                else (
+                    "provider_disabled"
+                    if external_enabled
+                    else "external_metadata_disabled"
+                )
             ),
             "privacy": "normalized_audio_tags_only",
         },
     ]
 
 
-def default_metadata_providers() -> tuple[MetadataProvider, ...]:
+def default_metadata_providers(
+    settings: Mapping[str, Any] | None = None,
+    *,
+    tmdb_token: str = "",
+) -> tuple[MetadataProvider, ...]:
+    values = dict(settings or {})
+    external_enabled = _enabled(values.get("external_enabled"))
     providers: list[MetadataProvider] = [DeterministicLocalProvider()]
-    token = str(os.environ.get("MEDIA_CENTER_TMDB_READ_ACCESS_TOKEN") or "").strip()
-    if _enabled(os.environ.get("MEDIA_CENTER_METADATA_EXTERNAL_ENABLED")) and token:
+    token = str(tmdb_token or "").strip()
+    if external_enabled and _enabled(values.get("tmdb_enabled")) and token:
         providers.append(
             TmdbMetadataProvider(
                 read_access_token=token,
-                language=str(os.environ.get("MEDIA_CENTER_METADATA_LOCALE") or "en-US"),
+                language=str(values.get("locale") or "ru-RU"),
             )
         )
-    if _enabled(os.environ.get("MEDIA_CENTER_METADATA_EXTERNAL_ENABLED")):
+    if external_enabled and _enabled(values.get("musicbrainz_enabled")):
         providers.append(MusicBrainzMetadataProvider())
     return tuple(providers)
 
@@ -773,6 +791,7 @@ class MediaEnrichmentWorker:
         work_interval_seconds: float = 0.2,
         publish_interval_seconds: float = 2.0,
         maintenance_interval_jobs: int = 100,
+        provider_configuration: Iterable[Mapping[str, Any]] | None = None,
     ):
         self.coordinator = coordinator
         self.providers = providers or default_metadata_providers()
@@ -787,6 +806,9 @@ class MediaEnrichmentWorker:
         )
         self.maintenance_interval_jobs = max(
             100, min(int(maintenance_interval_jobs), 10000)
+        )
+        self.provider_configuration = tuple(
+            dict(item) for item in (provider_configuration or ())
         )
         self._last_publish_monotonic = 0.0
         self._completed_since_maintenance = 0
@@ -927,9 +949,12 @@ class MediaEnrichmentWorker:
         active_provider_ids = {
             str(item.get("provider_id") or "") for item in providers
         }
+        configured = self.provider_configuration or tuple(
+            metadata_provider_configuration()
+        )
         providers.extend(
             status
-            for status in metadata_provider_configuration()
+            for status in configured
             if str(status.get("provider_id") or "") not in active_provider_ids
         )
         return {

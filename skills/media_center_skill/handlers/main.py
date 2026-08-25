@@ -46,7 +46,11 @@ from media_center.coordinator import (  # noqa: E402
     MediaCatalogCoordinator,
     clear_filename_evidence_cache,
 )
-from media_center.enrichment import MediaEnrichmentWorker  # noqa: E402
+from media_center.enrichment import (  # noqa: E402
+    MediaEnrichmentWorker,
+    default_metadata_providers,
+    metadata_provider_configuration,
+)
 from media_center.sync import MediaAgentSyncWorker  # noqa: E402
 
 
@@ -59,6 +63,7 @@ _coordinator_init_lock = threading.Lock()
 _coordinator_path = ""
 _coordinator_cached: MediaCatalogCoordinator | None = None
 _log = logging.getLogger("adaos.skill.media_center")
+_TMDB_TOKEN_SECRET = "tmdb_read_access_token"
 
 
 class MediaRootOperationBusy(RuntimeError):
@@ -109,14 +114,30 @@ def _enrichment_runtime(
 ) -> MediaEnrichmentWorker:
     coordinator = catalog or _coordinator()
     path = str(coordinator.repository.db_path.resolve())
+    settings = dict(coordinator.metadata_settings()["settings"])
+    token = _read_tmdb_token()
+    configuration = metadata_provider_configuration(
+        settings, tmdb_token_configured=bool(token)
+    )
     return background_runtime().enrichment_worker(
         path,
         lambda: MediaEnrichmentWorker(
             coordinator,
+            providers=default_metadata_providers(settings, tmdb_token=token),
+            provider_configuration=configuration,
             publish=lambda: _publish_operation_snapshot(coordinator),
             publish_settled=lambda: _publish_library_snapshot(coordinator),
         ),
     )
+
+
+def _read_tmdb_token() -> str:
+    try:
+        from adaos.sdk.data.secrets import get as secret_get
+
+        return str(secret_get(_TMDB_TOKEN_SECRET, "") or "").strip()
+    except Exception:
+        return ""
 
 
 def _run_agent_sync(
@@ -1447,6 +1468,77 @@ def metadata_facets(
         limit=limit,
         include_all=_bool(include_all, False),
     )
+
+
+@tool(summary="Return managed external metadata provider settings.", side_effects="none")
+def get_metadata_settings(**_: Any) -> dict[str, Any]:
+    catalog = _coordinator()
+    result = catalog.metadata_settings()
+    settings = dict(result["settings"])
+    token_configured = bool(_read_tmdb_token())
+    return {
+        **result,
+        "settings": {
+            **settings,
+            "tmdb_token_configured": token_configured,
+        },
+        "providers": metadata_provider_configuration(
+            settings, tmdb_token_configured=token_configured
+        ),
+    }
+
+
+@tool(summary="Update managed external metadata provider settings.", side_effects="local_write")
+def set_metadata_settings(
+    values: Mapping[str, Any] | None = None,
+    tmdb_token: str = "",
+    clear_tmdb_token: bool = False,
+    **_: Any,
+) -> dict[str, Any]:
+    from adaos.sdk.data.secrets import delete as secret_delete
+    from adaos.sdk.data.secrets import set as secret_set
+
+    catalog = _coordinator()
+    requested = dict(values or {})
+    normalized: dict[str, Any] = {}
+    for key in ("external_enabled", "musicbrainz_enabled", "tmdb_enabled"):
+        if key in requested and requested[key] is not None:
+            normalized[key] = _bool(requested[key], False)
+    if "locale" in requested and requested["locale"] is not None:
+        normalized["locale"] = str(requested["locale"] or "").strip()
+
+    token_before = _read_tmdb_token()
+    token_value = str(tmdb_token or "").strip()
+    token_changed = False
+    if _bool(clear_tmdb_token, False):
+        if token_before:
+            secret_delete(_TMDB_TOKEN_SECRET)
+            token_changed = True
+    elif token_value:
+        secret_set(_TMDB_TOKEN_SECRET, token_value)
+        token_changed = token_value != token_before
+
+    updated = catalog.set_metadata_settings(normalized)
+    changed = bool(updated.get("changed")) or token_changed
+    reset = {"stopped": True, "skipped": True}
+    if changed:
+        reset = background_runtime().reset_enrichment(timeout=30.0)
+        if reset.get("stopped") is not True:
+            raise RuntimeError("media_center_enrichment_restart_timeout")
+        _enrichment_runtime(catalog).ensure_started()
+        _publish_operation_snapshot(
+            catalog,
+            webspace_id=str(_.get("webspace_id") or ""),
+        )
+    current = get_metadata_settings()
+    current.update(
+        {
+            "changed": changed,
+            "worker_restarted": changed,
+            "worker_reset": reset,
+        }
+    )
+    return current
 
 
 @tool(summary="List media-center catalog rows.", side_effects="none")
@@ -3107,6 +3199,8 @@ def dispose(**_: Any) -> dict[str, Any]:
         _coordinator_path = ""
     with _home_snapshot_cache_lock:
         _HOME_SNAPSHOT_CACHE.clear()
+    with _ready_library_snapshot_cache_lock:
+        _READY_LIBRARY_SNAPSHOT_CACHE.clear()
     clear_filename_evidence_cache()
     return {
         "ok": True,

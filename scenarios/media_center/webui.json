@@ -1582,7 +1582,9 @@
                     {"key": "quality", "label": "Media quality", "path": "quality", "label_i18n": {"key": "runtime.media_center.ui.media_quality"}},
                     {"key": "node", "label": "Storage node", "path": "node_id", "label_i18n": {"key": "runtime.media_center.ui.storage_node"}},
                     {"key": "folder", "label": "Folder", "path": "folder_path", "label_i18n": {"key": "runtime.media_center.ui.folder"}},
-                    {"key": "provenance", "label": "Metadata sources", "path": "metadata_provenance", "label_i18n": {"key": "runtime.media_center.ui.metadata_sources"}}
+                    {"key": "provenance", "label": "Metadata sources", "path": "metadata_provenance", "label_i18n": {"key": "runtime.media_center.ui.metadata_sources"}},
+                    {"key": "enrichment_providers", "label": "Enrichment providers", "path": "enrichment.providers", "label_i18n": {"key": "runtime.media_center.ui.providers"}},
+                    {"key": "enrichment_operations", "label": "Enrichment operations", "path": "enrichment.operations", "label_i18n": {"key": "runtime.media_center.ui.background_operations"}}
                   ]
                 },
                 "title_i18n": {"key": "runtime.media_center.ui.media_details"}
@@ -2249,6 +2251,188 @@
                 "title_i18n": {
                   "key": "runtime.media_center.ui.catalog"
                 }
+              },
+              {
+                "id": "media-metadata-settings-status",
+                "type": "item.details",
+                "area": "main",
+                "title": "External metadata",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.get_metadata_settings",
+                  "params": {},
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["media_center.metadata_settings"],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "presentation": "body",
+                  "fields": [
+                    {"key": "tmdb_key", "label": "TMDb key configured", "path": "settings.tmdb_token_configured", "label_i18n": {"key": "runtime.media_center.ui.tmdb_key_configured"}},
+                    {"key": "locale", "label": "Metadata language", "path": "settings.locale", "label_i18n": {"key": "runtime.media_center.ui.metadata_language"}}
+                  ]
+                },
+                "title_i18n": {"key": "runtime.media_center.ui.external_metadata"}
+              },
+              {
+                "id": "media-metadata-settings-providers",
+                "type": "ui.list",
+                "area": "main",
+                "title": "Provider state",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.get_metadata_settings",
+                  "path": "providers",
+                  "params": {},
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["media_center.metadata_settings"],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "itemKey": "provider_id",
+                  "primaryKey": "provider_id",
+                  "secondaryKey": "state",
+                  "metaKey": "reason",
+                  "emptyText": "No metadata providers are registered."
+                },
+                "collection": {
+                  "display": "list",
+                  "focusGroup": "media-metadata-settings-providers",
+                  "virtualized": false,
+                  "cursor": {"enabled": false, "stateKey": "mediaCursor"}
+                },
+                "title_i18n": {"key": "runtime.media_center.ui.provider_state"}
+              },
+              {
+                "id": "media-external-metadata-enabled",
+                "type": "input.toggle",
+                "area": "main",
+                "title": "External metadata enrichment",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.get_metadata_settings",
+                  "params": {},
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["media_center.metadata_settings"],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "valuePath": "settings.external_enabled",
+                  "description": "Send normalized titles and tags to enabled metadata providers.",
+                  "description_i18n": {"key": "runtime.media_center.ui.external_metadata_description"}
+                },
+                "actions": [{
+                  "on": "change",
+                  "type": "callSkill",
+                  "target": "media_center_skill.set_metadata_settings",
+                  "timeoutMs": 60000,
+                  "params": {"values": {"external_enabled": "$event.checked"}},
+                  "invalidates": ["media_center.metadata_settings"]
+                }],
+                "title_i18n": {"key": "runtime.media_center.ui.external_metadata_enrichment"}
+              },
+              {
+                "id": "media-musicbrainz-enabled",
+                "type": "input.toggle",
+                "area": "main",
+                "title": "MusicBrainz",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.get_metadata_settings",
+                  "params": {},
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["media_center.metadata_settings"],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "valuePath": "settings.musicbrainz_enabled",
+                  "description": "Identify audio using normalized title, artist, and album tags.",
+                  "description_i18n": {"key": "runtime.media_center.ui.musicbrainz_description"}
+                },
+                "actions": [{
+                  "on": "change",
+                  "type": "callSkill",
+                  "target": "media_center_skill.set_metadata_settings",
+                  "timeoutMs": 60000,
+                  "params": {"values": {"musicbrainz_enabled": "$event.checked"}},
+                  "invalidates": ["media_center.metadata_settings"]
+                }]
+              },
+              {
+                "id": "media-tmdb-enabled",
+                "type": "input.toggle",
+                "area": "main",
+                "title": "TMDb",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.get_metadata_settings",
+                  "params": {},
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["media_center.metadata_settings"],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "valuePath": "settings.tmdb_enabled",
+                  "description": "Enrich films and series using your free TMDb API Read Access Token.",
+                  "description_i18n": {"key": "runtime.media_center.ui.tmdb_description"}
+                },
+                "actions": [{
+                  "on": "change",
+                  "type": "callSkill",
+                  "target": "media_center_skill.set_metadata_settings",
+                  "timeoutMs": 60000,
+                  "params": {"values": {"tmdb_enabled": "$event.checked"}},
+                  "invalidates": ["media_center.metadata_settings"]
+                }]
+              },
+              {
+                "id": "media-tmdb-token",
+                "type": "input.text",
+                "area": "main",
+                "title": "TMDb API Read Access Token",
+                "inputs": {
+                  "initialValue": "",
+                  "inputType": "password",
+                  "autocomplete": "new-password",
+                  "commitMode": "manual",
+                  "saveLabel": "Store key",
+                  "saveLabel_i18n": {"key": "runtime.media_center.ui.store_key"},
+                  "placeholder": "TMDb API Read Access Token",
+                  "helper": "The stored key is never returned to the interface.",
+                  "helper_i18n": {"key": "runtime.media_center.ui.tmdb_key_private_hint"}
+                },
+                "actions": [{
+                  "on": "change",
+                  "type": "callSkill",
+                  "target": "media_center_skill.set_metadata_settings",
+                  "timeoutMs": 60000,
+                  "params": {"tmdb_token": "$event.value"},
+                  "invalidates": ["media_center.metadata_settings"]
+                }],
+                "title_i18n": {"key": "runtime.media_center.ui.tmdb_api_read_access_token"}
+              },
+              {
+                "id": "media-tmdb-token-actions",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {
+                  "variant": "toolbar",
+                  "size": "small",
+                  "buttons": [{"id": "clear", "label": "Remove TMDb key", "icon": "trash-outline", "label_i18n": {"key": "runtime.media_center.ui.remove_tmdb_key"}}]
+                },
+                "actions": [{
+                  "on": "click:clear",
+                  "type": "callSkill",
+                  "target": "media_center_skill.set_metadata_settings",
+                  "timeoutMs": 60000,
+                  "params": {"clear_tmdb_token": true},
+                  "invalidates": ["media_center.metadata_settings"]
+                }]
               },
               {
                 "id": "media-scan-progress",

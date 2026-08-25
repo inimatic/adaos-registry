@@ -16,6 +16,8 @@ capabilities:
 - media.catalog
 - media.playback_planning
 - skills.invoke
+- secrets.read
+- secrets.write
 - project.deployment.manage
 - project.deployment.inspect
 - project.deployment.apply
@@ -61,6 +63,10 @@ memory_budget:
     max_items: 32
     ttl_seconds: 900
     cleanup_hook: dispose
+  - name: ready_library_snapshot_cache
+    route: process
+    max_items: 32
+    cleanup_hook: dispose
   - name: filename_evidence_cache
     route: process
     max_items: 2048
@@ -81,6 +87,8 @@ exports:
   - import_folder
   - library
   - metadata_facets
+  - get_metadata_settings
+  - set_metadata_settings
   - list_items
   - collection_contents
   - deep_search
@@ -409,6 +417,45 @@ tools:
         minimum: 1
         maximum: 100
         default: 50
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: get_metadata_settings
+  description: Return managed external metadata provider settings without secrets.
+  entry: handlers.main:get_metadata_settings
+  side_effects: none
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: set_metadata_settings
+  description: Update external metadata providers and the protected TMDb token.
+  entry: handlers.main:set_metadata_settings
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      values:
+        type: object
+        properties:
+          external_enabled:
+            type: boolean
+          musicbrainz_enabled:
+            type: boolean
+          tmdb_enabled:
+            type: boolean
+          locale:
+            type: string
+            maxLength: 20
+        additionalProperties: false
+      tmdb_token:
+        type: string
+        maxLength: 2048
+        writeOnly: true
+      clear_tmdb_token:
+        type: boolean
+        default: false
     additionalProperties: true
   output_schema:
     type: object

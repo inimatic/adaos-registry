@@ -153,6 +153,13 @@ class MediaCenterBackgroundRuntime:
         status = getattr(worker, "status", None)
         return dict(status()) if callable(status) else {"state": "unknown", "revision": 0}
 
+    def reset_enrichment(self, *, timeout: float = 30.0) -> dict[str, Any]:
+        with self._lock:
+            worker = self._enrichment_worker
+            self._enrichment_worker = None
+            self._enrichment_path = ""
+        return self._dispose_worker(worker, timeout=timeout)
+
     @staticmethod
     def _dispose_worker(worker: _Worker | None, *, timeout: float) -> dict[str, Any]:
         if worker is None:

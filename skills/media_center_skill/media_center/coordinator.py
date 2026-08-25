@@ -33,6 +33,19 @@ from .discovery import discovery_score, fold_text
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
 COORDINATOR_SCHEMA_REVISION = "2026-08-25.1"
 SEARCH_ROWID_REVISION = "1"
+METADATA_SETTINGS_KEY = "metadata_provider_settings"
+DEFAULT_METADATA_SETTINGS = {
+    "external_enabled": True,
+    "musicbrainz_enabled": True,
+    "tmdb_enabled": True,
+    "locale": "ru-RU",
+}
+
+
+def _setting_bool(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on", "enabled"}
+    return bool(value)
 AUDIO_CONTEXT_IDENTITY_REVISION = "1"
 VIDEO_SERIES_IDENTITY_REVISION = "2"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
@@ -3766,17 +3779,19 @@ class MediaCatalogCoordinator:
                 ).fetchall()
             ]
         item = self._public_coordinator_item(row, profile, projection)
+        enrichment = {
+            "subject_ref": subject_ref,
+            "providers": providers,
+            "operations": operations,
+            "metadata_revision": int(item.get("metadata_revision") or 0),
+        }
+        item["enrichment"] = enrichment
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
             "item": item,
             "resource": item.get("resource") or {},
-            "enrichment": {
-                "subject_ref": subject_ref,
-                "providers": providers,
-                "operations": operations,
-                "metadata_revision": int(item.get("metadata_revision") or 0),
-            },
+            "enrichment": enrichment,
         }
 
     def set_favorite(self, item_id: str, *, profile_id: str, favorite: bool) -> dict[str, Any]:
@@ -6476,6 +6491,62 @@ class MediaCatalogCoordinator:
             "with_album": facet_counts.get("album", 0),
             "with_series": facet_counts.get("series", 0),
             "with_rating": with_rating,
+        }
+
+    def metadata_settings(self) -> dict[str, Any]:
+        with self.repository.connect() as connection:
+            row = connection.execute(
+                "SELECT value FROM coordinator_meta WHERE key=?",
+                (METADATA_SETTINGS_KEY,),
+            ).fetchone()
+        stored = _json_loads(row["value"]) if row is not None else {}
+        values = dict(DEFAULT_METADATA_SETTINGS)
+        if isinstance(stored, Mapping):
+            for key in ("external_enabled", "musicbrainz_enabled", "tmdb_enabled"):
+                if key in stored:
+                    values[key] = _setting_bool(stored[key])
+            locale = _text(stored.get("locale"))
+            if locale:
+                values["locale"] = locale[:20]
+            values["revision"] = max(0, int(stored.get("revision") or 0))
+            values["updated_at"] = _text(stored.get("updated_at"))
+        else:
+            values["revision"] = 0
+            values["updated_at"] = ""
+        return {
+            "ok": True,
+            "schema": "adaos.media_center.metadata_settings.v1",
+            "settings": values,
+        }
+
+    def set_metadata_settings(self, values: Mapping[str, Any]) -> dict[str, Any]:
+        current = dict(self.metadata_settings()["settings"])
+        changed = False
+        for key in ("external_enabled", "musicbrainz_enabled", "tmdb_enabled"):
+            if key not in values or values[key] is None:
+                continue
+            next_value = _setting_bool(values[key])
+            changed = changed or current.get(key) != next_value
+            current[key] = next_value
+        if "locale" in values and values["locale"] is not None:
+            locale = _text(values["locale"])[:20]
+            if locale:
+                changed = changed or current.get("locale") != locale
+                current["locale"] = locale
+        if changed:
+            current["revision"] = int(current.get("revision") or 0) + 1
+            current["updated_at"] = now_iso()
+            with self.repository.connect() as connection:
+                connection.execute(
+                    "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                    (METADATA_SETTINGS_KEY, _json_dumps(current)),
+                )
+                connection.commit()
+        return {
+            "ok": True,
+            "schema": "adaos.media_center.metadata_settings.v1",
+            "changed": changed,
+            "settings": current,
         }
 
     def diagnostics(
