@@ -4929,6 +4929,20 @@ def test_background_job_indexes_recovery_and_exact_active_count(monkeypatch, tmp
                 """
             ).fetchall()
         )
+        migration_plan = " ".join(
+            str(row["detail"])
+            for row in connection.execute(
+                """
+                EXPLAIN QUERY PLAN UPDATE media_background_jobs
+                SET priority=CASE WHEN EXISTS (
+                    SELECT 1 FROM catalog_items c
+                    WHERE c.id=substr(media_background_jobs.subject_ref,6)
+                      AND c.media_kind='audio'
+                ) THEN 150 ELSE 200 END
+                WHERE kind='metadata_enrichment' AND status='queued'
+                """
+            ).fetchall()
+        )
 
     assert recovered == {
         "ok": True,
@@ -4944,6 +4958,7 @@ def test_background_job_indexes_recovery_and_exact_active_count(monkeypatch, tmp
     } <= indexes
     assert "idx_media_center_background_claim" in claim_plan
     assert "idx_media_center_background_recent" in recent_plan
+    assert "sqlite_autoindex_catalog_items_1" in migration_plan
     assert state["counts_by_kind"]["metadata_enrichment"]["queued"] >= 1
     assert state["storage"]["allocated_bytes"] >= state["storage"]["db_bytes"]
 

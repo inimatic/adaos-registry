@@ -31,7 +31,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-25.3"
+COORDINATOR_SCHEMA_REVISION = "2026-08-25.4"
 SEARCH_ROWID_REVISION = "1"
 METADATA_SETTINGS_KEY = "metadata_provider_settings"
 DEFAULT_METADATA_SETTINGS = {
@@ -628,7 +628,7 @@ class MediaCatalogCoordinator:
                 SET priority=CASE
                     WHEN EXISTS (
                         SELECT 1 FROM catalog_items c
-                        WHERE ('item:' || c.id)=media_background_jobs.subject_ref
+                        WHERE c.id=substr(media_background_jobs.subject_ref,6)
                           AND c.media_kind='audio'
                     ) THEN 150 ELSE 200 END
                 WHERE kind='metadata_enrichment' AND status='queued'
