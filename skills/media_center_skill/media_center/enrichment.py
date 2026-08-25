@@ -698,6 +698,54 @@ class MusicBrainzMetadataProvider:
         }
 
 
+def metadata_provider_configuration() -> list[dict[str, Any]]:
+    external_enabled = _enabled(
+        os.environ.get("MEDIA_CENTER_METADATA_EXTERNAL_ENABLED")
+    )
+    tmdb_token = str(
+        os.environ.get("MEDIA_CENTER_TMDB_READ_ACCESS_TOKEN") or ""
+    ).strip()
+    return [
+        {
+            "provider_id": "media_center.deterministic_local.v1",
+            "kind": "local",
+            "enabled": True,
+            "state": "ready",
+            "reason": "built_in",
+            "privacy": "indexed_evidence_only",
+        },
+        {
+            "provider_id": "media_center.tmdb.v1",
+            "kind": "external",
+            "enabled": bool(external_enabled and tmdb_token),
+            "state": "ready" if external_enabled and tmdb_token else "disabled",
+            "reason": (
+                "configured"
+                if external_enabled and tmdb_token
+                else (
+                    "credentials_missing"
+                    if external_enabled
+                    else "external_metadata_disabled"
+                )
+            ),
+            "language": str(
+                os.environ.get("MEDIA_CENTER_METADATA_LOCALE") or "en-US"
+            ),
+            "privacy": "normalized_title_year_kind_only",
+        },
+        {
+            "provider_id": "media_center.musicbrainz.v1",
+            "kind": "external",
+            "enabled": external_enabled,
+            "state": "ready" if external_enabled else "disabled",
+            "reason": (
+                "configured" if external_enabled else "external_metadata_disabled"
+            ),
+            "privacy": "normalized_audio_tags_only",
+        },
+    ]
+
+
 def default_metadata_providers() -> tuple[MetadataProvider, ...]:
     providers: list[MetadataProvider] = [DeterministicLocalProvider()]
     token = str(os.environ.get("MEDIA_CENTER_TMDB_READ_ACCESS_TOKEN") or "").strip()
@@ -724,7 +772,7 @@ class MediaEnrichmentWorker:
         poll_seconds: float = 2.0,
         work_interval_seconds: float = 0.2,
         publish_interval_seconds: float = 2.0,
-        maintenance_interval_jobs: int = 1000,
+        maintenance_interval_jobs: int = 100,
     ):
         self.coordinator = coordinator
         self.providers = providers or default_metadata_providers()
@@ -842,7 +890,7 @@ class MediaEnrichmentWorker:
         self._completed_since_maintenance += 1
         if self._completed_since_maintenance >= self.maintenance_interval_jobs:
             try:
-                self.coordinator.prune_terminal_background_jobs(batch_size=250)
+                self.coordinator.prune_terminal_background_jobs(batch_size=5000)
             finally:
                 self._completed_since_maintenance = 0
         publish_at = time.monotonic()
@@ -876,6 +924,14 @@ class MediaEnrichmentWorker:
                     "state": "unknown",
                 }
             )
+        active_provider_ids = {
+            str(item.get("provider_id") or "") for item in providers
+        }
+        providers.extend(
+            status
+            for status in metadata_provider_configuration()
+            if str(status.get("provider_id") or "") not in active_provider_ids
+        )
         return {
             "schema": "adaos.media_center.enrichment_runtime.v1",
             "state": "running" if thread is not None and thread.is_alive() else "idle",

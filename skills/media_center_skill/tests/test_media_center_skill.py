@@ -28,6 +28,7 @@ from media_center.enrichment import (  # noqa: E402
     MusicBrainzMetadataProvider,
     TmdbMetadataProvider,
     default_metadata_providers,
+    metadata_provider_configuration,
 )
 from media_center.sync import MediaAgentSyncWorker  # noqa: E402
 from media_center.topology import MediaCenterTopology  # noqa: E402
@@ -580,6 +581,24 @@ def test_library_defaults_to_playable_media(monkeypatch, tmp_path):
 
     assert [item["media_kind"] for item in payload["items"]] == ["video", "audio"]
     assert {item["resource_id"] for item in payload["items"]} == {"clip.mp4", "song.mp3"}
+
+
+def test_library_summary_projection_is_bounded_to_card_fields(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    repo = MediaCenterRepository()
+    repo.scan_resources([_resource("clip.mp4")])
+
+    payload = main.library(
+        auto_scan=False,
+        projection="summary",
+        sort="title",
+        limit=20,
+    )
+
+    assert payload["projection"] == "summary"
+    assert payload["items"][0]["resource_id"] == "clip.mp4"
+    assert "resource" not in payload["items"][0]
+    assert "metadata" not in payload["items"][0]
 
 
 def test_incremental_root_scan_does_not_mark_existing_media_server_rows_missing(monkeypatch, tmp_path):
@@ -3117,6 +3136,7 @@ def test_library_snapshot_request_preserves_receiver_params(monkeypatch):
                 "profile_id": "household",
                 "shared_surface": True,
                 "webspace_id": "television",
+                "reuse_ready": True,
             },
         )
     ]
@@ -3234,6 +3254,10 @@ def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp
     assert leaf["file_count"] == 1
     assert leaf["items"][0]["entry_type"] == "media"
     assert leaf["items"][0]["media_kind"] == "video"
+    assert leaf["items"][0]["queue_source_type"] == "folder"
+    assert leaf["items"][0]["queue_source_id"] == (
+        "agent-node-a:root-a:Shows/Example/Season 2"
+    )
     _validate_schema("folder-node.v1.schema.json", nested["items"][0])
 
     catalog.apply_agent_page(
@@ -4225,6 +4249,10 @@ def test_local_nfo_claims_drive_public_metadata_search_and_precedence(
     resolved = catalog.list_items(query="Preferred", media_kind="video")["items"][0]
     assert resolved["title"] == "User Preferred Title"
     assert resolved["metadata_provenance"]["title"] == "profile:default"
+    details = catalog.item_details(resolved["id"], profile_id="default")
+    assert details["item"]["title"] == "User Preferred Title"
+    assert details["item"]["year"] == 2024
+    assert details["enrichment"]["metadata_revision"] >= 1
 
 
 def test_metadata_facets_filters_and_plex_style_sorts_are_server_bounded(
@@ -4248,9 +4276,16 @@ def test_metadata_facets_filters_and_plex_style_sorts_are_server_bounded(
     catalog.apply_agent_page(_agent_page(*deltas))
 
     facets = catalog.metadata_facets(
-        dimension="genre", media_kind="video", profile_id="default"
+        dimension="genre",
+        media_kind="video",
+        profile_id="default",
+        include_all=True,
     )
-    assert {item["value"]: item["count"] for item in facets["items"]} == {
+    assert facets["items"][0]["option_value"] == ""
+    assert facets["items"][0]["label_i18n"] == {
+        "key": "runtime.media_center.ui.all_genres"
+    }
+    assert {item["value"]: item["count"] for item in facets["items"][1:]} == {
         "Drama": 2,
         "Science Fiction": 1,
     }
@@ -4273,6 +4308,24 @@ def test_metadata_facets_filters_and_plex_style_sorts_are_server_bounded(
         "Newer Drama",
     ]
     assert [item["title"] for item in second["items"]] == ["Old Drama"]
+
+
+def test_metadata_provider_configuration_explains_disabled_external_sources(
+    monkeypatch,
+):
+    monkeypatch.delenv("MEDIA_CENTER_METADATA_EXTERNAL_ENABLED", raising=False)
+    monkeypatch.delenv("MEDIA_CENTER_TMDB_READ_ACCESS_TOKEN", raising=False)
+
+    statuses = {
+        item["provider_id"]: item for item in metadata_provider_configuration()
+    }
+
+    assert statuses["media_center.deterministic_local.v1"]["enabled"] is True
+    assert statuses["media_center.tmdb.v1"]["enabled"] is False
+    assert statuses["media_center.tmdb.v1"]["reason"] == (
+        "external_metadata_disabled"
+    )
+    assert statuses["media_center.musicbrainz.v1"]["enabled"] is False
 
 
 def test_tmdb_provider_sends_only_normalized_evidence_and_caches_details():

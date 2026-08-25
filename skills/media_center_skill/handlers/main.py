@@ -29,6 +29,10 @@ _HOME_SNAPSHOT_CACHE_LIMIT = 32
 _HOME_SNAPSHOT_CACHE_TTL_SECONDS = 15 * 60
 _home_snapshot_cache_lock = threading.Lock()
 _home_snapshot_build_lock = threading.Lock()
+_READY_LIBRARY_SNAPSHOT_CACHE: dict[
+    tuple[str, str, bool], dict[str, Any]
+] = {}
+_ready_library_snapshot_cache_lock = threading.Lock()
 
 from media_center.background import background_runtime  # noqa: E402
 from media_center.catalog import (  # noqa: E402
@@ -44,7 +48,6 @@ from media_center.coordinator import (  # noqa: E402
 )
 from media_center.enrichment import MediaEnrichmentWorker  # noqa: E402
 from media_center.sync import MediaAgentSyncWorker  # noqa: E402
-from media_center.topology import MediaCenterTopology  # noqa: E402
 
 
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".mkv", ".avi", ".wmv", ".ogv"}
@@ -93,7 +96,11 @@ def _coordinator(repository: MediaCenterRepository | None = None) -> MediaCatalo
         return _coordinator_cached
 
 
-def _topology() -> MediaCenterTopology:
+def _topology() -> Any:
+    # Deployment SDK imports pull in the full topology/runtime stack. Catalog
+    # reads must not pay that cost when no topology tool is being called.
+    from media_center.topology import MediaCenterTopology
+
     return MediaCenterTopology()
 
 
@@ -217,6 +224,56 @@ def _compact_home_item(item: Mapping[str, Any]) -> dict[str, Any]:
     return compact
 
 
+def _compact_library_item(item: Mapping[str, Any]) -> dict[str, Any]:
+    compact = {
+        field: item[field]
+        for field in (
+            "id",
+            "resource_id",
+            "title",
+            "name",
+            "media_kind",
+            "kind",
+            "icon",
+            "favorite",
+            "size_bytes",
+            "modified_at",
+            "folder_path",
+            "agent_id",
+            "node_id",
+            "root_id",
+            "work_id",
+            "variant_id",
+            "collection_id",
+            "year",
+            "release_date",
+            "rating",
+            "critic_rating",
+            "audience_rating",
+            "content_rating",
+            "duration_ms",
+            "genres",
+            "artists",
+            "album",
+            "series",
+            "metadata_revision",
+        )
+        if item.get(field) not in (None, "", [], {})
+    }
+    quality = item.get("quality") if isinstance(item.get("quality"), Mapping) else {}
+    compact_quality = {
+        field: quality[field]
+        for field in ("height", "width", "bitrate", "codec", "container", "language")
+        if quality.get(field) not in (None, "", 0)
+    }
+    if compact_quality:
+        compact["quality"] = compact_quality
+    artwork = _compact_home_artwork(item.get("artwork"))
+    if artwork["state"] != "missing" or artwork["url"] or artwork["descriptor"]:
+        compact["artwork"] = artwork
+    return compact
+
+
 def _compact_home_snapshot(
     home: Mapping[str, Any],
     *,
@@ -317,34 +374,53 @@ def _publish_library_snapshot(
     profile_id: str = "default",
     shared_surface: bool = False,
     webspace_id: str = "",
+    reuse_ready: bool = False,
 ) -> bool:
     try:
         from adaos.sdk.io import stream_variable_publish
 
         profile = str(profile_id or "default").strip() or "default"
         surface_is_shared = _bool(shared_surface, False)
-        agent_sync = _agent_sync_status()
-        collection_state = catalog.collection_state(agent_sync=agent_sync)
-        catalog_revision = catalog.catalog_revision()
-        personal_revision = catalog.profile_revision(profile)
-        home = _cached_home_snapshot(
-            catalog,
-            profile_id=profile,
-            shared_surface=surface_is_shared,
-            catalog_revision=catalog_revision,
-            personal_revision=personal_revision,
-            collection_state=collection_state,
+        cache_key = (
+            str(catalog.repository.db_path.resolve()),
+            profile,
+            surface_is_shared,
         )
-        snapshot = {
-            "schema": "adaos.media_center.library_state.v1",
-            "profile_id": profile,
-            "catalog_revision": catalog_revision,
-            "personal_revision": personal_revision,
-            "participation": catalog.participation(),
-            "collection_state": collection_state,
-            "home": home,
-            "agent_sync": agent_sync,
-        }
+        snapshot: dict[str, Any] | None = None
+        if reuse_ready:
+            with _ready_library_snapshot_cache_lock:
+                cached = _READY_LIBRARY_SNAPSHOT_CACHE.get(cache_key)
+                if cached is not None:
+                    snapshot = dict(cached)
+        if snapshot is None:
+            agent_sync = _agent_sync_status()
+            collection_state = catalog.collection_state(agent_sync=agent_sync)
+            catalog_revision = catalog.catalog_revision()
+            personal_revision = catalog.profile_revision(profile)
+            home = _cached_home_snapshot(
+                catalog,
+                profile_id=profile,
+                shared_surface=surface_is_shared,
+                catalog_revision=catalog_revision,
+                personal_revision=personal_revision,
+                collection_state=collection_state,
+            )
+            snapshot = {
+                "schema": "adaos.media_center.library_state.v1",
+                "profile_id": profile,
+                "catalog_revision": catalog_revision,
+                "personal_revision": personal_revision,
+                "participation": catalog.participation(),
+                "collection_state": collection_state,
+                "home": home,
+                "agent_sync": agent_sync,
+            }
+            with _ready_library_snapshot_cache_lock:
+                _READY_LIBRARY_SNAPSHOT_CACHE[cache_key] = dict(snapshot)
+                while len(_READY_LIBRARY_SNAPSHOT_CACHE) > _HOME_SNAPSHOT_CACHE_LIMIT:
+                    _READY_LIBRARY_SNAPSHOT_CACHE.pop(
+                        next(iter(_READY_LIBRARY_SNAPSHOT_CACHE)), None
+                    )
         stream_variable_publish(
             "media_center.library_state",
             snapshot,
@@ -388,6 +464,8 @@ def _publish_operation_snapshot(
         from adaos.sdk.io import stream_variable_publish
 
         snapshot = catalog.operation_state(limit=30)
+        snapshot["runtime"] = _enrichment_runtime(catalog).status()
+        snapshot["coverage"] = catalog.metadata_coverage()
         stream_variable_publish(
             "media_center.operation_state",
             snapshot,
@@ -935,6 +1013,7 @@ def on_media_center_snapshot_requested(event: Any) -> None:
             False,
         ),
         webspace_id=str(payload.get("webspace_id") or ""),
+        reuse_ready=True,
     )
 
 
@@ -1274,15 +1353,16 @@ def library(
     rating_min: float | None = None,
     content_rating: str = "",
     auto_scan: bool = True,
+    projection: str = "full",
     **_: Any,
 ) -> dict[str, Any]:
     repo = _repository()
     catalog = _coordinator(repo)
     scan: dict[str, Any] | None = None
     agent_sync: dict[str, Any] | None = None
-    summary = repo.summary()
     if _bool(auto_scan, True):
         if catalog.catalog_revision() <= 0:
+            summary = repo.compact_summary()
             agent_sync = _run_agent_sync(
                 catalog, max_pages=1, limit=500, timeout_seconds=5.0
             )
@@ -1326,6 +1406,14 @@ def library(
         payload["scan"] = scan
     if agent_sync is not None:
         payload["agent_sync"] = agent_sync
+    projection_token = str(projection or "full").strip().lower()
+    if projection_token == "summary":
+        payload["items"] = [
+            _compact_library_item(item)
+            for item in payload.get("items") or []
+            if isinstance(item, Mapping)
+        ]
+        payload["projection"] = "summary"
     payload["runtime"] = {
         "catalog_owner": "media_center_skill",
         "discovery_owner": "media_library_agent",
@@ -1349,6 +1437,7 @@ def metadata_facets(
     media_kind: str = "playable",
     profile_id: str = "default",
     limit: int = 50,
+    include_all: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
     return _coordinator().metadata_facets(
@@ -1356,6 +1445,7 @@ def metadata_facets(
         media_kind=media_kind,
         profile_id=profile_id,
         limit=limit,
+        include_all=_bool(include_all, False),
     )
 
 
@@ -1526,8 +1616,12 @@ def deep_search(
 
 
 @tool(summary="Read one media-center catalog item.", side_effects="none")
-def get_item(item_id: str = "", **_: Any) -> dict[str, Any]:
-    return _repository().get_item(item_id)
+def get_item(
+    item_id: str = "",
+    profile_id: str = "default",
+    **_: Any,
+) -> dict[str, Any]:
+    return _coordinator().item_details(item_id, profile_id=profile_id)
 
 
 @tool(summary="Return the selected media item and a bounded playback queue.", side_effects="none")

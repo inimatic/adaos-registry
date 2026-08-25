@@ -3703,6 +3703,82 @@ class MediaCatalogCoordinator:
                     item["artwork"] = projected_artwork
         return item
 
+    def item_details(
+        self,
+        item_id: str,
+        *,
+        profile_id: str = "default",
+    ) -> dict[str, Any]:
+        token = _text(item_id)
+        if not token:
+            return {"ok": False, "error": "item_id_required"}
+        profile = _text(profile_id) or "default"
+        self.get_profile(profile)
+        subject_ref = f"item:{token}"
+        with self.repository.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT c.*, COALESCE(ps.favorite,c.favorite) AS profile_favorite,
+                    COALESCE(ps.resume_ms,0) AS profile_resume_ms,
+                    COALESCE(ps.duration_ms,0) AS profile_duration_ms,
+                    COALESCE(ps.completed,0) AS profile_completed,
+                    COALESCE(ps.rating,0) AS profile_rating,
+                    COALESCE(ps.hidden,0) AS profile_hidden,
+                    COALESCE(ps.last_played_at,'') AS profile_last_played_at,
+                    COALESCE(ps.revision,0) AS profile_revision
+                FROM catalog_items c
+                LEFT JOIN personal_media_state ps
+                    ON ps.item_id=c.id AND ps.profile_id=?
+                WHERE c.id=?
+                """,
+                (profile, token),
+            ).fetchone()
+            if row is None:
+                return {"ok": False, "error": "item_not_found", "item_id": token}
+            projection = connection.execute(
+                "SELECT * FROM catalog_metadata_projection WHERE item_id=?",
+                (token,),
+            ).fetchone()
+            providers = [
+                {
+                    "provider_id": str(provider["provenance"]),
+                    "claim_count": int(provider["claim_count"]),
+                    "latest_at": str(provider["latest_at"]),
+                }
+                for provider in connection.execute(
+                    """
+                    SELECT provenance,COUNT(*) AS claim_count,
+                        MAX(created_at) AS latest_at
+                    FROM metadata_claims WHERE subject_ref=?
+                    GROUP BY provenance ORDER BY claim_count DESC,provenance
+                    """,
+                    (subject_ref,),
+                ).fetchall()
+            ]
+            operations = [
+                dict(job) | {"progress": _json_loads(job["progress_json"]) or {}}
+                for job in connection.execute(
+                    """
+                    SELECT * FROM media_background_jobs WHERE subject_ref=?
+                    ORDER BY updated_at DESC,id DESC LIMIT 12
+                    """,
+                    (subject_ref,),
+                ).fetchall()
+            ]
+        item = self._public_coordinator_item(row, profile, projection)
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "item": item,
+            "resource": item.get("resource") or {},
+            "enrichment": {
+                "subject_ref": subject_ref,
+                "providers": providers,
+                "operations": operations,
+                "metadata_revision": int(item.get("metadata_revision") or 0),
+            },
+        }
+
     def set_favorite(self, item_id: str, *, profile_id: str, favorite: bool) -> dict[str, Any]:
         token = _text(item_id)
         profile = _text(profile_id) or "default"
@@ -4012,50 +4088,77 @@ class MediaCatalogCoordinator:
             filters.append("c.explicit=0")
         where = " AND ".join(filters)
         if not root and not parent_path:
-            root_filters = ["c.agent_id<>''", "c.root_id<>''", where]
-            root_params = list(visibility_params)
+            folder_agent_filter = ""
+            direct_agent_filter = ""
+            root_params: list[Any] = []
             if agent:
-                root_filters.append("c.agent_id=?")
-                root_params.append(agent)
-            root_where = " AND ".join(root_filters)
+                folder_agent_filter = " AND f.agent_id=?"
+                direct_agent_filter = " AND c.agent_id=?"
+                root_params.extend((agent, agent))
+            root_params.extend(visibility_params)
             with self.repository.connect() as connection:
-                root_total = int(
-                    connection.execute(
-                        f"""
-                        SELECT COUNT(*) FROM (
-                            SELECT c.agent_id,c.root_id
-                            FROM catalog_items c
-                            LEFT JOIN personal_media_state ps
-                                ON ps.item_id=c.id AND ps.profile_id=?
-                            WHERE {root_where}
-                            GROUP BY c.agent_id,c.root_id
-                        )
-                        """,
-                        tuple(root_params),
-                    ).fetchone()[0]
-                )
                 root_rows = connection.execute(
                     f"""
-                    SELECT c.agent_id,MAX(c.node_id) AS node_id,c.root_id,
-                        COUNT(*) AS source_count,
-                        MAX(c.catalog_revision) AS revision,
-                        MAX(COALESCE(json_extract(
+                    WITH root_candidates(
+                        agent_id,node_id,root_id,source_count,revision
+                    ) AS (
+                        SELECT f.agent_id,MAX(f.node_id),f.root_id,
+                            SUM(f.source_count),MAX(f.revision)
+                        FROM catalog_folder_nodes f
+                            INDEXED BY idx_media_center_folder_parent
+                        WHERE f.parent='' {folder_agent_filter}
+                        GROUP BY f.agent_id,f.root_id
+                        UNION ALL
+                        SELECT c.agent_id,MAX(c.node_id),c.root_id,
+                            COUNT(*),MAX(c.catalog_revision)
+                        FROM catalog_items c
+                            INDEXED BY idx_media_center_folder_browse
+                        WHERE c.agent_id<>'' AND c.root_id<>''
+                            AND c.folder_path='' AND c.missing=0
+                            {direct_agent_filter}
+                        GROUP BY c.agent_id,c.root_id
+                    ), roots(
+                        agent_id,node_id,root_id,source_count,revision
+                    ) AS (
+                        SELECT agent_id,MAX(node_id),root_id,
+                            SUM(source_count),MAX(revision)
+                        FROM root_candidates
+                        GROUP BY agent_id,root_id
+                    )
+                    SELECT r.*,
+                        (SELECT COALESCE(json_extract(
                             c.metadata_json,'$.media_library_root_path'
-                        ),'')) AS root_path,
-                        MAX(COALESCE(json_extract(
+                        ),'')
+                        FROM catalog_items c
+                            INDEXED BY idx_media_center_folder_browse
+                        WHERE c.agent_id=r.agent_id AND c.root_id=r.root_id
+                            AND c.missing=0 LIMIT 1) AS root_path,
+                        (SELECT COALESCE(json_extract(
                             c.metadata_json,'$.media_library_root_label'
-                        ),'')) AS root_label
-                    FROM catalog_items c
-                    LEFT JOIN personal_media_state ps
-                        ON ps.item_id=c.id AND ps.profile_id=?
-                    WHERE {root_where}
-                    GROUP BY c.agent_id,c.root_id
+                        ),'')
+                        FROM catalog_items c
+                            INDEXED BY idx_media_center_folder_browse
+                        WHERE c.agent_id=r.agent_id AND c.root_id=r.root_id
+                            AND c.missing=0 LIMIT 1) AS root_label
+                    FROM roots r
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM catalog_items c
+                            INDEXED BY idx_media_center_folder_browse
+                        LEFT JOIN personal_media_state ps
+                            ON ps.item_id=c.id AND ps.profile_id=?
+                        WHERE c.agent_id=r.agent_id AND c.root_id=r.root_id
+                            AND {where}
+                        LIMIT 1
+                    )
                     ORDER BY root_label COLLATE NOCASE,root_path COLLATE NOCASE,
-                        c.agent_id,c.root_id
+                        r.agent_id,r.root_id
                     LIMIT ? OFFSET ?
                     """,
-                    (*root_params, bounded, offset),
+                    (*root_params, bounded + 1, offset),
                 ).fetchall()
+            has_more = len(root_rows) > bounded
+            root_rows = root_rows[:bounded]
             items = []
             for row in root_rows:
                 root_path = _text(row["root_path"]).replace("\\", "/").rstrip("/")
@@ -4090,6 +4193,7 @@ class MediaCatalogCoordinator:
                     }
                 )
             next_offset = offset + len(items)
+            root_total = next_offset + (1 if has_more else 0)
             participation = self.participation()
             return {
                 "ok": True,
@@ -4101,6 +4205,8 @@ class MediaCatalogCoordinator:
                 "folder_count": len(items),
                 "file_count": 0,
                 "total_count": root_total,
+                "total_count_exact": not has_more,
+                "total_count_lower_bound": root_total,
                 "parent": "",
                 "breadcrumbs": [
                     {
@@ -4122,10 +4228,10 @@ class MediaCatalogCoordinator:
                     "cursor": _encode_cursor(offset, signature),
                     "next_cursor": (
                         _encode_cursor(next_offset, signature)
-                        if next_offset < root_total
+                        if has_more
                         else None
                     ),
-                    "has_more": next_offset < root_total,
+                    "has_more": has_more,
                 },
             }
         if not agent or not root:
@@ -4258,6 +4364,8 @@ class MediaCatalogCoordinator:
                         part for part in (parent_path, str(row["name"])) if part
                     ),
                     "parent": parent_path,
+                    "queue_source_type": "folder",
+                    "queue_source_id": f"{agent}:{root}:{parent_path}",
                     "icon": (
                         "musical-notes-outline"
                         if str(row["media_kind"]) == "audio"
@@ -5795,6 +5903,7 @@ class MediaCatalogCoordinator:
         media_kind: str = "playable",
         profile_id: str = "default",
         limit: int = 50,
+        include_all: bool = False,
     ) -> dict[str, Any]:
         field = _text(dimension).lower() or "genre"
         if field == "category":
@@ -5852,21 +5961,48 @@ class MediaCatalogCoordinator:
                     maximum_rating, field, bounded,
                 ),
             ).fetchall()
+        items = [
+            {
+                "label": str(row["display_value"]),
+                "value": str(row["display_value"]),
+                "option_value": (
+                    row["numeric_value"]
+                    if field == "year"
+                    else str(row["display_value"])
+                ),
+                "normalized_value": str(row["normalized_value"]),
+                "numeric_value": row["numeric_value"],
+                "count": int(row["item_count"]),
+            }
+            for row in rows
+        ]
+        if include_all:
+            all_label = "All years" if field == "year" else "All genres"
+            all_key = (
+                "runtime.media_center.ui.all_years"
+                if field == "year"
+                else "runtime.media_center.ui.all_genres"
+            )
+            items.insert(
+                0,
+                {
+                    "label": all_label,
+                    "value": "",
+                    "option_value": "",
+                    "normalized_value": "",
+                    "numeric_value": None,
+                    "count": 0,
+                    "label_i18n": {"key": all_key},
+                },
+            )
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
             "dimension": field,
             "media_kind": requested_kind,
-            "items": [
-                {
-                    "value": str(row["display_value"]),
-                    "normalized_value": str(row["normalized_value"]),
-                    "numeric_value": row["numeric_value"],
-                    "count": int(row["item_count"]),
-                }
-                for row in rows
-            ],
-            "count": len(rows),
+            "items": items,
+            "count": len(items),
+            "facet_count": len(rows),
             "bounded": True,
             "limit": bounded,
         }
@@ -6297,6 +6433,49 @@ class MediaCatalogCoordinator:
             "counts": counts,
             "active_count": active_count,
             "updated_at": now_iso(),
+        }
+
+    def metadata_coverage(self) -> dict[str, Any]:
+        with self.repository.connect() as connection:
+            total = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM catalog_metadata_projection "
+                    "INDEXED BY sqlite_autoindex_catalog_metadata_projection_1"
+                ).fetchone()[0]
+            )
+            with_year = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM catalog_metadata_projection "
+                    "INDEXED BY idx_media_center_metadata_year WHERE year IS NOT NULL"
+                ).fetchone()[0]
+            )
+            with_rating = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM catalog_metadata_projection "
+                    "INDEXED BY idx_media_center_metadata_rating WHERE rating IS NOT NULL"
+                ).fetchone()[0]
+            )
+            facet_counts = {
+                str(row["field_name"]): int(row["item_count"])
+                for row in connection.execute(
+                    """
+                    SELECT field_name,COUNT(DISTINCT item_id) AS item_count
+                    FROM catalog_metadata_facets
+                        INDEXED BY idx_media_center_metadata_facet_lookup
+                    WHERE field_name IN ('genre','artist','album','series')
+                    GROUP BY field_name
+                    """
+                ).fetchall()
+            }
+        return {
+            "schema": "adaos.media_center.metadata_coverage.v1",
+            "total": total,
+            "with_year": with_year,
+            "with_genres": facet_counts.get("genre", 0),
+            "with_artists": facet_counts.get("artist", 0),
+            "with_album": facet_counts.get("album", 0),
+            "with_series": facet_counts.get("series", 0),
+            "with_rating": with_rating,
         }
 
     def diagnostics(

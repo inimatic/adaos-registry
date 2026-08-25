@@ -449,6 +449,11 @@
                     "mediaCollectionTitle": "",
                     "mediaFavoritesOnly": "$event.mediaFavoritesOnly",
                     "mediaSort": "$event.mediaSort",
+                    "mediaSearch": "",
+                    "mediaGenre": "",
+                    "mediaYear": null,
+                    "mediaRatingMin": null,
+                    "mediaContentRating": "",
                     "mediaFolderAgentId": "",
                     "mediaFolderRootId": "",
                     "mediaFolderParent": "",
@@ -911,7 +916,8 @@
                   "content_rating": "$state.mediaContentRating",
                   "limit": "$state.mediaPageSize",
                   "cursor": "$state.mediaCursor",
-                  "auto_scan": true,
+                  "auto_scan": false,
+                  "projection": "summary",
                   "profile_id": "$state.profileId"
                 },
                 "cacheTtlMs": 0,
@@ -1365,8 +1371,8 @@
                   "on": "select:media",
                   "type": "updateState",
                   "params": {
-                    "playbackSourceType": "item",
-                    "playbackSourceId": "$event.id",
+                    "playbackSourceType": "$event.queue_source_type",
+                    "playbackSourceId": "$event.queue_source_id",
                     "selectedMediaItemId": "$event.id",
                     "selectedMediaFavorite": "$event.favorite"
                   }
@@ -1539,6 +1545,49 @@
                 }
               },
               {
+                "id": "media-center-player-details",
+                "type": "item.details",
+                "area": "main",
+                "title": "Media details",
+                "visibleIf": "$state.selectedMediaItemId != null",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.get_item",
+                  "params": {
+                    "item_id": "$state.selectedMediaItemId",
+                    "profile_id": "$state.profileId"
+                  },
+                  "cacheTtlMs": 5000,
+                  "invalidationTags": ["media_center.catalog"],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 2
+                },
+                "inputs": {
+                  "presentation": "body",
+                  "bindField": "item",
+                  "fields": [
+                    {"key": "title", "label": "Title", "path": "title", "label_i18n": {"key": "runtime.media_center.ui.title"}},
+                    {"key": "original_title", "label": "Original title", "path": "metadata.original_title", "label_i18n": {"key": "runtime.media_center.ui.original_title"}},
+                    {"key": "overview", "label": "Overview", "path": "metadata.overview", "label_i18n": {"key": "runtime.media_center.ui.overview"}},
+                    {"key": "year", "label": "Year", "path": "year", "label_i18n": {"key": "runtime.media_center.ui.year"}},
+                    {"key": "genres", "label": "Genres", "path": "genres", "label_i18n": {"key": "runtime.media_center.ui.genres"}},
+                    {"key": "rating", "label": "Rating", "path": "rating", "label_i18n": {"key": "runtime.media_center.ui.rating"}},
+                    {"key": "content_rating", "label": "Content rating", "path": "content_rating", "label_i18n": {"key": "runtime.media_center.ui.content_rating"}},
+                    {"key": "artists", "label": "Artists", "path": "artists", "label_i18n": {"key": "runtime.media_center.ui.artists"}},
+                    {"key": "album", "label": "Album", "path": "album", "label_i18n": {"key": "runtime.media_center.ui.album"}},
+                    {"key": "series", "label": "Series", "path": "series", "label_i18n": {"key": "runtime.media_center.ui.series"}},
+                    {"key": "actors", "label": "Cast", "path": "metadata.actors", "label_i18n": {"key": "runtime.media_center.ui.cast"}},
+                    {"key": "directors", "label": "Directors", "path": "metadata.directors", "label_i18n": {"key": "runtime.media_center.ui.directors"}},
+                    {"key": "external_ids", "label": "External IDs", "path": "metadata.external_ids", "label_i18n": {"key": "runtime.media_center.ui.external_ids"}},
+                    {"key": "quality", "label": "Media quality", "path": "quality", "label_i18n": {"key": "runtime.media_center.ui.media_quality"}},
+                    {"key": "node", "label": "Storage node", "path": "node_id", "label_i18n": {"key": "runtime.media_center.ui.storage_node"}},
+                    {"key": "folder", "label": "Folder", "path": "folder_path", "label_i18n": {"key": "runtime.media_center.ui.folder"}},
+                    {"key": "provenance", "label": "Metadata sources", "path": "metadata_provenance", "label_i18n": {"key": "runtime.media_center.ui.metadata_sources"}}
+                  ]
+                },
+                "title_i18n": {"key": "runtime.media_center.ui.media_details"}
+              },
+              {
                 "id": "media-center-player-favorite",
                 "type": "ui.actions",
                 "area": "main",
@@ -1685,6 +1734,7 @@
                     "dimension": "genre",
                     "media_kind": "$state.mediaKind",
                     "profile_id": "$state.profileId",
+                    "include_all": true,
                     "limit": 100
                   },
                   "cacheTtlMs": 5000,
@@ -1694,10 +1744,11 @@
                 },
                 "inputs": {
                   "value": "$state.mediaGenre",
-                  "optionLabelPath": "value",
-                  "optionValuePath": "value",
+                  "optionLabelPath": "label",
+                  "optionValuePath": "option_value",
                   "optionMetaPaths": ["count"],
                   "searchable": true,
+                  "emptyText": "No enriched genres yet",
                   "placeholder": "All genres",
                   "placeholder_i18n": {"key": "runtime.media_center.ui.all_genres"}
                 },
@@ -1720,6 +1771,7 @@
                     "dimension": "year",
                     "media_kind": "$state.mediaKind",
                     "profile_id": "$state.profileId",
+                    "include_all": true,
                     "limit": 100
                   },
                   "cacheTtlMs": 5000,
@@ -1729,10 +1781,11 @@
                 },
                 "inputs": {
                   "value": "$state.mediaYear",
-                  "optionLabelPath": "value",
-                  "optionValuePath": "numeric_value",
+                  "optionLabelPath": "label",
+                  "optionValuePath": "option_value",
                   "optionMetaPaths": ["count"],
                   "searchable": true,
+                  "emptyText": "No enriched years yet",
                   "placeholder": "All years",
                   "placeholder_i18n": {"key": "runtime.media_center.ui.all_years"}
                 },
@@ -2915,6 +2968,59 @@
               ]
             },
             "widgets": [
+              {
+                "id": "media-metadata-runtime",
+                "type": "item.details",
+                "area": "main",
+                "title": "Metadata providers",
+                "dataSource": {
+                  "kind": "stream",
+                  "receiver": "media_center.operation_state",
+                  "scope": "workspace"
+                },
+                "inputs": {
+                  "presentation": "body",
+                  "fields": [
+                    {"key": "state", "label": "Worker", "path": "runtime.state", "label_i18n": {"key": "runtime.media_center.ui.worker"}},
+                    {"key": "active", "label": "Active jobs", "path": "active_count", "label_i18n": {"key": "runtime.media_center.ui.active_jobs"}},
+                    {"key": "queued", "label": "Queued", "path": "counts.queued", "label_i18n": {"key": "runtime.media_center.ui.queued"}},
+                    {"key": "running", "label": "Running", "path": "counts.running", "label_i18n": {"key": "runtime.media_center.ui.running"}},
+                    {"key": "completed", "label": "Completed", "path": "counts.completed", "label_i18n": {"key": "runtime.media_center.ui.completed"}},
+                    {"key": "failed", "label": "Failed", "path": "counts.failed", "label_i18n": {"key": "runtime.media_center.ui.failed"}},
+                    {"key": "coverage_total", "label": "Projected items", "path": "coverage.total", "label_i18n": {"key": "runtime.media_center.ui.projected_items"}},
+                    {"key": "coverage_year", "label": "With year", "path": "coverage.with_year", "label_i18n": {"key": "runtime.media_center.ui.with_year"}},
+                    {"key": "coverage_genres", "label": "With genres", "path": "coverage.with_genres", "label_i18n": {"key": "runtime.media_center.ui.with_genres"}},
+                    {"key": "coverage_artists", "label": "With artists", "path": "coverage.with_artists", "label_i18n": {"key": "runtime.media_center.ui.with_artists"}}
+                  ]
+                },
+                "title_i18n": {"key": "runtime.media_center.ui.metadata_providers"}
+              },
+              {
+                "id": "media-metadata-providers",
+                "type": "ui.list",
+                "area": "main",
+                "title": "Providers",
+                "dataSource": {
+                  "kind": "stream",
+                  "receiver": "media_center.operation_state",
+                  "path": "runtime.providers",
+                  "scope": "workspace"
+                },
+                "inputs": {
+                  "itemKey": "provider_id",
+                  "primaryKey": "provider_id",
+                  "secondaryKey": "state",
+                  "metaKey": "reason",
+                  "emptyText": "No metadata providers are registered."
+                },
+                "collection": {
+                  "display": "list",
+                  "focusGroup": "media-metadata-providers",
+                  "virtualized": false,
+                  "cursor": {"enabled": false, "stateKey": "mediaCursor"}
+                },
+                "title_i18n": {"key": "runtime.media_center.ui.providers"}
+              },
               {
                 "id": "media-metadata-operations",
                 "type": "ui.list",
