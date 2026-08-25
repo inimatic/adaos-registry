@@ -504,6 +504,63 @@ def test_playback_queue_includes_effective_control_settings(monkeypatch):
     }
 
 
+def test_play_on_creates_a_durable_remote_session_and_sends_play(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "build_playback_queue",
+        lambda **_kwargs: {
+            "ok": True,
+            "items": [
+                {"id": "episode-1", "title": "Episode 1", "route": {}},
+                {"id": "episode-2", "title": "Episode 2", "route": {}},
+            ],
+            "initial_index": 1,
+            "playback_control": {
+                "queue_source": {"type": "collection", "id": "series-1"}
+            },
+        },
+    )
+    calls = []
+
+    def invoke(skill, method, params, **_kwargs):
+        calls.append((skill, method, params))
+        if method == "now_playing":
+            return {"ok": True, "items": []}, ""
+        if method == "create_session":
+            return {
+                "ok": True,
+                "session": {"id": "session-tv", "revision": 1},
+            }, ""
+        if method == "command":
+            return {
+                "ok": True,
+                "session": {"id": "session-tv", "revision": 2},
+                "command": {"command": "play"},
+            }, ""
+        raise AssertionError(method)
+
+    monkeypatch.setattr(main, "_invoke_skill", invoke)
+
+    result = main.play_on(
+        target_id="target-tv",
+        source_type="collection",
+        source_id="series-1",
+        start_item_id="episode-2",
+        profile_id="alice",
+    )
+
+    assert result["ok"] is True
+    assert result["queue_count"] == 2
+    assert [method for _skill, method, _params in calls] == [
+        "now_playing", "create_session", "command",
+    ]
+    assert calls[1][2]["active_index"] == 1
+    assert calls[1][2]["queue_source"] == {
+        "type": "collection", "id": "series-1",
+    }
+    assert calls[2][2]["session_id"] == "session-tv"
+
+
 def test_catalog_page_queue_preserves_current_query_sort_and_start_item(
     monkeypatch, tmp_path
 ):
@@ -1215,9 +1272,10 @@ def test_coordinator_projects_safe_versioned_artwork_url(monkeypatch, tmp_path):
         "source_revision": 1,
         "source_fingerprint": "fingerprint-1-1",
         "width": 720,
-        "height": 720,
-        "error_code": "",
-    }
+            "height": 720,
+            "error_code": "",
+            "fallback_urls": [],
+        }
     assert "/mnt/private" not in str(artwork)
 
 

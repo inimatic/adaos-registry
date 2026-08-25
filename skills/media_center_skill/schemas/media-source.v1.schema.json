@@ -9,6 +9,7 @@
     "source_revision": {"type": "integer", "minimum": 0}, "catalog_revision": {"type": "integer", "minimum": 0},
     "name": {"type": "string"}, "title": {"type": "string"}, "media_kind": {"enum": ["video", "audio", "image", "other"]},
     "mime_type": {"type": "string"}, "size_bytes": {"type": "integer", "minimum": 0}, "folder_path": {"type": "string"},
+    "library_path": {"type": "string"},
     "work_id": {"type": "string"}, "variant_id": {"type": "string"}, "collection_id": {"type": "string"},
     "quality": {"type": "object"}, "missing": {"type": "boolean"}, "resource": {"type": "object"}, "personal": {"type": "object"},
     "source": {"type": "string"}, "resource_id": {"type": "string"}, "subtitle": {"type": "string"}, "kind": {"type": "string"},
@@ -62,7 +63,12 @@
         "source_fingerprint": {"type": "string", "maxLength": 128},
         "width": {"type": "integer", "minimum": 0},
         "height": {"type": "integer", "minimum": 0},
-        "error_code": {"type": "string"}
+        "error_code": {"type": "string"},
+        "fallback_urls": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {"type": "string", "pattern": "^https?://"}
+        }
       },
       "additionalProperties": false
     }

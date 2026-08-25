@@ -14,6 +14,15 @@ The catalog filter modal is entirely UI-as-data. It reads profile-aware genre an
 
 The coordinator derives explicit `MediaSource`, `MediaVariant`, `MediaWork`, `MediaCollection`, and membership rows. Deterministic grouping preserves series/season/episode, album/disc/track, audiobook/part/chapter, and source-folder levels. Episode filenames are parsed by the production-stable GuessIt library behind a bounded cache, with the previous deterministic parser as a fallback; series identity therefore does not depend on inconsistent season-folder labels. Dependency diagnostics are bounded to warnings even when the host runtime uses DEBUG logging, so a catalog migration cannot turn parser rule traces into an I/O workload. TMDB remains an optional observable metadata-claim provider and ambiguous external matches do not become authoritative grouping decisions. `collection_contents()` resolves membership at every hierarchy level, returns at most 30 profile-admitted items plus bounded child collections and breadcrumbs, and gives collection cards sanitized representative artwork. Opening a series, album, or audiobook is therefore a navigation operation; explicit Play All builds the durable collection queue. Folder navigation is a separate lazy, cursor-backed read model with breadcrumbs. Its first page contains only configured agent-owned roots; subsequent pages, breadcrumbs, and folder queues are scoped by both agent and root identity. Unstructured legacy Media Server rows remain searchable but cannot flatten the folder browser or collide across equal paths on different disks. The transactionally maintained folder-node projection contains paths, revisions, and counts only; direct files remain bounded catalog rows and media bytes are never copied. Profile policy is still checked against source rows before a folder is exposed. Duplicate results are review candidates only and never authorize source deletion. Metadata, merge, split, and regroup corrections are audited and reversible; alias activation/revocation remains explicit evidence.
 
+`get_item()` exposes bounded metadata provenance, background operations, and
+all available variants of the same work without exposing an absolute source
+path. The public `library_path` is assembled from the sanitized relative folder
+and file name. `update_item_metadata()` is the SDK-flat user/skill interface for
+preferred title, original title, overview, year, genre, artist, album and series
+claims and for rejecting an incorrect provider match. Preferred profile claims
+win projection deterministically; provider rejection is field-aware, audited,
+and reversed through the ordinary correction journal.
+
 Provisional audio work identity includes normalized folder/collection context,
 so files named only `0.mp3` or `01.mp3` in different books cannot become
 playback alternatives by filename alone. Matching contextual tracks from
@@ -22,6 +31,13 @@ physical source and remains stable when migration, enrichment, or a reviewed
 correction reclassifies that source under another work.
 
 Profile-owned playlists have revision-safe ordered membership and explicit `private`, `household`, or `shared` visibility. Playlist reads remain cursor-backed and catalog/player limits remain independent; deleting a playlist never deletes source media.
+
+`add_playlist_item()` appends idempotently within the profile boundary, while
+`play_on()` moves the current ordered source context to a selected online target
+by creating or revision-safely updating a durable `media_control_skill`
+session and then issuing one idempotent Play command. Media bytes still travel
+from the selected source node to the playback endpoint, never through the
+controller surface.
 
 ## Playback Planning
 
@@ -56,6 +72,14 @@ Agent availability is independent from known catalog identity. The coordinator d
 The colocated compatibility path first reads the agent's stable identity and then resumes that agent's durable cursor. It never restarts delta ingestion at sequence zero merely because distributed topology is not configured, and it never borrows a cursor from a different prior local agent.
 
 When an agent delta names the same contained source path as a legacy `media_server` compatibility row, the coordinator retires the legacy row from normal reads. This removes duplicate UI entries during migration without deleting the original file or its core media reference.
+
+MusicBrainz projection consumes both recording `genres` and ranked community
+`tags`, deduplicates them deterministically, and requeues previously completed
+audio metadata jobs that produced no genre facet under the older recipe.
+External poster/cover candidates remain provenance-bearing metadata claims.
+Ready node-local artwork is preferred, but its public descriptor carries a
+bounded external fallback list so a stale derivative route does not leave a
+permanently blank card; the fallback does not claim node-local ownership.
 
 ## Personal State
 

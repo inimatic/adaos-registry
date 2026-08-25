@@ -31,11 +31,37 @@ Stop and Close commands: Stop resets playback but leaves the source ready,
 while Close persists the resumable position, unloads the source, and removes
 the mini-player surface.
 
+The persistent app-shell coordinator owns the complete bounded queue, so Ended,
+Next, Previous, Media Session actions, and server reconnect recovery continue
+to work when the modal is absent. Reopening details from the mini-player first
+restores the active queue item into page state, preventing the modal from
+jumping back to the episode or track that originally opened the queue. The
+player transport exposes Previous, Play/Pause, Next, Stop, Fullscreen,
+capability-gated Picture-in-Picture, and Play on. The fullscreen overlay uses
+the same controls and remains above buffering/recovery diagnostics. On narrow
+touch surfaces toolbar labels collapse to accessible icon controls.
+
+The content-first details surface uses the universal `item.details` media
+presentation: bounded poster/cover, primary metadata, quality, source node,
+safe library-relative path, and available original/derived versions. Favorite,
+Add to playlist, Edit metadata, and Close to mini-player form one peer action
+row. Add to playlist supports both existing profile-owned playlists and an
+atomic create-and-add flow. Edit metadata shows the immutable source identity,
+accepts reviewed title/overview/year/genre/artist/album/series values, and can
+reject an incorrect TMDb or MusicBrainz match. Corrections are audited and
+reversible in the coordinator; the scenario never edits source files or NFOs.
+
 Media Center modals are workspace-scoped UI-as-data surfaces. The client therefore does not stamp the currently displayed node onto coordinator reads or actions; source-node selection remains an explicit playback-plan concern. This keeps the same modal valid on desktop, TV, controller, and federated-node views.
 
 The Remote modal is a controller surface for another webspace or TV. Opening playback admits the current browser/TV as a durable endpoint session through the queue's generic control adapter. The app shell publishes meaningful state changes and bounded checkpoints, consumes session-scoped revisioned commands, and survives closing the player modal. Remote presents a compact target selector with device, endpoint, authorization and availability context, a human-titled Now Playing row for that target, and one transport toolbar. It subscribes to an immediately seeded, mutation-maintained `media_control.now_playing` projection and sends revision-safe transport intents through `media_control_skill`; a phone does not enter the media byte path. `media_control_skill` also contributes a standalone desktop icon and compact remote widget for control outside the Media Center scenario.
 
 Settings contains library roots, scan/import operations, profile/access and home-layout policy, playback defaults, agent resource/watch status, QoE, sanitized diagnostics, repair recommendations, and distributed deployment administration. Its universal details surface subscribes to `media_library_agent.progress`, so a queued or running scan shows the current root and bounded counters and a failed scan shows the durable diagnostic; root rows retain their last scan timestamp and status. Metadata and artwork activity are secondary and open in a dedicated modal; only that modal subscribes to the bounded `media_center.operation_state` and durable rendition-progress streams. The same projection reports per-kind enrichment queues, provider activity, SQLite allocation/reclaimable bytes, and resumable logical-compaction progress. They remain observable without adding background subscriptions to the main Settings surface, rebuilding home shelves, or putting job history into synchronized page state. Autoplay and auto-fullscreen use the generic `input.toggle` UI-as-data contract and read their authoritative profile values from `media_control_skill`; they are not mirrored in synchronized page state. The queue descriptor carries the effective values to the app-shell player, and the client caches the last confirmed profile preference only to make the next user gesture available for native fullscreen. Video selection prearms the player shell while browser activation is still valid; the persistent media element is attached when its source arrives, so slow first loads and resumed playback follow the same path and the diagnostic overlay remains visible in fullscreen. A server preference of `false` cancels a stale prearm as soon as the queue contract arrives. A failed media-element load exits native/schema fullscreen, records a bounded endpoint-local compatibility verdict, and presents Retry, Convert when a derived browser version is applicable, and Cancel over the player. Convert queues an exact-source-bound background rendition through `media_center_skill.ensure_rendition`; it never overwrites or relocates the original. Operators create a reviewed all-matching placement plan, explicitly apply its digest, and separately drain or remove an activation through public deployment tools. Folder import and scan calls have a ten-minute client budget and return asynchronous agent jobs when the distributed agent is active. Images remain disabled as catalog media by policy; normalized artwork is a derived presentation resource resolved by the app shell through AdaOS media transport. Original media bytes stay at their source paths; `.adaos` stores references, catalog state, jobs, playback state, and explicitly generated derived renditions only.
+
+When a ready node-local artwork route has become unavailable, the generic image
+renderer advances through the bounded external provider candidates published
+with the same artwork descriptor. This is a display fallback, not a second
+catalog authority; source-local embedded, folder, generated, or cached artwork
+remains preferred.
 
 ## Ownership
 

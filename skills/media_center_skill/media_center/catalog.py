@@ -778,6 +778,26 @@ def _normalize_resource(resource: Mapping[str, Any]) -> dict[str, Any] | None:
 
 
 def _public_artwork(metadata: Mapping[str, Any]) -> dict[str, Any]:
+    candidates = [
+        dict(candidate)
+        for candidate in metadata.get("artwork_candidates") or []
+        if isinstance(candidate, Mapping)
+    ][:20]
+    candidates.sort(
+        key=lambda candidate: (
+            {"poster": 0, "cover": 0, "backdrop": 1, "logo": 2}.get(
+                _text(candidate.get("kind")).lower(), 3
+            ),
+            _text(candidate.get("url")),
+        )
+    )
+    fallback_urls = list(
+        dict.fromkeys(
+            url
+            for candidate in candidates
+            if (url := _public_direct_url(candidate.get("url")))
+        )
+    )[:8]
     artwork = metadata.get("artwork")
     if isinstance(artwork, Mapping):
         artwork_descriptor = artwork.get("descriptor")
@@ -836,20 +856,8 @@ def _public_artwork(metadata: Mapping[str, Any]) -> dict[str, Any]:
                 if state == "failed" and not url
                 else _text(artwork.get("error_code"))
             ),
+            "fallback_urls": [candidate for candidate in fallback_urls if candidate != url],
         }
-    candidates = [
-        dict(candidate)
-        for candidate in metadata.get("artwork_candidates") or []
-        if isinstance(candidate, Mapping)
-    ][:20]
-    candidates.sort(
-        key=lambda candidate: (
-            {"poster": 0, "cover": 0, "backdrop": 1, "logo": 2}.get(
-                _text(candidate.get("kind")).lower(), 3
-            ),
-            _text(candidate.get("url")),
-        )
-    )
     for candidate in candidates:
         url = _public_direct_url(candidate.get("url"))
         if not url:
@@ -866,6 +874,7 @@ def _public_artwork(metadata: Mapping[str, Any]) -> dict[str, Any]:
             "width": _int(candidate.get("width")),
             "height": _int(candidate.get("height")),
             "error_code": "",
+            "fallback_urls": [candidate_url for candidate_url in fallback_urls if candidate_url != url],
         }
     return {
         "schema": "adaos.media.artwork.v1",
@@ -879,6 +888,7 @@ def _public_artwork(metadata: Mapping[str, Any]) -> dict[str, Any]:
         "width": 0,
         "height": 0,
         "error_code": "",
+        "fallback_urls": [],
     }
 
 

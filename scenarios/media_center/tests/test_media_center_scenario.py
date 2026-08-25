@@ -304,7 +304,12 @@ def test_media_center_human_text_is_localized_by_skill_owned_dictionaries() -> N
     for item in _walk_dicts(webui["ui"]["application"]):
         for field in human_fields:
             fallback = item.get(field)
-            if not isinstance(fallback, str) or not fallback or fallback in technical_placeholders:
+            if (
+                not isinstance(fallback, str)
+                or not fallback
+                or fallback.startswith("$")
+                or fallback in technical_placeholders
+            ):
                 continue
             spec = item.get(f"{field}_i18n")
             assert isinstance(spec, dict), f"missing {field}_i18n for {fallback!r}"
@@ -349,9 +354,12 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     assert {
         modal_id: modal["scope"]
         for modal_id, modal in modals.items()
-    } == {
-        "media_center_player": "workspace",
-        "media_center_filters": "workspace",
+        } == {
+            "media_center_player": "workspace",
+            "media_center_play_on": "workspace",
+            "media_center_add_to_playlist": "workspace",
+            "media_center_metadata_edit": "workspace",
+            "media_center_filters": "workspace",
         "media_center_remote": "workspace",
         "media_center_settings": "workspace",
         "media_center_metadata": "workspace",
