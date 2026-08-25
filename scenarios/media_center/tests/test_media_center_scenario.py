@@ -440,6 +440,12 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         widget["id"]: widget
         for widget in modals["media_center_settings"]["schema"]["widgets"]
     }
+    provider_list = settings_widgets["media-metadata-settings-providers"]
+    assert "path" not in provider_list["dataSource"]
+    assert provider_list["inputs"]["collectionKey"] == "providers"
+    assert settings_widgets["media-tmdb-token"]["inputs"]["inputType"] == (
+        "password"
+    )
     for widget_id, setting_key in {
         "media-autoplay-settings": "autoplay",
         "media-fullscreen-settings": "auto_fullscreen",

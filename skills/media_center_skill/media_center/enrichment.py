@@ -754,8 +754,13 @@ def metadata_provider_configuration(
         {
             "provider_id": "media_center.tmdb.v1",
             "kind": "external",
-            "enabled": tmdb_ready,
-            "state": "ready" if tmdb_ready else "disabled",
+            "enabled": tmdb_enabled,
+            "ready": tmdb_ready,
+            "state": (
+                "ready"
+                if tmdb_ready
+                else "credentials_missing" if tmdb_enabled else "disabled"
+            ),
             "reason": (
                 "configured"
                 if tmdb_ready

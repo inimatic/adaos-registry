@@ -4352,7 +4352,9 @@ def test_metadata_provider_configuration_explains_managed_provider_state():
     }
 
     assert statuses["media_center.deterministic_local.v1"]["enabled"] is True
-    assert statuses["media_center.tmdb.v1"]["enabled"] is False
+    assert statuses["media_center.tmdb.v1"]["enabled"] is True
+    assert statuses["media_center.tmdb.v1"]["ready"] is False
+    assert statuses["media_center.tmdb.v1"]["state"] == "credentials_missing"
     assert statuses["media_center.tmdb.v1"]["reason"] == "credentials_missing"
     assert statuses["media_center.tmdb.v1"]["language"] == "ru-RU"
     assert statuses["media_center.musicbrainz.v1"]["enabled"] is True
@@ -4536,6 +4538,12 @@ def test_external_metadata_providers_follow_managed_settings():
         "media_center.tmdb.v1",
         "media_center.musicbrainz.v1",
     ]
+    missing_credential = metadata_provider_configuration(
+        settings, tmdb_credential_configured=False
+    )[1]
+    assert missing_credential["enabled"] is True
+    assert missing_credential["ready"] is False
+    assert missing_credential["state"] == "credentials_missing"
 
 
 def test_metadata_settings_are_durable_and_default_to_managed_enrichment(

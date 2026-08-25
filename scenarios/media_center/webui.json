@@ -2285,7 +2285,6 @@
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.get_metadata_settings",
-                  "path": "providers",
                   "params": {},
                   "cacheTtlMs": 0,
                   "invalidationTags": ["media_center.metadata_settings"],
@@ -2293,6 +2292,7 @@
                   "maxRequestHz": 1
                 },
                 "inputs": {
+                  "collectionKey": "providers",
                   "itemKey": "provider_id",
                   "primaryKey": "provider_id",
                   "secondaryKey": "state",
