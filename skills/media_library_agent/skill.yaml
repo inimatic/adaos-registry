@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.34
+version: 0.6.35
 description: Distributed node-local media discovery and bounded rendition agent with
   durable jobs and ordered catalog deltas.
 supported_locales:
@@ -75,6 +75,7 @@ exports:
   - rendition_status
   - list_rendition_jobs
   - cancel_rendition
+  - compact_storage
   - optimize_storage
   - status
   - observe_topology
@@ -504,6 +505,32 @@ tools:
       reclaim:
         type: boolean
         default: false
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: compact_storage
+  entry: handlers.main:compact_storage
+  description: Run bounded resumable logical compaction without blocking scans.
+  side_effects: local_write
+  timeout_seconds: 600
+  input_schema:
+    type: object
+    properties:
+      max_batches:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 250
+      limit:
+        type: integer
+        minimum: 25
+        maximum: 2000
+        default: 1000
+      time_budget_seconds:
+        type: number
+        minimum: 1
+        maximum: 600
+        default: 300
     additionalProperties: true
   output_schema:
     type: object

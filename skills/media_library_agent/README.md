@@ -50,8 +50,10 @@ is always retained, so a new or delayed coordinator can still rebuild its read
 model. Descriptor fields represented by typed source columns or source metadata
 are normalized at rest and reconstructed at the public contract boundary.
 
-Logical compaction is resumable and runs in bounded worker batches. `status`
-reports its phase, counters, SQLite free pages, and retained delta count.
+Logical compaction is resumable and runs in bounded worker batches. The
+`compact_storage` tool can advance the same checkpoint under explicit batch and
+wall-clock budgets while a long scan is active. `status` reports its phase,
+counters, SQLite free pages, and retained delta count.
 `optimize_storage(reclaim=true)` is the explicit physical maintenance step: it
 pauses new local work, waits for executing jobs, checkpoints WAL, verifies free
 disk headroom, and rebuilds SQLite to return free pages to the filesystem.
