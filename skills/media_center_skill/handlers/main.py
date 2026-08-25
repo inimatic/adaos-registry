@@ -1993,6 +1993,148 @@ def build_playback_queue(
     return result
 
 
+@tool(
+    summary="Move one bounded playback context to an available endpoint.",
+    side_effects="external_write",
+)
+def play_on(
+    target_id: str = "",
+    source_type: str = "item",
+    source_id: str = "",
+    source_context: Mapping[str, Any] | None = None,
+    start_item_id: str = "",
+    profile_id: str = "default",
+    webspace_id: str = "",
+    **_: Any,
+) -> dict[str, Any]:
+    target = str(target_id or "").strip()
+    if not target:
+        return _skill_error(
+            "playback_target_required",
+            "Choose an online playback device.",
+        )
+    queue_result = build_playback_queue(
+        source_type=source_type,
+        source_id=source_id,
+        source_context=source_context or {},
+        profile_id=profile_id,
+        limit=500,
+        start_item_id=start_item_id,
+    )
+    if not queue_result.get("ok"):
+        return queue_result
+    queue = [
+        dict(item)
+        for item in queue_result.get("items") or []
+        if isinstance(item, Mapping)
+    ][:500]
+    if not queue:
+        return _skill_error("playback_queue_empty", "There is nothing to play.")
+    initial_index = max(
+        0,
+        min(len(queue) - 1, int(queue_result.get("initial_index") or 0)),
+    )
+    actor_ref = f"profile:{str(profile_id or 'default').strip() or 'default'}"
+    sessions, sessions_error = _invoke_skill(
+        "media_control_skill",
+        "now_playing",
+        {"profile_id": profile_id, "target_id": target, "limit": 5},
+        timeout=10.0,
+    )
+    existing = next(
+        (
+            dict(item)
+            for item in (sessions or {}).get("items") or []
+            if isinstance(item, Mapping) and str(item.get("target_id") or "") == target
+        ),
+        None,
+    )
+    if existing:
+        updated, update_error = _invoke_skill(
+            "media_control_skill",
+            "update_queue",
+            {
+                "session_id": str(existing.get("id") or ""),
+                "queue": queue,
+                "expected_queue_revision": int(existing.get("queue_revision") or 0),
+                "actor_ref": actor_ref,
+                "webspace_id": webspace_id,
+            },
+            timeout=20.0,
+        )
+        if not updated or not updated.get("ok"):
+            return _skill_error(
+                "playback_handoff_failed",
+                "The playback list could not be moved to that device.",
+                detail=str(update_error or (updated or {}).get("error") or "queue_update_failed"),
+                retryable=True,
+            )
+        session = dict(updated.get("session") or {})
+    else:
+        created, create_error = _invoke_skill(
+            "media_control_skill",
+            "create_session",
+            {
+                "target_id": target,
+                "profile_id": profile_id,
+                "actor_ref": actor_ref,
+                "queue": queue,
+                "active_index": initial_index,
+                "route": dict(queue[initial_index].get("route") or {}),
+                "queue_source": dict(
+                    (queue_result.get("playback_control") or {}).get("queue_source")
+                    or {}
+                ),
+                "lease_seconds": 300,
+                "webspace_id": webspace_id,
+            },
+            timeout=20.0,
+        )
+        if not created or not created.get("ok"):
+            return _skill_error(
+                "playback_handoff_failed",
+                "The playback session could not be opened on that device.",
+                detail=str(create_error or (created or {}).get("error") or sessions_error or "session_create_failed"),
+                retryable=True,
+            )
+        session = dict(created.get("session") or {})
+    session_id = str(session.get("id") or "")
+    idempotency_key = hashlib.sha256(
+        f"play-on:{session_id}:{target}:{start_item_id}:{session.get('revision')}".encode()
+    ).hexdigest()
+    commanded, command_error = _invoke_skill(
+        "media_control_skill",
+        "command",
+        {
+            "session_id": session_id,
+            "command": "play",
+            "arguments": {},
+            "actor_ref": actor_ref,
+            "expected_revision": int(session.get("revision") or 0),
+            "idempotency_key": idempotency_key,
+            "lease_seconds": 300,
+            "webspace_id": webspace_id,
+        },
+        timeout=20.0,
+    )
+    if not commanded or not commanded.get("ok"):
+        return _skill_error(
+            "playback_handoff_failed",
+            "The playback command could not be sent to that device.",
+            detail=str(command_error or (commanded or {}).get("error") or "play_command_failed"),
+            retryable=True,
+        )
+    return {
+        "ok": True,
+        "schema": COORDINATOR_SCHEMA,
+        "status": "requested",
+        "target_id": target,
+        "session": commanded.get("session"),
+        "command": commanded.get("command"),
+        "queue_count": len(queue),
+    }
+
+
 @tool(summary="Mark or unmark one media-center item as favorite.", side_effects="local_write")
 def set_favorite(item_id: str = "", favorite: bool = True, **_: Any) -> dict[str, Any]:
     profile_id = str(_.get("profile_id") or "default")
@@ -3176,12 +3318,82 @@ def apply_correction(
     actor_ref: str = "profile:default",
     **_: Any,
 ) -> dict[str, Any]:
-    return _coordinator().apply_correction(
+    catalog = _coordinator()
+    result = catalog.apply_correction(
         operation=operation,
         subject_ref=subject_ref,
         values=values or {},
         actor_ref=actor_ref,
     )
+    if result.get("ok"):
+        profile_id = str(_.get("profile_id") or "default")
+        _publish_library_snapshot(
+            catalog,
+            profile_id=profile_id,
+            webspace_id=str(_.get("webspace_id") or ""),
+        )
+    return result
+
+
+@tool(
+    summary="Correct one item's metadata or reject an incorrect provider match.",
+    side_effects="local_write",
+)
+def update_item_metadata(
+    item_id: str = "",
+    profile_id: str = "default",
+    title: str = "",
+    original_title: str = "",
+    overview: str = "",
+    year: int | str | None = None,
+    genres: str | list[str] | None = None,
+    artists: str | list[str] | None = None,
+    album: str = "",
+    series: str = "",
+    reject_providers: list[str] | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    token = str(item_id or "").strip()
+    if not token:
+        return _skill_error("item_id_required", "Choose a media item to correct.")
+
+    def _list_value(value: str | list[str] | None) -> list[str]:
+        source = value if isinstance(value, list) else str(value or "").split(",")
+        return [str(entry).strip() for entry in source if str(entry).strip()][:100]
+
+    values: dict[str, Any] = {
+        "title": str(title or "").strip(),
+        "original_title": str(original_title or "").strip(),
+        "overview": str(overview or "").strip(),
+        "genres": _list_value(genres),
+        "artists": _list_value(artists),
+        "album": str(album or "").strip(),
+        "series": str(series or "").strip(),
+        "reject_providers": [
+            str(provider).strip()
+            for provider in (reject_providers or [])
+            if str(provider).strip()
+        ][:20],
+    }
+    if year not in (None, ""):
+        try:
+            values["year"] = max(0, min(9999, int(year)))
+        except (TypeError, ValueError):
+            return _skill_error("metadata_year_invalid", "Enter a valid release year.")
+    catalog = _coordinator()
+    result = catalog.apply_correction(
+        operation="metadata",
+        subject_ref=f"item:{token}",
+        values=values,
+        actor_ref=f"profile:{str(profile_id or 'default').strip() or 'default'}",
+    )
+    if result.get("ok"):
+        _publish_library_snapshot(
+            catalog,
+            profile_id=profile_id,
+            webspace_id=str(_.get("webspace_id") or ""),
+        )
+    return result
 
 
 @tool(summary="Reverse one audited catalog correction.", side_effects="local_write")
@@ -3239,6 +3451,26 @@ def queue_background_job(kind: str = "", subject_ref: str = "", priority: int = 
         _enrichment_runtime(catalog).ensure_started()
         _publish_operation_snapshot(
             catalog,
+            webspace_id=str(_.get("webspace_id") or ""),
+        )
+    return result
+
+
+@tool(summary="Add one media item to a profile-owned playlist.", side_effects="local_write")
+def add_playlist_item(
+    playlist_id: str = "",
+    item_id: str = "",
+    profile_id: str = "default",
+    **_: Any,
+) -> dict[str, Any]:
+    catalog = _coordinator()
+    result = catalog.add_playlist_item(
+        playlist_id, profile_id=profile_id, item_id=item_id
+    )
+    if result.get("ok"):
+        _publish_library_snapshot(
+            catalog,
+            profile_id=profile_id,
             webspace_id=str(_.get("webspace_id") or ""),
         )
     return result

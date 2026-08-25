@@ -97,6 +97,7 @@ exports:
   - playback_plan
   - ensure_rendition
   - build_playback_queue
+  - play_on
   - set_favorite
   - sync_agent
   - home
@@ -109,11 +110,13 @@ exports:
   - list_collections
   - browse_folders
   - create_playlist
+  - add_playlist_item
   - list_playlists
   - playlist_items
   - update_playlist
   - delete_playlist
   - apply_correction
+  - update_item_metadata
   - reverse_correction
   - metadata_claims
   - duplicate_candidates
@@ -667,6 +670,44 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: play_on
+  description: Move an ordered media context to one available playback endpoint.
+  entry: handlers.main:play_on
+  side_effects: external_write
+  timeout_seconds: 90
+  input_schema:
+    type: object
+    required:
+    - target_id
+    - source_type
+    - source_id
+    properties:
+      target_id:
+        type: string
+      source_type:
+        type: string
+        enum:
+        - item
+        - work
+        - collection
+        - folder
+        - playlist
+        - catalog
+      source_id:
+        type: string
+      source_context:
+        type: object
+        additionalProperties: true
+      start_item_id:
+        type: string
+      profile_id:
+        type: string
+        default: default
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: set_favorite
   description: Mark or unmark one catalog item as favorite.
   entry: handlers.main:set_favorite
@@ -1039,6 +1080,26 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: add_playlist_item
+  description: Add one available media item to a profile-owned playlist.
+  entry: handlers.main:add_playlist_item
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - playlist_id
+    - item_id
+    properties:
+      playlist_id:
+        type: string
+      item_id:
+        type: string
+      profile_id:
+        type: string
+        default: default
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: playlist_items
   description: Read one bounded playlist page.
   entry: handlers.main:playlist_items
@@ -1145,6 +1206,53 @@ tools:
       actor_ref:
         type: string
         default: profile:default
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: update_item_metadata
+  description: Correct one media item's metadata or reject an incorrect provider match.
+  entry: handlers.main:update_item_metadata
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - item_id
+    properties:
+      item_id:
+        type: string
+      profile_id:
+        type: string
+        default: default
+      title:
+        type: string
+      original_title:
+        type: string
+      overview:
+        type: string
+      year:
+        oneOf:
+        - type: integer
+        - type: string
+      genres:
+        oneOf:
+        - type: string
+        - type: array
+          items:
+            type: string
+      artists:
+        oneOf:
+        - type: string
+        - type: array
+          items:
+            type: string
+      album:
+        type: string
+      series:
+        type: string
+      reject_providers:
+        type: array
+        items:
+          type: string
     additionalProperties: true
   output_schema:
     type: object

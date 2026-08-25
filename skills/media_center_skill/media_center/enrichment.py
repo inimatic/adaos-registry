@@ -697,10 +697,26 @@ class MusicBrainzMetadataProvider:
             item for item in list(recording.get("releases") or [])[:20]
             if isinstance(item, Mapping)
         ]
-        genres = [
-            str(item.get("name")) for item in list(recording.get("genres") or [])[:30]
-            if isinstance(item, Mapping) and item.get("name")
+        ranked_genres = [
+            (str(item.get("name") or "").strip(), int(item.get("count") or 0))
+            for item in [
+                *list(recording.get("genres") or [])[:30],
+                *list(recording.get("tags") or [])[:50],
+            ]
+            if isinstance(item, Mapping) and str(item.get("name") or "").strip()
         ]
+        genres = []
+        seen_genres: set[str] = set()
+        for name, _count in sorted(
+            ranked_genres, key=lambda value: (-value[1], value[0].casefold())
+        ):
+            normalized = fold_text(name)
+            if not normalized or normalized in seen_genres:
+                continue
+            seen_genres.add(normalized)
+            genres.append(name)
+            if len(genres) >= 12:
+                break
         fields = {
             "title": recording.get("title"),
             "artists": [value for value in artists if value],

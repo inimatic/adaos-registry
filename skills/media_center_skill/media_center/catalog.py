@@ -837,6 +837,36 @@ def _public_artwork(metadata: Mapping[str, Any]) -> dict[str, Any]:
                 else _text(artwork.get("error_code"))
             ),
         }
+    candidates = [
+        dict(candidate)
+        for candidate in metadata.get("artwork_candidates") or []
+        if isinstance(candidate, Mapping)
+    ][:20]
+    candidates.sort(
+        key=lambda candidate: (
+            {"poster": 0, "cover": 0, "backdrop": 1, "logo": 2}.get(
+                _text(candidate.get("kind")).lower(), 3
+            ),
+            _text(candidate.get("url")),
+        )
+    )
+    for candidate in candidates:
+        url = _public_direct_url(candidate.get("url"))
+        if not url:
+            continue
+        return {
+            "schema": "adaos.media.artwork.v1",
+            "state": "ready",
+            "url": url,
+            "descriptor": {},
+            "provider_id": _text(candidate.get("provider")),
+            "source_kind": "external_candidate",
+            "source_revision": 0,
+            "source_fingerprint": "",
+            "width": _int(candidate.get("width")),
+            "height": _int(candidate.get("height")),
+            "error_code": "",
+        }
     return {
         "schema": "adaos.media.artwork.v1",
         "state": "missing",

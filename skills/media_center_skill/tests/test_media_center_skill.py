@@ -1443,6 +1443,40 @@ def test_artwork_revision_preserves_series_identity_and_replaces_membership(
     assert series[0]["artwork"]["url"] == "/media/black-mirror.jpg"
 
 
+def test_external_artwork_candidate_falls_back_for_items_and_collections(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "external-artwork.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(1, "Show/Season 01/Show.S01E01.mp4", kind="video")
+        )
+    )
+    item = catalog.list_items(media_kind="video")["items"][0]
+    catalog.record_metadata_claim(
+        subject_ref=f"item:{item['id']}",
+        field_name="artwork_candidates",
+        value=[{
+            "kind": "poster",
+            "url": "https://image.tmdb.org/t/p/w500/poster.jpg?token=private",
+            "provider": "tmdb",
+        }],
+        provenance="media_center.tmdb.v1",
+        confidence=0.9,
+    )
+
+    enriched = catalog.item_details(item["id"])["item"]
+    collection = catalog.collections(kind="series")["items"][0]
+
+    assert enriched["artwork"]["state"] == "ready"
+    assert enriched["artwork"]["url"] == "https://image.tmdb.org/t/p/w500/poster.jpg"
+    assert enriched["artwork"]["source_kind"] == "external_candidate"
+    assert collection["artwork"]["url"] == enriched["artwork"]["url"]
+
+
 def test_collection_counts_only_available_logical_works_after_agent_rebind(
     monkeypatch, tmp_path
 ):
@@ -3673,6 +3707,7 @@ def test_playlists_are_profile_scoped_ordered_and_revision_safe(monkeypatch, tmp
         _agent_page(
             _agent_delta(1, "Music/Album/01.mp3"),
             _agent_delta(2, "Music/Album/02.mp3"),
+            _agent_delta(3, "Music/Album/03.mp3"),
         )
     )
     items = catalog.list_items(media_kind="audio", sort="title")["items"]
@@ -3698,6 +3733,11 @@ def test_playlists_are_profile_scoped_ordered_and_revision_safe(monkeypatch, tmp
         expected_revision=1,
         visibility="household",
     )
+    appended = catalog.add_playlist_item(
+        playlist_id,
+        profile_id="alice",
+        item_id=items[2]["id"],
+    )
 
     assert [item["id"] for item in page["items"]] == [
         items[1]["id"],
@@ -3706,6 +3746,8 @@ def test_playlists_are_profile_scoped_ordered_and_revision_safe(monkeypatch, tmp
     assert denied["error"] == "playlist_not_found"
     assert conflict["error"] == "playlist_revision_conflict"
     assert updated["playlist"]["revision"] == 2
+    assert appended["added"] is True
+    assert appended["playlist"]["revision"] == 3
     assert catalog.get_playlist(playlist_id, profile_id="bob")["ok"] is True
     _validate_schema("playlist.v1.schema.json", updated["playlist"])
 
@@ -4465,6 +4507,50 @@ def test_enrichment_worker_persists_provider_claims_and_terminal_progress(
     }
 
 
+def test_manual_metadata_override_rejects_and_reverses_an_external_match(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Lectures/AI systems.mp4", kind="video"))
+    )
+    item = catalog.list_items(media_kind="video")["items"][0]
+    subject = f"item:{item['id']}"
+    catalog.record_metadata_claim(
+        subject_ref=subject,
+        field_name="title",
+        value="Incorrect documentary",
+        provenance="media_center.tmdb.v1",
+        confidence=0.95,
+    )
+
+    correction = catalog.apply_correction(
+        operation="metadata",
+        subject_ref=subject,
+        values={
+            "title": "AI systems lecture",
+            "overview": "A manually reviewed lecture.",
+            "reject_providers": ["media_center.tmdb.v1"],
+        },
+        actor_ref="profile:alice",
+    )
+    corrected = catalog.item_details(item["id"], profile_id="alice")["item"]
+    reversed_result = catalog.reverse_correction(
+        correction["correction"]["id"], actor_ref="profile:alice"
+    )
+    restored = catalog.item_details(item["id"], profile_id="alice")["item"]
+
+    assert correction["ok"] is True
+    assert corrected["title"] == "AI systems lecture"
+    assert corrected["metadata"]["overview"] == "A manually reviewed lecture."
+    assert corrected["library_path"] == "Lectures/AI systems.mp4"
+    assert reversed_result["ok"] is True
+    assert restored["title"] == "Incorrect documentary"
+
+
 def test_local_nfo_claims_drive_public_metadata_search_and_precedence(
     monkeypatch, tmp_path
 ):
@@ -4749,7 +4835,12 @@ def test_musicbrainz_provider_is_rate_limited_cached_and_audio_only():
                 "id": "recording-1", "title": "Track", "score": 100,
                 "artist-credit": [{"artist": {"name": "Artist"}}],
                 "releases": [{"id": "release-1", "title": "Album", "date": "2020"}],
-                "genres": [{"name": "Rock"}],
+                "genres": [],
+                "tags": [
+                    {"name": "Alternative rock", "count": 12},
+                    {"name": "Rock", "count": 42},
+                    {"name": "rock", "count": 3},
+                ],
             }]}
 
     class Session:
@@ -4781,6 +4872,8 @@ def test_musicbrainz_provider_is_rate_limited_cached_and_audio_only():
     assert {claim["field_name"] for claim in first} >= {
         "title", "artists", "album", "genres", "artwork_candidates",
     }
+    genre_claim = next(claim for claim in first if claim["field_name"] == "genres")
+    assert genre_claim["value"] == ["Rock", "Alternative rock"]
     assert provider.claims(
         {
             "subject_ref": "item:numeric",

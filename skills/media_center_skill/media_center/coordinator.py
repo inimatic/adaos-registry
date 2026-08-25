@@ -33,7 +33,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-25.6"
+COORDINATOR_SCHEMA_REVISION = "2026-08-25.7"
 SEARCH_ROWID_REVISION = "2"
 STORAGE_COMPACTION_REVISION = "2026-08-25.1"
 METADATA_SETTINGS_KEY = "metadata_provider_settings"
@@ -43,6 +43,21 @@ DEFAULT_METADATA_SETTINGS = {
     "tmdb_enabled": True,
     "locale": "ru-RU",
 }
+MANUAL_METADATA_FIELDS = frozenset(
+    {
+        "title",
+        "original_title",
+        "overview",
+        "year",
+        "release_date",
+        "genres",
+        "artists",
+        "album",
+        "series",
+        "rating",
+        "content_rating",
+    }
+)
 
 
 def _file_size(path: Path) -> int:
@@ -521,6 +536,19 @@ class MediaCatalogCoordinator:
                 );
                 CREATE INDEX IF NOT EXISTS idx_media_center_claim_lookup
                     ON metadata_claims(subject_ref,field_name,confidence DESC,created_at DESC);
+                CREATE TABLE IF NOT EXISTS metadata_rejections (
+                    id TEXT PRIMARY KEY,
+                    subject_ref TEXT NOT NULL,
+                    provenance TEXT NOT NULL,
+                    field_name TEXT NOT NULL DEFAULT '',
+                    actor_ref TEXT NOT NULL,
+                    reason TEXT NOT NULL DEFAULT 'incorrect_match',
+                    correction_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    active INTEGER NOT NULL DEFAULT 1
+                );
+                CREATE INDEX IF NOT EXISTS idx_media_center_rejection_lookup
+                    ON metadata_rejections(subject_ref,provenance,field_name,active);
                 CREATE TABLE IF NOT EXISTS catalog_metadata_projection (
                     item_id TEXT PRIMARY KEY REFERENCES catalog_items(id) ON DELETE CASCADE,
                     metadata_json TEXT NOT NULL DEFAULT '{}',
@@ -874,6 +902,27 @@ class MediaCatalogCoordinator:
             self._ensure_search_rowids(connection)
             self._ensure_search_triggers(connection)
             self._backfill_metadata_projections(connection)
+            connection.execute(
+                """
+                UPDATE media_background_jobs
+                SET status='queued',attempts=0,provider_id='',started_at='',
+                    finished_at='',error_code='',
+                    progress_json='{"phase":"queued","completed":0,"total":1}',
+                    updated_at=?
+                WHERE kind='metadata_enrichment' AND status='completed'
+                    AND provider_id LIKE '%media_center.musicbrainz.v1%'
+                    AND subject_ref IN (
+                        SELECT 'item:' || c.id FROM catalog_items c
+                        WHERE c.media_kind='audio' AND c.missing=0
+                            AND NOT EXISTS (
+                                SELECT 1 FROM catalog_metadata_facets facet
+                                WHERE facet.item_id=c.id
+                                    AND facet.field_name='genre'
+                            )
+                    )
+                """,
+                (now,),
+            )
             connection.execute(
                 "INSERT OR REPLACE INTO coordinator_meta(key, value) "
                 "VALUES ('coordinator_schema_revision', ?)",
@@ -1784,10 +1833,21 @@ class MediaCatalogCoordinator:
             f"SELECT * FROM metadata_claims WHERE subject_ref IN ({placeholders})",
             tuple(subjects),
         ).fetchall()
+        rejected = {
+            (str(row["provenance"]), str(row["field_name"]))
+            for row in connection.execute(
+                f"SELECT provenance,field_name FROM metadata_rejections "
+                f"WHERE active=1 AND subject_ref IN ({placeholders})",
+                tuple(subjects),
+            ).fetchall()
+        }
         winners: dict[str, sqlite3.Row] = {}
         aliases = {"canonical_title": "title", "vote_average": "rating"}
         for row in rows:
             field = aliases.get(str(row["field_name"]), str(row["field_name"]))
+            provider = str(row["provenance"])
+            if (provider, "") in rejected or (provider, field) in rejected:
+                continue
             previous = winners.get(field)
             if previous is None or self._claim_priority(row) > self._claim_priority(previous):
                 winners[field] = row
@@ -4140,7 +4200,13 @@ class MediaCatalogCoordinator:
                 "schema": CATALOG_ITEM_SCHEMA,
                 "agent_id": str(row["agent_id"]), "node_id": str(row["node_id"]), "root_id": str(row["root_id"]),
                 "source_id": str(row["source_id"]), "source_revision": int(row["source_revision"]),
-                "folder_path": str(row["folder_path"]), "catalog_revision": int(row["catalog_revision"]),
+                "folder_path": str(row["folder_path"]),
+                "library_path": "/".join(
+                    part.strip("/\\")
+                    for part in (str(row["folder_path"]), str(row["name"]))
+                    if part.strip("/\\")
+                ),
+                "catalog_revision": int(row["catalog_revision"]),
                 "work_id": str(row["work_id"]), "variant_id": str(row["variant_id"]), "collection_id": str(row["collection_id"]),
                 "quality": _json_loads(row["quality_json"]) or {},
                 "favorite": bool(row["profile_favorite"]),
@@ -4267,6 +4333,34 @@ class MediaCatalogCoordinator:
                     (subject_ref,),
                 ).fetchall()
             ]
+            variants = [
+                {
+                    "id": str(variant["id"]),
+                    "source_id": str(variant["source_id"]),
+                    "node_id": str(variant["node_id"]),
+                    "media_kind": str(variant["media_kind"]),
+                    "mime_type": str(variant["mime_type"]),
+                    "quality": _json_loads(variant["quality_json"]) or {},
+                    "available": bool(variant["available"]),
+                    "derived": bool(variant["derived"]),
+                    "resource_id": str(variant["resource_id"]),
+                    "source_revision": int(variant["source_revision"] or 0),
+                    "exact_source_id": str(variant["exact_source_id"]),
+                    "exact_source_revision": int(
+                        variant["exact_source_revision"] or 0
+                    ),
+                }
+                for variant in connection.execute(
+                    """
+                    SELECT id,source_id,node_id,media_kind,mime_type,quality_json,
+                        available,derived,resource_id,source_revision,
+                        exact_source_id,exact_source_revision
+                    FROM media_variants WHERE work_id=?
+                    ORDER BY derived,available DESC,node_id,id LIMIT 50
+                    """,
+                    (str(row["work_id"]),),
+                ).fetchall()
+            ]
         item = self._public_coordinator_item(row, profile, projection)
         enrichment = {
             "subject_ref": subject_ref,
@@ -4275,12 +4369,14 @@ class MediaCatalogCoordinator:
             "metadata_revision": int(item.get("metadata_revision") or 0),
         }
         item["enrichment"] = enrichment
+        item["versions"] = variants
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
             "item": item,
             "resource": item.get("resource") or {},
             "enrichment": enrichment,
+            "versions": variants,
         }
 
     def set_favorite(self, item_id: str, *, profile_id: str, favorite: bool) -> dict[str, Any]:
@@ -4386,17 +4482,24 @@ class MediaCatalogCoordinator:
                                  AND available.missing=0
                          )) AS item_count,
                     (
-                        SELECT ci.metadata_json
+                        SELECT json_patch(
+                            ci.metadata_json,COALESCE(mp.metadata_json,'{{}}')
+                        )
                         FROM collection_memberships preview_membership
                             INDEXED BY idx_media_center_membership_preview
                         CROSS JOIN catalog_items ci
                             INDEXED BY idx_media_center_catalog_work_variant
                             ON ci.work_id=preview_membership.work_id
                             AND ci.variant_id=preview_membership.variant_id
+                        LEFT JOIN catalog_metadata_projection mp
+                            ON mp.item_id=ci.id
                         WHERE preview_membership.collection_id=c.id
                             AND ci.missing=0
                         ORDER BY CASE
                                 WHEN json_extract(ci.metadata_json, '$.artwork.state')='ready'
+                                    OR json_array_length(json_extract(
+                                        mp.metadata_json,'$.artwork_candidates'
+                                    ))>0
                                 THEN 0 ELSE 1 END,
                             preview_membership.season_number,
                             preview_membership.episode_number,
@@ -4474,17 +4577,24 @@ class MediaCatalogCoordinator:
                                  AND available.missing=0
                          )) AS item_count,
                     (
-                        SELECT ci.metadata_json
+                        SELECT json_patch(
+                            ci.metadata_json,COALESCE(mp.metadata_json,'{{}}')
+                        )
                         FROM collection_memberships preview_membership
                             INDEXED BY idx_media_center_membership_preview
                         CROSS JOIN catalog_items ci
                             INDEXED BY idx_media_center_catalog_work_variant
                             ON ci.work_id=preview_membership.work_id
                             AND ci.variant_id=preview_membership.variant_id
+                        LEFT JOIN catalog_metadata_projection mp
+                            ON mp.item_id=ci.id
                         WHERE preview_membership.collection_id=c.id
                             AND ci.missing=0
                         ORDER BY CASE
                                 WHEN json_extract(ci.metadata_json, '$.artwork.state')='ready'
+                                    OR json_array_length(json_extract(
+                                        mp.metadata_json,'$.artwork_candidates'
+                                    ))>0
                                 THEN 0 ELSE 1 END,
                             preview_membership.season_number,
                             preview_membership.episode_number,
@@ -5068,6 +5178,67 @@ class MediaCatalogCoordinator:
             "schema": COORDINATOR_SCHEMA,
             "playlist": {"schema": PLAYLIST_SCHEMA, **dict(row), "item_count": count},
         }
+
+    def add_playlist_item(
+        self, playlist_id: str, *, profile_id: str, item_id: str
+    ) -> dict[str, Any]:
+        token = _text(playlist_id)
+        profile = _text(profile_id) or "default"
+        item = _text(item_id)
+        if not token or not item:
+            return {"ok": False, "error": "playlist_item_required"}
+        with self.repository.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            playlist = connection.execute(
+                "SELECT * FROM user_playlists WHERE id=?", (token,)
+            ).fetchone()
+            if playlist is None or str(playlist["owner_profile_id"]) != profile:
+                connection.rollback()
+                return {"ok": False, "error": "playlist_not_found"}
+            available = connection.execute(
+                "SELECT 1 FROM catalog_items WHERE id=? AND missing=0", (item,)
+            ).fetchone()
+            if available is None:
+                connection.rollback()
+                return {"ok": False, "error": "playlist_item_unavailable"}
+            existing = connection.execute(
+                "SELECT 1 FROM user_playlist_items WHERE playlist_id=? AND item_id=?",
+                (token, item),
+            ).fetchone()
+            if existing is None:
+                count = int(
+                    connection.execute(
+                        "SELECT COUNT(*) FROM user_playlist_items WHERE playlist_id=?",
+                        (token,),
+                    ).fetchone()[0]
+                )
+                if count >= 500:
+                    connection.rollback()
+                    return {"ok": False, "error": "playlist_item_limit_exceeded"}
+                ordinal = int(
+                    connection.execute(
+                        "SELECT COALESCE(MAX(ordinal),-1)+1 FROM user_playlist_items "
+                        "WHERE playlist_id=?",
+                        (token,),
+                    ).fetchone()[0]
+                )
+                connection.execute(
+                    """
+                    INSERT INTO user_playlist_items(
+                        playlist_id,item_id,ordinal,added_by_profile_id,added_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (token, item, ordinal, profile, now_iso()),
+                )
+                connection.execute(
+                    "UPDATE user_playlists SET revision=revision+1,updated_at=? WHERE id=?",
+                    (now_iso(), token),
+                )
+            connection.commit()
+        result = self.get_playlist(token, profile_id=profile)
+        result["added"] = existing is None
+        result["item_id"] = item
+        return result
 
     def playlists(
         self, *, profile_id: str, limit: int = 30, cursor: str = ""
@@ -6222,6 +6393,9 @@ class MediaCatalogCoordinator:
         action = _text(operation).lower()
         subject = _text(subject_ref)
         actor = _text(actor_ref) or "profile:default"
+        correction_id = _stable_id(
+            "correction", action, subject, actor, now_iso(), size=24
+        )
         if action not in {"metadata", "merge", "split", "regroup"}:
             return {"ok": False, "error": "catalog_correction_unsupported"}
         before: dict[str, Any]
@@ -6229,35 +6403,105 @@ class MediaCatalogCoordinator:
         with self.repository.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             if action == "metadata":
-                work_id = subject.removeprefix("work:")
-                row = connection.execute(
+                item_id = subject.removeprefix("item:") if subject.startswith("item:") else ""
+                work_id = subject.removeprefix("work:") if subject.startswith("work:") else ""
+                if item_id:
+                    item_row = connection.execute(
+                        "SELECT * FROM catalog_items WHERE id=?", (item_id,)
+                    ).fetchone()
+                    if item_row is None:
+                        connection.rollback()
+                        return {"ok": False, "error": "catalog_correction_subject_invalid"}
+                    work_id = str(item_row["work_id"] or "")
+                else:
+                    item_row = None
+                work_row = connection.execute(
                     "SELECT * FROM media_works WHERE id=?", (work_id,)
                 ).fetchone()
-                title = _text(values.get("canonical_title"))
-                if row is None or not title:
+                if work_row is None:
                     connection.rollback()
                     return {"ok": False, "error": "catalog_correction_subject_invalid"}
-                before = {"canonical_title": str(row["canonical_title"])}
-                after = {"canonical_title": title}
-                connection.execute(
-                    """
-                    UPDATE media_works SET canonical_title=?, sort_title=?,
-                        revision=revision+1, updated_at=? WHERE id=?
-                    """,
-                    (title, title.casefold(), now_iso(), work_id),
-                )
-                claim_id = _stable_id(
-                    "claim", work_id, "canonical_title", title, actor, size=24
-                )
-                connection.execute(
-                    """
-                    INSERT OR REPLACE INTO metadata_claims(
-                        id,subject_ref,field_name,value_json,provenance,
-                        confidence,preferred,revision,created_at
-                    ) VALUES (?, ?, 'canonical_title', ?, ?, 1, 1, 1, ?)
-                    """,
-                    (claim_id, f"work:{work_id}", _json_dumps(title), actor, now_iso()),
-                )
+                normalized_values = {
+                    ("title" if str(field) == "canonical_title" else str(field)): value
+                    for field, value in dict(values or {}).items()
+                    if ("title" if str(field) == "canonical_title" else str(field))
+                    in MANUAL_METADATA_FIELDS
+                    and value not in (None, "", [], {})
+                }
+                rejected_providers = sorted(
+                    {
+                        _text(provider)
+                        for provider in values.get("reject_providers") or []
+                        if _text(provider)
+                    }
+                )[:20]
+                if not normalized_values and not rejected_providers:
+                    connection.rollback()
+                    return {"ok": False, "error": "catalog_correction_values_required"}
+                claim_subject = subject if item_id else f"work:{work_id}"
+                before = {
+                    "canonical_title": str(work_row["canonical_title"]),
+                    "rejected_providers": [],
+                }
+                claim_ids: list[str] = []
+                for field, value in normalized_values.items():
+                    claim_field = "canonical_title" if field == "title" else field
+                    claim_id = _stable_id(
+                        "claim", claim_subject, claim_field, _json_dumps(value), actor,
+                        size=24,
+                    )
+                    connection.execute(
+                        """
+                        INSERT OR REPLACE INTO metadata_claims(
+                            id,subject_ref,field_name,value_json,provenance,
+                            confidence,preferred,revision,created_at
+                        ) VALUES (?, ?, ?, ?, ?, 1, 1, 1, ?)
+                        """,
+                        (
+                            claim_id, claim_subject, claim_field,
+                            _json_dumps(value), actor, now_iso(),
+                        ),
+                    )
+                    claim_ids.append(claim_id)
+                title = _text(normalized_values.get("title"))
+                if title:
+                    connection.execute(
+                        """
+                        UPDATE media_works SET canonical_title=?, sort_title=?,
+                            revision=revision+1, updated_at=? WHERE id=?
+                        """,
+                        (title, title.casefold(), now_iso(), work_id),
+                    )
+                rejection_ids: list[str] = []
+                for provider in rejected_providers:
+                    rejection_id = _stable_id(
+                        "metadata-rejection", claim_subject, provider, actor, size=24
+                    )
+                    connection.execute(
+                        """
+                        INSERT OR REPLACE INTO metadata_rejections(
+                            id,subject_ref,provenance,field_name,actor_ref,reason,
+                            correction_id,created_at,active
+                        ) VALUES (?, ?, ?, '', ?, 'incorrect_match', ?, ?, 1)
+                        """,
+                        (
+                            rejection_id, claim_subject, provider, actor,
+                            correction_id, now_iso(),
+                        ),
+                    )
+                    rejection_ids.append(rejection_id)
+                after = {
+                    **normalized_values,
+                    "rejected_providers": rejected_providers,
+                    "claim_ids": claim_ids,
+                    "rejection_ids": rejection_ids,
+                }
+                impacted_rows = connection.execute(
+                    "SELECT id FROM catalog_items WHERE id=? OR work_id=?",
+                    (item_id, work_id),
+                ).fetchall()
+                for impacted in impacted_rows:
+                    self._refresh_metadata_projection(connection, str(impacted["id"]))
             elif action in {"merge", "split"}:
                 duplicate_id = subject.removeprefix("work:")
                 if action == "merge":
@@ -6331,9 +6575,6 @@ class MediaCatalogCoordinator:
                     """,
                     (collection_id, str(row["work_id"]), str(row["variant_id"])),
                 )
-            correction_id = _stable_id(
-                "correction", action, subject, actor, now_iso(), size=24
-            )
             connection.execute(
                 """
                 INSERT INTO catalog_corrections(
@@ -6382,16 +6623,43 @@ class MediaCatalogCoordinator:
             action = str(row["operation"])
             subject = str(row["subject_ref"])
             before = _json_loads(row["before_json"]) or {}
+            after = _json_loads(row["after_json"]) or {}
             if action == "metadata":
-                work_id = subject.removeprefix("work:")
+                item_id = subject.removeprefix("item:") if subject.startswith("item:") else ""
+                work_id = subject.removeprefix("work:") if subject.startswith("work:") else ""
+                if item_id:
+                    item = connection.execute(
+                        "SELECT work_id FROM catalog_items WHERE id=?", (item_id,)
+                    ).fetchone()
+                    work_id = str(item["work_id"] or "") if item else ""
                 title = _text(before.get("canonical_title"))
+                if title and work_id:
+                    connection.execute(
+                        """
+                        UPDATE media_works SET canonical_title=?, sort_title=?,
+                            revision=revision+1, updated_at=? WHERE id=?
+                        """,
+                        (title, title.casefold(), now_iso(), work_id),
+                    )
+                claim_ids = [
+                    _text(value) for value in after.get("claim_ids") or [] if _text(value)
+                ][:100]
+                if claim_ids:
+                    placeholders = ",".join("?" for _ in claim_ids)
+                    connection.execute(
+                        f"DELETE FROM metadata_claims WHERE id IN ({placeholders})",
+                        tuple(claim_ids),
+                    )
                 connection.execute(
-                    """
-                    UPDATE media_works SET canonical_title=?, sort_title=?,
-                        revision=revision+1, updated_at=? WHERE id=?
-                    """,
-                    (title, title.casefold(), now_iso(), work_id),
+                    "UPDATE metadata_rejections SET active=0 WHERE correction_id=?",
+                    (token,),
                 )
+                impacted_rows = connection.execute(
+                    "SELECT id FROM catalog_items WHERE id=? OR work_id=?",
+                    (item_id, work_id),
+                ).fetchall()
+                for impacted in impacted_rows:
+                    self._refresh_metadata_projection(connection, str(impacted["id"]))
             elif action == "merge":
                 duplicate_id = subject.removeprefix("work:")
                 connection.execute(
@@ -6404,7 +6672,7 @@ class MediaCatalogCoordinator:
                         _stable_id(
                             "alias",
                             duplicate_id,
-                            _text((_json_loads(row["after_json"]) or {}).get("alias_of")),
+                            _text(after.get("alias_of")),
                             size=24,
                         ),
                     ),
