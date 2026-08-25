@@ -96,6 +96,9 @@ class MediaLibraryAgentWorker:
         self._embedded_metadata_backfill_complete = False
         self._storage_migrations_enqueued = False
         self._last_partial_cleanup_monotonic = 0.0
+        self._job_retention_complete = False
+        self._last_job_retention_monotonic = 0.0
+        self._artwork_queue_saturated = False
 
     def ensure_started(self) -> bool:
         with self._lock:
@@ -146,6 +149,15 @@ class MediaLibraryAgentWorker:
         if self.repository.storage_maintenance_active():
             return None
         maintenance = self.repository.compact_storage_batch(limit=500)
+        retention_at = time.monotonic()
+        if (
+            not self._job_retention_complete
+            or self._last_job_retention_monotonic == 0.0
+            or retention_at - self._last_job_retention_monotonic >= 600
+        ):
+            retention = self.repository.compact_job_history_batch(limit=5000)
+            self._job_retention_complete = bool(retention.get("complete"))
+            self._last_job_retention_monotonic = retention_at
         self._refresh_resource_pressure(force=True)
         self._enqueue_due_schedules()
         self._poll_watch_schedules()
@@ -342,6 +354,7 @@ class MediaLibraryAgentWorker:
             )
 
     def _run_claimed_scan_job(self, job: Mapping[str, Any]) -> dict[str, Any]:
+        self._artwork_queue_saturated = False
         try:
             return self._run_job(job)
         except Exception as exc:
@@ -446,6 +459,33 @@ class MediaLibraryAgentWorker:
                 capability_witness=text(capabilities.get("witness")),
             )
         return bool(queued.get("created"))
+
+    def _queue_scan_artwork_if_capacity(
+        self,
+        source: Mapping[str, Any],
+        *,
+        priority: int,
+    ) -> bool:
+        if self._artwork_queue_saturated:
+            return False
+        maximum_active = max(
+            1,
+            min(
+                16,
+                int(
+                    os.environ.get("MEDIA_LIBRARY_AGENT_ARTWORK_BACKFILL_QUEUE")
+                    or 4
+                ),
+            ),
+        )
+        active = self.repository.active_artwork_job_count()
+        if active >= maximum_active:
+            self._artwork_queue_saturated = True
+            return False
+        created = self._queue_artwork_for_source(source, priority=priority)
+        if active + int(created) >= maximum_active:
+            self._artwork_queue_saturated = True
+        return created
 
     def _run_rendition_job(self, job: Mapping[str, Any]) -> dict[str, Any]:
         job_id = text(job.get("id"))
@@ -1152,7 +1192,7 @@ class MediaLibraryAgentWorker:
                     )
                     plan = artwork_plan(stored_source)
                     if operation != "unchanged" and plan["required"]:
-                        self._queue_artwork_for_source(
+                        self._queue_scan_artwork_if_capacity(
                             stored_source,
                             priority=350,
                         )

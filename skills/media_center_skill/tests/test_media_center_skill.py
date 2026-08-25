@@ -5518,6 +5518,87 @@ def test_metadata_credential_revision_requeues_current_catalog_once(
     }
 
 
+def test_large_catalog_background_jobs_stay_inside_admission_windows(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    monkeypatch.setenv("MEDIA_CENTER_METADATA_ENRICHMENT_QUEUE_WINDOW", "64")
+    monkeypatch.setenv("MEDIA_CENTER_FINGERPRINT_QUEUE_WINDOW", "32")
+    monkeypatch.setenv("MEDIA_CENTER_EMBEDDING_QUEUE_WINDOW", "32")
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+
+    for start in range(1, 1001, 100):
+        catalog.apply_agent_page(
+            _agent_page(
+                *(
+                    _agent_delta(index, f"Music/Large/{index:05d}.mp3")
+                    for index in range(start, start + 100)
+                )
+            )
+        )
+
+    counts = catalog.background_job_counts_by_kind()
+    assert catalog.repository.compact_summary()["total_count"] == 1000
+    assert counts["metadata_enrichment"]["queued"] <= 64
+    assert counts["fingerprint"]["queued"] <= 32
+    assert counts["embedding"]["queued"] <= 32
+
+
+def test_background_queue_compaction_preserves_window_and_cursor_refill(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    monkeypatch.setenv("MEDIA_CENTER_METADATA_ENRICHMENT_QUEUE_WINDOW", "32")
+    repository = MediaCenterRepository()
+    catalog = MediaCatalogCoordinator(repository)
+    catalog.apply_agent_page(
+        _agent_page(
+            *(
+                _agent_delta(index, f"Movies/{index:04d}.mp4", kind="video")
+                for index in range(1, 101)
+            )
+        )
+    )
+    with repository.connect() as connection:
+        now = catalog_module.now_iso()
+        connection.executemany(
+            "INSERT INTO media_background_jobs("
+            "id,kind,subject_ref,status,priority,created_at,updated_at"
+            ") VALUES (?, 'metadata_enrichment', ?, 'queued', 900, ?, ?)",
+            (
+                (f"legacy-{index}", f"item:legacy-{index}", now, now)
+                for index in range(100)
+            ),
+        )
+        connection.commit()
+
+    compacted = catalog.compact_background_job_queue(batch_size=1000)
+    with repository.connect() as connection:
+        queued = int(
+            connection.execute(
+                "SELECT COUNT(*) FROM media_background_jobs "
+                "WHERE kind='metadata_enrichment' AND status='queued'"
+            ).fetchone()[0]
+        )
+        connection.execute(
+            "UPDATE media_background_jobs SET status='completed' "
+            "WHERE kind='metadata_enrichment' AND status='queued'"
+        )
+        connection.commit()
+    refilled = catalog.refill_background_job_windows(force=True)
+
+    assert compacted["complete"] is True
+    assert queued == 32
+    assert refilled["kinds"]["metadata_enrichment"]["admitted"] > 0
+    assert catalog.background_job_counts_by_kind()["metadata_enrichment"][
+        "queued"
+    ] <= 32
+
+
 def test_enrichment_worker_runs_all_eligible_providers(monkeypatch, tmp_path):
     class ExternalProvider:
         provider_id = "test.external.v1"

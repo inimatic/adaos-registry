@@ -43,6 +43,12 @@ DEFAULT_METADATA_SETTINGS = {
     "tmdb_enabled": True,
     "locale": "ru-RU",
 }
+BACKGROUND_JOB_WINDOWS = {
+    "metadata_enrichment": 512,
+    "fingerprint": 256,
+    "embedding": 256,
+}
+BACKGROUND_JOB_REFILL_BATCH = 500
 MANUAL_METADATA_FIELDS = frozenset(
     {
         "title",
@@ -2286,6 +2292,10 @@ class MediaCatalogCoordinator:
                     now_iso(),
                 ),
             )
+            admission = self._refill_background_job_windows_connection(
+                connection,
+                force=True,
+            )
             connection.commit()
         return {
             "ok": True,
@@ -2297,6 +2307,7 @@ class MediaCatalogCoordinator:
             "next_cursor": _text(page.get("next_cursor")),
             "has_more": bool(page.get("has_more")),
             "catalog_revision": self.catalog_revision(),
+            "background_admission": admission,
         }
 
     @staticmethod
@@ -2433,6 +2444,190 @@ class MediaCatalogCoordinator:
                 ).rowcount
             )
         return queued
+
+    @staticmethod
+    def _background_job_window(kind: str) -> int:
+        token = _text(kind)
+        default = int(BACKGROUND_JOB_WINDOWS.get(token) or 0)
+        if not default:
+            return 0
+        env_key = f"MEDIA_CENTER_{token.upper()}_QUEUE_WINDOW"
+        return max(32, min(5000, int(os.environ.get(env_key) or default)))
+
+    @staticmethod
+    def _background_admission_key(kind: str) -> str:
+        return f"background_admission:{_text(kind)}"
+
+    def _refill_background_job_windows_connection(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        kinds: Iterable[str] = (
+            "metadata_enrichment",
+            "fingerprint",
+            "embedding",
+        ),
+        batch_size: int = BACKGROUND_JOB_REFILL_BATCH,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        bounded_batch = max(25, min(int(batch_size), 2000))
+        now = time.time()
+        provider_revision = self._metadata_settings_revision_connection(connection)
+        results: dict[str, dict[str, Any]] = {}
+        for raw_kind in kinds:
+            kind = _text(raw_kind)
+            window = self._background_job_window(kind)
+            if not window:
+                continue
+            active = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM media_background_jobs "
+                    "WHERE kind=? AND status IN ('queued','running')",
+                    (kind,),
+                ).fetchone()[0]
+            )
+            key = self._background_admission_key(kind)
+            state_row = connection.execute(
+                "SELECT value FROM coordinator_meta WHERE key=?", (key,)
+            ).fetchone()
+            state = _json_loads(state_row["value"]) if state_row else {}
+            if not isinstance(state, Mapping):
+                state = {}
+            cursor = _text(state.get("cursor"))
+            next_at = float(state.get("next_at") or 0)
+            admitted = 0
+            examined = 0
+            cycle_completed = False
+            if active < window and (force or next_at <= now):
+                rows = connection.execute(
+                    """
+                    SELECT id,title,name,media_kind,folder_path,fingerprint,
+                        size_bytes,modified_at,metadata_json
+                    FROM catalog_items
+                    WHERE missing=0 AND id>?
+                    ORDER BY id LIMIT ?
+                    """,
+                    (cursor, bounded_batch),
+                ).fetchall()
+                for row in rows:
+                    cursor = str(row["id"])
+                    examined += 1
+                    metadata = _json_loads(row["metadata_json"])
+                    admitted += self._queue_source_background_jobs(
+                        connection,
+                        item_id=str(row["id"]),
+                        title=str(row["title"]),
+                        name=str(row["name"]),
+                        media_kind=str(row["media_kind"]),
+                        folder_path=str(row["folder_path"]),
+                        fingerprint=str(row["fingerprint"]),
+                        size_bytes=int(row["size_bytes"] or 0),
+                        modified_at=str(row["modified_at"]),
+                        metadata=(metadata if isinstance(metadata, Mapping) else {}),
+                        kinds=(kind,),
+                        provider_revision=provider_revision,
+                    )
+                    if active + admitted >= window:
+                        break
+                if examined == len(rows) and len(rows) < bounded_batch:
+                    cursor = ""
+                    next_at = now + 300
+                    cycle_completed = True
+                else:
+                    next_at = 0
+            updated_state = {
+                "cursor": cursor,
+                "next_at": next_at,
+                "window": window,
+                "active": active + admitted,
+                "examined": max(0, int(state.get("examined") or 0)) + examined,
+                "admitted": max(0, int(state.get("admitted") or 0)) + admitted,
+                "cycle_completed": cycle_completed,
+                "updated_at": now_iso(),
+            }
+            connection.execute(
+                "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (key, _json_dumps(updated_state)),
+            )
+            results[kind] = {
+                "window": window,
+                "active": active + admitted,
+                "examined": examined,
+                "admitted": admitted,
+                "cursor": cursor,
+                "cycle_completed": cycle_completed,
+            }
+        return {
+            "schema": "adaos.media_center.background_admission.v1",
+            "kinds": results,
+        }
+
+    def refill_background_job_windows(
+        self,
+        *,
+        batch_size: int = BACKGROUND_JOB_REFILL_BATCH,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        with self.repository.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            result = self._refill_background_job_windows_connection(
+                connection,
+                batch_size=batch_size,
+                force=force,
+            )
+            connection.commit()
+        return result
+
+    def compact_background_job_queue(
+        self,
+        *,
+        batch_size: int = 5000,
+    ) -> dict[str, Any]:
+        bounded_batch = max(100, min(int(batch_size), 10000))
+        removed: dict[str, int] = {}
+        remaining_overflow: dict[str, int] = {}
+        with self.repository.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            for kind in BACKGROUND_JOB_WINDOWS:
+                window = self._background_job_window(kind)
+                queued = int(
+                    connection.execute(
+                        "SELECT COUNT(*) FROM media_background_jobs "
+                        "WHERE kind=? AND status='queued'",
+                        (kind,),
+                    ).fetchone()[0]
+                )
+                overflow = max(0, queued - window)
+                if not overflow:
+                    removed[kind] = 0
+                    remaining_overflow[kind] = 0
+                    continue
+                deleted = int(
+                    connection.execute(
+                        """
+                        DELETE FROM media_background_jobs WHERE id IN (
+                            SELECT id FROM media_background_jobs
+                            WHERE kind=? AND status='queued'
+                            ORDER BY priority,created_at,id
+                            LIMIT ? OFFSET ?
+                        )
+                        """,
+                        (kind, min(overflow, bounded_batch), window),
+                    ).rowcount
+                )
+                removed[kind] = deleted
+                remaining_overflow[kind] = max(0, overflow - deleted)
+                connection.execute(
+                    "DELETE FROM coordinator_meta WHERE key=?",
+                    (self._background_admission_key(kind),),
+                )
+            connection.commit()
+        return {
+            "schema": "adaos.media_center.background_queue_compaction.v1",
+            "removed": removed,
+            "remaining_overflow": remaining_overflow,
+            "complete": not any(remaining_overflow.values()),
+        }
 
     def _apply_delta(self, connection: sqlite3.Connection, delta: Mapping[str, Any], *, agent_id: str, node_id: str) -> str:
         source = delta.get("source") if isinstance(delta.get("source"), Mapping) else {}
@@ -2822,20 +3017,6 @@ class MediaCatalogCoordinator:
                     preferred=False,
                 )
         self._refresh_metadata_projection(connection, item_id)
-        self._queue_source_background_jobs(
-            connection,
-            item_id=item_id,
-            title=title,
-            name=name,
-            media_kind=kind,
-            folder_path=folder_path,
-            fingerprint=_text(source.get("fingerprint")),
-            size_bytes=int(
-                source.get("size_bytes") or descriptor.get("size_bytes") or 0
-            ),
-            modified_at=modified_at,
-            metadata=metadata,
-        )
         return operation or "updated"
 
     @staticmethod
@@ -7639,7 +7820,6 @@ class MediaCatalogCoordinator:
     def requeue_metadata_enrichment(self) -> dict[str, Any]:
         settings = dict(self.metadata_settings()["settings"])
         provider_revision = max(0, int(settings.get("revision") or 0))
-        queued = 0
         with self.repository.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             removed = int(
@@ -7648,39 +7828,29 @@ class MediaCatalogCoordinator:
                     "WHERE kind='metadata_enrichment' AND status='queued'"
                 ).rowcount
             )
-            rows = connection.execute(
-                """
-                SELECT id,title,name,media_kind,folder_path,fingerprint,size_bytes,
-                    modified_at,metadata_json
-                FROM catalog_items WHERE missing=0
-                ORDER BY id
-                """
+            connection.execute(
+                "DELETE FROM coordinator_meta WHERE key=?",
+                (self._background_admission_key("metadata_enrichment"),),
             )
-            for row in rows:
-                metadata = _json_loads(row["metadata_json"])
-                queued += self._queue_source_background_jobs(
-                    connection,
-                    item_id=str(row["id"]),
-                    title=str(row["title"]),
-                    name=str(row["name"]),
-                    media_kind=str(row["media_kind"]),
-                    folder_path=str(row["folder_path"]),
-                    fingerprint=str(row["fingerprint"]),
-                    size_bytes=int(row["size_bytes"] or 0),
-                    modified_at=str(row["modified_at"]),
-                    metadata=(
-                        metadata if isinstance(metadata, Mapping) else {}
-                    ),
-                    kinds=("metadata_enrichment",),
-                    provider_revision=provider_revision,
-                )
+            admission = self._refill_background_job_windows_connection(
+                connection,
+                kinds=("metadata_enrichment",),
+                force=True,
+            )
             connection.commit()
+        queued = int(
+            admission.get("kinds", {})
+            .get("metadata_enrichment", {})
+            .get("admitted", 0)
+        )
         return {
             "ok": True,
             "schema": "adaos.media_center.metadata_requeue.v1",
             "provider_revision": provider_revision,
             "removed_queued_count": removed,
             "queued_count": queued,
+            "deferred": True,
+            "admission": admission,
         }
 
     def diagnostics(

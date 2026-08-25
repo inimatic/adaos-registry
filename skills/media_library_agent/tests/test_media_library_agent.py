@@ -2625,6 +2625,89 @@ def test_artwork_backfill_queues_preexisting_sources_with_durable_cursor(
     assert status["cycle"] == 1
 
 
+def test_job_retention_compacts_legacy_artwork_queue_without_source_loss(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("MEDIA_LIBRARY_AGENT_ARTWORK_BACKFILL_QUEUE", "2")
+    library = tmp_path / "library"
+    library.mkdir()
+    (library / "legacy.mp3").write_bytes(b"audio")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "artwork-retention.sqlite3", node_id="node-a"
+    )
+    worker = MediaLibraryAgentWorker(
+        repository,
+        register=lambda path, _root, metadata: {
+            "resource_id": "legacy-audio",
+            "path": str(path),
+            "source_path": str(path),
+            "mime_type": "audio/mpeg",
+            "metadata": metadata,
+        },
+    )
+    monkeypatch.setattr(worker, "_queue_artwork_for_source", lambda *_a, **_k: False)
+    source = _rendition_source(repository, worker, library)
+    with repository.connect() as connection:
+        now = worker_module.now_iso()
+        connection.executemany(
+            "INSERT INTO rendition_jobs("
+            "id,source_id,root_id,source_revision,source_fingerprint,media_kind,"
+            "profile,target_json,priority,status,requested_at"
+            ") VALUES (?,?,?,?,?,'audio','artwork-card-v1','{}',700,'queued',?)",
+            (
+                (
+                    f"legacy-artwork-{index}",
+                    source["id"],
+                    source["root_id"],
+                    source["revision"],
+                    source["fingerprint"],
+                    now,
+                )
+                for index in range(20)
+            ),
+        )
+        connection.commit()
+
+    compacted = repository.compact_job_history_batch(limit=100)
+
+    assert compacted["complete"] is True
+    assert compacted["artwork_queue_removed"] == 18
+    assert repository.active_artwork_job_count() == 2
+    assert repository.get_source(source["id"])["present"] is True
+    assert repository.job_retention_status()["artwork_queue_window"] == 2
+
+
+def test_scan_artwork_admission_does_not_materialize_full_library_queue(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("MEDIA_LIBRARY_AGENT_ARTWORK_BACKFILL_QUEUE", "2")
+    library = tmp_path / "library"
+    library.mkdir()
+    for index in range(20):
+        (library / f"{index:03d}.mp3").write_bytes(b"audio")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "artwork-scan-window.sqlite3", node_id="node-a"
+    )
+    root = repository.add_root(str(library))["root"]
+    worker = MediaLibraryAgentWorker(
+        repository,
+        register=lambda path, _root, metadata: {
+            "resource_id": f"ref-{path.name}",
+            "path": str(path),
+            "source_path": str(path),
+            "mime_type": "audio/mpeg",
+            "metadata": metadata,
+        },
+    )
+    repository.create_job(root["id"], mode="full")
+
+    result = worker.run_once()
+
+    assert result and result["status"] == "completed"
+    assert repository.summary()["source_count"] == 20
+    assert repository.active_artwork_job_count() == 2
+
+
 def test_artwork_terminal_result_is_replanned_only_after_capability_change():
     source = {
         "id": "source-a",

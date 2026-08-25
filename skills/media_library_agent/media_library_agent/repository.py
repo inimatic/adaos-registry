@@ -946,6 +946,151 @@ class MediaLibraryAgentRepository:
             ).fetchone()
         return int(row["total"] or 0)
 
+    def compact_job_history_batch(self, *, limit: int = 5000) -> dict[str, Any]:
+        bounded = max(100, min(int(limit or 5000), 10000))
+        artwork_window = max(
+            1,
+            min(
+                16,
+                int(
+                    os.environ.get("MEDIA_LIBRARY_AGENT_ARTWORK_BACKFILL_QUEUE")
+                    or 4
+                ),
+            ),
+        )
+        rendition_terminal_retain = max(
+            1000,
+            min(
+                50000,
+                int(
+                    os.environ.get("MEDIA_LIBRARY_AGENT_RENDITION_HISTORY_RETAIN")
+                    or 5000
+                ),
+            ),
+        )
+        scan_terminal_retain = max(
+            100,
+            min(
+                10000,
+                int(
+                    os.environ.get("MEDIA_LIBRARY_AGENT_SCAN_HISTORY_RETAIN") or 1000
+                ),
+            ),
+        )
+        migration_terminal_retain = max(
+            10,
+            min(
+                1000,
+                int(
+                    os.environ.get("MEDIA_LIBRARY_AGENT_MIGRATION_HISTORY_RETAIN")
+                    or 100
+                ),
+            ),
+        )
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            queued_artwork = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM rendition_jobs "
+                    "WHERE profile='artwork-card-v1' AND status='queued'"
+                ).fetchone()[0]
+            )
+            artwork_overflow = max(0, queued_artwork - artwork_window)
+            artwork_removed = int(
+                connection.execute(
+                    """
+                    DELETE FROM rendition_jobs WHERE id IN (
+                        SELECT id FROM rendition_jobs
+                        WHERE profile='artwork-card-v1' AND status='queued'
+                        ORDER BY priority,requested_at,id
+                        LIMIT ? OFFSET ?
+                    )
+                    """,
+                    (min(artwork_overflow, bounded), artwork_window),
+                ).rowcount
+            )
+            if artwork_removed:
+                self._set_meta(connection, "artwork_backfill_cursor", "")
+                self._set_meta(connection, "artwork_backfill_next_at", 0)
+            rendition_removed = int(
+                connection.execute(
+                    """
+                    DELETE FROM rendition_jobs WHERE id IN (
+                        SELECT id FROM rendition_jobs
+                        WHERE status IN ('failed','canceled','invalidated')
+                          AND (output_json='{}' OR cleaned_at<>'')
+                        ORDER BY finished_at DESC,id DESC
+                        LIMIT ? OFFSET ?
+                    )
+                    """,
+                    (bounded, rendition_terminal_retain),
+                ).rowcount
+            )
+            scan_removed = int(
+                connection.execute(
+                    """
+                    DELETE FROM scan_jobs WHERE id IN (
+                        SELECT id FROM scan_jobs
+                        WHERE status IN ('completed','failed','canceled')
+                        ORDER BY finished_at DESC,id DESC
+                        LIMIT ? OFFSET ?
+                    )
+                    """,
+                    (bounded, scan_terminal_retain),
+                ).rowcount
+            )
+            migration_removed = int(
+                connection.execute(
+                    """
+                    DELETE FROM storage_migration_jobs WHERE id IN (
+                        SELECT id FROM storage_migration_jobs
+                        WHERE status IN ('completed','failed','canceled')
+                        ORDER BY finished_at DESC,id DESC
+                        LIMIT ? OFFSET ?
+                    )
+                    """,
+                    (bounded, migration_terminal_retain),
+                ).rowcount
+            )
+            result = {
+                "schema": "adaos.media_library.job_retention.v1",
+                "artwork_queue_window": artwork_window,
+                "artwork_queue_removed": artwork_removed,
+                "artwork_queue_overflow": max(
+                    0, artwork_overflow - artwork_removed
+                ),
+                "rendition_history_removed": rendition_removed,
+                "scan_history_removed": scan_removed,
+                "migration_history_removed": migration_removed,
+                "complete": not any(
+                    (
+                        max(0, artwork_overflow - artwork_removed),
+                        rendition_removed >= bounded,
+                        scan_removed >= bounded,
+                        migration_removed >= bounded,
+                    )
+                ),
+                "updated_at": now_iso(),
+            }
+            self._set_meta(connection, "job_retention_state", json_dumps(result))
+            connection.commit()
+        return result
+
+    def job_retention_status(self) -> dict[str, Any]:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT value FROM agent_meta WHERE key='job_retention_state'"
+            ).fetchone()
+        state = json_loads(row["value"], {}) if row else {}
+        return (
+            dict(state)
+            if isinstance(state, Mapping) and state
+            else {
+                "schema": "adaos.media_library.job_retention.v1",
+                "state": "pending",
+            }
+        )
+
     def add_root(
         self,
         path: str,
@@ -3155,6 +3300,7 @@ class MediaLibraryAgentRepository:
                 "completed_count": int(rendition["completed"] or 0),
                 "failed_count": int(rendition["failed"] or 0),
             },
+            "job_retention": self.job_retention_status(),
             "delta_cursor": encode_cursor(int(delta["sequence"] or 0)),
             "storage": self.storage_status(),
         }

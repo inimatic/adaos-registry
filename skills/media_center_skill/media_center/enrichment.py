@@ -958,6 +958,9 @@ class MediaEnrichmentWorker:
         self._last_loop_error_at = 0.0
         self._storage_maintenance_complete = False
         self._storage_maintenance_state: dict[str, Any] = {}
+        self._queue_compaction_complete = False
+        self._queue_maintenance_state: dict[str, Any] = {}
+        self._last_admission_monotonic = 0.0
 
     def ensure_started(self) -> bool:
         with self._lock:
@@ -999,6 +1002,26 @@ class MediaEnrichmentWorker:
             if isinstance(compacted, Mapping):
                 self._storage_maintenance_state = dict(compacted)
                 self._storage_maintenance_complete = bool(compacted.get("complete"))
+        queue_compaction = getattr(
+            self.coordinator, "compact_background_job_queue", None
+        )
+        if callable(queue_compaction) and not self._queue_compaction_complete:
+            compacted_queue = queue_compaction(batch_size=5000)
+            if isinstance(compacted_queue, Mapping):
+                self._queue_maintenance_state["compaction"] = dict(compacted_queue)
+                self._queue_compaction_complete = bool(
+                    compacted_queue.get("complete")
+                )
+        refill = getattr(self.coordinator, "refill_background_job_windows", None)
+        admission_at = time.monotonic()
+        if callable(refill) and (
+            self._last_admission_monotonic == 0.0
+            or admission_at - self._last_admission_monotonic >= 2.0
+        ):
+            admission = refill()
+            if isinstance(admission, Mapping):
+                self._queue_maintenance_state["admission"] = dict(admission)
+            self._last_admission_monotonic = admission_at
         job = self.coordinator.claim_background_job()
         if job is None:
             return None
@@ -1200,6 +1223,7 @@ class MediaEnrichmentWorker:
             "last_error": last_loop_error,
             "last_error_at": last_loop_error_at,
             "storage_maintenance": storage_maintenance,
+            "queue_maintenance": dict(self._queue_maintenance_state),
         }
 
     def _loop(self) -> None:
