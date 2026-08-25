@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import os
 import sqlite3
 import sys
 import time
@@ -1952,6 +1953,88 @@ def test_rendition_plan_distinguishes_lossless_remux_and_prepared_hls():
     ]
 
 
+def test_rendition_plan_transcodes_unprobed_avi_instead_of_unsafe_remux():
+    source = {
+        "id": "source-legacy-avi",
+        "revision": 2,
+        "fingerprint": "fingerprint-legacy-avi",
+        "name": "legacy.avi",
+        "media_kind": "video",
+        "mime_type": "video/avi",
+        "metadata": {
+            "technical": {
+                "probe": "basic",
+                "probe_status": "partial",
+                "container": "avi",
+                "streams": [],
+            }
+        },
+    }
+
+    plan = rendition_plan(
+        source,
+        endpoint_capabilities={
+            "codecs": ["h264", "aac"],
+            "containers": ["mp4", "webm"],
+            "mime_types": ["video/mp4"],
+            "hls": True,
+            "max_video_height": 1080,
+        },
+    )
+    command = rendition_module._single_file_command(
+        "ffmpeg",
+        Path("legacy.avi"),
+        Path("legacy.mp4.partial"),
+        {"media_kind": "video", "target": plan["target"]},
+        encoder="libx264",
+        limits={"threads": 1, "max_output_bytes": 1024**3},
+    )
+
+    assert plan["decision"] == "transcode"
+    assert plan["target"]["packaging"] == "single_file"
+    assert "stream_compatibility_unverified" in plan["reasons"]
+    assert command[command.index("-map") + 1] == "0:v:0"
+
+
+def test_rendition_progress_counts_partial_and_hls_outputs(tmp_path):
+    partial_target = tmp_path / "movie.mp4"
+    partial_target.with_suffix(".mp4.partial").write_bytes(b"partial-output")
+    hls_target = tmp_path / "package" / "master.m3u8"
+    hls_target.parent.mkdir()
+    hls_target.write_bytes(b"manifest")
+    (hls_target.parent / "segment-1.m4s").write_bytes(b"segment")
+
+    assert MediaLibraryAgentWorker._rendition_output_bytes(partial_target) == 14
+    assert MediaLibraryAgentWorker._rendition_output_bytes(hls_target) == 15
+
+
+def test_worker_removes_only_stale_orphan_rendition_partials(
+    monkeypatch, tmp_path
+):
+    repository = MediaLibraryAgentRepository(tmp_path / "agent.sqlite3")
+    root = repository.db_path.parent / "renditions"
+    root.mkdir()
+    stale = root / "stale.mp4.partial"
+    recent = root / "recent.mp4.partial"
+    regular = root / "ready.mp4"
+    stale.write_bytes(b"stale")
+    recent.write_bytes(b"recent")
+    regular.write_bytes(b"ready")
+    old = time.time() - 3600
+    os.utime(stale, (old, old))
+    monkeypatch.setenv(
+        "MEDIA_LIBRARY_AGENT_PARTIAL_CLEANUP_GRACE_SECONDS", "900"
+    )
+    worker = MediaLibraryAgentWorker(repository)
+
+    removed = worker._cleanup_orphan_rendition_partials()
+
+    assert removed == 1
+    assert not stale.exists()
+    assert recent.exists()
+    assert regular.exists()
+
+
 def test_ffmpeg_capabilities_selects_hardware_with_software_fallback(
     monkeypatch,
 ):
@@ -2133,6 +2216,69 @@ def test_claimed_scan_exception_is_terminal_and_observable(monkeypatch, tmp_path
     assert result["status"] == "failed"
     assert result["error"]["code"] == "worker_unhandled_exception"
     assert "fixture_failure" in result["error"]["detail"]
+
+
+def test_interactive_rendition_preempts_a_running_background_scan(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    (library / "legacy.avi").write_bytes(b"original-media")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "interactive-rendition.sqlite3", node_id="node-a"
+    )
+
+    def transcode(_source, target, _job, *, cancelled):
+        assert cancelled() is False
+        target.write_bytes(b"browser-compatible")
+        return {"size_bytes": target.stat().st_size, "mime_type": "video/mp4"}
+
+    def publish(target, _job):
+        return {
+            "resource_id": "derived-browser-copy",
+            "path": str(target),
+            "mime_type": "video/mp4",
+            "size_bytes": target.stat().st_size,
+            "metadata": {"namespace": "media-library-rendition"},
+        }
+
+    worker = MediaLibraryAgentWorker(
+        repository,
+        transcode=transcode,
+        publish_derived=publish,
+    )
+    source = _rendition_source(repository, worker, library)
+    scan = repository.create_job(source["root_id"], mode="incremental")["job"]
+    running_scan = repository.claim_job(scan["id"])
+    queued = repository.create_rendition_job(
+        source["id"],
+        profile="browser-mp4-v1",
+        target={
+            "profile": "browser-mp4-v1",
+            "decision": "transcode",
+            "packaging": "single_file",
+            "mime_type": "video/mp4",
+            "selected_tracks": {"video_index": -1, "audio_index": -1},
+        },
+        priority=25,
+    )["job"]
+    root = repository.get_root(source["root_id"])
+    counters = {
+        "discovered_count": 0,
+        "processed_count": 0,
+        "added_count": 0,
+        "updated_count": 0,
+        "removed_count": 0,
+        "skipped_count": 0,
+        "error_count": 0,
+        "processed_bytes": 0,
+    }
+
+    result = worker._run_priority_rendition_during_scan(
+        running_scan["id"], root, counters, ""
+    )
+
+    assert result and result["id"] == queued["id"]
+    assert result["status"] == "completed"
+    assert repository.get_job(running_scan["id"])["status"] == "running"
 
 
 def test_folder_artwork_is_bounded_published_and_tied_to_exact_source(tmp_path):

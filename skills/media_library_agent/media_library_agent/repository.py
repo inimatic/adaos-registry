@@ -1573,13 +1573,27 @@ class MediaLibraryAgentRepository:
             connection.commit()
         return {"ok": True, "changed": True, "source": public_source}
 
-    def next_queued_rendition_job(self) -> dict[str, Any] | None:
+    def next_queued_rendition_job(
+        self,
+        *,
+        max_priority: int | None = None,
+        exclude_profile: str = "",
+    ) -> dict[str, Any] | None:
+        filters = ["status='queued'"]
+        params: list[Any] = []
+        if max_priority is not None:
+            filters.append("priority<=?")
+            params.append(max(0, int(max_priority)))
+        if text(exclude_profile):
+            filters.append("profile<>?")
+            params.append(text(exclude_profile))
         with self.connect() as connection:
             row = connection.execute(
-                """
-                SELECT * FROM rendition_jobs WHERE status='queued'
+                f"""
+                SELECT * FROM rendition_jobs WHERE {' AND '.join(filters)}
                 ORDER BY priority,requested_at LIMIT 1
-                """
+                """,
+                tuple(params),
             ).fetchone()
         return self._public_rendition_job(row) if row else None
 
@@ -1666,7 +1680,15 @@ class MediaLibraryAgentRepository:
         params.append(bounded)
         with self.connect() as connection:
             rows = connection.execute(
-                f"SELECT * FROM rendition_jobs {where} ORDER BY requested_at DESC LIMIT ?",
+                f"""
+                SELECT rendition_jobs.*,sources.name AS source_name,
+                    sources.relative_path AS source_relative_path,
+                    sources.size_bytes AS source_size_bytes
+                FROM rendition_jobs
+                LEFT JOIN sources ON sources.id=rendition_jobs.source_id
+                {where.replace('source_id', 'rendition_jobs.source_id')}
+                ORDER BY requested_at DESC LIMIT ?
+                """,
                 tuple(params),
             ).fetchall()
         return {
@@ -1830,6 +1852,18 @@ class MediaLibraryAgentRepository:
                 (max(1, min(100, int(limit or 20))),),
             ).fetchall()
         return [self._public_rendition_job(row) for row in rows]
+
+    def active_rendition_job_count(self) -> int:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT count(*) AS count FROM rendition_jobs
+                WHERE status IN (
+                    'running','waiting_resources','waiting_storage','canceling'
+                )
+                """
+            ).fetchone()
+        return int(row["count"] or 0) if row else 0
 
     def source_by_path(self, root_id: str, relative_path: str) -> dict[str, Any] | None:
         with self.connect() as connection:
@@ -3302,7 +3336,7 @@ class MediaLibraryAgentRepository:
         }
 
     def _public_rendition_job(self, row: sqlite3.Row) -> dict[str, Any]:
-        return {
+        result = {
             "schema": RENDITION_JOB_SCHEMA,
             "id": str(row["id"]),
             "source_id": str(row["source_id"]),
@@ -3331,6 +3365,18 @@ class MediaLibraryAgentRepository:
             "cleaned_at": str(row["cleaned_at"]),
             "revision": int(row["revision"]),
         }
+        columns = set(row.keys())
+        if "source_name" in columns:
+            result.update(
+                {
+                    "source_name": str(row["source_name"] or ""),
+                    "source_relative_path": str(
+                        row["source_relative_path"] or ""
+                    ),
+                    "source_size_bytes": int(row["source_size_bytes"] or 0),
+                }
+            )
+        return result
 
     def _public_source(self, row: sqlite3.Row) -> dict[str, Any]:
         source = {

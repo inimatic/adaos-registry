@@ -18,6 +18,16 @@ first. The ordinary scan progress projection therefore exposes the root, file
 and counters for this maintenance instead of leaving genres, artists and albums
 silently pending.
 
+Version `0.6.39` makes browser conversion interactive without introducing a
+second worker. A requested non-artwork rendition parks a running scan at its
+next file boundary, then resumes that durable scan after conversion. Lossless
+MP4 remux is selected only when probed video and audio codecs are known to be
+copy-safe; unprobed AVI/Xvid-class sources use bounded H.264/AAC transcoding.
+The latest stream and bounded job-history read expose source identity and live
+partial output bytes. Old orphan `.partial` files are removed only inside the
+managed rendition directory, after a grace interval and while no rendition is
+active.
+
 ## Storage boundary
 
 Original media bytes remain at their original paths. The agent calls `adaos.sdk.io.media.register_media_file`, which records an allowlisted reference for range playback; it never copies the source into `.adaos`. Removing or draining the skill retains external media by design. Browser-compatible renditions and normalized artwork are explicitly derived data: their exact source revision and fingerprint are recorded, and only generated outputs may be copied to managed media storage.
@@ -89,9 +99,9 @@ rendition lifecycle rules are unchanged.
 ## Rendition model
 
 - `plan_rendition` compares source facts with explicit endpoint codecs, MIME types, containers, height, and bitrate. Compatible sources do not create a job.
-- One rendition shares the agent's single background worker with scanning. Playback/critical pressure pauses it. CPU threads, RSS, timeout, output size, temporary disk quota, cancellation, and final publication are bounded by `MEDIA_LIBRARY_AGENT_RENDITION_*` settings.
+- One rendition shares the agent's single background worker with scanning. An explicitly requested non-artwork rendition parks a scan at a file boundary and resumes it afterward; automatic artwork remains lower priority. Playback/critical pressure pauses both. CPU threads, RSS, timeout, output size, temporary disk quota, cancellation, and final publication are bounded by `MEDIA_LIBRARY_AGENT_RENDITION_*` settings.
 - The worker writes a `.partial` temporary file, atomically closes it, rechecks the source witness, publishes the derived resource, and atomically advertises it in a new source delta. A source change before or after publication invalidates the job and removes the generated resource.
-- `media_library_agent.rendition_progress` publishes the latest durable job at a bounded rate. Restart recovery requeues interrupted work; queued cancellation is immediately terminal.
+- `media_library_agent.rendition_progress` publishes the latest durable job, source label, and changing partial output byte count at a bounded rate. `list_rendition_jobs` provides bounded durable history for UI data; neither contract contains media bytes. Restart recovery requeues interrupted work; queued cancellation is immediately terminal. Stale orphan partials receive deferred managed-directory cleanup without touching ready outputs or original media.
 - Artwork uses the same durable queue with the low-priority `artwork-card-v1` profile. The agent tries embedded tags, a bounded folder-cover lookup, then scores up to three deterministic video fragments and rejects near-black or otherwise uninformative frames. It emits the best maximum 720x1080 JPEG of at most 4 MiB with selection, provider, and exact-source evidence; missing backends or artwork fail as observable jobs instead of blocking scans.
 - Existing sources are inspected through a durable cursor and a small bounded queue. Pillow, Mutagen, and a packaged `imageio-ffmpeg` fallback make local artwork extraction independent of host packages; `MEDIA_LIBRARY_AGENT_FFMPEG_PATH` may select an operator-managed binary instead. Backfill progress, capability evidence, and source counts by artwork state are exposed by `status`.
 - Queued scans run before automatic artwork work. An unchanged rescan preserves ready artwork and does not enqueue a duplicate; a changed source fingerprint or folder-cover witness invalidates the corresponding projection.

@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.38
+version: 0.6.39
 description: Distributed node-local media discovery and bounded rendition agent with
   durable jobs and ordered catalog deltas.
 supported_locales:
@@ -680,6 +680,28 @@ tools:
   output_schema:
     type: object
 data_routes:
+- surface: modal:media-center-metadata
+  route: tool
+  tool: list_rendition_jobs
+  owner: skill:media_library_agent
+  first_paint: bounded recent rendition history with current durable states
+  recovery: repeat the bounded list after rendition progress invalidation
+  guard_visibility: source-relative paths are visible only inside the owning workspace modal
+  budget:
+    max_payload_bytes: 262144
+    max_items: 100
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - media_center.renditions
 - surface: widget:media-library-agent-status
   route: tool/details
   tool: status

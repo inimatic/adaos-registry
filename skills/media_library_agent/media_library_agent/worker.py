@@ -92,6 +92,7 @@ class MediaLibraryAgentWorker:
         self._watch_state: dict[str, tuple[str, float, bool]] = {}
         self._watch_pending: dict[str, tuple[float, bool]] = {}
         self._embedded_metadata_backfill_complete = False
+        self._last_partial_cleanup_monotonic = 0.0
 
     def ensure_started(self) -> bool:
         with self._lock:
@@ -146,6 +147,7 @@ class MediaLibraryAgentWorker:
         self._enqueue_due_schedules()
         self._poll_watch_schedules()
         self._cleanup_invalidated_renditions()
+        self._cleanup_orphan_rendition_partials()
         # Existing libraries must receive source-local tags before the bounded
         # artwork backlog can consume the worker indefinitely.
         self._enqueue_embedded_metadata_backfill()
@@ -356,12 +358,31 @@ class MediaLibraryAgentWorker:
                     job_id, "rendition_canceled", status="canceled"
                 )
             processor = self._artwork if is_artwork else self._transcode
+            progress_checked_at = 0.0
+            progress_bytes = -1
+
+            def cancelled() -> bool:
+                nonlocal progress_checked_at, progress_bytes
+                should_cancel = self._stop.is_set() or self._rendition_cancelled(
+                    job_id
+                )
+                current_time = time.monotonic()
+                if not is_artwork and current_time - progress_checked_at >= 2.0:
+                    progress_checked_at = current_time
+                    current_bytes = self._rendition_output_bytes(target_path)
+                    if current_bytes > 0 and current_bytes != progress_bytes:
+                        progress_bytes = current_bytes
+                        self.repository.update_rendition_job(
+                            job_id, output_bytes=current_bytes
+                        )
+                        self._publish_rendition(job_id)
+                return should_cancel
+
             result = processor(
                 source_path,
                 target_path,
                 job,
-                cancelled=lambda: self._stop.is_set()
-                or self._rendition_cancelled(job_id),
+                cancelled=cancelled,
             )
             current = self.repository.get_source(text(job.get("source_id")))
             if (
@@ -446,6 +467,28 @@ class MediaLibraryAgentWorker:
                     missing_ok=True
                 )
 
+    @staticmethod
+    def _rendition_output_bytes(target_path: Path) -> int:
+        if target_path.name == "master.m3u8":
+            try:
+                return sum(
+                    int(candidate.stat().st_size)
+                    for candidate in target_path.parent.rglob("*")
+                    if candidate.is_file()
+                )
+            except OSError:
+                return 0
+        for candidate in (
+            target_path,
+            target_path.with_suffix(target_path.suffix + ".partial"),
+        ):
+            try:
+                if candidate.is_file():
+                    return int(candidate.stat().st_size)
+            except OSError:
+                continue
+        return 0
+
     def _wait_for_rendition_resources(self, job_id: str) -> None:
         waiting = False
         while not self._stop.is_set():
@@ -512,12 +555,16 @@ class MediaLibraryAgentWorker:
         job = self.repository.get_rendition_job(job_id)
         if job is None:
             return
+        source = self.repository.get_source(text(job.get("source_id"))) or {}
         try:
             self._publish_callback(
                 {
                     **job,
                     "schema": RENDITION_JOB_SCHEMA,
                     "job_type": "rendition",
+                    "source_name": text(source.get("name")),
+                    "source_relative_path": text(source.get("relative_path")),
+                    "source_size_bytes": int(source.get("size_bytes") or 0),
                     "agent_id": self.repository.agent_id,
                     "node_id": self.repository.node_id,
                     "updated_at": now_iso(),
@@ -531,6 +578,49 @@ class MediaLibraryAgentWorker:
         for job in self.repository.invalidated_rendition_outputs(limit=10):
             self._cleanup_published_descriptor(job.get("output") or {})
             self.repository.update_rendition_job(job["id"], cleaned_at=now_iso())
+
+    def _cleanup_orphan_rendition_partials(self) -> int:
+        now_monotonic = time.monotonic()
+        if now_monotonic - self._last_partial_cleanup_monotonic < 600.0:
+            return 0
+        self._last_partial_cleanup_monotonic = now_monotonic
+        if self.repository.active_rendition_job_count() > 0:
+            return 0
+        root = self.repository.db_path.parent / "renditions"
+        if not root.is_dir():
+            return 0
+        try:
+            grace_seconds = max(
+                60.0,
+                min(
+                    86400.0,
+                    float(
+                        os.environ.get(
+                            "MEDIA_LIBRARY_AGENT_PARTIAL_CLEANUP_GRACE_SECONDS"
+                        )
+                        or 900.0
+                    ),
+                ),
+            )
+        except ValueError:
+            grace_seconds = 900.0
+        cutoff = time.time() - grace_seconds
+        root_resolved = root.resolve()
+        removed = 0
+        for candidate in root.rglob("*.partial"):
+            try:
+                if candidate.is_symlink():
+                    continue
+                resolved = candidate.resolve()
+                if not resolved.is_relative_to(root_resolved):
+                    continue
+                if candidate.stat().st_mtime > cutoff:
+                    continue
+                candidate.unlink(missing_ok=True)
+                removed += 1
+            except OSError:
+                continue
+        return removed
 
     @staticmethod
     def _cleanup_published_descriptor(descriptor: Mapping[str, Any]) -> None:
@@ -777,6 +867,9 @@ class MediaLibraryAgentWorker:
                 self._wait_for_storage_maintenance(
                     job_id, root, counters, current_path
                 )
+                self._run_priority_rendition_during_scan(
+                    job_id, root, counters, current_path
+                )
                 current_path = relative_path
                 counters["discovered_count"] += 1
                 seen.add(relative_path)
@@ -924,6 +1017,68 @@ class MediaLibraryAgentWorker:
                 counters=counters,
                 current_path=current_path,
             )
+
+    def _run_priority_rendition_during_scan(
+        self,
+        job_id: str,
+        root: Mapping[str, Any],
+        counters: Mapping[str, int],
+        current_path: str,
+    ) -> dict[str, Any] | None:
+        try:
+            priority_ceiling = max(
+                0,
+                min(
+                    1000,
+                    int(
+                        os.environ.get(
+                            "MEDIA_LIBRARY_AGENT_INTERACTIVE_RENDITION_PRIORITY"
+                        )
+                        or 100
+                    ),
+                ),
+            )
+        except ValueError:
+            priority_ceiling = 100
+        queued = self.repository.next_queued_rendition_job(
+            max_priority=priority_ceiling,
+            exclude_profile=ARTWORK_PROFILE,
+        )
+        if queued is None:
+            return None
+        claimed = self.repository.claim_rendition_job(text(queued.get("id")))
+        if claimed is None:
+            return None
+        self._wait_reason = "priority_rendition"
+        self.repository.update_job(
+            job_id,
+            status="waiting_resources",
+            current_path=current_path,
+            **dict(counters),
+        )
+        self._publish_progress(
+            job_id,
+            root,
+            counters,
+            current_path,
+            status="waiting_resources",
+            force=True,
+        )
+        try:
+            return self._run_claimed_rendition_job(claimed)
+        finally:
+            self._wait_reason = ""
+            current = self.repository.get_job(job_id)
+            if current and not current.get("cancel_requested"):
+                self.repository.update_job(job_id, status="running")
+                self._publish_progress(
+                    job_id,
+                    root,
+                    counters,
+                    current_path,
+                    status="running",
+                    force=True,
+                )
 
     def _walk(
         self, root_path: Path, root: Mapping[str, Any]

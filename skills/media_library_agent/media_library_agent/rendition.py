@@ -20,6 +20,8 @@ ARTWORK_PROFILE = "artwork-card-v1"
 ARTWORK_SELECTION_ALGORITHM = "informative-frame-v2"
 ARTWORK_NAMES = ("cover", "folder", "front", "poster", "album", "artwork")
 ARTWORK_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
+MP4_COPY_VIDEO_CODECS = frozenset({"h264", "avc", "avc1"})
+MP4_COPY_AUDIO_CODECS = frozenset({"aac", "mp3", "mp4a"})
 
 
 def _ffmpeg_executable() -> tuple[str | None, str]:
@@ -195,13 +197,31 @@ def rendition_plan(
     container_only = bool(reasons) and set(reasons).issubset(
         {"container_not_supported", "mime_type_not_supported"}
     )
+    remux_safe = bool(
+        container_only
+        and (
+            (
+                kind == "video"
+                and video
+                and codec in MP4_COPY_VIDEO_CODECS
+                and (not audio or audio_codec in MP4_COPY_AUDIO_CODECS)
+            )
+            or (
+                kind == "audio"
+                and audio
+                and audio_codec in MP4_COPY_AUDIO_CODECS
+            )
+        )
+    )
+    if container_only and not remux_safe:
+        reasons.append("stream_compatibility_unverified")
     if hdr_unsupported:
         decision = "unsupported"
     elif not required:
         decision = "direct"
-    elif container_only:
+    elif remux_safe:
         decision = "remux"
-    elif bool(capabilities.get("hls")) and kind == "video":
+    elif bool(capabilities.get("hls")) and kind == "video" and bool(video):
         decision = "prepared_hls"
     else:
         decision = "transcode"
@@ -919,8 +939,14 @@ def _single_file_command(
         str(source_path),
     ]
     if kind == "video":
-        video_index = int(tracks.get("video_index") or 0)
-        command.extend(["-map", f"0:{video_index}"])
+        video_index = int(
+            tracks.get("video_index")
+            if tracks.get("video_index") is not None
+            else -1
+        )
+        command.extend(
+            ["-map", f"0:{video_index}" if video_index >= 0 else "0:v:0"]
+        )
         audio_index = int(
             tracks.get("audio_index")
             if tracks.get("audio_index") is not None
@@ -989,7 +1015,11 @@ def _hls_command(
         raise RuntimeError("rendition_hls_ladder_empty")
     output_directory = target_path.parent
     output_directory.mkdir(parents=True, exist_ok=True)
-    video_index = int(tracks.get("video_index") or 0)
+    video_index = int(
+        tracks.get("video_index")
+        if tracks.get("video_index") is not None
+        else -1
+    )
     has_audio = bool(tracks.get("has_audio"))
     audio_index = int(
         tracks.get("audio_index")
@@ -997,7 +1027,8 @@ def _hls_command(
         else -1
     )
     split_outputs = "".join(f"[vin{index}]" for index in range(len(ladder)))
-    filters = [f"[0:{video_index}]split={len(ladder)}{split_outputs}"]
+    video_input = f"0:{video_index}" if video_index >= 0 else "0:v:0"
+    filters = [f"[{video_input}]split={len(ladder)}{split_outputs}"]
     for index, rung in enumerate(ladder):
         height = max(240, int(rung.get("height") or 720))
         filters.append(
