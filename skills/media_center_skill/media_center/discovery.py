@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import math
-import os
 import re
 import unicodedata
 from collections.abc import Iterable
@@ -132,33 +131,8 @@ def text_embedding(value: Any, *, dimensions: int = EMBEDDING_DIMENSIONS) -> lis
     return list(_text_embedding(str(value or ""), bounded_dimensions))
 
 
-@lru_cache(maxsize=1)
-def _semantic_model() -> tuple[Any | None, str]:
-    model_name = str(os.environ.get("MEDIA_CENTER_SEMANTIC_MODEL") or "").strip()
-    if not model_name:
-        return None, "deterministic_hash_v1"
-    try:
-        from sentence_transformers import SentenceTransformer
-
-        return (
-            SentenceTransformer(model_name, local_files_only=True),
-            f"sentence_transformers:{model_name}",
-        )
-    except Exception:
-        return None, "deterministic_hash_v1"
-
-
 def semantic_embedding(value: Any) -> tuple[list[float], str]:
-    model, backend = _semantic_model()
-    if model is None:
-        return text_embedding(value), backend
-    try:
-        vector = model.encode(
-            [str(value or "")[:4096]], normalize_embeddings=True
-        )[0]
-        return [round(float(item), 7) for item in vector], backend
-    except Exception:
-        return text_embedding(value), "deterministic_hash_v1"
+    return text_embedding(value), "deterministic_hash_v1"
 
 
 def cosine_similarity(left: Iterable[Any], right: Iterable[Any]) -> float:
