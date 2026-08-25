@@ -7,11 +7,16 @@ dependency and remains the owner of core media resource registration and byte
 delivery.
 
 The unreleased 2026-08-25 local candidate combines
-`media_center_skill@0.8.74`, `media_library_agent@0.6.38`,
-`media_control_skill@0.2.11`, scenario `media_center@0.6.23`, and client
-`9310ca1`. It adds durable queue auto-advance and endpoint selection, compact
+`media_center_skill@0.8.75`, `media_library_agent@0.6.39`,
+`media_control_skill@0.2.11`, scenario `media_center@0.6.24`, and client
+`dfe90cd`. It adds durable queue auto-advance and endpoint selection, compact
 fullscreen/PiP/Play On controls, playlists, reviewed metadata correction,
-provider rejection, source identity and rendition visibility. Existing-library
+provider rejection, source identity and live rendition history. Requested
+browser conversion preempts scans at file boundaries, unsafe unprobed AVI
+remux falls back to H.264/AAC transcode, and stale managed partials receive
+deferred cleanup. External metadata transport failures are circuit-broken
+without discarding deterministic local claims. Legacy path aliases migrate
+personal state before stale rows are retired. Existing-library
 embedded tags are backfilled before automatic artwork work, and MusicBrainz
 does not consume its network budget on recognized audiobook chapters. This is
 local validation evidence only; no ProjectRelease or stand acceptance is

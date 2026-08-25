@@ -1500,11 +1500,15 @@
             "id": "media_center_player",
             "title": "Now Playing",
             "layout": {
-              "type": "stack",
+              "type": "split",
               "areas": [
                 {
                   "id": "main",
                   "role": "main"
+                },
+                {
+                  "id": "actions",
+                  "role": "footer"
                 }
               ]
             },
@@ -1649,7 +1653,7 @@
               {
                 "id": "media-center-player-favorite",
                 "type": "ui.actions",
-                "area": "main",
+                "area": "actions",
                 "visibleIf": "$state.selectedMediaItemId != null && $state.selectedMediaFavorite != true",
                 "inputs": {
                   "variant": "toolbar",
@@ -1725,7 +1729,7 @@
               {
                 "id": "media-center-player-unfavorite",
                 "type": "ui.actions",
-                "area": "main",
+                "area": "actions",
                 "visibleIf": "$state.selectedMediaItemId != null && $state.selectedMediaFavorite == true",
                 "inputs": {
                   "variant": "toolbar",
@@ -1836,6 +1840,7 @@
                   "optionLabelPath": "display_label",
                   "optionValuePath": "id",
                   "optionMetaPaths": ["authorization_label", "endpoint_label", "kind", "status"],
+                  "persistFallback": true,
                   "searchable": false,
                   "placeholder": "Choose an online playback device",
                   "placeholder_i18n": {"key": "runtime.media_center.ui.choose_a_playback_device"},
@@ -2044,7 +2049,7 @@
           "title": "Filter and sort",
           "title_i18n": {"key": "runtime.media_center.ui.filter_and_sort"},
           "scope": "workspace",
-          "presentation": {"kind": "modal", "restoreFocus": true},
+          "presentation": {"kind": "drawer", "restoreFocus": true},
           "schema": {
             "id": "media_center_filters",
             "title": "Filter and sort",
@@ -2279,6 +2284,7 @@
                     "kind",
                     "status"
                   ],
+                  "persistFallback": true,
                   "searchable": false,
                   "placeholder": "Choose a playback device",
                   "placeholder_i18n": {
@@ -3565,6 +3571,7 @@
                     {"key": "request_count"},
                     {"key": "cache_hit_count"},
                     {"key": "failure_count"},
+                    {"key": "retry_after_seconds"},
                     {"key": "last_success_at"},
                     {"key": "last_error"}
                   ],
@@ -3618,20 +3625,66 @@
                 }
               },
               {
-                "id": "media-artwork-operation",
+                "id": "media-rendition-operations",
+                "type": "ui.list",
+                "area": "main",
+                "title": "Conversion operations",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_library_agent.list_rendition_jobs",
+                  "params": {"limit": 30},
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["media_center.renditions"],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "itemKey": "id",
+                  "titleKey": "source_name",
+                  "subtitleKey": "status",
+                  "meta": [
+                    {"key": "profile"},
+                    {"key": "output_bytes"},
+                    {"key": "source_relative_path"},
+                    {"key": "error.code"}
+                  ],
+                  "emptyText": "No conversion operations.",
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.no_conversion_operations"
+                  }
+                },
+                "collection": {
+                  "display": "list",
+                  "focusGroup": "media-rendition-operations",
+                  "virtualized": true,
+                  "cursor": {"enabled": false, "stateKey": "mediaCursor"}
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.conversion_operations"
+                }
+              },
+              {
+                "id": "media-current-rendition-operation",
                 "type": "item.details",
                 "area": "main",
-                "title": "Artwork generation",
+                "title": "Current conversion",
                 "dataSource": {
                   "kind": "stream",
                   "receiver": "media_library_agent.rendition_progress",
                   "scope": "workspace"
                 },
                 "inputs": {
-                  "presentation": "body"
+                  "presentation": "body",
+                  "fields": [
+                    {"key": "status", "label": "Status", "path": "status", "label_i18n": {"key": "runtime.media_center.ui.status"}},
+                    {"key": "source", "label": "Source", "path": "source_name", "label_i18n": {"key": "runtime.media_center.ui.source"}},
+                    {"key": "profile", "label": "Profile", "path": "profile", "label_i18n": {"key": "runtime.media_center.ui.profile"}},
+                    {"key": "output_bytes", "label": "Produced bytes", "path": "output_bytes", "label_i18n": {"key": "runtime.media_center.ui.produced_bytes"}},
+                    {"key": "error", "label": "Diagnostic", "value": "{error.code}: {error.detail}", "label_i18n": {"key": "runtime.media_center.ui.diagnostic"}}
+                  ]
                 },
                 "title_i18n": {
-                  "key": "runtime.media_center.ui.artwork_generation"
+                  "key": "runtime.media_center.ui.current_conversion"
                 }
               },
               {

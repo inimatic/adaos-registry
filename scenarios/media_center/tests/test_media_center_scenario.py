@@ -366,7 +366,12 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "media_center_delete_root": "workspace",
     }
 
-    player_widgets = {widget["id"]: widget for widget in modals["media_center_player"]["schema"]["widgets"]}
+    player_schema = modals["media_center_player"]["schema"]
+    player_widgets = {widget["id"]: widget for widget in player_schema["widgets"]}
+    assert player_schema["layout"]["type"] == "split"
+    assert {
+        area["id"]: area["role"] for area in player_schema["layout"]["areas"]
+    } == {"main": "main", "actions": "footer"}
     player = player_widgets["media-center-player"]
     assert player["type"] == "media.videoBrowser"
     assert player["dataSource"]["name"] == "media_center_skill.build_playback_queue"
@@ -388,6 +393,8 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "media-center-player-unfavorite",
         "media-center-player-profile",
     } <= set(player_widgets)
+    assert player_widgets["media-center-player-favorite"]["area"] == "actions"
+    assert player_widgets["media-center-player-unfavorite"]["area"] == "actions"
     player_profile = player_widgets["media-center-player-profile"]
     assert player_profile["inputs"]["variant"] == "adaptiveToolbar"
     assert [option["value"] for option in player_profile["inputs"]["buttons"][0]["options"]] == [
@@ -445,16 +452,20 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         widget["id"]: widget
         for widget in modals["media_center_metadata"]["schema"]["widgets"]
     }
-    artwork_operation = next(
+    rendition_operation = next(
         widget
         for widget in modals["media_center_metadata"]["schema"]["widgets"]
-        if widget["id"] == "media-artwork-operation"
+        if widget["id"] == "media-current-rendition-operation"
     )
-    assert artwork_operation["dataSource"] == {
+    assert rendition_operation["dataSource"] == {
         "kind": "stream",
         "receiver": "media_library_agent.rendition_progress",
         "scope": "workspace",
     }
+    assert metadata_widgets["media-rendition-operations"]["dataSource"]["name"] == (
+        "media_library_agent.list_rendition_jobs"
+    )
+    assert modals["media_center_filters"]["presentation"]["kind"] == "drawer"
     assert metadata_widgets["media-metadata-operations"]["dataSource"] == {
         "kind": "stream",
         "receiver": "media_center.operation_state",
