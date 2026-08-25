@@ -681,6 +681,30 @@ def test_playback_variant_lookup_has_durable_indexes(monkeypatch, tmp_path):
     assert "idx_media_center_variant_work" in variant_indexes
 
 
+def test_base_variant_reuses_catalog_descriptor_without_losing_playback(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Movies/Example.mp4", kind="video"))
+    )
+    item = catalog.list_items(media_kind="video", limit=1)["items"][0]
+
+    with catalog.repository.connect() as connection:
+        descriptors = connection.execute(
+            "SELECT descriptor_json FROM media_variants WHERE derived=0"
+        ).fetchall()
+    plan = catalog.playback_plan(item["id"])
+
+    assert [str(row["descriptor_json"]) for row in descriptors] == ["{}"]
+    assert plan["ok"] is True
+    assert plan["descriptor"]["resource_id"]
+    assert plan["route"]["routed_path"] or plan["route"]["node_path"]
+
+
 def test_agent_delta_retires_same_path_legacy_catalog_row(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
@@ -4503,6 +4527,8 @@ def test_musicbrainz_provider_is_rate_limited_cached_and_audio_only():
 
     assert first == second
     assert len(session.calls) == 1
+    assert provider.status()["request_count"] == 1
+    assert provider.status()["last_success_at"] is not None
     assert session.calls[0][1]["headers"]["User-Agent"].startswith("AdaOS-MediaCenter")
     assert {claim["field_name"] for claim in first} >= {
         "title", "artists", "album", "genres", "artwork_candidates",
@@ -4652,6 +4678,38 @@ def test_enrichment_worker_runs_all_eligible_providers(monkeypatch, tmp_path):
         "media_center.deterministic_local.v1",
         "test.external.v1",
     }
+
+
+def test_enrichment_worker_routes_external_providers_by_media_kind(
+    monkeypatch, tmp_path
+):
+    class VideoProvider:
+        provider_id = "test.video.v1"
+        supported_jobs = frozenset({"metadata_enrichment"})
+
+        @staticmethod
+        def accepts(subject, *, job_kind):
+            return subject["media_kind"] == "video"
+
+        @staticmethod
+        def claims(subject, *, job_kind):
+            raise AssertionError("audio job must not reach video provider")
+
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/Track.mp3")))
+    worker = MediaEnrichmentWorker(
+        catalog,
+        providers=(default_metadata_providers()[0], VideoProvider()),
+    )
+
+    result = worker.run_once()
+    operation = catalog.operations(limit=1)["items"][0]
+
+    assert result["status"] == "completed"
+    assert operation["provider_id"] == "media_center.deterministic_local.v1"
 
 
 def test_enrichment_worker_coalesces_publication_and_exposes_pacing(
@@ -4826,10 +4884,13 @@ def test_background_job_indexes_recovery_and_exact_active_count(monkeypatch, tmp
     assert state["active_count"] == state["counts"]["queued"]
     assert {
         "idx_media_center_background_claim",
+        "idx_media_center_background_kind_status",
         "idx_media_center_background_recent",
     } <= indexes
     assert "idx_media_center_background_claim" in claim_plan
     assert "idx_media_center_background_recent" in recent_plan
+    assert state["counts_by_kind"]["metadata_enrichment"]["queued"] >= 1
+    assert state["storage"]["allocated_bytes"] >= state["storage"]["db_bytes"]
 
 
 def test_library_stream_snapshot_is_compact(monkeypatch, tmp_path):

@@ -3199,6 +3199,10 @@
                     {"key": "running", "label": "Running", "path": "counts.running", "label_i18n": {"key": "runtime.media_center.ui.running"}},
                     {"key": "completed", "label": "Completed", "path": "counts.completed", "label_i18n": {"key": "runtime.media_center.ui.completed"}},
                     {"key": "failed", "label": "Failed", "path": "counts.failed", "label_i18n": {"key": "runtime.media_center.ui.failed"}},
+                    {"key": "metadata_queued", "label": "Metadata queued", "path": "counts_by_kind.metadata_enrichment.queued", "label_i18n": {"key": "runtime.media_center.ui.metadata_queued"}},
+                    {"key": "metadata_running", "label": "Metadata running", "path": "counts_by_kind.metadata_enrichment.running", "label_i18n": {"key": "runtime.media_center.ui.metadata_running"}},
+                    {"key": "database_size", "label": "Database size", "path": "storage.db_bytes", "format": "bytes", "label_i18n": {"key": "runtime.media_center.ui.database_size"}},
+                    {"key": "reclaimable_storage", "label": "Reclaimable storage", "path": "storage.reclaimable_bytes", "format": "bytes", "label_i18n": {"key": "runtime.media_center.ui.reclaimable_storage"}},
                     {"key": "coverage_total", "label": "Projected items", "path": "coverage.total", "label_i18n": {"key": "runtime.media_center.ui.projected_items"}},
                     {"key": "coverage_year", "label": "With year", "path": "coverage.with_year", "label_i18n": {"key": "runtime.media_center.ui.with_year"}},
                     {"key": "coverage_genres", "label": "With genres", "path": "coverage.with_genres", "label_i18n": {"key": "runtime.media_center.ui.with_genres"}},
@@ -3222,7 +3226,14 @@
                   "itemKey": "provider_id",
                   "titleKey": "provider_id",
                   "subtitleKey": "state",
-                  "meta": [{"key": "reason"}],
+                  "meta": [
+                    {"key": "reason"},
+                    {"key": "request_count"},
+                    {"key": "cache_hit_count"},
+                    {"key": "failure_count"},
+                    {"key": "last_success_at"},
+                    {"key": "last_error"}
+                  ],
                   "emptyText": "No metadata providers are registered.",
                   "emptyText_i18n": {"key": "runtime.media_center.ui.no_metadata_providers"}
                 },
@@ -3246,9 +3257,14 @@
                 },
                 "inputs": {
                   "itemKey": "id",
-                  "titleKey": "kind",
+                  "titleKey": "subject_title",
                   "subtitleKey": "status",
-                  "meta": [{"key": "error_code"}],
+                  "meta": [
+                    {"key": "kind"},
+                    {"key": "media_kind"},
+                    {"key": "provider_id"},
+                    {"key": "error_code"}
+                  ],
                   "emptyText": "No background operations.",
                   "emptyText_i18n": {
                     "key": "runtime.media_center.ui.no_background_operations"

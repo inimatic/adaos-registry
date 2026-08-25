@@ -25,6 +25,8 @@ class MetadataProvider(Protocol):
         self, subject: Mapping[str, Any], *, job_kind: str
     ) -> list[dict[str, Any]]: ...
 
+    def accepts(self, subject: Mapping[str, Any], *, job_kind: str) -> bool: ...
+
     def status(self) -> dict[str, Any]: ...
 
 
@@ -43,6 +45,9 @@ class DeterministicLocalProvider:
     supported_jobs: frozenset[str] = frozenset(
         {"metadata_enrichment", "technical_probe", "fingerprint", "embedding"}
     )
+
+    def accepts(self, subject: Mapping[str, Any], *, job_kind: str) -> bool:
+        return job_kind in self.supported_jobs
 
     def claims(
         self, subject: Mapping[str, Any], *, job_kind: str
@@ -238,6 +243,12 @@ def _external_subject(subject: Mapping[str, Any]) -> dict[str, Any]:
 class TmdbMetadataProvider:
     provider_id = "media_center.tmdb.v1"
     supported_jobs = frozenset({"metadata_enrichment"})
+
+    def accepts(self, subject: Mapping[str, Any], *, job_kind: str) -> bool:
+        return (
+            job_kind in self.supported_jobs
+            and str(subject.get("media_kind") or "").strip().lower() == "video"
+        )
 
     def __init__(
         self,
@@ -557,6 +568,12 @@ class MusicBrainzMetadataProvider:
     provider_id = "media_center.musicbrainz.v1"
     supported_jobs = frozenset({"metadata_enrichment"})
 
+    def accepts(self, subject: Mapping[str, Any], *, job_kind: str) -> bool:
+        return (
+            job_kind in self.supported_jobs
+            and str(subject.get("media_kind") or "").strip().lower() == "audio"
+        )
+
     def __init__(
         self,
         *,
@@ -578,6 +595,7 @@ class MusicBrainzMetadataProvider:
         self._cache_hits = 0
         self._failures = 0
         self._last_error = ""
+        self._last_success_at = 0.0
 
     def _request(self, path: str, params: Mapping[str, Any]) -> dict[str, Any]:
         cache_key = f"{path}|{sorted(dict(params).items())!r}"
@@ -621,6 +639,7 @@ class MusicBrainzMetadataProvider:
         while len(self._cache) > 1000:
             self._cache.popitem(last=False)
         self._last_error = ""
+        self._last_success_at = time.time()
         return result
 
     def claims(
@@ -727,6 +746,7 @@ class MusicBrainzMetadataProvider:
             "cache_hit_count": self._cache_hits,
             "failure_count": self._failures,
             "last_error": self._last_error,
+            "last_success_at": self._last_success_at or None,
         }
 
 
@@ -899,7 +919,14 @@ class MediaEnrichmentWorker:
             return self.coordinator.fail_background_job(
                 job_id, error_code="enrichment_subject_not_found", retryable=False
             )
-        providers = [item for item in self.providers if kind in item.supported_jobs]
+        providers = []
+        for item in self.providers:
+            if kind not in item.supported_jobs:
+                continue
+            accepts = getattr(item, "accepts", None)
+            if callable(accepts) and not accepts(subject, job_kind=kind):
+                continue
+            providers.append(item)
         if not providers:
             return self.coordinator.fail_background_job(
                 job_id, error_code="enrichment_provider_unavailable", retryable=False

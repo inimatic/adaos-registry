@@ -14,7 +14,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 
 SCHEMA_VERSION = "adaos.media_center.catalog.v1"
-CATALOG_SCHEMA_REVISION = "2026-08-20.1"
+CATALOG_SCHEMA_REVISION = "2026-08-25.1"
 SKILL_NAME = "media_center_skill"
 MAX_LIST_LIMIT = 500
 DEFAULT_LIST_LIMIT = 100
@@ -140,6 +140,9 @@ class MediaCenterRepository:
         with closing(sqlite3.connect(str(self.db_path), timeout=30)) as connection:
             connection.execute("PRAGMA journal_mode=WAL")
             connection.execute("PRAGMA synchronous=NORMAL")
+            # New catalogs reclaim deleted pages incrementally. Existing catalogs
+            # adopt this setting after their explicit one-time VACUUM maintenance.
+            connection.execute("PRAGMA auto_vacuum=INCREMENTAL")
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS meta (

@@ -31,7 +31,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-25.2"
+COORDINATOR_SCHEMA_REVISION = "2026-08-25.3"
 SEARCH_ROWID_REVISION = "1"
 METADATA_SETTINGS_KEY = "metadata_provider_settings"
 DEFAULT_METADATA_SETTINGS = {
@@ -610,6 +610,29 @@ class MediaCatalogCoordinator:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_media_center_background_recent "
                 "ON media_background_jobs(updated_at DESC,id DESC)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_media_center_background_kind_status "
+                "ON media_background_jobs(kind,status,updated_at DESC,id DESC)"
+            )
+            # The base variant and catalog row describe the same exact source.
+            # Keep only derived descriptors here; playback_plan already falls
+            # back to catalog_items for the base descriptor.
+            connection.execute(
+                "UPDATE media_variants SET descriptor_json='{}' "
+                "WHERE derived=0 AND descriptor_json<>'{}'"
+            )
+            connection.execute(
+                """
+                UPDATE media_background_jobs
+                SET priority=CASE
+                    WHEN EXISTS (
+                        SELECT 1 FROM catalog_items c
+                        WHERE ('item:' || c.id)=media_background_jobs.subject_ref
+                          AND c.media_kind='audio'
+                    ) THEN 150 ELSE 200 END
+                WHERE kind='metadata_enrichment' AND status='queued'
+                """
             )
             alias_columns = {
                 str(row["name"])
@@ -1887,7 +1910,7 @@ class MediaCatalogCoordinator:
             else max(0, int(provider_revision))
         )
         priorities = {
-            "metadata_enrichment": 200,
+            "metadata_enrichment": 150 if media_kind == "audio" else 200,
             "embedding": 600,
             "fingerprint": 500,
         }
@@ -2168,7 +2191,7 @@ class MediaCatalogCoordinator:
                 kind,
                 mime_type,
                 _json_dumps(self._quality(descriptor, metadata)),
-                _json_dumps(descriptor),
+                "{}",
                 _text(
                     source.get("resource_id")
                     or descriptor.get("resource_id")
@@ -6565,8 +6588,25 @@ class MediaCatalogCoordinator:
     def operations(self, *, limit: int = 30) -> dict[str, Any]:
         bounded = max(1, min(100, int(limit or 30)))
         with self.repository.connect() as connection:
-            rows = connection.execute("SELECT * FROM media_background_jobs ORDER BY updated_at DESC LIMIT ?", (bounded,)).fetchall()
-        return {"ok": True, "schema": COORDINATOR_SCHEMA, "items": [dict(row) | {"progress": _json_loads(row["progress_json"]) or {}} for row in rows], "count": len(rows)}
+            rows = connection.execute(
+                """
+                SELECT j.*,c.title AS subject_title,c.media_kind AS media_kind
+                FROM media_background_jobs j
+                LEFT JOIN catalog_items c ON ('item:' || c.id)=j.subject_ref
+                ORDER BY j.updated_at DESC,j.id DESC LIMIT ?
+                """,
+                (bounded,),
+            ).fetchall()
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "items": [
+                dict(row)
+                | {"progress": _json_loads(row["progress_json"]) or {}}
+                for row in rows
+            ],
+            "count": len(rows),
+        }
 
     def background_job_counts(self) -> dict[str, int]:
         with self.repository.connect() as connection:
@@ -6578,9 +6618,52 @@ class MediaCatalogCoordinator:
             ).fetchall()
         return {str(row["status"]): int(row["count"]) for row in rows}
 
+    def background_job_counts_by_kind(self) -> dict[str, dict[str, int]]:
+        with self.repository.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT kind,status,COUNT(*) AS count
+                FROM media_background_jobs
+                GROUP BY kind,status
+                """
+            ).fetchall()
+        result: dict[str, dict[str, int]] = {}
+        for row in rows:
+            result.setdefault(str(row["kind"]), {})[str(row["status"])] = int(
+                row["count"]
+            )
+        return result
+
+    def storage_status(self) -> dict[str, Any]:
+        db_path = self.repository.db_path
+        wal_path = Path(f"{db_path}-wal")
+        with self.repository.connect() as connection:
+            page_size = int(connection.execute("PRAGMA page_size").fetchone()[0])
+            page_count = int(connection.execute("PRAGMA page_count").fetchone()[0])
+            freelist_count = int(
+                connection.execute("PRAGMA freelist_count").fetchone()[0]
+            )
+            auto_vacuum = int(
+                connection.execute("PRAGMA auto_vacuum").fetchone()[0]
+            )
+        return {
+            "schema": "adaos.media_center.storage_state.v1",
+            "db_bytes": db_path.stat().st_size if db_path.exists() else 0,
+            "wal_bytes": wal_path.stat().st_size if wal_path.exists() else 0,
+            "allocated_bytes": page_size * page_count,
+            "reclaimable_bytes": page_size * freelist_count,
+            "page_size": page_size,
+            "page_count": page_count,
+            "freelist_count": freelist_count,
+            "auto_vacuum": {0: "none", 1: "full", 2: "incremental"}.get(
+                auto_vacuum, "unknown"
+            ),
+        }
+
     def operation_state(self, *, limit: int = 30) -> dict[str, Any]:
         operations = self.operations(limit=limit)
         counts = self.background_job_counts()
+        counts_by_kind = self.background_job_counts_by_kind()
         active_count = sum(
             counts.get(status, 0)
             for status in ("queued", "running", "waiting_resources", "canceling")
@@ -6589,7 +6672,9 @@ class MediaCatalogCoordinator:
             **operations,
             "schema": "adaos.media_center.operation_state.v1",
             "counts": counts,
+            "counts_by_kind": counts_by_kind,
             "active_count": active_count,
+            "storage": self.storage_status(),
             "updated_at": now_iso(),
         }
 
