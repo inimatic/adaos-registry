@@ -561,6 +561,69 @@ def test_play_on_creates_a_durable_remote_session_and_sends_play(monkeypatch):
     assert calls[2][2]["session_id"] == "session-tv"
 
 
+def test_play_on_selects_requested_item_in_existing_remote_session(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "build_playback_queue",
+        lambda **_kwargs: {
+            "ok": True,
+            "items": [
+                {"id": "episode-1", "title": "Episode 1", "route": {}},
+                {"id": "episode-2", "title": "Episode 2", "route": {}},
+            ],
+            "initial_index": 1,
+            "playback_control": {
+                "queue_source": {"type": "collection", "id": "series-1"}
+            },
+        },
+    )
+    calls = []
+
+    def invoke(skill, method, params, **_kwargs):
+        calls.append((skill, method, params))
+        if method == "now_playing":
+            return {
+                "ok": True,
+                "items": [
+                    {
+                        "id": "session-tv",
+                        "target_id": "target-tv",
+                        "revision": 4,
+                        "queue_revision": 2,
+                    }
+                ],
+            }, ""
+        if method == "update_queue":
+            return {
+                "ok": True,
+                "session": {"id": "session-tv", "revision": 5},
+            }, ""
+        if method == "command":
+            return {
+                "ok": True,
+                "session": {"id": "session-tv", "revision": 6},
+                "command": {"command": "play"},
+            }, ""
+        raise AssertionError(method)
+
+    monkeypatch.setattr(main, "_invoke_skill", invoke)
+
+    result = main.play_on(
+        target_id="target-tv",
+        source_type="collection",
+        source_id="series-1",
+        start_item_id="episode-2",
+        profile_id="alice",
+    )
+
+    assert result["ok"] is True
+    assert [method for _skill, method, _params in calls] == [
+        "now_playing", "update_queue", "command",
+    ]
+    assert calls[1][2]["active_index"] == 1
+    assert calls[2][2]["expected_revision"] == 5
+
+
 def test_catalog_page_queue_preserves_current_query_sort_and_start_item(
     monkeypatch, tmp_path
 ):

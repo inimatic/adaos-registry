@@ -561,6 +561,7 @@ class MediaControlRepository:
         *,
         queue: Iterable[Mapping[str, Any]],
         expected_queue_revision: int,
+        active_index: int | None = None,
         actor_ref: str,
     ) -> dict[str, Any]:
         items = [dict(item) for item in queue][:MAX_QUEUE_ITEMS]
@@ -580,14 +581,43 @@ class MediaControlRepository:
                 connection.rollback()
                 return {"ok": False, "error": "playback_control_lease_conflict"}
             self._replace_queue(connection, token, items)
-            new_index = min(int(row["active_queue_index"]), len(items) - 1)
+            requested_index = (
+                int(row["active_queue_index"])
+                if active_index is None
+                else int(active_index)
+            )
+            new_index = max(0, min(requested_index, len(items) - 1))
             active = items[new_index]
+            active_item_id = text(active.get("item_id") or active.get("id"))
+            selection_changed = (
+                active_index is not None
+                or active_item_id != str(row["active_item_id"])
+            )
+            descriptor = (
+                active.get("descriptor")
+                if isinstance(active.get("descriptor"), Mapping)
+                else active
+            )
+            route = descriptor.get("route") if isinstance(descriptor, Mapping) else {}
             connection.execute(
                 """
                 UPDATE playback_sessions SET queue_revision=queue_revision+1,revision=revision+1,
-                    active_queue_index=?,active_item_id=?,work_id=?,variant_id=?,source_id=?,updated_at=? WHERE id=?
+                    active_queue_index=?,active_item_id=?,work_id=?,variant_id=?,source_id=?,route_json=?,
+                    position_ms=?,duration_ms=?,state=?,updated_at=? WHERE id=?
                 """,
-                (new_index, text(active.get("item_id") or active.get("id")), text(active.get("work_id")), text(active.get("variant_id")), text(active.get("source_id")), now_iso(), token),
+                (
+                    new_index,
+                    active_item_id,
+                    text(active.get("work_id")),
+                    text(active.get("variant_id")),
+                    text(active.get("source_id")),
+                    dumps(route or {}),
+                    0 if selection_changed else int(row["position_ms"]),
+                    0 if selection_changed else int(row["duration_ms"]),
+                    "ready" if selection_changed else str(row["state"]),
+                    now_iso(),
+                    token,
+                ),
             )
             connection.commit()
         return self.get_session(token)

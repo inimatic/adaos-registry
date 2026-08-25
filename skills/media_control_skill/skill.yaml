@@ -1,5 +1,5 @@
 name: media_control_skill
-version: 0.2.10
+version: 0.2.11
 description: Persistent Media Center control plane for playback targets, sessions,
   queues, commands, checkpoints, and settings.
 supported_locales:
@@ -310,6 +310,9 @@ tools:
       expected_queue_revision:
         type: integer
         minimum: 1
+      active_index:
+        type: integer
+        minimum: 0
       actor_ref:
         type: string
       webspace_id:
@@ -731,4 +734,3 @@ compatibility:
     min_commit: 60ba2e20101127f458457d9c30eb6a91f6249556
     min_short_commit: 60ba2e20
     build_date: '2026-08-24T15:15:48+03:00'
-

@@ -484,6 +484,7 @@ def update_queue(
     session_id: str = "",
     queue: list[Mapping[str, Any]] | None = None,
     expected_queue_revision: int = 0,
+    active_index: int | None = None,
     actor_ref: str = "",
     webspace_id: str = "",
     **_: Any,
@@ -493,6 +494,7 @@ def update_queue(
         session_id,
         queue=queue or [],
         expected_queue_revision=expected_queue_revision,
+        active_index=active_index,
         actor_ref=actor_ref,
     )
     if result.get("ok"):

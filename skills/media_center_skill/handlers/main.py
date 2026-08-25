@@ -2057,6 +2057,7 @@ def play_on(
                 "session_id": str(existing.get("id") or ""),
                 "queue": queue,
                 "expected_queue_revision": int(existing.get("queue_revision") or 0),
+                "active_index": initial_index,
                 "actor_ref": actor_ref,
                 "webspace_id": webspace_id,
             },

@@ -79,6 +79,33 @@ def test_session_queue_is_persistent_and_server_paged():
     assert page["queue"]["pagination"]["limit"] == 30
 
 
+def test_queue_replacement_can_select_item_and_reset_playback_state():
+    repository = MediaControlRepository()
+    session = _session(repository)
+    with repository.connect() as connection:
+        connection.execute(
+            "UPDATE playback_sessions SET state='playing',position_ms=42000,duration_ms=90000 WHERE id=?",
+            (session["id"],),
+        )
+        connection.commit()
+
+    result = repository.update_queue(
+        session["id"],
+        queue=_queue(3),
+        expected_queue_revision=session["queue_revision"],
+        active_index=2,
+        actor_ref="profile:alice",
+    )
+
+    updated = result["session"]
+    assert updated["active_queue_index"] == 2
+    assert updated["active_item_id"] == "item-2"
+    assert updated["position_ms"] == 0
+    assert updated["duration_ms"] == 0
+    assert updated["state"] == "ready"
+    assert updated["route"]["path"] == "/media/2"
+
+
 def test_now_playing_exposes_human_titles_and_target_labels():
     repository = MediaControlRepository()
     session = _session(repository)
