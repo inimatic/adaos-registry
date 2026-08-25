@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import sqlite3
+import time
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -1661,17 +1662,21 @@ class MediaCatalogCoordinator:
             if reclaim:
                 connection.execute("PRAGMA auto_vacuum=INCREMENTAL")
                 connection.execute("VACUUM")
-            post_vacuum_checkpoint = (
-                tuple(
-                    int(value)
-                    for value in connection.execute(
-                        "PRAGMA wal_checkpoint(TRUNCATE)"
-                    ).fetchone()
-                )
-                if reclaim
-                else checkpoint
-            )
             connection.execute("PRAGMA optimize")
+        post_vacuum_checkpoint = checkpoint
+        if reclaim:
+            deadline = time.monotonic() + 5.0
+            while True:
+                with self.repository.connect() as connection:
+                    post_vacuum_checkpoint = tuple(
+                        int(value)
+                        for value in connection.execute(
+                            "PRAGMA wal_checkpoint(TRUNCATE)"
+                        ).fetchone()
+                    )
+                if post_vacuum_checkpoint[0] == 0 or time.monotonic() >= deadline:
+                    break
+                time.sleep(0.05)
         after = self.storage_status()
         return {
             "ok": True,

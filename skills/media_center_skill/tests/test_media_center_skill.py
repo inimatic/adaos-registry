@@ -902,6 +902,27 @@ def test_storage_compaction_is_bounded_resumable_and_preserves_public_metadata(
     assert projection == {"overview": "Preserved"}
 
 
+def test_storage_optimization_reports_settled_file_size(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media-center-optimize.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    with catalog.repository.connect() as connection:
+        connection.execute("CREATE TABLE storage_padding(payload BLOB)")
+        connection.execute("INSERT INTO storage_padding VALUES (zeroblob(4194304))")
+        connection.commit()
+        connection.execute("DELETE FROM storage_padding")
+        connection.commit()
+
+    result = catalog.optimize_storage(reclaim=True)
+
+    assert result["ok"] is True
+    assert result["post_vacuum_checkpoint"][0] == 0
+    assert result["after"]["db_bytes"] == catalog.repository.db_path.stat().st_size
+    assert result["after"]["wal_bytes"] == 0
+    assert result["reclaimed_bytes"] > 0
+
+
 def test_agent_delta_retires_same_path_legacy_catalog_row(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")

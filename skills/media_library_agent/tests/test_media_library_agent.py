@@ -750,6 +750,26 @@ def test_storage_compaction_retains_latest_replayable_source_snapshot(tmp_path):
     }
 
 
+def test_storage_optimization_reports_settled_file_size(tmp_path):
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "optimize.sqlite3", node_id="node-a"
+    )
+    with repository.connect() as connection:
+        connection.execute("CREATE TABLE storage_padding(payload BLOB)")
+        connection.execute("INSERT INTO storage_padding VALUES (zeroblob(4194304))")
+        connection.commit()
+        connection.execute("DELETE FROM storage_padding")
+        connection.commit()
+
+    result = repository.optimize_storage(reclaim=True)
+
+    assert result["ok"] is True
+    assert result["post_vacuum_checkpoint"][0] == 0
+    assert result["after"]["db_bytes"] == repository.db_path.stat().st_size
+    assert result["after"]["wal_bytes"] == 0
+    assert result["reclaimed_bytes"] > 0
+
+
 def test_repository_context_closes_sqlite_connection(tmp_path):
     repository = MediaLibraryAgentRepository(
         tmp_path / "closing-connection.sqlite3", node_id="node-a"
