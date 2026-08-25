@@ -362,8 +362,9 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
             "media_center_filters": "workspace",
         "media_center_remote": "workspace",
         "media_center_settings": "workspace",
-        "media_center_metadata": "workspace",
-        "media_center_delete_root": "workspace",
+            "media_center_metadata": "workspace",
+            "media_center_storage_policy": "workspace",
+            "media_center_delete_root": "workspace",
     }
 
     player_schema = modals["media_center_player"]["schema"]
@@ -512,8 +513,33 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         if widget["id"] == "media-roots-table"
     )
     delete_column = next(column for column in roots["inputs"]["columns"] if column.get("kind") == "buttons")
-    assert delete_column["buttons"][0]["id"] == "delete"
-    assert roots["actions"][1]["params"]["modalId"] == "media_center_delete_root"
+    assert {button["id"] for button in delete_column["buttons"]} == {
+        "storage",
+        "delete",
+    }
+    storage_widgets = {
+        widget["id"]: widget
+        for widget in modals["media_center_storage_policy"]["schema"]["widgets"]
+    }
+    assert storage_widgets["media-rendition-storage-mode"]["type"] == (
+        "input.selector"
+    )
+    save_action = next(
+        action
+        for action in storage_widgets["media-storage-policy-actions"]["actions"]
+        if action["on"] == "click:save" and action["type"] == "callSkill"
+    )
+    assert save_action["target"] == "media_center_skill.set_root_storage_policy"
+    assert next(
+        action
+        for action in roots["actions"]
+        if action["on"] == "click:storage" and action["type"] == "openModal"
+    )["params"]["modalId"] == "media_center_storage_policy"
+    assert next(
+        action
+        for action in roots["actions"]
+        if action["on"] == "click:delete" and action["type"] == "openModal"
+    )["params"]["modalId"] == "media_center_delete_root"
     scan_progress = settings_widgets["media-scan-progress"]
     assert scan_progress["dataSource"] == {
         "kind": "stream",

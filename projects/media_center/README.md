@@ -23,6 +23,16 @@ does not consume its network budget on recognized audiobook chapters. This is
 local validation evidence only; no ProjectRelease or stand acceptance is
 claimed.
 
+The same candidate adds per-root derived-storage policy. Converted single-file
+renditions default to an atomic content-addressed `.adaos-media` store on the
+volume that owns the original, with a 100 GiB configurable root quota; artwork
+defaults to the node cache for interactive reads. Existing node-cache
+renditions migrate through durable resumable background jobs and yield to
+playback pressure. Settings exposes the policy per media folder and Metadata
+Activity exposes bounded migration progress. The source-owned managed
+directory is excluded from scans, and original media is never copied, moved,
+or deleted by this lifecycle.
+
 Release `0.6.75` makes catalog startup single-flight under real storage
 contention. It ships `media_center_skill@0.8.67` and keeps the remaining
 `0.6.74` component set. Bounded schema-revision reads absorb short SQLite locks;

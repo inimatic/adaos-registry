@@ -34,6 +34,7 @@ from .rendition import (
     materialize_artwork,
     output_path,
     publish_derived_resource,
+    publish_managed_rendition,
     rendition_limits,
     transcode_with_ffmpeg,
 )
@@ -79,6 +80,7 @@ class MediaLibraryAgentWorker:
         self._transcode = transcode or transcode_with_ffmpeg
         self._artwork = artwork or materialize_artwork
         self._publish_derived = publish_derived or publish_derived_resource
+        self._publish_derived_custom = publish_derived is not None
         self._poll_seconds = max(0.05, min(10.0, float(poll_seconds)))
         self._stop = threading.Event()
         self._wake = threading.Event()
@@ -92,6 +94,7 @@ class MediaLibraryAgentWorker:
         self._watch_state: dict[str, tuple[str, float, bool]] = {}
         self._watch_pending: dict[str, tuple[float, bool]] = {}
         self._embedded_metadata_backfill_complete = False
+        self._storage_migrations_enqueued = False
         self._last_partial_cleanup_monotonic = 0.0
 
     def ensure_started(self) -> bool:
@@ -148,6 +151,7 @@ class MediaLibraryAgentWorker:
         self._poll_watch_schedules()
         self._cleanup_invalidated_renditions()
         self._cleanup_orphan_rendition_partials()
+        self._enqueue_storage_migrations()
         # Existing libraries must receive source-local tags before the bounded
         # artwork backlog can consume the worker indefinitely.
         self._enqueue_embedded_metadata_backfill()
@@ -166,6 +170,11 @@ class MediaLibraryAgentWorker:
             claimed = self.repository.claim_job(queued["id"])
             if claimed is not None:
                 return self._run_claimed_scan_job(claimed)
+        migration = self.repository.next_storage_migration()
+        if migration is not None:
+            claimed_migration = self.repository.claim_storage_migration(migration["id"])
+            if claimed_migration is not None:
+                return self._run_storage_migration(claimed_migration)
         if rendition is not None:
             claimed_rendition = self.repository.claim_rendition_job(rendition["id"])
             if claimed_rendition is not None:
@@ -183,6 +192,128 @@ class MediaLibraryAgentWorker:
         ):
             return maintenance
         return None
+
+    def _enqueue_storage_migrations(self) -> None:
+        if self._storage_migrations_enqueued:
+            return
+        for root in self.repository.list_roots()["items"][:1000]:
+            policy = dict(root.get("storage_policy") or {})
+            if text(policy.get("rendition_mode")) == "source_root" and bool(
+                policy.get("legacy_migration", True)
+            ):
+                self.repository.enqueue_storage_migration(text(root.get("id")))
+        self._storage_migrations_enqueued = True
+
+    def _run_storage_migration(self, job: Mapping[str, Any]) -> dict[str, Any]:
+        job_id = text(job.get("id"))
+        if self._refresh_resource_pressure(force=True) in {"playback", "critical"}:
+            result = self.repository.update_storage_migration(
+                job_id,
+                status="waiting_resources",
+                current_rendition_job_id="",
+                error_code="",
+                error_detail="",
+            )
+            self._publish_storage_migration(result or job)
+            return result or dict(job)
+        root = self.repository.get_root(text(job.get("root_id")))
+        if root is None:
+            result = self.repository.update_storage_migration(
+                job_id,
+                status="failed",
+                finished_at=now_iso(),
+                error_code="root_not_found",
+            )
+            self._publish_storage_migration(result or job)
+            return result or dict(job)
+        candidate = self.repository.storage_migration_candidate(
+            text(root.get("id")), text(job.get("cursor"))
+        )
+        if candidate is None:
+            result = self.repository.update_storage_migration(
+                job_id,
+                status="completed",
+                finished_at=now_iso(),
+                current_rendition_job_id="",
+                error_code="",
+                error_detail="",
+            )
+            self._publish_storage_migration(result or job)
+            return result or dict(job)
+
+        old_descriptor = dict(candidate.get("output") or {})
+        old_path = Path(
+            text(old_descriptor.get("path") or old_descriptor.get("source_path"))
+        )
+        migrated = False
+        migrated_bytes = 0
+        error_code = ""
+        error_detail = ""
+        try:
+            if not old_path.is_file():
+                raise RuntimeError("legacy_rendition_not_found")
+            migrated_bytes = int(old_path.stat().st_size)
+            policy = dict(root.get("storage_policy") or {})
+            quota = max(
+                1024**3,
+                int(policy.get("rendition_quota_bytes") or 100 * 1024**3),
+            )
+            if (
+                self.repository.rendition_storage_bytes(
+                    text(root.get("id")), "source_root"
+                )
+                + migrated_bytes
+                > quota
+            ):
+                raise RuntimeError("rendition_storage_quota_exceeded")
+            descriptor = dict(publish_managed_rendition(old_path, candidate, root=root))
+            replaced = self.repository.replace_rendition_storage(
+                text(candidate.get("id")),
+                descriptor=descriptor,
+                output_bytes=migrated_bytes,
+            )
+            if not replaced.get("ok"):
+                raise RuntimeError(
+                    text(replaced.get("error")) or "storage_migration_update_failed"
+                )
+            self._cleanup_published_descriptor(old_descriptor)
+            migrated = True
+        except Exception as exc:
+            error_code, _, error_detail = text(exc).partition(":")
+            error_code = error_code or "storage_migration_failed"
+        result = self.repository.update_storage_migration(
+            job_id,
+            status="queued",
+            cursor=text(candidate.get("id")),
+            processed_count=int(job.get("processed_count") or 0) + 1,
+            migrated_count=int(job.get("migrated_count") or 0) + int(migrated),
+            failed_count=int(job.get("failed_count") or 0) + int(not migrated),
+            processed_bytes=int(job.get("processed_bytes") or 0)
+            + (migrated_bytes if migrated else 0),
+            current_rendition_job_id=text(candidate.get("id")),
+            error_code=error_code,
+            error_detail=error_detail[:1000],
+        )
+        self._publish_storage_migration(result or job)
+        return result or dict(job)
+
+    def _publish_storage_migration(self, job: Mapping[str, Any]) -> None:
+        if not self._publish_callback:
+            return
+        try:
+            self._publish_callback(
+                {
+                    **dict(job),
+                    "job_id": text(job.get("id")),
+                    "job_type": "storage_migration",
+                    "agent_id": self.repository.agent_id,
+                    "node_id": self.repository.node_id,
+                    "updated_at": now_iso(),
+                },
+                "",
+            )
+        except Exception:
+            pass
 
     def _enqueue_embedded_metadata_backfill(self) -> int:
         if self._embedded_metadata_backfill_complete:
@@ -333,9 +464,22 @@ class MediaLibraryAgentWorker:
             return self._finish_rendition_failed(
                 job_id, "source_path_invalid", str(exc)
             )
+        root = self.repository.get_root(text(source.get("root_id")))
+        if root is None:
+            return self._finish_rendition_failed(job_id, "root_not_found")
+        storage_policy = dict(root.get("storage_policy") or {})
         target_path = output_path(self.repository.db_path, job)
         limits = rendition_limits()
         is_artwork = text(job.get("profile")) == ARTWORK_PROFILE
+        requested_storage_mode = text(
+            storage_policy.get("artwork_mode" if is_artwork else "rendition_mode")
+        ) or ("node_cache" if is_artwork else "source_root")
+        packaging = text((job.get("target") or {}).get("packaging"))
+        storage_mode = (
+            "node_cache"
+            if packaging == "hls_cmaf_vod" and requested_storage_mode == "source_root"
+            else requested_storage_mode
+        )
         estimated = (
             int((job.get("target") or {}).get("max_output_bytes") or 4 * 1024**2)
             if is_artwork
@@ -350,6 +494,18 @@ class MediaLibraryAgentWorker:
             return self._finish_rendition_failed(
                 job_id, "rendition_disk_quota_exceeded"
             )
+        if storage_mode == "source_root" and not is_artwork:
+            quota = max(
+                1024**3,
+                int(storage_policy.get("rendition_quota_bytes") or 100 * 1024**3),
+            )
+            used = self.repository.rendition_storage_bytes(
+                text(root.get("id")), "source_root"
+            )
+            if used + estimated > quota:
+                return self._finish_rendition_failed(
+                    job_id, "rendition_storage_quota_exceeded"
+                )
         self._publish_rendition(job_id)
         try:
             self._wait_for_rendition_resources(job_id)
@@ -363,9 +519,7 @@ class MediaLibraryAgentWorker:
 
             def cancelled() -> bool:
                 nonlocal progress_checked_at, progress_bytes
-                should_cancel = self._stop.is_set() or self._rendition_cancelled(
-                    job_id
-                )
+                should_cancel = self._stop.is_set() or self._rendition_cancelled(job_id)
                 current_time = time.monotonic()
                 if not is_artwork and current_time - progress_checked_at >= 2.0:
                     progress_checked_at = current_time
@@ -395,11 +549,23 @@ class MediaLibraryAgentWorker:
                 return self._finish_rendition_failed(
                     job_id, "source_changed", status="invalidated"
                 )
-            descriptor = dict(self._publish_derived(target_path, job))
+            descriptor = dict(
+                self._publish_derived(target_path, job)
+                if self._publish_derived_custom or storage_mode == "node_cache"
+                else publish_managed_rendition(target_path, job, root=root)
+            )
             descriptor_metadata = dict(descriptor.get("metadata") or {})
             descriptor_metadata.update(
                 {
-                    "storage_mode": "derived_copy",
+                    "storage_mode": text(
+                        descriptor_metadata.get("storage_mode")
+                        or (
+                            "derived_copy"
+                            if self._publish_derived_custom
+                            else storage_mode
+                        )
+                    ),
+                    "requested_storage_mode": requested_storage_mode,
                     "derived_from_source_id": text(job.get("source_id")),
                     "derived_from_source_revision": int(
                         job.get("source_revision") or 0
@@ -639,6 +805,20 @@ class MediaLibraryAgentWorker:
             if isinstance(item, Mapping)
         ]
         candidates = resources or [dict(descriptor)]
+        resource_ids = [
+            text(candidate.get("resource_id") or candidate.get("id"))
+            for candidate in candidates
+            if text(candidate.get("resource_id") or candidate.get("id")).startswith(
+                "ref_"
+            )
+        ]
+        if resource_ids:
+            try:
+                from adaos.sdk.io.media import unregister_media_references
+
+                unregister_media_references(resource_ids)
+            except Exception:
+                pass
         for candidate in candidates:
             candidate_name = text(
                 candidate.get("filename") or candidate.get("resource_id")
@@ -861,13 +1041,9 @@ class MediaLibraryAgentWorker:
                     )
                     return finished or {}
 
-                self._wait_for_storage_maintenance(
-                    job_id, root, counters, current_path
-                )
+                self._wait_for_storage_maintenance(job_id, root, counters, current_path)
                 self._wait_for_resources(job_id, root, counters, current_path)
-                self._wait_for_storage_maintenance(
-                    job_id, root, counters, current_path
-                )
+                self._wait_for_storage_maintenance(job_id, root, counters, current_path)
                 self._run_priority_rendition_during_scan(
                     job_id, root, counters, current_path
                 )
@@ -1141,6 +1317,8 @@ class MediaLibraryAgentWorker:
     @staticmethod
     def _excluded(relative_path: str, patterns: list[str]) -> bool:
         normalized = relative_path.replace("\\", "/")
+        if normalized == ".adaos-media" or normalized.startswith(".adaos-media/"):
+            return True
         return any(
             fnmatch.fnmatch(normalized, pattern)
             or fnmatch.fnmatch(Path(normalized).name, pattern)

@@ -72,7 +72,12 @@ def _human_error(code: str, fallback: str, **extra: Any) -> dict[str, Any]:
 def _publish_progress(payload: Mapping[str, Any], webspace_id: str) -> None:
     global _progress_stopping, _progress_thread
     snapshot = dict(payload)
-    job_type = "rendition" if text(snapshot.get("job_type")) == "rendition" else "scan"
+    requested_type = text(snapshot.get("job_type"))
+    job_type = (
+        requested_type
+        if requested_type in {"rendition", "storage_migration"}
+        else "scan"
+    )
     key = f"{job_type}:{text(snapshot.get('job_id')) or 'snapshot'}"
     with _progress_condition:
         _progress_stopping = False
@@ -121,18 +126,28 @@ def _deliver_progress(payload: Mapping[str, Any], webspace_id: str) -> None:
     from adaos.sdk.io import stream_variable_publish
 
     meta = {"webspace_id": webspace_id} if webspace_id else None
-    is_rendition = text(payload.get("job_type")) == "rendition"
+    job_type = text(payload.get("job_type"))
+    is_rendition = job_type == "rendition"
+    is_storage_migration = job_type == "storage_migration"
     stream_variable_publish(
         (
             "media_library_agent.rendition_progress"
             if is_rendition
-            else "media_library_agent.progress"
+            else (
+                "media_library_agent.storage_progress"
+                if is_storage_migration
+                else "media_library_agent.progress"
+            )
         ),
         dict(payload),
         var_id=(
             "media_library_agent.current_rendition"
             if is_rendition
-            else "media_library_agent.current_scan"
+            else (
+                "media_library_agent.current_storage_migration"
+                if is_storage_migration
+                else "media_library_agent.current_scan"
+            )
         ),
         ttl_ms=120000,
         _meta=meta,
@@ -387,6 +402,7 @@ def add_root(
     follow_symlinks: bool = False,
     exclusions: list[str] | None = None,
     scan_window: Mapping[str, Any] | None = None,
+    storage_policy: Mapping[str, Any] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
     repository, _worker = _runtime()
@@ -397,6 +413,7 @@ def add_root(
         follow_symlinks=bool(follow_symlinks),
         exclusions=exclusions or (),
         scan_window=scan_window,
+        storage_policy=storage_policy,
     )
     if result.get("ok"):
         return result
@@ -408,6 +425,9 @@ def add_root(
         "root_exclusion_invalid": "One of the exclusion patterns is invalid.",
         "root_path_overlap": "This folder overlaps another active media folder on this node.",
         "root_scan_window_invalid": "The scan window must contain valid local start/end times and weekdays.",
+        "storage_policy_rendition_mode_invalid": "The rendition storage mode is invalid.",
+        "storage_policy_artwork_mode_invalid": "The artwork storage mode is invalid.",
+        "storage_policy_quota_invalid": "The rendition storage quota is invalid.",
     }
     return {
         **result,
@@ -436,6 +456,55 @@ def remove_root(root_id: str = "", **_: Any) -> dict[str, Any]:
 def list_roots(include_disabled: bool = False, **_: Any) -> dict[str, Any]:
     repository, _worker = _runtime()
     return repository.list_roots(include_disabled=bool(include_disabled))
+
+
+@tool(
+    summary="Update the managed derived-media policy for one source root.",
+    side_effects="local_write",
+)
+def set_storage_policy(
+    root_id: str = "", values: Mapping[str, Any] | None = None, **_: Any
+) -> dict[str, Any]:
+    repository, worker = _runtime()
+    result = repository.set_root_storage_policy(root_id, dict(values or {}))
+    if not result.get("ok"):
+        return {
+            **result,
+            **_human_error(
+                text(result.get("error")) or "storage_policy_update_failed",
+                "The media storage policy could not be updated.",
+            ),
+        }
+    migration = repository.enqueue_storage_migration(root_id)
+    _ensure_worker_if_owned(worker)
+    return {**result, "migration": migration}
+
+
+@tool(
+    summary="Queue resumable migration of legacy renditions to their source volume.",
+    side_effects="local_write",
+)
+def migrate_storage(root_id: str = "", **_: Any) -> dict[str, Any]:
+    repository, worker = _runtime()
+    result = repository.enqueue_storage_migration(root_id)
+    if not result.get("ok"):
+        return {
+            **result,
+            **_human_error(
+                text(result.get("error")) or "storage_migration_queue_failed",
+                "The rendition storage migration could not be queued.",
+            ),
+        }
+    _ensure_worker_if_owned(worker)
+    return result
+
+
+@tool(summary="List bounded rendition storage migration history.", side_effects="none")
+def list_storage_migrations(
+    root_id: str = "", limit: int = 20, **_: Any
+) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    return repository.list_storage_migrations(root_id=root_id, limit=limit)
 
 
 @tool(
@@ -513,6 +582,7 @@ def import_folder(
     follow_symlinks: bool = False,
     exclusions: list[str] | None = None,
     scan_window: Mapping[str, Any] | None = None,
+    storage_policy: Mapping[str, Any] | None = None,
     webspace_id: str = "",
     **_: Any,
 ) -> dict[str, Any]:
@@ -523,6 +593,7 @@ def import_folder(
         follow_symlinks=follow_symlinks,
         exclusions=exclusions,
         scan_window=scan_window,
+        storage_policy=storage_policy,
     )
     if not added.get("ok"):
         return added
@@ -831,6 +902,7 @@ def list_rendition_jobs(
     return {
         **repository.list_rendition_jobs(source_id=source_id, limit=limit),
         "artwork": worker.artwork_status(),
+        "storage_migrations": repository.list_storage_migrations(limit=20),
         "resource_pressure": worker.resource_pressure,
     }
 

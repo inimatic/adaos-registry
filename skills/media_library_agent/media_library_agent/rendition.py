@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import mimetypes
 import os
 import platform
@@ -22,6 +23,8 @@ ARTWORK_NAMES = ("cover", "folder", "front", "poster", "album", "artwork")
 ARTWORK_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
 MP4_COPY_VIDEO_CODECS = frozenset({"h264", "avc", "avc1"})
 MP4_COPY_AUDIO_CODECS = frozenset({"aac", "mp3", "mp4a"})
+MANAGED_MEDIA_DIRECTORY = ".adaos-media"
+MANAGED_STORE_SCHEMA = "adaos.media_library.managed_store.v1"
 
 
 def _ffmpeg_executable() -> tuple[str | None, str]:
@@ -95,7 +98,11 @@ def _preferred_audio(
     language = text(preferred_language).lower()
     if language:
         match = next(
-            (item for item in streams if text(item.get("language")).lower() == language),
+            (
+                item
+                for item in streams
+                if text(item.get("language")).lower() == language
+            ),
             None,
         )
         if match:
@@ -114,7 +121,13 @@ def _preferred_audio(
 def _abr_ladder(
     maximum_height: int, maximum_bitrate: int, source_height: int
 ) -> list[dict[str, int]]:
-    presets = ((360, 800_000), (480, 1_400_000), (720, 3_000_000), (1080, 6_000_000), (2160, 16_000_000))
+    presets = (
+        (360, 800_000),
+        (480, 1_400_000),
+        (720, 3_000_000),
+        (1080, 6_000_000),
+        (2160, 16_000_000),
+    )
     ceiling_height = min(
         value for value in (maximum_height, source_height, 1080) if value > 0
     )
@@ -154,17 +167,25 @@ def rendition_plan(
     audio_streams = _technical_streams(technical, "audio")
     video = video_streams[0] if video_streams else {}
     audio = _preferred_audio(audio_streams, preferred_audio_language)
-    codec = text(video.get("codec") or audio.get("codec") or technical.get("codec")).lower()
+    codec = text(
+        video.get("codec") or audio.get("codec") or technical.get("codec")
+    ).lower()
     audio_codec = text(audio.get("codec")).lower()
     codecs = _tokens(capabilities.get("codecs"))
     mime_types = _mime_tokens(capabilities.get("mime_types"))
     containers = _tokens(capabilities.get("containers"))
-    container = text(technical.get("container") or Path(text(source.get("name"))).suffix.lstrip(".")).lower()
+    container = text(
+        technical.get("container") or Path(text(source.get("name"))).suffix.lstrip(".")
+    ).lower()
     reasons: list[str] = []
     codec_incompatible = bool(codecs and codec and codec not in codecs)
     audio_incompatible = bool(codecs and audio_codec and audio_codec not in codecs)
     if codec_incompatible:
-        reasons.append("video_codec_not_supported" if kind == "video" else "audio_codec_not_supported")
+        reasons.append(
+            "video_codec_not_supported"
+            if kind == "video"
+            else "audio_codec_not_supported"
+        )
     if kind == "video" and audio_incompatible:
         reasons.append("audio_codec_not_supported")
     if mime_types and mime_type and mime_type not in mime_types:
@@ -185,7 +206,9 @@ def rendition_plan(
         if text(item) and text(item) != "sdr"
     }
     endpoint_hdr = _tokens(capabilities.get("hdr_modes"))
-    hdr_unsupported = bool(source_hdr and endpoint_hdr and source_hdr.isdisjoint(endpoint_hdr))
+    hdr_unsupported = bool(
+        source_hdr and endpoint_hdr and source_hdr.isdisjoint(endpoint_hdr)
+    )
     if hdr_unsupported:
         reasons.append("hdr_tone_mapping_deferred")
     required = bool(reasons)
@@ -206,11 +229,7 @@ def rendition_plan(
                 and codec in MP4_COPY_VIDEO_CODECS
                 and (not audio or audio_codec in MP4_COPY_AUDIO_CODECS)
             )
-            or (
-                kind == "audio"
-                and audio
-                and audio_codec in MP4_COPY_AUDIO_CODECS
-            )
+            or (kind == "audio" and audio and audio_codec in MP4_COPY_AUDIO_CODECS)
         )
     )
     if container_only and not remux_safe:
@@ -355,9 +374,13 @@ def artwork_plan(
         "required": bool(force or not (current or terminal)),
         "state": "ready" if current else (text(artwork.get("state")) or "missing"),
         "reasons": (
-            ["forced"] if force else
-            (["artwork_ready"] if current else
-             (["terminal_artwork_state"] if terminal else ["artwork_missing"]))
+            ["forced"]
+            if force
+            else (
+                ["artwork_ready"]
+                if current
+                else (["terminal_artwork_state"] if terminal else ["artwork_missing"])
+            )
         ),
         "target": {
             "profile": ARTWORK_PROFILE,
@@ -438,7 +461,9 @@ def _embedded_artwork_bytes(source_path: Path, *, maximum: int) -> bytes | None:
     if isinstance(tags, Mapping):
         for key, value in list(tags.items())[:500]:
             if str(key).casefold() in {"covr", "cover", "metadata_block_picture"}:
-                candidates.extend(value if isinstance(value, (list, tuple)) else [value])
+                candidates.extend(
+                    value if isinstance(value, (list, tuple)) else [value]
+                )
                 continue
             if hasattr(value, "data") and str(key).upper().startswith("APIC"):
                 candidates.append(value)
@@ -565,12 +590,32 @@ def _video_frame_artwork(
         )
         partial.unlink(missing_ok=True)
         command = [
-            executable, "-nostdin", "-hide_banner", "-loglevel", "error",
-            "-protocol_whitelist", "file,pipe", "-ss", seek_seconds,
-            "-i", str(source_path), "-map", "0:v:0", "-frames:v", "1",
-            "-vf", "scale=w='min(720,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease",
-            "-pix_fmt", "yuvj420p", "-threads", "1", "-q:v", "3",
-            "-f", "image2", str(partial),
+            executable,
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-protocol_whitelist",
+            "file,pipe",
+            "-ss",
+            seek_seconds,
+            "-i",
+            str(source_path),
+            "-map",
+            "0:v:0",
+            "-frames:v",
+            "1",
+            "-vf",
+            "scale=w='min(720,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease",
+            "-pix_fmt",
+            "yuvj420p",
+            "-threads",
+            "1",
+            "-q:v",
+            "3",
+            "-f",
+            "image2",
+            str(partial),
         ]
         process = subprocess.Popen(
             command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
@@ -593,6 +638,7 @@ def _video_frame_artwork(
                 if partial.stat().st_size > maximum_output_bytes:
                     raise RuntimeError("artwork_output_limit_exceeded")
                 from PIL import Image  # type: ignore[import-not-found]
+
                 with Image.open(partial) as image:
                     width, height = image.size
                 information = _frame_information(partial)
@@ -641,8 +687,12 @@ def materialize_artwork(
     cancelled: CancelCallback,
 ) -> dict[str, Any]:
     target = dict(job.get("target") or {})
-    maximum_input = max(1024, min(32 * 1024**2, int(target.get("max_input_bytes") or 32 * 1024**2)))
-    maximum_output = max(64 * 1024, min(4 * 1024**2, int(target.get("max_output_bytes") or 4 * 1024**2)))
+    maximum_input = max(
+        1024, min(32 * 1024**2, int(target.get("max_input_bytes") or 32 * 1024**2))
+    )
+    maximum_output = max(
+        64 * 1024, min(4 * 1024**2, int(target.get("max_output_bytes") or 4 * 1024**2))
+    )
     maximum_size = (
         max(64, min(1920, int(target.get("max_width") or 720))),
         max(64, min(1920, int(target.get("max_height") or 1080))),
@@ -716,6 +766,156 @@ def output_path(db_path: Path, job: Mapping[str, Any]) -> Path:
         package.mkdir(parents=True, exist_ok=True)
         return package / "master.m3u8"
     return derived_workspace(db_path) / f"rendition-{digest}{suffix}"
+
+
+def _managed_content_digest(job: Mapping[str, Any]) -> str:
+    target = dict(job.get("target") or {})
+    payload = "\0".join(
+        (
+            text(job.get("source_fingerprint")),
+            text(job.get("profile")),
+            json.dumps(
+                target,
+                ensure_ascii=True,
+                separators=(",", ":"),
+                sort_keys=True,
+                default=str,
+            ),
+        )
+    )
+    return hashlib.sha256(payload.encode("utf-8", errors="replace")).hexdigest()
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _managed_store(root: Path) -> Path:
+    root_path = root.resolve(strict=True)
+    if not root_path.is_dir():
+        raise RuntimeError("rendition_storage_root_unavailable")
+    store = root_path / MANAGED_MEDIA_DIRECTORY
+    if store.exists() and store.is_symlink():
+        raise RuntimeError("rendition_storage_symlink_rejected")
+    store.mkdir(parents=True, exist_ok=True)
+    resolved = store.resolve(strict=True)
+    try:
+        resolved.relative_to(root_path)
+    except ValueError as exc:
+        raise RuntimeError("rendition_storage_outside_root") from exc
+    marker = resolved / "store.json"
+    if not marker.exists():
+        partial = marker.with_suffix(".json.partial")
+        partial.write_text(
+            json.dumps(
+                {
+                    "schema": MANAGED_STORE_SCHEMA,
+                    "owner": "media_library_agent",
+                    "layout": "content_addressed_v1",
+                },
+                ensure_ascii=True,
+                separators=(",", ":"),
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+        partial.replace(marker)
+    return resolved
+
+
+def publish_managed_rendition(
+    path: Path,
+    job: Mapping[str, Any],
+    *,
+    root: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """Move one derived file to the source volume and register it in place."""
+
+    target = dict(job.get("target") or {})
+    if text(target.get("packaging")) == "hls_cmaf_vod":
+        raise RuntimeError("managed_rendition_package_not_supported")
+    source = path.resolve(strict=True)
+    if not source.is_file():
+        raise RuntimeError("rendition_output_empty")
+    root_path = Path(text(root.get("path"))).resolve(strict=True)
+    store = _managed_store(root_path)
+    digest = _managed_content_digest(job)
+    suffix = source.suffix.lower() or (
+        ".mp4" if text(job.get("media_kind")) == "video" else ".m4a"
+    )
+    profile = (
+        "".join(
+            character
+            for character in text(job.get("profile")).lower()
+            if character.isalnum() or character in {"-", "_"}
+        )
+        or "rendition"
+    )
+    directory = store / "renditions" / profile / digest[:2]
+    directory.mkdir(parents=True, exist_ok=True)
+    destination = directory / f"{digest}{suffix}"
+    source_size = int(source.stat().st_size)
+    source_checksum = _sha256_file(source)
+    if destination.is_file():
+        if (
+            int(destination.stat().st_size) != source_size
+            or _sha256_file(destination) != source_checksum
+        ):
+            destination.unlink()
+    if not destination.exists():
+        temporary = destination.with_name(
+            f"{destination.name}.{text(job.get('id'))[:24]}.partial"
+        )
+        temporary.unlink(missing_ok=True)
+        shutil.copyfile(source, temporary)
+        if (
+            int(temporary.stat().st_size) != source_size
+            or _sha256_file(temporary) != source_checksum
+        ):
+            temporary.unlink(missing_ok=True)
+            raise RuntimeError("rendition_storage_verification_failed")
+        temporary.replace(destination)
+
+    from adaos.sdk.io.media import register_media_file
+
+    descriptor = register_media_file(
+        destination,
+        root=root_path,
+        content_ref=(
+            f"managed-rendition:{text(job.get('source_id'))}:"
+            f"{text(job.get('source_fingerprint'))}:{text(job.get('profile'))}:"
+            f"{digest}"
+        ),
+        namespace="media-library-rendition",
+        mime=text(target.get("mime_type"))
+        or mimetypes.guess_type(destination.name)[0]
+        or "application/octet-stream",
+        metadata={
+            "managed_store_schema": MANAGED_STORE_SCHEMA,
+            "managed_storage_mode": "source_root",
+            "checksum_sha256": source_checksum,
+            "content_digest": digest,
+            "rendition_profile": text(job.get("profile")),
+        },
+    )
+    metadata = dict(descriptor.get("metadata") or {})
+    metadata.update(
+        {
+            "storage_mode": "source_root",
+            "managed_storage_mode": "source_root",
+            "checksum_sha256": source_checksum,
+            "content_digest": digest,
+        }
+    )
+    descriptor["metadata"] = metadata
+    delivery = dict(descriptor.get("delivery") or {})
+    delivery["storage_mode"] = "source_root"
+    descriptor["delivery"] = delivery
+    return descriptor
 
 
 def current_disk_usage(db_path: Path) -> int:
@@ -795,7 +995,9 @@ def _probe_ffmpeg_capabilities(
     }.get(platform.system(), ("nvenc", "qsv", "vaapi"))
     selected = "libx264"
     selected_backend = "software"
-    requested = preferred if policy == "auto" else (() if policy == "software" else (policy,))
+    requested = (
+        preferred if policy == "auto" else (() if policy == "software" else (policy,))
+    )
     for backend in requested:
         candidate = encoder_names[backend]
         if candidate in available_encoders:
@@ -831,7 +1033,15 @@ def ffmpeg_capabilities() -> dict[str, Any]:
     policy = text(
         os.environ.get("MEDIA_LIBRARY_AGENT_HARDWARE_ACCELERATION") or "auto"
     ).lower()
-    if policy not in {"auto", "software", "nvenc", "qsv", "amf", "vaapi", "videotoolbox"}:
+    if policy not in {
+        "auto",
+        "software",
+        "nvenc",
+        "qsv",
+        "amf",
+        "vaapi",
+        "videotoolbox",
+    }:
         policy = "auto"
     return dict(_probe_ffmpeg_capabilities(executable, source, policy))
 
@@ -940,17 +1150,11 @@ def _single_file_command(
     ]
     if kind == "video":
         video_index = int(
-            tracks.get("video_index")
-            if tracks.get("video_index") is not None
-            else -1
+            tracks.get("video_index") if tracks.get("video_index") is not None else -1
         )
-        command.extend(
-            ["-map", f"0:{video_index}" if video_index >= 0 else "0:v:0"]
-        )
+        command.extend(["-map", f"0:{video_index}" if video_index >= 0 else "0:v:0"])
         audio_index = int(
-            tracks.get("audio_index")
-            if tracks.get("audio_index") is not None
-            else -1
+            tracks.get("audio_index") if tracks.get("audio_index") is not None else -1
         )
         command.extend(["-map", f"0:{audio_index}" if audio_index >= 0 else "0:a:0?"])
         if decision == "remux":
@@ -1016,15 +1220,11 @@ def _hls_command(
     output_directory = target_path.parent
     output_directory.mkdir(parents=True, exist_ok=True)
     video_index = int(
-        tracks.get("video_index")
-        if tracks.get("video_index") is not None
-        else -1
+        tracks.get("video_index") if tracks.get("video_index") is not None else -1
     )
     has_audio = bool(tracks.get("has_audio"))
     audio_index = int(
-        tracks.get("audio_index")
-        if tracks.get("audio_index") is not None
-        else -1
+        tracks.get("audio_index") if tracks.get("audio_index") is not None else -1
     )
     split_outputs = "".join(f"[vin{index}]" for index in range(len(ladder)))
     video_input = f"0:{video_index}" if video_index >= 0 else "0:v:0"
@@ -1173,9 +1373,7 @@ def transcode_with_ffmpeg(
                 "video_encoder": encoder,
                 "hardware_accelerated": encoder not in {"copy", "libx264"},
                 "hardware_backend": text(capabilities.get("hardware_acceleration")),
-                "software_fallback_used": bool(
-                    failures and encoder == "libx264"
-                ),
+                "software_fallback_used": bool(failures and encoder == "libx264"),
                 "attempt_failures": failures[-2:],
             }
         except RuntimeError as exc:
@@ -1187,9 +1385,7 @@ def transcode_with_ffmpeg(
     raise RuntimeError("rendition_backend_failed")
 
 
-def publish_derived_resource(
-    path: Path, job: Mapping[str, Any]
-) -> Mapping[str, Any]:
+def publish_derived_resource(path: Path, job: Mapping[str, Any]) -> Mapping[str, Any]:
     from adaos.sdk.io.media import publish_media_file, publish_media_package
 
     target = dict(job.get("target") or {})

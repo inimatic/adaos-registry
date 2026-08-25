@@ -396,7 +396,7 @@
       "description": "Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 72
+      "tools_count": 73
     },
     {
       "kind": "skill",
@@ -460,7 +460,7 @@
       },
       "description": "Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.",
       "runtime_python": "3.11",
-      "tools_count": 28
+      "tools_count": 31
     },
     {
       "kind": "skill",

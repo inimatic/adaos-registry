@@ -2,13 +2,27 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "adaos.media_library.root.v1",
   "type": "object",
-  "required": ["schema", "id", "node_id", "path", "label", "enabled", "include_images", "follow_symlinks", "exclusions", "revision"],
+  "required": ["schema", "id", "node_id", "path", "label", "enabled", "include_images", "follow_symlinks", "exclusions", "storage_policy", "revision"],
   "properties": {
     "schema": {"const": "adaos.media_library.root.v1"},
     "id": {"type": "string"}, "node_id": {"type": "string"}, "path": {"type": "string"}, "label": {"type": "string"},
     "enabled": {"type": "boolean"}, "include_images": {"type": "boolean"}, "follow_symlinks": {"type": "boolean"},
     "exclusions": {"type": "array", "maxItems": 64, "items": {"type": "string", "maxLength": 300}},
-    "scan_window": {"type": "object"}, "created_at": {"type": "string"}, "updated_at": {"type": "string"},
+    "scan_window": {"type": "object"},
+    "storage_policy": {
+      "type": "object",
+      "required": ["schema", "rendition_mode", "artwork_mode", "managed_directory", "rendition_quota_bytes", "legacy_migration"],
+      "properties": {
+        "schema": {"const": "adaos.media_library.storage_policy.v1"},
+        "rendition_mode": {"enum": ["source_root", "node_cache"]},
+        "artwork_mode": {"enum": ["source_root", "node_cache"]},
+        "managed_directory": {"const": ".adaos-media"},
+        "rendition_quota_bytes": {"type": "integer", "minimum": 1073741824},
+        "legacy_migration": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "created_at": {"type": "string"}, "updated_at": {"type": "string"},
     "last_scan_at": {"type": "string"}, "last_status": {"type": "string"}, "revision": {"type": "integer", "minimum": 1}
   },
   "additionalProperties": false

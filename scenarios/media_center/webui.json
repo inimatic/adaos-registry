@@ -39,6 +39,8 @@
             "mediaFolderParent": "",
             "mediaRootPath": "",
             "selectedMediaRootId": null,
+            "mediaRenditionStorageMode": "source_root",
+            "mediaArtworkStorageMode": "node_cache",
             "playbackSourceType": "item",
             "playbackSourceId": "",
             "playbackSourceContext": {},
@@ -2967,11 +2969,29 @@
                       }
                     },
                     {
+                      "key": "storage_policy.rendition_mode",
+                      "label": "Renditions",
+                      "width": "120px",
+                      "label_i18n": {"key": "runtime.media_center.ui.renditions"}
+                    },
+                    {
+                      "key": "storage_policy.artwork_mode",
+                      "label": "Artwork",
+                      "width": "110px",
+                      "label_i18n": {"key": "runtime.media_center.ui.artwork"}
+                    },
+                    {
                       "key": "actions",
                       "label": "",
                       "kind": "buttons",
-                      "width": "52px",
+                      "width": "92px",
                       "buttons": [
+                        {
+                          "id": "storage",
+                          "icon": "server-outline",
+                          "title": "Storage policy",
+                          "title_i18n": {"key": "runtime.media_center.ui.storage_policy"}
+                        },
                         {
                           "id": "delete",
                           "icon": "trash-outline",
@@ -2988,6 +3008,22 @@
                   }
                 },
                 "actions": [
+                  {
+                    "on": "click:storage",
+                    "type": "updateState",
+                    "params": {
+                      "selectedMediaRootId": "$event.id",
+                      "mediaRenditionStorageMode": "$event.storage_policy.rendition_mode",
+                      "mediaArtworkStorageMode": "$event.storage_policy.artwork_mode"
+                    }
+                  },
+                  {
+                    "on": "click:storage",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "media_center_storage_policy"
+                    }
+                  },
                   {
                     "on": "click:delete",
                     "type": "updateState",
@@ -3718,6 +3754,44 @@
                 }
               },
               {
+                "id": "media-storage-migrations",
+                "type": "ui.list",
+                "area": "main",
+                "title": "Rendition storage migration",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.rendition_operations",
+                  "path": "storage_migrations",
+                  "params": {"limit": 30},
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["media_center.renditions"],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "itemKey": "id",
+                  "titleKey": "status",
+                  "subtitleKey": "root_id",
+                  "meta": [
+                    {"key": "processed_count"},
+                    {"key": "total_count"},
+                    {"key": "migrated_count"},
+                    {"key": "failed_count"},
+                    {"key": "processed_bytes"},
+                    {"key": "error.code"}
+                  ],
+                  "emptyText": "No rendition storage migrations.",
+                  "emptyText_i18n": {"key": "runtime.media_center.ui.no_storage_migrations"}
+                },
+                "collection": {
+                  "display": "list",
+                  "focusGroup": "media-storage-migrations",
+                  "virtualized": true,
+                  "cursor": {"enabled": false, "stateKey": "mediaCursor"}
+                },
+                "title_i18n": {"key": "runtime.media_center.ui.storage_migrations"}
+              },
+              {
                 "id": "media-metadata-close",
                 "type": "ui.actions",
                 "area": "main",
@@ -3747,6 +3821,92 @@
           },
           "title_i18n": {
             "key": "runtime.media_center.ui.metadata_activity"
+          }
+        },
+        "media_center_storage_policy": {
+          "title": "Storage policy",
+          "title_i18n": {"key": "runtime.media_center.ui.storage_policy"},
+          "scope": "workspace",
+          "presentation": {"kind": "modal", "restoreFocus": true},
+          "schema": {
+            "id": "media_center_storage_policy",
+            "title": "Storage policy",
+            "title_i18n": {"key": "runtime.media_center.ui.storage_policy"},
+            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "widgets": [
+              {
+                "id": "media-rendition-storage-mode",
+                "type": "input.selector",
+                "area": "main",
+                "title": "Converted media",
+                "title_i18n": {"key": "runtime.media_center.ui.converted_media"},
+                "inputs": {
+                  "value": "$state.mediaRenditionStorageMode",
+                  "options": [
+                    {"label": "With source files", "value": "source_root", "label_i18n": {"key": "runtime.media_center.ui.with_source_files"}},
+                    {"label": "Node cache", "value": "node_cache", "label_i18n": {"key": "runtime.media_center.ui.node_cache"}}
+                  ]
+                },
+                "actions": [{"on": "change", "type": "updateState", "params": {"mediaRenditionStorageMode": "$event.value"}}]
+              },
+              {
+                "id": "media-artwork-storage-mode",
+                "type": "input.selector",
+                "area": "main",
+                "title": "Artwork and thumbnails",
+                "title_i18n": {"key": "runtime.media_center.ui.artwork_and_thumbnails"},
+                "inputs": {
+                  "value": "$state.mediaArtworkStorageMode",
+                  "options": [
+                    {"label": "Node cache", "value": "node_cache", "label_i18n": {"key": "runtime.media_center.ui.node_cache"}},
+                    {"label": "With source files", "value": "source_root", "label_i18n": {"key": "runtime.media_center.ui.with_source_files"}}
+                  ]
+                },
+                "actions": [{"on": "change", "type": "updateState", "params": {"mediaArtworkStorageMode": "$event.value"}}]
+              },
+              {
+                "id": "media-storage-policy-note",
+                "type": "static.markdown",
+                "area": "main",
+                "inputs": {
+                  "content": "Converted files use a managed content-addressed store. Existing converted files migrate in the background; original media is never moved.",
+                  "content_i18n": {
+                    "key": "runtime.media_center.ui.storage_policy_description"
+                  }
+                }
+              },
+              {
+                "id": "media-storage-policy-actions",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {
+                  "variant": "toolbar",
+                  "buttons": [
+                    {"id": "save", "label": "Save", "icon": "save-outline", "label_i18n": {"key": "runtime.media_center.ui.save"}},
+                    {"id": "cancel", "label": "Cancel", "icon": "close-outline", "label_i18n": {"key": "runtime.media_center.ui.cancel"}}
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click:save",
+                    "type": "callSkill",
+                    "target": "media_center_skill.set_root_storage_policy",
+                    "timeoutMs": 300000,
+                    "params": {
+                      "root_id": "$state.selectedMediaRootId",
+                      "values": {
+                        "rendition_mode": "$state.mediaRenditionStorageMode",
+                        "artwork_mode": "$state.mediaArtworkStorageMode",
+                        "legacy_migration": true
+                      }
+                    },
+                    "invalidates": ["media_center.roots", "media_center.renditions"]
+                  },
+                  {"on": "click:save", "type": "closeModal"},
+                  {"on": "click:cancel", "type": "closeModal"}
+                ]
+              }
+            ]
           }
         },
         "media_center_delete_root": {

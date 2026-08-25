@@ -29,9 +29,7 @@ _HOME_SNAPSHOT_CACHE_LIMIT = 32
 _HOME_SNAPSHOT_CACHE_TTL_SECONDS = 15 * 60
 _home_snapshot_cache_lock = threading.Lock()
 _home_snapshot_build_lock = threading.Lock()
-_READY_LIBRARY_SNAPSHOT_CACHE: dict[
-    tuple[str, str, bool], dict[str, Any]
-] = {}
+_READY_LIBRARY_SNAPSHOT_CACHE: dict[tuple[str, str, bool], dict[str, Any]] = {}
 _ready_library_snapshot_cache_lock = threading.Lock()
 
 from media_center.background import background_runtime  # noqa: E402
@@ -59,7 +57,9 @@ from media_center.sync import MediaAgentSyncWorker  # noqa: E402
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".mkv", ".avi", ".wmv", ".ogv"}
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".aac", ".opus", ".ogg"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
-LEGACY_MANAGED_COPY_RE = re.compile(r"^media-center-[0-9a-f]{24}-import\.[^.]+$", re.IGNORECASE)
+LEGACY_MANAGED_COPY_RE = re.compile(
+    r"^media-center-[0-9a-f]{24}-import\.[^.]+$", re.IGNORECASE
+)
 _coordinator_lock = threading.Lock()
 _coordinator_init_lock = threading.Lock()
 _coordinator_path = ""
@@ -79,7 +79,9 @@ def _repository() -> MediaCenterRepository:
     return MediaCenterRepository()
 
 
-def _coordinator(repository: MediaCenterRepository | None = None) -> MediaCatalogCoordinator:
+def _coordinator(
+    repository: MediaCenterRepository | None = None,
+) -> MediaCatalogCoordinator:
     global _coordinator_cached, _coordinator_path
     if repository is None:
         path = str(default_db_path().resolve())
@@ -135,9 +137,7 @@ def _enrichment_runtime(
         runtime_key,
         lambda: MediaEnrichmentWorker(
             coordinator,
-            providers=default_metadata_providers(
-                settings, tmdb_credential=credential
-            ),
+            providers=default_metadata_providers(settings, tmdb_credential=credential),
             provider_configuration=configuration,
             publish=lambda: _publish_operation_snapshot(coordinator),
             publish_settled=lambda: _publish_library_snapshot(coordinator),
@@ -192,9 +192,8 @@ def _metadata_provider_configuration(
     if credential_state.get("state") != "unavailable":
         return providers
     for provider in providers:
-        if (
-            provider.get("provider_id") == "media_center.tmdb.v1"
-            and provider.get("enabled")
+        if provider.get("provider_id") == "media_center.tmdb.v1" and provider.get(
+            "enabled"
         ):
             provider.update(
                 {
@@ -527,8 +526,7 @@ def _publish_library_snapshot(
             # advances whenever either plane changes; max() can repeat and make
             # clients reject a fresh replacement as stale.
             seq=(
-                int(snapshot["catalog_revision"])
-                + int(snapshot["personal_revision"])
+                int(snapshot["catalog_revision"]) + int(snapshot["personal_revision"])
             ),
             ttl_ms=120000,
             _meta={
@@ -579,11 +577,15 @@ def _publish_operation_snapshot(
         return False
 
 
-def _invoke_agent(operation: str, arguments: Mapping[str, Any] | None = None, *, timeout: float = 15.0) -> tuple[dict[str, Any] | None, str]:
+def _invoke_agent(
+    operation: str, arguments: Mapping[str, Any] | None = None, *, timeout: float = 15.0
+) -> tuple[dict[str, Any] | None, str]:
     try:
         from adaos.sdk.skills import invoke
 
-        result = invoke("media_library_agent", operation, dict(arguments or {}), timeout=timeout)
+        result = invoke(
+            "media_library_agent", operation, dict(arguments or {}), timeout=timeout
+        )
         if isinstance(result, Mapping):
             return dict(result), ""
         return None, "media_library_agent_invalid_response"
@@ -714,8 +716,7 @@ def _sanitize_diagnostic(value: Any, *, depth: int = 0) -> Any:
         return result
     if isinstance(value, (list, tuple)):
         return [
-            _sanitize_diagnostic(item, depth=depth + 1)
-            for item in list(value)[:100]
+            _sanitize_diagnostic(item, depth=depth + 1) for item in list(value)[:100]
         ]
     if isinstance(value, str):
         return value[:500]
@@ -755,15 +756,23 @@ def _skill_text(key: str, fallback: str) -> str:
     return translated if translated and translated != key else fallback
 
 
-def _discover_resources(source: str = "all", limit: int | None = 5000) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def _discover_resources(
+    source: str = "all", limit: int | None = 5000
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     try:
         from adaos.sdk.io.media import list_media_resources
     except Exception as exc:
-        return [], {"ok": False, "error": "sdk_media_discovery_unavailable", "detail": str(exc)}
+        return [], {
+            "ok": False,
+            "error": "sdk_media_discovery_unavailable",
+            "detail": str(exc),
+        }
 
     try:
         resources = list_media_resources(source=source, limit=limit)
-        return [item for item in resources if not _is_legacy_managed_copy(item)], {"ok": True}
+        return [item for item in resources if not _is_legacy_managed_copy(item)], {
+            "ok": True
+        }
     except ValueError as exc:
         return [], {"ok": False, "error": str(exc)}
     except Exception as exc:
@@ -771,17 +780,30 @@ def _discover_resources(source: str = "all", limit: int | None = 5000) -> tuple[
 
 
 def _is_legacy_managed_copy(descriptor: Mapping[str, Any]) -> bool:
-    metadata = descriptor.get("metadata") if isinstance(descriptor.get("metadata"), Mapping) else {}
-    if metadata.get("namespace") == "media-center" and metadata.get("variant") == "import":
+    metadata = (
+        descriptor.get("metadata")
+        if isinstance(descriptor.get("metadata"), Mapping)
+        else {}
+    )
+    if (
+        metadata.get("namespace") == "media-center"
+        and metadata.get("variant") == "import"
+    ):
         return True
     return bool(LEGACY_MANAGED_COPY_RE.fullmatch(str(descriptor.get("name") or "")))
 
 
-def _register_media_file_descriptor(path: Path, *, root: Mapping[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+def _register_media_file_descriptor(
+    path: Path, *, root: Mapping[str, Any]
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     try:
         from adaos.sdk.io.media import register_media_file
     except Exception as exc:
-        return None, {"error": "sdk_media_registration_unavailable", "detail": str(exc), "path": str(path)}
+        return None, {
+            "error": "sdk_media_registration_unavailable",
+            "detail": str(exc),
+            "path": str(path),
+        }
 
     try:
         mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
@@ -806,7 +828,11 @@ def _register_media_file_descriptor(path: Path, *, root: Mapping[str, Any]) -> t
         descriptor.setdefault("mime_type", mime_type)
         return descriptor, None
     except Exception as exc:
-        return None, {"error": "media_file_registration_failed", "detail": str(exc), "path": str(path)}
+        return None, {
+            "error": "media_file_registration_failed",
+            "detail": str(exc),
+            "path": str(path),
+        }
 
 
 def _iter_root_media_files(root: Mapping[str, Any]) -> Iterator[Path]:
@@ -838,7 +864,10 @@ def _int_limit(value: Any, default: int, maximum: int) -> int:
     return max(1, min(maximum, parsed))
 
 
-@tool(summary="Ensure the durable media-center catalog schema.", side_effects="local_write")
+@tool(
+    summary="Ensure the durable media-center catalog schema.",
+    side_effects="local_write",
+)
 def ensure_schema(**_: Any) -> dict[str, Any]:
     repo = _repository()
     legacy = repo.ensure_schema()
@@ -846,7 +875,10 @@ def ensure_schema(**_: Any) -> dict[str, Any]:
     return {**legacy, "coordinator": coordinator}
 
 
-@tool(summary="Rehydrate the durable media-center catalog after activation.", side_effects="local_write")
+@tool(
+    summary="Rehydrate the durable media-center catalog after activation.",
+    side_effects="local_write",
+)
 def rehydrate(**_: Any) -> dict[str, Any]:
     repo = _repository()
     catalog = _coordinator(repo)
@@ -1033,7 +1065,9 @@ def _sync_agents(
             "mode": "distributed",
             "agents": results,
             "agent_count": len(results),
-            "applied_count": sum(int(item.get("applied_count") or 0) for item in results),
+            "applied_count": sum(
+                int(item.get("applied_count") or 0) for item in results
+            ),
             "has_more": any(bool(item.get("has_more")) for item in results),
             "retired_compatibility": retired_compatibility,
             "participation": catalog.participation(),
@@ -1123,9 +1157,7 @@ def on_media_center_snapshot_requested(event: Any) -> None:
     _publish_library_snapshot(
         _coordinator(),
         profile_id=str(
-            receiver_params.get("profile_id")
-            or payload.get("profile_id")
-            or "default"
+            receiver_params.get("profile_id") or payload.get("profile_id") or "default"
         ),
         shared_surface=_bool(
             receiver_params.get(
@@ -1180,10 +1212,7 @@ def on_playback_observed(event: Any) -> None:
         if previous and previous[0] == bucket and previous[1] == state:
             return
         publish_required = bool(
-            previous is None
-            or previous[1] != state
-            or terminal
-            or bucket % 4 == 0
+            previous is None or previous[1] != state or terminal or bucket % 4 == 0
         )
         _PLAYBACK_OBSERVATION_CACHE[cache_key] = (bucket, state, time.monotonic())
         while len(_PLAYBACK_OBSERVATION_CACHE) > _PLAYBACK_OBSERVATION_LIMIT:
@@ -1208,7 +1237,10 @@ def on_playback_observed(event: Any) -> None:
         )
 
 
-@tool(summary="Pull bounded idempotent deltas from ready library agents.", side_effects="local_write")
+@tool(
+    summary="Pull bounded idempotent deltas from ready library agents.",
+    side_effects="local_write",
+)
 def sync_agent(max_pages: int = 4, limit: int = 500, **_: Any) -> dict[str, Any]:
     catalog = _coordinator()
     result = _run_agent_sync(catalog, max_pages=max_pages, limit=limit)
@@ -1221,12 +1253,20 @@ def sync_agent(max_pages: int = 4, limit: int = 500, **_: Any) -> dict[str, Any]
     return result
 
 
-@tool(summary="Scan core-backed media resources into the media-center catalog.", side_effects="local_write")
+@tool(
+    summary="Scan core-backed media resources into the media-center catalog.",
+    side_effects="local_write",
+)
 def scan_sources(source: str = "all", limit: int = 5000, **_: Any) -> dict[str, Any]:
     resources, discovery = _discover_resources(source=source or "all", limit=limit)
     if not discovery.get("ok"):
         repo = _repository()
-        return {**discovery, "schema": SCHEMA_VERSION, "summary": repo.summary(), "facets": repo.facets()}
+        return {
+            **discovery,
+            "schema": SCHEMA_VERSION,
+            "summary": repo.summary(),
+            "facets": repo.facets(),
+        }
     repo = _repository()
     result = repo.scan_resources(resources, source=source or "all")
     _coordinator(repo).refresh_search_index(force_legacy=True)
@@ -1235,18 +1275,64 @@ def scan_sources(source: str = "all", limit: int = 5000, **_: Any) -> dict[str, 
 
 @tool(summary="List configured media-center library folders.", side_effects="none")
 def list_roots(include_disabled: bool = False, **_: Any) -> dict[str, Any]:
-    agent, _error = _invoke_agent("list_roots", {"include_disabled": _bool(include_disabled, False)})
+    agent, _error = _invoke_agent(
+        "list_roots", {"include_disabled": _bool(include_disabled, False)}
+    )
     if agent is not None:
         agent["owner"] = "media_library_agent"
         return agent
     return _repository().list_roots(include_disabled=_bool(include_disabled, False))
 
 
-@tool(summary="Add a local library folder to the media-center import set.", side_effects="local_write")
-def add_root(path: str = "", label: str = "", include_images: bool = False, **_: Any) -> dict[str, Any]:
+@tool(
+    summary="Update derived-media storage policy for one library folder.",
+    side_effects="local_write",
+)
+def set_root_storage_policy(
+    root_id: str = "", values: Mapping[str, Any] | None = None, **_: Any
+) -> dict[str, Any]:
+    agent, error = _invoke_agent(
+        "set_storage_policy",
+        {"root_id": str(root_id or ""), "values": dict(values or {})},
+        timeout=30.0,
+    )
+    if agent is None:
+        return _skill_error(
+            "storage_policy_update_unavailable",
+            human_message=_skill_text(
+                "runtime.media_center.error.storage_policy_update_unavailable",
+                "The media storage policy is temporarily unavailable.",
+            ),
+            i18n_key="runtime.media_center.error.storage_policy_update_unavailable",
+            detail=str(error or "media_library_agent_unavailable")[:500],
+            retryable=True,
+        )
+    return {**agent, "owner": "media_library_agent"}
+
+
+@tool(
+    summary="Add a local library folder to the media-center import set.",
+    side_effects="local_write",
+)
+def add_root(
+    path: str = "",
+    label: str = "",
+    include_images: bool = False,
+    storage_policy: Mapping[str, Any] | None = None,
+    **_: Any,
+) -> dict[str, Any]:
     agent, _error = _invoke_agent(
         "add_root",
-        {"path": path, "label": label, "include_images": _bool(include_images, False)},
+        {
+            "path": path,
+            "label": label,
+            "include_images": _bool(include_images, False),
+            **(
+                {"storage_policy": dict(storage_policy or {})}
+                if storage_policy is not None
+                else {}
+            ),
+        },
     )
     if agent is not None:
         agent["owner"] = "media_library_agent"
@@ -1254,7 +1340,9 @@ def add_root(path: str = "", label: str = "", include_images: bool = False, **_:
     repo = _repository()
     try:
         with _root_mutation_lease(repo):
-            return repo.add_root(path, label=label, include_images=_bool(include_images, False))
+            return repo.add_root(
+                path, label=label, include_images=_bool(include_images, False)
+            )
     except MediaRootOperationBusy:
         return _skill_error(
             "media_root_operation_busy",
@@ -1263,7 +1351,10 @@ def add_root(path: str = "", label: str = "", include_images: bool = False, **_:
         )
 
 
-@tool(summary="Disable a configured media-center library folder.", side_effects="local_write")
+@tool(
+    summary="Disable a configured media-center library folder.",
+    side_effects="local_write",
+)
 def remove_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
     agent, _error = _invoke_agent("remove_root", {"root_id": root_id})
     if agent is not None:
@@ -1281,7 +1372,10 @@ def remove_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
         )
 
 
-@tool(summary="Delete a media folder, its catalog rows, and core resource links.", side_effects="local_write")
+@tool(
+    summary="Delete a media folder, its catalog rows, and core resource links.",
+    side_effects="local_write",
+)
 def delete_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
     agent, _error = _invoke_agent("remove_root", {"root_id": root_id})
     if agent is not None:
@@ -1321,14 +1415,18 @@ def delete_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
         )
 
 
-@tool(summary="Register playable files from configured folders without copying media bytes.", side_effects="local_write")
-def scan_roots(root_id: str = "", path: str = "", limit: int = 1000, **_: Any) -> dict[str, Any]:
+@tool(
+    summary="Register playable files from configured folders without copying media bytes.",
+    side_effects="local_write",
+)
+def scan_roots(
+    root_id: str = "", path: str = "", limit: int = 1000, **_: Any
+) -> dict[str, Any]:
     arguments = {
         "root_id": root_id,
         "mode": "incremental",
         "webspace_id": str(_.get("webspace_id") or ""),
     }
-
 
     agent, _error = _invoke_agent("start_scan", arguments)
     if agent is not None:
@@ -1347,7 +1445,9 @@ def scan_roots(root_id: str = "", path: str = "", limit: int = 1000, **_: Any) -
         )
 
 
-def _scan_roots(repo: MediaCenterRepository, *, root_id: str = "", path: str = "", limit: int = 1000) -> dict[str, Any]:
+def _scan_roots(
+    repo: MediaCenterRepository, *, root_id: str = "", path: str = "", limit: int = 1000
+) -> dict[str, Any]:
     limit_value = _int_limit(limit, 1000, 5000)
     roots = repo.list_roots()["items"]
     root_token = str(root_id or "").strip()
@@ -1355,7 +1455,12 @@ def _scan_roots(repo: MediaCenterRepository, *, root_id: str = "", path: str = "
     if root_token:
         roots = [root for root in roots if str(root.get("id") or "") == root_token]
     elif path_token:
-        roots = [root for root in roots if str(root.get("path") or "") == str(Path(path_token).expanduser().resolve(strict=False))]
+        roots = [
+            root
+            for root in roots
+            if str(root.get("path") or "")
+            == str(Path(path_token).expanduser().resolve(strict=False))
+        ]
 
     if not roots:
         return _skill_error(
@@ -1397,20 +1502,32 @@ def _scan_roots(repo: MediaCenterRepository, *, root_id: str = "", path: str = "
                 errors.append(error)
                 root_errors += 1
         if not found:
-            repo.mark_root_scanned(str(root.get("id") or ""), status="no_playable_files")
+            repo.mark_root_scanned(
+                str(root.get("id") or ""), status="no_playable_files"
+            )
             continue
-        status = "ok" if root_registered else ("error" if root_errors else "limit_reached" if root_skipped else "empty")
+        status = (
+            "ok"
+            if root_registered
+            else (
+                "error" if root_errors else "limit_reached" if root_skipped else "empty"
+            )
+        )
         repo.mark_root_scanned(str(root.get("id") or ""), status=status)
 
-    scan = repo.scan_resources(descriptors, source="media_server", mark_missing=False) if descriptors else {
-        "ok": True,
-        "schema": SCHEMA_VERSION,
-        "source": "media_server",
-        "discovered_count": 0,
-        "updated_count": 0,
-        "missing_count": 0,
-        "summary": repo.summary(),
-    }
+    scan = (
+        repo.scan_resources(descriptors, source="media_server", mark_missing=False)
+        if descriptors
+        else {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "source": "media_server",
+            "discovered_count": 0,
+            "updated_count": 0,
+            "missing_count": 0,
+            "summary": repo.summary(),
+        }
+    )
     if descriptors:
         _coordinator(repo).refresh_search_index(force_legacy=True)
     return {
@@ -1424,14 +1541,29 @@ def _scan_roots(repo: MediaCenterRepository, *, root_id: str = "", path: str = "
     }
 
 
-@tool(summary="Add a folder and register its playable files in place.", side_effects="local_write")
-def import_folder(path: str = "", label: str = "", include_images: bool = False, limit: int = 1000, **_: Any) -> dict[str, Any]:
+@tool(
+    summary="Add a folder and register its playable files in place.",
+    side_effects="local_write",
+)
+def import_folder(
+    path: str = "",
+    label: str = "",
+    include_images: bool = False,
+    limit: int = 1000,
+    storage_policy: Mapping[str, Any] | None = None,
+    **_: Any,
+) -> dict[str, Any]:
     agent, _error = _invoke_agent(
         "import_folder",
         {
             "path": path,
             "label": label,
             "include_images": _bool(include_images, False),
+            **(
+                {"storage_policy": dict(storage_policy or {})}
+                if storage_policy is not None
+                else {}
+            ),
             "webspace_id": str(_.get("webspace_id") or ""),
         },
     )
@@ -1442,7 +1574,9 @@ def import_folder(path: str = "", label: str = "", include_images: bool = False,
     repo = _repository()
     try:
         with _root_mutation_lease(repo):
-            added = repo.add_root(path, label=label, include_images=_bool(include_images, False))
+            added = repo.add_root(
+                path, label=label, include_images=_bool(include_images, False)
+            )
             if not added.get("ok"):
                 return added
             root = added.get("root") if isinstance(added.get("root"), Mapping) else {}
@@ -1456,7 +1590,10 @@ def import_folder(path: str = "", label: str = "", include_images: bool = False,
         )
 
 
-@tool(summary="Return the media-center library projection for widgets and playback.", side_effects="none")
+@tool(
+    summary="Return the media-center library projection for widgets and playback.",
+    side_effects="none",
+)
 def library(
     query: str = "",
     media_kind: str = "playable",
@@ -1488,10 +1625,7 @@ def library(
             agent_sync = _run_agent_sync(
                 catalog, max_pages=1, limit=500, timeout_seconds=5.0
             )
-            if (
-                not agent_sync.get("ok")
-                and int(summary.get("total_count") or 0) == 0
-            ):
+            if not agent_sync.get("ok") and int(summary.get("total_count") or 0) == 0:
                 scan = scan_sources(source="all", limit=5000)
         else:
             agent_sync = _agent_sync_status()
@@ -1546,14 +1680,21 @@ def library(
         "playback_contract": "adaos.media.resource.v1",
     }
     payload["capabilities"] = {
-        "catalog": {"status": "distributed_coordinator", "durable": True, "max_page_size": 30},
+        "catalog": {
+            "status": "distributed_coordinator",
+            "durable": True,
+            "max_page_size": 30,
+        },
         "playback": {"status": "delegated_to_core_media_resource"},
         "enrichment": {"status": "background_jobs"},
     }
     return payload
 
 
-@tool(summary="Return bounded profile-aware metadata navigation facets.", side_effects="none")
+@tool(
+    summary="Return bounded profile-aware metadata navigation facets.",
+    side_effects="none",
+)
 def metadata_facets(
     dimension: str = "genre",
     media_kind: str = "playable",
@@ -1571,7 +1712,9 @@ def metadata_facets(
     )
 
 
-@tool(summary="Return managed external metadata provider settings.", side_effects="none")
+@tool(
+    summary="Return managed external metadata provider settings.", side_effects="none"
+)
 def get_metadata_settings(**_: Any) -> dict[str, Any]:
     catalog = _coordinator()
     result = catalog.metadata_settings()
@@ -1591,7 +1734,10 @@ def get_metadata_settings(**_: Any) -> dict[str, Any]:
     }
 
 
-@tool(summary="Update managed external metadata provider settings.", side_effects="local_write")
+@tool(
+    summary="Update managed external metadata provider settings.",
+    side_effects="local_write",
+)
 def set_metadata_settings(
     values: Mapping[str, Any] | None = None,
     tmdb_credential: str = "",
@@ -1756,9 +1902,7 @@ def deep_search(
                 "count": added,
                 "candidate_count": discovery.get("candidate_count", 0),
                 "candidate_limit": discovery.get("candidate_limit", 0),
-                "truncated_candidates": bool(
-                    discovery.get("truncated_candidates")
-                ),
+                "truncated_candidates": bool(discovery.get("truncated_candidates")),
             }
         )
     agent_limit = max(1, min(16, int(max_agents or 4)))
@@ -1766,9 +1910,7 @@ def deep_search(
         instances = _topology().agent_instances(limit=agent_limit)
     except Exception as exc:
         instances = []
-        failures.append(
-            {"stage": "agent_technical_fts", "error": str(exc)[:500]}
-        )
+        failures.append({"stage": "agent_technical_fts", "error": str(exc)[:500]})
     if not instances:
         instances = [None]
     for instance in instances[:agent_limit]:
@@ -1800,9 +1942,7 @@ def deep_search(
                 }
             )
             continue
-        agent = (
-            page.get("agent") if isinstance(page.get("agent"), Mapping) else {}
-        )
+        agent = page.get("agent") if isinstance(page.get("agent"), Mapping) else {}
         agent_id = str(agent.get("id") or "")
         resolved = catalog.resolve_agent_hits(
             page.get("items") or [],
@@ -1859,7 +1999,10 @@ def get_item(
     return _coordinator().item_details(item_id, profile_id=profile_id)
 
 
-@tool(summary="Return the selected media item and a bounded playback queue.", side_effects="none")
+@tool(
+    summary="Return the selected media item and a bounded playback queue.",
+    side_effects="none",
+)
 def playback_queue(
     item_id: str = "",
     query: str = "",
@@ -1889,7 +2032,9 @@ def playback_queue(
         profile_id=profile_id,
     )
     items = [selected]
-    items.extend(item for item in listing["items"] if item.get("id") != selected.get("id"))
+    items.extend(
+        item for item in listing["items"] if item.get("id") != selected.get("id")
+    )
     items = items[:queue_limit]
     return {
         **listing,
@@ -1914,7 +2059,10 @@ def playback_queue(
     }
 
 
-@tool(summary="Select a media variant and route for one playback endpoint.", side_effects="none")
+@tool(
+    summary="Select a media variant and route for one playback endpoint.",
+    side_effects="none",
+)
 def playback_plan(
     item_id: str = "",
     endpoint_id: str = "",
@@ -1977,9 +2125,8 @@ def ensure_rendition(
             "playback_plan": plan,
             "rendition": None,
         }
-    if (
-        str(compatibility.get("mode") or "") == "unsupported"
-        and not _bool(force, False)
+    if str(compatibility.get("mode") or "") == "unsupported" and not _bool(
+        force, False
     ):
         return {
             "ok": False,
@@ -2010,9 +2157,7 @@ def ensure_rendition(
                 timeout_seconds=20.0,
             )
         else:
-            rendition, error = _invoke_agent(
-                "plan_rendition", arguments, timeout=20.0
-            )
+            rendition, error = _invoke_agent("plan_rendition", arguments, timeout=20.0)
             if rendition is None:
                 raise RuntimeError(error or "media_library_agent_unavailable")
     except Exception as exc:
@@ -2025,9 +2170,7 @@ def ensure_rendition(
     return {
         "ok": bool(rendition.get("ok")),
         "schema": COORDINATOR_SCHEMA,
-        "status": (
-            "queued" if rendition.get("asynchronous") else "source_compatible"
-        ),
+        "status": ("queued" if rendition.get("asynchronous") else "source_compatible"),
         "source_binding": {
             "agent_id": str((binding or {}).get("agent_id") or ""),
             "node_id": str((binding or {}).get("node_id") or ""),
@@ -2081,23 +2224,47 @@ def rendition_operations(
     artwork = {
         "schema": "adaos.media_center.artwork_operation.v1",
         "state": str(artwork_source.get("state") or "unknown"),
-        "active_job_count": max(
-            0, int(artwork_source.get("active_job_count") or 0)
-        ),
+        "active_job_count": max(0, int(artwork_source.get("active_job_count") or 0)),
         "examined_count": max(0, int(artwork_source.get("examined_count") or 0)),
         "queued_count": max(0, int(artwork_source.get("queued_count") or 0)),
         "ready_count": max(0, int(artwork_sources.get("ready") or 0)),
         "pending_count": max(0, int(artwork_sources.get("pending") or 0)),
         "failed_count": max(0, int(artwork_sources.get("failed") or 0)),
-        "unavailable_count": max(
-            0, int(artwork_sources.get("unavailable") or 0)
-        ),
+        "unavailable_count": max(0, int(artwork_sources.get("unavailable") or 0)),
         "total_count": max(0, int(artwork_sources.get("total") or 0)),
         "last_run_at": str(artwork_source.get("last_run_at") or ""),
-        "last_completed_at": str(
-            artwork_source.get("last_completed_at") or ""
-        ),
+        "last_completed_at": str(artwork_source.get("last_completed_at") or ""),
     }
+    migration_source = (
+        dict(agent.get("storage_migrations") or {})
+        if isinstance(agent.get("storage_migrations"), Mapping)
+        else {}
+    )
+    storage_migrations = [
+        {
+            "schema": "adaos.media_center.storage_migration.v1",
+            "id": str(item.get("id") or ""),
+            "root_id": str(item.get("root_id") or ""),
+            "status": str(item.get("status") or "unknown"),
+            "total_count": max(0, int(item.get("total_count") or 0)),
+            "processed_count": max(0, int(item.get("processed_count") or 0)),
+            "migrated_count": max(0, int(item.get("migrated_count") or 0)),
+            "failed_count": max(0, int(item.get("failed_count") or 0)),
+            "processed_bytes": max(0, int(item.get("processed_bytes") or 0)),
+            "requested_at": str(item.get("requested_at") or ""),
+            "finished_at": str(item.get("finished_at") or ""),
+            "error": (
+                {
+                    "code": str((item.get("error") or {}).get("code") or ""),
+                    "detail": str((item.get("error") or {}).get("detail") or "")[:500],
+                }
+                if isinstance(item.get("error"), Mapping)
+                else None
+            ),
+        }
+        for item in (migration_source.get("items") or [])[:20]
+        if isinstance(item, Mapping)
+    ]
     return {
         "ok": True,
         "schema": COORDINATOR_SCHEMA,
@@ -2108,10 +2275,13 @@ def rendition_operations(
         "owner": "media_library_agent",
         "resource_pressure": str(agent.get("resource_pressure") or "unknown"),
         "artwork": artwork,
+        "storage_migrations": storage_migrations,
     }
 
 
-@tool(summary="Build a bounded playback queue from a catalog source.", side_effects="none")
+@tool(
+    summary="Build a bounded playback queue from a catalog source.", side_effects="none"
+)
 def build_playback_queue(
     source_type: str = "item",
     source_id: str = "",
@@ -2193,9 +2363,7 @@ def play_on(
         if isinstance(item, Mapping)
     ][:500]
     if not queue:
-        return _skill_error(
-            "playback_queue_empty", message="There is nothing to play."
-        )
+        return _skill_error("playback_queue_empty", message="There is nothing to play.")
     initial_index = max(
         0,
         min(len(queue) - 1, int(queue_result.get("initial_index") or 0)),
@@ -2233,7 +2401,11 @@ def play_on(
             return _skill_error(
                 "playback_handoff_failed",
                 message="The playback list could not be moved to that device.",
-                detail=str(update_error or (updated or {}).get("error") or "queue_update_failed"),
+                detail=str(
+                    update_error
+                    or (updated or {}).get("error")
+                    or "queue_update_failed"
+                ),
                 retryable=True,
             )
         session = dict(updated.get("session") or {})
@@ -2261,7 +2433,12 @@ def play_on(
             return _skill_error(
                 "playback_handoff_failed",
                 message="The playback session could not be opened on that device.",
-                detail=str(create_error or (created or {}).get("error") or sessions_error or "session_create_failed"),
+                detail=str(
+                    create_error
+                    or (created or {}).get("error")
+                    or sessions_error
+                    or "session_create_failed"
+                ),
                 retryable=True,
             )
         session = dict(created.get("session") or {})
@@ -2288,7 +2465,9 @@ def play_on(
         return _skill_error(
             "playback_handoff_failed",
             message="The playback command could not be sent to that device.",
-            detail=str(command_error or (commanded or {}).get("error") or "play_command_failed"),
+            detail=str(
+                command_error or (commanded or {}).get("error") or "play_command_failed"
+            ),
             retryable=True,
         )
     return {
@@ -2302,7 +2481,10 @@ def play_on(
     }
 
 
-@tool(summary="Mark or unmark one media-center item as favorite.", side_effects="local_write")
+@tool(
+    summary="Mark or unmark one media-center item as favorite.",
+    side_effects="local_write",
+)
 def set_favorite(item_id: str = "", favorite: bool = True, **_: Any) -> dict[str, Any]:
     profile_id = str(_.get("profile_id") or "default")
     catalog = _coordinator()
@@ -2407,12 +2589,20 @@ def diagnostic_export(
     }
 
 
-@tool(summary="Return Media Center deployment and node administration state.", side_effects="none")
-def deployment_status(deployment_id: str = "media-center-home", limit: int = 50, **_: Any) -> dict[str, Any]:
+@tool(
+    summary="Return Media Center deployment and node administration state.",
+    side_effects="none",
+)
+def deployment_status(
+    deployment_id: str = "media-center-home", limit: int = 50, **_: Any
+) -> dict[str, Any]:
     return _topology().deployment_status(deployment_id, limit=limit)
 
 
-@tool(summary="Create a reviewed dry-run Media Center deployment plan.", side_effects="local_write")
+@tool(
+    summary="Create a reviewed dry-run Media Center deployment plan.",
+    side_effects="local_write",
+)
 def configure_deployment(
     release_digest: str = "",
     subnet_id: str = "",
@@ -2441,27 +2631,40 @@ def configure_deployment(
         key = "runtime.media_center.error.deployment_plan_failed"
         return _skill_error(
             "deployment_plan_failed",
-            human_message=_skill_text(key, "Could not create the Media Center deployment plan."),
+            human_message=_skill_text(
+                key, "Could not create the Media Center deployment plan."
+            ),
             i18n_key=key,
             detail=str(exc)[:300],
         )
 
 
-@tool(summary="Apply one explicitly reviewed Media Center deployment plan.", side_effects="remote_write")
-def apply_deployment(plan_digest: str = "", idempotency_key: str = "", **_: Any) -> dict[str, Any]:
+@tool(
+    summary="Apply one explicitly reviewed Media Center deployment plan.",
+    side_effects="remote_write",
+)
+def apply_deployment(
+    plan_digest: str = "", idempotency_key: str = "", **_: Any
+) -> dict[str, Any]:
     try:
-        return _topology().apply_deployment(plan_digest, idempotency_key=idempotency_key)
+        return _topology().apply_deployment(
+            plan_digest, idempotency_key=idempotency_key
+        )
     except Exception as exc:
         key = "runtime.media_center.error.deployment_apply_failed"
         return _skill_error(
             "deployment_apply_failed",
-            human_message=_skill_text(key, "Could not apply the Media Center deployment plan."),
+            human_message=_skill_text(
+                key, "Could not apply the Media Center deployment plan."
+            ),
             i18n_key=key,
             detail=str(exc)[:300],
         )
 
 
-@tool(summary="Return one durable Media Center deployment operation.", side_effects="none")
+@tool(
+    summary="Return one durable Media Center deployment operation.", side_effects="none"
+)
 def deployment_operation_status(operation_id: str = "", **_: Any) -> dict[str, Any]:
     try:
         return _topology().deployment_operation_status(operation_id)
@@ -2469,16 +2672,25 @@ def deployment_operation_status(operation_id: str = "", **_: Any) -> dict[str, A
         key = "runtime.media_center.error.deployment_status_failed"
         return _skill_error(
             "deployment_status_failed",
-            human_message=_skill_text(key, "Could not read the Media Center deployment operation."),
+            human_message=_skill_text(
+                key, "Could not read the Media Center deployment operation."
+            ),
             i18n_key=key,
             detail=str(exc)[:300],
         )
 
 
-@tool(summary="Cordon and drain one Media Center component activation.", side_effects="remote_write")
-def drain_activation(activation_id: str = "", idempotency_key: str = "", **_: Any) -> dict[str, Any]:
+@tool(
+    summary="Cordon and drain one Media Center component activation.",
+    side_effects="remote_write",
+)
+def drain_activation(
+    activation_id: str = "", idempotency_key: str = "", **_: Any
+) -> dict[str, Any]:
     try:
-        return _topology().drain_activation(activation_id, idempotency_key=idempotency_key)
+        return _topology().drain_activation(
+            activation_id, idempotency_key=idempotency_key
+        )
     except Exception as exc:
         key = "runtime.media_center.error.deployment_drain_failed"
         return _skill_error(
@@ -2489,10 +2701,17 @@ def drain_activation(activation_id: str = "", idempotency_key: str = "", **_: An
         )
 
 
-@tool(summary="Remove one drained Media Center activation while retaining media and derived data.", side_effects="remote_write")
-def remove_activation(activation_id: str = "", idempotency_key: str = "", **_: Any) -> dict[str, Any]:
+@tool(
+    summary="Remove one drained Media Center activation while retaining media and derived data.",
+    side_effects="remote_write",
+)
+def remove_activation(
+    activation_id: str = "", idempotency_key: str = "", **_: Any
+) -> dict[str, Any]:
     try:
-        return _topology().remove_activation(activation_id, idempotency_key=idempotency_key)
+        return _topology().remove_activation(
+            activation_id, idempotency_key=idempotency_key
+        )
     except Exception as exc:
         key = "runtime.media_center.error.deployment_remove_failed"
         return _skill_error(
@@ -2503,7 +2722,10 @@ def remove_activation(activation_id: str = "", idempotency_key: str = "", **_: A
         )
 
 
-@tool(summary="Define Media Center logical service and datasets through the public SDK.", side_effects="local_write")
+@tool(
+    summary="Define Media Center logical service and datasets through the public SDK.",
+    side_effects="local_write",
+)
 def define_topology(
     service_definition: Mapping[str, Any] | None = None,
     service_group: Mapping[str, Any] | None = None,
@@ -2524,13 +2746,18 @@ def define_topology(
         key = "runtime.media_center.error.topology_define_failed"
         return _skill_error(
             "topology_define_failed",
-            human_message=_skill_text(key, "Could not define Media Center service topology."),
+            human_message=_skill_text(
+                key, "Could not define Media Center service topology."
+            ),
             i18n_key=key,
             detail=str(exc)[:300],
         )
 
 
-@tool(summary="Admit one exact deployed library-agent activation.", side_effects="local_write")
+@tool(
+    summary="Admit one exact deployed library-agent activation.",
+    side_effects="local_write",
+)
 def register_agent(
     instance: Mapping[str, Any] | None = None,
     expected_revision: int = 0,
@@ -2553,7 +2780,9 @@ def register_agent(
         )
 
 
-@tool(summary="Renew one admitted library-agent membership.", side_effects="local_write")
+@tool(
+    summary="Renew one admitted library-agent membership.", side_effects="local_write"
+)
 def renew_agent(
     instance_id: str = "",
     expected_revision: int = 1,
@@ -2584,7 +2813,10 @@ def renew_agent(
         )
 
 
-@tool(summary="Drain one admitted library agent from distributed routes.", side_effects="local_write")
+@tool(
+    summary="Drain one admitted library agent from distributed routes.",
+    side_effects="local_write",
+)
 def drain_agent(
     instance_id: str = "",
     expected_revision: int = 1,
@@ -2605,7 +2837,10 @@ def drain_agent(
         )
 
 
-@tool(summary="Verify a node-local replica and commit it in the authority plane.", side_effects="remote_write")
+@tool(
+    summary="Verify a node-local replica and commit it in the authority plane.",
+    side_effects="remote_write",
+)
 def observe_agent_topology(
     instance_id: str = "",
     partition: Mapping[str, Any] | None = None,
@@ -2624,13 +2859,18 @@ def observe_agent_topology(
         key = "runtime.media_center.error.agent_observation_failed"
         return _skill_error(
             "agent_observation_failed",
-            human_message=_skill_text(key, "Could not verify this Media Center replica."),
+            human_message=_skill_text(
+                key, "Could not verify this Media Center replica."
+            ),
             i18n_key=key,
             detail=str(exc)[:300],
         )
 
 
-@tool(summary="Create a reviewed Media Center topology-change plan.", side_effects="local_write")
+@tool(
+    summary="Create a reviewed Media Center topology-change plan.",
+    side_effects="local_write",
+)
 def plan_topology_change(
     partition_id: str = "",
     action: str = "",
@@ -2651,13 +2891,18 @@ def plan_topology_change(
         key = "runtime.media_center.error.topology_plan_failed"
         return _skill_error(
             "topology_plan_failed",
-            human_message=_skill_text(key, "Could not create the Media Center topology plan."),
+            human_message=_skill_text(
+                key, "Could not create the Media Center topology plan."
+            ),
             i18n_key=key,
             detail=str(exc)[:300],
         )
 
 
-@tool(summary="Apply one explicitly reviewed Media Center topology plan.", side_effects="remote_write")
+@tool(
+    summary="Apply one explicitly reviewed Media Center topology plan.",
+    side_effects="remote_write",
+)
 def apply_topology_change(
     plan_digest: str = "",
     idempotency_key: str = "",
@@ -2672,7 +2917,9 @@ def apply_topology_change(
         key = "runtime.media_center.error.topology_apply_failed"
         return _skill_error(
             "topology_apply_failed",
-            human_message=_skill_text(key, "Could not apply the Media Center topology plan."),
+            human_message=_skill_text(
+                key, "Could not apply the Media Center topology plan."
+            ),
             i18n_key=key,
             detail=str(exc)[:300],
         )
@@ -2692,7 +2939,11 @@ def topology_operation_status(operation_id: str = "", **_: Any) -> dict[str, Any
             i18n_key=key,
             detail=str(exc)[:300],
         )
-@tool(summary="Perform an explicit fenced authority handoff.", side_effects="remote_write")
+
+
+@tool(
+    summary="Perform an explicit fenced authority handoff.", side_effects="remote_write"
+)
 def handoff_authority(
     partition_id: str = "",
     target_instance_id: str = "",
@@ -2715,18 +2966,26 @@ def handoff_authority(
         key = "runtime.media_center.error.authority_handoff_failed"
         return _skill_error(
             "authority_handoff_failed",
-            human_message=_skill_text(key, "Could not hand off Media Center authority."),
+            human_message=_skill_text(
+                key, "Could not hand off Media Center authority."
+            ),
             i18n_key=key,
             detail=str(exc)[:300],
         )
 
 
-@tool(summary="Return bounded generic distributed topology state for Media Center.", side_effects="none")
+@tool(
+    summary="Return bounded generic distributed topology state for Media Center.",
+    side_effects="none",
+)
 def topology_status(limit: int = 50, **_: Any) -> dict[str, Any]:
     return _topology().distributed_status(limit=limit)
 
 
-@tool(summary="Explain route eligibility and partial participation for Media Center shards.", side_effects="none")
+@tool(
+    summary="Explain route eligibility and partial participation for Media Center shards.",
+    side_effects="none",
+)
 def explain_route(
     partition_ids: list[str] | None = None,
     dataset_id: str = "media-catalog-authority",
@@ -2764,7 +3023,10 @@ def home(
     )
 
 
-@tool(summary="List bounded Media Center profiles and their policies.", side_effects="none")
+@tool(
+    summary="List bounded Media Center profiles and their policies.",
+    side_effects="none",
+)
 def list_profiles(limit: int = 20, **_: Any) -> dict[str, Any]:
     return _coordinator().list_profiles(limit=limit)
 
@@ -2774,7 +3036,10 @@ def get_profile(profile_id: str = "default", **_: Any) -> dict[str, Any]:
     return _coordinator().get_profile(profile_id)
 
 
-@tool(summary="Revision-safely update one Media Center profile policy.", side_effects="local_write")
+@tool(
+    summary="Revision-safely update one Media Center profile policy.",
+    side_effects="local_write",
+)
 def set_profile_policy(
     profile_id: str = "default",
     expected_revision: int = 1,
@@ -2796,7 +3061,10 @@ def set_profile_policy(
     return result
 
 
-@tool(summary="Set profile-scoped rating or hidden state for one media item.", side_effects="local_write")
+@tool(
+    summary="Set profile-scoped rating or hidden state for one media item.",
+    side_effects="local_write",
+)
 def set_personal_state(
     item_id: str = "",
     profile_id: str = "default",
@@ -2820,7 +3088,9 @@ def set_personal_state(
     return result
 
 
-@tool(summary="Return bounded explainable profile recommendations.", side_effects="none")
+@tool(
+    summary="Return bounded explainable profile recommendations.", side_effects="none"
+)
 def recommendations(
     profile_id: str = "default", limit: int = 12, **_: Any
 ) -> dict[str, Any]:
@@ -2922,13 +3192,27 @@ def _compound_voice_plan(
                         {"volume": min(1.0, int(percent.group(1)) / 100)}
                         if percent
                         else {"delta": -0.2}
-                        if any(token in folded for token in ("lower", "quieter", "тише"))
+                        if any(
+                            token in folded for token in ("lower", "quieter", "тише")
+                        )
                         else {"delta": 0.2}
                     ),
                     "requires": ["target_policy", "playback_lease"],
                 }
             )
-        elif any(token in folded for token in ("pause", "stop", "next", "previous", "пауза", "стоп", "следующ", "предыдущ")):
+        elif any(
+            token in folded
+            for token in (
+                "pause",
+                "stop",
+                "next",
+                "previous",
+                "пауза",
+                "стоп",
+                "следующ",
+                "предыдущ",
+            )
+        ):
             action = next(
                 value
                 for token, value in (
@@ -2992,7 +3276,10 @@ def _compound_voice_plan(
     }
 
 
-@tool(summary="Resolve bounded Media Center voice discovery and playback intents.", side_effects="local_write")
+@tool(
+    summary="Resolve bounded Media Center voice discovery and playback intents.",
+    side_effects="local_write",
+)
 def voice_request(
     intent: str = "",
     text: str = "",
@@ -3027,8 +3314,18 @@ def voice_request(
             return compound
     catalog = _coordinator()
     transport_actions = {
-        "play", "pause", "seek", "volume", "mute", "next", "previous",
-        "stop", "handoff", "tracks", "rate", "sleep_timer",
+        "play",
+        "pause",
+        "seek",
+        "volume",
+        "mute",
+        "next",
+        "previous",
+        "stop",
+        "handoff",
+        "tracks",
+        "rate",
+        "sleep_timer",
     }
     if not operation:
         first = raw.casefold().split(" ", 1)[0] if raw else ""
@@ -3178,8 +3475,7 @@ def voice_request(
     exact = [
         item
         for item in candidates
-        if str(item.get("title") or "").strip().casefold()
-        == resolved_query.casefold()
+        if str(item.get("title") or "").strip().casefold() == resolved_query.casefold()
     ]
     if len(exact) == 1:
         candidates = exact
@@ -3250,7 +3546,9 @@ def voice_request(
         return {
             "ok": False,
             "schema": SCHEMA_VERSION,
-            "error": "playback_target_ambiguous" if target_candidates else "playback_target_unavailable",
+            "error": "playback_target_ambiguous"
+            if target_candidates
+            else "playback_target_unavailable",
             "intent": "play",
             "clarification": {
                 "prompt": "Which playback target should I use?",
@@ -3310,12 +3608,20 @@ def voice_request(
     }
 
 
-@tool(summary="List typed media collections through an opaque cursor.", side_effects="none")
-def list_collections(kind: str = "", limit: int = 30, cursor: str = "", **_: Any) -> dict[str, Any]:
+@tool(
+    summary="List typed media collections through an opaque cursor.",
+    side_effects="none",
+)
+def list_collections(
+    kind: str = "", limit: int = 30, cursor: str = "", **_: Any
+) -> dict[str, Any]:
     try:
         return _coordinator().collections(kind=kind, limit=limit, cursor=cursor)
     except ValueError:
-        return _skill_error("invalid_media_catalog_cursor", message="The collection page changed. Refresh the list.")
+        return _skill_error(
+            "invalid_media_catalog_cursor",
+            message="The collection page changed. Refresh the list.",
+        )
 
 
 @tool(
@@ -3343,7 +3649,10 @@ def collection_contents(
         )
 
 
-@tool(summary="Browse bounded catalog folders through an opaque cursor.", side_effects="none")
+@tool(
+    summary="Browse bounded catalog folders through an opaque cursor.",
+    side_effects="none",
+)
 def browse_folders(
     agent_id: str = "",
     root_id: str = "",
@@ -3427,7 +3736,10 @@ def playlist_items(
         return _skill_error("invalid_media_catalog_cursor")
 
 
-@tool(summary="Revision-safely replace playlist metadata and order.", side_effects="local_write")
+@tool(
+    summary="Revision-safely replace playlist metadata and order.",
+    side_effects="local_write",
+)
 def update_playlist(
     playlist_id: str = "",
     profile_id: str = "default",
@@ -3455,7 +3767,10 @@ def update_playlist(
     return result
 
 
-@tool(summary="Revision-safely delete a playlist without deleting media.", side_effects="local_write")
+@tool(
+    summary="Revision-safely delete a playlist without deleting media.",
+    side_effects="local_write",
+)
 def delete_playlist(
     playlist_id: str = "",
     profile_id: str = "default",
@@ -3477,7 +3792,10 @@ def delete_playlist(
     return result
 
 
-@tool(summary="Apply an audited reversible catalog correction.", side_effects="local_write")
+@tool(
+    summary="Apply an audited reversible catalog correction.",
+    side_effects="local_write",
+)
 def apply_correction(
     operation: str = "",
     subject_ref: str = "",
@@ -3571,24 +3889,25 @@ def update_item_metadata(
 def reverse_correction(
     correction_id: str = "", actor_ref: str = "profile:default", **_: Any
 ) -> dict[str, Any]:
-    return _coordinator().reverse_correction(
-        correction_id, actor_ref=actor_ref
-    )
+    return _coordinator().reverse_correction(correction_id, actor_ref=actor_ref)
 
 
 @tool(summary="List bounded metadata claims and provenance.", side_effects="none")
-def metadata_claims(
-    subject_ref: str = "", limit: int = 30, **_: Any
-) -> dict[str, Any]:
+def metadata_claims(subject_ref: str = "", limit: int = 30, **_: Any) -> dict[str, Any]:
     return _coordinator().metadata_claims(subject_ref, limit=limit)
 
 
-@tool(summary="Return cheap non-destructive duplicate and variant candidates.", side_effects="none")
+@tool(
+    summary="Return cheap non-destructive duplicate and variant candidates.",
+    side_effects="none",
+)
 def duplicate_candidates(limit: int = 30, **_: Any) -> dict[str, Any]:
     return _coordinator().duplicate_candidates(limit=limit)
 
 
-@tool(summary="Persist a bounded profile resume checkpoint.", side_effects="local_write")
+@tool(
+    summary="Persist a bounded profile resume checkpoint.", side_effects="local_write"
+)
 def save_checkpoint(
     item_id: str = "",
     profile_id: str = "default",
@@ -3614,8 +3933,13 @@ def save_checkpoint(
     return result
 
 
-@tool(summary="Queue background media enrichment or technical analysis.", side_effects="local_write")
-def queue_background_job(kind: str = "", subject_ref: str = "", priority: int = 100, **_: Any) -> dict[str, Any]:
+@tool(
+    summary="Queue background media enrichment or technical analysis.",
+    side_effects="local_write",
+)
+def queue_background_job(
+    kind: str = "", subject_ref: str = "", priority: int = 100, **_: Any
+) -> dict[str, Any]:
     catalog = _coordinator()
     result = catalog.queue_background_job(kind, subject_ref, priority=priority)
     if result.get("ok"):
@@ -3627,7 +3951,10 @@ def queue_background_job(kind: str = "", subject_ref: str = "", priority: int = 
     return result
 
 
-@tool(summary="Add one media item to a profile-owned playlist.", side_effects="local_write")
+@tool(
+    summary="Add one media item to a profile-owned playlist.",
+    side_effects="local_write",
+)
 def add_playlist_item(
     playlist_id: str = "",
     item_id: str = "",
@@ -3746,7 +4073,10 @@ def dispose(**_: Any) -> dict[str, Any]:
     }
 
 
-@tool(summary="Explain the MVP media-center workflow and admitted next steps.", side_effects="none")
+@tool(
+    summary="Explain the MVP media-center workflow and admitted next steps.",
+    side_effects="none",
+)
 def next_steps(**_: Any) -> dict[str, Any]:
     steps = [
         {
@@ -3770,18 +4100,35 @@ def next_steps(**_: Any) -> dict[str, Any]:
             "reason": "Inspect agent participation, background metadata jobs, playback routes, and bounded diagnostics before changing deployment.",
         },
     ]
-    message = " ".join(f"{idx + 1}. {item['label']}: {item['reason']}" for idx, item in enumerate(steps))
-    return {"ok": True, "schema": SCHEMA_VERSION, "steps": steps, "message": message, "speech_text": message}
+    message = " ".join(
+        f"{idx + 1}. {item['label']}: {item['reason']}"
+        for idx, item in enumerate(steps)
+    )
+    return {
+        "ok": True,
+        "schema": SCHEMA_VERSION,
+        "steps": steps,
+        "message": message,
+        "speech_text": message,
+    }
 
 
-@tool(summary="Small conversational entrypoint for media-center control.", side_effects="local_write")
+@tool(
+    summary="Small conversational entrypoint for media-center control.",
+    side_effects="local_write",
+)
 def chat(text: str = "", **payload: Any) -> dict[str, Any]:
     raw = str(text or "").strip()
     folded = raw.casefold()
     if any(token in folded for token in ("folder", "folders", "root", "roots", "папк")):
         return list_roots()
-    if any(token in folded for token in ("scan", "refresh", "rescan", "index", "catalog")):
-        result = scan_sources(source=str(payload.get("source") or "all"), limit=int(payload.get("limit") or 5000))
+    if any(
+        token in folded for token in ("scan", "refresh", "rescan", "index", "catalog")
+    ):
+        result = scan_sources(
+            source=str(payload.get("source") or "all"),
+            limit=int(payload.get("limit") or 5000),
+        )
         result["message"] = (
             f"Catalog refreshed: {result.get('discovered_count', 0)} resources, "
             f"{result.get('updated_count', 0)} updated, {result.get('missing_count', 0)} missing."

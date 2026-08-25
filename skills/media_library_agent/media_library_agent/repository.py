@@ -39,12 +39,41 @@ ACTIVE_JOB_STATUSES = (
 )
 TERMINAL_JOB_STATUSES = ("completed", "failed", "canceled")
 _CLOCK = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
-_DATABASE_SCHEMA_REVISION = "4"
+_DATABASE_SCHEMA_REVISION = "6"
 _STORAGE_COMPACTION_REVISION = "2026-08-25.1"
 _SCHEMA_LOCK_TIMEOUT_SECONDS = 300.0
 _CONTENTLESS_DELETE_SEARCH = sqlite3.sqlite_version_info >= (3, 43, 0)
 _DESCRIPTOR_METADATA_KEYS = "_media_library_source_metadata_keys"
 _DESCRIPTOR_SOURCE_FIELDS = "_media_library_source_fields"
+ROOT_STORAGE_POLICY_SCHEMA = "adaos.media_library.storage_policy.v1"
+MANAGED_MEDIA_DIRECTORY = ".adaos-media"
+DEFAULT_RENDITION_QUOTA_BYTES = 100 * 1024**3
+
+
+def normalize_storage_policy(value: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    requested = dict(value or {})
+    rendition_mode = text(requested.get("rendition_mode") or "source_root")
+    artwork_mode = text(requested.get("artwork_mode") or "node_cache")
+    if rendition_mode not in {"source_root", "node_cache"}:
+        raise ValueError("storage_policy_rendition_mode_invalid")
+    if artwork_mode not in {"source_root", "node_cache"}:
+        raise ValueError("storage_policy_artwork_mode_invalid")
+    try:
+        quota = int(
+            requested.get("rendition_quota_bytes") or DEFAULT_RENDITION_QUOTA_BYTES
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError("storage_policy_quota_invalid") from exc
+    if quota < 1024**3 or quota > 10 * 1024**4:
+        raise ValueError("storage_policy_quota_invalid")
+    return {
+        "schema": ROOT_STORAGE_POLICY_SCHEMA,
+        "rendition_mode": rendition_mode,
+        "artwork_mode": artwork_mode,
+        "managed_directory": MANAGED_MEDIA_DIRECTORY,
+        "rendition_quota_bytes": quota,
+        "legacy_migration": bool(requested.get("legacy_migration", True)),
+    }
 
 
 def _file_size(path: Path) -> int:
@@ -349,6 +378,7 @@ class MediaLibraryAgentRepository:
                     follow_symlinks INTEGER NOT NULL DEFAULT 0,
                     exclusions_json TEXT NOT NULL DEFAULT '[]',
                     scan_window_json TEXT NOT NULL DEFAULT '{}',
+                    storage_policy_json TEXT NOT NULL DEFAULT '{}',
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     last_scan_at TEXT NOT NULL DEFAULT '',
@@ -483,12 +513,34 @@ class MediaLibraryAgentRepository:
                     error_detail TEXT NOT NULL DEFAULT '',
                     cancel_requested INTEGER NOT NULL DEFAULT 0,
                     cleaned_at TEXT NOT NULL DEFAULT '',
+                    storage_mode TEXT NOT NULL DEFAULT '',
+                    checksum_sha256 TEXT NOT NULL DEFAULT '',
                     revision INTEGER NOT NULL DEFAULT 1
                 );
                 CREATE INDEX IF NOT EXISTS idx_media_agent_rendition_queue
                     ON rendition_jobs(status, priority, requested_at);
                 CREATE INDEX IF NOT EXISTS idx_media_agent_rendition_source
                     ON rendition_jobs(source_id, source_fingerprint, profile);
+                CREATE TABLE IF NOT EXISTS storage_migration_jobs (
+                    id TEXT PRIMARY KEY,
+                    root_id TEXT NOT NULL REFERENCES roots(id) ON DELETE CASCADE,
+                    status TEXT NOT NULL,
+                    requested_at TEXT NOT NULL,
+                    started_at TEXT NOT NULL DEFAULT '',
+                    finished_at TEXT NOT NULL DEFAULT '',
+                    cursor TEXT NOT NULL DEFAULT '',
+                    total_count INTEGER NOT NULL DEFAULT 0,
+                    processed_count INTEGER NOT NULL DEFAULT 0,
+                    migrated_count INTEGER NOT NULL DEFAULT 0,
+                    failed_count INTEGER NOT NULL DEFAULT 0,
+                    processed_bytes INTEGER NOT NULL DEFAULT 0,
+                    current_rendition_job_id TEXT NOT NULL DEFAULT '',
+                    error_code TEXT NOT NULL DEFAULT '',
+                    error_detail TEXT NOT NULL DEFAULT '',
+                    revision INTEGER NOT NULL DEFAULT 1
+                );
+                CREATE INDEX IF NOT EXISTS idx_media_agent_storage_migration_queue
+                    ON storage_migration_jobs(status, requested_at);
                 """
             )
             schedule_columns = {
@@ -502,6 +554,29 @@ class MediaLibraryAgentRepository:
                 if name not in schedule_columns:
                     connection.execute(
                         f"ALTER TABLE schedules ADD COLUMN {name} {definition}"
+                    )
+            root_columns = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(roots)").fetchall()
+            }
+            if "storage_policy_json" not in root_columns:
+                connection.execute(
+                    "ALTER TABLE roots ADD COLUMN storage_policy_json "
+                    "TEXT NOT NULL DEFAULT '{}'"
+                )
+            rendition_columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(rendition_jobs)"
+                ).fetchall()
+            }
+            for name, definition in {
+                "storage_mode": "TEXT NOT NULL DEFAULT ''",
+                "checksum_sha256": "TEXT NOT NULL DEFAULT ''",
+            }.items():
+                if name not in rendition_columns:
+                    connection.execute(
+                        f"ALTER TABLE rendition_jobs ADD COLUMN {name} {definition}"
                     )
             source_columns = {
                 str(row["name"])
@@ -842,6 +917,7 @@ class MediaLibraryAgentRepository:
         follow_symlinks: bool = False,
         exclusions: Iterable[str] = (),
         scan_window: Mapping[str, Any] | None = None,
+        storage_policy: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         token = text(path)
         if not token:
@@ -921,18 +997,34 @@ class MediaLibraryAgentRepository:
             existing = connection.execute(
                 "SELECT * FROM roots WHERE path = ?", (str(resolved),)
             ).fetchone()
+            existing_policy = (
+                json_loads(existing["storage_policy_json"], {}) if existing else {}
+            )
+            try:
+                policy = normalize_storage_policy(
+                    storage_policy if storage_policy is not None else existing_policy
+                )
+            except ValueError as exc:
+                return {
+                    "ok": False,
+                    "error": text(exc),
+                    "schema": SCHEMA_VERSION,
+                }
             revision = int(existing["revision"] or 0) + 1 if existing else 1
             created_at = str(existing["created_at"]) if existing else now
             connection.execute(
                 """
                 INSERT INTO roots (
                     id, node_id, path, label, enabled, include_images, follow_symlinks,
-                    exclusions_json, scan_window_json, created_at, updated_at, revision
-                ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+                    exclusions_json, scan_window_json, storage_policy_json,
+                    created_at, updated_at, revision
+                ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(path) DO UPDATE SET
                     label=excluded.label, enabled=1, include_images=excluded.include_images,
                     follow_symlinks=excluded.follow_symlinks, exclusions_json=excluded.exclusions_json,
-                    scan_window_json=excluded.scan_window_json, updated_at=excluded.updated_at,
+                    scan_window_json=excluded.scan_window_json,
+                    storage_policy_json=excluded.storage_policy_json,
+                    updated_at=excluded.updated_at,
                     revision=excluded.revision
                 """,
                 (
@@ -944,6 +1036,7 @@ class MediaLibraryAgentRepository:
                     int(follow_symlinks),
                     json_dumps(patterns),
                     json_dumps(window),
+                    json_dumps(policy),
                     created_at,
                     now,
                     revision,
@@ -955,6 +1048,235 @@ class MediaLibraryAgentRepository:
             "schema": SCHEMA_VERSION,
             "root": self.get_root(root_id),
             "roots": self.list_roots()["items"],
+        }
+
+    def set_root_storage_policy(
+        self, root_id: str, values: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        root = self.get_root(root_id)
+        if root is None:
+            return {"ok": False, "error": "root_not_found", "schema": SCHEMA_VERSION}
+        merged = {**dict(root.get("storage_policy") or {}), **dict(values or {})}
+        try:
+            policy = normalize_storage_policy(merged)
+        except ValueError as exc:
+            return {"ok": False, "error": text(exc), "schema": SCHEMA_VERSION}
+        with self.connect() as connection:
+            changed = connection.execute(
+                "UPDATE roots SET storage_policy_json=?,updated_at=?,revision=revision+1 "
+                "WHERE id=?",
+                (json_dumps(policy), now_iso(), text(root_id)),
+            ).rowcount
+            connection.commit()
+        return {
+            "ok": bool(changed),
+            "schema": SCHEMA_VERSION,
+            "root": self.get_root(root_id),
+        }
+
+    def rendition_storage_bytes(self, root_id: str, storage_mode: str) -> int:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT COALESCE(SUM(output_bytes),0) AS total FROM rendition_jobs "
+                "WHERE root_id=? AND status='completed' AND profile<>'artwork-card-v1' "
+                "AND storage_mode=?",
+                (text(root_id), text(storage_mode)),
+            ).fetchone()
+        return max(0, int(row["total"] or 0)) if row else 0
+
+    def enqueue_storage_migration(self, root_id: str) -> dict[str, Any]:
+        root = self.get_root(root_id)
+        if root is None:
+            return {"ok": False, "error": "root_not_found", "schema": SCHEMA_VERSION}
+        policy = dict(root.get("storage_policy") or {})
+        if text(policy.get("rendition_mode")) != "source_root" or not bool(
+            policy.get("legacy_migration", True)
+        ):
+            return {
+                "ok": True,
+                "schema": SCHEMA_VERSION,
+                "created": False,
+                "skipped": True,
+                "reason": "storage_migration_disabled",
+                "job": None,
+            }
+        with self.connect() as connection:
+            existing = connection.execute(
+                "SELECT * FROM storage_migration_jobs WHERE root_id=? "
+                "AND status IN ('queued','running','waiting_resources') "
+                "ORDER BY requested_at DESC LIMIT 1",
+                (text(root_id),),
+            ).fetchone()
+            if existing is not None:
+                return {
+                    "ok": True,
+                    "schema": SCHEMA_VERSION,
+                    "created": False,
+                    "job": self._public_storage_migration(existing),
+                }
+            total = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM rendition_jobs WHERE root_id=? "
+                    "AND status='completed' AND profile<>'artwork-card-v1' "
+                    "AND storage_mode<>'source_root' "
+                    "AND COALESCE(json_extract(target_json,'$.packaging'),'single_file')"
+                    "<>'hls_cmaf_vod'",
+                    (text(root_id),),
+                ).fetchone()[0]
+            )
+            if total == 0:
+                previous = connection.execute(
+                    "SELECT * FROM storage_migration_jobs WHERE root_id=? "
+                    "AND status='completed' ORDER BY finished_at DESC LIMIT 1",
+                    (text(root_id),),
+                ).fetchone()
+                return {
+                    "ok": True,
+                    "schema": SCHEMA_VERSION,
+                    "created": False,
+                    "skipped": True,
+                    "reason": "no_legacy_renditions",
+                    "job": self._public_storage_migration(previous)
+                    if previous is not None
+                    else None,
+                }
+            requested_at = now_iso()
+            job_id = stable_id(
+                "storagemigration",
+                root_id,
+                int(root.get("revision") or 0),
+                requested_at,
+            )
+            connection.execute(
+                "INSERT INTO storage_migration_jobs("
+                "id,root_id,status,requested_at,finished_at,total_count"
+                ") VALUES (?,?,?,?,?,?)",
+                (
+                    job_id,
+                    text(root_id),
+                    "queued",
+                    requested_at,
+                    "",
+                    total,
+                ),
+            )
+            row = connection.execute(
+                "SELECT * FROM storage_migration_jobs WHERE id=?", (job_id,)
+            ).fetchone()
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "created": True,
+            "job": self._public_storage_migration(row),
+        }
+
+    def next_storage_migration(self) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM storage_migration_jobs "
+                "WHERE status IN ('queued','waiting_resources') "
+                "ORDER BY requested_at LIMIT 1"
+            ).fetchone()
+        return self._public_storage_migration(row) if row else None
+
+    def claim_storage_migration(self, job_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            changed = connection.execute(
+                "UPDATE storage_migration_jobs SET status='running',"
+                "started_at=CASE WHEN started_at='' THEN ? ELSE started_at END,"
+                "error_code='',error_detail='',revision=revision+1 "
+                "WHERE id=? AND status IN ('queued','waiting_resources')",
+                (now_iso(), text(job_id)),
+            ).rowcount
+            row = connection.execute(
+                "SELECT * FROM storage_migration_jobs WHERE id=?", (text(job_id),)
+            ).fetchone()
+            connection.commit()
+        return self._public_storage_migration(row) if changed and row else None
+
+    def storage_migration_candidate(
+        self, root_id: str, cursor: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT rendition_jobs.*,sources.name AS source_name,"
+                "sources.relative_path AS source_relative_path,"
+                "sources.size_bytes AS source_size_bytes "
+                "FROM rendition_jobs LEFT JOIN sources "
+                "ON sources.id=rendition_jobs.source_id "
+                "WHERE rendition_jobs.root_id=? AND rendition_jobs.id>? "
+                "AND rendition_jobs.status='completed' "
+                "AND rendition_jobs.profile<>'artwork-card-v1' "
+                "AND rendition_jobs.storage_mode<>'source_root' "
+                "AND COALESCE(json_extract(rendition_jobs.target_json,'$.packaging'),"
+                "'single_file')<>'hls_cmaf_vod' "
+                "ORDER BY rendition_jobs.id LIMIT 1",
+                (text(root_id), text(cursor)),
+            ).fetchone()
+        return self._public_rendition_job(row) if row else None
+
+    def update_storage_migration(
+        self, job_id: str, *, status: str | None = None, **fields: Any
+    ) -> dict[str, Any] | None:
+        allowed = {
+            "finished_at",
+            "cursor",
+            "processed_count",
+            "migrated_count",
+            "failed_count",
+            "processed_bytes",
+            "current_rendition_job_id",
+            "error_code",
+            "error_detail",
+        }
+        updates: list[str] = []
+        values: list[Any] = []
+        if status is not None:
+            updates.append("status=?")
+            values.append(text(status))
+        for key, value in fields.items():
+            if key in allowed:
+                updates.append(f"{key}=?")
+                values.append(value)
+        if not updates:
+            return self.get_storage_migration(job_id)
+        updates.append("revision=revision+1")
+        values.append(text(job_id))
+        with self.connect() as connection:
+            connection.execute(
+                f"UPDATE storage_migration_jobs SET {', '.join(updates)} WHERE id=?",
+                tuple(values),
+            )
+            connection.commit()
+        return self.get_storage_migration(job_id)
+
+    def get_storage_migration(self, job_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM storage_migration_jobs WHERE id=?", (text(job_id),)
+            ).fetchone()
+        return self._public_storage_migration(row) if row else None
+
+    def list_storage_migrations(
+        self, *, root_id: str = "", limit: int = 20
+    ) -> dict[str, Any]:
+        bounded = max(1, min(100, int(limit or 20)))
+        where = "WHERE root_id=?" if text(root_id) else ""
+        params: tuple[Any, ...] = (
+            (text(root_id), bounded) if text(root_id) else (bounded,)
+        )
+        with self.connect() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM storage_migration_jobs {where} "
+                "ORDER BY requested_at DESC LIMIT ?",
+                params,
+            ).fetchall()
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "items": [self._public_storage_migration(row) for row in rows],
+            "count": len(rows),
         }
 
     def get_root(self, root_id: str) -> dict[str, Any] | None:
@@ -1590,7 +1912,7 @@ class MediaLibraryAgentRepository:
         with self.connect() as connection:
             row = connection.execute(
                 f"""
-                SELECT * FROM rendition_jobs WHERE {' AND '.join(filters)}
+                SELECT * FROM rendition_jobs WHERE {" AND ".join(filters)}
                 ORDER BY priority,requested_at LIMIT 1
                 """,
                 tuple(params),
@@ -1625,6 +1947,8 @@ class MediaLibraryAgentRepository:
             "error_detail",
             "cancel_requested",
             "cleaned_at",
+            "storage_mode",
+            "checksum_sha256",
         }
         updates: list[str] = []
         values: list[Any] = []
@@ -1686,7 +2010,7 @@ class MediaLibraryAgentRepository:
                     sources.size_bytes AS source_size_bytes
                 FROM rendition_jobs
                 LEFT JOIN sources ON sources.id=rendition_jobs.source_id
-                {where.replace('source_id', 'rendition_jobs.source_id')}
+                {where.replace("source_id", "rendition_jobs.source_id")}
                 ORDER BY requested_at DESC LIMIT ?
                 """,
                 tuple(params),
@@ -1750,6 +2074,17 @@ class MediaLibraryAgentRepository:
                 size=28,
             )
             target = json_loads(job["target_json"], {})
+            descriptor_metadata = (
+                dict(descriptor.get("metadata") or {})
+                if isinstance(descriptor.get("metadata"), Mapping)
+                else {}
+            )
+            storage_mode = text(
+                descriptor_metadata.get("storage_mode")
+                or descriptor_metadata.get("managed_storage_mode")
+                or "node_cache"
+            )
+            checksum_sha256 = text(descriptor_metadata.get("checksum_sha256"))
             rendition: dict[str, Any] = {
                 "id": rendition_id,
                 "profile": str(job["profile"]),
@@ -1815,12 +2150,15 @@ class MediaLibraryAgentRepository:
                 """
                 UPDATE rendition_jobs SET status='completed',finished_at=?,
                     output_json=?,output_bytes=?,error_code='',error_detail='',
+                    storage_mode=?,checksum_sha256=?,
                     revision=revision+1 WHERE id=?
                 """,
                 (
                     now_iso(),
                     json_dumps(dict(descriptor)),
                     max(0, int(output_bytes)),
+                    storage_mode,
+                    checksum_sha256,
                     str(job["id"]),
                 ),
             )
@@ -1852,6 +2190,93 @@ class MediaLibraryAgentRepository:
                 (max(1, min(100, int(limit or 20))),),
             ).fetchall()
         return [self._public_rendition_job(row) for row in rows]
+
+    def replace_rendition_storage(
+        self,
+        rendition_job_id: str,
+        *,
+        descriptor: Mapping[str, Any],
+        output_bytes: int,
+    ) -> dict[str, Any]:
+        descriptor_metadata = (
+            dict(descriptor.get("metadata") or {})
+            if isinstance(descriptor.get("metadata"), Mapping)
+            else {}
+        )
+        storage_mode = text(
+            descriptor_metadata.get("storage_mode")
+            or descriptor_metadata.get("managed_storage_mode")
+        )
+        checksum = text(descriptor_metadata.get("checksum_sha256"))
+        if storage_mode != "source_root" or not checksum:
+            return {"ok": False, "error": "managed_descriptor_invalid"}
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            job = connection.execute(
+                "SELECT * FROM rendition_jobs WHERE id=? AND status='completed'",
+                (text(rendition_job_id),),
+            ).fetchone()
+            if job is None:
+                connection.rollback()
+                return {"ok": False, "error": "rendition_job_not_found"}
+            source = connection.execute(
+                "SELECT * FROM sources WHERE id=?", (str(job["source_id"]),)
+            ).fetchone()
+            source_changed = False
+            public_source: dict[str, Any] | None = None
+            if source is not None and bool(source["present"]):
+                metadata = json_loads(source["metadata_json"], {})
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                renditions = []
+                for value in metadata.get("derived_renditions") or []:
+                    if not isinstance(value, Mapping):
+                        continue
+                    item = dict(value)
+                    if text(item.get("profile")) == str(job["profile"]) and text(
+                        item.get("exact_source_fingerprint")
+                    ) == str(job["source_fingerprint"]):
+                        item["descriptor"] = dict(descriptor)
+                        item["size_bytes"] = max(0, int(output_bytes))
+                        item["migrated_at"] = now_iso()
+                        source_changed = True
+                    renditions.append(item)
+                if source_changed:
+                    metadata["derived_renditions"] = renditions[-8:]
+                    connection.execute(
+                        "UPDATE sources SET metadata_json=?,revision=revision+1,"
+                        "last_seen_at=? WHERE id=?",
+                        (json_dumps(metadata), now_iso(), str(source["id"])),
+                    )
+                    changed = connection.execute(
+                        "SELECT * FROM sources WHERE id=?", (str(source["id"]),)
+                    ).fetchone()
+                    public_source = self._public_source(changed)
+                    self._insert_delta(
+                        connection,
+                        "updated",
+                        public_source,
+                        job_id=f"storage-migration:{job['id']}",
+                    )
+            connection.execute(
+                "UPDATE rendition_jobs SET output_json=?,output_bytes=?,"
+                "storage_mode='source_root',checksum_sha256=?,revision=revision+1 "
+                "WHERE id=?",
+                (
+                    json_dumps(dict(descriptor)),
+                    max(0, int(output_bytes)),
+                    checksum,
+                    str(job["id"]),
+                ),
+            )
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "source_changed": source_changed,
+            "source": public_source,
+            "job": self.get_rendition_job(rendition_job_id),
+        }
 
     def active_rendition_job_count(self) -> int:
         with self.connect() as connection:
@@ -3285,6 +3710,7 @@ class MediaLibraryAgentRepository:
         return dict(saved["result"])
 
     def _public_root(self, row: sqlite3.Row) -> dict[str, Any]:
+        policy = normalize_storage_policy(json_loads(row["storage_policy_json"], {}))
         return {
             "schema": ROOT_SCHEMA,
             "id": str(row["id"]),
@@ -3296,6 +3722,7 @@ class MediaLibraryAgentRepository:
             "follow_symlinks": bool(row["follow_symlinks"]),
             "exclusions": json_loads(row["exclusions_json"], []),
             "scan_window": json_loads(row["scan_window_json"], {}),
+            "storage_policy": policy,
             "created_at": str(row["created_at"]),
             "updated_at": str(row["updated_at"]),
             "last_scan_at": str(row["last_scan_at"]),
@@ -3335,6 +3762,34 @@ class MediaLibraryAgentRepository:
             "revision": int(row["revision"]),
         }
 
+    @staticmethod
+    def _public_storage_migration(row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "schema": "adaos.media_library.storage_migration.v1",
+            "id": str(row["id"]),
+            "root_id": str(row["root_id"]),
+            "status": str(row["status"]),
+            "requested_at": str(row["requested_at"]),
+            "started_at": str(row["started_at"]),
+            "finished_at": str(row["finished_at"]),
+            "cursor": str(row["cursor"]),
+            "total_count": int(row["total_count"]),
+            "processed_count": int(row["processed_count"]),
+            "migrated_count": int(row["migrated_count"]),
+            "failed_count": int(row["failed_count"]),
+            "processed_bytes": int(row["processed_bytes"]),
+            "current_rendition_job_id": str(row["current_rendition_job_id"]),
+            "error": (
+                {
+                    "code": str(row["error_code"]),
+                    "detail": str(row["error_detail"]),
+                }
+                if row["error_code"]
+                else None
+            ),
+            "revision": int(row["revision"]),
+        }
+
     def _public_rendition_job(self, row: sqlite3.Row) -> dict[str, Any]:
         result = {
             "schema": RENDITION_JOB_SCHEMA,
@@ -3363,6 +3818,8 @@ class MediaLibraryAgentRepository:
             ),
             "cancel_requested": bool(row["cancel_requested"]),
             "cleaned_at": str(row["cleaned_at"]),
+            "storage_mode": str(row["storage_mode"]),
+            "checksum_sha256": str(row["checksum_sha256"]),
             "revision": int(row["revision"]),
         }
         columns = set(row.keys())
@@ -3370,9 +3827,7 @@ class MediaLibraryAgentRepository:
             result.update(
                 {
                     "source_name": str(row["source_name"] or ""),
-                    "source_relative_path": str(
-                        row["source_relative_path"] or ""
-                    ),
+                    "source_relative_path": str(row["source_relative_path"] or ""),
                     "source_size_bytes": int(row["source_size_bytes"] or 0),
                 }
             )

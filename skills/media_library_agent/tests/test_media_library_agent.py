@@ -653,7 +653,7 @@ def test_repository_schema_initialization_is_concurrency_safe(tmp_path):
         results = list(executor.map(initialize, range(16)))
 
     assert all(result["ok"] is True for result in results)
-    assert {result["schema_revision"] for result in results} == {"4"}
+    assert {result["schema_revision"] for result in results} == {"6"}
     with sqlite3.connect(database) as connection:
         rows = dict(connection.execute("SELECT key,value FROM agent_meta").fetchall())
         indexes = {
@@ -661,7 +661,7 @@ def test_repository_schema_initialization_is_concurrency_safe(tmp_path):
             for row in connection.execute("PRAGMA index_list(sources)").fetchall()
         }
     assert rows["node_id"] == "node-a"
-    assert rows["database_schema_revision"] == "4"
+    assert rows["database_schema_revision"] == "6"
     assert "idx_media_agent_sources_folder" in indexes
 
 
@@ -678,8 +678,34 @@ def test_current_schema_check_does_not_require_sqlite_writer_lock(tmp_path):
         blocker.close()
 
     assert result["ok"] is True
-    assert result["schema_revision"] == "4"
+    assert result["schema_revision"] == "6"
     assert time.monotonic() - started < 1.0
+
+
+def test_root_storage_policy_defaults_to_source_renditions_and_local_artwork(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "storage-policy.sqlite3", node_id="node-a"
+    )
+
+    root = repository.add_root(str(library))["root"]
+
+    assert root["storage_policy"] == {
+        "schema": "adaos.media_library.storage_policy.v1",
+        "rendition_mode": "source_root",
+        "artwork_mode": "node_cache",
+        "managed_directory": ".adaos-media",
+        "rendition_quota_bytes": 100 * 1024**3,
+        "legacy_migration": True,
+    }
+    updated = repository.set_root_storage_policy(
+        root["id"],
+        {"rendition_mode": "node_cache", "rendition_quota_bytes": 5 * 1024**3},
+    )
+    assert updated["root"]["storage_policy"]["rendition_mode"] == "node_cache"
+    assert updated["root"]["storage_policy"]["artwork_mode"] == "node_cache"
+    assert MediaLibraryAgentWorker._excluded(".adaos-media/renditions/file.mp4", [])
 
 
 def test_repository_normalizes_source_storage_and_uses_contentless_fts(tmp_path):
@@ -2008,9 +2034,7 @@ def test_rendition_progress_counts_partial_and_hls_outputs(tmp_path):
     assert MediaLibraryAgentWorker._rendition_output_bytes(hls_target) == 15
 
 
-def test_worker_removes_only_stale_orphan_rendition_partials(
-    monkeypatch, tmp_path
-):
+def test_worker_removes_only_stale_orphan_rendition_partials(monkeypatch, tmp_path):
     repository = MediaLibraryAgentRepository(tmp_path / "agent.sqlite3")
     root = repository.db_path.parent / "renditions"
     root.mkdir()
@@ -2022,9 +2046,7 @@ def test_worker_removes_only_stale_orphan_rendition_partials(
     regular.write_bytes(b"ready")
     old = time.time() - 3600
     os.utime(stale, (old, old))
-    monkeypatch.setenv(
-        "MEDIA_LIBRARY_AGENT_PARTIAL_CLEANUP_GRACE_SECONDS", "900"
-    )
+    monkeypatch.setenv("MEDIA_LIBRARY_AGENT_PARTIAL_CLEANUP_GRACE_SECONDS", "900")
     worker = MediaLibraryAgentWorker(repository)
 
     removed = worker._cleanup_orphan_rendition_partials()
@@ -2060,6 +2082,186 @@ def test_ffmpeg_capabilities_selects_hardware_with_software_fallback(
     assert capabilities["selected_video_encoder"] == "h264_nvenc"
     assert capabilities["hardware_acceleration"] == "nvenc"
     assert capabilities["software_fallback"] is True
+
+
+def test_managed_rendition_is_content_addressed_on_source_volume(monkeypatch, tmp_path):
+    from adaos.sdk.io import media as media_sdk
+
+    library = tmp_path / "library"
+    library.mkdir()
+    staging = tmp_path / "staging.mp4"
+    staging.write_bytes(b"browser-compatible")
+    registered: dict[str, object] = {}
+
+    def register(path, *, root, content_ref, namespace, mime, metadata):
+        registered.update(
+            path=Path(path),
+            root=Path(root),
+            content_ref=content_ref,
+            namespace=namespace,
+            mime=mime,
+            metadata=dict(metadata),
+        )
+        return {
+            "resource_id": "ref_managed",
+            "filename": Path(path).name,
+            "path": str(path),
+            "mime_type": mime,
+            "size_bytes": Path(path).stat().st_size,
+            "metadata": {"storage_mode": "reference", **dict(metadata)},
+            "delivery": {"storage_mode": "reference"},
+        }
+
+    monkeypatch.setattr(media_sdk, "register_media_file", register)
+    job = {
+        "id": "rendition-job-a",
+        "source_id": "source-a",
+        "source_fingerprint": "fingerprint-a",
+        "source_revision": 1,
+        "media_kind": "video",
+        "profile": "browser-mp4-v1",
+        "target": {"packaging": "single_file", "mime_type": "video/mp4"},
+    }
+
+    first = rendition_module.publish_managed_rendition(
+        staging, job, root={"path": str(library)}
+    )
+    second = rendition_module.publish_managed_rendition(
+        staging, job, root={"path": str(library)}
+    )
+
+    managed_path = Path(first["path"])
+    assert managed_path == Path(second["path"])
+    assert managed_path.is_relative_to(library / ".adaos-media" / "renditions")
+    assert managed_path.read_bytes() == b"browser-compatible"
+    assert registered["root"] == library
+    assert registered["namespace"] == "media-library-rendition"
+    assert first["metadata"]["storage_mode"] == "source_root"
+    assert len(first["metadata"]["checksum_sha256"]) == 64
+    marker = json.loads(
+        (library / ".adaos-media" / "store.json").read_text(encoding="utf-8")
+    )
+    assert marker["schema"] == "adaos.media_library.managed_store.v1"
+
+
+def test_legacy_rendition_migration_is_resumable_and_rewrites_source_descriptor(
+    monkeypatch, tmp_path
+):
+    library = tmp_path / "library"
+    library.mkdir()
+    (library / "legacy.mkv").write_bytes(b"original")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "migration.sqlite3", node_id="node-a"
+    )
+    legacy = tmp_path / "node-cache" / "legacy-browser.mp4"
+
+    def register(path, _root, metadata):
+        return {
+            "resource_id": "source-ref",
+            "path": str(path),
+            "source_path": str(path),
+            "mime_type": "video/x-matroska",
+            "metadata": metadata,
+        }
+
+    def transcode(_source, target, _job, *, cancelled):
+        assert cancelled() is False
+        target.write_bytes(b"converted")
+        return {"size_bytes": target.stat().st_size, "mime_type": "video/mp4"}
+
+    def publish_legacy(target, _job):
+        legacy.parent.mkdir()
+        legacy.write_bytes(target.read_bytes())
+        return {
+            "resource_id": legacy.name,
+            "filename": legacy.name,
+            "path": str(legacy),
+            "mime_type": "video/mp4",
+            "size_bytes": legacy.stat().st_size,
+            "metadata": {"namespace": "media-library-rendition"},
+        }
+
+    conversion_worker = MediaLibraryAgentWorker(
+        repository,
+        register=register,
+        transcode=transcode,
+        publish_derived=publish_legacy,
+    )
+    source = _rendition_source(repository, conversion_worker, library)
+    queued = repository.create_rendition_job(
+        source["id"],
+        profile="browser-mp4-v1",
+        target={
+            "packaging": "single_file",
+            "mime_type": "video/mp4",
+            "decision": "transcode",
+        },
+        priority=10,
+    )["job"]
+    completed = conversion_worker.run_once()
+    assert completed and completed["id"] == queued["id"]
+    assert completed["storage_mode"] == "derived_copy"
+
+    managed = library / ".adaos-media" / "renditions" / "managed.mp4"
+
+    def publish_managed(path, _job, *, root):
+        assert root["id"] == source["root_id"]
+        managed.parent.mkdir(parents=True)
+        managed.write_bytes(path.read_bytes())
+        return {
+            "resource_id": "ref_managed",
+            "filename": managed.name,
+            "path": str(managed),
+            "mime_type": "video/mp4",
+            "size_bytes": managed.stat().st_size,
+            "metadata": {
+                "namespace": "media-library-rendition",
+                "storage_mode": "source_root",
+                "checksum_sha256": "a" * 64,
+            },
+        }
+
+    monkeypatch.setattr(worker_module, "publish_managed_rendition", publish_managed)
+    migration = repository.enqueue_storage_migration(source["root_id"])["job"]
+    claimed = repository.claim_storage_migration(migration["id"])
+    migration_worker = MediaLibraryAgentWorker(repository)
+
+    first = migration_worker._run_storage_migration(claimed)
+    second_claim = repository.claim_storage_migration(first["id"])
+    settled = migration_worker._run_storage_migration(second_claim)
+
+    migrated_job = repository.get_rendition_job(queued["id"])
+    migrated_source = repository.get_source(source["id"])
+    assert settled["status"] == "completed"
+    assert settled["migrated_count"] == 1
+    assert migrated_job["storage_mode"] == "source_root"
+    assert migrated_job["checksum_sha256"] == "a" * 64
+    assert (
+        migrated_source["metadata"]["derived_renditions"][0]["descriptor"][
+            "resource_id"
+        ]
+        == "ref_managed"
+    )
+    assert managed.read_bytes() == b"converted"
+    assert not legacy.exists()
+
+
+def test_storage_migration_does_not_accumulate_empty_jobs(tmp_path: Path) -> None:
+    library = tmp_path / "library"
+    library.mkdir()
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "storage-migration-empty.sqlite3", node_id="node-a"
+    )
+    root = repository.add_root(str(library))["root"]
+
+    first = repository.enqueue_storage_migration(root["id"])
+    second = repository.enqueue_storage_migration(root["id"])
+
+    assert first["created"] is False
+    assert first["reason"] == "no_legacy_renditions"
+    assert first["job"] is None
+    assert second == first
+    assert repository.list_storage_migrations(root_id=root["id"])["items"] == []
 
 
 def test_rendition_is_bounded_derived_and_tied_to_exact_source(tmp_path):

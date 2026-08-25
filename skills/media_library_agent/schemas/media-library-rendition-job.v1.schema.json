@@ -14,7 +14,7 @@
     "profile": {"type": "string", "minLength": 1},
     "target": {"type": "object"},
     "priority": {"type": "integer", "minimum": 0, "maximum": 1000},
-    "status": {"enum": ["queued", "running", "waiting_resources", "canceling", "completed", "failed", "canceled", "invalidated"]},
+    "status": {"enum": ["queued", "running", "waiting_resources", "waiting_storage", "canceling", "completed", "failed", "canceled", "invalidated"]},
     "requested_at": {"type": "string"},
     "started_at": {"type": "string"},
     "finished_at": {"type": "string"},
@@ -36,6 +36,8 @@
     },
     "cancel_requested": {"type": "boolean"},
     "cleaned_at": {"type": "string"},
+    "storage_mode": {"type": "string"},
+    "checksum_sha256": {"type": "string"},
     "revision": {"type": "integer", "minimum": 1}
   },
   "additionalProperties": false

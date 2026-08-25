@@ -80,6 +80,7 @@ exports:
   - rehydrate
   - scan_sources
   - list_roots
+  - set_root_storage_policy
   - add_root
   - remove_root
   - delete_root
@@ -219,6 +220,25 @@ tools:
       include_images:
         type: boolean
         default: false
+      storage_policy:
+        type: object
+        additionalProperties: true
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: set_root_storage_policy
+  description: Configure managed rendition and artwork storage for one media folder.
+  entry: handlers.main:set_root_storage_policy
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [root_id, values]
+    properties:
+      root_id:
+        type: string
+      values:
+        type: object
+        additionalProperties: true
     additionalProperties: true
   output_schema:
     type: object
@@ -289,6 +309,9 @@ tools:
       include_images:
         type: boolean
         default: false
+      storage_policy:
+        type: object
+        additionalProperties: true
       limit:
         type: integer
         minimum: 1

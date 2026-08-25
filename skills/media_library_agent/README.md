@@ -32,6 +32,25 @@ active.
 
 Original media bytes remain at their original paths. The agent calls `adaos.sdk.io.media.register_media_file`, which records an allowlisted reference for range playback; it never copies the source into `.adaos`. Removing or draining the skill retains external media by design. Browser-compatible renditions and normalized artwork are explicitly derived data: their exact source revision and fingerprint are recorded, and only generated outputs may be copied to managed media storage.
 
+Every root has an explicit `adaos.media_library.storage_policy.v1` policy. By
+default, large browser-compatible renditions are published in-place under the
+source volume's `.adaos-media/renditions/<profile>/` content-addressed store,
+while artwork remains in the faster node cache. The managed directory is
+always excluded from discovery, carries a schema marker, and contains only
+agent-owned derived data. Publication uses a same-directory partial file,
+SHA-256 verification and atomic replacement before registering an external
+AdaOS media reference; originals are never moved or rewritten. Per-root
+rendition quotas fail closed before conversion work starts.
+
+Changing a root from the legacy node-cache mode to `source_root` creates one
+durable resumable migration job. The worker moves verified single-file
+renditions one at a time, rewrites their catalog descriptors atomically, and
+deletes the superseded managed copy only after the new reference is committed.
+Migration yields to playback and critical resource pressure. HLS packages stay
+in node cache until the media plane supports managed package references;
+operator-visible status reports this distinction instead of silently moving an
+incomplete package.
+
 Process-local `.skill_state` is development/runtime data, not package source.
 The workspace ignores it and the Project package builder excludes it, so a
 release cannot embed a scanner database, local paths, or scan history.

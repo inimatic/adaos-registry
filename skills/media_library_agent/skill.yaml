@@ -59,6 +59,9 @@ exports:
   - add_root
   - remove_root
   - list_roots
+  - set_storage_policy
+  - migrate_storage
+  - list_storage_migrations
   - start_scan
   - import_folder
   - scan_status
@@ -129,6 +132,9 @@ tools:
           maxLength: 300
       scan_window:
         type: object
+      storage_policy:
+        type: object
+        additionalProperties: true
     additionalProperties: true
   output_schema:
     type: object
@@ -156,6 +162,64 @@ tools:
       include_disabled:
         type: boolean
         default: false
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: set_storage_policy
+  entry: handlers.main:set_storage_policy
+  description: Configure where source-root renditions and artwork are retained.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - root_id
+    - values
+    properties:
+      root_id:
+        type: string
+      values:
+        type: object
+        properties:
+          rendition_mode:
+            enum: [source_root, node_cache]
+          artwork_mode:
+            enum: [source_root, node_cache]
+          rendition_quota_bytes:
+            type: integer
+            minimum: 1073741824
+          legacy_migration:
+            type: boolean
+        additionalProperties: false
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: migrate_storage
+  entry: handlers.main:migrate_storage
+  description: Queue resumable migration of legacy renditions to source-root storage.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [root_id]
+    properties:
+      root_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: list_storage_migrations
+  entry: handlers.main:list_storage_migrations
+  description: List bounded rendition storage migration history.
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      root_id:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
     additionalProperties: true
   output_schema:
     type: object
@@ -210,6 +274,9 @@ tools:
           maxLength: 300
       scan_window:
         type: object
+      storage_policy:
+        type: object
+        additionalProperties: true
       webspace_id:
         type: string
     additionalProperties: true
