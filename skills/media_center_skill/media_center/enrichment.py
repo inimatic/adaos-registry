@@ -910,6 +910,11 @@ class MediaEnrichmentWorker:
         return {"stopped": stopped, "worker": "enrichment"}
 
     def run_once(self) -> dict[str, Any] | None:
+        maintenance_active = getattr(
+            self.coordinator, "storage_maintenance_active", None
+        )
+        if callable(maintenance_active) and maintenance_active():
+            return None
         maintenance = getattr(self.coordinator, "compact_storage_batch", None)
         if callable(maintenance) and not self._storage_maintenance_complete:
             compacted = maintenance(limit=250)

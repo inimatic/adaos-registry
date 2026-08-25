@@ -4939,6 +4939,25 @@ def test_enrichment_worker_routes_external_providers_by_media_kind(
     assert operation["provider_id"] == "media_center.deterministic_local.v1"
 
 
+def test_storage_maintenance_fence_pauses_enrichment_and_agent_sync(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/Track.mp3")))
+    worker = MediaEnrichmentWorker(catalog)
+    catalog.set_storage_maintenance(True)
+
+    assert worker.run_once() is None
+    assert catalog.background_job_counts()["queued"] > 0
+    assert main._run_agent_sync(catalog)["mode"] == "storage_maintenance"
+
+    catalog.set_storage_maintenance(False)
+    assert worker.run_once() is not None
+
+
 def test_enrichment_worker_coalesces_publication_and_exposes_pacing(
     monkeypatch, tmp_path
 ):

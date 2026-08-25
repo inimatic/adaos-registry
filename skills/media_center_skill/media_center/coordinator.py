@@ -1617,6 +1617,23 @@ class MediaCatalogCoordinator:
             "complete": phase == "complete",
         }
 
+    def storage_maintenance_active(self) -> bool:
+        with self.repository.connect() as connection:
+            row = connection.execute(
+                "SELECT value FROM coordinator_meta "
+                "WHERE key='storage_maintenance_active'"
+            ).fetchone()
+        return _text(row["value"] if row else "").lower() in {"1", "true", "yes"}
+
+    def set_storage_maintenance(self, active: bool) -> None:
+        with self.repository.connect() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES "
+                "('storage_maintenance_active',?)",
+                ("1" if active else "0",),
+            )
+            connection.commit()
+
     def optimize_storage(self, *, reclaim: bool = False) -> dict[str, Any]:
         before = self.storage_status()
         db_path = self.repository.db_path

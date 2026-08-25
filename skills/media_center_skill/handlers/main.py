@@ -151,6 +151,14 @@ def _run_agent_sync(
     limit: int = 500,
     timeout_seconds: float = 30.0,
 ) -> dict[str, Any]:
+    if catalog.storage_maintenance_active():
+        return {
+            "ok": True,
+            "mode": "storage_maintenance",
+            "agent_count": 0,
+            "applied_count": 0,
+            "has_more": False,
+        }
     return background_runtime().run_agent_sync(
         lambda: _sync_agents(
             catalog,
@@ -3288,17 +3296,20 @@ def optimize_storage(reclaim: bool = False, **_: Any) -> dict[str, Any]:
             storage=storage,
         )
     runtime = background_runtime()
-    stopped = runtime.dispose(timeout=30.0)
-    if stopped.get("stopped") is not True:
-        return _skill_error(
-            "media_center_storage_workers_busy",
-            message="Media Center workers could not pause for storage maintenance.",
-            retryable=True,
-            background=stopped,
-        )
+    catalog.set_storage_maintenance(True)
     try:
+        stopped = runtime.dispose(timeout=30.0)
+        if stopped.get("stopped") is not True:
+            return _skill_error(
+                "media_center_storage_workers_busy",
+                message="Media Center workers could not pause for storage maintenance.",
+                retryable=True,
+                background=stopped,
+            )
+        time.sleep(1.0)
         return catalog.optimize_storage(reclaim=_bool(reclaim, False))
     finally:
+        catalog.set_storage_maintenance(False)
         runtime.ensure_bootstrap_started(
             str(default_db_path().resolve()), _start_live_runtime
         )
