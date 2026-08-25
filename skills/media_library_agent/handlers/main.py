@@ -910,6 +910,7 @@ def list_rendition_jobs(
     return {
         **repository.list_rendition_jobs(source_id=source_id, limit=limit),
         "artwork": worker.artwork_status(),
+        "job_retention": repository.job_retention_status(),
         "storage_migrations": repository.list_storage_migrations(limit=20),
         "resource_pressure": worker.resource_pressure,
     }

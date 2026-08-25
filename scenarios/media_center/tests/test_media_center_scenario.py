@@ -466,6 +466,15 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     assert metadata_widgets["media-rendition-operations"]["dataSource"]["name"] == (
         "media_center_skill.rendition_operations"
     )
+    assert metadata_widgets["media-provider-artwork-cache"]["dataSource"]["path"] == (
+        "runtime.artwork_cache"
+    )
+    assert metadata_widgets["media-background-admission"]["dataSource"]["path"] == (
+        "runtime.queue_maintenance.admission"
+    )
+    assert metadata_widgets["media-job-retention"]["dataSource"]["path"] == (
+        "job_retention"
+    )
     assert modals["media_center_filters"]["presentation"]["kind"] == "drawer"
     assert metadata_widgets["media-metadata-operations"]["dataSource"] == {
         "kind": "stream",

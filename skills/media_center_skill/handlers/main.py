@@ -2380,6 +2380,35 @@ def rendition_operations(
         "last_run_at": str(artwork_source.get("last_run_at") or ""),
         "last_completed_at": str(artwork_source.get("last_completed_at") or ""),
     }
+    retention_source = (
+        dict(agent.get("job_retention") or {})
+        if isinstance(agent.get("job_retention"), Mapping)
+        else {}
+    )
+    job_retention = {
+        "schema": "adaos.media_center.job_retention.v1",
+        "state": str(retention_source.get("state") or "ready"),
+        "artwork_queue_window": max(
+            0, int(retention_source.get("artwork_queue_window") or 0)
+        ),
+        "artwork_queue_removed": max(
+            0, int(retention_source.get("artwork_queue_removed") or 0)
+        ),
+        "artwork_queue_overflow": max(
+            0, int(retention_source.get("artwork_queue_overflow") or 0)
+        ),
+        "rendition_history_removed": max(
+            0, int(retention_source.get("rendition_history_removed") or 0)
+        ),
+        "scan_history_removed": max(
+            0, int(retention_source.get("scan_history_removed") or 0)
+        ),
+        "migration_history_removed": max(
+            0, int(retention_source.get("migration_history_removed") or 0)
+        ),
+        "complete": bool(retention_source.get("complete")),
+        "updated_at": str(retention_source.get("updated_at") or ""),
+    }
     migration_source = (
         dict(agent.get("storage_migrations") or {})
         if isinstance(agent.get("storage_migrations"), Mapping)
@@ -2420,6 +2449,7 @@ def rendition_operations(
         "owner": "media_library_agent",
         "resource_pressure": str(agent.get("resource_pressure") or "unknown"),
         "artwork": artwork,
+        "job_retention": job_retention,
         "storage_migrations": storage_migrations,
     }
 

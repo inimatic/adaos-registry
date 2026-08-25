@@ -4436,6 +4436,16 @@ def test_rendition_operations_exposes_bounded_compact_agent_projection(monkeypat
                         "unavailable": 25,
                     },
                 },
+                "job_retention": {
+                    "artwork_queue_window": 4,
+                    "artwork_queue_removed": 120,
+                    "artwork_queue_overflow": 8,
+                    "rendition_history_removed": 30,
+                    "scan_history_removed": 12,
+                    "migration_history_removed": 2,
+                    "complete": False,
+                    "updated_at": "2026-08-25T10:03:00+00:00",
+                },
             },
             "",
         )
@@ -4461,6 +4471,18 @@ def test_rendition_operations_exposes_bounded_compact_agent_projection(monkeypat
         "total_count": 100,
         "last_run_at": "2026-08-25T10:02:00+00:00",
         "last_completed_at": "",
+    }
+    assert result["job_retention"] == {
+        "schema": "adaos.media_center.job_retention.v1",
+        "state": "ready",
+        "artwork_queue_window": 4,
+        "artwork_queue_removed": 120,
+        "artwork_queue_overflow": 8,
+        "rendition_history_removed": 30,
+        "scan_history_removed": 12,
+        "migration_history_removed": 2,
+        "complete": False,
+        "updated_at": "2026-08-25T10:03:00+00:00",
     }
     assert result["items"] == [
         {

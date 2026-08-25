@@ -3623,6 +3623,55 @@
                 "title_i18n": {"key": "runtime.media_center.ui.providers"}
               },
               {
+                "id": "media-provider-artwork-cache",
+                "type": "item.details",
+                "area": "main",
+                "title": "Provider artwork cache",
+                "dataSource": {
+                  "kind": "stream",
+                  "receiver": "media_center.operation_state",
+                  "path": "runtime.artwork_cache",
+                  "scope": "workspace"
+                },
+                "inputs": {
+                  "presentation": "body",
+                  "fields": [
+                    {"key": "state", "label": "State", "path": "state", "label_i18n": {"key": "runtime.media_center.ui.status"}},
+                    {"key": "attempts", "label": "Attempts", "path": "attempt_count", "label_i18n": {"key": "runtime.media_center.ui.attempts"}},
+                    {"key": "cache_hits", "label": "Cache hits", "path": "cache_hit_count", "label_i18n": {"key": "runtime.media_center.ui.cache_hits"}},
+                    {"key": "ready", "label": "Cached", "path": "ready_count", "label_i18n": {"key": "runtime.media_center.ui.cached"}},
+                    {"key": "failed", "label": "Failed", "path": "failure_count", "label_i18n": {"key": "runtime.media_center.ui.failed"}},
+                    {"key": "stored_bytes", "label": "Stored bytes", "path": "stored_bytes", "format": "bytes", "label_i18n": {"key": "runtime.media_center.ui.stored_bytes"}},
+                    {"key": "last_error", "label": "Last error", "path": "last_error", "label_i18n": {"key": "runtime.media_center.ui.last_error"}}
+                  ]
+                },
+                "title_i18n": {"key": "runtime.media_center.ui.provider_artwork_cache"}
+              },
+              {
+                "id": "media-background-admission",
+                "type": "item.details",
+                "area": "main",
+                "title": "Background admission",
+                "dataSource": {
+                  "kind": "stream",
+                  "receiver": "media_center.operation_state",
+                  "path": "runtime.queue_maintenance.admission",
+                  "scope": "workspace"
+                },
+                "inputs": {
+                  "presentation": "body",
+                  "fields": [
+                    {"key": "metadata_active", "label": "Metadata active", "path": "kinds.metadata_enrichment.active", "label_i18n": {"key": "runtime.media_center.ui.metadata_active"}},
+                    {"key": "metadata_window", "label": "Metadata window", "path": "kinds.metadata_enrichment.window", "label_i18n": {"key": "runtime.media_center.ui.metadata_window"}},
+                    {"key": "fingerprint_active", "label": "Fingerprint active", "path": "kinds.fingerprint.active", "label_i18n": {"key": "runtime.media_center.ui.fingerprint_active"}},
+                    {"key": "fingerprint_window", "label": "Fingerprint window", "path": "kinds.fingerprint.window", "label_i18n": {"key": "runtime.media_center.ui.fingerprint_window"}},
+                    {"key": "embedding_active", "label": "Embedding active", "path": "kinds.embedding.active", "label_i18n": {"key": "runtime.media_center.ui.embedding_active"}},
+                    {"key": "embedding_window", "label": "Embedding window", "path": "kinds.embedding.window", "label_i18n": {"key": "runtime.media_center.ui.embedding_window"}}
+                  ]
+                },
+                "title_i18n": {"key": "runtime.media_center.ui.background_admission"}
+              },
+              {
                 "id": "media-metadata-operations",
                 "type": "ui.list",
                 "area": "main",
@@ -3689,6 +3738,36 @@
                   ]
                 },
                 "title_i18n": {"key": "runtime.media_center.ui.artwork_generation"}
+              },
+              {
+                "id": "media-job-retention",
+                "type": "item.details",
+                "area": "main",
+                "title": "Background history retention",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.rendition_operations",
+                  "path": "job_retention",
+                  "params": {"limit": 1},
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["media_center.renditions"],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "presentation": "body",
+                  "fields": [
+                    {"key": "state", "label": "State", "path": "state", "label_i18n": {"key": "runtime.media_center.ui.status"}},
+                    {"key": "artwork_window", "label": "Artwork queue window", "path": "artwork_queue_window", "label_i18n": {"key": "runtime.media_center.ui.artwork_queue_window"}},
+                    {"key": "artwork_overflow", "label": "Artwork queue overflow", "path": "artwork_queue_overflow", "label_i18n": {"key": "runtime.media_center.ui.artwork_queue_overflow"}},
+                    {"key": "artwork_removed", "label": "Artwork jobs removed", "path": "artwork_queue_removed", "label_i18n": {"key": "runtime.media_center.ui.artwork_jobs_removed"}},
+                    {"key": "rendition_removed", "label": "Conversion history removed", "path": "rendition_history_removed", "label_i18n": {"key": "runtime.media_center.ui.conversion_history_removed"}},
+                    {"key": "scan_removed", "label": "Scan history removed", "path": "scan_history_removed", "label_i18n": {"key": "runtime.media_center.ui.scan_history_removed"}},
+                    {"key": "complete", "label": "Compaction complete", "path": "complete", "label_i18n": {"key": "runtime.media_center.ui.compaction_complete"}},
+                    {"key": "updated", "label": "Updated", "path": "updated_at", "label_i18n": {"key": "runtime.media_center.ui.updated"}}
+                  ]
+                },
+                "title_i18n": {"key": "runtime.media_center.ui.background_history_retention"}
               },
               {
                 "id": "media-rendition-operations",
