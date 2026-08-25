@@ -547,6 +547,33 @@ def _invoke_skill(
         return None, str(exc)
 
 
+def _compact_rendition_operation(value: Mapping[str, Any]) -> dict[str, Any]:
+    error = value.get("error") if isinstance(value.get("error"), Mapping) else {}
+    return {
+        "schema": "adaos.media_center.rendition_operation.v1",
+        "id": str(value.get("id") or ""),
+        "source_id": str(value.get("source_id") or ""),
+        "source_name": str(value.get("source_name") or "")[:300],
+        "source_relative_path": str(value.get("source_relative_path") or "")[:1000],
+        "media_kind": str(value.get("media_kind") or ""),
+        "profile": str(value.get("profile") or ""),
+        "status": str(value.get("status") or "unknown"),
+        "priority": int(value.get("priority") or 0),
+        "requested_at": str(value.get("requested_at") or ""),
+        "started_at": str(value.get("started_at") or ""),
+        "finished_at": str(value.get("finished_at") or ""),
+        "output_bytes": max(0, int(value.get("output_bytes") or 0)),
+        "source_size_bytes": max(0, int(value.get("source_size_bytes") or 0)),
+        "cancel_requested": bool(value.get("cancel_requested")),
+        "error": {
+            "code": str(error.get("code") or "")[:120],
+            "detail": str(error.get("detail") or error.get("message") or "")[:500],
+        }
+        if error
+        else None,
+    }
+
+
 @contextmanager
 def _root_mutation_lease(repo: MediaCenterRepository) -> Iterator[None]:
     lock_path = repo.db_path.with_suffix(".root-mutation.lock")
@@ -1944,6 +1971,47 @@ def ensure_rendition(
         },
         "playback_plan": plan,
         "rendition": rendition,
+    }
+
+
+@tool(
+    summary="Return bounded recent media conversion operations from the source agent.",
+    side_effects="none",
+)
+def rendition_operations(
+    source_id: str = "",
+    limit: int = 30,
+    **_: Any,
+) -> dict[str, Any]:
+    page_size = max(1, min(100, int(limit or 30)))
+    agent, error = _invoke_agent(
+        "list_rendition_jobs",
+        {"source_id": str(source_id or "").strip(), "limit": page_size},
+        timeout=20.0,
+    )
+    if agent is None:
+        return _skill_error(
+            "rendition_operations_unavailable",
+            message="Media conversion activity is temporarily unavailable.",
+            detail=str(error or "media_library_agent_unavailable")[:500],
+            retryable=True,
+            items=[],
+            count=0,
+            bounded=True,
+        )
+    items = [
+        _compact_rendition_operation(item)
+        for item in (agent.get("items") or [])[:page_size]
+        if isinstance(item, Mapping)
+    ]
+    return {
+        "ok": True,
+        "schema": COORDINATOR_SCHEMA,
+        "operation_schema": "adaos.media_center.rendition_operation.v1",
+        "items": items,
+        "count": len(items),
+        "bounded": True,
+        "owner": "media_library_agent",
     }
 
 

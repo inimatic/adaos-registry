@@ -4319,6 +4319,85 @@ def test_coordinator_queues_rendition_on_exact_source_agent(monkeypatch, tmp_pat
     assert captured["arguments"]["force"] is True
 
 
+def test_rendition_operations_exposes_bounded_compact_agent_projection(monkeypatch):
+    captured = {}
+
+    def invoke_agent(operation, arguments, *, timeout):
+        captured.update(operation=operation, arguments=arguments, timeout=timeout)
+        return (
+            {
+                "ok": True,
+                "items": [
+                    {
+                        "id": "rendition-1",
+                        "source_id": "source-1",
+                        "source_name": "Legacy movie.avi",
+                        "source_relative_path": "Movies/Legacy movie.avi",
+                        "media_kind": "video",
+                        "profile": "browser-mp4-v1",
+                        "status": "running",
+                        "priority": 25,
+                        "requested_at": "2026-08-25T10:00:00+00:00",
+                        "started_at": "2026-08-25T10:01:00+00:00",
+                        "output_bytes": 123456,
+                        "source_size_bytes": 987654,
+                        "target": {"abr_ladder": [1, 2, 3], "private": "large"},
+                        "output": {"path": "/private/rendition.mp4"},
+                    }
+                ],
+            },
+            "",
+        )
+
+    monkeypatch.setattr(main, "_invoke_agent", invoke_agent)
+
+    result = main.rendition_operations(source_id="source-1", limit=500)
+
+    assert result["ok"] is True
+    assert result["bounded"] is True
+    assert result["count"] == 1
+    assert result["items"] == [
+        {
+            "schema": "adaos.media_center.rendition_operation.v1",
+            "id": "rendition-1",
+            "source_id": "source-1",
+            "source_name": "Legacy movie.avi",
+            "source_relative_path": "Movies/Legacy movie.avi",
+            "media_kind": "video",
+            "profile": "browser-mp4-v1",
+            "status": "running",
+            "priority": 25,
+            "requested_at": "2026-08-25T10:00:00+00:00",
+            "started_at": "2026-08-25T10:01:00+00:00",
+            "finished_at": "",
+            "output_bytes": 123456,
+            "source_size_bytes": 987654,
+            "cancel_requested": False,
+            "error": None,
+        }
+    ]
+    assert captured == {
+        "operation": "list_rendition_jobs",
+        "arguments": {"source_id": "source-1", "limit": 100},
+        "timeout": 20.0,
+    }
+
+
+def test_rendition_operations_settles_with_observable_error(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "_invoke_agent",
+        lambda *_args, **_kwargs: (None, "agent_timeout"),
+    )
+
+    result = main.rendition_operations(limit=30)
+
+    assert result["ok"] is False
+    assert result["error"] == "rendition_operations_unavailable"
+    assert result["items"] == []
+    assert result["retryable"] is True
+
+
 def test_profile_customizes_home_order_view_density_and_target(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
@@ -5196,6 +5275,7 @@ def test_musicbrainz_tls_failure_opens_a_bounded_circuit_breaker():
     assert session.calls == 1
     assert provider.status()["request_count"] == 1
     assert provider.status()["state"] == "degraded"
+    assert provider.status()["last_error"] == "musicbrainz_tls_handshake_failed"
     assert provider.status()["retry_after_seconds"] > 0
 
 

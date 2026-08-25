@@ -3631,7 +3631,7 @@
                 "title": "Conversion operations",
                 "dataSource": {
                   "kind": "skill",
-                  "name": "media_library_agent.list_rendition_jobs",
+                  "name": "media_center_skill.rendition_operations",
                   "params": {"limit": 30},
                   "cacheTtlMs": 0,
                   "invalidationTags": ["media_center.renditions"],

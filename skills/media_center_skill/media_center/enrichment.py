@@ -37,6 +37,23 @@ class MetadataProviderError(RuntimeError):
         self.retryable = retryable
 
 
+def _request_failure_code(provider: str, exc: Exception) -> str:
+    prefix = str(provider).strip().lower() or "metadata_provider"
+    if isinstance(exc, requests.exceptions.SSLError):
+        reason = "tls_handshake_failed"
+    elif isinstance(
+        exc, (requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout)
+    ):
+        reason = "request_timeout"
+    elif isinstance(exc, requests.exceptions.ConnectionError):
+        reason = "connection_failed"
+    elif isinstance(exc, (ValueError, TypeError)):
+        reason = "invalid_response"
+    else:
+        reason = "request_failed"
+    return f"{prefix}_{reason}"
+
+
 @dataclass(frozen=True, slots=True)
 class DeterministicLocalProvider:
     """Cheap offline claims derived from indexed evidence, never media bytes."""
@@ -648,7 +665,7 @@ class MusicBrainzMetadataProvider:
         except (requests.RequestException, ValueError, TypeError) as exc:
             self._failures += 1
             self._consecutive_failures += 1
-            self._last_error = type(exc).__name__
+            self._last_error = _request_failure_code("musicbrainz", exc)
             self._retry_after_monotonic = time.monotonic() + min(
                 900.0, 30.0 * (2 ** min(5, self._consecutive_failures - 1))
             )

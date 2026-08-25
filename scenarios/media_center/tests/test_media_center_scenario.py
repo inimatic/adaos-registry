@@ -463,7 +463,7 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "scope": "workspace",
     }
     assert metadata_widgets["media-rendition-operations"]["dataSource"]["name"] == (
-        "media_library_agent.list_rendition_jobs"
+        "media_center_skill.rendition_operations"
     )
     assert modals["media_center_filters"]["presentation"]["kind"] == "drawer"
     assert metadata_widgets["media-metadata-operations"]["dataSource"] == {

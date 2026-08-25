@@ -7,15 +7,16 @@ dependency and remains the owner of core media resource registration and byte
 delivery.
 
 The unreleased 2026-08-25 local candidate combines
-`media_center_skill@0.8.75`, `media_library_agent@0.6.39`,
-`media_control_skill@0.2.11`, scenario `media_center@0.6.24`, and client
+`media_center_skill@0.8.76`, `media_library_agent@0.6.39`,
+`media_control_skill@0.2.11`, scenario `media_center@0.6.25`, and client
 `dfe90cd`. It adds durable queue auto-advance and endpoint selection, compact
 fullscreen/PiP/Play On controls, playlists, reviewed metadata correction,
-provider rejection, source identity and live rendition history. Requested
+provider rejection, source identity and compact live rendition history. Requested
 browser conversion preempts scans at file boundaries, unsafe unprobed AVI
 remux falls back to H.264/AAC transcode, and stale managed partials receive
 deferred cleanup. External metadata transport failures are circuit-broken
-without discarding deterministic local claims. Legacy path aliases migrate
+without discarding deterministic local claims, and provider status uses stable
+skill-owned diagnostics instead of transport-library exception names. Legacy path aliases migrate
 personal state before stale rows are retired. Existing-library
 embedded tags are backfilled before automatic artwork work, and MusicBrainz
 does not consume its network budget on recognized audiobook chapters. This is
@@ -443,3 +444,21 @@ Uninstall removes unreferenced Project-owned code while retaining runtime
 evidence and source artifacts. External media roots are never Project-owned,
 never copied into `.adaos`, and never deleted by Project lifecycle operations.
 Derived rendition retention remains a separate reviewed choice.
+
+The target storage contract assigns a derived-storage policy to each library
+root instead of scattering hidden directories through media folders. Small,
+regenerable artwork and previews default to a bounded fast node-local cache.
+Large browser renditions default to a configured content-addressed managed
+store on the source node; an operator may place that store on the same
+high-capacity filesystem as the source root without placing it in a versioned
+skill slot. A source-adjacent `.adaos-media` store is opt-in and exists once at
+the configured root, not once per descendant folder. Derived keys include the
+source identity, immutable source revision/fingerprint, transformation profile,
+and format. The catalog holds references and provenance, while reference-aware
+retention removes superseded objects only after no work/version/playlist or
+active job refers to them. Moving or mounting a descendant independently can
+therefore discover a root marker when visible, use another configured managed
+store, or regenerate disposable artifacts; it never makes a child folder a
+second authority. Migration from the current Media Server slot-local content
+store must copy and verify objects before switching descriptors, then reclaim
+the old slot data separately.
