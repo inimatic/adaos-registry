@@ -1557,10 +1557,10 @@
                     "item_id": "$state.selectedMediaItemId",
                     "profile_id": "$state.profileId"
                   },
-                  "cacheTtlMs": 5000,
+                  "cacheTtlMs": 0,
                   "invalidationTags": ["media_center.catalog"],
-                  "preserveLastValue": true,
-                  "maxRequestHz": 2
+                  "preserveLastValue": false,
+                  "maxRequestHz": 5
                 },
                 "inputs": {
                   "presentation": "body",
@@ -1751,6 +1751,7 @@
                   "optionMetaPaths": ["count"],
                   "searchable": true,
                   "emptyText": "No enriched genres yet",
+                  "emptyText_i18n": {"key": "runtime.media_center.ui.no_enriched_genres"},
                   "placeholder": "All genres",
                   "placeholder_i18n": {"key": "runtime.media_center.ui.all_genres"}
                 },
@@ -1788,6 +1789,7 @@
                   "optionMetaPaths": ["count"],
                   "searchable": true,
                   "emptyText": "No enriched years yet",
+                  "emptyText_i18n": {"key": "runtime.media_center.ui.no_enriched_years"},
                   "placeholder": "All years",
                   "placeholder_i18n": {"key": "runtime.media_center.ui.all_years"}
                 },
@@ -2295,7 +2297,8 @@
                   "primaryKey": "provider_id",
                   "secondaryKey": "state",
                   "metaKey": "reason",
-                  "emptyText": "No metadata providers are registered."
+                  "emptyText": "No metadata providers are registered.",
+                  "emptyText_i18n": {"key": "runtime.media_center.ui.no_metadata_providers"}
                 },
                 "collection": {
                   "display": "list",
@@ -2339,6 +2342,7 @@
                 "type": "input.toggle",
                 "area": "main",
                 "title": "MusicBrainz",
+                "title_i18n": {"key": "runtime.media_center.ui.musicbrainz"},
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.get_metadata_settings",
@@ -2367,6 +2371,7 @@
                 "type": "input.toggle",
                 "area": "main",
                 "title": "TMDb",
+                "title_i18n": {"key": "runtime.media_center.ui.tmdb"},
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.get_metadata_settings",
@@ -3218,7 +3223,8 @@
                   "primaryKey": "provider_id",
                   "secondaryKey": "state",
                   "metaKey": "reason",
-                  "emptyText": "No metadata providers are registered."
+                  "emptyText": "No metadata providers are registered.",
+                  "emptyText_i18n": {"key": "runtime.media_center.ui.no_metadata_providers"}
                 },
                 "collection": {
                   "display": "list",

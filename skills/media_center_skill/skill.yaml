@@ -1861,6 +1861,27 @@ data_routes:
     preserve_last_value: false
     invalidation_tags:
     - media_center.catalog
+- surface: modal:media-center-metadata-settings
+  route: tool/details
+  tool: get_metadata_settings
+  owner: skill:media_center_skill
+  first_paint: managed provider readiness without protected credential values
+  recovery: repeat after a provider setting or credential mutation
+  guard_visibility: provider settings, readiness, counters, and failures only
+  budget:
+    max_payload_bytes: 65536
+    max_items: 16
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - media_center.metadata_settings
 - surface: widget:media-center-roots
   route: tool
   tool: list_roots
