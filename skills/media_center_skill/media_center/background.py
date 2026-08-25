@@ -130,19 +130,30 @@ class MediaCenterBackgroundRuntime:
 
     def enrichment_worker(
         self,
-        path: str,
+        key: str,
         factory: Callable[[], _TWorker],
     ) -> _TWorker:
         stale: _Worker | None = None
+        restart = False
         with self._lock:
-            if self._enrichment_worker is None or self._enrichment_path != path:
+            if self._enrichment_worker is None or self._enrichment_path != key:
                 stale = self._enrichment_worker
+                status = getattr(stale, "status", None)
+                if callable(status):
+                    try:
+                        restart = str(dict(status()).get("state") or "") == "running"
+                    except Exception:
+                        restart = False
                 self._enrichment_worker = factory()
-                self._enrichment_path = path
+                self._enrichment_path = key
             worker = self._enrichment_worker
         if stale is not None:
             stale.dispose(timeout=0.2)
         assert worker is not None
+        if restart:
+            ensure_started = getattr(worker, "ensure_started", None)
+            if callable(ensure_started):
+                ensure_started()
         return cast(_TWorker, worker)
 
     def agent_sync_status(self) -> dict[str, Any]:

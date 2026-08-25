@@ -3625,6 +3625,36 @@
                 }
               },
               {
+                "id": "media-artwork-operation",
+                "type": "item.details",
+                "area": "main",
+                "title": "Artwork generation",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.rendition_operations",
+                  "path": "artwork",
+                  "params": {"limit": 30},
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["media_center.renditions"],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "presentation": "body",
+                  "fields": [
+                    {"key": "state", "label": "State", "path": "state", "label_i18n": {"key": "runtime.media_center.ui.status"}},
+                    {"key": "active", "label": "Active", "path": "active_job_count", "label_i18n": {"key": "runtime.media_center.ui.active_jobs"}},
+                    {"key": "pending", "label": "Pending", "path": "pending_count", "label_i18n": {"key": "runtime.media_center.ui.pending"}},
+                    {"key": "ready", "label": "Ready", "path": "ready_count", "label_i18n": {"key": "runtime.media_center.ui.ready"}},
+                    {"key": "failed", "label": "Failed", "path": "failed_count", "label_i18n": {"key": "runtime.media_center.ui.failed"}},
+                    {"key": "unavailable", "label": "Unavailable", "path": "unavailable_count", "label_i18n": {"key": "runtime.media_center.ui.unavailable"}},
+                    {"key": "examined", "label": "Examined", "path": "examined_count", "label_i18n": {"key": "runtime.media_center.ui.examined"}},
+                    {"key": "last_run", "label": "Last run", "path": "last_run_at", "label_i18n": {"key": "runtime.media_center.ui.last_run"}}
+                  ]
+                },
+                "title_i18n": {"key": "runtime.media_center.ui.artwork_generation"}
+              },
+              {
                 "id": "media-rendition-operations",
                 "type": "ui.list",
                 "area": "main",

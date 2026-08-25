@@ -93,6 +93,41 @@ def test_background_runtime_reuses_and_disposes_process_owned_workers() -> None:
     assert receipt["stopped"] is True
 
 
+def test_background_runtime_restarts_running_enrichment_when_configuration_changes() -> None:
+    runtime = MediaCenterBackgroundRuntime()
+    events: list[str] = []
+
+    class Worker:
+        def __init__(self, name: str, state: str):
+            self.name = name
+            self.state = state
+
+        def dispose(self, *, timeout: float = 5.0) -> dict[str, object]:
+            events.append(f"dispose:{self.name}:{timeout}")
+            self.state = "idle"
+            return {"stopped": True}
+
+        def ensure_started(self) -> bool:
+            events.append(f"start:{self.name}")
+            self.state = "running"
+            return True
+
+        def status(self) -> dict[str, object]:
+            return {"state": self.state}
+
+    first = runtime.enrichment_worker(
+        "catalog:revision-1", lambda: Worker("first", "running")
+    )
+    second = runtime.enrichment_worker(
+        "catalog:revision-2", lambda: Worker("second", "idle")
+    )
+
+    assert second is not first
+    assert second.status()["state"] == "running"
+    assert events == ["dispose:first:0.2", "start:second"]
+    runtime.dispose(timeout=1.0)
+
+
 def test_background_runtime_bootstrap_is_async_and_process_owned() -> None:
     runtime = MediaCenterBackgroundRuntime()
     entered = threading.Event()
@@ -4345,6 +4380,21 @@ def test_rendition_operations_exposes_bounded_compact_agent_projection(monkeypat
                         "output": {"path": "/private/rendition.mp4"},
                     }
                 ],
+                "resource_pressure": "playback",
+                "artwork": {
+                    "state": "running",
+                    "active_job_count": 2,
+                    "examined_count": 50,
+                    "queued_count": 12,
+                    "last_run_at": "2026-08-25T10:02:00+00:00",
+                    "sources": {
+                        "total": 100,
+                        "pending": 2,
+                        "ready": 70,
+                        "failed": 3,
+                        "unavailable": 25,
+                    },
+                },
             },
             "",
         )
@@ -4356,6 +4406,21 @@ def test_rendition_operations_exposes_bounded_compact_agent_projection(monkeypat
     assert result["ok"] is True
     assert result["bounded"] is True
     assert result["count"] == 1
+    assert result["resource_pressure"] == "playback"
+    assert result["artwork"] == {
+        "schema": "adaos.media_center.artwork_operation.v1",
+        "state": "running",
+        "active_job_count": 2,
+        "examined_count": 50,
+        "queued_count": 12,
+        "ready_count": 70,
+        "pending_count": 2,
+        "failed_count": 3,
+        "unavailable_count": 25,
+        "total_count": 100,
+        "last_run_at": "2026-08-25T10:02:00+00:00",
+        "last_completed_at": "",
+    }
     assert result["items"] == [
         {
             "schema": "adaos.media_center.rendition_operation.v1",
@@ -5069,6 +5134,29 @@ def test_metadata_provider_configuration_explains_managed_provider_state():
     assert statuses["media_center.tmdb.v1"]["reason"] == "credentials_missing"
     assert statuses["media_center.tmdb.v1"]["language"] == "ru-RU"
     assert statuses["media_center.musicbrainz.v1"]["enabled"] is True
+
+
+def test_tmdb_secret_store_failure_is_not_reported_as_missing_credentials():
+    providers = {
+        item["provider_id"]: item
+        for item in main._metadata_provider_configuration(
+            {
+                "external_enabled": True,
+                "musicbrainz_enabled": True,
+                "tmdb_enabled": True,
+                "locale": "ru-RU",
+            },
+            {
+                "configured": None,
+                "state": "unavailable",
+                "reason": "secret_store_unavailable",
+            },
+        )
+    }
+
+    assert providers["media_center.tmdb.v1"]["state"] == "unavailable"
+    assert providers["media_center.tmdb.v1"]["reason"] == "secret_store_unavailable"
+    assert providers["media_center.musicbrainz.v1"]["state"] == "ready"
 
 
 def test_tmdb_provider_sends_only_normalized_evidence_and_caches_details():

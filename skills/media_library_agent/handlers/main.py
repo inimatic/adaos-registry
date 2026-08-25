@@ -827,8 +827,12 @@ def rendition_status(job_id: str = "", **_: Any) -> dict[str, Any]:
 def list_rendition_jobs(
     source_id: str = "", limit: int = 20, **_: Any
 ) -> dict[str, Any]:
-    repository, _worker = _runtime()
-    return repository.list_rendition_jobs(source_id=source_id, limit=limit)
+    repository, worker = _runtime()
+    return {
+        **repository.list_rendition_jobs(source_id=source_id, limit=limit),
+        "artwork": worker.artwork_status(),
+        "resource_pressure": worker.resource_pressure,
+    }
 
 
 @tool(summary="Cooperatively cancel one rendition job.", side_effects="local_write")

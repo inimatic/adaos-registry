@@ -2398,6 +2398,7 @@ def test_artwork_backfill_queues_preexisting_sources_with_durable_cursor(
     assert changed["metadata"]["artwork"]["state"] == "pending"
     assert status["queued_count"] == 1
     assert status["sources"]["pending"] == 1
+    assert status["active_job_count"] == 1
     assert status["cursor"] == ""
     assert status["cycle"] == 1
 

@@ -809,6 +809,7 @@ class MediaLibraryAgentWorker:
     def artwork_status(self) -> dict[str, Any]:
         return {
             **self.repository.artwork_backfill_status(),
+            "active_job_count": self.repository.active_artwork_job_count(),
             "capabilities": artwork_capabilities(),
         }
 

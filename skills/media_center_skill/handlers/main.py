@@ -66,6 +66,9 @@ _coordinator_path = ""
 _coordinator_cached: MediaCatalogCoordinator | None = None
 _log = logging.getLogger("adaos.skill.media_center")
 _TMDB_CREDENTIAL_SECRET = "tmdb_api_credential"
+_tmdb_secret_error_lock = threading.Lock()
+_tmdb_secret_error_witness = ""
+_tmdb_secret_error_at = 0.0
 
 
 class MediaRootOperationBusy(RuntimeError):
@@ -117,12 +120,19 @@ def _enrichment_runtime(
     coordinator = catalog or _coordinator()
     path = str(coordinator.repository.db_path.resolve())
     settings = dict(coordinator.metadata_settings()["settings"])
-    credential = _read_tmdb_credential()
-    configuration = metadata_provider_configuration(
-        settings, tmdb_credential_configured=bool(credential)
+    credential_state = _read_tmdb_credential_state()
+    credential = str(credential_state.get("value") or "")
+    configuration = _metadata_provider_configuration(settings, credential_state)
+    credential_witness = (
+        hashlib.sha256(credential.encode("utf-8")).hexdigest()[:16]
+        if credential
+        else str(credential_state.get("state") or "missing")
+    )
+    runtime_key = "\0".join(
+        (path, str(settings.get("revision") or 0), credential_witness)
     )
     return background_runtime().enrichment_worker(
-        path,
+        runtime_key,
         lambda: MediaEnrichmentWorker(
             coordinator,
             providers=default_metadata_providers(
@@ -136,12 +146,64 @@ def _enrichment_runtime(
 
 
 def _read_tmdb_credential() -> str:
+    return str(_read_tmdb_credential_state().get("value") or "")
+
+
+def _read_tmdb_credential_state() -> dict[str, Any]:
+    global _tmdb_secret_error_at, _tmdb_secret_error_witness
     try:
         from adaos.sdk.data.secrets import get as secret_get
 
-        return str(secret_get(_TMDB_CREDENTIAL_SECRET, "") or "").strip()
-    except Exception:
-        return ""
+        value = str(secret_get(_TMDB_CREDENTIAL_SECRET, "") or "").strip()
+        return {
+            "value": value,
+            "configured": bool(value),
+            "state": "ready" if value else "missing",
+            "reason": "configured" if value else "credentials_missing",
+        }
+    except Exception as exc:
+        witness = f"{type(exc).__name__}:{str(exc)[:200]}"
+        now = time.monotonic()
+        with _tmdb_secret_error_lock:
+            should_log = (
+                witness != _tmdb_secret_error_witness
+                or now - _tmdb_secret_error_at >= 300.0
+            )
+            if should_log:
+                _tmdb_secret_error_witness = witness
+                _tmdb_secret_error_at = now
+        if should_log:
+            _log.warning("TMDb credential store is unavailable: %s", witness)
+        return {
+            "value": "",
+            "configured": None,
+            "state": "unavailable",
+            "reason": "secret_store_unavailable",
+        }
+
+
+def _metadata_provider_configuration(
+    settings: Mapping[str, Any], credential_state: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    providers = metadata_provider_configuration(
+        settings,
+        tmdb_credential_configured=credential_state.get("configured") is True,
+    )
+    if credential_state.get("state") != "unavailable":
+        return providers
+    for provider in providers:
+        if (
+            provider.get("provider_id") == "media_center.tmdb.v1"
+            and provider.get("enabled")
+        ):
+            provider.update(
+                {
+                    "ready": False,
+                    "state": "unavailable",
+                    "reason": "secret_store_unavailable",
+                }
+            )
+    return providers
 
 
 def _run_agent_sync(
@@ -1514,16 +1576,18 @@ def get_metadata_settings(**_: Any) -> dict[str, Any]:
     catalog = _coordinator()
     result = catalog.metadata_settings()
     settings = dict(result["settings"])
-    credential_configured = bool(_read_tmdb_credential())
+    credential_state = _read_tmdb_credential_state()
+    credential_configured = credential_state.get("configured") is True
     return {
         **result,
         "settings": {
             **settings,
             "tmdb_credential_configured": credential_configured,
+            "tmdb_credential_state": str(
+                credential_state.get("state") or "unavailable"
+            ),
         },
-        "providers": metadata_provider_configuration(
-            settings, tmdb_credential_configured=credential_configured
-        ),
+        "providers": _metadata_provider_configuration(settings, credential_state),
     }
 
 
@@ -2004,6 +2068,36 @@ def rendition_operations(
         for item in (agent.get("items") or [])[:page_size]
         if isinstance(item, Mapping)
     ]
+    artwork_source = (
+        dict(agent.get("artwork") or {})
+        if isinstance(agent.get("artwork"), Mapping)
+        else {}
+    )
+    artwork_sources = (
+        dict(artwork_source.get("sources") or {})
+        if isinstance(artwork_source.get("sources"), Mapping)
+        else {}
+    )
+    artwork = {
+        "schema": "adaos.media_center.artwork_operation.v1",
+        "state": str(artwork_source.get("state") or "unknown"),
+        "active_job_count": max(
+            0, int(artwork_source.get("active_job_count") or 0)
+        ),
+        "examined_count": max(0, int(artwork_source.get("examined_count") or 0)),
+        "queued_count": max(0, int(artwork_source.get("queued_count") or 0)),
+        "ready_count": max(0, int(artwork_sources.get("ready") or 0)),
+        "pending_count": max(0, int(artwork_sources.get("pending") or 0)),
+        "failed_count": max(0, int(artwork_sources.get("failed") or 0)),
+        "unavailable_count": max(
+            0, int(artwork_sources.get("unavailable") or 0)
+        ),
+        "total_count": max(0, int(artwork_sources.get("total") or 0)),
+        "last_run_at": str(artwork_source.get("last_run_at") or ""),
+        "last_completed_at": str(
+            artwork_source.get("last_completed_at") or ""
+        ),
+    }
     return {
         "ok": True,
         "schema": COORDINATOR_SCHEMA,
@@ -2012,6 +2106,8 @@ def rendition_operations(
         "count": len(items),
         "bounded": True,
         "owner": "media_library_agent",
+        "resource_pressure": str(agent.get("resource_pressure") or "unknown"),
+        "artwork": artwork,
     }
 
 
