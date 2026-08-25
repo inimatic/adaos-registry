@@ -1582,6 +1582,47 @@ def test_playback_observation_ignores_failure_before_media_started(monkeypatch):
     assert checkpoints == []
 
 
+def test_playback_observation_leases_source_agent_pressure(monkeypatch):
+    pressure_updates = []
+    catalog = SimpleNamespace(
+        source_binding=lambda **_kwargs: {"instance_id": "agent-instance-a"},
+        checkpoint=lambda *_args, **_kwargs: {"ok": True},
+    )
+
+    class Topology:
+        def invoke_agent(self, instance_id, operation, arguments, *, timeout_seconds):
+            pressure_updates.append(
+                (instance_id, operation, arguments, timeout_seconds)
+            )
+            return {"ok": True}
+
+    monkeypatch.setattr(main, "_coordinator", lambda: catalog)
+    monkeypatch.setattr(main, "_topology", lambda: Topology())
+    monkeypatch.setattr(main, "_publish_library_snapshot", lambda *_a, **_k: True)
+    main._PLAYBACK_OBSERVATION_CACHE.clear()
+    main._PLAYBACK_PRESSURE_SESSIONS.clear()
+    base = {
+        "session_id": "session-a",
+        "target_id": "tv-a",
+        "item_id": "movie-1",
+        "profile_id": "alice",
+        "position_ms": 15_000,
+        "duration_ms": 120_000,
+        "playback_confirmed": True,
+    }
+
+    main.on_playback_observed({**base, "state": "playing"})
+    main.on_playback_observed({**base, "state": "playing", "position_ms": 16_000})
+    main.on_playback_observed({**base, "state": "paused"})
+
+    assert [entry[2]["level"] for entry in pressure_updates] == [
+        "playback",
+        "normal",
+    ]
+    assert pressure_updates[0][2]["ttl_seconds"] == 120.0
+    assert main._PLAYBACK_PRESSURE_SESSIONS == {}
+
+
 def test_coordinator_builds_typed_collections_and_bounded_cursor_pages(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())

@@ -22,6 +22,11 @@ if str(_SKILL_ROOT) not in sys.path:
 
 _PLAYBACK_OBSERVATION_CACHE: dict[str, tuple[int, str, float]] = {}
 _PLAYBACK_OBSERVATION_LIMIT = 256
+_PLAYBACK_PRESSURE_SESSIONS: dict[str, tuple[str, float]] = {}
+_PLAYBACK_PRESSURE_LIMIT = 128
+_PLAYBACK_PRESSURE_LEASE_SECONDS = 120.0
+_PLAYBACK_PRESSURE_REFRESH_SECONDS = 45.0
+_playback_pressure_lock = threading.Lock()
 _HOME_SNAPSHOT_CACHE: dict[
     tuple[str, str, bool], tuple[tuple[int, int], dict[str, Any], float]
 ] = {}
@@ -611,6 +616,107 @@ def _invoke_skill(
         return None, str(exc)
 
 
+def _set_agent_resource_pressure(instance_id: str, level: str) -> None:
+    arguments = {
+        "level": level,
+        "ttl_seconds": (_PLAYBACK_PRESSURE_LEASE_SECONDS if level == "playback" else 0),
+    }
+    try:
+        if instance_id and instance_id != "__default__":
+            result = _topology().invoke_agent(
+                instance_id,
+                "set_resource_pressure",
+                arguments,
+                timeout_seconds=5.0,
+            )
+        else:
+            result, error = _invoke_agent(
+                "set_resource_pressure", arguments, timeout=5.0
+            )
+            if result is None:
+                raise RuntimeError(error or "media_library_agent_unavailable")
+        if not bool(result.get("ok", True)):
+            raise RuntimeError(str(result.get("error") or "pressure_rejected"))
+    except Exception as exc:
+        _log.warning(
+            "source agent playback pressure update failed instance=%s level=%s error=%s",
+            instance_id or "default",
+            level,
+            f"{type(exc).__name__}: {exc}"[:300],
+        )
+
+
+def _reconcile_playback_pressure(
+    catalog: MediaCatalogCoordinator,
+    payload: Mapping[str, Any],
+    *,
+    item_id: str,
+    state: str,
+) -> None:
+    session_id = str(
+        payload.get("session_id") or payload.get("target_id") or f"item:{item_id}"
+    ).strip()
+    if not session_id:
+        return
+    active = state in {"loading", "playing", "buffering", "recovering"}
+    instance_id = ""
+    if active:
+        try:
+            binding = catalog.source_binding(source_id="", item_id=item_id)
+        except (AttributeError, TypeError):
+            return
+        if not isinstance(binding, Mapping):
+            return
+        instance_id = str(binding.get("instance_id") or "__default__")
+
+    now = time.monotonic()
+    updates: dict[str, str] = {}
+    with _playback_pressure_lock:
+        expired = [
+            key
+            for key, (_instance, refreshed_at) in _PLAYBACK_PRESSURE_SESSIONS.items()
+            if now - refreshed_at > _PLAYBACK_PRESSURE_LEASE_SECONDS
+        ]
+        for key in expired:
+            old_instance, _refreshed_at = _PLAYBACK_PRESSURE_SESSIONS.pop(key)
+            updates.setdefault(old_instance, "normal")
+
+        previous = _PLAYBACK_PRESSURE_SESSIONS.get(session_id)
+        if active:
+            if previous and previous[0] != instance_id:
+                updates.setdefault(previous[0], "normal")
+            needs_refresh = bool(
+                previous is None
+                or previous[0] != instance_id
+                or now - previous[1] >= _PLAYBACK_PRESSURE_REFRESH_SECONDS
+            )
+            _PLAYBACK_PRESSURE_SESSIONS[session_id] = (instance_id, now)
+            if needs_refresh:
+                updates[instance_id] = "playback"
+        elif previous is not None:
+            old_instance, _refreshed_at = _PLAYBACK_PRESSURE_SESSIONS.pop(session_id)
+            updates.setdefault(old_instance, "normal")
+
+        while len(_PLAYBACK_PRESSURE_SESSIONS) > _PLAYBACK_PRESSURE_LIMIT:
+            oldest = min(
+                _PLAYBACK_PRESSURE_SESSIONS,
+                key=lambda key: _PLAYBACK_PRESSURE_SESSIONS[key][1],
+            )
+            old_instance, _refreshed_at = _PLAYBACK_PRESSURE_SESSIONS.pop(oldest)
+            updates.setdefault(old_instance, "normal")
+
+        active_instances = {
+            current_instance
+            for current_instance, _refreshed_at in _PLAYBACK_PRESSURE_SESSIONS.values()
+        }
+        for current_instance in tuple(updates):
+            if current_instance in active_instances:
+                updates[current_instance] = "playback"
+
+    for current_instance, level in updates.items():
+        _set_agent_resource_pressure(current_instance, level)
+
+
 def _compact_rendition_operation(value: Mapping[str, Any]) -> dict[str, Any]:
     error = value.get("error") if isinstance(value.get("error"), Mapping) else {}
     return {
@@ -1196,6 +1302,13 @@ def on_playback_observed(event: Any) -> None:
     position_ms = max(0, int(payload.get("position_ms") or 0))
     duration_ms = max(position_ms, int(payload.get("duration_ms") or 0))
     state = str(payload.get("state") or "paused").strip().lower()
+    catalog = _coordinator()
+    _reconcile_playback_pressure(
+        catalog,
+        payload,
+        item_id=item_id,
+        state=state,
+    )
     if state not in {"playing", "paused", "stopped", "ended", "error"}:
         return
     playback_confirmed = _bool(
@@ -1221,7 +1334,6 @@ def on_playback_observed(event: Any) -> None:
                 key=lambda key: _PLAYBACK_OBSERVATION_CACHE[key][2],
             )
             _PLAYBACK_OBSERVATION_CACHE.pop(oldest, None)
-    catalog = _coordinator()
     result = catalog.checkpoint(
         item_id,
         profile_id=profile_id,

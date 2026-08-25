@@ -118,8 +118,8 @@ class MediaLibraryAgentWorker:
         if thread and thread.is_alive() and thread is not threading.current_thread():
             thread.join(timeout=max(0.0, timeout))
 
-    def set_resource_pressure(self, level: str) -> str:
-        token = self.repository.set_resource_pressure(level)
+    def set_resource_pressure(self, level: str, *, ttl_seconds: float = 0.0) -> str:
+        token = self.repository.set_resource_pressure(level, ttl_seconds=ttl_seconds)
         self._resource_pressure = token
         self._resource_pressure_checked_at = time.monotonic()
         self._wake.set()

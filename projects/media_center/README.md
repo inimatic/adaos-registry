@@ -31,7 +31,10 @@ renditions migrate through durable resumable background jobs and yield to
 playback pressure. Settings exposes the policy per media folder and Metadata
 Activity exposes bounded migration progress. The source-owned managed
 directory is excluded from scans, and original media is never copied, moved,
-or deleted by this lifecycle.
+or deleted by this lifecycle. Authoritative endpoint observations also maintain
+a short source-agent playback-pressure lease. It pauses scan, artwork,
+migration, and conversion work during playback, releases on pause/terminal
+state, and expires automatically if a disconnect loses the final observation.
 
 Release `0.6.75` makes catalog startup single-flight under real storage
 contention. It ships `media_center_skill@0.8.67` and keeps the remaining

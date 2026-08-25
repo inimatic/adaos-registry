@@ -715,17 +715,25 @@ def configure_schedule(
     summary="Pause or resume background scans according to playback pressure.",
     side_effects="local_write",
 )
-def set_resource_pressure(level: str = "normal", **_: Any) -> dict[str, Any]:
+def set_resource_pressure(
+    level: str = "normal", ttl_seconds: float = 0.0, **_: Any
+) -> dict[str, Any]:
     repository, worker = _runtime()
     try:
-        current = repository.set_resource_pressure(level)
+        ttl = max(0.0, min(600.0, float(ttl_seconds or 0.0)))
+        current = repository.set_resource_pressure(level, ttl_seconds=ttl)
         if _owns_background_worker():
-            worker.set_resource_pressure(current)
-    except ValueError:
+            worker.set_resource_pressure(current, ttl_seconds=ttl)
+    except (TypeError, ValueError):
         return _human_error(
             "invalid_resource_pressure", "The resource pressure level is invalid."
         )
-    return {"ok": True, "schema": SCHEMA_VERSION, "resource_pressure": current}
+    return {
+        "ok": True,
+        "schema": SCHEMA_VERSION,
+        "resource_pressure": current,
+        "pressure": repository.resource_pressure_status(),
+    }
 
 
 @tool(
@@ -1031,6 +1039,7 @@ def status(**_: Any) -> dict[str, Any]:
                 "current_process" if _owns_background_worker() else "service_process"
             ),
             "resource_pressure": pressure,
+            "resource_pressure_lease": repository.resource_pressure_status(),
             "max_concurrent_scans": 1,
             "watch": worker.watch_status(),
             "progress_publisher": _progress_publisher_status(),

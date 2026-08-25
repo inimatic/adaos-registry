@@ -417,6 +417,11 @@ tools:
         - normal
         - playback
         - critical
+      ttl_seconds:
+        type: number
+        minimum: 0
+        maximum: 600
+        default: 0
     additionalProperties: true
   output_schema:
     type: object

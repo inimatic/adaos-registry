@@ -1133,6 +1133,26 @@ def test_resource_pressure_is_shared_across_agent_processes(tmp_path):
     worker.dispose()
 
 
+def test_resource_pressure_lease_expires_without_terminal_event(tmp_path):
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "resource-pressure-lease.sqlite3", node_id="node-a"
+    )
+    repository.set_resource_pressure("playback", ttl_seconds=120)
+    assert repository.resource_pressure() == "playback"
+    assert repository.resource_pressure_status()["leased"] is True
+
+    with repository.connect() as connection:
+        connection.execute(
+            "UPDATE agent_meta SET value='2000-01-01T00:00:00+00:00' "
+            "WHERE key='resource_pressure_expires_at'"
+        )
+        connection.commit()
+
+    status = repository.resource_pressure_status()
+    assert status["level"] == "normal"
+    assert status["requested_level"] == "playback"
+
+
 def test_storage_maintenance_cooperatively_pauses_active_scan(tmp_path):
     library = tmp_path / "library"
     library.mkdir()

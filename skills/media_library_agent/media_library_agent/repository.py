@@ -718,25 +718,63 @@ class MediaLibraryAgentRepository:
     def agent_id(self) -> str:
         return stable_id("agent", self.node_id, size=20)
 
-    def set_resource_pressure(self, level: str) -> str:
+    def set_resource_pressure(self, level: str, *, ttl_seconds: float = 0.0) -> str:
         token = text(level).lower()
         if token not in {"normal", "playback", "critical"}:
             raise ValueError("invalid_resource_pressure")
+        ttl = max(0.0, min(600.0, float(ttl_seconds or 0.0)))
+        expires_at = (
+            (datetime.now(timezone.utc) + timedelta(seconds=ttl)).isoformat()
+            if token != "normal" and ttl > 0
+            else ""
+        )
         with self.connect() as connection:
             connection.execute(
                 "INSERT OR REPLACE INTO agent_meta(key, value) VALUES ('resource_pressure', ?)",
                 (token,),
+            )
+            connection.execute(
+                "INSERT OR REPLACE INTO agent_meta(key, value) "
+                "VALUES ('resource_pressure_expires_at', ?)",
+                (expires_at,),
             )
             connection.commit()
         return token
 
     def resource_pressure(self) -> str:
         with self.connect() as connection:
-            row = connection.execute(
-                "SELECT value FROM agent_meta WHERE key='resource_pressure'"
-            ).fetchone()
-        token = text(row["value"] if row else "normal").lower()
-        return token if token in {"normal", "playback", "critical"} else "normal"
+            values = self._meta_values(
+                connection,
+                ("resource_pressure", "resource_pressure_expires_at"),
+            )
+        token = text(values.get("resource_pressure") or "normal").lower()
+        if token not in {"normal", "playback", "critical"}:
+            return "normal"
+        expires_at = text(values.get("resource_pressure_expires_at"))
+        if token == "normal" or not expires_at:
+            return token
+        try:
+            expires = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
+            if expires <= datetime.now(timezone.utc):
+                return "normal"
+        except ValueError:
+            return "normal"
+        return token
+
+    def resource_pressure_status(self) -> dict[str, Any]:
+        with self.connect() as connection:
+            values = self._meta_values(
+                connection,
+                ("resource_pressure", "resource_pressure_expires_at"),
+            )
+        return {
+            "level": self.resource_pressure(),
+            "requested_level": text(values.get("resource_pressure") or "normal"),
+            "expires_at": text(values.get("resource_pressure_expires_at")),
+            "leased": bool(text(values.get("resource_pressure_expires_at"))),
+        }
 
     @staticmethod
     def _meta_values(
