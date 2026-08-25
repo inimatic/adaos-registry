@@ -195,6 +195,9 @@ _TITLE_NOISE_RE = re.compile(
 )
 _EPISODE_RE = re.compile(r"\bS\d{1,2}E\d{1,3}\b", re.IGNORECASE)
 _YEAR_RE = re.compile(r"(?<!\d)(19\d{2}|20\d{2})(?!\d)")
+_AUDIOBOOK_PATH_RE = re.compile(
+    r"(?:audio[ ._\-]*books?|аудиокниг)", re.IGNORECASE
+)
 
 
 def _enabled(value: Any) -> bool:
@@ -572,6 +575,9 @@ class MusicBrainzMetadataProvider:
         return (
             job_kind in self.supported_jobs
             and str(subject.get("media_kind") or "").strip().lower() == "audio"
+            and not _AUDIOBOOK_PATH_RE.search(
+                str(subject.get("folder_path") or "")
+            )
         )
 
     def __init__(

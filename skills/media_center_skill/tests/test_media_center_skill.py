@@ -5005,6 +5005,16 @@ def test_musicbrainz_provider_is_rate_limited_cached_and_audio_only():
         job_kind="metadata_enrichment",
     ) == []
     assert len(session.calls) == 1
+    assert provider.accepts(
+        {
+            "subject_ref": "item:audiobook",
+            "title": "Chapter 01.mp3",
+            "folder_path": "Аудиокниги/Author/Book",
+            "media_kind": "audio",
+            "metadata": {},
+        },
+        job_kind="metadata_enrichment",
+    ) is False
 
 
 def test_external_metadata_providers_follow_managed_settings():
