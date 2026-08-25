@@ -3237,6 +3237,39 @@ def queue_background_job(kind: str = "", subject_ref: str = "", priority: int = 
 
 
 @tool(
+    summary="Run bounded resumable Media Center catalog compaction.",
+    side_effects="local_write",
+)
+def compact_storage(
+    max_batches: int = 250,
+    limit: int = 1000,
+    time_budget_seconds: float = 300.0,
+    **_: Any,
+) -> dict[str, Any]:
+    catalog = _coordinator()
+    bounded_batches = max(1, min(1000, int(max_batches or 250)))
+    bounded_limit = max(10, min(1000, int(limit or 1000)))
+    bounded_seconds = max(1.0, min(600.0, float(time_budget_seconds or 300.0)))
+    started = time.monotonic()
+    result: dict[str, Any] = {}
+    completed_batches = 0
+    for _index in range(bounded_batches):
+        result = catalog.compact_storage_batch(limit=bounded_limit)
+        completed_batches += 1
+        if result.get("complete"):
+            break
+        if time.monotonic() - started >= bounded_seconds:
+            break
+    return {
+        **result,
+        "batches": completed_batches,
+        "elapsed_seconds": round(time.monotonic() - started, 3),
+        "budget_exhausted": not bool(result.get("complete")),
+        "storage": catalog.storage_status(),
+    }
+
+
+@tool(
     summary="Optimize Media Center catalog storage and optionally reclaim disk space.",
     side_effects="local_write",
 )
