@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.39
+version: 0.6.40
 description: Distributed node-local media discovery and bounded rendition agent with
   durable jobs and ordered catalog deltas.
 supported_locales:
@@ -181,9 +181,13 @@ tools:
         type: object
         properties:
           rendition_mode:
-            enum: [source_root, node_cache]
+            enum:
+            - source_root
+            - node_cache
           artwork_mode:
-            enum: [source_root, node_cache]
+            enum:
+            - source_root
+            - node_cache
           rendition_quota_bytes:
             type: integer
             minimum: 1073741824
@@ -199,7 +203,8 @@ tools:
   side_effects: local_write
   input_schema:
     type: object
-    required: [root_id]
+    required:
+    - root_id
     properties:
       root_id:
         type: string
@@ -758,7 +763,8 @@ data_routes:
   owner: skill:media_library_agent
   first_paint: bounded recent rendition history with current durable states
   recovery: repeat the bounded list after rendition progress invalidation
-  guard_visibility: source-relative paths are visible only inside the owning workspace modal
+  guard_visibility: source-relative paths are visible only inside the owning workspace
+    modal
   budget:
     max_payload_bytes: 262144
     max_items: 100
@@ -870,12 +876,13 @@ llm_hints:
     intent: media_center.scan
     tool: start_scan
     side_effect_class: local_write
-updated_at: '2026-08-24T13:38:20+00:00'
+updated_at: '2026-08-26T04:30:33+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.935+5659.60ba2e20
-    recorded_at: '2026-08-24T13:38:20+00:00'
+    min_version: 0.1.939+5685.a8e1dfd0
+    recorded_at: '2026-08-26T04:30:33+00:00'
     source: skill_push
-    min_commit: 60ba2e20101127f458457d9c30eb6a91f6249556
-    min_short_commit: 60ba2e20
-    build_date: '2026-08-24T15:15:48+03:00'
+    min_commit: a8e1dfd019f9bfd9ba2f188596b5d314ec88786a
+    min_short_commit: a8e1dfd0
+    build_date: '2026-08-26T07:29:43+03:00'
+
