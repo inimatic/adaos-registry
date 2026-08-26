@@ -725,6 +725,47 @@ def test_infrastate_first_snapshot_uses_retained_core_update_status() -> None:
     }
 
 
+def test_infrastate_rehydrate_projects_retained_status_before_return(monkeypatch) -> None:
+    get_ctx().bus.publish(
+        Event(
+            type="core.update.status",
+            payload={"state": "preparing", "phase": "prepare"},
+            source="supervisor.event_bridge",
+            ts=10.0,
+        )
+    )
+    mod = _load_infrastate_module()
+    projected: list[tuple[dict[str, object], str | None, str]] = []
+
+    monkeypatch.setattr(mod, "_invalidate_runtime_caches", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        mod,
+        "_lightweight_projection_sections",
+        lambda **_kwargs: {
+            "infrastate.summary": {"value": mod.read_core_update_status()["state"]}
+        },
+    )
+
+    async def _capture_project(sections, *, webspace_id=None, reason=""):
+        projected.append((dict(sections), webspace_id, reason))
+
+    monkeypatch.setattr(mod, "_project_sections_async", _capture_project)
+    monkeypatch.setattr(mod, "_publish_active_stream_receiver_snapshots", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "_write_ui_state", lambda **_kwargs: {})
+
+    result = mod.infrastate_runtime_rehydrate(webspace_id="desktop")
+
+    assert result["ok"] is True
+    assert result["state"] == "preparing"
+    assert projected == [
+        (
+            {"infrastate.summary": {"value": "preparing"}},
+            "desktop",
+            "infrastate_control_refresh:legacy.refresh_snapshot",
+        )
+    ]
+
+
 def test_infrastate_scenario_marketplace_does_not_build_skill_inventory(monkeypatch):
     mod = _load_infrastate_module()
 

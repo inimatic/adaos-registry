@@ -1826,6 +1826,28 @@ def infrastate_runtime_dispose(reason: str = "dispose", **_: Any) -> dict[str, A
     return _cleanup_runtime_state(reason=reason or "dispose", wait=False)
 
 
+@tool("infrastate_runtime_rehydrate")
+def infrastate_runtime_rehydrate(
+    reason: str = "runtime_owner_rehydrate",
+    webspace_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    """Materialize current retained control state before activation returns."""
+
+    target_webspace = str(webspace_id or "").strip() or default_webspace_id()
+    _invalidate_runtime_caches(webspace_id=target_webspace)
+    result = refresh_snapshot(webspace_id=target_webspace)
+    status = read_core_update_status()
+    return {
+        "ok": bool(result.get("ok", False)),
+        "reason": str(reason or "runtime_owner_rehydrate"),
+        "webspace_id": target_webspace,
+        "state": str(status.get("state") or "idle"),
+        "phase": str(status.get("phase") or ""),
+        "projected_slots": list(result.get("projected_slots") or []),
+    }
+
+
 def _consume_stream_snapshot_request(*, webspace_id: str | None, receiver: str, node_id: str | None = None) -> bool:
     key = _stream_cache_key(webspace_id, receiver, node_id)
     now = time.monotonic()

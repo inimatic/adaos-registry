@@ -1,5 +1,5 @@
 name: infrastate_skill
-version: 0.75.71
+version: 0.75.72
 description: Локальный обзор состояния ядра, graceful update, A/B слотов и последнего
   результата обновления.
 runtime:
@@ -570,6 +570,7 @@ memory_budget:
 lifecycle:
   drain: infrastate_runtime_drain
   dispose: infrastate_runtime_dispose
+  rehydrate: infrastate_runtime_rehydrate
 default_tool: get_snapshot
 tools:
 - name: infrastate_runtime_drain
@@ -591,6 +592,19 @@ tools:
     type: object
     properties:
       reason:
+        type: string
+  output_schema:
+    type: object
+- name: infrastate_runtime_rehydrate
+  description: Materialize retained infrastructure state into the default webspace
+    before runtime activation completes.
+  entry: handlers.main:infrastate_runtime_rehydrate
+  input_schema:
+    type: object
+    properties:
+      reason:
+        type: string
+      webspace_id:
         type: string
   output_schema:
     type: object
@@ -691,13 +705,13 @@ tools:
   output_schema:
     type: object
     properties: {}
-updated_at: '2026-08-26T06:55:49+00:00'
+updated_at: '2026-08-26T07:40:16+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.941+5690.16e2b588
-    recorded_at: '2026-08-26T06:55:49+00:00'
+    min_version: 0.1.941+5691.48396ceb
+    recorded_at: '2026-08-26T07:40:16+00:00'
     source: skill_push
-    min_commit: 16e2b58881d9d02221b514b6d95f5f23b52ead1c
-    min_short_commit: 16e2b588
-    build_date: '2026-08-26T09:37:55+03:00'
+    min_commit: 48396cebf884fe8ea97bb77574195d1088c2969d
+    min_short_commit: 48396ceb
+    build_date: '2026-08-26T10:06:19+03:00'
 
