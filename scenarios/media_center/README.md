@@ -119,13 +119,26 @@ one-time search and metadata projection backfills took 91.541 and 72.368
 seconds; the bounded 50,000-item identity migration took 26.888 seconds. At
 50,000 items, FTS p95 was 71.038 ms and RSS was 35.254 MiB.
 
-The 2026-08-21 local server acceptance run passed for 3,600.063 seconds with
-20,000 catalog items and 307,950 applied agent deltas. It recorded no operation
-errors; p95 was 64.079 ms for FTS, 57.656 ms for catalog pages, 33.881 ms for
-playback plans, and 120.926 ms for delta application. RSS peaked at 39.02 MiB
-with 0.793 MiB sustained growth, and aggregate CPU p95 was 13.533%. This is
-server evidence only; the separate one-hour Android TV renderer gate remains
-mandatory.
+The 2026-08-26 Windows server acceptance run passed for 3,600.031 seconds with
+50,000 catalog items and 289,875 applied agent deltas. It recorded no operation
+errors; p95 was 80.441 ms for FTS, 73.586 ms for catalog pages, 38.874 ms for
+playback plans, and 142.322 ms for delta application. RSS peaked at 40.523 MiB
+with 0.668 MiB sustained growth, aggregate CPU p95 was 15.633%, and the final
+WAL size was zero.
+
+The matching one-hour production-bundle desktop renderer run stayed within all
+resource budgets while the server workload ran: idle CPU was 4.498%, steady
+main-thread CPU 5.473%, renderer private-memory p95 201.914 MiB, JS heap growth
+2.46 MiB, DOM mutation rate 1.407/s, input-delay p95 13.3 ms, and dropped-frame
+ratio zero. Eight long tasks were observed (0.133/min, maximum 832 ms). The
+first harness result remained formally failed because its playback selector
+looked for an English `Music` label in the Russian UI and treated an expected,
+handled reliability-projection `503` as a browser error. The fixed harness uses
+stable command IDs, accepts that fallback only beside a healthy node status,
+and supports an explicit browser-compatible fixture. Its follow-up playback
+probe advanced 29.883 seconds with media error code zero and preserved exactly
+one media element after modal-to-mini transition. This closes the local desktop
+performance investigation, not the separate one-hour physical Android TV gate.
 
 The harness reports one-time FTS/trigram and folder-index backfill separately
 from p50/p95/max catalog FTS, cursor-page, Home, root-folder, leaf-folder and
