@@ -7,6 +7,15 @@ worker builds the rowid-addressed FTS index in resumable batches. Search and
 background-operation diagnostics expose the persisted index phase, cursor,
 indexed count, and deferred legacy cleanup state.
 
+Large legacy job tables are normalized by a checkpointed rowid pass before new
+background work is admitted. Maintenance executes one I/O-bounded lane per
+interval: legacy queue/history cleanup, search indexing, or logical storage
+compaction. Until the `(kind,status)` read index can be built cheaply,
+operation-state counts are explicitly marked as a capped lower bound and omit
+per-kind totals; recent operation rows and queue-migration progress remain
+exact. This prevents startup, reconnect, and operation widgets from scanning a
+large historical table while preserving observable forward progress.
+
 `media_center_skill` is the logical Media Center coordinator. It owns the global catalog read model, work/variant/collection identity, profile-scoped favorites and resume state, bounded search, and playback planning. It does not walk filesystems or own source media.
 
 `media_library_agent` owns node-local roots and asynchronous scans. The coordinator invokes its public tools and consumes ordered `adaos.media_library.source_delta.v1` pages. The agent registers each source through `adaos.sdk.io.media.register_media_file`; only a root-bound reference is stored in `.adaos`, while media bytes stay at their original path.
