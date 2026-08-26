@@ -1629,6 +1629,24 @@ def test_playback_observation_leases_source_agent_pressure(monkeypatch):
     assert main._PLAYBACK_PRESSURE_SESSIONS == {}
 
 
+def test_playback_pressure_session_cache_is_bounded(monkeypatch):
+    catalog = SimpleNamespace(
+        source_binding=lambda **_kwargs: {"instance_id": "agent-instance-a"}
+    )
+    monkeypatch.setattr(main, "_set_agent_resource_pressure", lambda *_a: None)
+    main._PLAYBACK_PRESSURE_SESSIONS.clear()
+
+    for index in range(main._PLAYBACK_PRESSURE_LIMIT + 5):
+        main._reconcile_playback_pressure(
+            catalog,
+            {"session_id": f"session-{index}"},
+            item_id=f"item-{index}",
+            state="playing",
+        )
+
+    assert len(main._PLAYBACK_PRESSURE_SESSIONS) == main._PLAYBACK_PRESSURE_LIMIT
+
+
 def test_coordinator_builds_typed_collections_and_bounded_cursor_pages(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())

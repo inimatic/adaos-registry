@@ -58,6 +58,11 @@ memory_budget:
     max_items: 256
     ttl_seconds: 900
     cleanup_hook: dispose
+  - name: playback_pressure_sessions
+    route: process
+    max_items: 128
+    ttl_seconds: 120
+    cleanup_hook: dispose
   - name: home_snapshot_cache
     route: process
     max_items: 32
