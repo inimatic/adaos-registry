@@ -100,6 +100,7 @@ class MediaLibraryAgentWorker:
         self._last_job_retention_monotonic = 0.0
         self._artwork_queue_saturated = False
         self._last_search_backfill_monotonic = 0.0
+        self._last_storage_maintenance_monotonic = 0.0
 
     def ensure_started(self) -> bool:
         with self._lock:
@@ -149,7 +150,40 @@ class MediaLibraryAgentWorker:
     def run_once(self) -> dict[str, Any] | None:
         if self.repository.storage_maintenance_active():
             return None
-        maintenance = self.repository.compact_storage_batch(limit=500)
+        self._refresh_resource_pressure(force=True)
+        maintenance_batch = max(
+            1,
+            min(
+                100,
+                int(os.environ.get("MEDIA_LIBRARY_AGENT_MAINTENANCE_BATCH") or 5),
+            ),
+        )
+        maintenance_interval = max(
+            5.0,
+            min(
+                300.0,
+                float(
+                    os.environ.get(
+                        "MEDIA_LIBRARY_AGENT_MAINTENANCE_INTERVAL_SECONDS"
+                    )
+                    or 30.0
+                ),
+            ),
+        )
+        maintenance_at = time.monotonic()
+        maintenance: dict[str, Any] = {"complete": True}
+        if (
+            self._resource_pressure == "normal"
+            and (
+                self._last_storage_maintenance_monotonic == 0.0
+                or maintenance_at - self._last_storage_maintenance_monotonic
+                >= maintenance_interval
+            )
+        ):
+            maintenance = self.repository.compact_storage_batch(
+                limit=maintenance_batch
+            )
+            self._last_storage_maintenance_monotonic = maintenance_at
         retention_at = time.monotonic()
         if (
             not self._job_retention_complete
@@ -159,7 +193,6 @@ class MediaLibraryAgentWorker:
             retention = self.repository.compact_job_history_batch(limit=5000)
             self._job_retention_complete = bool(retention.get("complete"))
             self._last_job_retention_monotonic = retention_at
-        self._refresh_resource_pressure(force=True)
         search_backfill = None
         search_interval = max(
             0.1,

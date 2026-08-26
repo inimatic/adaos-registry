@@ -935,15 +935,15 @@ def cancel_rendition(job_id: str = "", **_: Any) -> dict[str, Any]:
     side_effects="local_write",
 )
 def compact_storage(
-    max_batches: int = 250,
-    limit: int = 1000,
-    time_budget_seconds: float = 300.0,
+    max_batches: int = 100,
+    limit: int = 25,
+    time_budget_seconds: float = 120.0,
     **_: Any,
 ) -> dict[str, Any]:
     repository, _worker = _runtime()
-    bounded_batches = max(1, min(1000, int(max_batches or 250)))
-    bounded_limit = max(25, min(2000, int(limit or 1000)))
-    bounded_seconds = max(1.0, min(600.0, float(time_budget_seconds or 300.0)))
+    bounded_batches = max(1, min(1000, int(max_batches or 100)))
+    bounded_limit = max(1, min(2000, int(limit or 25)))
+    bounded_seconds = max(1.0, min(600.0, float(time_budget_seconds or 120.0)))
     started = time.monotonic()
     result: dict[str, Any] = {}
     completed_batches = 0

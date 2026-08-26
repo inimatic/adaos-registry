@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.41
+version: 0.6.42
 description: Distributed node-local media discovery and bounded rendition agent with
   durable jobs and ordered catalog deltas.
 supported_locales:
@@ -597,17 +597,17 @@ tools:
         type: integer
         minimum: 1
         maximum: 1000
-        default: 250
+        default: 100
       limit:
         type: integer
-        minimum: 25
+        minimum: 1
         maximum: 2000
-        default: 1000
+        default: 25
       time_budget_seconds:
         type: number
         minimum: 1
         maximum: 600
-        default: 300
+        default: 120
     additionalProperties: true
   output_schema:
     type: object

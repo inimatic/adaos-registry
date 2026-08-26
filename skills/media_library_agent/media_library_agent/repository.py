@@ -40,14 +40,23 @@ ACTIVE_JOB_STATUSES = (
 TERMINAL_JOB_STATUSES = ("completed", "failed", "canceled")
 _CLOCK = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 _DATABASE_SCHEMA_REVISION = "6"
-_STORAGE_COMPACTION_REVISION = "2026-08-25.1"
+_STORAGE_COMPACTION_REVISION = "2026-08-26.2"
 _SCHEMA_LOCK_TIMEOUT_SECONDS = 300.0
 _CONTENTLESS_DELETE_SEARCH = sqlite3.sqlite_version_info >= (3, 43, 0)
 _DESCRIPTOR_METADATA_KEYS = "_media_library_source_metadata_keys"
 _DESCRIPTOR_SOURCE_FIELDS = "_media_library_source_fields"
+_DELTA_SOURCE_REFERENCE = "_media_library_source_reference"
+_DELTA_SOURCE_REFERENCE_PAYLOAD = json_dumps({_DELTA_SOURCE_REFERENCE: 1})
 ROOT_STORAGE_POLICY_SCHEMA = "adaos.media_library.storage_policy.v1"
 MANAGED_MEDIA_DIRECTORY = ".adaos-media"
 DEFAULT_RENDITION_QUOTA_BYTES = 100 * 1024**3
+
+
+def _is_delta_source_reference(value: Any) -> bool:
+    payload = json_loads(value, {})
+    return bool(
+        isinstance(payload, Mapping) and payload.get(_DELTA_SOURCE_REFERENCE)
+    )
 
 
 def normalize_storage_policy(value: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -2862,6 +2871,10 @@ class MediaLibraryAgentRepository:
             size=28,
         )
         connection.execute(
+            "DELETE FROM source_deltas WHERE source_id=? AND payload_json=?",
+            (text(source.get("id")), _DELTA_SOURCE_REFERENCE_PAYLOAD),
+        )
+        connection.execute(
             """
             INSERT OR IGNORE INTO source_deltas(
                 id, schema_name, agent_id, node_id, root_id, source_id, operation,
@@ -2899,11 +2912,37 @@ class MediaLibraryAgentRepository:
                 f"SELECT * FROM source_deltas WHERE sequence>? {root_clause} ORDER BY sequence LIMIT ?",
                 tuple(params),
             ).fetchall()
-        has_more = len(rows) > bounded
-        visible = rows[:bounded]
-        items = [self._public_delta(row) for row in visible]
+            has_more = len(rows) > bounded
+            visible = rows[:bounded]
+            referenced_ids = sorted(
+                {
+                    str(row["source_id"])
+                    for row in visible
+                    if _is_delta_source_reference(row["payload_json"])
+                }
+            )
+            source_rows: dict[str, sqlite3.Row] = {}
+            if referenced_ids:
+                placeholders = ",".join("?" for _ in referenced_ids)
+                source_rows = {
+                    str(row["id"]): row
+                    for row in connection.execute(
+                        f"SELECT * FROM sources WHERE id IN ({placeholders})",
+                        tuple(referenced_ids),
+                    ).fetchall()
+                }
+            items = [
+                item
+                for row in visible
+                if (
+                    item := self._public_delta(
+                        row, source_row=source_rows.get(str(row["source_id"]))
+                    )
+                )
+                is not None
+            ]
         next_sequence = int(visible[-1]["sequence"]) if visible else after
-        summary = self.summary()
+        summary = self.health_summary()
         return {
             "ok": True,
             "schema": SCHEMA_VERSION,
@@ -2915,8 +2954,6 @@ class MediaLibraryAgentRepository:
             "agent": {"id": self.agent_id, "node_id": self.node_id},
             "library_state": {
                 "root_count": int(summary.get("root_count") or 0),
-                "source_count": int(summary.get("source_count") or 0),
-                "available_count": int(summary.get("available_count") or 0),
                 "active_job_count": int(summary.get("active_job_count") or 0),
                 "failed_job_count": int(summary.get("failed_job_count") or 0),
             },
@@ -3236,7 +3273,7 @@ class MediaLibraryAgentRepository:
         return scan + rendition
 
     def compact_storage_batch(self, *, limit: int = 500) -> dict[str, Any]:
-        bounded = max(25, min(int(limit or 500), 2000))
+        bounded = max(1, min(int(limit or 500), 2000))
         grace_seconds = max(
             60,
             min(
@@ -3253,7 +3290,11 @@ class MediaLibraryAgentRepository:
                 "SELECT value FROM agent_meta WHERE key=?", (state_key,)
             ).fetchone()
             state = json_loads(row["value"], {}) if row is not None else {}
-            if not isinstance(state, Mapping) or text(state.get("revision")) != (
+            if isinstance(state, Mapping) and text(state.get("revision")) == (
+                "2026-08-25.1"
+            ):
+                state = {**dict(state), "revision": _STORAGE_COMPACTION_REVISION}
+            elif not isinstance(state, Mapping) or text(state.get("revision")) != (
                 _STORAGE_COMPACTION_REVISION
             ):
                 state = {
@@ -3294,31 +3335,98 @@ class MediaLibraryAgentRepository:
                 if len(rows) < bounded:
                     phase = "delta_history"
                     cursor = ""
-            elif phase in {"delta_history", "steady"}:
+            elif phase == "delta_history":
+                scan_limit = bounded
                 rows = connection.execute(
                     """
-                    SELECT d.sequence FROM source_deltas d
-                    WHERE d.created_at<? AND EXISTS (
-                        SELECT 1 FROM source_deltas newer
-                        WHERE newer.source_id=d.source_id
-                          AND newer.sequence>d.sequence
-                    )
-                    ORDER BY d.sequence LIMIT ?
+                    SELECT sequence,source_id,created_at FROM source_deltas
+                    WHERE sequence>?
+                    ORDER BY sequence LIMIT ?
                     """,
-                    (cutoff, bounded),
+                    (int(cursor or 0), scan_limit),
                 ).fetchall()
-                sequences = [int(item["sequence"]) for item in rows]
+                sequences = []
+                for item in rows:
+                    if text(item["created_at"]) >= cutoff:
+                        continue
+                    newer = connection.execute(
+                        """
+                        SELECT 1 FROM source_deltas
+                        WHERE source_id=? AND sequence>? LIMIT 1
+                        """,
+                        (text(item["source_id"]), int(item["sequence"])),
+                    ).fetchone()
+                    if newer is not None:
+                        sequences.append(int(item["sequence"]))
                 if sequences:
                     placeholders = ",".join("?" for _ in sequences)
                     connection.execute(
                         f"DELETE FROM source_deltas WHERE sequence IN ({placeholders})",
                         tuple(sequences),
                     )
-                scanned = len(sequences)
+                scanned = len(rows)
                 deleted = len(sequences)
-                if phase == "delta_history" and len(sequences) < bounded:
+                if rows:
+                    cursor = str(rows[-1]["sequence"])
+                if len(rows) < scan_limit:
                     phase = "deltas"
-                    cursor = ""
+                    cursor = "0"
+            elif phase in {"delta_references", "steady"}:
+                scan_limit = bounded
+                rows = connection.execute(
+                    """
+                    SELECT d.sequence,d.source_id,d.source_revision,d.operation,
+                        d.created_at,d.payload_json,s.revision AS current_revision
+                    FROM source_deltas d
+                    LEFT JOIN sources s ON s.id=d.source_id
+                    WHERE d.sequence>?
+                    ORDER BY d.sequence LIMIT ?
+                    """,
+                    (int(cursor or 0), scan_limit),
+                ).fetchall()
+                sequences = []
+                updates = []
+                for item in rows:
+                    if text(item["created_at"]) >= cutoff:
+                        continue
+                    newer = connection.execute(
+                        """
+                        SELECT 1 FROM source_deltas newer
+                        WHERE newer.source_id=? AND newer.sequence>? LIMIT 1
+                        """,
+                        (text(item["source_id"]), int(item["sequence"])),
+                    ).fetchone()
+                    if newer is not None:
+                        sequences.append(int(item["sequence"]))
+                        continue
+                    if (
+                        item["current_revision"] is not None
+                        and int(item["current_revision"])
+                        == int(item["source_revision"])
+                        and text(item["operation"]) != "removed"
+                        and text(item["payload_json"])
+                        != _DELTA_SOURCE_REFERENCE_PAYLOAD
+                    ):
+                        updates.append(
+                            (_DELTA_SOURCE_REFERENCE_PAYLOAD, int(item["sequence"]))
+                        )
+                if sequences:
+                    placeholders = ",".join("?" for _ in sequences)
+                    connection.execute(
+                        f"DELETE FROM source_deltas WHERE sequence IN ({placeholders})",
+                        tuple(sequences),
+                    )
+                connection.executemany(
+                    "UPDATE source_deltas SET payload_json=? WHERE sequence=?", updates
+                )
+                scanned = len(rows)
+                deleted = len(sequences)
+                updated = len(updates)
+                if rows:
+                    cursor = str(rows[-1]["sequence"])
+                if len(rows) < scan_limit:
+                    phase = "steady"
+                    cursor = "0"
             elif phase == "deltas":
                 rows = connection.execute(
                     "SELECT sequence,payload_json FROM source_deltas "
@@ -3343,8 +3451,8 @@ class MediaLibraryAgentRepository:
                 if rows:
                     cursor = str(rows[-1]["sequence"])
                 if len(rows) < bounded:
-                    phase = "steady"
-                    cursor = ""
+                    phase = "delta_references"
+                    cursor = "0"
             state = {
                 "revision": _STORAGE_COMPACTION_REVISION,
                 "phase": phase,
@@ -4303,8 +4411,30 @@ class MediaLibraryAgentRepository:
         )
         return source
 
-    def _public_delta(self, row: sqlite3.Row) -> dict[str, Any]:
+    def _public_delta(
+        self, row: sqlite3.Row, *, source_row: sqlite3.Row | None = None
+    ) -> dict[str, Any] | None:
         payload = json_loads(row["payload_json"], {})
+        referenced = bool(
+            isinstance(payload, Mapping) and payload.get(_DELTA_SOURCE_REFERENCE)
+        )
+        if referenced and source_row is not None:
+            if int(source_row["revision"] or 0) != int(row["source_revision"] or 0):
+                return None
+            source = self._public_source(source_row)
+        elif referenced:
+            source = {
+                "schema": "adaos.media_library.source.v1",
+                "id": str(row["source_id"]),
+                "root_id": str(row["root_id"]),
+                "node_id": str(row["node_id"]),
+                "present": False,
+                "revision": int(row["source_revision"]),
+            }
+        else:
+            source = _expand_source_payload(
+                payload if isinstance(payload, Mapping) else {}
+            )
         return {
             "schema": DELTA_SCHEMA,
             "id": str(row["id"]),
@@ -4316,8 +4446,6 @@ class MediaLibraryAgentRepository:
             "operation": str(row["operation"]),
             "source_revision": int(row["source_revision"]),
             "job_id": str(row["job_id"]),
-            "source": _expand_source_payload(
-                payload if isinstance(payload, Mapping) else {}
-            ),
+            "source": source,
             "created_at": str(row["created_at"]),
         }

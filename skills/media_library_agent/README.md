@@ -94,14 +94,20 @@ is not retained a second time by the FTS content table. A required rebuild is
 checkpointed by source row id and advances in bounded low-priority batches;
 playback or critical resource pressure pauses it, and search responses expose
 the incomplete index instead of pretending that missing matches are final.
-Full-state source deltas
-remain ordered and idempotent, while old intermediate revisions are collapsed
-after a one-hour grace period; the newest snapshot or tombstone for every source
-is always retained, so a new or delayed coordinator can still rebuild its read
-model. Descriptor fields represented by typed source columns or source metadata
-are normalized at rest and reconstructed at the public contract boundary.
+Source deltas remain ordered and idempotent. Old intermediate revisions are
+collapsed after a one-hour grace period. A stable newest upsert is stored as a
+small reference to the authoritative `sources` row and expanded back to the
+same full public delta during replay; tombstones remain self-contained. A later
+source change removes the reference before writing its new delta, so a delayed
+coordinator cannot observe a stale snapshot. Descriptor fields represented by
+typed source columns or source metadata are normalized at rest and reconstructed
+at the public contract boundary.
 
-Logical compaction is resumable and runs in bounded worker batches. The
+Logical compaction is resumable and runs in exact bounded worker batches. The
+background worker defaults to five delta rows no more than once per 30 seconds
+and pauses under playback or critical resource pressure. Existing completed
+compaction checkpoints survive the reference-format upgrade instead of
+restarting the expensive source-descriptor pass. The
 `compact_storage` tool can advance the same checkpoint under explicit batch and
 wall-clock budgets while a long scan is active. `status` reports its phase,
 counters, SQLite free pages, and retained delta count.
@@ -143,7 +149,7 @@ rendition lifecycle rules are unchanged.
 
 ## Coordinator contract
 
-The coordinator pulls `adaos.media_library.source_delta.v1` records with an opaque cursor. Deltas are ordered per agent, source revisions are monotonic, and replay is idempotent. Every page also carries a compact authoritative library-state witness with root, source, available-source, active-job, and failed-job counts. A rolling-upgrade coordinator treats a page from an older agent as unknown state instead of inferring that the library is unconfigured. Folder segments are included in source metadata so search remains useful for numbered audiobook and album tracks. Derived rendition descriptors remain variants of the existing work and never become duplicate catalog rows. Node-local folder navigation is separately cursor-backed and never materializes an entire tree.
+The coordinator pulls `adaos.media_library.source_delta.v1` records with an opaque cursor. Deltas are ordered per agent, source revisions are monotonic, and replay is idempotent. Every page carries the compact library-state fields that can be read without a source-table scan: root, active-job, and failed-job counts. Source and available-source counts are omitted when unknown, so the coordinator retains its materialized counts instead of mistaking an unobserved value for an empty library. A rolling-upgrade coordinator applies the same unknown-state rule. Folder segments are included in source metadata so search remains useful for numbered audiobook and album tracks. Derived rendition descriptors remain variants of the existing work and never become duplicate catalog rows. Node-local folder navigation is separately cursor-backed and never materializes an entire tree.
 
 ## Distributed topology adapter
 

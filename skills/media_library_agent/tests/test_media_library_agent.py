@@ -73,8 +73,6 @@ def test_delta_pages_include_compact_authoritative_library_state(tmp_path):
 
     assert page["library_state"] == {
         "root_count": 1,
-        "source_count": 0,
-        "available_count": 0,
         "active_job_count": 0,
         "failed_job_count": 0,
     }
@@ -929,6 +927,68 @@ def test_storage_compaction_retains_latest_replayable_source_snapshot(tmp_path):
     assert page["items"][0]["source"]["descriptor"]["metadata"] == {
         "storage_mode": "reference"
     }
+    with repository.connect() as connection:
+        payload = connection.execute(
+            "SELECT payload_json FROM source_deltas"
+        ).fetchone()[0]
+    assert payload == '{"_media_library_source_reference":1}'
+
+    repository.upsert_source(
+        {**source_value, "metadata": {**source_value["metadata"], "album": "Newest"}},
+        job_id="job-3",
+    )
+    update = repository.pull_deltas(cursor=page["next_cursor"], limit=10)
+
+    assert len(update["items"]) == 1
+    assert update["items"][0]["source"]["metadata"]["album"] == "Newest"
+    with repository.connect() as connection:
+        payloads = connection.execute(
+            "SELECT payload_json FROM source_deltas ORDER BY sequence"
+        ).fetchall()
+    assert len(payloads) == 1
+    assert payloads[0][0] != '{"_media_library_source_reference":1}'
+
+
+def test_storage_compaction_preserves_completed_prior_revision(tmp_path):
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "compaction-revision.sqlite3", node_id="node-a"
+    )
+    with repository.connect() as connection:
+        connection.execute(
+            "INSERT OR REPLACE INTO agent_meta(key,value) VALUES (?,?)",
+            (
+                "storage_compaction_state",
+                '{"revision":"2026-08-25.1","phase":"steady",'
+                '"cursor":"","scanned":123,"updated":7,"deleted":5}',
+            ),
+        )
+        connection.commit()
+
+    result = repository.compact_storage_batch(limit=1)
+
+    assert result["revision"] == "2026-08-26.2"
+    assert result["phase"] == "steady"
+    assert result["scanned"] == 123
+    assert result["updated"] == 7
+    assert result["deleted"] == 5
+
+
+def test_worker_paces_storage_compaction(monkeypatch, tmp_path):
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "paced-compaction.sqlite3", node_id="node-a"
+    )
+    calls = []
+    monkeypatch.setattr(
+        repository,
+        "compact_storage_batch",
+        lambda *, limit: calls.append(limit) or {"complete": True},
+    )
+    worker = MediaLibraryAgentWorker(repository)
+
+    worker.run_once()
+    worker.run_once()
+
+    assert calls == [5]
 
 
 def test_storage_optimization_reports_settled_file_size(tmp_path):
