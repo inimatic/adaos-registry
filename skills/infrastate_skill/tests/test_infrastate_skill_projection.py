@@ -13,7 +13,9 @@ from uuid import uuid4
 
 import pytest
 
+from adaos.domain import Event
 from adaos.sdk.data.projections import clear_projection_demand
+from adaos.services.agent_context import get_ctx
 
 if "y_py" not in sys.modules:
     sys.modules["y_py"] = types.SimpleNamespace(
@@ -699,6 +701,30 @@ def test_infrastate_direct_marketplace_tool_returns_items(monkeypatch):
     ]
 
 
+def test_infrastate_first_snapshot_uses_retained_core_update_status() -> None:
+    get_ctx().bus.publish(
+        Event(
+            type="core.update.status",
+            payload={
+                "state": "preparing",
+                "phase": "prepare",
+                "prepare_elapsed_s": 42.0,
+            },
+            source="supervisor.event_bridge",
+            ts=10.0,
+        )
+    )
+
+    mod = _load_infrastate_module()
+
+    assert mod.read_core_update_status.__module__ == "adaos.sdk.status"
+    assert mod.read_core_update_status() == {
+        "state": "preparing",
+        "phase": "prepare",
+        "prepare_elapsed_s": 42.0,
+    }
+
+
 def test_infrastate_scenario_marketplace_does_not_build_skill_inventory(monkeypatch):
     mod = _load_infrastate_module()
 
@@ -1299,6 +1325,23 @@ def test_infrastate_supervisor_transition_note_covers_planned_and_subsequent_upd
     assert "subsequent transition queued" in planned["description"]
 
 
+def test_infrastate_supervisor_transition_note_exposes_prepare_progress():
+    mod = _load_infrastate_module()
+
+    preparing = mod._supervisor_transition_note(
+        {
+            "state": "preparing",
+            "phase": "prepare",
+            "message": "preparing inactive slot; worker active for 120s",
+            "prepare_elapsed_s": 120.0,
+            "prepare_timeout_sec": 3600.0,
+        }
+    )
+
+    assert preparing["status"] == "warn"
+    assert "worker active" in preparing["description"]
+
+
 def test_infrastate_highlight_changed_summary_text_marks_only_changed_segments():
     mod = _load_infrastate_module()
 
@@ -1600,6 +1643,14 @@ def test_infrastate_summary_buttons_include_defer_actions_for_planned(monkeypatc
     assert "cancel_update" in ids
 
 
+def test_infrastate_summary_buttons_allow_cancel_during_prepare():
+    mod = _load_infrastate_module()
+
+    buttons = mod._summary_buttons({"state": "preparing", "phase": "prepare"})
+
+    assert [item["id"] for item in buttons] == ["cancel_update"]
+
+
 def test_infrastate_step_items_include_supervisor_transition():
     mod = _load_infrastate_module()
 
@@ -1618,6 +1669,28 @@ def test_infrastate_step_items_include_supervisor_transition():
     supervisor_item = next(item for item in items if item["id"] == "supervisor_transition")
     assert supervisor_item["status"] == "warn"
     assert "root promotion" in supervisor_item["description"]
+
+
+def test_infrastate_step_items_include_prepare_timing():
+    mod = _load_infrastate_module()
+
+    items = mod._step_items(
+        {
+            "state": "preparing",
+            "phase": "prepare",
+            "message": "preparing inactive slot; worker active for 120s",
+            "target_rev": "rev2026",
+            "prepare_elapsed_s": 120.0,
+            "prepare_timeout_sec": 3600.0,
+        },
+        {"active_slot": "A", "previous_slot": "B"},
+        {"node_state": "ready", "reason": "runtime nominal"},
+        {"version": "0.1.941", "runtime_git_short_commit": "deadbee"},
+    )
+
+    by_id = {item["id"]: item for item in items}
+    assert by_id["prepare_elapsed"]["description"] == "120.0"
+    assert by_id["prepare_timeout"]["description"] == "3600.0"
 
 
 def test_infrastate_scenario_items_reconcile_sql_registry_to_local_runtime(monkeypatch, tmp_path: Path):

@@ -32,10 +32,10 @@ from adaos.sdk.data import (
     skill_memory_set,
 )
 from adaos.sdk.io import stream_publish
+from adaos.sdk.status import current_update_status as read_core_update_status
 from adaos.services.agent_context import get_ctx
 from adaos.services.core_slots import active_slot_manifest, slot_status
 from adaos.services.core_update import read_last_result as read_core_update_last_result
-from adaos.services.core_update import read_status as read_core_update_status
 from adaos.services import node_config as _node_config
 from adaos.sdk.manage import node as _sdk_node
 from adaos.services.realtime_sidecar import realtime_sidecar_diag_path, realtime_sidecar_enabled
@@ -6458,6 +6458,8 @@ def _step_items(status: dict[str, Any], slots_payload: dict[str, Any], lifecycle
         {"id": "commit", "title": "Runtime commit", "status": "idle", "description": str(build.get("runtime_git_short_commit") or build.get("git_short_sha") or "unknown")},
         {"id": "branch", "title": "Runtime branch", "status": "idle", "description": str(build.get("runtime_git_branch") or build.get("git_branch") or "unknown")},
         {"id": "target_rev", "title": "Target rev", "status": "idle", "description": str(status.get("target_rev") or "--")},
+        {"id": "prepare_elapsed", "title": "Prepare elapsed", "status": "idle", "description": str(status.get("prepare_elapsed_s") or "--")},
+        {"id": "prepare_timeout", "title": "Prepare timeout", "status": "idle", "description": str(status.get("prepare_timeout_sec") or "--")},
         {"id": "drain_timeout", "title": "Drain timeout", "status": "idle", "description": str(status.get("drain_timeout_sec") or "--")},
         {"id": "signal_delay", "title": "Signal delay", "status": "idle", "description": str(status.get("signal_delay_sec") or "--")},
         {"id": "command", "title": "Command", "status": "idle", "description": str(status.get("command") or "--")},
@@ -6510,7 +6512,7 @@ def _supervisor_transition_note(status: dict[str, Any]) -> dict[str, str]:
         if restored_slot:
             description += f" | restored slot {restored_slot}"
         return {"status": "warn", "description": description + suffix}
-    if state in {"countdown", "draining", "stopping", "restarting", "applying"}:
+    if state in {"preparing", "countdown", "draining", "stopping", "restarting", "applying"}:
         description = message or phase or state
         if state == "countdown" and scheduled_for > 0:
             description += f" | remaining={scheduled_for}s"
@@ -6527,7 +6529,7 @@ def _supervisor_transition_note(status: dict[str, Any]) -> dict[str, str]:
 def _summary_buttons(status: dict[str, Any]) -> list[dict[str, Any]]:
     state = str(status.get("state") or "")
     remaining_sec = _countdown_remaining_sec(status)
-    if state not in {"planned", "countdown", "draining", "stopping"}:
+    if state not in {"planned", "preparing", "countdown", "draining", "stopping"}:
         return []
     if remaining_sec <= 0 and state == "countdown":
         return []
@@ -9820,8 +9822,8 @@ def on_webspace_reload(evt: Any) -> None:
 @subscribe("subnet.member.update.result")
 @subscribe("subnet.stopping")
 @subscribe("subnet.stopped")
-@subscribe("core.update.status")
-@subscribe("hub.core_update.status")
+@subscribe("core.update.status", replay_latest=True)
+@subscribe("hub.core_update.status", replay_latest=True)
 @subscribe("node.names.changed")
 async def on_runtime_event(evt: Any) -> None:
     payload = getattr(evt, "payload", evt)
