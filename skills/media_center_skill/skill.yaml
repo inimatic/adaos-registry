@@ -462,6 +462,13 @@ tools:
   side_effects: none
   input_schema:
     type: object
+    properties:
+      include_facets:
+        type: boolean
+        default: false
+      include_exact_counts:
+        type: boolean
+        default: false
     additionalProperties: true
   output_schema:
     type: object

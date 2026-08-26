@@ -2676,16 +2676,33 @@ def set_favorite(item_id: str = "", favorite: bool = True, **_: Any) -> dict[str
 
 
 @tool(summary="Return compact media-center catalog status.", side_effects="none")
-def status(**_: Any) -> dict[str, Any]:
+def status(
+    include_facets: bool = False,
+    include_exact_counts: bool = False,
+    **_: Any,
+) -> dict[str, Any]:
     repo = _repository()
     catalog = _coordinator(repo)
     summary = repo.compact_summary()
+    facets = (
+        repo.facets()
+        if _bool(include_facets, False)
+        else {
+            "state": "deferred",
+            "media_kind": [],
+            "source": [],
+            "reason": "explicit_request_required",
+        }
+    )
     return {
         "ok": True,
         "schema": COORDINATOR_SCHEMA,
         "summary": summary,
-        "facets": repo.facets(),
-        "coordinator": catalog.diagnostics(summary=summary),
+        "facets": facets,
+        "coordinator": catalog.diagnostics(
+            summary=summary,
+            exact_counts=_bool(include_exact_counts, False),
+        ),
         "storage": catalog.storage_status(),
         "background_jobs": {
             "counts": catalog.background_job_counts(),

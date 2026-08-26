@@ -16,6 +16,12 @@ per-kind totals; recent operation rows and queue-migration progress remain
 exact. This prevents startup, reconnect, and operation widgets from scanning a
 large historical table while preserving observable forward progress.
 
+The default `status` tool is an interactive compact projection: catalog
+summary, storage, provider/runtime state, and bounded job witnesses do not
+materialize legacy facets or exact work/variant/collection counts. Operators
+may request `include_facets` or `include_exact_counts` explicitly for an
+offline diagnostic pass; UI polling never triggers those wide scans.
+
 `media_center_skill` is the logical Media Center coordinator. It owns the global catalog read model, work/variant/collection identity, profile-scoped favorites and resume state, bounded search, and playback planning. It does not walk filesystems or own source media.
 
 `media_library_agent` owns node-local roots and asynchronous scans. The coordinator invokes its public tools and consumes ordered `adaos.media_library.source_delta.v1` pages. The agent registers each source through `adaos.sdk.io.media.register_media_file`; only a root-bound reference is stored in `.adaos`, while media bytes stay at their original path.

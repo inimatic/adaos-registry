@@ -9074,21 +9074,25 @@ class MediaCatalogCoordinator:
         }
 
     def diagnostics(
-        self, *, summary: Mapping[str, Any] | None = None
+        self,
+        *,
+        summary: Mapping[str, Any] | None = None,
+        exact_counts: bool = False,
     ) -> dict[str, Any]:
         with self.repository.connect() as connection:
-            works = int(connection.execute("SELECT COUNT(*) FROM media_works").fetchone()[0])
-            variants = int(connection.execute("SELECT COUNT(*) FROM media_variants").fetchone()[0])
-            collections = int(connection.execute("SELECT COUNT(*) FROM media_collections").fetchone()[0])
-            jobs = {
-                str(row["status"]): int(row["count"])
-                for row in connection.execute(
-                    """
-                    SELECT status,COUNT(*) AS count FROM media_background_jobs
-                    GROUP BY status
-                    """
-                ).fetchall()
-            }
+            works = variants = collections = None
+            if exact_counts:
+                works = int(
+                    connection.execute("SELECT COUNT(*) FROM media_works").fetchone()[0]
+                )
+                variants = int(
+                    connection.execute("SELECT COUNT(*) FROM media_variants").fetchone()[0]
+                )
+                collections = int(
+                    connection.execute(
+                        "SELECT COUNT(*) FROM media_collections"
+                    ).fetchone()[0]
+                )
             agents = [
                 {
                     "agent_id": str(row["agent_id"]),
@@ -9106,6 +9110,7 @@ class MediaCatalogCoordinator:
                 ).fetchall()
             ]
             search_index = self._search_index_status_connection(connection)
+        jobs, _jobs_by_kind, job_count_state = self._background_job_count_snapshot()
         compact_summary = dict(summary or self.repository.compact_summary())
         # FTS5 COUNT(*) scans every indexed token payload and can take minutes
         # for large libraries. Search rows have a strict one-to-one catalog
@@ -9161,7 +9166,13 @@ class MediaCatalogCoordinator:
             )
         return {
             "ok": True, "schema": COORDINATOR_SCHEMA, "catalog_revision": self.catalog_revision(),
-            "counts": {"sources": compact_summary["total_count"], "works": works, "variants": variants, "collections": collections},
+            "counts": {
+                "sources": compact_summary["total_count"],
+                "works": works,
+                "variants": variants,
+                "collections": collections,
+            },
+            "counts_exact": bool(exact_counts),
             "participation": self.participation(),
             "budgets": {"catalog_page": MAX_PAGE_SIZE, "player_queue": 10, "agent_delta_page": 1000},
             "storage": {"media_bytes": "external", "catalog": "skill_local_relational"},
@@ -9173,6 +9184,7 @@ class MediaCatalogCoordinator:
                 "local_discovery_candidate_hard_maximum": 20000,
             },
             "background_jobs": jobs,
+            "background_job_count_state": job_count_state,
             "agents": agents,
             "repair_recommendations": recommendations[:30],
         }

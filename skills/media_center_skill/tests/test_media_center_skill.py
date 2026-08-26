@@ -2344,8 +2344,11 @@ def test_status_and_collection_state_avoid_wide_catalog_summary(monkeypatch, tmp
     assert compact["total_bytes_exact"] is False
     assert state["available_count"] == 1
     assert diagnostics["counts"]["sources"] == 1
+    assert diagnostics["counts"]["works"] is None
+    assert diagnostics["counts_exact"] is False
     assert result["summary"]["available_count"] == 1
     assert result["coordinator"]["counts"]["sources"] == 1
+    assert result["facets"]["state"] == "deferred"
     assert result["storage"]["db_bytes"] > 0
     assert result["background_jobs"]["counts_by_kind"]
 
@@ -5768,6 +5771,7 @@ def test_large_legacy_queue_uses_bounded_counts_and_resumable_reset(
         connection.commit()
 
     state = catalog.operation_state(limit=1)
+    diagnostics = catalog.diagnostics()
     compacted = catalog.compact_background_job_queue(batch_size=100)
 
     assert state["counts"]["queued"] == 256
@@ -5779,6 +5783,8 @@ def test_large_legacy_queue_uses_bounded_counts_and_resumable_reset(
         "by_kind": False,
         "index": {},
     }
+    assert diagnostics["background_job_count_state"]["scope"] == "active_sample"
+    assert diagnostics["background_jobs"]["queued"] == 256
     assert compacted["complete"] is False
     assert compacted["admission_paused"] is True
     assert compacted["state"]["scanned"] == 100
