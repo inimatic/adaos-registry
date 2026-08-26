@@ -14,7 +14,7 @@ from run_media_center_soak import _rss_window_summary, _warmup_duration, run  # 
 
 
 def test_short_soak_exercises_reads_during_agent_deltas() -> None:
-    result = run(count=500, duration_seconds=2, enforce=True)
+    result = run(count=500, duration_seconds=5, enforce=True)
 
     assert result["passed"] is True
     assert result["workload"]["agent_delta_items"] >= 25

@@ -380,8 +380,8 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.8.77",
-      "updated_at": "2026-08-26T04:31:29+00:00",
+      "version": "0.8.78",
+      "updated_at": "2026-08-26T12:15:00+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
       "source": {
@@ -445,8 +445,8 @@
       "kind": "skill",
       "id": "media_library_agent",
       "name": "media_library_agent",
-      "version": "0.6.40",
-      "updated_at": "2026-08-26T04:30:33+00:00",
+      "version": "0.6.41",
+      "updated_at": "2026-08-26T12:15:00+00:00",
       "path": "skills/media_library_agent",
       "manifest": "skills/media_library_agent/skill.yaml",
       "source": {

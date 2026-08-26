@@ -6,10 +6,10 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-The unreleased 2026-08-25 local candidate combines
-`media_center_skill@0.8.76`, `media_library_agent@0.6.39`,
-`media_control_skill@0.2.11`, scenario `media_center@0.6.25`, and client
-`dfe90cd`. It adds durable queue auto-advance and endpoint selection, compact
+The unreleased 2026-08-26 local candidate combines
+`media_center_skill@0.8.78`, `media_library_agent@0.6.41`,
+`media_control_skill@0.2.12`, scenario `media_center@0.6.26`, and client
+`99b65f3`. It adds durable queue auto-advance and endpoint selection, compact
 fullscreen/PiP/Play On controls, playlists, reviewed metadata correction,
 provider rejection, source identity and compact live rendition history. Requested
 browser conversion preempts scans at file boundaries, unsafe unprobed AVI
@@ -22,6 +22,15 @@ embedded tags are backfilled before automatic artwork work, and MusicBrainz
 does not consume its network budget on recognized audiobook chapters. This is
 local validation evidence only; no ProjectRelease or stand acceptance is
 claimed.
+
+Existing large coordinator databases activate without synchronous FTS,
+projection, favorite, or background-history rebuilds. A single paced
+maintenance lane advances durable search, logical-storage, and legacy-job
+checkpoints; old queued work is reset by bounded rowid pages before admission
+resumes. Operation queries use indexed joins and publish an explicit capped
+lower bound until the historical `(kind,status)` index can be created cheaply.
+The `.30` catalog with 424,514 historical jobs therefore remains searchable and
+observable while migration proceeds instead of blocking API startup.
 
 The same candidate adds per-root derived-storage policy. Converted single-file
 renditions default to an atomic content-addressed `.adaos-media` store on the
