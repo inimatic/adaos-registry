@@ -1,5 +1,5 @@
 name: root_mgmnt
-version: 0.5.1
+version: 0.5.2
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -58,7 +58,9 @@ tools:
     type: object
     properties:
       webspace_id:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
   output_schema:
     type: object
 - name: dispose
@@ -81,13 +83,16 @@ tools:
     type: object
     properties: {}
 - name: refresh_snapshot
-  description: Force-refresh the root snapshot and update its Yjs projection only when data changed.
+  description: Force-refresh the root snapshot and update its Yjs projection only
+    when data changed.
   entry: handlers.main:refresh_snapshot
   input_schema:
     type: object
     properties:
       webspace_id:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
   output_schema:
     type: object
     properties: {}
@@ -293,5 +298,13 @@ tools:
   output_schema:
     type: object
     properties: {}
-updated_at: '2026-07-24T09:15:00+00:00'
+updated_at: '2026-08-26T06:42:32+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.941+5690.16e2b588
+    recorded_at: '2026-08-26T06:42:32+00:00'
+    source: skill_push
+    min_commit: 16e2b58881d9d02221b514b6d95f5f23b52ead1c
+    min_short_commit: 16e2b588
+    build_date: '2026-08-26T09:37:55+03:00'
 

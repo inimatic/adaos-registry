@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-26T04:31:52+00:00",
+  "updated_at": "2026-08-26T06:42:32+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -867,8 +867,8 @@
       "kind": "skill",
       "id": "root_mgmnt",
       "name": "root_mgmnt",
-      "version": "0.5.1",
-      "updated_at": "2026-07-24T09:15:00+00:00",
+      "version": "0.5.2",
+      "updated_at": "2026-08-26T06:42:32+00:00",
       "path": "skills/root_mgmnt",
       "manifest": "skills/root_mgmnt/skill.yaml",
       "source": {
