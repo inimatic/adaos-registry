@@ -4008,6 +4008,7 @@ def test_infrastate_runtime_event_invalidates_snapshot_cache(monkeypatch):
     mod = _load_infrastate_module()
     invalidated: list[str | None] = []
     scheduled: list[dict[str, object]] = []
+    scheduler_threads: list[int] = []
     appended: list[str] = []
 
     monkeypatch.setattr(
@@ -4019,11 +4020,15 @@ def test_infrastate_runtime_event_invalidates_snapshot_cache(monkeypatch):
     monkeypatch.setattr(
         mod,
         "_schedule_snapshot_refresh",
-        lambda **kwargs: scheduled.append(dict(kwargs)),
+        lambda **kwargs: (
+            scheduler_threads.append(threading.get_ident()),
+            scheduled.append(dict(kwargs)),
+        ),
     )
 
-    asyncio.run(
-        mod.on_runtime_event(
+    async def _run() -> int:
+        loop_thread_id = threading.get_ident()
+        await mod.on_runtime_event(
             SimpleNamespace(
                 type="core.update.status",
                 payload={
@@ -4033,11 +4038,14 @@ def test_infrastate_runtime_event_invalidates_snapshot_cache(monkeypatch):
                 },
             )
         )
-    )
+        return loop_thread_id
+
+    loop_thread_id = asyncio.run(_run())
 
     assert invalidated == ["default"]
     assert appended == ["core.update.status"]
     assert scheduled == [{"webspace_id": "default", "reason": "core.update.status.terminal"}]
+    assert scheduler_threads == [loop_thread_id]
 
 
 def test_infrastate_sys_ready_defers_first_paint_refresh(monkeypatch):

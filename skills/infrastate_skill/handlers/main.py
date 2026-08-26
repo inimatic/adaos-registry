@@ -9890,8 +9890,7 @@ async def on_runtime_event(evt: Any) -> None:
         ) + 1
         _projection_diag["last_lifecycle_refresh_event"] = event_type
         _projection_diag["last_lifecycle_refresh_deferred_at"] = time.time()
-        await asyncio.to_thread(
-            _schedule_snapshot_refresh,
+        _schedule_snapshot_refresh(
             webspace_id=webspace_id,
             reason=(f"{event_type}.terminal" if terminal_core_update else event_type),
         )
