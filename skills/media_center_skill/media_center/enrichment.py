@@ -927,6 +927,7 @@ class MediaEnrichmentWorker:
         work_interval_seconds: float = 0.2,
         publish_interval_seconds: float = 2.0,
         maintenance_interval_jobs: int = 100,
+        maintenance_interval_seconds: float = 5.0,
         provider_configuration: Iterable[Mapping[str, Any]] | None = None,
         artwork_cache: ExternalArtworkCache | None = None,
     ):
@@ -941,6 +942,9 @@ class MediaEnrichmentWorker:
         )
         self.maintenance_interval_jobs = max(
             100, min(int(maintenance_interval_jobs), 10000)
+        )
+        self.maintenance_interval_seconds = max(
+            1.0, min(float(maintenance_interval_seconds), 60.0)
         )
         self.provider_configuration = tuple(
             dict(item) for item in (provider_configuration or ())
@@ -958,9 +962,14 @@ class MediaEnrichmentWorker:
         self._last_loop_error_at = 0.0
         self._storage_maintenance_complete = False
         self._storage_maintenance_state: dict[str, Any] = {}
+        self._search_index_complete = False
+        self._search_index_state: dict[str, Any] = {}
         self._queue_compaction_complete = False
+        self._queue_admission_paused = True
         self._queue_maintenance_state: dict[str, Any] = {}
         self._last_admission_monotonic = 0.0
+        self._last_maintenance_monotonic = 0.0
+        self._maintenance_lane = 0
 
     def ensure_started(self) -> bool:
         with self._lock:
@@ -996,25 +1005,19 @@ class MediaEnrichmentWorker:
         )
         if callable(maintenance_active) and maintenance_active():
             return None
-        maintenance = getattr(self.coordinator, "compact_storage_batch", None)
-        if callable(maintenance) and not self._storage_maintenance_complete:
-            compacted = maintenance(limit=250)
-            if isinstance(compacted, Mapping):
-                self._storage_maintenance_state = dict(compacted)
-                self._storage_maintenance_complete = bool(compacted.get("complete"))
-        queue_compaction = getattr(
-            self.coordinator, "compact_background_job_queue", None
-        )
-        if callable(queue_compaction) and not self._queue_compaction_complete:
-            compacted_queue = queue_compaction(batch_size=5000)
-            if isinstance(compacted_queue, Mapping):
-                self._queue_maintenance_state["compaction"] = dict(compacted_queue)
-                self._queue_compaction_complete = bool(
-                    compacted_queue.get("complete")
-                )
+        maintenance_at = time.monotonic()
+        if (
+            self._last_maintenance_monotonic == 0.0
+            or maintenance_at - self._last_maintenance_monotonic
+            >= self.maintenance_interval_seconds
+        ):
+            self._run_maintenance_lane()
+            self._last_maintenance_monotonic = time.monotonic()
+        if self._queue_admission_paused:
+            return None
         refill = getattr(self.coordinator, "refill_background_job_windows", None)
         admission_at = time.monotonic()
-        if callable(refill) and (
+        if callable(refill) and not self._queue_admission_paused and (
             self._last_admission_monotonic == 0.0
             or admission_at - self._last_admission_monotonic >= 2.0
         ):
@@ -1176,6 +1179,63 @@ class MediaEnrichmentWorker:
                 pass
         return result
 
+    def _run_maintenance_lane(self) -> None:
+        if self._queue_admission_paused:
+            self._run_queue_maintenance(batch_size=1000)
+            return
+        lanes = (
+            "search_index",
+            "storage_compaction",
+            "background_history",
+        )
+        for _attempt in lanes:
+            lane = lanes[self._maintenance_lane % len(lanes)]
+            self._maintenance_lane = (self._maintenance_lane + 1) % len(lanes)
+            if lane == "search_index":
+                if self._search_index_complete:
+                    continue
+                maintenance = getattr(
+                    self.coordinator, "compact_search_index_batch", None
+                )
+                if not callable(maintenance):
+                    self._search_index_complete = True
+                    continue
+                state = maintenance(limit=100)
+                if isinstance(state, Mapping):
+                    self._search_index_state = dict(state)
+                    self._search_index_complete = bool(state.get("complete"))
+                return
+            if lane == "storage_compaction":
+                if self._storage_maintenance_complete:
+                    continue
+                maintenance = getattr(self.coordinator, "compact_storage_batch", None)
+                if not callable(maintenance):
+                    self._storage_maintenance_complete = True
+                    continue
+                state = maintenance(limit=1)
+                if isinstance(state, Mapping):
+                    self._storage_maintenance_state = dict(state)
+                    self._storage_maintenance_complete = bool(state.get("complete"))
+                return
+            if self._queue_compaction_complete:
+                continue
+            self._run_queue_maintenance(batch_size=250)
+            return
+
+    def _run_queue_maintenance(self, *, batch_size: int) -> None:
+        maintenance = getattr(
+            self.coordinator, "compact_background_job_queue", None
+        )
+        if not callable(maintenance):
+            self._queue_compaction_complete = True
+            self._queue_admission_paused = False
+            return
+        state = maintenance(batch_size=batch_size)
+        if isinstance(state, Mapping):
+            self._queue_maintenance_state["compaction"] = dict(state)
+            self._queue_compaction_complete = bool(state.get("complete"))
+            self._queue_admission_paused = bool(state.get("admission_paused"))
+
     def status(self) -> dict[str, Any]:
         with self._lock:
             thread = self._thread
@@ -1183,6 +1243,7 @@ class MediaEnrichmentWorker:
             last_loop_error = self._last_loop_error
             last_loop_error_at = self._last_loop_error_at
             storage_maintenance = dict(self._storage_maintenance_state)
+            search_index = dict(self._search_index_state)
         providers = []
         for provider in self.providers:
             status = getattr(provider, "status", None)
@@ -1219,11 +1280,14 @@ class MediaEnrichmentWorker:
             "poll_seconds": self.poll_seconds,
             "work_interval_seconds": self.work_interval_seconds,
             "publish_interval_seconds": self.publish_interval_seconds,
+            "maintenance_interval_seconds": self.maintenance_interval_seconds,
             "loop_failure_count": loop_failure_count,
             "last_error": last_loop_error,
             "last_error_at": last_loop_error_at,
             "storage_maintenance": storage_maintenance,
+            "search_index": search_index,
             "queue_maintenance": dict(self._queue_maintenance_state),
+            "background_admission_paused": self._queue_admission_paused,
         }
 
     def _loop(self) -> None:

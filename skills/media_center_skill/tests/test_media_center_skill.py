@@ -1047,15 +1047,17 @@ def test_storage_compaction_is_bounded_resumable_and_preserves_public_metadata(
         )
         connection.commit()
 
-    first = catalog.compact_storage_batch(limit=10)
-    second = catalog.compact_storage_batch(limit=10)
+    batches = [catalog.compact_storage_batch(limit=10)]
+    while not batches[-1]["complete"]:
+        batches.append(catalog.compact_storage_batch(limit=10))
     details = catalog.item_details(item["id"])["item"]
     storage = catalog.storage_status()
 
-    assert first["phase"] == "projection"
-    assert first["batch_scanned"] == 1
-    assert second["complete"] is True
-    assert second["batch_scanned"] == 1
+    assert batches[-1]["complete"] is True
+    assert all(batch["batch_scanned"] <= 10 for batch in batches)
+    assert {"variants", "catalog", "projection_backfill", "projection"} & {
+        batch["phase"] for batch in batches
+    }
     assert storage["logical_compaction"]["phase"] == "complete"
     assert details["metadata"]["title"] == "Legacy"
     assert details["metadata"]["overview"] == "Preserved"
@@ -2384,7 +2386,15 @@ def test_search_rowid_migration_rebuilds_legacy_fts_rows(monkeypatch, tmp_path):
         )
         connection.commit()
 
-    MediaCatalogCoordinator(repository)
+    migrated = MediaCatalogCoordinator(repository)
+    pending = migrated.search_index_status()
+    assert pending["phase"] == "pending"
+    assert pending["partial"] is True
+    assert migrated.list_items(query="Example", media_kind="video")["count"] == 1
+    while True:
+        batch = migrated.compact_search_index_batch(limit=10)
+        if batch["complete"]:
+            break
     with repository.connect() as connection:
         catalog_rowid = int(
             connection.execute(
@@ -2420,6 +2430,79 @@ def test_current_search_schema_preserves_completed_rowid_revision(monkeypatch, t
         ).fetchone()[0]
 
     assert after == before
+
+
+def test_legacy_search_schema_is_deferred_and_rebuilt_in_bounded_batches(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    repository = MediaCenterRepository()
+    catalog = MediaCatalogCoordinator(repository)
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Movies/Example/movie.mp4", kind="video"))
+    )
+    with repository.connect() as connection:
+        connection.executescript(
+            """
+            DROP TRIGGER IF EXISTS catalog_items_search_ai;
+            DROP TRIGGER IF EXISTS catalog_items_search_ad;
+            DROP TRIGGER IF EXISTS catalog_items_search_au;
+            DROP TABLE catalog_search;
+            DROP TABLE catalog_fuzzy_search;
+            CREATE VIRTUAL TABLE catalog_search USING fts5(
+                item_id UNINDEXED,text,
+                tokenize='unicode61 remove_diacritics 2'
+            );
+            CREATE VIRTUAL TABLE catalog_fuzzy_search USING fts5(
+                item_id UNINDEXED,tokens,tokenize='unicode61'
+            );
+            INSERT INTO catalog_search(item_id,text)
+                SELECT id,search_text FROM catalog_items;
+            INSERT INTO catalog_fuzzy_search(item_id,tokens)
+                SELECT id,fuzzy_text FROM catalog_items;
+            UPDATE coordinator_meta SET value='legacy'
+                WHERE key='coordinator_schema_revision';
+            INSERT OR REPLACE INTO coordinator_meta(key,value)
+                VALUES ('search_rowid_revision','1');
+            """
+        )
+        connection.commit()
+
+    statements: list[str] = []
+    original_connect = repository.connect
+
+    def traced_connect():
+        connection = original_connect()
+        connection.set_trace_callback(statements.append)
+        return connection
+
+    monkeypatch.setattr(repository, "connect", traced_connect)
+    migrated = MediaCatalogCoordinator(repository)
+
+    assert migrated.search_index_status()["phase"] == "pending"
+    assert migrated.list_items(query="Example", media_kind="video")["count"] == 1
+    activation_sql = "\n".join(statements).lower()
+    assert "drop table catalog_search" not in activation_sql
+    assert "alter table catalog_search" not in activation_sql
+
+    first = migrated.compact_search_index_batch(limit=10)
+    assert first["migrated_tables"] == [
+        "catalog_search_legacy_1",
+        "catalog_fuzzy_search_legacy_1",
+    ]
+    partial_search = migrated.list_items(
+        query="Example", media_kind="video", limit=10
+    )
+    assert partial_search["count"] == 1
+    assert partial_search["ranking"]["version"] == "legacy-fts-fallback-v1"
+    while not first["complete"]:
+        first = migrated.compact_search_index_batch(limit=10)
+    assert migrated.search_index_status()["ready"] is True
+    with repository.connect() as connection:
+        assert connection.execute(
+            "SELECT rowid FROM catalog_search "
+            "WHERE catalog_search MATCH 'example*'"
+        ).fetchone() is not None
 
 
 def test_media_topology_uses_public_sdk_and_builds_safe_default_placement(monkeypatch):
@@ -5662,6 +5745,71 @@ def test_background_queue_compaction_preserves_window_and_cursor_refill(
     ] <= 32
 
 
+def test_large_legacy_queue_uses_bounded_counts_and_resumable_reset(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    repository = MediaCenterRepository()
+    catalog = MediaCatalogCoordinator(repository)
+    with repository.connect() as connection:
+        now = catalog_module.now_iso()
+        connection.executemany(
+            "INSERT INTO media_background_jobs("
+            "id,kind,subject_ref,status,priority,created_at,updated_at"
+            ") VALUES (?, 'metadata_enrichment', ?, 'queued', 900, ?, ?)",
+            (
+                (f"legacy-{index}", f"item:legacy-{index}", now, now)
+                for index in range(6001)
+            ),
+        )
+        connection.execute("DROP INDEX idx_media_center_background_kind_status")
+        connection.commit()
+
+    state = catalog.operation_state(limit=1)
+    compacted = catalog.compact_background_job_queue(batch_size=100)
+
+    assert state["counts"]["queued"] == 256
+    assert state["count_state"] | {"index": {}} == {
+        "complete": False,
+        "scope": "active_sample",
+        "lower_bound": True,
+        "sample_limit": 256,
+        "by_kind": False,
+        "index": {},
+    }
+    assert compacted["complete"] is False
+    assert compacted["admission_paused"] is True
+    assert compacted["state"]["scanned"] == 100
+    assert compacted["removed"]["legacy_queued"] == 100
+
+
+def test_enrichment_maintenance_runs_one_bounded_lane_per_tick():
+    calls = []
+
+    class Coordinator:
+        def compact_search_index_batch(self, *, limit):
+            calls.append(("search", limit))
+            return {"complete": False}
+
+        def compact_storage_batch(self, *, limit):
+            calls.append(("storage", limit))
+            return {"complete": False}
+
+        def compact_background_job_queue(self, *, batch_size):
+            calls.append(("queue", batch_size))
+            return {"complete": True, "admission_paused": False}
+
+    worker = MediaEnrichmentWorker(Coordinator())
+
+    worker._run_maintenance_lane()
+    worker._run_maintenance_lane()
+    worker._run_maintenance_lane()
+
+    assert calls == [("queue", 1000), ("search", 100), ("storage", 1)]
+
+
 def test_enrichment_worker_runs_all_eligible_providers(monkeypatch, tmp_path):
     class ExternalProvider:
         provider_id = "test.external.v1"
@@ -5928,6 +6076,18 @@ def test_background_job_indexes_recovery_and_exact_active_count(monkeypatch, tmp
                 """
             ).fetchall()
         )
+        operations_join_plan = " ".join(
+            str(row["detail"])
+            for row in connection.execute(
+                """
+                EXPLAIN QUERY PLAN
+                SELECT j.id,c.title
+                FROM media_background_jobs j
+                LEFT JOIN catalog_items c ON c.id=substr(j.subject_ref,6)
+                ORDER BY j.updated_at DESC,j.id DESC LIMIT 30
+                """
+            ).fetchall()
+        )
         migration_plan = " ".join(
             str(row["detail"])
             for row in connection.execute(
@@ -5957,6 +6117,7 @@ def test_background_job_indexes_recovery_and_exact_active_count(monkeypatch, tmp
     } <= indexes
     assert "idx_media_center_background_claim" in claim_plan
     assert "idx_media_center_background_recent" in recent_plan
+    assert "sqlite_autoindex_catalog_items_1" in operations_join_plan
     assert "sqlite_autoindex_catalog_items_1" in migration_plan
     assert state["counts_by_kind"]["metadata_enrichment"]["queued"] >= 1
     assert state["storage"]["allocated_bytes"] >= state["storage"]["db_bytes"]

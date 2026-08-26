@@ -80,7 +80,7 @@ def test_enrichment_worker_projects_cached_artwork_set(tmp_path):
             return False
 
         def compact_storage_batch(self, *, limit):
-            assert limit == 250
+            assert limit == 1
             return {"complete": True}
 
         def claim_background_job(self):

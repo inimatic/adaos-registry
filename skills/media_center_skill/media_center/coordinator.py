@@ -33,9 +33,12 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-25.8"
+COORDINATOR_SCHEMA_REVISION = "2026-08-26.1"
 SEARCH_ROWID_REVISION = "2"
-STORAGE_COMPACTION_REVISION = "2026-08-25.1"
+SEARCH_INDEX_PHASE_KEY = "search_index_phase"
+SEARCH_INDEX_CURSOR_KEY = "search_index_cursor"
+SEARCH_INDEX_COUNT_KEY = "search_index_count"
+STORAGE_COMPACTION_REVISION = "2026-08-26.2"
 METADATA_SETTINGS_KEY = "metadata_provider_settings"
 DEFAULT_METADATA_SETTINGS = {
     "external_enabled": True,
@@ -743,28 +746,47 @@ class MediaCatalogCoordinator:
                 "CREATE INDEX IF NOT EXISTS idx_media_center_background_recent "
                 "ON media_background_jobs(updated_at DESC,id DESC)"
             )
-            connection.execute(
-                "CREATE INDEX IF NOT EXISTS idx_media_center_background_kind_status "
-                "ON media_background_jobs(kind,status,updated_at DESC,id DESC)"
+            background_index = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='index' "
+                "AND name='idx_media_center_background_kind_status'"
+            ).fetchone()
+            background_max_rowid = int(
+                connection.execute(
+                    "SELECT COALESCE(MAX(rowid),0) FROM media_background_jobs"
+                ).fetchone()[0]
             )
-            # The base variant and catalog row describe the same exact source.
-            # Keep only derived descriptors here; playback_plan already falls
-            # back to catalog_items for the base descriptor.
+            if background_index is None and background_max_rowid <= 50_000:
+                connection.execute(
+                    "CREATE INDEX idx_media_center_background_kind_status "
+                    "ON media_background_jobs(kind,status,updated_at DESC,id DESC)"
+                )
+                background_index = True
             connection.execute(
-                "UPDATE media_variants SET descriptor_json='{}' "
-                "WHERE derived=0 AND descriptor_json<>'{}'"
+                "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (
+                    "background_kind_status_index_state",
+                    _json_dumps(
+                        {
+                            "state": "ready" if background_index else "pending",
+                            "max_rowid": background_max_rowid,
+                            "reason": "" if background_index else "large_table_deferred",
+                        }
+                    ),
+                ),
             )
             connection.execute(
-                """
-                UPDATE media_background_jobs
-                SET priority=CASE
-                    WHEN EXISTS (
-                        SELECT 1 FROM catalog_items c
-                        WHERE c.id=substr(media_background_jobs.subject_ref,6)
-                          AND c.media_kind='audio'
-                    ) THEN 150 ELSE 200 END
-                WHERE kind='metadata_enrichment' AND status='queued'
-                """
+                "INSERT OR IGNORE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (
+                    "base_variant_descriptor_backfill_state",
+                    _json_dumps({"state": "pending", "cursor": ""}),
+                ),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (
+                    "background_priority_backfill_state",
+                    _json_dumps({"state": "pending", "cursor": 0}),
+                ),
             )
             alias_columns = {
                 str(row["name"])
@@ -821,7 +843,7 @@ class MediaCatalogCoordinator:
                     connection.execute(
                         f"ALTER TABLE agent_catalog_state ADD COLUMN {name} {definition}"
                     )
-            self._ensure_compact_search_schema(connection)
+            search_schema_current = self._ensure_compact_search_schema(connection)
             now = now_iso()
             default_profiles = (
                 ("default", "Personal", "personal", _default_profile_policy()),
@@ -845,13 +867,11 @@ class MediaCatalogCoordinator:
                 ],
             )
             connection.execute(
-                """
-                INSERT OR IGNORE INTO personal_media_state(
-                    profile_id,item_id,favorite,updated_at
-                )
-                SELECT 'default',id,1,? FROM catalog_items WHERE favorite=1
-                """,
-                (now,),
+                "INSERT OR IGNORE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (
+                    "legacy_favorite_backfill_state",
+                    _json_dumps({"state": "pending", "cursor": ""}),
+                ),
             )
             for profile_row in connection.execute(
                 "SELECT id,kind,policy_json FROM media_profiles"
@@ -966,31 +986,73 @@ class MediaCatalogCoordinator:
                 [(now, legacy_id) for legacy_id in legacy_aliases],
             )
             retired_legacy_count = len(legacy_aliases)
-            self._rebuild_folder_nodes(connection)
-            self._backfill_search(connection)
-            self._ensure_search_rowids(connection)
-            self._ensure_search_triggers(connection)
-            self._backfill_metadata_projections(connection)
+            folder_projection_present = connection.execute(
+                "SELECT 1 FROM catalog_folder_nodes LIMIT 1"
+            ).fetchone() is not None
+            folder_source_present = connection.execute(
+                "SELECT 1 FROM catalog_items "
+                "WHERE missing=0 AND folder_path<>'' LIMIT 1"
+            ).fetchone() is not None
             connection.execute(
-                """
-                UPDATE media_background_jobs
-                SET status='queued',attempts=0,provider_id='',started_at='',
-                    finished_at='',error_code='',
-                    progress_json='{"phase":"queued","completed":0,"total":1}',
-                    updated_at=?
-                WHERE kind='metadata_enrichment' AND status='completed'
-                    AND provider_id LIKE '%media_center.musicbrainz.v1%'
-                    AND subject_ref IN (
-                        SELECT 'item:' || c.id FROM catalog_items c
-                        WHERE c.media_kind='audio' AND c.missing=0
-                            AND NOT EXISTS (
-                                SELECT 1 FROM catalog_metadata_facets facet
-                                WHERE facet.item_id=c.id
-                                    AND facet.field_name='genre'
-                            )
-                    )
-                """,
-                (now,),
+                "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (
+                    "folder_projection_state",
+                    _json_dumps(
+                        {
+                            "state": (
+                                "ready"
+                                if folder_projection_present or not folder_source_present
+                                else "pending"
+                            ),
+                            "reason": (
+                                ""
+                                if folder_projection_present or not folder_source_present
+                                else "projection_missing"
+                            ),
+                        }
+                    ),
+                ),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (
+                    "search_text_backfill_state",
+                    _json_dumps({"state": "pending", "cursor": ""}),
+                ),
+            )
+            self._ensure_search_rowids(
+                connection, search_schema_current=search_schema_current
+            )
+            if search_schema_current:
+                self._ensure_search_triggers(connection)
+            projection_present = connection.execute(
+                "SELECT 1 FROM catalog_metadata_projection LIMIT 1"
+            ).fetchone() is not None
+            catalog_present = connection.execute(
+                "SELECT 1 FROM catalog_items LIMIT 1"
+            ).fetchone() is not None
+            connection.execute(
+                "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (
+                    "metadata_projection_backfill_state",
+                    _json_dumps(
+                        {
+                            "state": (
+                                "ready"
+                                if projection_present or not catalog_present
+                                else "pending"
+                            ),
+                            "cursor": "",
+                        }
+                    ),
+                ),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (
+                    "musicbrainz_genre_requeue_state",
+                    _json_dumps({"state": "pending", "cursor": 0}),
+                ),
             )
             connection.execute(
                 "INSERT OR REPLACE INTO coordinator_meta(key, value) "
@@ -1653,15 +1715,8 @@ class MediaCatalogCoordinator:
         }
 
     @staticmethod
-    def _ensure_compact_search_schema(connection: sqlite3.Connection) -> None:
-        connection.executescript(
-            """
-            DROP TRIGGER IF EXISTS catalog_items_search_ai;
-            DROP TRIGGER IF EXISTS catalog_items_search_ad;
-            DROP TRIGGER IF EXISTS catalog_items_search_au;
-            """
-        )
-        definitions = {
+    def _search_table_definitions(connection: sqlite3.Connection) -> dict[str, str]:
+        return {
             str(row["name"]): str(row["sql"] or "").lower()
             for row in connection.execute(
                 "SELECT name,sql FROM sqlite_master "
@@ -1669,6 +1724,10 @@ class MediaCatalogCoordinator:
                 "('catalog_search','catalog_fuzzy_search')"
             ).fetchall()
         }
+
+    @classmethod
+    def _search_schema_current(cls, connection: sqlite3.Connection) -> bool:
+        definitions = cls._search_table_definitions(connection)
         main_current = all(
             token in definitions.get("catalog_search", "")
             for token in ("content='catalog_items'", "content_rowid='rowid'")
@@ -1682,11 +1741,21 @@ class MediaCatalogCoordinator:
                 "tokenize='trigram'",
             )
         )
-        if not (main_current and fuzzy_current):
+        return main_current and fuzzy_current
+
+    @classmethod
+    def _ensure_compact_search_schema(cls, connection: sqlite3.Connection) -> bool:
+        connection.executescript(
+            """
+            DROP TRIGGER IF EXISTS catalog_items_search_ai;
+            DROP TRIGGER IF EXISTS catalog_items_search_ad;
+            DROP TRIGGER IF EXISTS catalog_items_search_au;
+            """
+        )
+        definitions = cls._search_table_definitions(connection)
+        if not definitions:
             connection.executescript(
                 """
-                DROP TABLE IF EXISTS catalog_search;
-                DROP TABLE IF EXISTS catalog_fuzzy_search;
                 CREATE VIRTUAL TABLE catalog_search USING fts5(
                     search_text,
                     content='catalog_items',
@@ -1701,23 +1770,73 @@ class MediaCatalogCoordinator:
                 );
                 """
             )
-            connection.execute(
-                "DELETE FROM coordinator_meta WHERE key='search_rowid_revision'"
+            has_catalog_rows = connection.execute(
+                "SELECT 1 FROM catalog_items LIMIT 1"
+            ).fetchone() is not None
+            phase = "pending" if has_catalog_rows else "complete"
+            if has_catalog_rows:
+                connection.execute(
+                    "DELETE FROM coordinator_meta WHERE key='search_rowid_revision'"
+                )
+            else:
+                connection.execute(
+                    "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                    ("search_rowid_revision", SEARCH_ROWID_REVISION),
+                )
+            connection.executemany(
+                "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (
+                    (SEARCH_INDEX_PHASE_KEY, phase),
+                    (SEARCH_INDEX_CURSOR_KEY, "0"),
+                    (SEARCH_INDEX_COUNT_KEY, "0"),
+                ),
             )
+            return True
+        current = cls._search_schema_current(connection)
+        marker = connection.execute(
+            "SELECT value FROM coordinator_meta WHERE key='search_rowid_revision'"
+        ).fetchone()
+        complete = bool(
+            current and marker and str(marker["value"]) == SEARCH_ROWID_REVISION
+        )
+        phase = "complete" if complete else "pending"
+        connection.execute(
+            "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+            (SEARCH_INDEX_PHASE_KEY, phase),
+        )
+        if not complete:
+            connection.executemany(
+                "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (
+                    (SEARCH_INDEX_CURSOR_KEY, "0"),
+                    (SEARCH_INDEX_COUNT_KEY, "0"),
+                ),
+            )
+        return current
 
     @staticmethod
     def _ensure_search_triggers(connection: sqlite3.Connection) -> None:
         connection.executescript(
             """
             CREATE TRIGGER IF NOT EXISTS catalog_items_search_ai
-            AFTER INSERT ON catalog_items BEGIN
+            AFTER INSERT ON catalog_items
+            WHEN COALESCE((SELECT value FROM coordinator_meta
+                    WHERE key='search_index_phase'),'pending')='complete'
+                OR new.rowid<=CAST(COALESCE((SELECT value FROM coordinator_meta
+                    WHERE key='search_index_cursor'),'0') AS INTEGER)
+            BEGIN
                 INSERT INTO catalog_search(rowid,search_text)
                     VALUES (new.rowid,new.search_text);
                 INSERT INTO catalog_fuzzy_search(rowid,fuzzy_text)
                     VALUES (new.rowid,new.fuzzy_text);
             END;
             CREATE TRIGGER IF NOT EXISTS catalog_items_search_ad
-            AFTER DELETE ON catalog_items BEGIN
+            AFTER DELETE ON catalog_items
+            WHEN COALESCE((SELECT value FROM coordinator_meta
+                    WHERE key='search_index_phase'),'pending')='complete'
+                OR old.rowid<=CAST(COALESCE((SELECT value FROM coordinator_meta
+                    WHERE key='search_index_cursor'),'0') AS INTEGER)
+            BEGIN
                 INSERT INTO catalog_search(catalog_search,rowid,search_text)
                     VALUES ('delete',old.rowid,old.search_text);
                 INSERT INTO catalog_fuzzy_search(
@@ -1726,8 +1845,15 @@ class MediaCatalogCoordinator:
             END;
             CREATE TRIGGER IF NOT EXISTS catalog_items_search_au
             AFTER UPDATE OF search_text,fuzzy_text ON catalog_items
-            WHEN old.search_text<>new.search_text
-                OR old.fuzzy_text<>new.fuzzy_text BEGIN
+            WHEN (old.search_text<>new.search_text
+                    OR old.fuzzy_text<>new.fuzzy_text)
+                AND (
+                    COALESCE((SELECT value FROM coordinator_meta
+                        WHERE key='search_index_phase'),'pending')='complete'
+                    OR old.rowid<=CAST(COALESCE((SELECT value FROM coordinator_meta
+                        WHERE key='search_index_cursor'),'0') AS INTEGER)
+                )
+            BEGIN
                 INSERT INTO catalog_search(catalog_search,rowid,search_text)
                     VALUES ('delete',old.rowid,old.search_text);
                 INSERT INTO catalog_search(rowid,search_text)
@@ -1741,8 +1867,220 @@ class MediaCatalogCoordinator:
             """
         )
 
-    def compact_storage_batch(self, *, limit: int = 250) -> dict[str, Any]:
+    @classmethod
+    def _search_index_status_connection(
+        cls, connection: sqlite3.Connection
+    ) -> dict[str, Any]:
+        values = {
+            str(row["key"]): str(row["value"])
+            for row in connection.execute(
+                "SELECT key,value FROM coordinator_meta WHERE key IN (?,?,?,?)",
+                (
+                    "search_rowid_revision",
+                    SEARCH_INDEX_PHASE_KEY,
+                    SEARCH_INDEX_CURSOR_KEY,
+                    SEARCH_INDEX_COUNT_KEY,
+                ),
+            ).fetchall()
+        }
+        current = cls._search_schema_current(connection)
+        definitions = cls._search_table_definitions(connection)
+        legacy_current_ready = bool(
+            not current
+            and "item_id" in definitions.get("catalog_search", "")
+            and "text" in definitions.get("catalog_search", "")
+        )
+        marker_current = values.get("search_rowid_revision") == SEARCH_ROWID_REVISION
+        phase = values.get(SEARCH_INDEX_PHASE_KEY) or (
+            "complete" if current and marker_current else "pending"
+        )
+        legacy_tables = [
+            str(row["name"])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name GLOB 'catalog_*search_legacy_[0-9]*' "
+                "ORDER BY name"
+            ).fetchall()
+            if not any(
+                str(row["name"]).endswith(suffix)
+                for suffix in ("_config", "_content", "_data", "_docsize", "_idx")
+            )
+        ]
+        legacy_search_table = next(
+            (
+                name
+                for name in legacy_tables
+                if name.startswith("catalog_search_legacy_")
+            ),
+            "",
+        )
+        legacy_query_table = (
+            "catalog_search" if legacy_current_ready else legacy_search_table
+        )
+        legacy_query_ready = bool(legacy_query_table)
+        ready = bool(current and marker_current and phase == "complete")
+        return {
+            "schema": "adaos.media_center.search_index_state.v1",
+            "phase": phase,
+            "ready": ready,
+            "partial": not ready,
+            "schema_current": current,
+            "legacy_query_ready": legacy_query_ready,
+            "legacy_query_table": legacy_query_table,
+            "revision": values.get("search_rowid_revision", ""),
+            "expected_revision": SEARCH_ROWID_REVISION,
+            "cursor": max(0, int(values.get(SEARCH_INDEX_CURSOR_KEY) or 0)),
+            "indexed_count": max(0, int(values.get(SEARCH_INDEX_COUNT_KEY) or 0)),
+            "legacy_tables": legacy_tables,
+            "cleanup_pending": bool(legacy_tables),
+        }
+
+    def search_index_status(self) -> dict[str, Any]:
+        with self.repository.connect() as connection:
+            return self._search_index_status_connection(connection)
+
+    @staticmethod
+    def _next_legacy_search_table(
+        connection: sqlite3.Connection, base_name: str
+    ) -> str:
+        for index in range(1, 100):
+            candidate = f"{base_name}_legacy_{index}"
+            exists = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                (candidate,),
+            ).fetchone()
+            if exists is None:
+                return candidate
+        raise RuntimeError("media_center_search_legacy_table_limit")
+
+    def compact_search_index_batch(self, *, limit: int = 250) -> dict[str, Any]:
         bounded = max(10, min(int(limit or 250), 1000))
+        with self.repository.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            status = self._search_index_status_connection(connection)
+            migrated_tables: list[str] = []
+            if not status["schema_current"]:
+                connection.executescript(
+                    """
+                    DROP TRIGGER IF EXISTS catalog_items_search_ai;
+                    DROP TRIGGER IF EXISTS catalog_items_search_ad;
+                    DROP TRIGGER IF EXISTS catalog_items_search_au;
+                    """
+                )
+                definitions = self._search_table_definitions(connection)
+                for table_name in ("catalog_search", "catalog_fuzzy_search"):
+                    if table_name not in definitions:
+                        continue
+                    legacy_name = self._next_legacy_search_table(
+                        connection, table_name
+                    )
+                    connection.execute(
+                        f"ALTER TABLE {table_name} RENAME TO {legacy_name}"
+                    )
+                    migrated_tables.append(legacy_name)
+                connection.executescript(
+                    """
+                    CREATE VIRTUAL TABLE catalog_search USING fts5(
+                        search_text,
+                        content='catalog_items',
+                        content_rowid='rowid',
+                        tokenize='unicode61 remove_diacritics 2'
+                    );
+                    CREATE VIRTUAL TABLE catalog_fuzzy_search USING fts5(
+                        fuzzy_text,
+                        content='catalog_items',
+                        content_rowid='rowid',
+                        tokenize='trigram'
+                    );
+                    """
+                )
+                connection.executemany(
+                    "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                    (
+                        (SEARCH_INDEX_PHASE_KEY, "building"),
+                        (SEARCH_INDEX_CURSOR_KEY, "0"),
+                        (SEARCH_INDEX_COUNT_KEY, "0"),
+                    ),
+                )
+                connection.execute(
+                    "DELETE FROM coordinator_meta WHERE key='search_rowid_revision'"
+                )
+                status = self._search_index_status_connection(connection)
+            elif not status["ready"] and status["phase"] != "building":
+                connection.execute(
+                    "INSERT INTO catalog_search(catalog_search) VALUES ('delete-all')"
+                )
+                connection.execute(
+                    "INSERT INTO catalog_fuzzy_search(catalog_fuzzy_search) "
+                    "VALUES ('delete-all')"
+                )
+                connection.executemany(
+                    "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                    (
+                        (SEARCH_INDEX_PHASE_KEY, "building"),
+                        (SEARCH_INDEX_CURSOR_KEY, "0"),
+                        (SEARCH_INDEX_COUNT_KEY, "0"),
+                    ),
+                )
+                status = self._search_index_status_connection(connection)
+            self._ensure_search_triggers(connection)
+            if status["ready"]:
+                connection.commit()
+                return {**status, "ok": True, "complete": True, "processed": 0}
+            cursor = max(0, int(status.get("cursor") or 0))
+            indexed_count = max(0, int(status.get("indexed_count") or 0))
+            rows = connection.execute(
+                "SELECT rowid,search_text,fuzzy_text FROM catalog_items "
+                "WHERE rowid>? ORDER BY rowid LIMIT ?",
+                (cursor, bounded),
+            ).fetchall()
+            if rows:
+                connection.executemany(
+                    "INSERT INTO catalog_search(rowid,search_text) VALUES (?,?)",
+                    [(int(row["rowid"]), str(row["search_text"] or "")) for row in rows],
+                )
+                connection.executemany(
+                    "INSERT INTO catalog_fuzzy_search(rowid,fuzzy_text) VALUES (?,?)",
+                    [(int(row["rowid"]), str(row["fuzzy_text"] or "")) for row in rows],
+                )
+                cursor = int(rows[-1]["rowid"])
+                indexed_count += len(rows)
+                connection.executemany(
+                    "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                    (
+                        (SEARCH_INDEX_PHASE_KEY, "building"),
+                        (SEARCH_INDEX_CURSOR_KEY, str(cursor)),
+                        (SEARCH_INDEX_COUNT_KEY, str(indexed_count)),
+                    ),
+                )
+                connection.commit()
+                return {
+                    **self._search_index_status_connection(connection),
+                    "ok": True,
+                    "complete": False,
+                    "processed": len(rows),
+                    "migrated_tables": migrated_tables,
+                }
+            connection.executemany(
+                "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (
+                    ("search_rowid_revision", SEARCH_ROWID_REVISION),
+                    (SEARCH_INDEX_PHASE_KEY, "complete"),
+                    (SEARCH_INDEX_CURSOR_KEY, str(cursor)),
+                    (SEARCH_INDEX_COUNT_KEY, str(indexed_count)),
+                ),
+            )
+            connection.commit()
+            return {
+                **self._search_index_status_connection(connection),
+                "ok": True,
+                "complete": True,
+                "processed": 0,
+                "migrated_tables": migrated_tables,
+            }
+
+    def compact_storage_batch(self, *, limit: int = 250) -> dict[str, Any]:
+        bounded = max(1, min(int(limit or 250), 1000))
         state_key = "storage_compaction_state"
         with self.repository.connect() as connection:
             row = connection.execute(
@@ -1754,24 +2092,59 @@ class MediaCatalogCoordinator:
             ):
                 state = {
                     "revision": STORAGE_COMPACTION_REVISION,
-                    "phase": "catalog",
+                    "phase": "variants",
                     "cursor": "",
                     "scanned": 0,
                     "updated": 0,
                 }
-            phase = _text(state.get("phase")) or "catalog"
+            phase = _text(state.get("phase")) or "variants"
             cursor = _text(state.get("cursor"))
             scanned = 0
             updated = 0
-            if phase == "catalog":
+            if phase == "variants":
                 rows = connection.execute(
                     """
-                    SELECT id,descriptor_json,metadata_json FROM catalog_items
+                    SELECT id,derived,descriptor_json FROM media_variants
+                    WHERE id>? ORDER BY id LIMIT ?
+                    """,
+                    (cursor, bounded),
+                ).fetchall()
+                descriptor_updates = [
+                    (str(row["id"]),)
+                    for row in rows
+                    if not bool(row["derived"])
+                    and str(row["descriptor_json"] or "{}") != "{}"
+                ]
+                connection.executemany(
+                    "UPDATE media_variants SET descriptor_json='{}' WHERE id=?",
+                    descriptor_updates,
+                )
+                scanned = len(rows)
+                updated = len(descriptor_updates)
+                if rows:
+                    cursor = str(rows[-1]["id"])
+                if len(rows) < bounded:
+                    phase = "catalog"
+                    cursor = ""
+                    connection.execute(
+                        "INSERT OR REPLACE INTO coordinator_meta(key,value) "
+                        "VALUES (?,?)",
+                        (
+                            "base_variant_descriptor_backfill_state",
+                            _json_dumps({"state": "complete", "cursor": ""}),
+                        ),
+                    )
+            elif phase == "catalog":
+                rows = connection.execute(
+                    """
+                    SELECT id,title,name,source_path,folder_path,descriptor_json,
+                        metadata_json,search_text,fuzzy_text
+                    FROM catalog_items
                     WHERE agent_id<>'' AND id>? ORDER BY id LIMIT ?
                     """,
                     (cursor, bounded),
                 ).fetchall()
-                updates: list[tuple[str, str, str]] = []
+                updates: list[tuple[str, str, str, str, str]] = []
                 for item in rows:
                     descriptor = _json_loads(item["descriptor_json"])
                     metadata = _json_loads(item["metadata_json"])
@@ -1785,16 +2158,37 @@ class MediaCatalogCoordinator:
                         if isinstance(metadata, Mapping)
                         else {}
                     )
+                    next_search_text = str(item["search_text"] or "")
+                    next_fuzzy_text = str(item["fuzzy_text"] or "")
+                    if not next_search_text or not next_fuzzy_text:
+                        next_search_text = self._search_text(
+                            title=item["title"],
+                            name=item["name"],
+                            relative_path=item["source_path"],
+                            folder_path=item["folder_path"],
+                            metadata=(
+                                metadata if isinstance(metadata, Mapping) else {}
+                            ),
+                        )
+                        next_fuzzy_text = self._fuzzy_tokens(next_search_text)
                     if (
                         compact_descriptor != str(item["descriptor_json"])
                         or compact_metadata != str(item["metadata_json"])
+                        or next_search_text != str(item["search_text"] or "")
+                        or next_fuzzy_text != str(item["fuzzy_text"] or "")
                     ):
                         updates.append(
-                            (compact_descriptor, compact_metadata, str(item["id"]))
+                            (
+                                compact_descriptor,
+                                compact_metadata,
+                                next_search_text,
+                                next_fuzzy_text,
+                                str(item["id"]),
+                            )
                         )
                 connection.executemany(
-                    "UPDATE catalog_items SET descriptor_json=?,metadata_json=? "
-                    "WHERE id=?",
+                    "UPDATE catalog_items SET descriptor_json=?,metadata_json=?,"
+                    "search_text=?,fuzzy_text=? WHERE id=?",
                     updates,
                 )
                 scanned = len(rows)
@@ -1802,8 +2196,36 @@ class MediaCatalogCoordinator:
                 if rows:
                     cursor = str(rows[-1]["id"])
                 if len(rows) < bounded:
+                    phase = "projection_backfill"
+                    cursor = ""
+                    connection.execute(
+                        "INSERT OR REPLACE INTO coordinator_meta(key,value) "
+                        "VALUES (?,?)",
+                        (
+                            "search_text_backfill_state",
+                            _json_dumps({"state": "complete", "cursor": ""}),
+                        ),
+                    )
+            elif phase == "projection_backfill":
+                projected = self._backfill_metadata_projections(
+                    connection,
+                    start_after=cursor,
+                    limit=bounded,
+                )
+                scanned = int(projected["processed"])
+                updated = scanned
+                cursor = str(projected["cursor"])
+                if projected["complete"]:
                     phase = "projection"
                     cursor = ""
+                    connection.execute(
+                        "INSERT OR REPLACE INTO coordinator_meta(key,value) "
+                        "VALUES (?,?)",
+                        (
+                            "metadata_projection_backfill_state",
+                            _json_dumps({"state": "complete", "cursor": ""}),
+                        ),
+                    )
             elif phase == "projection":
                 rows = connection.execute(
                     """
@@ -1844,8 +2266,140 @@ class MediaCatalogCoordinator:
                 if rows:
                     cursor = str(rows[-1]["item_id"])
                 if len(rows) < bounded:
+                    phase = "background_jobs"
+                    cursor = "0"
+            elif phase == "background_jobs":
+                rows = connection.execute(
+                    """
+                    WITH batch AS MATERIALIZED (
+                        SELECT rowid,id,kind,status,subject_ref,priority
+                        FROM media_background_jobs
+                        WHERE rowid>? ORDER BY rowid LIMIT ?
+                    )
+                    SELECT batch.rowid AS job_rowid,batch.id,batch.priority,
+                        CASE WHEN c.media_kind='audio' THEN 150 ELSE 200 END
+                            AS desired_priority,
+                        CASE WHEN batch.kind='metadata_enrichment'
+                            AND batch.status='queued' THEN 1 ELSE 0 END AS eligible
+                    FROM batch
+                    LEFT JOIN catalog_items c
+                        ON c.id=substr(batch.subject_ref,6)
+                    ORDER BY batch.rowid
+                    """,
+                    (max(0, int(cursor or 0)), bounded),
+                ).fetchall()
+                priority_updates = [
+                    (int(row["desired_priority"]), str(row["id"]))
+                    for row in rows
+                    if bool(row["eligible"])
+                    and int(row["priority"] or 0) != int(row["desired_priority"])
+                ]
+                connection.executemany(
+                    "UPDATE media_background_jobs SET priority=? WHERE id=?",
+                    priority_updates,
+                )
+                scanned = len(rows)
+                updated = len(priority_updates)
+                if rows:
+                    cursor = str(rows[-1]["job_rowid"])
+                if len(rows) < bounded:
+                    phase = "musicbrainz_requeue"
+                    cursor = "0"
+                    connection.execute(
+                        "INSERT OR REPLACE INTO coordinator_meta(key,value) "
+                        "VALUES (?,?)",
+                        (
+                            "background_priority_backfill_state",
+                            _json_dumps({"state": "complete", "cursor": 0}),
+                        ),
+                    )
+            elif phase == "musicbrainz_requeue":
+                rows = connection.execute(
+                    """
+                    WITH batch AS MATERIALIZED (
+                        SELECT rowid,id,kind,status,provider_id,subject_ref
+                        FROM media_background_jobs
+                        WHERE rowid>? ORDER BY rowid LIMIT ?
+                    )
+                    SELECT batch.rowid AS job_rowid,batch.id,
+                        CASE WHEN batch.kind='metadata_enrichment'
+                            AND batch.status='completed'
+                            AND batch.provider_id LIKE '%media_center.musicbrainz.v1%'
+                            AND c.media_kind='audio' AND c.missing=0
+                            AND NOT EXISTS (
+                            SELECT 1 FROM catalog_metadata_facets facet
+                            WHERE facet.item_id=c.id AND facet.field_name='genre'
+                        ) THEN 1 ELSE 0 END AS eligible
+                    FROM batch
+                    LEFT JOIN catalog_items c
+                        ON batch.subject_ref=('item:' || c.id)
+                    ORDER BY batch.rowid
+                    """,
+                    (max(0, int(cursor or 0)), bounded),
+                ).fetchall()
+                now = now_iso()
+                connection.executemany(
+                    """
+                    UPDATE media_background_jobs
+                    SET status='queued',attempts=0,provider_id='',started_at='',
+                        finished_at='',error_code='',
+                        progress_json='{"phase":"queued","completed":0,"total":1}',
+                        updated_at=?
+                    WHERE id=?
+                    """,
+                    [
+                        (now, str(row["id"]))
+                        for row in rows
+                        if bool(row["eligible"])
+                    ],
+                )
+                scanned = len(rows)
+                updated = sum(bool(row["eligible"]) for row in rows)
+                if rows:
+                    cursor = str(rows[-1]["job_rowid"])
+                if len(rows) < bounded:
+                    phase = "favorites"
+                    cursor = ""
+                    connection.execute(
+                        "INSERT OR REPLACE INTO coordinator_meta(key,value) "
+                        "VALUES (?,?)",
+                        (
+                            "musicbrainz_genre_requeue_state",
+                            _json_dumps({"state": "complete", "cursor": 0}),
+                        ),
+                    )
+            elif phase == "favorites":
+                rows = connection.execute(
+                    """
+                    SELECT id FROM catalog_items
+                    WHERE favorite=1 AND id>? ORDER BY id LIMIT ?
+                    """,
+                    (cursor, bounded),
+                ).fetchall()
+                now = now_iso()
+                connection.executemany(
+                    """
+                    INSERT OR IGNORE INTO personal_media_state(
+                        profile_id,item_id,favorite,updated_at
+                    ) VALUES ('default',?,1,?)
+                    """,
+                    [(str(row["id"]), now) for row in rows],
+                )
+                scanned = len(rows)
+                updated = len(rows)
+                if rows:
+                    cursor = str(rows[-1]["id"])
+                if len(rows) < bounded:
                     phase = "complete"
                     cursor = ""
+                    connection.execute(
+                        "INSERT OR REPLACE INTO coordinator_meta(key,value) "
+                        "VALUES (?,?)",
+                        (
+                            "legacy_favorite_backfill_state",
+                            _json_dumps({"state": "complete", "cursor": ""}),
+                        ),
+                    )
             state = {
                 "revision": STORAGE_COMPACTION_REVISION,
                 "phase": phase,
@@ -1970,22 +2524,33 @@ class MediaCatalogCoordinator:
                 updates,
             )
 
-    def _ensure_search_rowids(self, connection: sqlite3.Connection) -> None:
+    def _ensure_search_rowids(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        search_schema_current: bool | None = None,
+    ) -> None:
         marker = connection.execute(
             "SELECT value FROM coordinator_meta WHERE key='search_rowid_revision'"
         ).fetchone()
-        if marker and str(marker["value"]) == SEARCH_ROWID_REVISION:
+        current = (
+            self._search_schema_current(connection)
+            if search_schema_current is None
+            else bool(search_schema_current)
+        )
+        if current and marker and str(marker["value"]) == SEARCH_ROWID_REVISION:
+            connection.execute(
+                "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (SEARCH_INDEX_PHASE_KEY, "complete"),
+            )
             return
-        connection.execute(
-            "INSERT INTO catalog_search(catalog_search) VALUES ('rebuild')"
-        )
-        connection.execute(
-            "INSERT INTO catalog_fuzzy_search(catalog_fuzzy_search) "
-            "VALUES ('rebuild')"
-        )
-        connection.execute(
+        connection.executemany(
             "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
-            ("search_rowid_revision", SEARCH_ROWID_REVISION),
+            (
+                (SEARCH_INDEX_PHASE_KEY, "pending"),
+                (SEARCH_INDEX_CURSOR_KEY, "0"),
+                (SEARCH_INDEX_COUNT_KEY, "0"),
+            ),
         )
 
     @staticmethod
@@ -2194,17 +2759,29 @@ class MediaCatalogCoordinator:
             ),
         )
 
-    def _backfill_metadata_projections(self, connection: sqlite3.Connection) -> None:
-        cursor = connection.execute(
+    def _backfill_metadata_projections(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        start_after: str = "",
+        limit: int = 250,
+    ) -> dict[str, Any]:
+        bounded = max(10, min(int(limit or 250), 1000))
+        query_cursor = connection.execute(
             "SELECT id,name,source_path,folder_path,metadata_json,work_id,title "
-            "FROM catalog_items WHERE NOT EXISTS ("
+            "FROM catalog_items WHERE id>? AND NOT EXISTS ("
             "SELECT 1 FROM catalog_metadata_projection projection "
-            "WHERE projection.item_id=catalog_items.id) ORDER BY id"
+            "WHERE projection.item_id=catalog_items.id) ORDER BY id LIMIT ?",
+            (_text(start_after), bounded),
         )
+        processed = 0
+        last_cursor = _text(start_after)
         while True:
-            rows = cursor.fetchmany(250)
+            rows = query_cursor.fetchmany(bounded)
             if not rows:
                 break
+            processed += len(rows)
+            last_cursor = str(rows[-1]["id"])
             subject_to_item: dict[str, str] = {}
             for row in rows:
                 item_id = str(row["id"])
@@ -2363,6 +2940,11 @@ class MediaCatalogCoordinator:
                 "WHERE id=?",
                 catalog_updates,
             )
+        return {
+            "processed": processed,
+            "cursor": last_cursor,
+            "complete": processed < bounded,
+        }
 
     @staticmethod
     def _metadata_projection_map(
@@ -2818,22 +3400,152 @@ class MediaCatalogCoordinator:
         bounded_batch = max(100, min(int(batch_size), 10000))
         removed: dict[str, int] = {}
         remaining_overflow: dict[str, int] = {}
+        terminal_removed = 0
+        state_key = "background_queue_compaction_state"
         with self.repository.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            kind_status_index = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='index' "
+                "AND name='idx_media_center_background_kind_status'"
+            ).fetchone()
+            state_row = connection.execute(
+                "SELECT value FROM coordinator_meta WHERE key=?", (state_key,)
+            ).fetchone()
+            state = _json_loads(state_row["value"]) if state_row is not None else {}
+            if not isinstance(state, Mapping):
+                state = {}
+            if kind_status_index is None:
+                phase = _text(state.get("phase")) or "queued_reset"
+                cursor = max(0, int(state.get("cursor") or 0))
+                if phase == "queued_reset":
+                    rows = connection.execute(
+                        "SELECT rowid,id,status FROM media_background_jobs "
+                        "WHERE rowid>? ORDER BY rowid LIMIT ?",
+                        (cursor, bounded_batch),
+                    ).fetchall()
+                    queued_ids = [
+                        (str(row["id"]),)
+                        for row in rows
+                        if str(row["status"]) == "queued"
+                    ]
+                    connection.executemany(
+                        "DELETE FROM media_background_jobs "
+                        "WHERE id=? AND status='queued'",
+                        queued_ids,
+                    )
+                    if rows:
+                        cursor = int(rows[-1]["rowid"])
+                    if len(rows) < bounded_batch:
+                        phase = "terminal_history"
+                        cursor = 0
+                        for kind in BACKGROUND_JOB_WINDOWS:
+                            connection.execute(
+                                "DELETE FROM coordinator_meta WHERE key=?",
+                                (self._background_admission_key(kind),),
+                            )
+                    next_state = {
+                        "phase": phase,
+                        "cursor": cursor,
+                        "scanned": int(state.get("scanned") or 0) + len(rows),
+                        "removed": int(state.get("removed") or 0)
+                        + len(queued_ids),
+                        "updated_at": now_iso(),
+                    }
+                    connection.executemany(
+                        "INSERT OR REPLACE INTO coordinator_meta(key,value) "
+                        "VALUES (?,?)",
+                        (
+                            (state_key, _json_dumps(next_state)),
+                            (
+                                "background_kind_status_index_state",
+                                _json_dumps(
+                                    {
+                                        "state": "pending",
+                                        "reason": phase,
+                                    }
+                                ),
+                            ),
+                        ),
+                    )
+                    connection.commit()
+                    return {
+                        "schema": (
+                            "adaos.media_center.background_queue_compaction.v1"
+                        ),
+                        "phase": phase,
+                        "removed": {"legacy_queued": len(queued_ids)},
+                        "terminal_removed": 0,
+                        "remaining_overflow": {
+                            "legacy_queued": 1 if rows else 0
+                        },
+                        "kind_status_index_ready": False,
+                        "admission_paused": phase == "queued_reset",
+                        "complete": False,
+                        "state": next_state,
+                    }
+                terminal_removed = int(
+                    connection.execute(
+                        """
+                        DELETE FROM media_background_jobs WHERE id IN (
+                            SELECT id FROM media_background_jobs
+                            INDEXED BY idx_media_center_background_recent
+                            WHERE status IN ('completed','failed','canceled')
+                            ORDER BY updated_at DESC,id DESC LIMIT ? OFFSET 10000
+                        )
+                        """,
+                        (bounded_batch,),
+                    ).rowcount
+                )
+                if terminal_removed == 0:
+                    sample = connection.execute(
+                        "SELECT rowid FROM media_background_jobs LIMIT 50001"
+                    ).fetchall()
+                    if len(sample) <= 50_000:
+                        connection.execute(
+                            "CREATE INDEX idx_media_center_background_kind_status "
+                            "ON media_background_jobs("
+                            "kind,status,updated_at DESC,id DESC)"
+                        )
+                        kind_status_index = True
+                        phase = "complete"
+                next_state = {
+                    "phase": phase,
+                    "cursor": 0,
+                    "scanned": int(state.get("scanned") or 0),
+                    "removed": int(state.get("removed") or 0) + terminal_removed,
+                    "updated_at": now_iso(),
+                }
+                connection.executemany(
+                    "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                    (
+                        (state_key, _json_dumps(next_state)),
+                        (
+                            "background_kind_status_index_state",
+                            _json_dumps(
+                                {
+                                    "state": (
+                                        "ready" if kind_status_index else "pending"
+                                    ),
+                                    "reason": "" if kind_status_index else phase,
+                                }
+                            ),
+                        ),
+                    ),
+                )
+                connection.commit()
+                return {
+                    "schema": "adaos.media_center.background_queue_compaction.v1",
+                    "phase": phase,
+                    "removed": {},
+                    "terminal_removed": terminal_removed,
+                    "remaining_overflow": {},
+                    "kind_status_index_ready": bool(kind_status_index),
+                    "admission_paused": False,
+                    "complete": bool(kind_status_index),
+                    "state": next_state,
+                }
             for kind in BACKGROUND_JOB_WINDOWS:
                 window = self._background_job_window(kind)
-                queued = int(
-                    connection.execute(
-                        "SELECT COUNT(*) FROM media_background_jobs "
-                        "WHERE kind=? AND status='queued'",
-                        (kind,),
-                    ).fetchone()[0]
-                )
-                overflow = max(0, queued - window)
-                if not overflow:
-                    removed[kind] = 0
-                    remaining_overflow[kind] = 0
-                    continue
                 deleted = int(
                     connection.execute(
                         """
@@ -2844,21 +3556,53 @@ class MediaCatalogCoordinator:
                             LIMIT ? OFFSET ?
                         )
                         """,
-                        (kind, min(overflow, bounded_batch), window),
+                        (kind, bounded_batch, window),
                     ).rowcount
                 )
                 removed[kind] = deleted
-                remaining_overflow[kind] = max(0, overflow - deleted)
+                remaining_overflow[kind] = 1 if deleted >= bounded_batch else 0
+                if deleted:
+                    connection.execute(
+                        "DELETE FROM coordinator_meta WHERE key=?",
+                        (self._background_admission_key(kind),),
+                    )
+            terminal_removed = int(
                 connection.execute(
-                    "DELETE FROM coordinator_meta WHERE key=?",
-                    (self._background_admission_key(kind),),
-                )
+                    """
+                    DELETE FROM media_background_jobs WHERE id IN (
+                        SELECT id FROM media_background_jobs
+                        INDEXED BY idx_media_center_background_recent
+                        WHERE status IN ('completed','failed','canceled')
+                        ORDER BY updated_at DESC,id DESC LIMIT ? OFFSET 10000
+                    )
+                    """,
+                    (bounded_batch,),
+                ).rowcount
+            )
+            connection.execute(
+                "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+                (
+                    "background_kind_status_index_state",
+                    _json_dumps(
+                        {
+                            "state": "ready",
+                            "reason": "",
+                        }
+                    ),
+                ),
+            )
             connection.commit()
         return {
             "schema": "adaos.media_center.background_queue_compaction.v1",
             "removed": removed,
+            "terminal_removed": terminal_removed,
             "remaining_overflow": remaining_overflow,
-            "complete": not any(remaining_overflow.values()),
+            "kind_status_index_ready": True,
+            "admission_paused": False,
+            "complete": (
+                not any(remaining_overflow.values())
+                and terminal_removed == 0
+            ),
         }
 
     def _apply_delta(self, connection: sqlite3.Connection, delta: Mapping[str, Any], *, agent_id: str, node_id: str) -> str:
@@ -4224,7 +4968,12 @@ class MediaCatalogCoordinator:
             resolved_offset = max(0, int(offset or 0))
             cursor_anchor = None
         personal_driven = bool(
-            not query_token and (favorites_only or history_only or continue_only)
+            not query_token
+            and (
+                history_only
+                or continue_only
+                or (favorites_only and profile != "default")
+            )
         )
         filters: list[str] = []
         params: list[Any] = [profile]
@@ -4422,19 +5171,40 @@ class MediaCatalogCoordinator:
             search_candidate_limit = 96
         search_candidate_limit = max(64, min(10_000, search_candidate_limit))
         search_candidate_count = 0
+        search_index: dict[str, Any] = {
+            "ready": True,
+            "partial": False,
+            "phase": "complete",
+        }
         with self.repository.connect() as connection:
-            if query_token:
+            search_index = self._search_index_status_connection(connection)
+            if query_token and (
+                search_index["ready"] or search_index.get("legacy_query_ready")
+            ):
+                if search_index["ready"]:
+                    search_rowid = "catalog_search.rowid"
+                    search_from = (
+                        "catalog_search CROSS JOIN catalog_items c "
+                        "ON c.rowid=catalog_search.rowid"
+                    )
+                    search_match = "catalog_search.search_text MATCH ?"
+                else:
+                    legacy_table = str(search_index["legacy_query_table"])
+                    search_rowid = "c.rowid"
+                    search_from = (
+                        f"{legacy_table} JOIN catalog_items c "
+                        f"ON c.id={legacy_table}.item_id"
+                    )
+                    search_match = f"{legacy_table} MATCH ?"
                 rows = connection.execute(
                     f"""
                     WITH search_input(query_label) AS (VALUES (?)),
                     search_candidates AS MATERIALIZED (
-                        SELECT catalog_search.rowid
-                        FROM catalog_search
-                        CROSS JOIN catalog_items c
-                            ON c.rowid=catalog_search.rowid
+                        SELECT {search_rowid} AS rowid
+                        FROM {search_from}
                         LEFT JOIN personal_media_state ps
                             ON ps.item_id=c.id AND ps.profile_id=?
-                        WHERE catalog_search.search_text MATCH ?
+                        WHERE {search_match}
                             AND {' AND '.join(filters)}
                         LIMIT ?
                     ),
@@ -4491,12 +5261,10 @@ class MediaCatalogCoordinator:
                             f"""
                             SELECT COUNT(*) FROM (
                                 SELECT 1
-                                FROM catalog_search
-                                CROSS JOIN catalog_items c
-                                    ON c.rowid=catalog_search.rowid
+                                FROM {search_from}
                                 LEFT JOIN personal_media_state ps
                                     ON ps.item_id=c.id AND ps.profile_id=?
-                                WHERE catalog_search.search_text MATCH ?
+                                WHERE {search_match}
                                     AND {' AND '.join(filters)}
                                 LIMIT ?
                             )
@@ -4509,6 +5277,55 @@ class MediaCatalogCoordinator:
                             ),
                         ).fetchone()[0]
                     )
+            elif query_token:
+                folded_query = self._fuzzy_tokens(query_token)
+                folded_terms = [
+                    self._fuzzy_tokens(term)
+                    for term in re.findall(r"[\w]+", query_token, flags=re.UNICODE)[:12]
+                    if self._fuzzy_tokens(term)
+                ] or [folded_query]
+                fallback_text = (
+                    "COALESCE(NULLIF(c.fuzzy_text,''),lower(c.title || ' ' || "
+                    "c.name || ' ' || c.source_path || ' ' || c.folder_path))"
+                )
+                fallback_filters = [
+                    *filters,
+                    *(f"instr({fallback_text},?)>0" for _term in folded_terms),
+                ]
+                fallback_params = [*params, *folded_terms]
+                fallback_where = " AND ".join(fallback_filters)
+                rows = connection.execute(
+                    f"""
+                    SELECT c.*, COALESCE(ps.favorite,c.favorite) AS profile_favorite,
+                        COALESCE(ps.resume_ms,0) AS profile_resume_ms,
+                        COALESCE(ps.duration_ms,0) AS profile_duration_ms,
+                        COALESCE(ps.completed,0) AS profile_completed,
+                        COALESCE(ps.rating,0) AS profile_rating,
+                        COALESCE(ps.hidden,0) AS profile_hidden,
+                        COALESCE(ps.last_played_at,'') AS profile_last_played_at,
+                        COALESCE(ps.revision,0) AS profile_revision,
+                        CASE WHEN {fallback_text}=? THEN 0
+                            WHEN instr({fallback_text},?)>0 THEN 1 ELSE 2 END
+                            AS catalog_rank,
+                        c.rowid AS catalog_rowid,
+                        0 AS search_candidate_count
+                    FROM catalog_items c
+                    LEFT JOIN personal_media_state ps
+                        ON ps.item_id=c.id AND ps.profile_id=?
+                    WHERE {fallback_where}
+                    ORDER BY catalog_rank,c.rowid LIMIT ? OFFSET ?
+                    """,
+                    (
+                        folded_query,
+                        folded_query,
+                        *fallback_params,
+                        page_size + 1,
+                        resolved_offset,
+                    ),
+                ).fetchall()
+                search_candidate_count = min(
+                    search_candidate_limit, resolved_offset + len(rows)
+                )
             else:
                 rows = connection.execute(
                     f"""
@@ -4576,7 +5393,15 @@ class MediaCatalogCoordinator:
             "total_count_lower_bound": total_count,
             "catalog_revision": self.catalog_revision(),
             "ranking": {
-                "version": "deterministic-fts-v2",
+                "version": (
+                    "deterministic-fts-v2"
+                    if search_index.get("ready")
+                    else (
+                        "legacy-fts-fallback-v1"
+                        if search_index.get("legacy_query_ready")
+                        else "bounded-folded-fallback-v1"
+                    )
+                ),
                 "query_mode": "explicit_submit",
                 "candidate_window_bounded": bool(query_token),
                 "candidate_limit": search_candidate_limit if query_token else None,
@@ -4585,8 +5410,9 @@ class MediaCatalogCoordinator:
                     query_token and search_candidate_count >= search_candidate_limit
                 ),
             },
+            "search_index": search_index,
             "participation": participation,
-            "partial": participation["partial"],
+            "partial": bool(participation["partial"] or search_index.get("partial")),
             "pagination": {
                 "limit": page_size,
                 "offset": resolved_offset,
@@ -4680,15 +5506,57 @@ class MediaCatalogCoordinator:
             for group in query_groups
         )
         rows: list[sqlite3.Row] = []
+        search_index: dict[str, Any]
         with self.repository.connect() as connection:
-            candidate_rows = connection.execute(
-                """
-                SELECT rowid,rank FROM catalog_fuzzy_search
-                WHERE catalog_fuzzy_search MATCH ?
-                ORDER BY rank,rowid LIMIT ?
-                """,
-                (expression, score_limit + 1),
-            ).fetchall()
+            search_index = self._search_index_status_connection(connection)
+            if search_index["ready"]:
+                candidate_rows = connection.execute(
+                    """
+                    SELECT rowid,rank FROM catalog_fuzzy_search
+                    WHERE catalog_fuzzy_search MATCH ?
+                    ORDER BY rank,rowid LIMIT ?
+                    """,
+                    (expression, score_limit + 1),
+                ).fetchall()
+            elif search_index.get("legacy_query_ready"):
+                legacy_table = str(search_index["legacy_query_table"])
+                legacy_terms = [
+                    part
+                    for part in re.findall(r"[\w]+", token, flags=re.UNICODE)[:12]
+                    if part
+                ]
+                legacy_expression = " AND ".join(
+                    f'"{part.replace(chr(34), chr(34) * 2)}"*'
+                    for part in legacy_terms
+                )
+                candidate_rows = connection.execute(
+                    f"""
+                    SELECT c.rowid,{legacy_table}.rank
+                    FROM {legacy_table}
+                    JOIN catalog_items c ON c.id={legacy_table}.item_id
+                    WHERE {legacy_table} MATCH ?
+                    ORDER BY {legacy_table}.rank,c.rowid LIMIT ?
+                    """,
+                    (legacy_expression, score_limit + 1),
+                ).fetchall()
+            else:
+                folded_terms = [
+                    self._fuzzy_tokens(part)
+                    for part in re.findall(r"[\w]+", token, flags=re.UNICODE)[:12]
+                    if self._fuzzy_tokens(part)
+                ]
+                fallback_text = (
+                    "COALESCE(NULLIF(fuzzy_text,''),lower(title || ' ' || name || "
+                    "' ' || source_path || ' ' || folder_path))"
+                )
+                fallback = " AND ".join(
+                    f"instr({fallback_text},?)>0" for _term in folded_terms
+                ) or "1=0"
+                candidate_rows = connection.execute(
+                    f"SELECT rowid,0.0 AS rank FROM catalog_items "
+                    f"WHERE missing=0 AND {fallback} ORDER BY rowid LIMIT ?",
+                    (*folded_terms, score_limit + 1),
+                ).fetchall()
             candidate_rowids = [int(row["rowid"]) for row in candidate_rows]
             admitted_values = sorted(admitted)
             admitted_placeholders = (
@@ -4762,7 +5630,10 @@ class MediaCatalogCoordinator:
             "candidate_limit": candidate_limit,
             "score_limit": score_limit,
             "truncated_candidates": len(candidate_rows) > score_limit,
-            "partial": self.participation()["partial"],
+            "search_index": search_index,
+            "partial": bool(
+                self.participation()["partial"] or search_index.get("partial")
+            ),
             "ranking": {
                 "version": "local-discovery-v1",
                 "signals": [
@@ -7911,7 +8782,7 @@ class MediaCatalogCoordinator:
                 """
                 SELECT j.*,c.title AS subject_title,c.media_kind AS media_kind
                 FROM media_background_jobs j
-                LEFT JOIN catalog_items c ON ('item:' || c.id)=j.subject_ref
+                LEFT JOIN catalog_items c ON c.id=substr(j.subject_ref,6)
                 ORDER BY j.updated_at DESC,j.id DESC LIMIT ?
                 """,
                 (bounded,),
@@ -7927,31 +8798,77 @@ class MediaCatalogCoordinator:
             "count": len(rows),
         }
 
-    def background_job_counts(self) -> dict[str, int]:
+    def _background_job_count_snapshot(
+        self,
+    ) -> tuple[dict[str, int], dict[str, dict[str, int]], dict[str, Any]]:
         with self.repository.connect() as connection:
-            rows = connection.execute(
+            index_ready = bool(
+                connection.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='index' "
+                    "AND name='idx_media_center_background_kind_status'"
+                ).fetchone()
+            )
+            if index_ready:
+                query = """
+                    SELECT kind,status,COUNT(*) AS count
+                    FROM media_background_jobs
+                    INDEXED BY idx_media_center_background_kind_status
+                    GROUP BY kind,status
                 """
-                SELECT status,COUNT(*) AS count FROM media_background_jobs
-                GROUP BY status
-                """
-            ).fetchall()
-        return {str(row["status"]): int(row["count"]) for row in rows}
-
-    def background_job_counts_by_kind(self) -> dict[str, dict[str, int]]:
-        with self.repository.connect() as connection:
-            rows = connection.execute(
-                """
-                SELECT kind,status,COUNT(*) AS count
-                FROM media_background_jobs
-                GROUP BY kind,status
-                """
-            ).fetchall()
+                rows = connection.execute(query).fetchall()
+                sampled = False
+            else:
+                sample_limit = 256
+                sample_rows = connection.execute(
+                    """
+                    SELECT status
+                    FROM media_background_jobs
+                    INDEXED BY idx_media_center_background_claim
+                    WHERE status IN ('queued','running','waiting_resources','canceling')
+                    ORDER BY status,attempts,priority,created_at,id
+                    LIMIT ?
+                    """,
+                    (sample_limit + 1,),
+                ).fetchall()
+                sampled = len(sample_rows) > sample_limit
+                grouped_status: dict[str, int] = {}
+                for row in sample_rows[:sample_limit]:
+                    status = str(row["status"])
+                    grouped_status[status] = grouped_status.get(status, 0) + 1
+                rows = [
+                    {"kind": "", "status": status, "count": count}
+                    for status, count in grouped_status.items()
+                ]
+            state_row = connection.execute(
+                "SELECT value FROM coordinator_meta "
+                "WHERE key='background_kind_status_index_state'"
+            ).fetchone()
+        counts: dict[str, int] = {}
         result: dict[str, dict[str, int]] = {}
         for row in rows:
-            result.setdefault(str(row["kind"]), {})[str(row["status"])] = int(
-                row["count"]
-            )
-        return result
+            status = str(row["status"])
+            count = int(row["count"])
+            counts[status] = counts.get(status, 0) + count
+            if str(row["kind"]):
+                result.setdefault(str(row["kind"]), {})[status] = count
+        persisted = _json_loads(state_row["value"]) if state_row is not None else {}
+        count_state = {
+            "complete": index_ready,
+            "scope": "all" if index_ready else "active_sample",
+            "lower_bound": sampled,
+            "sample_limit": 0 if index_ready else sample_limit,
+            "by_kind": index_ready,
+            "index": dict(persisted) if isinstance(persisted, Mapping) else {},
+        }
+        return counts, result, count_state
+
+    def background_job_counts(self) -> dict[str, int]:
+        counts, _counts_by_kind, _state = self._background_job_count_snapshot()
+        return counts
+
+    def background_job_counts_by_kind(self) -> dict[str, dict[str, int]]:
+        _counts, counts_by_kind, _state = self._background_job_count_snapshot()
+        return counts_by_kind
 
     def storage_status(self) -> dict[str, Any]:
         db_path = self.repository.db_path
@@ -7999,8 +8916,7 @@ class MediaCatalogCoordinator:
 
     def operation_state(self, *, limit: int = 30) -> dict[str, Any]:
         operations = self.operations(limit=limit)
-        counts = self.background_job_counts()
-        counts_by_kind = self.background_job_counts_by_kind()
+        counts, counts_by_kind, count_state = self._background_job_count_snapshot()
         active_count = sum(
             counts.get(status, 0)
             for status in ("queued", "running", "waiting_resources", "canceling")
@@ -8010,8 +8926,10 @@ class MediaCatalogCoordinator:
             "schema": "adaos.media_center.operation_state.v1",
             "counts": counts,
             "counts_by_kind": counts_by_kind,
+            "count_state": count_state,
             "active_count": active_count,
             "storage": self.storage_status(),
+            "search_index": self.search_index_status(),
             "updated_at": now_iso(),
         }
 
@@ -8187,11 +9105,16 @@ class MediaCatalogCoordinator:
                     """
                 ).fetchall()
             ]
+            search_index = self._search_index_status_connection(connection)
         compact_summary = dict(summary or self.repository.compact_summary())
         # FTS5 COUNT(*) scans every indexed token payload and can take minutes
         # for large libraries. Search rows have a strict one-to-one catalog
         # rowid invariant, so the ordinary catalog count is the bounded witness.
-        search_rows = int(compact_summary["total_count"])
+        search_rows = (
+            int(compact_summary["total_count"])
+            if search_index["ready"]
+            else int(search_index.get("indexed_count") or 0)
+        )
         recommendations: list[dict[str, Any]] = []
         if not agents:
             recommendations.append(
@@ -8244,6 +9167,7 @@ class MediaCatalogCoordinator:
             "storage": {"media_bytes": "external", "catalog": "skill_local_relational"},
             "search": {
                 "indexed_rows": search_rows,
+                "index": search_index,
                 "ranking_version": "federated-discovery-v2",
                 "local_discovery_candidate_default": 5000,
                 "local_discovery_candidate_hard_maximum": 20000,

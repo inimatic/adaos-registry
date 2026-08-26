@@ -1,5 +1,12 @@
 # Media Center Coordinator
 
+Version 0.8.78 keeps activation bounded on large existing catalogs. Legacy FTS
+indexes are preserved during activation, search falls back to bounded folded
+catalog matching while the replacement index is partial, and the enrichment
+worker builds the rowid-addressed FTS index in resumable batches. Search and
+background-operation diagnostics expose the persisted index phase, cursor,
+indexed count, and deferred legacy cleanup state.
+
 `media_center_skill` is the logical Media Center coordinator. It owns the global catalog read model, work/variant/collection identity, profile-scoped favorites and resume state, bounded search, and playback planning. It does not walk filesystems or own source media.
 
 `media_library_agent` owns node-local roots and asynchronous scans. The coordinator invokes its public tools and consumes ordered `adaos.media_library.source_delta.v1` pages. The agent registers each source through `adaos.sdk.io.media.register_media_file`; only a root-bound reference is stored in `.adaos`, while media bytes stay at their original path.
