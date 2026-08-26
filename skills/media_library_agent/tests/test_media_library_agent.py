@@ -52,6 +52,15 @@ def test_agent_declares_core_managed_membership_and_health_projection():
     assert health["distributed"]["pressure"]["state"] == "normal"
 
 
+def test_compact_status_avoids_diagnostic_storage_queries():
+    health = main.status(compact=True)
+
+    assert health["distributed"]["health"]["ready"] is True
+    assert health["agent"]["id"]
+    assert "storage" not in health
+    assert "worker" not in health
+
+
 def test_delta_pages_include_compact_authoritative_library_state(tmp_path):
     library = tmp_path / "library"
     library.mkdir()

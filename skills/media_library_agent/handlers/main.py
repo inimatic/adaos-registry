@@ -1015,7 +1015,9 @@ def optimize_storage(reclaim: bool = False, **_: Any) -> dict[str, Any]:
 
 
 @tool(summary="Return compact agent health and capacity state.", side_effects="none")
-def status(**_: Any) -> dict[str, Any]:
+def status(compact: bool = False, **_: Any) -> dict[str, Any]:
+    if compact:
+        return service_health_status()
     repository, worker = _runtime()
     summary = repository.summary()
     pressure = worker.resource_pressure

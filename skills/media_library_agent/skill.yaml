@@ -617,6 +617,10 @@ tools:
   side_effects: none
   input_schema:
     type: object
+    properties:
+      compact:
+        type: boolean
+        default: false
     additionalProperties: true
   output_schema:
     type: object

@@ -1210,7 +1210,9 @@ def _sync_agents(
             "participation": catalog.participation(),
         }
     agent_status, status_error = _invoke_agent(
-        "status", {}, timeout=min(5.0, max(1.0, float(timeout_seconds)))
+        "status",
+        {"compact": True},
+        timeout=min(5.0, max(1.0, float(timeout_seconds))),
     )
     agent_info = (
         agent_status.get("agent")

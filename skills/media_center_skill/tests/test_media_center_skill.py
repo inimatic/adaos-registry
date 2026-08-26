@@ -3633,6 +3633,7 @@ def test_local_agent_sync_resumes_from_its_durable_cursor(monkeypatch, tmp_path)
 
     def invoke_agent(operation, arguments, *, timeout):
         if operation == "status":
+            assert arguments == {"compact": True}
             return (
                 {
                     "ok": True,
