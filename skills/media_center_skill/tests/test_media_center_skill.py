@@ -1440,6 +1440,31 @@ def test_coordinator_applies_agent_deltas_and_searches_folder_segments(monkeypat
     assert replay["ignored_count"] == 2
 
 
+def test_coordinator_keeps_unresolved_agent_sources_distinct(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "unresolved-sources.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    first = _agent_delta(1, "Video/First.avi", kind="video")
+    second = _agent_delta(2, "Video/Second.avi", kind="video")
+    for delta in (first, second):
+        delta["source"]["resource_id"] = ""
+        delta["source"]["descriptor"].pop("id")
+        delta["source"]["descriptor"].pop("resource_id")
+
+    applied = catalog.apply_agent_page(_agent_page(first, second))
+    items = catalog.list_items(media_kind="video", limit=30)["items"]
+
+    assert applied["applied_count"] == 2
+    assert {item["name"] for item in items} == {"First.avi", "Second.avi"}
+    with catalog.repository.connect() as connection:
+        identities = connection.execute(
+            "SELECT source,resource_id FROM catalog_items ORDER BY source"
+        ).fetchall()
+    assert [row["resource_id"] for row in identities] == ["", ""]
+    assert len({row["source"] for row in identities}) == 2
+
+
 def test_coordinator_projects_safe_versioned_artwork_url(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "artwork.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())

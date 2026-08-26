@@ -93,6 +93,12 @@ Agent availability is independent from known catalog identity. The coordinator d
 
 The colocated compatibility path first reads the agent's stable identity and then resumes that agent's durable cursor. It never restarts delta ingestion at sequence zero merely because distributed topology is not configured, and it never borrows a cursor from a different prior local agent.
 
+An agent source whose media registration is unresolved still receives a distinct
+catalog identity derived from its agent and source IDs. Its public resource ID
+remains empty and playback therefore fails closed, but another unresolved file
+cannot collide with it on the legacy `(source, resource_id)` uniqueness key or
+stop delta catch-up for the rest of the library.
+
 When an agent delta names the same contained source through an exact path or a root/path alias, the coordinator retires the legacy `media_server` compatibility row from normal reads. Favorite, resume/history, play count, rating, hidden state, and playlist membership are merged into the canonical agent row before retirement. This removes stale externally matched artwork and duplicate UI entries without deleting the original file or its core media reference.
 
 MusicBrainz projection consumes both recording `genres` and ranked community

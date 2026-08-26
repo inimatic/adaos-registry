@@ -3694,6 +3694,16 @@ class MediaCatalogCoordinator:
         size_bytes = int(
             source.get("size_bytes") or descriptor.get("size_bytes") or 0
         )
+        resource_id = _text(
+            source.get("resource_id")
+            or descriptor.get("resource_id")
+            or descriptor.get("id")
+        )
+        catalog_source = (
+            f"agent:{agent_id}"
+            if resource_id
+            else f"agent:{agent_id}:source:{source_id}"
+        )
         retired_legacy_rows: list[sqlite3.Row] = []
         if source_path or relative_path:
             retired_legacy_rows = connection.execute(
@@ -3798,7 +3808,7 @@ class MediaCatalogCoordinator:
                 explicit=excluded.explicit
             """,
             (
-                item_id, f"agent:{agent_id}", _text(source.get("resource_id") or descriptor.get("resource_id") or descriptor.get("id")),
+                item_id, catalog_source, resource_id,
                 name, title, kind, mime_type, size_bytes,
                 modified_at, content_path, routed_path, _text(descriptor.get("playback_id")), source_path,
                 _json_dumps(_compact_source_descriptor(descriptor)),
