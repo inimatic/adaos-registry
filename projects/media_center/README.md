@@ -7,9 +7,9 @@ dependency and remains the owner of core media resource registration and byte
 delivery.
 
 The unreleased 2026-08-26 local candidate combines
-`media_center_skill@0.8.78`, `media_library_agent@0.6.41`,
+`media_center_skill@0.8.79`, `media_library_agent@0.6.42`,
 `media_control_skill@0.2.12`, scenario `media_center@0.6.26`, and client
-`99b65f3`. It adds durable queue auto-advance and endpoint selection, compact
+`dcee3b4`. It adds durable queue auto-advance and endpoint selection, compact
 fullscreen/PiP/Play On controls, playlists, reviewed metadata correction,
 provider rejection, source identity and compact live rendition history. Requested
 browser conversion preempts scans at file boundaries, unsafe unprobed AVI
@@ -31,6 +31,11 @@ resumes. Operation queries use indexed joins and publish an explicit capped
 lower bound until the historical `(kind,status)` index can be created cheaply.
 The `.30` catalog with 424,514 historical jobs therefore remains searchable and
 observable while migration proceeds instead of blocking API startup.
+Agent delta-history compaction also advances in exact small sequence pages and
+replaces redundant latest-source payloads with resolvable references. The
+coordinator keeps unresolved source identities distinct without inventing a
+playable resource ID, so a compatibility sync cannot violate the legacy
+catalog uniqueness constraint.
 
 The same candidate adds per-root derived-storage policy. Converted single-file
 renditions default to an atomic content-addressed `.adaos-media` store on the
