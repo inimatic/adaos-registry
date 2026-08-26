@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.76
+version: 0.8.77
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -237,7 +237,9 @@ tools:
   side_effects: local_write
   input_schema:
     type: object
-    required: [root_id, values]
+    required:
+    - root_id
+    - values
     properties:
       root_id:
         type: string
@@ -1436,7 +1438,8 @@ tools:
   output_schema:
     type: object
 - name: optimize_storage
-  description: Optimize catalog indexes and optionally reclaim SQLite disk space after bounded logical compaction.
+  description: Optimize catalog indexes and optionally reclaim SQLite disk space after
+    bounded logical compaction.
   entry: handlers.main:optimize_storage
   side_effects: local_write
   input_schema:
@@ -2307,7 +2310,8 @@ data_routes:
   owner: skill:media_center_skill
   first_paint: bounded compact conversion history from the source-owning agent
   recovery: repeat rendition_operations after progress invalidation or reconnect
-  guard_visibility: workspace-visible relative source names, states, byte counters, and bounded diagnostics only
+  guard_visibility: workspace-visible relative source names, states, byte counters,
+    and bounded diagnostics only
   budget:
     max_payload_bytes: 65536
     max_items: 100
@@ -2422,12 +2426,13 @@ nlu_hints:
           type: object
       additionalProperties: true
   entities: []
-updated_at: '2026-08-24T18:57:11+00:00'
+updated_at: '2026-08-26T04:31:29+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.937+5665.6ec1f110
-    recorded_at: '2026-08-24T18:57:11+00:00'
+    min_version: 0.1.939+5685.a8e1dfd0
+    recorded_at: '2026-08-26T04:31:29+00:00'
     source: skill_push
-    min_commit: 6ec1f110ffc010624f0f59326d30a08661b84160
-    min_short_commit: 6ec1f110
-    build_date: '2026-08-24T20:59:08+03:00'
+    min_commit: a8e1dfd019f9bfd9ba2f188596b5d314ec88786a
+    min_short_commit: a8e1dfd0
+    build_date: '2026-08-26T07:29:43+03:00'
+
