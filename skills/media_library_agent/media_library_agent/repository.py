@@ -626,17 +626,6 @@ class MediaLibraryAgentRepository:
             source_count = int(
                 connection.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
             )
-            search_count = (
-                int(
-                    connection.execute("SELECT COUNT(*) FROM source_search").fetchone()[
-                        0
-                    ]
-                )
-                if search_schema is not None
-                else -1
-            )
-            if search_count != source_count:
-                rebuild_search = True
             if rebuild_search:
                 connection.execute("DROP TABLE IF EXISTS source_search")
                 options = (
@@ -649,17 +638,32 @@ class MediaLibraryAgentRepository:
                     "text, tokenize='unicode61 remove_diacritics 2'"
                     f"{options})"
                 )
-                connection.execute(
-                    """
-                    INSERT INTO source_search(rowid,text)
-                    SELECT search_rowid,
-                        COALESCE(name,'') || ' ' ||
-                        COALESCE(relative_path,'') || ' ' ||
-                        COALESCE(folder_path,'') || ' ' ||
-                        COALESCE(metadata_json,'') || ' ' ||
-                        COALESCE(descriptor_json,'')
-                    FROM sources
-                    """
+                search_state = "pending" if source_count else "completed"
+                self._set_meta(connection, "source_search_backfill_state", search_state)
+                self._set_meta(connection, "source_search_backfill_cursor", 0)
+                self._set_meta(connection, "source_search_backfill_indexed", 0)
+                self._set_meta(
+                    connection, "source_search_backfill_total", source_count
+                )
+                self._set_meta(connection, "source_search_backfill_started_at", "")
+                self._set_meta(
+                    connection,
+                    "source_search_backfill_completed_at",
+                    now_iso() if not source_count else "",
+                )
+            else:
+                # Revision 6 built this exact FTS schema transactionally. Preserve it
+                # on upgrade instead of rewriting a large, already searchable index.
+                self._set_meta(connection, "source_search_backfill_state", "completed")
+                self._set_meta(connection, "source_search_backfill_cursor", 0)
+                self._set_meta(
+                    connection, "source_search_backfill_indexed", source_count
+                )
+                self._set_meta(
+                    connection, "source_search_backfill_total", source_count
+                )
+                self._set_meta(
+                    connection, "source_search_backfill_completed_at", now_iso()
                 )
             connection.commit()
 
@@ -799,6 +803,118 @@ class MediaLibraryAgentRepository:
             (text(key), str(value)),
         )
 
+    def source_search_backfill_status(self) -> dict[str, Any]:
+        with self.connect() as connection:
+            meta = self._meta_values(
+                connection,
+                (
+                    "source_search_backfill_state",
+                    "source_search_backfill_cursor",
+                    "source_search_backfill_indexed",
+                    "source_search_backfill_total",
+                    "source_search_backfill_started_at",
+                    "source_search_backfill_completed_at",
+                ),
+            )
+        # Revision 6 created a complete FTS index transactionally. New pending
+        # migrations persist an explicit state; pre-state revision 6 databases are
+        # therefore complete rather than unknown.
+        state = text(meta.get("source_search_backfill_state") or "completed")
+        indexed = max(0, int(meta.get("source_search_backfill_indexed") or 0))
+        total = max(indexed, int(meta.get("source_search_backfill_total") or 0))
+        return {
+            "schema": "adaos.media_library.search_backfill.v1",
+            "state": state,
+            "partial": state != "completed",
+            "cursor": max(0, int(meta.get("source_search_backfill_cursor") or 0)),
+            "indexed_count": indexed,
+            "total_count": total,
+            "progress": min(1.0, indexed / total) if total else 1.0,
+            "started_at": text(meta.get("source_search_backfill_started_at")),
+            "completed_at": text(meta.get("source_search_backfill_completed_at")),
+        }
+
+    def source_search_backfill_batch(self, *, limit: int = 100) -> dict[str, Any]:
+        bounded = max(1, min(500, int(limit or 100)))
+        with self.connect() as connection:
+            meta = self._meta_values(
+                connection,
+                (
+                    "source_search_backfill_state",
+                    "source_search_backfill_cursor",
+                    "source_search_backfill_indexed",
+                    "source_search_backfill_total",
+                    "source_search_backfill_started_at",
+                ),
+            )
+            state = text(meta.get("source_search_backfill_state") or "completed")
+            if state == "completed":
+                return {
+                    "ok": True,
+                    "job_type": "search_index",
+                    "batch_count": 0,
+                    **self.source_search_backfill_status(),
+                }
+            cursor = max(0, int(meta.get("source_search_backfill_cursor") or 0))
+            rows = connection.execute(
+                """
+                SELECT search_rowid,
+                    COALESCE(name,'') || ' ' ||
+                    COALESCE(relative_path,'') || ' ' ||
+                    COALESCE(folder_path,'') || ' ' ||
+                    COALESCE(metadata_json,'') || ' ' ||
+                    COALESCE(descriptor_json,'') AS search_text
+                FROM sources
+                WHERE search_rowid>? ORDER BY search_rowid LIMIT ?
+                """,
+                (cursor, bounded),
+            ).fetchall()
+            if not rows:
+                total = int(
+                    connection.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
+                )
+                self._set_meta(connection, "source_search_backfill_state", "completed")
+                self._set_meta(connection, "source_search_backfill_indexed", total)
+                self._set_meta(connection, "source_search_backfill_total", total)
+                self._set_meta(
+                    connection, "source_search_backfill_completed_at", now_iso()
+                )
+                connection.commit()
+                return {
+                    "ok": True,
+                    "job_type": "search_index",
+                    "batch_count": 0,
+                    **self.source_search_backfill_status(),
+                }
+            if not text(meta.get("source_search_backfill_started_at")):
+                self._set_meta(
+                    connection, "source_search_backfill_started_at", now_iso()
+                )
+            connection.executemany(
+                "DELETE FROM source_search WHERE rowid=?",
+                ((int(row["search_rowid"]),) for row in rows),
+            )
+            connection.executemany(
+                "INSERT INTO source_search(rowid,text) VALUES (?,?)",
+                (
+                    (int(row["search_rowid"]), str(row["search_text"]))
+                    for row in rows
+                ),
+            )
+            indexed = max(0, int(meta.get("source_search_backfill_indexed") or 0))
+            indexed += len(rows)
+            cursor = int(rows[-1]["search_rowid"])
+            self._set_meta(connection, "source_search_backfill_state", "running")
+            self._set_meta(connection, "source_search_backfill_cursor", cursor)
+            self._set_meta(connection, "source_search_backfill_indexed", indexed)
+            connection.commit()
+        return {
+            "ok": True,
+            "job_type": "search_index",
+            "batch_count": len(rows),
+            **self.source_search_backfill_status(),
+        }
+
     def artwork_backfill_batch(
         self,
         *,
@@ -817,13 +933,21 @@ class MediaLibraryAgentRepository:
                     "artwork_backfill_cycle",
                     "artwork_backfill_examined",
                     "artwork_backfill_queued",
+                    "artwork_backfill_count_started",
+                    "artwork_backfill_count_cycle",
+                    "artwork_backfill_counted",
+                    "artwork_backfill_count_pending",
+                    "artwork_backfill_count_ready",
+                    "artwork_backfill_count_unavailable",
+                    "artwork_backfill_count_failed",
                 ),
             )
             try:
                 next_at = float(meta.get("artwork_backfill_next_at") or 0)
             except ValueError:
                 next_at = 0.0
-            if next_at > now:
+            counts_missing = not text(meta.get("artwork_backfill_count_started"))
+            if next_at > now and not counts_missing:
                 return {
                     "ok": True,
                     "state": "idle",
@@ -832,6 +956,31 @@ class MediaLibraryAgentRepository:
                     "cursor": text(meta.get("artwork_backfill_cursor")),
                 }
             cursor = text(meta.get("artwork_backfill_cursor"))
+            cycle = max(0, int(meta.get("artwork_backfill_cycle") or 0))
+            count_cycle = max(0, int(meta.get("artwork_backfill_count_cycle") or 0))
+            if not cursor and (
+                not text(meta.get("artwork_backfill_count_started"))
+                or count_cycle != cycle
+            ):
+                for key in (
+                    "artwork_backfill_counted",
+                    "artwork_backfill_count_pending",
+                    "artwork_backfill_count_ready",
+                    "artwork_backfill_count_unavailable",
+                    "artwork_backfill_count_failed",
+                ):
+                    self._set_meta(connection, key, 0)
+                self._set_meta(connection, "artwork_backfill_count_started", 1)
+                self._set_meta(connection, "artwork_backfill_count_cycle", cycle)
+                self._set_meta(connection, "artwork_backfill_counts_complete", 0)
+                meta = {
+                    **meta,
+                    "artwork_backfill_counted": "0",
+                    "artwork_backfill_count_pending": "0",
+                    "artwork_backfill_count_ready": "0",
+                    "artwork_backfill_count_unavailable": "0",
+                    "artwork_backfill_count_failed": "0",
+                }
             rows = connection.execute(
                 """
                 SELECT * FROM sources
@@ -848,6 +997,7 @@ class MediaLibraryAgentRepository:
                 self._set_meta(
                     connection, "artwork_backfill_last_completed_at", now_iso()
                 )
+                self._set_meta(connection, "artwork_backfill_counts_complete", 1)
                 connection.commit()
                 return {
                     "ok": True,
@@ -866,6 +1016,31 @@ class MediaLibraryAgentRepository:
             self._set_meta(connection, "artwork_backfill_next_at", 0)
             self._set_meta(connection, "artwork_backfill_examined", examined)
             self._set_meta(connection, "artwork_backfill_last_run_at", now_iso())
+            counts = {
+                "pending": max(
+                    0, int(meta.get("artwork_backfill_count_pending") or 0)
+                ),
+                "ready": max(0, int(meta.get("artwork_backfill_count_ready") or 0)),
+                "unavailable": max(
+                    0, int(meta.get("artwork_backfill_count_unavailable") or 0)
+                ),
+                "failed": max(
+                    0, int(meta.get("artwork_backfill_count_failed") or 0)
+                ),
+            }
+            for row in rows:
+                metadata = json_loads(str(row["metadata_json"]), {})
+                artwork = metadata.get("artwork") if isinstance(metadata, Mapping) else {}
+                state = text(artwork.get("state")) if isinstance(artwork, Mapping) else ""
+                if state in counts:
+                    counts[state] += 1
+            self._set_meta(
+                connection,
+                "artwork_backfill_counted",
+                max(0, int(meta.get("artwork_backfill_counted") or 0)) + len(rows),
+            )
+            for state, count in counts.items():
+                self._set_meta(connection, f"artwork_backfill_count_{state}", count)
             connection.commit()
         return {
             "ok": True,
@@ -886,6 +1061,37 @@ class MediaLibraryAgentRepository:
             self._set_meta(connection, "artwork_backfill_queued", total)
             connection.commit()
 
+    def record_artwork_backfill_state_transitions(
+        self, transitions: Iterable[tuple[str, str]]
+    ) -> None:
+        values = [
+            (text(previous), text(current))
+            for previous, current in transitions
+            if text(previous) != text(current)
+        ]
+        if not values:
+            return
+        states = ("pending", "ready", "unavailable", "failed")
+        with self.connect() as connection:
+            meta = self._meta_values(
+                connection,
+                tuple(f"artwork_backfill_count_{state}" for state in states),
+            )
+            counts = {
+                state: max(
+                    0, int(meta.get(f"artwork_backfill_count_{state}") or 0)
+                )
+                for state in states
+            }
+            for previous, current in values:
+                if previous in counts:
+                    counts[previous] = max(0, counts[previous] - 1)
+                if current in counts:
+                    counts[current] += 1
+            for state, count in counts.items():
+                self._set_meta(connection, f"artwork_backfill_count_{state}", count)
+            connection.commit()
+
     def artwork_backfill_status(self) -> dict[str, Any]:
         with self.connect() as connection:
             meta = self._meta_values(
@@ -898,18 +1104,14 @@ class MediaLibraryAgentRepository:
                     "artwork_backfill_queued",
                     "artwork_backfill_last_run_at",
                     "artwork_backfill_last_completed_at",
+                    "artwork_backfill_counted",
+                    "artwork_backfill_count_pending",
+                    "artwork_backfill_count_ready",
+                    "artwork_backfill_count_unavailable",
+                    "artwork_backfill_count_failed",
+                    "artwork_backfill_counts_complete",
                 ),
             )
-            states = connection.execute(
-                """
-                SELECT COUNT(*) AS total,
-                    SUM(CASE WHEN json_extract(metadata_json,'$.artwork.state')='pending' THEN 1 ELSE 0 END) AS pending,
-                    SUM(CASE WHEN json_extract(metadata_json,'$.artwork.state')='ready' THEN 1 ELSE 0 END) AS ready,
-                    SUM(CASE WHEN json_extract(metadata_json,'$.artwork.state')='unavailable' THEN 1 ELSE 0 END) AS unavailable,
-                    SUM(CASE WHEN json_extract(metadata_json,'$.artwork.state')='failed' THEN 1 ELSE 0 END) AS failed
-                FROM sources WHERE present=1
-                """
-            ).fetchone()
         try:
             next_at = float(meta.get("artwork_backfill_next_at") or 0)
         except ValueError:
@@ -925,11 +1127,20 @@ class MediaLibraryAgentRepository:
             "last_completed_at": text(meta.get("artwork_backfill_last_completed_at")),
             "next_at": next_at or None,
             "sources": {
-                "total": int(states["total"] or 0),
-                "pending": int(states["pending"] or 0),
-                "ready": int(states["ready"] or 0),
-                "unavailable": int(states["unavailable"] or 0),
-                "failed": int(states["failed"] or 0),
+                "total": max(0, int(meta.get("artwork_backfill_counted") or 0)),
+                "pending": max(
+                    0, int(meta.get("artwork_backfill_count_pending") or 0)
+                ),
+                "ready": max(
+                    0, int(meta.get("artwork_backfill_count_ready") or 0)
+                ),
+                "unavailable": max(
+                    0, int(meta.get("artwork_backfill_count_unavailable") or 0)
+                ),
+                "failed": max(
+                    0, int(meta.get("artwork_backfill_count_failed") or 0)
+                ),
+                "partial": text(meta.get("artwork_backfill_counts_complete")) != "1",
             },
         }
 
@@ -2718,6 +2929,7 @@ class MediaLibraryAgentRepository:
         bounded = max(1, min(100, int(limit or 30)))
         offset = decode_cursor(cursor)
         if not token:
+            search_index = self.source_search_backfill_status()
             return {
                 "ok": True,
                 "schema": SCHEMA_VERSION,
@@ -2726,6 +2938,8 @@ class MediaLibraryAgentRepository:
                 "next_cursor": None,
                 "has_more": False,
                 "agent": {"id": self.agent_id, "node_id": self.node_id},
+                "search_index": search_index,
+                "partial": bool(search_index["partial"]),
             }
         terms = [
             term for term in re.findall(r"[\w]+", token, flags=re.UNICODE) if term
@@ -2748,6 +2962,7 @@ class MediaLibraryAgentRepository:
             ).fetchall()
         visible = rows[:bounded]
         has_more = len(rows) > bounded
+        search_index = self.source_search_backfill_status()
         return {
             "ok": True,
             "schema": SCHEMA_VERSION,
@@ -2765,6 +2980,8 @@ class MediaLibraryAgentRepository:
             "next_cursor": encode_cursor(offset + len(visible)) if has_more else None,
             "has_more": has_more,
             "agent": {"id": self.agent_id, "node_id": self.node_id},
+            "search_index": search_index,
+            "partial": bool(search_index["partial"]),
         }
 
     def browse_folders(
@@ -3303,6 +3520,47 @@ class MediaLibraryAgentRepository:
             "job_retention": self.job_retention_status(),
             "delta_cursor": encode_cursor(int(delta["sequence"] or 0)),
             "storage": self.storage_status(),
+        }
+
+    def health_summary(self) -> dict[str, Any]:
+        with self.connect() as connection:
+            roots = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM roots WHERE enabled=1"
+                ).fetchone()[0]
+            )
+            scans_active = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM scan_jobs WHERE status IN ("
+                    "'queued','running','waiting_resources','waiting_storage','canceling')"
+                ).fetchone()[0]
+            )
+            scans_failed = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM scan_jobs WHERE status='failed'"
+                ).fetchone()[0]
+            )
+            renditions_active = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM rendition_jobs WHERE status IN ("
+                    "'queued','running','waiting_resources','waiting_storage','canceling')"
+                ).fetchone()[0]
+            )
+            renditions_failed = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM rendition_jobs WHERE status='failed'"
+                ).fetchone()[0]
+            )
+        active = scans_active + renditions_active
+        failed = scans_failed + renditions_failed
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "agent": {"id": self.agent_id, "node_id": self.node_id},
+            "root_count": roots,
+            "active_job_count": active,
+            "failed_job_count": failed,
+            "search_index": self.source_search_backfill_status(),
         }
 
     def topology_root_witness(self, root_id: str) -> dict[str, Any] | None:

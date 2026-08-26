@@ -99,6 +99,7 @@ class MediaLibraryAgentWorker:
         self._job_retention_complete = False
         self._last_job_retention_monotonic = 0.0
         self._artwork_queue_saturated = False
+        self._last_search_backfill_monotonic = 0.0
 
     def ensure_started(self) -> bool:
         with self._lock:
@@ -159,6 +160,30 @@ class MediaLibraryAgentWorker:
             self._job_retention_complete = bool(retention.get("complete"))
             self._last_job_retention_monotonic = retention_at
         self._refresh_resource_pressure(force=True)
+        search_backfill = None
+        search_interval = max(
+            0.1,
+            min(
+                10.0,
+                float(
+                    os.environ.get(
+                        "MEDIA_LIBRARY_AGENT_SEARCH_BACKFILL_INTERVAL_SECONDS"
+                    )
+                    or 0.5
+                ),
+            ),
+        )
+        now = time.monotonic()
+        if (
+            self._resource_pressure == "normal"
+            and now - self._last_search_backfill_monotonic >= search_interval
+        ):
+            search_backfill = self.repository.source_search_backfill_batch(
+                limit=int(
+                    os.environ.get("MEDIA_LIBRARY_AGENT_SEARCH_BACKFILL_BATCH") or 100
+                )
+            )
+            self._last_search_backfill_monotonic = now
         self._enqueue_due_schedules()
         self._poll_watch_schedules()
         self._cleanup_invalidated_renditions()
@@ -203,6 +228,8 @@ class MediaLibraryAgentWorker:
             or int(maintenance.get("batch_updated") or 0) > 0
         ):
             return maintenance
+        if search_backfill and int(search_backfill.get("batch_count") or 0) > 0:
+            return search_backfill
         return None
 
     def _enqueue_storage_migrations(self) -> None:
@@ -399,6 +426,7 @@ class MediaLibraryAgentWorker:
         )
         queued = 0
         examined = 0
+        state_transitions: list[tuple[str, str]] = []
         while examined < configured_batch_size and active + queued < maximum_active:
             batch = self.repository.artwork_backfill_batch(
                 limit=min(
@@ -412,9 +440,28 @@ class MediaLibraryAgentWorker:
                 break
             examined += len(items)
             for source in items:
+                metadata = source.get("metadata")
+                artwork = metadata.get("artwork") if isinstance(metadata, Mapping) else {}
+                previous_state = (
+                    text(artwork.get("state")) if isinstance(artwork, Mapping) else ""
+                )
                 queued += int(self._queue_artwork_for_source(source, priority=700))
+                changed = self.repository.get_source(text(source.get("id")))
+                changed_metadata = changed.get("metadata") if changed else {}
+                changed_artwork = (
+                    changed_metadata.get("artwork")
+                    if isinstance(changed_metadata, Mapping)
+                    else {}
+                )
+                current_state = (
+                    text(changed_artwork.get("state"))
+                    if isinstance(changed_artwork, Mapping)
+                    else ""
+                )
+                state_transitions.append((previous_state, current_state))
                 if active + queued >= maximum_active:
                     break
+        self.repository.record_artwork_backfill_state_transitions(state_transitions)
         self.repository.record_artwork_backfill_queued(queued)
         return queued
 
@@ -1032,6 +1079,9 @@ class MediaLibraryAgentWorker:
             "active_job_count": self.repository.active_artwork_job_count(),
             "capabilities": artwork_capabilities(),
         }
+
+    def search_status(self) -> dict[str, Any]:
+        return self.repository.source_search_backfill_status()
 
     def _run_job(self, job: Mapping[str, Any]) -> dict[str, Any]:
         job_id = text(job.get("id"))

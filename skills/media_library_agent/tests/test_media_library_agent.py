@@ -37,7 +37,7 @@ _HANDLER_SPEC = importlib.util.spec_from_file_location(
 assert _HANDLER_SPEC and _HANDLER_SPEC.loader
 main = importlib.util.module_from_spec(_HANDLER_SPEC)
 _HANDLER_SPEC.loader.exec_module(main)
-_WORKER_STATE_TIMEOUT_SECONDS = 20.0
+_WORKER_STATE_TIMEOUT_SECONDS = 60.0
 
 
 def test_agent_declares_core_managed_membership_and_health_projection():
@@ -88,7 +88,7 @@ def isolated_runtime(monkeypatch, tmp_path):
         pass
 
 
-def _wait(job_id: str, timeout: float = 5.0) -> dict:
+def _wait(job_id: str, timeout: float = _WORKER_STATE_TIMEOUT_SECONDS) -> dict:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         payload = main.scan_status(job_id=job_id)
@@ -776,6 +776,102 @@ def test_repository_normalizes_source_storage_and_uses_contentless_fts(tmp_path)
 
     assert repository.search_sources(query="Before")["items"] == []
     assert repository.search_sources(query="After")["items"][0]["name"] == "01.mp3"
+
+
+def test_legacy_search_schema_activates_with_resumable_partial_backfill(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "search-migration.sqlite3", node_id="node-a"
+    )
+    root = repository.add_root(str(library))["root"]
+    for index in range(25):
+        repository.upsert_source(
+            {
+                "root_id": root["id"],
+                "relative_path": f"Album/Track {index:02}.mp3",
+                "folder_path": "Album",
+                "name": f"Track {index:02}",
+                "media_kind": "audio",
+                "mime_type": "audio/mpeg",
+                "size_bytes": 5,
+                "modified_ns": index + 1,
+                "inode": index + 1,
+                "fingerprint": f"fingerprint-{index}",
+                "metadata": {"album": "Migration fixture"},
+            },
+            job_id="seed",
+        )
+    with repository.connect() as connection:
+        connection.execute("DROP TABLE source_search")
+        connection.execute(
+            "CREATE VIRTUAL TABLE source_search USING fts5("
+            "source_id UNINDEXED,text,tokenize='unicode61 remove_diacritics 2')"
+        )
+        connection.execute(
+            "UPDATE agent_meta SET value='5' WHERE key='database_schema_revision'"
+        )
+        connection.commit()
+
+    migrated = MediaLibraryAgentRepository(repository.db_path, node_id="node-a")
+
+    initial = migrated.source_search_backfill_status()
+    assert initial["state"] == "pending"
+    assert initial["partial"] is True
+    assert initial["indexed_count"] == 0
+    assert initial["total_count"] == 25
+    first = migrated.source_search_backfill_batch(limit=5)
+    assert first["batch_count"] == 5
+    assert first["progress"] == 0.2
+    assert migrated.search_sources(query="Track 01")["count"] == 1
+    late = migrated.search_sources(query="Track 24")
+    assert late["count"] == 0
+    assert late["partial"] is True
+
+    while migrated.source_search_backfill_status()["partial"]:
+        migrated.source_search_backfill_batch(limit=5)
+
+    complete = migrated.search_sources(query="Track 24")
+    assert complete["count"] == 1
+    assert complete["partial"] is False
+
+
+def test_health_and_artwork_status_do_not_parse_full_source_metadata(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "bounded-health.sqlite3", node_id="node-a"
+    )
+    root = repository.add_root(str(library))["root"]
+    _operation, source = repository.upsert_source(
+        {
+            "root_id": root["id"],
+            "relative_path": "Movie.mkv",
+            "folder_path": "",
+            "name": "Movie.mkv",
+            "media_kind": "video",
+            "mime_type": "video/x-matroska",
+            "size_bytes": 5,
+            "modified_ns": 1,
+            "inode": 1,
+            "fingerprint": "fingerprint",
+            "metadata": {},
+        },
+        job_id="seed",
+    )
+    with repository.connect() as connection:
+        connection.execute(
+            "UPDATE sources SET metadata_json='invalid-json' WHERE id=?",
+            (source["id"],),
+        )
+        connection.commit()
+
+    health = repository.health_summary()
+    artwork = repository.artwork_backfill_status()
+
+    assert health["ok"] is True
+    assert health["root_count"] == 1
+    assert artwork["sources"]["partial"] is True
 
 
 def test_storage_compaction_retains_latest_replayable_source_snapshot(tmp_path):

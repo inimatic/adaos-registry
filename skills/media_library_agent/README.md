@@ -28,6 +28,15 @@ partial output bytes. Old orphan `.partial` files are removed only inside the
 managed rendition directory, after a grace interval and while no rendition is
 active.
 
+Version `0.6.41` keeps activation and service admission bounded on large,
+slow-storage libraries. `/health` uses an index-backed compact projection and
+does not materialize UI status or parse source metadata. Search-index schema
+replacement creates an empty FTS table transactionally, then the single
+background worker fills it in resumable batches while searches report
+`partial=true`; an already complete revision-6 index is preserved. Artwork
+state totals are likewise accumulated by the bounded backfill cursor instead
+of running `json_extract` across the entire source table on every status read.
+
 ## Storage boundary
 
 Original media bytes remain at their original paths. The agent calls `adaos.sdk.io.media.register_media_file`, which records an allowlisted reference for range playback; it never copies the source into `.adaos`. Removing or draining the skill retains external media by design. Browser-compatible renditions and normalized artwork are explicitly derived data: their exact source revision and fingerprint are recorded, and only generated outputs may be copied to managed media storage.
@@ -69,7 +78,9 @@ do not renegotiate SQLite WAL mode or acquire a writer lock during startup.
 This keeps service health admission independent from concurrent core migration
 and UI rehydration on slow storage. Worker transition tests use bounded
 slow-storage deadlines rather than assuming a local SSD completes a scan in
-two seconds.
+two seconds. Service startup requeues interrupted work using the compact health
+projection; it never computes the full library summary before binding the
+health port.
 
 The agent database and the Media Center coordinator database are deliberately
 separate. This database is the node-local source of truth for roots, source
@@ -79,7 +90,11 @@ search, personalization, and playback planning; it must not become a second
 copy of the complete agent descriptor.
 
 Source search uses a contentless FTS5 index, so searchable JSON is tokenized but
-is not retained a second time by the FTS content table. Full-state source deltas
+is not retained a second time by the FTS content table. A required rebuild is
+checkpointed by source row id and advances in bounded low-priority batches;
+playback or critical resource pressure pauses it, and search responses expose
+the incomplete index instead of pretending that missing matches are final.
+Full-state source deltas
 remain ordered and idempotent, while old intermediate revisions are collapsed
 after a one-hour grace period; the newest snapshot or tombstone for every source
 is always retained, so a new or delayed coordinator can still rebuild its read

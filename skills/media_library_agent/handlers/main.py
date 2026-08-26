@@ -303,14 +303,14 @@ def recover_interrupted_runtime() -> dict[str, Any]:
     repository, worker = _runtime()
     if not _owns_background_worker():
         return {
-            **repository.summary(),
+            **repository.health_summary(),
             "requeued_job_count": 0,
             "worker": {"running": False, "owner": "service_process"},
         }
     requeued = repository.requeue_interrupted_jobs()
     worker.ensure_started()
     return {
-        **repository.summary(),
+        **repository.health_summary(),
         "requeued_job_count": requeued,
         "worker": {"running": True, "owner": "current_process"},
     }
@@ -1045,6 +1045,7 @@ def status(**_: Any) -> dict[str, Any]:
             "watch": worker.watch_status(),
             "progress_publisher": _progress_publisher_status(),
             "artwork": worker.artwork_status(),
+            "search_index": worker.search_status(),
             "transcoding": ffmpeg_capabilities(),
         },
         "limits": {
@@ -1057,6 +1058,29 @@ def status(**_: Any) -> dict[str, Any]:
                 os.environ.get("MEDIA_LIBRARY_AGENT_WATCH_MAX_ENTRIES") or 50_000
             ),
             "rendition": rendition_limits(),
+        },
+    }
+
+
+def service_health_status() -> dict[str, Any]:
+    repository, worker = _runtime()
+    summary = repository.health_summary()
+    pressure = worker.resource_pressure
+    active_jobs = int(summary.get("active_job_count") or 0)
+    failed_jobs = int(summary.get("failed_job_count") or 0)
+    return {
+        **summary,
+        "distributed": {
+            "health": {
+                "status": "passing",
+                "ready": True,
+                "active_jobs": active_jobs,
+                "failed_jobs": failed_jobs,
+            },
+            "pressure": {
+                "state": pressure,
+                "active_jobs": active_jobs,
+            },
         },
     }
 

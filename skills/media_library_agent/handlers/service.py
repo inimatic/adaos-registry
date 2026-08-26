@@ -42,7 +42,7 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
             return
-        payload = main.status()
+        payload = main.service_health_status()
         raw = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
         self.send_response(200 if payload.get("ok") else 503)
         self.send_header("Content-Type", "application/json; charset=utf-8")
