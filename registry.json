@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-26T08:05:00+00:00",
+  "updated_at": "2026-08-26T04:31:29+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -381,7 +381,7 @@
       "id": "media_center_skill",
       "name": "media_center_skill",
       "version": "0.8.79",
-      "updated_at": "2026-08-26T14:54:00+00:00",
+      "updated_at": "2026-08-26T04:31:29+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
       "source": {
