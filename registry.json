@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-26T07:40:16+00:00",
+  "updated_at": "2026-08-26T08:05:00+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -865,40 +865,6 @@
     },
     {
       "kind": "skill",
-      "id": "root_mgmnt",
-      "name": "root_mgmnt",
-      "version": "0.5.2",
-      "updated_at": "2026-08-26T06:42:32+00:00",
-      "path": "skills/root_mgmnt",
-      "manifest": "skills/root_mgmnt/skill.yaml",
-      "source": {
-        "path": "skills/root_mgmnt",
-        "manifest": "skills/root_mgmnt/skill.yaml"
-      },
-      "install": {
-        "kind": "skill",
-        "name": "root_mgmnt",
-        "id": "root_mgmnt"
-      },
-      "description": "Private root operator skill for LLM policy, fleet activity, and subnet lifecycle hygiene.",
-      "entry": "handlers/main.py",
-      "runtime_python": "3.11",
-      "activation": {
-        "mode": "lazy",
-        "when": {
-          "scenarios_active": [
-            "release_validation_ops"
-          ],
-          "client_presence": true,
-          "webspace_scope": "active"
-        },
-        "startup_allowed": true,
-        "background_refresh": false
-      },
-      "tools_count": 20
-    },
-    {
-      "kind": "skill",
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.2",
@@ -1353,8 +1319,8 @@
       "kind": "scenario",
       "id": "release_validation_ops",
       "name": "release_validation_ops",
-      "version": "0.1.5",
-      "updated_at": "2026-07-24T09:15:00+00:00",
+      "version": "0.1.6",
+      "updated_at": "2026-08-26T08:05:00+00:00",
       "path": "scenarios/release_validation_ops",
       "manifest": "scenarios/release_validation_ops/scenario.yaml",
       "source": {
@@ -1367,10 +1333,9 @@
         "id": "release_validation_ops"
       },
       "title": "Release Validation Operations",
-      "description": "Private Root operator workspace for infrastructure context and observe-only AdaOS release validation campaigns.",
+      "description": "Observe-only AdaOS release validation campaigns.",
       "skills": {
         "required": [
-          "root_mgmnt",
           "release_validation_skill"
         ]
       }

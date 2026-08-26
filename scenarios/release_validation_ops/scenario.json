@@ -1,12 +1,11 @@
 {
   "id": "release_validation_ops",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "name": "Release Validation Operations",
   "type": "desktop",
   "title": "Release Validation Operations",
-  "description": "Private Root operator workspace for infrastructure context and observe-only AdaOS release validation campaigns.",
+  "description": "Observe-only AdaOS release validation campaigns.",
   "depends": [
-    "root_mgmnt",
     "release_validation_skill"
   ],
   "ui": {
@@ -45,34 +44,6 @@
               }
             },
             {
-              "id": "release-ops-autonomous-summary",
-              "type": "visual.metricTile",
-              "area": "main",
-              "title": "Test-node validation",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/root_mgmnt/validation_summary"
-              },
-              "inputs": {
-                "valuePath": "value",
-                "labelPath": "label",
-                "subtitlePath": "subtitle",
-                "descriptionPath": "description",
-                "colorPath": "color",
-                "emptyText": "IDLE"
-              }
-            },
-            {
-              "id": "release-ops-root-fleet-metric",
-              "type": "visual.metricTile",
-              "area": "right",
-              "title": "Root fleet",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/root_mgmnt/metrics/fleet_total"
-              }
-            },
-            {
               "id": "release-ops-actions",
               "type": "input.commandBar",
               "area": "right",
@@ -84,8 +55,7 @@
                   { "id": "refresh", "label": "Refresh validation" },
                   { "id": "register", "label": "Register contracts" },
                   { "id": "run", "label": "Run latest pending" },
-                  { "id": "retry", "label": "Retry latest" },
-                  { "id": "refresh-root", "label": "Refresh Root context" }
+                  { "id": "retry", "label": "Retry latest" }
                 ]
               },
               "actions": [
@@ -111,12 +81,6 @@
                   "on": "click:retry",
                   "type": "callSkill",
                   "target": "release_validation_skill.retry_latest_campaign",
-                  "params": { "webspace_id": "$runtime.webspace_id" }
-                },
-                {
-                  "on": "click:refresh-root",
-                  "type": "callSkill",
-                  "target": "root_mgmnt.refresh_snapshot",
                   "params": { "webspace_id": "$runtime.webspace_id" }
                 }
               ]
@@ -226,48 +190,6 @@
                 "path": "data/release_validation/detail"
               },
               "inputs": { "emptyText": "No campaign evidence" }
-            },
-            {
-              "id": "release-ops-root-fleet",
-              "type": "ui.table",
-              "area": "bottom",
-              "title": "Root infrastructure context",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/root_mgmnt/fleet"
-              },
-              "inputs": {
-                "emptyText": "Root fleet snapshot is unavailable",
-                "columns": [
-                  { "key": "subnet_id", "label": "Subnet", "mono": true },
-                  { "key": "display_name", "label": "Name" },
-                  { "key": "live_now", "label": "Live", "width": "75px" },
-                  { "key": "lifecycle_state", "label": "Lifecycle", "width": "120px" },
-                  { "key": "validation_state", "label": "Validation", "width": "105px" },
-                  { "key": "activity_score", "label": "Activity", "width": "90px", "mono": true }
-                ]
-              }
-            },
-            {
-              "id": "release-ops-autonomous-reports",
-              "type": "ui.table",
-              "area": "bottom",
-              "title": "Automated test reports",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/root_mgmnt/validations"
-              },
-              "inputs": {
-                "emptyText": "No autonomous test-node report received",
-                "columns": [
-                  { "key": "node_id", "label": "Node", "width": "130px" },
-                  { "key": "state", "label": "State", "width": "105px" },
-                  { "key": "build_identity", "label": "Build", "width": "190px", "mono": true },
-                  { "key": "checks_passed", "label": "Passed", "width": "75px", "mono": true },
-                  { "key": "reason", "label": "Result" },
-                  { "key": "finished_at", "label": "Finished", "width": "185px", "mono": true }
-                ]
-              }
             },
             {
               "id": "release-ops-journal",

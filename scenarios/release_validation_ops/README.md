@@ -1,15 +1,15 @@
 # Release Validation Operations
 
-Private operator scenario for the internal Root node. This document is the source of truth for the non-public validation topology and must not be copied into public AdaOS documentation.
+Observe-only scenario for AdaOS release validation campaigns.
 
 ## Purpose
 
-The scenario combines two skills:
+The scenario uses one skill:
 
-- `root_mgmnt` supplies Root fleet, policy, lifecycle, and audit context.
 - `release_validation_skill` owns the test registry view, manual campaign controls, evidence projection, and terminal notifications.
 
-Root fleet widgets consume `data/root_mgmnt` from Yjs. The private skill subscribes to the Root backend SSE change stream and material local subnet events, then replaces the projection only when its semantic digest changes. SSE keepalives and timestamp-only snapshot rebuilds therefore do not redraw the fleet. **Refresh Root context** is a recovery control, not the normal update mechanism.
+Root fleet, policy, lifecycle, and audit context moved to a private Root
+operator project. This public scenario does not depend on that private skill.
 
 The AdaOS core service `adaos.services.release_validation` owns the durable schemas, state transitions, classification rules, and allowlisted SSH runner. Keeping those rules in core prevents a UI or LLM tool call from turning test observation into arbitrary remote execution.
 
@@ -87,7 +87,7 @@ Set `ADAOS_RELEASE_VALIDATION_AUTORUN=1` only on a registered test hub. After `s
 
 The build identity is taken from the active-slot manifest installed by the standard GitHub/Root updater. The agent does not request an update and does not resolve GitHub independently. A report ID is deterministic for node, suite version, slot, and build identity, so a restart of the same build reuses the immutable report instead of generating duplicate evidence.
 
-Reports are stored under `.adaos/state/release_validation/autonomous/reports`; `latest.json` is the local pointer. A hub attaches the latest report to its existing mTLS core-update report. Root stores it with the canonical hub report, includes a compact validation view in the Root management snapshot, and emits `snapshot.changed` only when the material report changes. The operator scenario consumes that view from Yjs; it does not poll the test node or Root.
+Reports are stored under `.adaos/state/release_validation/autonomous/reports`; `latest.json` is the local pointer. A hub attaches the latest report to its existing mTLS core-update report. Root stores it with the canonical hub report and emits `snapshot.changed` only when the material report changes. A private Root operator scenario may consume the Root-wide validation view separately.
 
 The initial autonomous suite is intentionally small. It does not run arbitrary commands, update, restart, or roll back the node. A failed report alerts the current node's Telegram route, but automatic rollback and build blocking remain disabled until promotion policy and independent confirmation are implemented.
 
@@ -112,4 +112,4 @@ Later phases can add a dedicated test-agent protocol, headless browser suites, a
 
 ## Migration to the internal node
 
-Move the scenario and skill together, install a core revision containing `adaos.services.release_validation`, copy or re-register the private node registry, verify the SSH known-host entry and identity permissions, activate the scenario, and run one exact-build campaign. Telegram routing belongs to the destination node and requires no artifact changes.
+Move `release_validation_ops` with `release_validation_skill`, install a core revision containing `adaos.services.release_validation`, copy or re-register the private node registry, verify the SSH known-host entry and identity permissions, activate the scenario, and run one exact-build campaign. Telegram routing belongs to the destination node and requires no artifact changes. Root management belongs to a separate private operator project.
