@@ -7,7 +7,7 @@ dependency and remains the owner of core media resource registration and byte
 delivery.
 
 The unreleased 2026-08-26 local candidate combines
-`media_center_skill@0.8.82`, `media_library_agent@0.6.42`,
+`media_center_skill@0.8.83`, `media_library_agent@0.6.42`,
 `media_control_skill@0.2.12`, scenario `media_center@0.6.27`, and client
 `dcee3b4`. It adds durable queue auto-advance and endpoint selection, compact
 fullscreen/PiP/Play On controls, playlists, reviewed metadata correction,
@@ -36,6 +36,9 @@ artwork is explicitly marked as suggested until that review occurs.
 When a path is reclassified as an audiobook, incompatible historical
 MusicBrainz claims remain available as evidence but are rejected from the live
 projection; numbered part/volume directories no longer become book titles.
+Deterministic claims are derived from source-agent metadata rather than feeding
+the already-resolved projection back into itself, and an explicit audiobook
+path outranks conflicting embedded music tags.
 
 Existing large coordinator databases activate without synchronous FTS,
 projection, favorite, or background-history rebuilds. A single paced

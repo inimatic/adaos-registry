@@ -125,6 +125,10 @@ external artwork is marked `suggested` until a profile confirms or replaces it.
 Reclassifying a source as an audiobook records a system rejection for stale
 MusicBrainz claims instead of deleting evidence, and immediately rebuilds the
 resolved metadata projection without that incompatible match.
+The deterministic provider reads source-agent metadata separately from resolved
+claims, preventing an old external match from being reissued under local
+provenance. An explicit audiobook path outranks conflicting embedded album and
+artist tags while preserving both claim sets for review.
 
 ## Personal State
 

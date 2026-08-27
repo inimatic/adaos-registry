@@ -8843,6 +8843,9 @@ class MediaCatalogCoordinator:
                         **(metadata if isinstance(metadata, Mapping) else {}),
                         **(projected if isinstance(projected, Mapping) else {}),
                     },
+                    "source_metadata": (
+                        dict(metadata) if isinstance(metadata, Mapping) else {}
+                    ),
                     "descriptor": _json_loads(row["descriptor_json"]) or {},
                 }
         if subject.startswith("work:"):

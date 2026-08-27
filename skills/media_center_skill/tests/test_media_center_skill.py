@@ -5874,7 +5874,8 @@ def test_audiobook_reclassification_suppresses_stale_musicbrainz_claims(
             break
 
     details = catalog.item_details(item["id"])["item"]
-    assert details["metadata"].get("album") != "Tom Clancy's Enemy Contact"
+    assert details["metadata"].get("album") == "\u041e\u0431\u044b\u043a\u043d\u043e\u0432\u0435\u043d\u043d\u0430\u044f \u0438\u0441\u0442\u043e\u0440\u0438\u044f"
+    assert details["metadata"].get("artists") == ["\u0413\u043e\u043d\u0447\u0430\u0440\u043e\u0432 \u0418 \u0410"]
     assert (
         details["metadata_provenance"].get("album")
         != "media_center.musicbrainz.v1"

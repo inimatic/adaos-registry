@@ -96,7 +96,13 @@ class DeterministicLocalProvider:
                         "confidence": 0.8,
                     }
                 )
-            metadata = subject.get("metadata")
+            resolved_metadata = subject.get("metadata")
+            source_metadata = subject.get("source_metadata")
+            metadata = (
+                source_metadata
+                if isinstance(source_metadata, Mapping)
+                else resolved_metadata
+            )
             if isinstance(metadata, Mapping):
                 for field in ("album", "artist", "artists", "series", "language"):
                     value = metadata.get(field)
@@ -110,29 +116,30 @@ class DeterministicLocalProvider:
                             }
                         )
             path_identity = _path_identity(subject)
+            audiobook = path_identity.get("kind") == "audiobook"
             existing_artists = (
                 metadata.get("artists") or metadata.get("artist")
                 if isinstance(metadata, Mapping)
                 else None
             )
-            if not existing_artists and path_identity.get("artists"):
+            if (audiobook or not existing_artists) and path_identity.get("artists"):
                 claims.append(
                     {
                         "subject_ref": subject_ref,
                         "field_name": "artists",
                         "value": path_identity["artists"],
-                        "confidence": 0.58,
+                        "confidence": 0.92 if audiobook else 0.58,
                     }
                 )
-            if not (
+            if (audiobook or not (
                 metadata.get("album") if isinstance(metadata, Mapping) else None
-            ) and path_identity.get("album"):
+            )) and path_identity.get("album"):
                 claims.append(
                     {
                         "subject_ref": subject_ref,
                         "field_name": "album",
                         "value": path_identity["album"],
-                        "confidence": 0.58,
+                        "confidence": 0.92 if audiobook else 0.58,
                     }
                 )
             if path_identity.get("audiobook_title"):
@@ -387,8 +394,18 @@ def _external_subject(subject: Mapping[str, Any]) -> dict[str, Any]:
         or _EPISODE_RE.search(raw_title)
     )
     path_identity = _path_identity(subject)
-    artists = evidence.get("artists") or evidence.get("artist") or []
-    album = str(evidence.get("album") or "")[:300]
+    content_kind = str(path_identity.get("kind") or "music")
+    if content_kind == "audiobook":
+        artists = (
+            path_identity.get("artists")
+            or evidence.get("artists")
+            or evidence.get("artist")
+            or []
+        )
+        album = str(path_identity.get("album") or evidence.get("album") or "")[:300]
+    else:
+        artists = evidence.get("artists") or evidence.get("artist") or []
+        album = str(evidence.get("album") or "")[:300]
     return {
         "subject_ref": str(subject.get("subject_ref") or ""),
         "title": title[:300],
@@ -397,7 +414,7 @@ def _external_subject(subject: Mapping[str, Any]) -> dict[str, Any]:
         "tmdb_kind": "tv" if series else "movie",
         "artists": artists or path_identity.get("artists") or [],
         "album": album or str(path_identity.get("album") or "")[:300],
-        "content_kind": str(path_identity.get("kind") or "music"),
+        "content_kind": content_kind,
         "audiobook_title": str(path_identity.get("audiobook_title") or "")[:300],
         "evidence_source": str(path_identity.get("evidence_source") or "tags"),
         "external_ids": dict(evidence.get("external_ids") or {})
