@@ -566,6 +566,7 @@ def test_infrastate_marketplace_action_is_a_safe_noop(monkeypatch):
 def test_infrastate_marketplace_items_include_selected_node_target(monkeypatch):
     mod = _load_infrastate_module()
 
+    monkeypatch.setenv("ENV_TYPE", "dev")
     monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
     monkeypatch.setattr(
         mod,
@@ -586,6 +587,7 @@ def test_infrastate_marketplace_items_include_selected_node_target(monkeypatch):
 def test_infrastate_marketplace_stream_defaults_to_selected_node(monkeypatch):
     mod = _load_infrastate_module()
 
+    monkeypatch.setenv("ENV_TYPE", "dev")
     monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
     monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="hub-1"))
     monkeypatch.setattr(mod, "_ui_state", lambda: {"selected_node_id": "member-1"})
@@ -608,6 +610,7 @@ def test_infrastate_marketplace_stream_defaults_to_selected_node(monkeypatch):
 def test_infrastate_marketplace_stream_honors_explicit_target_node(monkeypatch):
     mod = _load_infrastate_module()
 
+    monkeypatch.setenv("ENV_TYPE", "dev")
     monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
     monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="hub-1"))
     monkeypatch.setattr(
@@ -633,6 +636,7 @@ def test_infrastate_marketplace_stream_honors_explicit_target_node(monkeypatch):
 def test_infrastate_marketplace_uses_remote_installed_set(monkeypatch):
     mod = _load_infrastate_module()
 
+    monkeypatch.setenv("ENV_TYPE", "dev")
     monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
     monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="hub-1"))
     monkeypatch.setattr(mod, "runtime_lifecycle_snapshot", lambda: {})
@@ -769,6 +773,7 @@ def test_infrastate_rehydrate_projects_retained_status_before_return(monkeypatch
 def test_infrastate_scenario_marketplace_does_not_build_skill_inventory(monkeypatch):
     mod = _load_infrastate_module()
 
+    monkeypatch.setenv("ENV_TYPE", "dev")
     monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
     monkeypatch.setattr(mod, "_scenario_items", lambda: [])
     monkeypatch.setattr(
@@ -797,6 +802,7 @@ def test_infrastate_scenario_marketplace_does_not_build_skill_inventory(monkeypa
 def test_infrastate_direct_inventory_tool_returns_items(monkeypatch):
     mod = _load_infrastate_module()
 
+    monkeypatch.setenv("ENV_TYPE", "dev")
     monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="hub-1"))
     monkeypatch.setattr(mod, "_operations_snapshot", lambda webspace_id=None: {"active_items": []})
     monkeypatch.setattr(mod, "_inventory_items_from", lambda _builder: [{"name": "web_desktop"}])
@@ -808,6 +814,182 @@ def test_infrastate_direct_inventory_tool_returns_items(monkeypatch):
     assert result["kind"] == "scenarios"
     assert result["count"] == 1
     assert result["items"] == [{"name": "web_desktop"}]
+
+
+def test_infrastate_marketplace_defaults_to_workspace_projects(monkeypatch, tmp_path: Path):
+    mod = _load_infrastate_module()
+    workspace = tmp_path / "workspace"
+    project_dir = workspace / "projects" / "demo_project"
+    project_dir.mkdir(parents=True)
+    (project_dir / "project.yaml").write_text(
+        "\n".join(
+            [
+                "schema: adaos.project.v1",
+                "kind: project",
+                "id: demo_project",
+                "version: 0.1.0",
+                "profiles: [demo.v1]",
+                "components:",
+                "  owned:",
+                "  - ref: scenario:demo_scenario",
+                "    role: primary",
+                "    exposure: application",
+                "    lifecycle: bound",
+                "  dependencies: []",
+                "entrypoints:",
+                "- id: main",
+                "  presentation: scenario:demo_scenario",
+                "  default: true",
+                "  bindings: {}",
+                "catalog:",
+                "  title: Demo Project",
+                "  description: Project-first marketplace row",
+                "  categories: [home]",
+                "  tags: [alpha]",
+                "publication:",
+                "  stage: alpha",
+                "  visibility: listed",
+                "install:",
+                "  default: false",
+                "lifecycle:",
+                "  uninstall:",
+                "    components: retain",
+                "    runtime_data: retain",
+                "    source_artifacts: retain",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.delenv("ENV_TYPE", raising=False)
+    monkeypatch.setattr(
+        mod,
+        "get_ctx",
+        lambda: SimpleNamespace(paths=SimpleNamespace(workspace_dir=lambda: workspace, state_dir=lambda: tmp_path / "state")),
+    )
+    monkeypatch.setattr(mod, "_operations_snapshot", lambda webspace_id=None: {"active_items": []})
+
+    items = mod._marketplace_items(webspace_id="desktop")
+
+    assert items["skills"] == []
+    assert items["scenarios"] == []
+    assert items["projects"][0]["id"] == "demo_project"
+    assert items["projects"][0]["name"] == "Demo Project"
+    assert items["projects"][0]["stage"] == "alpha"
+    assert items["projects"][0]["categories"] == "home"
+
+
+def test_infrastate_project_catalog_merges_remote_registry_projects(monkeypatch, tmp_path: Path):
+    mod = _load_infrastate_module()
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    mod._marketplace_catalog_cache.clear()
+
+    monkeypatch.setattr(
+        mod,
+        "get_ctx",
+        lambda: SimpleNamespace(paths=SimpleNamespace(workspace_dir=lambda: workspace)),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_registry_json_catalog_entries",
+        lambda kind, workspace_root: [
+            {
+                "kind": "project",
+                "id": "web_desktop",
+                "name": "web_desktop",
+                "title": "Web Desktop",
+                "version": "0.3.12",
+                "stage": "beta",
+                "install_default": True,
+                "components_count": 7,
+            }
+        ]
+        if kind == "projects"
+        else [],
+    )
+
+    entries = mod._marketplace_catalog_entries("projects")
+
+    assert entries == [
+        {
+            "kind": "project",
+            "id": "web_desktop",
+            "name": "web_desktop",
+            "title": "Web Desktop",
+            "version": "0.3.12",
+            "stage": "beta",
+            "install_default": True,
+            "components_count": 7,
+        }
+    ]
+
+
+def test_infrastate_inventory_defaults_to_installed_projects(monkeypatch):
+    mod = _load_infrastate_module()
+
+    monkeypatch.delenv("ENV_TYPE", raising=False)
+    monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="hub-1"))
+    monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
+    monkeypatch.setattr(
+        mod,
+        "load_installed_projects",
+        lambda ctx: [
+            {
+                "id": "web_desktop",
+                "version": "0.3.11",
+                "title": "Web Desktop",
+                "categories": ["system", "desktop"],
+                "tags": ["default-install"],
+                "publication": {"stage": "beta"},
+                "component_refs": ["scenario:web_desktop", "skill:web_desktop_skill"],
+                "installed_at": "2026-08-27T00:00:00Z",
+                "status": "installed",
+            }
+        ],
+    )
+
+    result = mod.get_inventory(webspace_id="desktop", target_node_id="hub-1")
+
+    assert result["ok"] is True
+    assert result["kind"] == "projects"
+    assert result["items"] == [
+        {
+            "kind": "project",
+            "id": "web_desktop",
+            "name": "web_desktop",
+            "display_name": "Web Desktop",
+            "title": "Web Desktop",
+            "version": "0.3.11",
+            "description": "",
+            "stage": "beta",
+            "status": "installed",
+            "status_icon": "checkmark-circle-outline",
+            "status_tooltip": "installed",
+            "categories": "system, desktop",
+            "tags": "default-install",
+            "components_count": 2,
+            "component_refs": ["scenario:web_desktop", "skill:web_desktop_skill"],
+            "installed_at": "2026-08-27T00:00:00Z",
+            "source": "",
+            "uninstall_disabled": True,
+        }
+    ]
+
+
+def test_infrastate_marketplace_install_rejects_raw_components_outside_dev(monkeypatch):
+    mod = _load_infrastate_module()
+
+    monkeypatch.delenv("ENV_TYPE", raising=False)
+    monkeypatch.setattr(mod, "default_webspace_id", lambda: "desktop")
+    monkeypatch.setattr(mod, "_write_ui_state", lambda **kwargs: {})
+
+    with pytest.raises(ValueError, match="ENV_TYPE=dev"):
+        mod._perform_action(
+            "marketplace_install",
+            SimpleNamespace(node_id="hub-1"),
+            {"value": {"kind": "skill", "id": "weather_skill"}},
+        )
 
 
 def test_infrastate_compact_snapshot_keeps_semantic_state_plane_contracts():
@@ -1937,6 +2119,7 @@ def test_infrastate_inventory_stream_honors_drift_only_toggle(monkeypatch):
         {"name": "aligned", "has_drift": False},
         {"name": "behind", "has_drift": True},
     ]
+    monkeypatch.setenv("ENV_TYPE", "dev")
     monkeypatch.setattr(mod, "_skills_items", lambda *, include_all=True: list(rows))
     monkeypatch.setattr(mod, "_ui_state", lambda: {"inventory_drift_only": False})
 
@@ -1951,6 +2134,7 @@ def test_infrastate_inventory_stream_honors_drift_only_toggle(monkeypatch):
 def test_infrastate_inventory_stream_honors_explicit_selected_node(monkeypatch):
     mod = _load_infrastate_module()
 
+    monkeypatch.setenv("ENV_TYPE", "dev")
     monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="hub-1"))
     monkeypatch.setattr(mod, "_ui_state", lambda: {"selected_node_id": "hub-1"})
     monkeypatch.setattr(mod, "runtime_lifecycle_snapshot", lambda: {})
@@ -2397,6 +2581,7 @@ def test_infrastate_adaos_update_uses_union_sparse_sync_and_installed_skill_name
 def test_infrastate_marketplace_filters_installed_and_marks_running_operations(monkeypatch):
     mod = _load_infrastate_module()
 
+    monkeypatch.setenv("ENV_TYPE", "dev")
     monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
     monkeypatch.setattr(
         mod,
@@ -3085,14 +3270,18 @@ def test_infrastate_broad_action_still_refreshes_inventory_streams(monkeypatch):
 
     mod._remember_stream_receiver("desktop", mod._skills_receiver())
     mod._remember_stream_receiver("desktop", mod._scenarios_receiver())
+    mod._remember_stream_receiver("desktop", mod._projects_receiver())
+    mod._remember_stream_receiver("desktop", mod._marketplace_projects_receiver())
     mod._remember_stream_receiver("desktop", mod._marketplace_skills_receiver())
     mod._remember_stream_receiver("desktop", mod._marketplace_scenarios_receiver())
 
     mod._schedule_action_inventory_streams("marketplace_install", webspace_id="desktop")
 
     assert stream_refreshes == [
+        (mod._projects_receiver(), "desktop", "infrastate.action:marketplace_install"),
         (mod._skills_receiver(), "desktop", "infrastate.action:marketplace_install"),
         (mod._scenarios_receiver(), "desktop", "infrastate.action:marketplace_install"),
+        (mod._marketplace_projects_receiver(), "desktop", "infrastate.action:marketplace_install"),
         (mod._marketplace_skills_receiver(), "desktop", "infrastate.action:marketplace_install"),
         (mod._marketplace_scenarios_receiver(), "desktop", "infrastate.action:marketplace_install"),
     ]
@@ -3772,6 +3961,13 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
     marketplace_widgets = webui["registry"]["modals"]["marketplace_modal"]["schema"]["widgets"]
     by_id = {widget.get("id"): widget for widget in [*infrastate_widgets, *marketplace_widgets]}
 
+    assert by_id["infrastate-projects"]["dataSource"] == {
+        "kind": "stream",
+        "scope": "node",
+        "receiver": "infrastate.projects",
+    }
+    assert webui["webio"]["receivers"]["infrastate.projects"]["scope"] == "node"
+    assert by_id["infrastate-projects"]["title"] == "Installed projects"
     assert by_id["infrastate-skills"]["dataSource"] == {
         "kind": "stream",
         "scope": "node",
@@ -3810,6 +4006,12 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
         and ((action.get("params") or {}).get("id") == "scenario_hard_pull")
         for action in scenario_actions
     )
+    assert by_id["marketplace-projects"]["dataSource"] == {
+        "kind": "stream",
+        "scope": "node",
+        "receiver": "infrastate.marketplace.projects",
+    }
+    assert webui["webio"]["receivers"]["infrastate.marketplace.projects"]["scope"] == "node"
     assert by_id["marketplace-skills"]["dataSource"] == {
         "kind": "stream",
         "scope": "node",
@@ -3822,11 +4024,44 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
         "receiver": "infrastate.marketplace.scenarios",
     }
     assert webui["webio"]["receivers"]["infrastate.marketplace.scenarios"]["scope"] == "node"
+    mod = _load_infrastate_module()
+    registered = set(mod._STREAM_RUNTIME.diagnostics_snapshot()["registered_receivers"])
+    assert "infrastate.projects" in registered
+    assert "infrastate.marketplace.projects" in registered
+
+
+def test_infrastate_marketplace_project_stream_uses_snapshot_payload():
+    mod = _load_infrastate_module()
+    snapshot = {
+        "marketplace": {
+            "projects": [
+                {
+                    "kind": "project",
+                    "id": "web_desktop",
+                    "name": "Web Desktop",
+                }
+            ],
+            "skills": [{"kind": "skill", "id": "weather_skill"}],
+            "scenarios": [{"kind": "scenario", "id": "web_desktop"}],
+        }
+    }
+
+    assert mod._stream_payload_for_receiver(
+        snapshot,
+        mod._marketplace_projects_receiver(),
+    ) == [
+        {
+            "kind": "project",
+            "id": "web_desktop",
+            "name": "Web Desktop",
+        }
+    ]
 
 
 def test_infrastate_skill_inventory_stream_payload_is_compact(monkeypatch):
     mod = _load_infrastate_module()
 
+    monkeypatch.setenv("ENV_TYPE", "dev")
     monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="local-node"))
     monkeypatch.setattr(mod, "_ui_state", lambda: {"selected_node_id": "local-node"})
     monkeypatch.setattr(mod, "_inventory_drift_only_enabled", lambda: False)
@@ -4133,6 +4368,7 @@ def test_infrastate_sys_ready_materializes_when_event_history_is_unavailable(mon
 def test_infrastate_marketplace_hides_skills_installed_via_scenario_dependencies(monkeypatch):
     mod = _load_infrastate_module()
 
+    monkeypatch.setenv("ENV_TYPE", "dev")
     monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
     monkeypatch.setattr(
         mod,

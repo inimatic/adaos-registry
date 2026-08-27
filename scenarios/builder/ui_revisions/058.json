@@ -2651,8 +2651,9 @@
                   "dataSource": {
                     "kind": "skill",
                     "name": "builder_sdk_control_skill.list_projects",
+                    "scope": "local",
                     "params": {
-                      "limit": 200,
+                      "limit": 50,
                       "selected_object_type": "$state.selectedProjectKind",
                       "selected_object_id": "$state.selectedProjectId",
                       "include_archived": "$state.projectPickerArchived",
@@ -2735,11 +2736,12 @@
                     ]
                   },
                   "actions": [
-                    {
-                      "on": "select",
-                      "type": "callSkill",
-                      "target": "builder_sdk_control_skill.select_preview",
-                      "params": {
+                  {
+                    "on": "select",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.select_preview",
+                    "scope": "local",
+                    "params": {
                         "object_type": "$event.object_type",
                         "object_id": "$event.object_id",
                         "_meta": {
@@ -6707,8 +6709,9 @@
                   "dataSource": {
                     "kind": "skill",
                     "name": "builder_sdk_control_skill.list_projects",
+                    "scope": "local",
                     "params": {
-                      "limit": 200,
+                      "limit": 50,
                       "selected_object_type": "$state.selectedProjectKind",
                       "selected_object_id": "$state.selectedProjectId",
                       "include_archived": "$state.projectPickerArchived",
@@ -6790,11 +6793,12 @@
                     ]
                   },
                   "actions": [
-                    {
-                      "on": "select",
-                      "type": "callSkill",
-                      "target": "builder_sdk_control_skill.select_preview",
-                      "params": {
+                  {
+                    "on": "select",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.select_preview",
+                    "scope": "local",
+                    "params": {
                         "object_type": "$event.object_type",
                         "object_id": "$event.object_id",
                         "_meta": {

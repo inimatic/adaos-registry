@@ -1,0 +1,34 @@
+schema: adaos.project.v1
+kind: project
+id: ai_event_analysis_lab
+version: 0.2.22
+profiles: [adaos.analysis.events.v1]
+components:
+  owned:
+  - ref: skill:ai_event_analysis_skill
+    role: primary
+    exposure: advanced
+    lifecycle: bound
+    relations: [evaluates]
+  dependencies: []
+entrypoints: []
+catalog:
+  title: AI Event Analysis Lab
+  description: Measurable AI/ML analysis of AdaOS operational event windows.
+  categories: [operations, research]
+  tags: [event-analysis, lab, alpha]
+publication:
+  stage: alpha
+  visibility: unlisted
+  channel: stable
+install:
+  default: false
+compatibility:
+  validation_profiles: [analysis.events.local]
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition

@@ -1,0 +1,60 @@
+schema: adaos.project.v1
+kind: project
+id: research_tlp
+version: 0.3.7
+profiles: [adaos.research.tlp.v1]
+components:
+  owned:
+  - ref: scenario:tlp_research
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [presents]
+  - ref: skill:tlp_structured_proof_02
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  - ref: skill:tlp_experiment_skill
+    role: supporting
+    exposure: project_only
+    lifecycle: bound
+    relations: [uses, evaluates]
+  dependencies:
+  - ref: project:research_platform
+    version: ^0.1
+    lifecycle: shared
+    relations: [uses, presents]
+entrypoints:
+- id: tlp
+  presentation: scenario:tlp_research
+  default: true
+  bindings:
+    research_category: tlp
+catalog:
+  title: TLP Mechanistic Research
+  description: Governed TLP research instance with STL-10 proof runner and experiment provider.
+  categories: [research]
+  tags: [tlp, alpha, max-plus, pooling]
+publication:
+  stage: alpha
+  visibility: listed
+  channel: stable
+install:
+  default: false
+  features:
+  - id: tlp-study
+    title: TLP study
+    default: true
+    optional: false
+    components: [scenario:tlp_research, skill:tlp_structured_proof_02, skill:tlp_experiment_skill]
+compatibility:
+  required_entrypoints: [tlp]
+  validation_profiles: [research.tlp.local]
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition

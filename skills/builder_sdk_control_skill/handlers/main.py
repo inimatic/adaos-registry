@@ -4,7 +4,7 @@ import json
 import re
 from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any
 from uuid import uuid4
 
@@ -13,7 +13,6 @@ import yaml
 from adaos.sdk import conversation, navigation
 from adaos.sdk.builder import automation, development_sessions, issues as builder_issues, preview, review, semantic_ui, workflow
 from adaos.sdk.core.decorators import tool
-from adaos.sdk.core.errors import SdkRuntimeNotInitialized
 from adaos.sdk.developer import compositions, projects, prompt_context
 from adaos.sdk.llm.llm_client import list_llm_models
 
@@ -21,6 +20,7 @@ SKILL_ID = "builder_sdk_control_skill"
 DEFAULT_PROJECT_KIND = "scenario"
 DEFAULT_PROJECT_ID = "builder"
 MAX_LIFECYCLE_CHILDREN = 5
+MAX_CATALOG_STATE_BYTES = 512 * 1024
 
 
 def _webspace_id(value: str | None, meta: Mapping[str, Any] | None) -> str:
@@ -75,181 +75,390 @@ def _project_topic(
 def _identity(object_type: str | None, object_id: str | None) -> tuple[str, str]:
     kind = str(object_type or DEFAULT_PROJECT_KIND).strip().lower().rstrip("s")
     project_id = str(object_id or DEFAULT_PROJECT_ID).strip()
-    if kind not in {"scenario", "skill"}:
-        raise ValueError("object_type must be scenario or skill")
+    if kind not in {"project", "scenario", "skill"}:
+        raise ValueError("object_type must be project, scenario or skill")
     if not project_id:
         raise ValueError("object_id is required")
     return kind, project_id
 
 
-def _bound_development_session(
-    kind: str,
+_PROJECT_TEXT_SUFFIXES = {".json", ".md", ".txt", ".yaml", ".yml"}
+_PROJECT_READONLY_NAMES = {"prompt_state.json"}
+
+
+def _composition_manifest(project_id: str) -> dict[str, Any]:
+    return dict(compositions.get(project_id))
+
+
+def _project_templates_root() -> Path:
+    return Path(__file__).resolve().parents[5] / "src" / "adaos" / "project_templates"
+
+
+def _project_template_manifest(template_id: str) -> dict[str, Any]:
+    token = str(template_id or "project_empty").strip() or "project_empty"
+    path = _project_templates_root() / token / "project.yaml"
+    if not path.is_file():
+        if token != "project_empty":
+            raise ValueError(f"unknown project template: {token}")
+        return {
+            "schema": "adaos.project.v1",
+            "kind": "project",
+            "id": "new_project",
+            "version": "0.1.0",
+            "profiles": [],
+            "components": {"owned": [], "dependencies": []},
+            "entrypoints": [],
+            "catalog": {
+                "title": "New Project",
+                "description": "Empty Builder Project draft.",
+                "categories": [],
+                "tags": [],
+            },
+            "publication": {"stage": "alpha", "visibility": "unlisted", "channel": "alpha"},
+            "install": {"default": False, "features": []},
+            "lifecycle": {
+                "uninstall": {
+                    "components": "retain",
+                    "runtime_data": "retain",
+                    "source_artifacts": "retain",
+                }
+            },
+        }
+    return yaml.safe_load(path.read_text(encoding="utf-8-sig")) or {}
+
+
+def _project_template_items() -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    root = _project_templates_root()
+    names = ["project_empty"]
+    if root.is_dir():
+        names = sorted(
+            {item.name for item in root.iterdir() if item.is_dir() and not item.name.startswith((".", "_"))}
+            | {"project_empty"}
+        )
+    for name in names:
+        try:
+            manifest = _project_template_manifest(name)
+        except Exception:
+            manifest = {}
+        catalog = manifest.get("catalog") if isinstance(manifest.get("catalog"), Mapping) else {}
+        description = str(catalog.get("description") or manifest.get("description") or "").strip()
+        items.append(
+            {
+                "id": name,
+                "label": "Empty Project" if name == "project_empty" else f"{name} (builtin)",
+                "source": "builtin",
+                "kind": "project",
+                "version": str(manifest.get("version") or ""),
+                "description": description,
+                "search_text": " ".join(part for part in (name, description, "project") if part),
+            }
+        )
+    return items
+
+
+def _new_project_payload(
     project_id: str,
-    source_webspace_id: str,
-) -> dict[str, Any] | None:
-    """Resolve the exact Development Session admitted by this Builder host."""
+    *,
+    template: str,
+    source_project_id: str | None = None,
+) -> dict[str, Any]:
+    payload = _project_template_manifest(template)
+    token = str(project_id or "").strip()
+    payload["id"] = token
+    payload["created_at"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    payload.setdefault("created_by", "AdaOS Builder")
+    catalog = dict(payload.get("catalog") or {})
+    catalog["title"] = token.replace("_", " ").strip().title() or token
+    if source_project_id:
+        source = _composition_manifest(source_project_id)
+        source_catalog = _composition_catalog(source)
+        catalog["description"] = str(source_catalog.get("description") or catalog.get("description") or "")
+        catalog["categories"] = list(source_catalog.get("categories") or catalog.get("categories") or [])
+        catalog["tags"] = sorted(
+            set([*list(source_catalog.get("tags") or []), "fork"])
+        )
+        payload["profiles"] = list(source.get("profiles") or [])
+        payload["components"] = {
+            "owned": [],
+            "dependencies": [
+                {
+                    "ref": f"project:{source_project_id}",
+                    "version": str(source.get("version") or ""),
+                    "lifecycle": "shared",
+                    "relations": ["uses"],
+                }
+            ],
+        }
+    payload["catalog"] = catalog
+    return payload
 
-    try:
-        binding = development_sessions.binding_for(source_webspace_id)
-    except SdkRuntimeNotInitialized:
-        return None
-    if not binding:
-        return None
-    session = development_sessions.get(str(binding["session_id"]))
-    target_ref = f"{kind}:{project_id}"
-    target_refs = {
-        str(item.get("ref") or "")
-        for group in session["targets"].values()
-        for item in group
-        if isinstance(item, Mapping)
-    }
-    if target_ref not in target_refs:
-        return None
-    return {"session": session, "binding": binding}
+
+def _composition_catalog(project: Mapping[str, Any]) -> dict[str, Any]:
+    return dict(project.get("catalog")) if isinstance(project.get("catalog"), Mapping) else {}
 
 
-def _bound_automation_instruction(
-    kind: str,
-    project_id: str,
-    source_webspace_id: str,
-) -> dict[str, Any] | None:
-    """Resolve the exact AutomationBrief admitted by this Builder host binding."""
+def _composition_refs(project: Mapping[str, Any], group: str) -> list[str]:
+    components = dict(project.get("components")) if isinstance(project.get("components"), Mapping) else {}
+    refs: list[str] = []
+    for item in components.get(group) or []:
+        if not isinstance(item, Mapping):
+            continue
+        ref = str(item.get("ref") or "").strip()
+        if ref and ref not in refs:
+            refs.append(ref)
+    return refs
 
-    admitted = _bound_development_session(kind, project_id, source_webspace_id)
-    if not admitted:
-        return None
-    session = admitted["session"]
-    if not any(
-        str(item.get("kind") or "") == "automation_brief"
-        for item in session.get("instruction_inputs") or []
-        if isinstance(item, Mapping)
-    ):
-        return None
-    instruction = development_sessions.get_instruction(
-        str(session["session_id"]), "automation_brief"
+
+def _composition_owned_refs(project_id: str) -> list[str]:
+    project = _composition_manifest(project_id)
+    return _composition_refs(project, "owned")
+
+
+def _composition_dependency_refs(project_id: str) -> list[str]:
+    project = _composition_manifest(project_id)
+    return _composition_refs(project, "dependencies")
+
+
+def _project_has_primary(project: Mapping[str, Any]) -> bool:
+    return any(
+        isinstance(item, Mapping) and item.get("role") == "primary"
+        for item in dict(project.get("components") or {}).get("owned") or []
     )
-    value = instruction["value"]
-    expected_digest = str(session["handoff"]["automation_brief_digest"])
-    if str(value.get("digest") or "") != expected_digest:
-        raise ValueError("bound AutomationBrief digest does not match the Development Session")
-    return {**instruction, **admitted}
 
 
-def _required_acceptance_evidence(
-    kind: str,
+def _component_member(
+    component_kind: str,
+    component_id: str,
+    *,
+    role: str,
+) -> dict[str, Any]:
+    if component_kind == "scenario":
+        return {
+            "ref": f"scenario:{component_id}",
+            "role": role,
+            "exposure": "application" if role == "primary" else "advanced",
+            "lifecycle": "bound",
+            "relations": ["presents"] if role == "primary" else ["uses"],
+        }
+    return {
+        "ref": f"skill:{component_id}",
+        "role": role,
+        "exposure": "project_only" if role in {"primary", "implementation"} else "advanced",
+        "lifecycle": "bound",
+        "relations": ["realizes"] if role in {"primary", "implementation"} else ["uses"],
+    }
+
+
+def _add_component_to_project(
     project_id: str,
-    source_webspace_id: str,
-) -> dict[str, Any] | None:
-    """Fail closed when a bound Development Session has executable gates."""
-
-    admitted = _bound_development_session(kind, project_id, source_webspace_id)
-    if not admitted:
-        return None
-    policy = admitted["session"]
-    requirements = [
+    *,
+    component_kind: str,
+    component_id: str,
+    template: str | None = None,
+    role: str | None = None,
+    make_primary: bool | None = None,
+) -> dict[str, Any]:
+    current = _composition_manifest(project_id)
+    payload = {
+        key: value
+        for key, value in current.items()
+        if key not in {"ref", "manifest_digest", "source_path"}
+    }
+    components = dict(payload.get("components") or {})
+    owned = [
         dict(item)
-        for item in policy.get("acceptance_requirements") or []
-        if isinstance(item, Mapping) and bool(item.get("required"))
+        for item in components.get("owned") or []
+        if isinstance(item, Mapping)
     ]
-    if not requirements:
-        return None
-    state = automation.get_state(
-        object_type=kind,
-        object_id=project_id,
-        webspace_id=source_webspace_id,
+    ref = f"{component_kind}:{component_id}"
+    if ref in {str(item.get("ref") or "") for item in owned}:
+        raise ValueError(f"{ref} is already owned by project:{project_id}")
+    component_root = projects.resolve_root(component_kind, component_id, required=False)
+    created_component = False
+    if not component_root.is_dir():
+        template_id = str(template or "").strip()
+        if not template_id or template_id.lower() == "default":
+            template_id = "scenario_default" if component_kind == "scenario" else "skill_default"
+        projects.create(component_kind, component_id, template=template_id)
+        created_component = True
+    has_primary = _project_has_primary(payload)
+    effective_primary = bool(make_primary) or not has_primary
+    effective_role = str(role or "").strip().lower() or (
+        "primary" if effective_primary else ("implementation" if component_kind == "skill" else "supporting")
     )
-    automation_session = state.get("session") if isinstance(state.get("session"), Mapping) else {}
-    if str(automation_session.get("development_session_id") or "") != str(policy["session_id"]):
-        raise ValueError("release is not bound to the required Development Session acceptance evidence")
-    readiness = (
-        automation_session.get("completion_readiness")
-        if isinstance(automation_session.get("completion_readiness"), Mapping)
-        else {}
-    )
-    acceptance = readiness.get("acceptance") if isinstance(readiness.get("acceptance"), Mapping) else {}
-    if not bool(acceptance.get("ok")):
-        raise ValueError("required consumer-owned acceptance has not passed")
-    receipts = [dict(item) for item in acceptance.get("receipts") or [] if isinstance(item, Mapping)]
-    passed_ids = {
-        str(item.get("requirement_id") or "")
-        for item in receipts
-        if bool(item.get("ok")) and bool(item.get("required")) and str(item.get("digest") or "")
-    }
-    missing = sorted(str(item["id"]) for item in requirements if str(item["id"]) not in passed_ids)
-    if missing:
-        raise ValueError(
-            "required consumer acceptance receipts are missing or failed: " + ", ".join(missing)
-        )
-    return dict(acceptance)
-
-
-def _instruction_text(value: Mapping[str, Any]) -> str:
-    return json.dumps(dict(value), ensure_ascii=False, indent=2, sort_keys=True)
-
-
-def _automation_change_request(brief: Mapping[str, Any] | None, fallback: str) -> str:
-    if not brief:
-        return " ".join(str(fallback or "").split())[:4000]
-    lines = [
-        "Implement the exact accepted AutomationBrief through Builder Automation.",
-        f"Brief digest: {str(brief.get('digest') or 'unavailable')}",
-        f"Objective: {' '.join(str(brief.get('objective') or '').split())}",
-        "The full digest-bound brief is an immutable Development Session instruction input.",
-    ]
-    prohibited = [" ".join(str(item).split()) for item in brief.get("prohibited_actions") or []]
-    if prohibited:
-        lines.append("Prohibited: " + " | ".join(prohibited))
-    return "\n".join(lines)[:4000]
-
-
-def _automation_change_issues(brief: Mapping[str, Any] | None, fallback: str) -> list[dict[str, Any]]:
-    if not brief:
-        return [
-            {
-                "issue_id": f"automation-{uuid4().hex[:12]}",
-                "title": " ".join(str(fallback).split())[:240],
-                "lane": "automation",
-                "acceptance_criteria": [
-                    f"The implementation and its tests satisfy: {' '.join(str(fallback).split())}"[:500]
-                ],
-            }
+    if effective_role not in {"primary", "implementation", "supporting"}:
+        raise ValueError("role must be primary, implementation or supporting")
+    if effective_role == "primary":
+        for item in owned:
+            if item.get("role") == "primary":
+                item["role"] = "supporting"
+                item.setdefault("relations", ["uses"])
+    owned.append(_component_member(component_kind, component_id, role=effective_role))
+    components["owned"] = owned
+    components.setdefault("dependencies", [])
+    payload["components"] = components
+    if component_kind == "scenario" and effective_role == "primary":
+        entrypoints = [
+            dict(item)
+            for item in payload.get("entrypoints") or []
+            if isinstance(item, Mapping)
         ]
-    issues: list[dict[str, Any]] = []
-    for index, item in enumerate(brief.get("implementation_requirements") or [], start=1):
-        if not isinstance(item, Mapping):
-            continue
-        requirement = " ".join(str(item.get("requirement") or "").split())
-        verification = " ".join(str(item.get("verification") or "").split())
-        if not requirement:
-            continue
-        criteria = [requirement]
-        if verification:
-            criteria.append(f"Verification evidence: {verification}")
-        issues.append(
-            {
-                "issue_id": str(item.get("id") or f"requirement-{index}"),
-                "title": requirement[:240],
-                "lane": "automation",
-                "acceptance_criteria": [criterion[:500] for criterion in criteria],
-            }
-        )
-    for index, item in enumerate(brief.get("acceptance_checks") or [], start=1):
-        if not isinstance(item, Mapping):
-            continue
-        check = " ".join(str(item.get("check") or "").split())
-        evidence = " ".join(str(item.get("evidence") or "").split())
-        if not check:
-            continue
-        criterion = check if not evidence else f"{check} Evidence: {evidence}"
-        issues.append(
-            {
-                "issue_id": str(item.get("id") or f"acceptance-{index}"),
-                "title": check[:240],
-                "lane": "automation",
-                "acceptance_criteria": [criterion[:500]],
-            }
-        )
-    return issues or _automation_change_issues(None, fallback)
+        if not any(str(item.get("presentation") or "") == ref for item in entrypoints):
+            entrypoints.append(
+                {
+                    "id": "main",
+                    "presentation": ref,
+                    "default": not any(item.get("default") is True for item in entrypoints),
+                    "bindings": {},
+                }
+            )
+        payload["entrypoints"] = entrypoints
+    updated = compositions.replace(
+        project_id,
+        payload,
+        expected_manifest_digest=str(current.get("manifest_digest") or ""),
+    )
+    return {
+        "ok": True,
+        "project": updated,
+        "component_ref": ref,
+        "created_component": created_component,
+    }
+
+
+def _split_component_ref(ref: str) -> tuple[str, str] | None:
+    kind, separator, component_id = str(ref or "").strip().partition(":")
+    if separator != ":" or kind not in {"scenario", "skill"} or not component_id:
+        return None
+    return kind, component_id
+
+
+def _project_presentation_scenario_id(project_id: str) -> str:
+    project = _composition_manifest(project_id)
+    entrypoints = [
+        dict(item)
+        for item in project.get("entrypoints") or []
+        if isinstance(item, Mapping)
+    ]
+    selected = next(
+        (item for item in entrypoints if item.get("default") is True),
+        entrypoints[0] if entrypoints else {},
+    )
+    presentation = str(selected.get("presentation") or "").strip()
+    kind, separator, component_id = presentation.partition(":")
+    if separator == ":" and kind == "scenario" and component_id:
+        return component_id
+    return ""
+
+
+def _component_path_from_project_file(project_id: str, path: str) -> tuple[str, str, str] | None:
+    raw = str(path or "").strip().replace("\\", "/")
+    parts = PurePosixPath(raw).parts
+    if not parts or parts[0] != "components":
+        return None
+    if len(parts) < 4:
+        raise ValueError("component file path must be components/<kind>/<id>/<path>")
+    component_kind = str(parts[1]).strip().lower().rstrip("s")
+    component_id = str(parts[2]).strip()
+    relative = "/".join(parts[3:]).strip("/")
+    if component_kind not in {"scenario", "skill"} or not component_id or not relative:
+        raise ValueError("component file path must be components/<kind>/<id>/<path>")
+    if f"{component_kind}:{component_id}" not in set(_composition_owned_refs(project_id)):
+        raise ValueError(f"component is not owned by project:{project_id}: {component_kind}:{component_id}")
+    return component_kind, component_id, relative
+
+
+def _project_root_file(project_id: str, relative_path: str) -> tuple[str, Path]:
+    raw = str(relative_path or "").strip().replace("\\", "/")
+    if not raw:
+        raise ValueError("path is required")
+    relative = Path(raw)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("path is outside project root")
+    root = compositions.resolve_root(project_id)
+    full = (root / relative).resolve()
+    try:
+        full.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("path is outside project root") from exc
+    return relative.as_posix(), full
+
+
+def _project_file_editable(relative_path: str, full: Path | None = None) -> tuple[bool, str]:
+    path = PurePosixPath(relative_path)
+    if path.name in _PROJECT_READONLY_NAMES:
+        return False, "managed_state_file"
+    if path.suffix.lower() not in _PROJECT_TEXT_SUFFIXES:
+        return False, "unsupported_file_type"
+    if full is not None and full.is_symlink():
+        return False, "symlink_not_editable"
+    return True, ""
+
+
+def _project_root_file_descriptor(project_id: str, full: Path) -> dict[str, Any]:
+    root = compositions.resolve_root(project_id)
+    relative = full.relative_to(root).as_posix()
+    editable, reason = _project_file_editable(relative, full)
+    stat = full.stat()
+    return {
+        "kind": "project",
+        "project_id": project_id,
+        "path": relative,
+        "size_bytes": stat.st_size,
+        "updated_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+        "editable": editable,
+        "readonly_reason": reason,
+    }
+
+
+def _read_project_composition_file(project_id: str, path: str, *, max_bytes: int) -> dict[str, Any]:
+    relative, full = _project_root_file(project_id, path)
+    if not full.is_file():
+        raise FileNotFoundError(f"project file '{relative}' was not found")
+    maximum = max(1, min(int(max_bytes), 1_048_576))
+    raw = full.read_bytes()
+    truncated = len(raw) > maximum
+    editable, reason = _project_file_editable(relative, full)
+    return {
+        "ok": True,
+        "kind": "project",
+        "project_id": project_id,
+        "path": relative,
+        "content": raw[:maximum].decode("utf-8", errors="replace"),
+        "size_bytes": len(raw),
+        "truncated": truncated,
+        "editable": editable and not truncated,
+        "readonly_reason": reason or ("file_too_large" if truncated else ""),
+    }
+
+
+def _write_project_composition_file(
+    project_id: str,
+    path: str,
+    text: str,
+    *,
+    max_bytes: int,
+) -> dict[str, Any]:
+    relative, full = _project_root_file(project_id, path)
+    editable, reason = _project_file_editable(relative, full)
+    if not editable:
+        raise ValueError(f"project file is not editable: {reason}")
+    raw = str(text).encode("utf-8")
+    maximum = max(1, min(int(max_bytes), 1_048_576))
+    if len(raw) > maximum:
+        raise ValueError(f"project file exceeds {maximum} bytes")
+    full.parent.mkdir(parents=True, exist_ok=True)
+    temporary = full.with_name(f".{full.name}.tmp")
+    temporary.write_bytes(raw)
+    temporary.replace(full)
+    return {
+        "ok": True,
+        "kind": "project",
+        "project_id": project_id,
+        "path": relative,
+        "size_bytes": len(raw),
+    }
 
 
 @tool("get_development_session", summary="Read the scoped Development Session bound to this Builder host.", side_effects="none")
@@ -267,15 +476,6 @@ def get_development_session(
             "content": "No external Development Session is bound. Select a normal Builder project or open an accepted handoff from its owning Workbench.",
         }
     session = development_sessions.get(str(binding["session_id"]))
-    instruction = None
-    if any(
-        str(item.get("kind") or "") == "automation_brief"
-        for item in session.get("instruction_inputs") or []
-        if isinstance(item, Mapping)
-    ):
-        instruction = development_sessions.get_instruction(
-            str(session["session_id"]), "automation_brief"
-        )
     targets = [
         item
         for group in session["targets"].values()
@@ -297,12 +497,6 @@ def get_development_session(
         )
         return_url = navigation.build_url(destination, base_url=preview.public_app_base())
     return_link = f"\n\n[Return to Research Workbench]({return_url})" if return_url else ""
-    instruction_content = (
-        f"**Exact instruction:** `{instruction['instruction']['ref']}`  \n"
-        f"**Instruction digest:** `{instruction['value'].get('digest')}`\n\n"
-        if instruction
-        else "**Exact instruction:** not attached\n\n"
-    )
     content = (
         f"## Scoped Development Session `{session['session_id']}`\n\n"
         f"**Project:** `{session['project_ref']}`  \n"
@@ -310,7 +504,6 @@ def get_development_session(
         f"**Read-write targets:** {target_labels}  \n"
         f"**Read-only context:** {context_labels}  \n"
         f"**Artifact inputs:** {artifact_labels}\n\n"
-        f"{instruction_content}"
         "Changing UI focus does not enlarge write authority. Codex has not been started."
         f"{return_link}"
     )
@@ -321,9 +514,6 @@ def get_development_session(
         "binding": binding,
         "session": session,
         "targets": targets,
-        "instruction": instruction["instruction"] if instruction else None,
-        "implementation_brief": _instruction_text(instruction["value"]) if instruction else None,
-        "implementation_brief_digest": instruction["value"].get("digest") if instruction else None,
         "return_url": return_url,
         "content": content,
     }
@@ -360,62 +550,6 @@ def request_development_scope(
         reason,
         actor=actor,
     )
-
-
-@tool("record_development_feedback", summary="Return typed implementation feedback without mutating the accepted protocol.", side_effects="local_write")
-def record_development_feedback(
-    kind: str,
-    summary: str,
-    severity: str = "warning",
-    blocking: bool = True,
-    affected_refs: list[str] | None = None,
-    constraints: list[str] | None = None,
-    evidence: list[Mapping[str, Any]] | None = None,
-    proposed_action: str = "clarify_contract",
-    protocol_digest: str | None = None,
-    webspace_id: str | None = None,
-    actor: str = "codex",
-    _meta: Mapping[str, Any] | None = None,
-) -> dict[str, Any]:
-    source = _preview_source_webspace_id(webspace_id, _meta)
-    binding = development_sessions.binding_for(source)
-    if not binding:
-        raise ValueError("no Development Session is bound to this Builder host")
-    session = development_sessions.get(str(binding["session_id"]))
-    return development_sessions.record_feedback(
-        str(session["session_id"]),
-        kind,
-        summary,
-        severity=severity,
-        blocking=blocking,
-        affected_refs=affected_refs or (),
-        constraints=constraints or (),
-        evidence=evidence or (),
-        proposed_action=proposed_action,
-        protocol_digest=protocol_digest or str(session["handoff"]["research_prototype_digest"]),
-        actor=actor,
-    )
-
-
-@tool("list_development_feedback", summary="Read typed feedback returned for the bound Development Session.", side_effects="none")
-def list_development_feedback(
-    kind: str | None = None,
-    blocking: bool | None = None,
-    limit: int = 500,
-    webspace_id: str | None = None,
-    _meta: Mapping[str, Any] | None = None,
-) -> dict[str, Any]:
-    source = _preview_source_webspace_id(webspace_id, _meta)
-    binding = development_sessions.binding_for(source)
-    if not binding:
-        return {"ok": True, "bound": False, "items": []}
-    items = development_sessions.list_feedback(
-        str(binding["session_id"]),
-        kind=kind,
-        blocking=blocking,
-        limit=limit,
-    )
-    return {"ok": True, "bound": True, "session_id": binding["session_id"], "items": items}
 
 
 @tool("get_skill_preview", summary="Describe the skill selected by the paired Builder host.", side_effects="none")
@@ -478,6 +612,33 @@ def _context(kind: str, project_id: str) -> dict[str, Any]:
         }
 
 
+def _catalog_state(kind: str, project_id: str) -> dict[str, Any]:
+    normalized = str(kind or "").strip().lower().rstrip("s")
+    state: dict[str, Any] = {
+        "object_type": normalized,
+        "object_id": str(project_id),
+        "archived": False,
+    }
+    try:
+        root = (
+            compositions.resolve_root(project_id)
+            if normalized == "project"
+            else projects.resolve_root(normalized, project_id)
+        )
+        path = root / "prompt_state.json"
+        if not path.is_file() or path.stat().st_size > MAX_CATALOG_STATE_BYTES:
+            return state
+        raw = json.loads(path.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return state
+    if not isinstance(raw, Mapping):
+        return state
+    for key in ("archived", "updated_at", "builder_llm_model"):
+        if key in raw:
+            state[key] = raw[key]
+    return state
+
+
 def _workflow_projection(kind: str, project_id: str, state: Mapping[str, Any] | None = None) -> dict[str, Any]:
     try:
         return workflow.get_state(kind, project_id)
@@ -502,7 +663,7 @@ def _workflow_projection(kind: str, project_id: str, state: Mapping[str, Any] | 
                 "can_prepare_candidate": active == "automation" and automation_status == "completed",
                 "can_decide_candidate": False,
                 "can_publish": False,
-                "can_preview_prototype": kind == "scenario",
+                "can_preview_prototype": kind in {"project", "scenario"},
                 "can_preview_automation": kind == "scenario" and automation_status == "completed",
                 "can_preview_publication": kind == "scenario" and token == "publication",
                 "can_plan_change_set": True,
@@ -822,6 +983,60 @@ def _project_descriptor(
 ) -> dict[str, Any]:
     """Describe a project, taking scenario metadata only from scenario.yaml."""
 
+    if kind == "project":
+        project = (
+            dict(described)
+            if isinstance(described, Mapping) and described.get("components")
+            else _composition_manifest(project_id)
+        )
+        catalog = _composition_catalog(project)
+        owned = [
+            dict(item)
+            for item in dict(project.get("components") or {}).get("owned") or []
+            if isinstance(item, Mapping)
+        ]
+        dependencies = [
+            dict(item)
+            for item in dict(project.get("components") or {}).get("dependencies") or []
+            if isinstance(item, Mapping)
+        ]
+        primary = next(
+            (item for item in owned if str(item.get("role") or "") == "primary"),
+            owned[0] if owned else {},
+        )
+        component_refs = [
+            str(item.get("ref") or "").strip()
+            for item in owned
+            if str(item.get("ref") or "").strip()
+        ]
+        dependency_refs = [
+            str(item.get("ref") or "").strip()
+            for item in dependencies
+            if str(item.get("ref") or "").strip()
+        ]
+        return {
+            **project,
+            "ok": True,
+            "kind": "project",
+            "id": str(project.get("id") or project_id),
+            "name": str(project.get("name") or project.get("id") or project_id),
+            "title": str(catalog.get("title") or project.get("title") or project_id),
+            "description": str(catalog.get("description") or project.get("description") or ""),
+            "project_type": "project",
+            "version": str(project.get("version") or ""),
+            "depends": dependency_refs,
+            "manifest": "project.yaml",
+            "profiles": list(project.get("profiles") or []),
+            "catalog": catalog,
+            "primary_ref": str(primary.get("ref") or "").strip() or None,
+            "component_refs": component_refs,
+            "dependency_refs": dependency_refs,
+            "entrypoints": [
+                dict(item)
+                for item in project.get("entrypoints") or []
+                if isinstance(item, Mapping)
+            ],
+        }
     described = dict(described) if isinstance(described, Mapping) else dict(projects.describe(kind, project_id))
     if kind != "scenario":
         return described
@@ -849,6 +1064,14 @@ def _project_descriptor(
 def _declared_skill_dependencies(kind: str, project_id: str) -> set[str]:
     """Read dependency declarations only from the canonical project manifest."""
 
+    if kind == "project":
+        refs = [*_composition_owned_refs(project_id), *_composition_dependency_refs(project_id)]
+        return {
+            component_id
+            for ref in refs
+            for component_kind, component_id in [_split_component_ref(ref) or ("", "")]
+            if component_kind == "skill" and component_id
+        }
     manifest_name = "scenario.yaml" if kind == "scenario" else "skill.yaml"
     try:
         payload = projects.read_file(kind, project_id, manifest_name, max_bytes=256_000)
@@ -1041,11 +1264,78 @@ def list_projects(
     _meta: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     needle = str(query or "").strip().casefold()
+    requested_kind = str(kind or "").strip().lower().rstrip("s")
+    if requested_kind and requested_kind not in {"project", "scenario", "skill"}:
+        raise ValueError("kind must be project, scenario or skill")
+    bounded_limit = max(1, min(int(limit), 5000))
     selected_kind = str(selected_object_type or "").strip().lower().rstrip("s")
     selected_id = str(selected_object_id or "").strip()
     source = _preview_source_webspace_id(webspace_id, _meta)
+    dev_space = _preview_dev_webspace_id(source)
     items: list[dict[str, Any]] = []
-    for item in projects.list_projects(kind=kind, limit=limit):
+    if requested_kind in {"", "project"}:
+        try:
+            project_items = compositions.list_projects(limit=bounded_limit)
+        except Exception:
+            project_items = []
+        for project_item in project_items:
+            object_id = str(project_item.get("id") or project_item.get("name") or "").strip()
+            if not object_id or object_id.startswith((".", "_")):
+                continue
+            item = _project_descriptor("project", object_id, project_item)
+            title = str(item.get("title") or item.get("name") or object_id)
+            description = str(item.get("description") or "")
+            if needle and needle not in f"{object_id} {title} {description}".casefold():
+                continue
+            state = _catalog_state("project", object_id)
+            if state.get("archived") and not include_archived:
+                continue
+            current = selected_kind == "project" and object_id == selected_id
+            items.append(
+                {
+                    "kind": "project",
+                    "name": str(item.get("name") or object_id),
+                    "project_type": "project",
+                    "depends": list(item.get("depends") or []),
+                    "manifest": str(item.get("manifest") or "project.yaml"),
+                    "profiles": list(item.get("profiles") or []),
+                    "primary_ref": item.get("primary_ref"),
+                    "component_refs": list(item.get("component_refs") or []),
+                    "dependency_refs": list(item.get("dependency_refs") or []),
+                    "id": f"project:{object_id}",
+                    "object_type": "project",
+                    "object_id": object_id,
+                    "title": title,
+                    "subtitle": description or f"project · {item.get('version') or 'DEV'}",
+                    "type": "Project",
+                    "type_i18n": {"key": "builder.project_type.project"},
+                    "stage": "Архив" if state.get("archived") else "Прототип",
+                    "stage_i18n": {
+                        "key": "builder.project_stage.archive"
+                        if state.get("archived")
+                        else "builder.project_stage.prototype"
+                    },
+                    "version": str(item.get("version") or "DEV"),
+                    "stable": str(item.get("version") or "—"),
+                    "space": dev_space,
+                    "sync": "Текущий" if current else "Доступен в DEV",
+                    "sync_i18n": {
+                        "key": "builder.project_sync.current"
+                        if current
+                        else "builder.project_sync.available_dev"
+                    },
+                    "updated": str(state.get("updated_at") or "DEV"),
+                    "current": current,
+                    "archived": bool(state.get("archived")),
+                    "builder_llm_model": state.get("builder_llm_model"),
+                }
+            )
+            if len(items) >= bounded_limit:
+                return items
+        if requested_kind == "project":
+            return items
+    component_limit = max(1, bounded_limit - len(items))
+    for item in projects.list_projects(kind=kind, limit=component_limit):
         raw_object_id = str(item.get("id") or item.get("name") or "").strip()
         if not raw_object_id or raw_object_id.startswith((".", "_")):
             continue
@@ -1055,13 +1345,17 @@ def list_projects(
         description = str(item.get("description") or "")
         if needle and needle not in f"{object_id} {title} {description}".casefold():
             continue
-        state = _context(object_type, object_id)
+        state = _catalog_state(object_type, object_id)
         if state.get("archived") and not include_archived:
             continue
         current = object_type == selected_kind and object_id == selected_id
         items.append(
             {
-                **dict(item),
+                "kind": object_type,
+                "name": str(item.get("name") or object_id),
+                "project_type": str(item.get("project_type") or object_type),
+                "depends": list(item.get("depends") or []),
+                "manifest": item.get("manifest"),
                 "id": f"{object_type}:{object_id}",
                 "object_type": object_type,
                 "object_id": object_id,
@@ -1081,7 +1375,7 @@ def list_projects(
                 },
                 "version": str(item.get("version") or "DEV"),
                 "stable": str(item.get("version") or "—"),
-                "space": _preview_dev_webspace_id(source),
+                "space": dev_space,
                 "sync": "Текущий" if current else "Доступен в DEV",
                 "sync_i18n": {
                     "key": "builder.project_sync.current"
@@ -1114,7 +1408,6 @@ def get_project(
         else {}
     )
     source = _preview_source_webspace_id(webspace_id, _meta)
-    development_instruction = _bound_automation_instruction(kind, project_id, source)
     topic = _project_topic(kind, project_id, webspace_id=source)
     prototype_projection = (
         workflow_projection.get("prototype")
@@ -1194,29 +1487,7 @@ def get_project(
         "can_decide_candidate": bool(capabilities.get("can_decide_candidate")),
         "can_publish": bool(capabilities.get("can_publish")),
         "can_start_implementation": bool(
-            active_phase == "prototype"
-            and (
-                (change_gate == "automation" and change_id)
-                or (
-                    development_instruction is not None
-                    and change_status in {"not_planned", "published", "rejected", "superseded"}
-                )
-            )
-        ),
-        "development_session_id": (
-            development_instruction["session"]["session_id"]
-            if development_instruction
-            else None
-        ),
-        "development_implementation_brief": (
-            _instruction_text(development_instruction["value"])
-            if development_instruction
-            else None
-        ),
-        "development_implementation_brief_digest": (
-            development_instruction["value"].get("digest")
-            if development_instruction
-            else None
+            kind != "project" and active_phase == "prototype" and change_gate == "automation" and change_id
         ),
         "change_set_id": change_set_projection.get("change_set_id"),
         "change_id": change_id or None,
@@ -1240,14 +1511,24 @@ def list_project_objects(
     object_id: str = DEFAULT_PROJECT_ID,
 ) -> list[dict[str, Any]]:
     kind, project_id = _identity(object_type, object_id)
-    root = projects.describe(kind, project_id)
     identities = [(kind, project_id)]
-    if kind == "scenario":
+    if kind == "project":
+        refs = [*_composition_owned_refs(project_id), *_composition_dependency_refs(project_id)]
+        for ref in refs:
+            component = _split_component_ref(ref)
+            if component and component not in identities:
+                identities.append(component)
+    elif kind == "scenario":
+        root = projects.describe(kind, project_id)
         identities.extend(("skill", str(item)) for item in root.get("depends") or [] if str(item).strip())
     items: list[dict[str, Any]] = []
     for current_kind, current_id in identities:
         try:
-            described = projects.describe(current_kind, current_id)
+            described = (
+                _project_descriptor("project", current_id)
+                if current_kind == "project"
+                else projects.describe(current_kind, current_id)
+            )
         except projects.DeveloperProjectError:
             described = {"title": current_id, "version": "", "description": "Dependency is not present in DEV"}
         state = _context(current_kind, current_id) if described.get("version") != "" else {}
@@ -1274,6 +1555,69 @@ def list_project_files(
     kind, project_id = _identity(object_type, object_id)
     items: list[dict[str, Any]] = []
     ignored_parts = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", "__pycache__"}
+
+    if kind == "project":
+        root = compositions.resolve_root(project_id)
+        bounded_limit = max(1, min(int(limit), 5000))
+        for full in sorted((path for path in root.rglob("*") if path.is_file()), key=lambda path: path.as_posix().lower()):
+            relative = full.relative_to(root).as_posix()
+            path = PurePosixPath(relative)
+            if ignored_parts.intersection(path.parts) or path.suffix.lower() in {".pyc", ".pyo"}:
+                continue
+            item = _project_root_file_descriptor(project_id, full)
+            items.append(
+                {
+                    **item,
+                    "id": relative,
+                    "title": path.name,
+                    "subtitle": relative,
+                    "object_type": "project",
+                    "object_id": project_id,
+                    "protected": not bool(item.get("editable")),
+                }
+            )
+            if len(items) >= bounded_limit:
+                return items
+        for ref in _composition_owned_refs(project_id):
+            component = _split_component_ref(ref)
+            if component is None:
+                continue
+            component_kind, component_id = component
+            remaining = bounded_limit - len(items)
+            if remaining <= 0:
+                return items
+            try:
+                component_files = projects.list_files(component_kind, component_id, limit=remaining)
+            except projects.DeveloperProjectError:
+                continue
+            prefix = f"components/{component_kind}/{component_id}"
+            for item in component_files:
+                relative = str(item.get("path") or "")
+                path = PurePosixPath(relative)
+                if ignored_parts.intersection(path.parts) or path.suffix.lower() in {".pyc", ".pyo"}:
+                    continue
+                project_path = f"{prefix}/{relative}"
+                items.append(
+                    {
+                        **item,
+                        "id": project_path,
+                        "kind": "project",
+                        "project_id": project_id,
+                        "path": project_path,
+                        "title": path.name,
+                        "subtitle": project_path,
+                        "object_type": "project",
+                        "object_id": project_id,
+                        "component_ref": ref,
+                        "component_object_type": component_kind,
+                        "component_object_id": component_id,
+                        "protected": not bool(item.get("editable")),
+                    }
+                )
+                if len(items) >= bounded_limit:
+                    return items
+        return items
+
     for item in projects.list_files(kind, project_id, limit=limit):
         relative = str(item.get("path") or "")
         path = PurePosixPath(relative)
@@ -1327,6 +1671,8 @@ def list_project_file_tree(
 @tool("list_templates", summary="List DEV project templates by project kind.", side_effects="none")
 def list_templates(object_type: str = DEFAULT_PROJECT_KIND) -> list[dict[str, Any]]:
     kind, _project_id = _identity(object_type, "template")
+    if kind == "project":
+        return _project_template_items()
     return projects.list_templates(kind)
 
 
@@ -1338,6 +1684,24 @@ def read_project_file(
     max_bytes: int = 131_072,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
+    if kind == "project":
+        component = _component_path_from_project_file(project_id, path)
+        if component is not None:
+            component_kind, component_id, relative = component
+            result = dict(projects.read_file(component_kind, component_id, relative, max_bytes=max_bytes))
+            project_path = f"components/{component_kind}/{component_id}/{result.get('path') or relative}"
+            return {
+                **result,
+                "kind": "project",
+                "project_id": project_id,
+                "path": project_path,
+                "object_type": "project",
+                "object_id": project_id,
+                "component_ref": f"{component_kind}:{component_id}",
+                "component_object_type": component_kind,
+                "component_object_id": component_id,
+            }
+        return _read_project_composition_file(project_id, path, max_bytes=max_bytes)
     return projects.read_file(kind, project_id, path, max_bytes=max_bytes)
 
 
@@ -1353,7 +1717,27 @@ def save_project_file(
 ) -> dict[str, Any]:
     _require_transport_integrity(path, text)
     kind, project_id = _identity(object_type, object_id)
-    result = projects.write_file(kind, project_id, path, text, max_bytes=max_bytes)
+    if kind == "project":
+        component = _component_path_from_project_file(project_id, path)
+        if component is not None:
+            component_kind, component_id, relative = component
+            raw_result = dict(projects.write_file(component_kind, component_id, relative, text, max_bytes=max_bytes))
+            project_path = f"components/{component_kind}/{component_id}/{raw_result.get('path') or relative}"
+            result = {
+                **raw_result,
+                "kind": "project",
+                "project_id": project_id,
+                "path": project_path,
+                "object_type": "project",
+                "object_id": project_id,
+                "component_ref": f"{component_kind}:{component_id}",
+                "component_object_type": component_kind,
+                "component_object_id": component_id,
+            }
+        else:
+            result = _write_project_composition_file(project_id, path, text, max_bytes=max_bytes)
+    else:
+        result = projects.write_file(kind, project_id, path, text, max_bytes=max_bytes)
     evidence = _record_project_change(
         kind=kind,
         project_id=project_id,
@@ -1500,6 +1884,29 @@ def update_project_metadata(
     project_type: str | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
+    if kind == "project":
+        current = _composition_manifest(project_id)
+        if project_type is not None and str(project_type).strip() not in {"", "project"}:
+            raise ValueError("project_type is immutable after creation (current: project)")
+        if title is not None and not str(title).strip():
+            raise ValueError("title must not be empty")
+        payload = {
+            key: value
+            for key, value in current.items()
+            if key not in {"ref", "manifest_digest", "source_path"}
+        }
+        catalog = _composition_catalog(payload)
+        if title is not None:
+            catalog["title"] = str(title).strip()
+        if description is not None:
+            catalog["description"] = str(description).strip()
+        payload["catalog"] = catalog
+        updated = compositions.replace(
+            project_id,
+            payload,
+            expected_manifest_digest=str(current.get("manifest_digest") or ""),
+        )
+        return _project_descriptor("project", project_id, updated)
     return projects.update_metadata(
         kind,
         project_id,
@@ -1663,32 +2070,6 @@ def plan_change_set(
         "evidence_synced": evidence_error is None,
         "evidence_error": evidence_error,
     }
-
-
-@tool(
-    "rebase_change",
-    summary="Rebase one stale Builder Change after deterministic affected-ref verification.",
-    side_effects="local_write",
-)
-def rebase_change(
-    change_id: str,
-    expected_project_generation: int,
-    verified_unchanged_refs: list[str],
-    object_type: str = DEFAULT_PROJECT_KIND,
-    object_id: str = DEFAULT_PROJECT_ID,
-) -> dict[str, Any]:
-    """Expose the Project aggregate's explicit optimistic-concurrency repair."""
-
-    kind, project_id = _identity(object_type, object_id)
-    return workflow.rebase_change(
-        kind,
-        project_id,
-        str(change_id or "").strip(),
-        expected_project_generation=expected_project_generation,
-        verified_unchanged_refs=[
-            str(item).strip() for item in verified_unchanged_refs if str(item).strip()
-        ],
-    )
 
 
 @tool("add_change_issues", summary="Add follow-up issues to the active Builder change set.", side_effects="local_write")
@@ -2163,6 +2544,31 @@ def select_preview_target(
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
+    if kind == "project":
+        if str(stage or "").strip().lower() not in {"", "prototype"} and not follow_active:
+            raise ValueError("only the project prototype entrypoint can be shown in Preview")
+        result = preview.select_project(
+            kind,
+            project_id,
+            source_webspace_id=_preview_source_webspace_id(webspace_id, _meta),
+            ensure_ready=True,
+            wait_for_rebuild=True,
+            publish_event=True,
+        )
+        try:
+            current = workflow.get_state(kind, project_id)
+            interaction = workflow.update_interaction_context(
+                kind,
+                project_id,
+                {"preview_target": f"prototype:{project_id}:current"},
+                expected_generation=int(current.get("generation") or 0),
+            )
+            result["interaction_updated"] = True
+            result["interaction"] = interaction.get("workflow", {}).get("interaction")
+        except Exception as exc:
+            result["interaction_updated"] = False
+            result["interaction_error"] = str(exc)
+        return result
     return _select_scenario_preview_target(
         kind,
         project_id,
@@ -2241,6 +2647,40 @@ def get_automation(
     kind, project_id = _identity(object_type, object_id)
     source = _webspace_id(webspace_id, _meta)
     topic = _project_topic(kind, project_id, webspace_id=source)
+    if kind == "project":
+        try:
+            workflow_projection = workflow.get_state(kind, project_id)
+        except Exception:
+            workflow_projection = {}
+        projection = (
+            workflow_projection.get("automation")
+            if isinstance(workflow_projection.get("automation"), Mapping)
+            else {}
+        )
+        progress = projection.get("progress") if isinstance(projection.get("progress"), Mapping) else {}
+        evidence = projection.get("evidence") if isinstance(projection.get("evidence"), Mapping) else {}
+        return {
+            "ok": True,
+            "session_present": False,
+            "project_level_automation": "deferred",
+            "automation": dict(projection) or {"status": "idle", "phase": "not_started"},
+            "status": projection.get("status") or "idle",
+            "phase": projection.get("phase") or "not_started",
+            "task_id": projection.get("task_id"),
+            "progress_message": progress.get("message"),
+            "failure_message": projection.get("error"),
+            "failure_id": projection.get("failure_id"),
+            "failure_stage": projection.get("failure_stage"),
+            "version": projection.get("version"),
+            "updated_at": _datetime_value(projection.get("updated_at")),
+            "source_prototype_version": projection.get("source_prototype_version"),
+            "retryable": False,
+            "diagnostic_hint": "Project-level Automation is deferred; use owned component automation.",
+            "events_path": evidence.get("events_path"),
+            "stderr_path": evidence.get("stderr_path"),
+            "result_path": evidence.get("result_path"),
+            "conversation_id": topic.get("conversation_id"),
+        }
     result = automation.get_state(
         object_type=kind,
         object_id=project_id,
@@ -2255,46 +2695,8 @@ def get_automation(
     projection = result.get("automation") if isinstance(result.get("automation"), Mapping) else {}
     progress = projection.get("progress") if isinstance(projection.get("progress"), Mapping) else {}
     evidence = projection.get("evidence") if isinstance(projection.get("evidence"), Mapping) else {}
-    workflow_error: str | None = None
-    try:
-        workflow_value = workflow.get_state(kind, project_id)
-    except (RuntimeError, SdkRuntimeNotInitialized) as exc:
-        # Isolated skill validation has no AgentContext. Preserve the
-        # Automation read model and make the absent workflow head explicit.
-        workflow_value = {}
-        workflow_error = f"{type(exc).__name__}: {exc}"
-    governed = (
-        workflow_value.get("governed")
-        if isinstance(workflow_value.get("governed"), Mapping)
-        else {}
-    )
-    change_set = (
-        workflow_value.get("change_set")
-        if isinstance(workflow_value.get("change_set"), Mapping)
-        else {}
-    )
-    delivery = (
-        workflow_value.get("delivery")
-        if isinstance(workflow_value.get("delivery"), Mapping)
-        else {}
-    )
     return {
         **result,
-        "workflow_head": {
-            "schema": "adaos.builder.workflow_head.v1",
-            "available": workflow_error is None,
-            "error": workflow_error,
-            "state": governed.get("state"),
-            "generation": governed.get("generation"),
-            "change_set_id": change_set.get("change_set_id"),
-            "change_status": change_set.get("status"),
-            "delivery_status": delivery.get("status"),
-            "can_plan_change_set": bool(
-                dict(workflow_value.get("capabilities") or {}).get(
-                    "can_plan_change_set"
-                )
-            ),
-        },
         "status": projection.get("status"),
         "phase": projection.get("phase"),
         "task_id": projection.get("task_id"),
@@ -2311,26 +2713,6 @@ def get_automation(
         "stderr_path": evidence.get("stderr_path"),
         "result_path": evidence.get("result_path"),
     }
-
-
-@tool(
-    "release_candidate_runtime",
-    summary="Release a terminal skill candidate's DEV runtime while retaining evidence.",
-    side_effects="local_write",
-)
-def release_candidate_runtime(
-    object_id: str,
-    development_session_id: str,
-    object_type: str = "skill",
-) -> dict[str, Any]:
-    kind, project_id = _identity(object_type, object_id)
-    if kind != "skill":
-        raise ValueError("candidate runtime release requires object_type=skill")
-    return automation.release_candidate_runtime(
-        object_type=kind,
-        object_id=project_id,
-        development_session_id=str(development_session_id or "").strip(),
-    )
 
 
 @tool("get_process", summary="Project dependent Change, Prototype, Implementation, Trial, and Release provenance.", side_effects="none")
@@ -2524,14 +2906,40 @@ def get_lifecycle(
     current_revision = ""
     revisions: list[str] = []
     file_updated_at: dict[str, Any] = {}
-    for item in projects.list_files(kind, project_id, limit=1000):
+    presentation_scenario_id = _project_presentation_scenario_id(project_id) if kind == "project" else project_id
+    file_items = (
+        list_project_files(kind, project_id, limit=1000)
+        if kind == "project"
+        else projects.list_files(kind, project_id, limit=1000)
+    )
+    for item in file_items:
         path = PurePosixPath(str(item.get("path") or ""))
-        file_updated_at[path.as_posix()] = item.get("updated_at")
-        if kind == "scenario" and len(path.parts) == 2 and path.parts[0] == "ui_revisions" and path.suffix == ".json":
-            revisions.append(path.stem)
-    if kind == "scenario":
+        component_path = path
+        if kind == "project":
+            parts = path.parts
+            if (
+                len(parts) >= 5
+                and parts[0] == "components"
+                and parts[1] == "scenario"
+                and parts[2] == presentation_scenario_id
+            ):
+                component_path = PurePosixPath(*parts[3:])
+            else:
+                file_updated_at[path.as_posix()] = item.get("updated_at")
+                continue
+        file_updated_at[component_path.as_posix()] = item.get("updated_at")
+        if len(component_path.parts) == 2 and component_path.parts[0] == "ui_revisions" and component_path.suffix == ".json":
+            revisions.append(component_path.stem)
+    if kind in {"project", "scenario"} and presentation_scenario_id:
         try:
-            current_revision = str(projects.read_file(kind, project_id, "ui_revisions/current.txt", max_bytes=64)["content"]).strip()
+            current_revision = str(
+                projects.read_file(
+                    "scenario",
+                    presentation_scenario_id,
+                    "ui_revisions/current.txt",
+                    max_bytes=64,
+                )["content"]
+            ).strip()
         except projects.DeveloperProjectError:
             current_revision = ""
     revision_nodes: list[dict[str, Any]] = []
@@ -2558,8 +2966,8 @@ def get_lifecycle(
                 "badges": ["текущая"] if current else [],
                 "canMakeCurrent": not current and active_phase == "prototype",
                 "canStabilize": current and bool(workflow_capabilities.get("can_stabilize_prototype")),
-                "canOpenAutomation": current and bool(workflow_capabilities.get("can_handoff_to_automation")),
-                "canPreview": kind == "scenario",
+                "canOpenAutomation": kind != "project" and current and bool(workflow_capabilities.get("can_handoff_to_automation")),
+                "canPreview": kind in {"project", "scenario"},
             }
         )
     if not revision_nodes:
@@ -2578,8 +2986,8 @@ def get_lifecycle(
                 "conversationLabel": "Prototype conversation",
                 "badges": ["текущая"],
                 "canStabilize": bool(workflow_capabilities.get("can_stabilize_prototype")),
-                "canOpenAutomation": bool(workflow_capabilities.get("can_handoff_to_automation")),
-                "canPreview": kind == "scenario",
+                "canOpenAutomation": kind != "project" and bool(workflow_capabilities.get("can_handoff_to_automation")),
+                "canPreview": kind in {"project", "scenario"},
             }
         )
     automation_state = get_automation(kind, project_id, webspace_id, _meta)
@@ -2788,7 +3196,7 @@ def get_lifecycle(
 
 @tool("start_automation", summary="Start Builder Automation from an approved brief.", side_effects="local_write")
 def start_automation(
-    implementation_brief: str | None = None,
+    implementation_brief: str,
     object_type: str = DEFAULT_PROJECT_KIND,
     object_id: str = DEFAULT_PROJECT_ID,
     webspace_id: str | None = None,
@@ -2796,33 +3204,11 @@ def start_automation(
     brief_path: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    kind, project_id = _identity(object_type, object_id)
-    source = _preview_source_webspace_id(webspace_id, _meta)
-    admitted = _bound_automation_instruction(kind, project_id, source)
-    admitted_session = admitted or _bound_development_session(kind, project_id, source)
-    supplied_brief = str(implementation_brief or "").strip()
-    brief_value: Mapping[str, Any] | None = None
-    if admitted:
-        brief_value = admitted["value"]
-        exact_brief = _instruction_text(brief_value)
-        if supplied_brief:
-            try:
-                supplied_value = json.loads(supplied_brief)
-            except json.JSONDecodeError as exc:
-                raise ValueError(
-                    "this Builder host is bound to an exact AutomationBrief; free-form replacement is not allowed"
-                ) from exc
-            if not isinstance(supplied_value, Mapping) or dict(supplied_value) != dict(brief_value):
-                raise ValueError(
-                    "submitted AutomationBrief does not match the digest-bound Development Session instruction"
-                )
-        implementation_brief = exact_brief
-        brief_path = str(admitted["instruction"]["path"])
-    elif not supplied_brief:
-        raise ValueError("implementation_brief is required when no exact Development Session instruction is bound")
-    else:
-        implementation_brief = supplied_brief
     _require_transport_integrity(implementation_brief)
+    kind, project_id = _identity(object_type, object_id)
+    if kind == "project":
+        raise ValueError("Project-level Automation is deferred; start Automation on an owned component")
+    source = _webspace_id(webspace_id, _meta)
     topic = _project_topic(kind, project_id, webspace_id=source)
     bound_conversation_id = str(conversation_id or topic.get("conversation_id") or "").strip() or None
     workflow_state = workflow.get_state(kind, project_id)
@@ -2837,8 +3223,17 @@ def start_automation(
         "superseded",
     }:
         planned = plan_change_set(
-            request=_automation_change_request(brief_value, implementation_brief),
-            issues=_automation_change_issues(brief_value, implementation_brief),
+            request=implementation_brief,
+            issues=[
+                {
+                    "issue_id": f"automation-{uuid4().hex[:12]}",
+                    "title": " ".join(str(implementation_brief).split())[:240],
+                    "lane": "automation",
+                    "acceptance_criteria": [
+                        f"The implementation and its tests satisfy: {' '.join(str(implementation_brief).split())}"[:500]
+                    ],
+                }
+            ],
             object_type=kind,
             object_id=project_id,
             webspace_id=source,
@@ -2862,11 +3257,6 @@ def start_automation(
         conversation_id=bound_conversation_id,
         brief_path=brief_path,
         change_set_id=str(change_set.get("change_set_id") or "").strip() or None,
-        development_session_id=(
-            str(admitted_session["session"]["session_id"])
-            if admitted_session
-            else None
-        ),
     )
 
 
@@ -2881,20 +3271,16 @@ def submit_automation(
 ) -> dict[str, Any]:
     _require_transport_integrity(text)
     kind, project_id = _identity(object_type, object_id)
+    if kind == "project":
+        raise ValueError("Project-level Automation is deferred; submit to an owned component Automation session")
     source = _webspace_id(webspace_id, _meta)
     topic = _project_topic(kind, project_id, webspace_id=source)
-    admitted_session = _bound_development_session(kind, project_id, source)
     return automation.submit(
         text,
         object_type=kind,
         object_id=project_id,
         webspace_id=source,
         conversation_id=str(conversation_id or topic.get("conversation_id") or "").strip() or None,
-        development_session_id=(
-            str(admitted_session["session"]["session_id"])
-            if admitted_session
-            else None
-        ),
     )
 
 
@@ -2906,6 +3292,8 @@ def return_to_prototype(
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
+    if kind == "project":
+        raise ValueError("Project-level Automation is deferred; return an owned component to prototype")
     return automation.return_to_prototype(
         object_type=kind,
         object_id=project_id,
@@ -2923,6 +3311,8 @@ def recover_validated_automation(
     object_id: str = DEFAULT_PROJECT_ID,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
+    if kind == "project":
+        raise ValueError("Project-level Automation is deferred; recover an owned component Automation session")
     return automation.recover_validated_result(
         object_type=kind,
         object_id=project_id,
@@ -2939,6 +3329,8 @@ def reconcile_automation_checkpoint(
     object_id: str = DEFAULT_PROJECT_ID,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
+    if kind == "project":
+        raise ValueError("Project-level Automation is deferred; reconcile an owned component checkpoint")
     return automation.reconcile_checkpoint(
         object_type=kind,
         object_id=project_id,
@@ -3013,15 +3405,59 @@ async def apply_subscription_update(
     return {**result, "idempotency_key": attempt_id}
 
 
-@tool("create_project", summary="Create and select a DEV skill or scenario project.", side_effects="local_write")
+@tool("create_project", summary="Create and select a DEV project, skill, or scenario.", side_effects="local_write")
 def create_project(
     object_type: str,
     object_id: str,
     template: str | None = None,
+    source_project_id: str | None = None,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
+    if kind == "project":
+        template_id = str(template or "").strip()
+        if not template_id or template_id.lower() == "default":
+            template_id = "project_empty"
+        created = compositions.create(
+            _new_project_payload(
+                project_id,
+                template=template_id,
+                source_project_id=str(source_project_id or "").strip() or None,
+            )
+        )
+        try:
+            selected = dict(
+                select_preview(
+                    kind,
+                    project_id,
+                    webspace_id=webspace_id,
+                    _meta=_meta,
+                )
+                or {}
+            )
+        except Exception as exc:
+            selected = {
+                "ok": False,
+                "error": f"{type(exc).__name__}: {exc}",
+                "recovery": "add_project_scenario",
+            }
+        topic = _project_topic(kind, project_id, webspace_id=webspace_id, meta=_meta)
+        catalog = created.get("catalog") if isinstance(created.get("catalog"), Mapping) else {}
+        return {
+            **created,
+            "ok": True,
+            "object_type": kind,
+            "object_id": project_id,
+            "project_ref": f"project:{project_id}",
+            "title": str(catalog.get("title") or project_id),
+            "description": str(catalog.get("description") or ""),
+            "preview": selected,
+            "preview_selected": bool(selected.get("ok", True)),
+            "conversation_id": topic.get("conversation_id"),
+            "topic_id": topic.get("topic_id"),
+            "thread_id": topic.get("thread_id"),
+        }
     template_id = str(template or "").strip()
     if not template_id or template_id.lower() == "default":
         template_id = "scenario_default" if kind == "scenario" else "skill_default"
@@ -3062,6 +3498,40 @@ def create_project(
     }
 
 
+@tool("add_project_scenario", summary="Add or create a scenario component in a DEV Project.", side_effects="local_write")
+def add_project_scenario(
+    project_id: str,
+    scenario_id: str,
+    template: str | None = None,
+    make_primary: bool | None = None,
+) -> dict[str, Any]:
+    return _add_component_to_project(
+        project_id,
+        component_kind="scenario",
+        component_id=scenario_id,
+        template=template,
+        make_primary=make_primary,
+    )
+
+
+@tool("add_project_skill", summary="Add or create a skill component in a DEV Project.", side_effects="local_write")
+def add_project_skill(
+    project_id: str,
+    skill_id: str,
+    template: str | None = None,
+    role: str | None = None,
+    make_primary: bool | None = None,
+) -> dict[str, Any]:
+    return _add_component_to_project(
+        project_id,
+        component_kind="skill",
+        component_id=skill_id,
+        template=template,
+        role=role,
+        make_primary=make_primary,
+    )
+
+
 @tool("delete_project", summary="Delete a project through the governed developer lifecycle.", side_effects="external_write")
 def delete_project(
     confirm: bool = False,
@@ -3070,6 +3540,8 @@ def delete_project(
     object_id: str = DEFAULT_PROJECT_ID,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
+    if kind == "project":
+        raise ValueError("Project aggregate deletion is not supported from Builder in this iteration")
     if not confirm:
         raise ValueError("confirm=true is required to delete a project")
     return projects.delete(kind, project_id, remove_local=remove_local)
@@ -3081,13 +3553,10 @@ def push_project(
     object_id: str = DEFAULT_PROJECT_ID,
     message: str | None = None,
     checkpoint_id: str | None = None,
-    confirmed: bool = False,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
-    if not confirmed:
-        raise ValueError("Forge checkpoint requires explicit user confirmation")
     checkpoint_change_id = str(checkpoint_id or "").strip()
     if not checkpoint_change_id:
         raise ValueError("checkpoint_id is required")
@@ -3101,6 +3570,105 @@ def push_project(
         "context_packet_digest": context_packet_digest or None,
     }
     checkpoint_results: list[dict[str, Any]] = []
+    if kind == "project":
+        project_manifest = _composition_manifest(project_id)
+        for ref in _composition_owned_refs(project_id):
+            component = _split_component_ref(ref)
+            if component is None:
+                continue
+            component_kind, component_id = component
+            component_result = projects.push(
+                component_kind,
+                component_id,
+                message=checkpoint_message,
+                metadata={**checkpoint_metadata, "project_ref": f"project:{project_id}"},
+            )
+            checkpoint_results.append({"ref": ref, **dict(component_result)})
+        if not checkpoint_results:
+            raise ValueError("Project checkpoint requires at least one owned component")
+        commit = next(
+            (
+                str(item.get("commit") or item.get("commit_sha") or "").strip()
+                for item in checkpoint_results
+                if str(item.get("commit") or item.get("commit_sha") or "").strip()
+            ),
+            "",
+        ) or None
+        package_digest = str(project_manifest.get("manifest_digest") or "").strip()
+        source_revision = package_digest
+        result = {
+            "ok": True,
+            "kind": "project",
+            "name": project_id,
+            "version": str(project_manifest.get("version") or "DEV"),
+            "manifest_digest": package_digest,
+            "package_digest": package_digest,
+            "source_revision": source_revision,
+            "components_pushed": checkpoint_results,
+        }
+        evidence = _record_project_change(
+            kind=kind,
+            project_id=project_id,
+            action="checkpoint",
+            summary=checkpoint_message,
+            webspace_id=_webspace_id(webspace_id, _meta),
+            commit=commit,
+            change_id=checkpoint_change_id,
+            meta={
+                "canonical_change_id": canonical_change_id or None,
+                "context_packet_digest": context_packet_digest or None,
+                "project_manifest_digest": package_digest,
+                "checkpoint_artifacts": [
+                    {
+                        "kind": item.get("kind"),
+                        "name": item.get("name"),
+                        "ref": item.get("ref"),
+                        "commit": item.get("commit"),
+                        "package_digest": item.get("package_digest"),
+                    }
+                    for item in checkpoint_results
+                ],
+            },
+        )
+        change_id = str(evidence.get("change_id") or "").strip()
+        workflow_result = workflow.transition(
+            kind,
+            project_id,
+            "checkpoint_recorded",
+            actor="builder.checkpoint",
+            metadata={
+                "change_id": change_id,
+                "run_id": change_id,
+                "canonical_change_id": canonical_change_id or None,
+                "context_packet_digest": context_packet_digest or None,
+                "package_digest": package_digest,
+                "source_revision": source_revision,
+            },
+        )
+        workflow_projection = (
+            workflow_result.get("workflow")
+            if isinstance(workflow_result.get("workflow"), Mapping)
+            else {}
+        )
+        change_set_projection = (
+            workflow_projection.get("change_set")
+            if isinstance(workflow_projection.get("change_set"), Mapping)
+            else {}
+        )
+        if change_set_projection:
+            _sync_change_set_record(
+                kind=kind,
+                project_id=project_id,
+                webspace_id=_webspace_id(webspace_id, _meta),
+                change_set=change_set_projection,
+            )
+        return {
+            **result,
+            "change_id": change_id,
+            "checkpoint_artifacts": checkpoint_results,
+            "evidence": evidence,
+            "workflow": workflow_projection,
+        }
     if kind == "scenario":
         automation_state = get_automation(kind, project_id, webspace_id, _meta)
         automation_projection = (
@@ -3161,10 +3729,9 @@ def push_project(
     change_id = str(evidence.get("change_id") or "").strip()
     package_digest = str(result.get("package_digest") or "").strip()
     source_revision = str(result.get("source_revision") or commit or "").strip()
-    version = str(result.get("version") or "").strip()
-    if not package_digest or not source_revision or not version:
+    if not package_digest or not source_revision:
         raise ValueError(
-            "Forge checkpoint did not return immutable version/package/source identities; "
+            "Forge checkpoint did not return immutable package/source identities; "
             "the updated artifact pipeline must be available"
         )
     workflow_result = workflow.transition(
@@ -3179,8 +3746,6 @@ def push_project(
             "context_packet_digest": context_packet_digest or None,
             "package_digest": package_digest,
             "source_revision": source_revision,
-            "version": version,
-            "confirmed": True,
         },
     )
     workflow_projection = (
@@ -3209,40 +3774,23 @@ def push_project(
     }
 
 
-def _checkpoint_candidate_id(
-    kind: str,
-    project_id: str,
-    delivery: Mapping[str, Any],
-) -> tuple[str, str] | None:
+def _checkpoint_candidate_id(project_id: str, delivery: Mapping[str, Any]) -> str | None:
     version = str(delivery.get("version") or "").strip()
     package_digest = str(delivery.get("package_digest") or "").strip()
-    if not version:
-        # Compatibility recovery for checkpoints created before the control
-        # skill forwarded the already available Forge semantic version.  The
-        # candidate is accepted only after package and source identities are
-        # compared below, so a later DEV manifest cannot authorize different
-        # bytes accidentally.
-        try:
-            project = projects.describe(kind, project_id)
-        except Exception:
-            project = {}
-        version = str(project.get("version") or "").strip()
     if not version or not package_digest.startswith("sha256:"):
         return None
-    return f"{project_id}-{version.replace('.', '-')}-{package_digest[-12:]}", version
+    return f"{project_id}-{version.replace('.', '-')}-{package_digest[-12:]}"
 
 
 def _recover_running_checkpoint_candidate(
-    kind: str,
     project_id: str,
     delivery: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     """Recover an exact Trial after its external result outlived a local rollback."""
 
-    identity = _checkpoint_candidate_id(kind, project_id, delivery)
-    if not identity:
+    candidate_id = _checkpoint_candidate_id(project_id, delivery)
+    if not candidate_id:
         return None
-    candidate_id, checkpoint_version = identity
     try:
         result = projects.get_candidate(candidate_id)
     except Exception:
@@ -3253,7 +3801,7 @@ def _recover_running_checkpoint_candidate(
     expected = {
         "candidate_id": candidate_id,
         "project_id": project_id,
-        "version": checkpoint_version,
+        "version": str(delivery.get("version") or "").strip(),
         "package_digest": str(delivery.get("package_digest") or "").strip(),
         "source_revision": str(delivery.get("source_revision") or "").strip(),
     }
@@ -3317,8 +3865,7 @@ def _ensure_trial_waiting_before_result(
         return
     if str(delivery.get("status") or "") == "activating" and governed_state == "trial_waiting":
         return
-    delivery_status = str(delivery.get("status") or "")
-    if delivery_status not in {"checkpoint", "activating"} or governed_state != "trial_ready":
+    if str(delivery.get("status") or "") != "checkpoint" or governed_state != "trial_ready":
         raise ValueError("Trial result cannot be reconciled from the current Builder state")
     workflow.transition(
         kind,
@@ -3422,22 +3969,7 @@ def publish_project(
         operation = "Trial activation" if dry_run else "Publication"
         raise ValueError(f"{operation} requires explicit user confirmation")
     if dry_run:
-        source_webspace_id = _preview_source_webspace_id(webspace_id, _meta)
-        acceptance_evidence = _required_acceptance_evidence(
-            kind,
-            project_id,
-            source_webspace_id,
-        )
-        governed_workflow = (
-            workflow_before.get("governed")
-            if isinstance(workflow_before.get("governed"), Mapping)
-            else {}
-        )
-        reconciles_half_applied_waiting = (
-            str(delivery.get("status") or "") == "activating"
-            and str(governed_workflow.get("state") or "") == "trial_ready"
-        )
-        if not bool(capabilities.get("can_prepare_candidate")) and not reconciles_half_applied_waiting:
+        if not bool(capabilities.get("can_prepare_candidate")):
             raise ValueError(
                 "Candidate preparation requires the current completed Automation result "
                 "and no active trial"
@@ -3454,11 +3986,6 @@ def publish_project(
             "change_set_id": change_set_workflow.get("change_set_id"),
             "canonical_change_id": canonical_change_id or None,
             "context_packet_digest": context_packet_digest or None,
-            "acceptance_digest": (
-                acceptance_evidence.get("digest")
-                if isinstance(acceptance_evidence, Mapping)
-                else None
-            ),
         }
         candidate_change_ids = list(
             dict.fromkeys(
@@ -3489,11 +4016,7 @@ def publish_project(
             },
         )
         try:
-            recovered_result = (
-                None
-                if stale_candidate_id
-                else _recover_running_checkpoint_candidate(kind, project_id, delivery)
-            )
+            recovered_result = None if stale_candidate_id else _recover_running_checkpoint_candidate(project_id, delivery)
             if recovered_result is not None:
                 result = recovered_result
             elif stale_candidate_id:
@@ -3905,7 +4428,6 @@ __all__ = [
     "get_project",
     "get_state",
     "list_changes",
-    "list_development_feedback",
     "list_project_file_tree",
     "list_project_files",
     "list_project_objects",
@@ -3916,8 +4438,6 @@ __all__ = [
     "publish_project",
     "push_project",
     "read_project_file",
-    "record_development_feedback",
-    "release_candidate_runtime",
     "save_prompt_context",
     "save_project_file",
     "select_preview",

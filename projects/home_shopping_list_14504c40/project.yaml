@@ -1,0 +1,51 @@
+schema: adaos.project.v1
+kind: project
+id: home_shopping_list_14504c40
+version: 0.0.3
+profiles: [adaos.home.shopping_list.v1]
+components:
+  owned:
+  - ref: scenario:shopping_list_14504c40
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [presents]
+  - ref: skill:shopping_list_14504c40_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  dependencies: []
+entrypoints:
+- id: shopping-list
+  presentation: scenario:shopping_list_14504c40
+  default: true
+  bindings:
+    category: home
+catalog:
+  title: Home Shopping List 14504c40
+  description: Published alpha recipe book and shopping-list instance.
+  categories: [home]
+  tags: [recipes, shopping-list, alpha, instance]
+publication:
+  stage: alpha
+  visibility: listed
+  channel: alpha
+install:
+  default: false
+  features:
+  - id: shopping-list
+    title: Shopping list
+    default: true
+    optional: false
+    components: [scenario:shopping_list_14504c40, skill:shopping_list_14504c40_skill]
+compatibility:
+  required_entrypoints: [shopping-list]
+  validation_profiles: [home.shopping_list.alpha]
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition

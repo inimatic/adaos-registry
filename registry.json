@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-27T08:31:04+00:00",
+  "updated_at": "2026-08-27T09:28:52+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -29,7 +29,7 @@
       "id": "adaos_drive",
       "name": "adaos_drive",
       "version": "0.1.2",
-      "updated_at": "2026-08-18T00:00:00+00:00",
+      "updated_at": "2026-08-17T20:11:20+00:00",
       "path": "skills/adaos_drive",
       "manifest": "skills/adaos_drive/skill.yaml",
       "source": {
@@ -135,8 +135,8 @@
       "kind": "skill",
       "id": "builder_sdk_control_skill",
       "name": "builder_sdk_control_skill",
-      "version": "0.1.72",
-      "updated_at": "2026-08-21T01:37:28+00:00",
+      "version": "0.1.73-local.1",
+      "updated_at": "2026-08-05T21:22:48+00:00",
       "path": "skills/builder_sdk_control_skill",
       "manifest": "skills/builder_sdk_control_skill/skill.yaml",
       "source": {
@@ -151,7 +151,7 @@
       "description": "SDK-only backend for the functional Builder DEV scenario.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 59
+      "tools_count": 57
     },
     {
       "kind": "skill",
@@ -195,7 +195,7 @@
       "description": "Draft conversational character skill for onboarding, profile tuning, and controlled user trials.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 9
+      "tools_count": 10
     },
     {
       "kind": "skill",
@@ -348,13 +348,13 @@
         "startup_allowed": false,
         "background_refresh": false
       },
-      "tools_count": 8
+      "tools_count": 9
     },
     {
       "kind": "skill",
       "id": "infrastate_skill",
       "name": "infrastate_skill",
-      "version": "0.75.75",
+      "version": "0.75.76",
       "updated_at": "2026-08-27T06:30:00+00:00",
       "path": "skills/infrastate_skill",
       "manifest": "skills/infrastate_skill/skill.yaml",
@@ -980,6 +980,50 @@
     },
     {
       "kind": "skill",
+      "id": "test03_recipes_skill",
+      "name": "test03_recipes_skill",
+      "version": "0.2.5",
+      "updated_at": "2026-07-28T08:38:38+00:00",
+      "path": "skills/test03_recipes_skill",
+      "manifest": "skills/test03_recipes_skill/skill.yaml",
+      "source": {
+        "path": "skills/test03_recipes_skill",
+        "manifest": "skills/test03_recipes_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "test03_recipes_skill",
+        "id": "test03_recipes_skill"
+      },
+      "description": "Durable node-local recipe catalog and favorite selections for the Test03 Recipes scenario.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 3
+    },
+    {
+      "kind": "skill",
+      "id": "test05_recipes_skill",
+      "name": "test05_recipes_skill",
+      "version": "0.1.1",
+      "updated_at": "2026-07-29T17:25:33+00:00",
+      "path": "skills/test05_recipes_skill",
+      "manifest": "skills/test05_recipes_skill/skill.yaml",
+      "source": {
+        "path": "skills/test05_recipes_skill",
+        "manifest": "skills/test05_recipes_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "test05_recipes_skill",
+        "id": "test05_recipes_skill"
+      },
+      "description": "Локальная книга рецептов с поиском и избранным.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 4
+    },
+    {
+      "kind": "skill",
       "id": "tlp_experiment_skill",
       "name": "tlp_experiment_skill",
       "version": "0.1.1",
@@ -1058,7 +1102,7 @@
       "kind": "skill",
       "id": "weather_skill",
       "name": "weather_skill",
-      "version": "2.6.23",
+      "version": "2.6.26",
       "updated_at": "2026-08-14T19:40:13+00:00",
       "path": "skills/weather_skill",
       "manifest": "skills/weather_skill/skill.yaml",
@@ -1073,7 +1117,7 @@
       },
       "description": "Standalone SDK weather skill with Open-Meteo forecasts, browser location, declarative actions and subnet projections.",
       "runtime_python": "3.11",
-      "tools_count": 3
+      "tools_count": 4
     },
     {
       "kind": "skill",
@@ -1096,6 +1140,28 @@
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
       "tools_count": 0
+    },
+    {
+      "kind": "skill",
+      "id": "workflow_lab_dashboard_skill",
+      "name": "workflow_lab_dashboard_skill",
+      "version": "0.1.1",
+      "updated_at": "2026-08-05T20:24:22+00:00",
+      "path": "skills/workflow_lab_dashboard_skill",
+      "manifest": "skills/workflow_lab_dashboard_skill/skill.yaml",
+      "source": {
+        "path": "skills/workflow_lab_dashboard_skill",
+        "manifest": "skills/workflow_lab_dashboard_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "workflow_lab_dashboard_skill",
+        "id": "workflow_lab_dashboard_skill"
+      },
+      "description": "Deterministic local request-state tools for the bilingual Workflow Lab dashboard.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 2
     }
   ],
   "scenarios": [
@@ -1344,8 +1410,8 @@
       "kind": "scenario",
       "id": "research_workbench",
       "name": "research_workbench",
-      "version": "0.0.14",
-      "updated_at": "2026-08-17T22:04:28+00:00",
+      "version": "0.1.5",
+      "updated_at": "2026-08-19T09:30:00+00:00",
       "path": "scenarios/research_workbench",
       "manifest": "scenarios/research_workbench/scenario.yaml",
       "source": {
@@ -1358,7 +1424,7 @@
         "id": "research_workbench"
       },
       "title": "Research Workbench",
-      "description": "Shared portfolio, intake, formulation, and pre-Codex handoff for AdaOS research directions.",
+      "description": "Shared portfolio and full-page Direction to Task to ImplementationTrack workbench with governed formulation, Builder handoff, and joined evidence lineage.",
       "trigger": "manual",
       "skills": {
         "required": [
@@ -1470,6 +1536,36 @@
     },
     {
       "kind": "scenario",
+      "id": "test05_recipes",
+      "name": "test05_recipes",
+      "version": "0.1.4",
+      "updated_at": "2026-07-29T17:25:37+00:00",
+      "path": "scenarios/test05_recipes",
+      "manifest": "scenarios/test05_recipes/scenario.yaml",
+      "source": {
+        "path": "scenarios/test05_recipes",
+        "manifest": "scenarios/test05_recipes/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "test05_recipes",
+        "id": "test05_recipes"
+      },
+      "title": "Домашняя книга рецептов",
+      "title_i18n": {
+        "fallback": "Домашняя книга рецептов",
+        "key": "scenario.test05_recipes.title"
+      },
+      "description": "Локальная книга рецептов с поиском, добавлением и избранным.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "test05_recipes_skill"
+        ]
+      }
+    },
+    {
+      "kind": "scenario",
       "id": "tlp_research",
       "name": "tlp_research",
       "version": "0.3.6",
@@ -1523,6 +1619,1387 @@
           "voice_chat_skill"
         ]
       }
+    }
+  ],
+  "projects": [
+    {
+      "kind": "project",
+      "id": "adaos_builder",
+      "name": "adaos_builder",
+      "version": "0.3.1",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/adaos_builder",
+      "manifest": "projects/adaos_builder/project.yaml",
+      "source": {
+        "path": "projects/adaos_builder",
+        "manifest": "projects/adaos_builder/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "adaos_builder",
+        "id": "adaos_builder"
+      },
+      "title": "AdaOS Builder",
+      "description": "Project-scoped development workbench for prototypes, automation, trials, and publication.",
+      "categories": [
+        "development"
+      ],
+      "tags": [
+        "builder",
+        "prompt-ide",
+        "project",
+        "devspace"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "builder-workbench",
+          "title": "Builder workbench",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:builder",
+            "skill:builder_skill",
+            "skill:builder_sdk_control_skill"
+          ]
+        },
+        {
+          "id": "automation",
+          "title": "Automation loop",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:builder_automation_skill"
+          ]
+        },
+        {
+          "id": "prompt-ide",
+          "title": "Prompt IDE",
+          "default": false,
+          "optional": true,
+          "components": [
+            "scenario:prompt_engineer_scenario",
+            "skill:prompt_engineer_skill"
+          ]
+        },
+        {
+          "id": "skill-preview",
+          "title": "Skill preview",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:skill_preview"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:builder",
+        "scenario:prompt_engineer_scenario",
+        "scenario:skill_preview",
+        "skill:builder_skill",
+        "skill:builder_sdk_control_skill",
+        "skill:builder_automation_skill",
+        "skill:prompt_engineer_skill"
+      ],
+      "components_count": 7,
+      "profiles": [
+        "adaos.builder.v1",
+        "adaos.development.workbench.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "adaos_drive",
+      "name": "adaos_drive",
+      "version": "0.1.3",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/adaos_drive",
+      "manifest": "projects/adaos_drive/project.yaml",
+      "source": {
+        "path": "projects/adaos_drive",
+        "manifest": "projects/adaos_drive/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "adaos_drive",
+        "id": "adaos_drive"
+      },
+      "title": "AdaOS Drive",
+      "description": "Two-panel browser file manager for explicitly connected local folders.",
+      "categories": [
+        "files",
+        "productivity"
+      ],
+      "tags": [
+        "drive",
+        "file-manager",
+        "local-folders"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "drive",
+          "title": "Drive",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:adaos_drive",
+            "skill:adaos_drive"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:adaos_drive",
+        "skill:adaos_drive"
+      ],
+      "components_count": 2,
+      "profiles": [
+        "adaos.drive.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "ai_event_analysis_lab",
+      "name": "ai_event_analysis_lab",
+      "version": "0.2.22",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/ai_event_analysis_lab",
+      "manifest": "projects/ai_event_analysis_lab/project.yaml",
+      "source": {
+        "path": "projects/ai_event_analysis_lab",
+        "manifest": "projects/ai_event_analysis_lab/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "ai_event_analysis_lab",
+        "id": "ai_event_analysis_lab"
+      },
+      "title": "AI Event Analysis Lab",
+      "description": "Measurable AI/ML analysis of AdaOS operational event windows.",
+      "categories": [
+        "operations",
+        "research"
+      ],
+      "tags": [
+        "event-analysis",
+        "lab",
+        "alpha"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "components": [
+        "skill:ai_event_analysis_skill"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.analysis.events.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "builder_pipeline_smoke_1784408500",
+      "name": "builder_pipeline_smoke_1784408500",
+      "version": "0.0.3",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/builder_pipeline_smoke_1784408500",
+      "manifest": "projects/builder_pipeline_smoke_1784408500/project.yaml",
+      "source": {
+        "path": "projects/builder_pipeline_smoke_1784408500",
+        "manifest": "projects/builder_pipeline_smoke_1784408500/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "builder_pipeline_smoke_1784408500",
+        "id": "builder_pipeline_smoke_1784408500"
+      },
+      "title": "Builder Pipeline Smoke",
+      "description": "Internal SDK-only fixture for Builder pipeline proof.",
+      "categories": [
+        "development"
+      ],
+      "tags": [
+        "internal",
+        "smoke",
+        "fixture"
+      ],
+      "publication": {
+        "stage": "internal",
+        "visibility": "hidden",
+        "channel": "stable"
+      },
+      "stage": "internal",
+      "visibility": "hidden",
+      "channel": "stable",
+      "install_default": false,
+      "components": [
+        "scenario:builder_pipeline_smoke_1784408500",
+        "skill:builder_pipeline_smoke_1784408500_skill"
+      ],
+      "components_count": 2,
+      "profiles": [
+        "adaos.builder.fixture.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "cv_descriptor_lab",
+      "name": "cv_descriptor_lab",
+      "version": "0.1.4",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/cv_descriptor_lab",
+      "manifest": "projects/cv_descriptor_lab/project.yaml",
+      "source": {
+        "path": "projects/cv_descriptor_lab",
+        "manifest": "projects/cv_descriptor_lab/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "cv_descriptor_lab",
+        "id": "cv_descriptor_lab"
+      },
+      "title": "CV Descriptor Lab",
+      "description": "Browser-side visual object descriptor pilot for embeddings, signatures, thumbnails, and descriptions.",
+      "categories": [
+        "vision",
+        "demo"
+      ],
+      "tags": [
+        "cv",
+        "descriptors",
+        "lab",
+        "alpha"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "components": [
+        "skill:cv_descriptor"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.cv.descriptor_lab.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "default_app_bundle",
+      "name": "default_app_bundle",
+      "version": "0.1.1",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/default_app_bundle",
+      "manifest": "projects/default_app_bundle/project.yaml",
+      "source": {
+        "path": "projects/default_app_bundle",
+        "manifest": "projects/default_app_bundle/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "default_app_bundle",
+        "id": "default_app_bundle"
+      },
+      "title": "Default Apps Bundle",
+      "description": "Small default AdaOS apps and the current stable NLU service baseline.",
+      "categories": [
+        "system",
+        "productivity"
+      ],
+      "tags": [
+        "default-install",
+        "notebook",
+        "weather",
+        "conversation",
+        "nlu"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": true,
+      "features": [
+        {
+          "id": "personal-tools",
+          "title": "Personal tools",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:notebook_skill",
+            "skill:weather_skill"
+          ]
+        },
+        {
+          "id": "conversation-companions",
+          "title": "Conversation companions",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:conversation_companions"
+          ]
+        },
+        {
+          "id": "rasa-nlu",
+          "title": "Rasa NLU service",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:rasa_nlu_service_skill"
+          ]
+        }
+      ],
+      "components": [
+        "skill:notebook_skill",
+        "skill:weather_skill",
+        "skill:conversation_companions",
+        "skill:rasa_nlu_service_skill"
+      ],
+      "components_count": 4,
+      "profiles": [
+        "adaos.default_apps.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "home_recipes_03",
+      "name": "home_recipes_03",
+      "version": "0.2.6",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/home_recipes_03",
+      "manifest": "projects/home_recipes_03/project.yaml",
+      "source": {
+        "path": "projects/home_recipes_03",
+        "manifest": "projects/home_recipes_03/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "home_recipes_03",
+        "id": "home_recipes_03"
+      },
+      "title": "Home Recipes 03",
+      "description": "Published alpha recipe catalog instance used for current home-category development.",
+      "categories": [
+        "home"
+      ],
+      "tags": [
+        "recipes",
+        "alpha",
+        "instance",
+        "test03"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "listed",
+        "channel": "alpha"
+      },
+      "stage": "alpha",
+      "visibility": "listed",
+      "channel": "alpha",
+      "install_default": false,
+      "components": [
+        "skill:test03_recipes_skill"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.home.recipes.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "home_recipes_05",
+      "name": "home_recipes_05",
+      "version": "0.1.5",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/home_recipes_05",
+      "manifest": "projects/home_recipes_05/project.yaml",
+      "source": {
+        "path": "projects/home_recipes_05",
+        "manifest": "projects/home_recipes_05/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "home_recipes_05",
+        "id": "home_recipes_05"
+      },
+      "title": "Home Recipes 05",
+      "description": "Published alpha home recipe catalog with search, creation, and favorites.",
+      "categories": [
+        "home"
+      ],
+      "tags": [
+        "recipes",
+        "alpha",
+        "instance",
+        "test05"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "listed",
+        "channel": "alpha"
+      },
+      "stage": "alpha",
+      "visibility": "listed",
+      "channel": "alpha",
+      "install_default": false,
+      "features": [
+        {
+          "id": "recipes",
+          "title": "Recipes",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:test05_recipes",
+            "skill:test05_recipes_skill"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:test05_recipes",
+        "skill:test05_recipes_skill"
+      ],
+      "components_count": 2,
+      "profiles": [
+        "adaos.home.recipes.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "home_shopping_list_14504c40",
+      "name": "home_shopping_list_14504c40",
+      "version": "0.0.3",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/home_shopping_list_14504c40",
+      "manifest": "projects/home_shopping_list_14504c40/project.yaml",
+      "source": {
+        "path": "projects/home_shopping_list_14504c40",
+        "manifest": "projects/home_shopping_list_14504c40/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "home_shopping_list_14504c40",
+        "id": "home_shopping_list_14504c40"
+      },
+      "title": "Home Shopping List 14504c40",
+      "description": "Published alpha recipe book and shopping-list instance.",
+      "categories": [
+        "home"
+      ],
+      "tags": [
+        "recipes",
+        "shopping-list",
+        "alpha",
+        "instance"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "listed",
+        "channel": "alpha"
+      },
+      "stage": "alpha",
+      "visibility": "listed",
+      "channel": "alpha",
+      "install_default": false,
+      "features": [
+        {
+          "id": "shopping-list",
+          "title": "Shopping list",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:shopping_list_14504c40",
+            "skill:shopping_list_14504c40_skill"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:shopping_list_14504c40",
+        "skill:shopping_list_14504c40_skill"
+      ],
+      "components_count": 2,
+      "profiles": [
+        "adaos.home.shopping_list.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "media_center",
+      "name": "media_center",
+      "version": "0.6.83",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/media_center",
+      "manifest": "projects/media_center/project.yaml",
+      "source": {
+        "path": "projects/media_center",
+        "manifest": "projects/media_center/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "media_center",
+        "id": "media_center"
+      },
+      "title": "Media Center",
+      "description": "Distributed in-place household media library, playback, and remote control.",
+      "categories": [
+        "media",
+        "home"
+      ],
+      "tags": [
+        "audio",
+        "video",
+        "tv",
+        "remote-control",
+        "distributed"
+      ],
+      "publication": {
+        "stage": "beta",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "beta",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "library",
+          "title": "Media library",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:media_center",
+            "skill:media_center_skill",
+            "skill:media_library_agent"
+          ]
+        },
+        {
+          "id": "playback-control",
+          "title": "Playback control",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:media_control_skill"
+          ]
+        },
+        {
+          "id": "legacy-mediaserver",
+          "title": "Legacy media server",
+          "default": false,
+          "optional": true,
+          "components": [
+            "skill:mediaserver"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:media_center",
+        "skill:media_center_skill",
+        "skill:media_library_agent",
+        "skill:media_control_skill",
+        "skill:mediaserver"
+      ],
+      "components_count": 5,
+      "profiles": [
+        "adaos.media_center.v1",
+        "adaos.media_center.tv.v1",
+        "adaos.media_center.desktop.v1",
+        "adaos.media_center.mobile_control.v1",
+        "adaos.media_center.embedded.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "media_indexer_lab",
+      "name": "media_indexer_lab",
+      "version": "0.1.36",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/media_indexer_lab",
+      "manifest": "projects/media_indexer_lab/project.yaml",
+      "source": {
+        "path": "projects/media_indexer_lab",
+        "manifest": "projects/media_indexer_lab/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "media_indexer_lab",
+        "id": "media_indexer_lab"
+      },
+      "title": "Media Indexer Lab",
+      "description": "Legacy semantic media indexing pilot retained for diagnosis and possible Media Center reintegration.",
+      "categories": [
+        "media",
+        "demo"
+      ],
+      "tags": [
+        "indexer",
+        "lab",
+        "deprecated"
+      ],
+      "publication": {
+        "stage": "deprecated",
+        "visibility": "hidden",
+        "channel": "stable"
+      },
+      "stage": "deprecated",
+      "visibility": "hidden",
+      "channel": "stable",
+      "install_default": false,
+      "components": [
+        "skill:media_indexer_skill"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.media.indexer_lab.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "new_face_vision",
+      "name": "new_face_vision",
+      "version": "0.2.17",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/new_face_vision",
+      "manifest": "projects/new_face_vision/project.yaml",
+      "source": {
+        "path": "projects/new_face_vision",
+        "manifest": "projects/new_face_vision/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "new_face_vision",
+        "id": "new_face_vision"
+      },
+      "title": "New Face Vision",
+      "description": "Desktop video frame analysis for stone defect inspection.",
+      "categories": [
+        "vision"
+      ],
+      "tags": [
+        "inspection",
+        "video",
+        "deeplabv3",
+        "alpha"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "inspection",
+          "title": "Vision inspection",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:new_face_vision_scenario",
+            "skill:new_face_vision_skill"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:new_face_vision_scenario",
+        "skill:new_face_vision_skill"
+      ],
+      "components_count": 2,
+      "profiles": [
+        "adaos.vision.inspection.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "nlu_runtime",
+      "name": "nlu_runtime",
+      "version": "0.1.1",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/nlu_runtime",
+      "manifest": "projects/nlu_runtime/project.yaml",
+      "source": {
+        "path": "projects/nlu_runtime",
+        "manifest": "projects/nlu_runtime/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "nlu_runtime",
+        "id": "nlu_runtime"
+      },
+      "title": "NLU Runtime Modules",
+      "description": "Optional research-stage neural and lightweight local NLU runtimes.",
+      "categories": [
+        "system",
+        "nlu"
+      ],
+      "tags": [
+        "optional",
+        "research",
+        "neural",
+        "lite"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "neural-nlu",
+          "title": "Neural NLU service",
+          "default": false,
+          "optional": true,
+          "components": [
+            "skill:neural_nlu_service_skill"
+          ]
+        },
+        {
+          "id": "lite-nlu",
+          "title": "Lite NLU service",
+          "default": false,
+          "optional": true,
+          "components": [
+            "skill:neuro_nlu_lite_skill"
+          ]
+        }
+      ],
+      "components": [
+        "skill:neural_nlu_service_skill",
+        "skill:neuro_nlu_lite_skill"
+      ],
+      "components_count": 2,
+      "profiles": [
+        "adaos.nlu.runtime.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "ops_infrascope",
+      "name": "ops_infrascope",
+      "version": "0.10.5",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/ops_infrascope",
+      "manifest": "projects/ops_infrascope/project.yaml",
+      "source": {
+        "path": "projects/ops_infrascope",
+        "manifest": "projects/ops_infrascope/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "ops_infrascope",
+        "id": "ops_infrascope"
+      },
+      "title": "Infrascope Operations",
+      "description": "Operator inventory, infrastructure state, access, subnet, and service diagnostics.",
+      "categories": [
+        "operations",
+        "system"
+      ],
+      "tags": [
+        "infrascope",
+        "inventory",
+        "marketplace",
+        "infra",
+        "subnet"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "inventory",
+          "title": "Inventory and marketplace",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:infrascope",
+            "skill:infrascope_skill",
+            "skill:infrastate_skill"
+          ]
+        },
+        {
+          "id": "infra-access",
+          "title": "Managed infra access",
+          "default": false,
+          "optional": true,
+          "components": [
+            "skill:infra_access_skill",
+            "skill:subnet_env",
+            "skill:service_doctor_skill"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:infrascope",
+        "skill:infrascope_skill",
+        "skill:infrastate_skill",
+        "skill:infra_access_skill",
+        "skill:subnet_env",
+        "skill:service_doctor_skill"
+      ],
+      "components_count": 6,
+      "profiles": [
+        "adaos.operations.infrascope.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "redevice_control",
+      "name": "redevice_control",
+      "version": "0.1.8",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/redevice_control",
+      "manifest": "projects/redevice_control/project.yaml",
+      "source": {
+        "path": "projects/redevice_control",
+        "manifest": "projects/redevice_control/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "redevice_control",
+        "id": "redevice_control"
+      },
+      "title": "ReDevice Control",
+      "description": "Endpoint inventory, settings, slideshow projection, and voice endpoint controls.",
+      "categories": [
+        "devices",
+        "home"
+      ],
+      "tags": [
+        "redevice",
+        "endpoints",
+        "slideshow",
+        "voice",
+        "alpha"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "endpoint-control",
+          "title": "Endpoint control",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:redevice_user_face",
+            "skill:redevice_settings",
+            "skill:redevice_list"
+          ]
+        },
+        {
+          "id": "voice",
+          "title": "Voice endpoint",
+          "default": false,
+          "optional": true,
+          "components": [
+            "skill:redevice_voice"
+          ]
+        },
+        {
+          "id": "slideshow",
+          "title": "Slideshow endpoint",
+          "default": false,
+          "optional": true,
+          "components": [
+            "skill:slideshow_skill"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:redevice_user_face",
+        "skill:redevice_settings",
+        "skill:redevice_list",
+        "skill:redevice_voice",
+        "skill:slideshow_skill"
+      ],
+      "components_count": 5,
+      "profiles": [
+        "adaos.redevice.control.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "release_validation_ops",
+      "name": "release_validation_ops",
+      "version": "0.1.7",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/release_validation_ops",
+      "manifest": "projects/release_validation_ops/project.yaml",
+      "source": {
+        "path": "projects/release_validation_ops",
+        "manifest": "projects/release_validation_ops/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "release_validation_ops",
+        "id": "release_validation_ops"
+      },
+      "title": "Release Validation Operations",
+      "description": "Observe-only release validation campaign runner and evidence log.",
+      "categories": [
+        "operations",
+        "release"
+      ],
+      "tags": [
+        "release-validation",
+        "campaigns",
+        "evidence"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "validation",
+          "title": "Release validation",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:release_validation_ops",
+            "skill:release_validation_skill"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:release_validation_ops",
+        "skill:release_validation_skill"
+      ],
+      "components_count": 2,
+      "profiles": [
+        "adaos.release_validation.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "research_platform",
+      "name": "research_platform",
+      "version": "0.1.1",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/research_platform",
+      "manifest": "projects/research_platform/project.yaml",
+      "source": {
+        "path": "projects/research_platform",
+        "manifest": "projects/research_platform/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "research_platform",
+        "id": "research_platform"
+      },
+      "title": "Research Platform",
+      "description": "Reusable governed research workbench, orchestration, experiment management, evaluation, and tracking.",
+      "categories": [
+        "research"
+      ],
+      "tags": [
+        "workbench",
+        "orchestration",
+        "experiments",
+        "evaluator",
+        "mlflow"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "workbench",
+          "title": "Research workbench",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:research_workbench",
+            "skill:research_orchestrator_skill",
+            "skill:research_manager_skill"
+          ]
+        },
+        {
+          "id": "evaluation",
+          "title": "Evaluation and calibration",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:research_evaluator_skill",
+            "skill:research_calibration_runner_skill"
+          ]
+        },
+        {
+          "id": "tracker",
+          "title": "MLflow tracker",
+          "default": false,
+          "optional": true,
+          "components": [
+            "skill:mlflow_tracker_skill"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:research_workbench",
+        "skill:research_orchestrator_skill",
+        "skill:research_manager_skill",
+        "skill:research_evaluator_skill",
+        "skill:research_calibration_runner_skill",
+        "skill:mlflow_tracker_skill"
+      ],
+      "components_count": 6,
+      "profiles": [
+        "adaos.research.platform.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "research_tlp",
+      "name": "research_tlp",
+      "version": "0.3.7",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/research_tlp",
+      "manifest": "projects/research_tlp/project.yaml",
+      "source": {
+        "path": "projects/research_tlp",
+        "manifest": "projects/research_tlp/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "research_tlp",
+        "id": "research_tlp"
+      },
+      "title": "TLP Mechanistic Research",
+      "description": "Governed TLP research instance with STL-10 proof runner and experiment provider.",
+      "categories": [
+        "research"
+      ],
+      "tags": [
+        "tlp",
+        "alpha",
+        "max-plus",
+        "pooling"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "tlp-study",
+          "title": "TLP study",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:tlp_research",
+            "skill:tlp_structured_proof_02",
+            "skill:tlp_experiment_skill"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:tlp_research",
+        "skill:tlp_structured_proof_02",
+        "skill:tlp_experiment_skill"
+      ],
+      "components_count": 3,
+      "profiles": [
+        "adaos.research.tlp.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "semantic_ui_demo",
+      "name": "semantic_ui_demo",
+      "version": "0.10.3",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/semantic_ui_demo",
+      "manifest": "projects/semantic_ui_demo/project.yaml",
+      "source": {
+        "path": "projects/semantic_ui_demo",
+        "manifest": "projects/semantic_ui_demo/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "semantic_ui_demo",
+        "id": "semantic_ui_demo"
+      },
+      "title": "Semantic UI Demo",
+      "description": "Semantic Web UI demo with table, chart payload, and live event stream.",
+      "categories": [
+        "demo",
+        "development"
+      ],
+      "tags": [
+        "semantic-ui",
+        "taiga",
+        "metrics",
+        "alpha"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "demo",
+          "title": "Demo",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:taiga_ui_demo_scenario",
+            "skill:demo_metrics_skill"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:taiga_ui_demo_scenario",
+        "skill:demo_metrics_skill"
+      ],
+      "components_count": 2,
+      "profiles": [
+        "adaos.demo.semantic_ui.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "streaming_recipe_book_eval",
+      "name": "streaming_recipe_book_eval",
+      "version": "0.0.4",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/streaming_recipe_book_eval",
+      "manifest": "projects/streaming_recipe_book_eval/project.yaml",
+      "source": {
+        "path": "projects/streaming_recipe_book_eval",
+        "manifest": "projects/streaming_recipe_book_eval/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "streaming_recipe_book_eval",
+        "id": "streaming_recipe_book_eval"
+      },
+      "title": "Streaming Recipe Book Eval",
+      "description": "Deprecated recipe catalog evaluation instance retained for comparison.",
+      "categories": [
+        "home"
+      ],
+      "tags": [
+        "recipes",
+        "eval",
+        "deprecated"
+      ],
+      "publication": {
+        "stage": "deprecated",
+        "visibility": "hidden",
+        "channel": "stable"
+      },
+      "stage": "deprecated",
+      "visibility": "hidden",
+      "channel": "stable",
+      "install_default": false,
+      "components": [
+        "scenario:streaming_recipe_book_eval",
+        "skill:streaming_recipe_book_eval_skill"
+      ],
+      "components_count": 2,
+      "profiles": [
+        "adaos.home.recipes.eval.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "web_desktop",
+      "name": "web_desktop",
+      "version": "0.3.12",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/web_desktop",
+      "manifest": "projects/web_desktop/project.yaml",
+      "source": {
+        "path": "projects/web_desktop",
+        "manifest": "projects/web_desktop/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "web_desktop",
+        "id": "web_desktop"
+      },
+      "title": "Web Desktop",
+      "description": "Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.",
+      "categories": [
+        "system",
+        "desktop"
+      ],
+      "tags": [
+        "default-install",
+        "shell",
+        "browser",
+        "voice",
+        "onboarding"
+      ],
+      "publication": {
+        "stage": "beta",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "beta",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": true,
+      "features": [
+        {
+          "id": "shell",
+          "title": "Desktop shell",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:web_desktop",
+            "skill:web_desktop_skill"
+          ]
+        },
+        {
+          "id": "onboarding",
+          "title": "Node onboarding",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:greet_on_boot_skill",
+            "skill:pair_new_device_skill",
+            "skill:adaos_connect"
+          ]
+        },
+        {
+          "id": "browser-voice",
+          "title": "Browser and voice bridge",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:browsers_skill",
+            "skill:voice_chat_skill"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:web_desktop",
+        "skill:web_desktop_skill",
+        "skill:greet_on_boot_skill",
+        "skill:pair_new_device_skill",
+        "skill:adaos_connect",
+        "skill:voice_chat_skill",
+        "skill:browsers_skill"
+      ],
+      "components_count": 7,
+      "profiles": [
+        "adaos.desktop.shell.v1",
+        "adaos.default_install.v1"
+      ]
+    },
+    {
+      "kind": "project",
+      "id": "workflow_lab",
+      "name": "workflow_lab",
+      "version": "0.1.3",
+      "updated_at": "2026-08-27T09:28:54+00:00",
+      "path": "projects/workflow_lab",
+      "manifest": "projects/workflow_lab/project.yaml",
+      "source": {
+        "path": "projects/workflow_lab",
+        "manifest": "projects/workflow_lab/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "workflow_lab",
+        "id": "workflow_lab"
+      },
+      "title": "Workflow Lab",
+      "description": "Internal conversational workflow control and dashboard reference lab.",
+      "categories": [
+        "development"
+      ],
+      "tags": [
+        "workflow",
+        "lab",
+        "internal"
+      ],
+      "publication": {
+        "stage": "internal",
+        "visibility": "hidden",
+        "channel": "stable"
+      },
+      "stage": "internal",
+      "visibility": "hidden",
+      "channel": "stable",
+      "install_default": false,
+      "components": [
+        "skill:conversational_workflow_lab_skill",
+        "skill:workflow_lab_dashboard_skill"
+      ],
+      "components_count": 2,
+      "profiles": [
+        "adaos.workflow.lab.v1"
+      ]
     }
   ]
 }

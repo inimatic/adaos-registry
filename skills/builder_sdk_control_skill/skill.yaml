@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.72
+version: 0.1.73-local.1
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -29,6 +29,7 @@ tools:
       kind:
         type: string
         enum:
+        - project
         - scenario
         - skill
       query:
@@ -40,6 +41,7 @@ tools:
       selected_object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       selected_object_id:
@@ -65,6 +67,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -84,6 +87,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -107,6 +111,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -126,6 +131,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -149,6 +155,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
   output_schema:
@@ -170,6 +177,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -199,6 +207,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -222,6 +231,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -243,6 +253,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -267,6 +278,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -288,6 +300,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -310,6 +323,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -328,6 +342,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -356,6 +371,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -373,6 +389,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -413,6 +430,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -435,6 +453,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -463,6 +482,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -528,6 +548,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -538,41 +559,6 @@ tools:
       expected_generation:
         type: integer
         minimum: 0
-  output_schema:
-    type: object
-- name: rebase_change
-  description: Rebase one stale Builder Change after deterministic verification of
-    its affected refs.
-  entry: handlers.main:rebase_change
-  side_effects: local_write
-  input_schema:
-    type: object
-    required:
-    - change_id
-    - expected_project_generation
-    - verified_unchanged_refs
-    properties:
-      change_id:
-        type: string
-        minLength: 1
-      expected_project_generation:
-        type: integer
-        minimum: 0
-      verified_unchanged_refs:
-        type: array
-        minItems: 1
-        maxItems: 100
-        items:
-          type: string
-          minLength: 1
-      object_type:
-        type: string
-        enum:
-        - scenario
-        - skill
-      object_id:
-        type: string
-        minLength: 1
   output_schema:
     type: object
 - name: add_change_issues
@@ -634,6 +620,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -668,6 +655,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -700,6 +688,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -721,6 +710,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -739,6 +729,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -807,6 +798,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -930,6 +922,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -951,6 +944,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -969,6 +963,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -1013,6 +1008,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -1032,6 +1028,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -1055,6 +1052,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -1077,34 +1075,10 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
-        type: string
-        minLength: 1
-  output_schema:
-    type: object
-- name: release_candidate_runtime
-  description: Release a terminal skill candidate DEV runtime while retaining its
-    governed source, Builder session, and evidence.
-  entry: handlers.main:release_candidate_runtime
-  side_effects: local_write
-  timeout_seconds: 600
-  input_schema:
-    type: object
-    additionalProperties: false
-    required:
-    - object_id
-    - development_session_id
-    properties:
-      object_type:
-        type: string
-        const: skill
-        default: skill
-      object_id:
-        type: string
-        minLength: 1
-      development_session_id:
         type: string
         minLength: 1
   output_schema:
@@ -1119,6 +1093,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -1138,6 +1113,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -1171,6 +1147,8 @@ tools:
   timeout_seconds: 120
   input_schema:
     type: object
+    required:
+    - implementation_brief
     properties:
       implementation_brief:
         type: string
@@ -1325,7 +1303,7 @@ tools:
   output_schema:
     type: object
 - name: create_project
-  description: Create a new DEV skill or scenario from a template.
+  description: Create a new DEV project, skill, or scenario from a template.
   entry: handlers.main:create_project
   side_effects: local_write
   input_schema:
@@ -1337,6 +1315,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -1344,26 +1323,78 @@ tools:
         minLength: 1
       template:
         type: string
+      source_project_id:
+        type: string
       webspace_id:
         type: string
       conversation_id:
         type: string
   output_schema:
     type: object
+- name: add_project_scenario
+  description: Add or create a scenario component in a DEV Project.
+  entry: handlers.main:add_project_scenario
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - project_id
+    - scenario_id
+    properties:
+      project_id:
+        type: string
+        minLength: 1
+      scenario_id:
+        type: string
+        minLength: 1
+      template:
+        type: string
+      make_primary:
+        type: boolean
+  output_schema:
+    type: object
+- name: add_project_skill
+  description: Add or create a skill component in a DEV Project.
+  entry: handlers.main:add_project_skill
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - project_id
+    - skill_id
+    properties:
+      project_id:
+        type: string
+        minLength: 1
+      skill_id:
+        type: string
+        minLength: 1
+      template:
+        type: string
+      role:
+        type: string
+        enum:
+        - primary
+        - implementation
+        - supporting
+      make_primary:
+        type: boolean
+  output_schema:
+    type: object
 - name: push_project
   description: Checkpoint a DEV project as an exact Forge revision and immutable package.
   entry: handlers.main:push_project
-  side_effects: external_write
+  side_effects: local_write
   timeout_seconds: 120
   input_schema:
     type: object
     required:
     - checkpoint_id
-    - confirmed
     properties:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -1375,10 +1406,6 @@ tools:
         type: string
         minLength: 1
         description: Caller-assigned immutable identity for this checkpoint operation.
-      confirmed:
-        type: boolean
-        description: Explicit confirmation before the Forge checkpoint and verification
-          acceptance.
       webspace_id:
         type: string
   output_schema:
@@ -1449,6 +1476,7 @@ tools:
       object_type:
         type: string
         enum:
+        - project
         - scenario
         - skill
       object_id:
@@ -1535,131 +1563,6 @@ tools:
     - ok
     - approved
     - request
-- name: record_development_feedback
-  description: Return typed clarification, feasibility, capability, protocol, or runtime
-    feedback without mutating accepted science.
-  entry: handlers.main:record_development_feedback
-  side_effects: local_write
-  input_schema:
-    type: object
-    required:
-    - kind
-    - summary
-    properties:
-      kind:
-        enum:
-        - clarification_required
-        - feasibility_constraint
-        - capability_gap
-        - protocol_conflict
-        - runtime_blocker
-      summary:
-        type: string
-        minLength: 10
-        maxLength: 4000
-      severity:
-        enum:
-        - info
-        - warning
-        - error
-        default: warning
-      blocking:
-        type: boolean
-        default: true
-      affected_refs:
-        type: array
-        maxItems: 50
-        uniqueItems: true
-        items:
-          type: string
-          pattern: '^(skill|scenario):'
-      constraints:
-        type: array
-        maxItems: 100
-        uniqueItems: true
-        items:
-          type: string
-          minLength: 3
-      evidence:
-        type: array
-        maxItems: 100
-        items:
-          type: object
-          required:
-          - kind
-          - ref
-          - digest
-          properties:
-            kind:
-              enum:
-              - file
-              - test
-              - log
-              - contract
-              - environment
-            ref:
-              type: string
-              minLength: 1
-            digest:
-              type:
-              - string
-              - 'null'
-              pattern: ^sha256:[0-9a-f]{64}$
-          additionalProperties: false
-      proposed_action:
-        enum:
-        - clarify_contract
-        - revise_engineering_contract
-        - request_capability
-        - request_scope
-        - retry_infrastructure
-        - abort_execution
-        default: clarify_contract
-      protocol_digest:
-        type: string
-        pattern: ^sha256:[0-9a-f]{64}$
-      webspace_id:
-        type: string
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-    - idempotent
-    - feedback
-    - state_path
-- name: list_development_feedback
-  description: Read validated typed feedback for the Development Session bound to
-    this Builder host.
-  entry: handlers.main:list_development_feedback
-  side_effects: none
-  input_schema:
-    type: object
-    properties:
-      kind:
-        enum:
-        - clarification_required
-        - feasibility_constraint
-        - capability_gap
-        - protocol_conflict
-        - runtime_blocker
-      blocking:
-        type: boolean
-      limit:
-        type: integer
-        minimum: 1
-        maximum: 5000
-      webspace_id:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-    - bound
-    - items
 - name: get_skill_preview
   description: Describe the skill selected by the paired Builder host for the generic
     preview scenario.
@@ -2171,13 +2074,4 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-08-21T01:37:28+00:00'
-compatibility:
-  adaos_core:
-    min_version: 0.1.895+5490.e46bbe4b
-    recorded_at: '2026-08-21T01:37:28+00:00'
-    source: skill_push
-    min_commit: e46bbe4b5fd1955ac4bc9ba84b7ca2816c0716ec
-    min_short_commit: e46bbe4b
-    build_date: '2026-08-21T01:24:28+00:00'
-
+updated_at: '2026-08-05T21:22:48+00:00'

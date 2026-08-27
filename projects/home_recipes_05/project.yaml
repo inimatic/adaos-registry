@@ -1,0 +1,51 @@
+schema: adaos.project.v1
+kind: project
+id: home_recipes_05
+version: 0.1.5
+profiles: [adaos.home.recipes.v1]
+components:
+  owned:
+  - ref: scenario:test05_recipes
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [presents]
+  - ref: skill:test05_recipes_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  dependencies: []
+entrypoints:
+- id: recipes
+  presentation: scenario:test05_recipes
+  default: true
+  bindings:
+    category: home
+catalog:
+  title: Home Recipes 05
+  description: Published alpha home recipe catalog with search, creation, and favorites.
+  categories: [home]
+  tags: [recipes, alpha, instance, test05]
+publication:
+  stage: alpha
+  visibility: listed
+  channel: alpha
+install:
+  default: false
+  features:
+  - id: recipes
+    title: Recipes
+    default: true
+    optional: false
+    components: [scenario:test05_recipes, skill:test05_recipes_skill]
+compatibility:
+  required_entrypoints: [recipes]
+  validation_profiles: [home.recipes.alpha]
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition

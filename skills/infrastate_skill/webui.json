@@ -221,6 +221,44 @@
           "updateSource": "core.update.status"
         }
       },
+      "infrastate.projects": {
+        "mode": "replace",
+        "transport": "hub",
+        "scope": "node",
+        "snapshotPolicy": "on_subscribe",
+        "patches": true,
+        "itemPath": "/items",
+        "idField": "name",
+        "initialState": {
+          "status": "init",
+          "message": "Loading installed projects...",
+          "items": []
+        },
+        "budget": {
+          "maxPayloadBytes": 65536,
+          "maxPublishHz": 0.5,
+          "maxSnapshotHz": 1,
+          "maxItems": 256
+        },
+        "guardVisibility": {
+          "degradedState": "Keep last projects inventory stream value.",
+          "log": "service.infrastate_skill.runtime.log",
+          "quarantine": false,
+          "metric": "webio_stream_guard.infrastate.projects"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:installed_projects",
+          "owner": "skill:infrastate_skill",
+          "firstPaint": "loading projects initial state",
+          "recovery": "stream snapshot requested on stream subscribe",
+          "updateSource": [
+            "project.installed",
+            "skill.installed",
+            "scenario.installed"
+          ]
+        }
+      },
       "infrastate.skills": {
         "mode": "replace",
         "transport": "hub",
@@ -294,6 +332,37 @@
           "updateSource": [
             "scenario.installed",
             "scenario.removed",
+            "scenarios.synced"
+          ]
+        }
+      },
+      "infrastate.marketplace.projects": {
+        "mode": "replace",
+        "transport": "hub",
+        "scope": "node",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": [],
+        "budget": {
+          "maxPayloadBytes": 65536,
+          "maxPublishHz": 0.2,
+          "maxSnapshotHz": 1,
+          "maxItems": 256
+        },
+        "guardVisibility": {
+          "degradedState": "Keep last marketplace project rows.",
+          "log": "service.infrastate_skill.runtime.log",
+          "quarantine": false,
+          "metric": "webio_stream_guard.infrastate.marketplace.projects"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:marketplace",
+          "owner": "skill:infrastate_skill",
+          "firstPaint": "empty marketplace project list",
+          "recovery": "marketplace snapshot requested on stream subscribe",
+          "updateSource": [
+            "project.installed",
+            "skills.updated",
             "scenarios.synced"
           ]
         }
@@ -1239,11 +1308,66 @@
               ]
             },
             {
+              "id": "infrastate-projects",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Installed projects",
+              "visibleIf": "$state.infrastateTab === 'inventory'",
+              "dataSource": {
+                "kind": "stream",
+                "scope": "node",
+                "receiver": "infrastate.projects"
+              },
+              "inputs": {
+                "emptyText": "No installed projects",
+                "columns": [
+                  {
+                    "key": "status_icon",
+                    "label": "",
+                    "kind": "icon",
+                    "tooltipKey": "status_tooltip",
+                    "width": "44px"
+                  },
+                  {
+                    "key": "display_name",
+                    "label": "Project"
+                  },
+                  {
+                    "key": "version",
+                    "label": "Version",
+                    "mono": true,
+                    "width": "110px"
+                  },
+                  {
+                    "key": "stage",
+                    "label": "Stage",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "categories",
+                    "label": "Categories",
+                    "width": "160px"
+                  },
+                  {
+                    "key": "components_count",
+                    "label": "Components",
+                    "width": "110px"
+                  },
+                  {
+                    "key": "installed_at",
+                    "label": "Installed",
+                    "mono": true,
+                    "width": "170px"
+                  }
+                ]
+              }
+            },
+            {
               "id": "infrastate-skills",
               "type": "ui.table",
               "area": "main",
               "title": "Installed skills",
-              "visibleIf": "$state.infrastateTab === 'inventory'",
+              "visibleIf": "$state.infrastateTab === 'inventory' && $state.infrastateDevMode === true",
               "dataSource": {
                 "kind": "stream",
                 "scope": "node",
@@ -1479,7 +1603,7 @@
               "type": "ui.table",
               "area": "main",
               "title": "Scenarios",
-              "visibleIf": "$state.infrastateTab === 'inventory'",
+              "visibleIf": "$state.infrastateTab === 'inventory' && $state.infrastateDevMode === true",
               "dataSource": {
                 "kind": "stream",
                 "scope": "node",
@@ -1781,10 +1905,78 @@
           },
           "widgets": [
             {
+              "id": "marketplace-projects",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Installable projects",
+              "dataSource": {
+                "kind": "stream",
+                "scope": "node",
+                "receiver": "infrastate.marketplace.projects"
+              },
+              "inputs": {
+                "emptyText": "No installable projects",
+                "columns": [
+                  {
+                    "key": "id",
+                    "label": "Project",
+                    "mono": true,
+                    "width": "190px"
+                  },
+                  {
+                    "key": "version",
+                    "label": "Version",
+                    "mono": true,
+                    "width": "110px"
+                  },
+                  {
+                    "key": "stage",
+                    "label": "Stage",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "categories",
+                    "label": "Categories",
+                    "width": "160px"
+                  },
+                  {
+                    "key": "components_count",
+                    "label": "Components",
+                    "width": "110px"
+                  },
+                  {
+                    "key": "description",
+                    "label": "Description"
+                  }
+                ],
+                "buttons": [
+                  {
+                    "id": "install",
+                    "label": "Install",
+                    "disabledKey": "install_disabled"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:install",
+                  "type": "callHost",
+                  "target": "infrastate.action",
+                  "params": {
+                    "id": "marketplace_install",
+                    "value": "$event",
+                    "node_id": "$event.node_id",
+                    "target_node_id": "$event.target_node_id"
+                  }
+                }
+              ]
+            },
+            {
               "id": "marketplace-skills",
               "type": "ui.table",
               "area": "main",
               "title": "Installable skills",
+              "visibleIf": "$state.infrastateDevMode === true",
               "dataSource": {
                 "kind": "stream",
                 "scope": "node",
@@ -1842,6 +2034,7 @@
               "type": "ui.table",
               "area": "main",
               "title": "Installable scenarios",
+              "visibleIf": "$state.infrastateDevMode === true",
               "dataSource": {
                 "kind": "stream",
                 "scope": "node",

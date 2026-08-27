@@ -114,8 +114,9 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
     assert picker["dataSource"] == {
         "kind": "skill",
         "name": "builder_sdk_control_skill.list_projects",
+        "scope": "local",
         "params": {
-            "limit": 200,
+            "limit": 50,
             "selected_object_type": "$state.selectedProjectKind",
             "selected_object_id": "$state.selectedProjectId",
             "include_archived": "$state.projectPickerArchived",
@@ -133,7 +134,7 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
         for key, value in picker["dataSource"]["params"].items()
     }
     assert resolved_params == {
-        "limit": 200,
+        "limit": 50,
         "selected_object_type": "scenario",
         "selected_object_id": "builder",
         "include_archived": False,
@@ -167,6 +168,7 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
     updates = [item for item in picker["actions"] if item.get("type") == "updateState"]
     assert len(calls) == 1
     assert calls[0]["target"] == "builder_sdk_control_skill.select_preview"
+    assert calls[0]["scope"] == "local"
     assert len(updates) == 1
     assert updates[0]["params"]["selectedProjectId"] == "$event.object_id"
     assert updates[0]["params"]["builderTopicId"] == (
@@ -175,9 +177,10 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
     assert any(item.get("type") == "closeModal" for item in picker["actions"])
     assert any(item.get("on") == "add" for item in picker["actions"])
     assert picker["inputs"]["addButtonFirst"] is True
-    assert picker["inputs"]["toolbarToggles"][0]["stateKey"] == (
-        "projectPickerArchived"
-    )
+    toggles = picker["inputs"]["toolbarToggles"]
+    if isinstance(toggles, dict):
+        toggles = [toggles]
+    assert toggles[0]["stateKey"] == "projectPickerArchived"
 
 
 def test_process_inspection_is_separate_from_the_canonical_conversation() -> None:

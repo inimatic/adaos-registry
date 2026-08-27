@@ -1,0 +1,82 @@
+schema: adaos.project.v1
+kind: project
+id: research_platform
+version: 0.1.1
+profiles: [adaos.research.platform.v1]
+components:
+  owned:
+  - ref: scenario:research_workbench
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [presents]
+  - ref: skill:research_orchestrator_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  - ref: skill:research_manager_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  - ref: skill:research_evaluator_skill
+    role: supporting
+    exposure: project_only
+    lifecycle: bound
+    relations: [evaluates]
+  - ref: skill:research_calibration_runner_skill
+    role: supporting
+    exposure: project_only
+    lifecycle: bound
+    relations: [evaluates]
+  - ref: skill:mlflow_tracker_skill
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
+    relations: [uses]
+  dependencies: []
+entrypoints:
+- id: workbench
+  presentation: scenario:research_workbench
+  default: true
+  bindings:
+    platform: research
+catalog:
+  title: Research Platform
+  description: Reusable governed research workbench, orchestration, experiment management, evaluation, and tracking.
+  categories: [research]
+  tags: [workbench, orchestration, experiments, evaluator, mlflow]
+publication:
+  stage: alpha
+  visibility: listed
+  channel: stable
+install:
+  default: false
+  features:
+  - id: workbench
+    title: Research workbench
+    default: true
+    optional: false
+    components: [scenario:research_workbench, skill:research_orchestrator_skill, skill:research_manager_skill]
+  - id: evaluation
+    title: Evaluation and calibration
+    default: true
+    optional: false
+    components: [skill:research_evaluator_skill, skill:research_calibration_runner_skill]
+  - id: tracker
+    title: MLflow tracker
+    default: false
+    optional: true
+    components: [skill:mlflow_tracker_skill]
+compatibility:
+  required_entrypoints: [workbench]
+  required_contracts: [adaos.research.direction.v1, adaos.research.experiment.v1]
+  validation_profiles: [research.platform.local]
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition

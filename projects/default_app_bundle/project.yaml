@@ -1,0 +1,65 @@
+schema: adaos.project.v1
+kind: project
+id: default_app_bundle
+version: 0.1.1
+profiles: [adaos.default_apps.v1]
+components:
+  owned:
+  - ref: skill:notebook_skill
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [realizes]
+  - ref: skill:weather_skill
+    role: supporting
+    exposure: application
+    lifecycle: bound
+    relations: [uses]
+  - ref: skill:conversation_companions
+    role: supporting
+    exposure: application
+    lifecycle: bound
+    relations: [uses]
+  - ref: skill:rasa_nlu_service_skill
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
+    relations: [uses]
+  dependencies: []
+entrypoints: []
+catalog:
+  title: Default Apps Bundle
+  description: Small default AdaOS apps and the current stable NLU service baseline.
+  categories: [system, productivity]
+  tags: [default-install, notebook, weather, conversation, nlu]
+publication:
+  stage: alpha
+  visibility: listed
+  channel: stable
+install:
+  default: true
+  features:
+  - id: personal-tools
+    title: Personal tools
+    default: true
+    optional: false
+    components: [skill:notebook_skill, skill:weather_skill]
+  - id: conversation-companions
+    title: Conversation companions
+    default: true
+    optional: false
+    components: [skill:conversation_companions]
+  - id: rasa-nlu
+    title: Rasa NLU service
+    default: true
+    optional: false
+    components: [skill:rasa_nlu_service_skill]
+compatibility:
+  validation_profiles: [default_apps.local]
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition

@@ -1,0 +1,45 @@
+schema: adaos.project.v1
+kind: project
+id: builder_pipeline_smoke_1784408500
+version: 0.0.3
+profiles: [adaos.builder.fixture.v1]
+components:
+  owned:
+  - ref: scenario:builder_pipeline_smoke_1784408500
+    role: primary
+    exposure: advanced
+    lifecycle: bound
+    relations: [presents]
+  - ref: skill:builder_pipeline_smoke_1784408500_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  dependencies: []
+entrypoints:
+- id: smoke
+  presentation: scenario:builder_pipeline_smoke_1784408500
+  default: true
+  bindings:
+    fixture: builder_pipeline
+catalog:
+  title: Builder Pipeline Smoke
+  description: Internal SDK-only fixture for Builder pipeline proof.
+  categories: [development]
+  tags: [internal, smoke, fixture]
+publication:
+  stage: internal
+  visibility: hidden
+  channel: stable
+install:
+  default: false
+compatibility:
+  required_entrypoints: [smoke]
+  validation_profiles: [builder.fixture]
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: remove
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition

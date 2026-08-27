@@ -1,0 +1,76 @@
+schema: adaos.project.v1
+kind: project
+id: ops_infrascope
+version: 0.10.5
+profiles: [adaos.operations.infrascope.v1]
+components:
+  owned:
+  - ref: scenario:infrascope
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [presents]
+  - ref: skill:infrascope_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  - ref: skill:infrastate_skill
+    role: supporting
+    exposure: application
+    lifecycle: bound
+    relations: [uses]
+  - ref: skill:infra_access_skill
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
+    relations: [uses]
+  - ref: skill:subnet_env
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
+    relations: [uses]
+  - ref: skill:service_doctor_skill
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
+    relations: [uses]
+  dependencies: []
+entrypoints:
+- id: infrascope
+  presentation: scenario:infrascope
+  default: true
+  bindings:
+    operator_surface: infrascope
+catalog:
+  title: Infrascope Operations
+  description: Operator inventory, infrastructure state, access, subnet, and service diagnostics.
+  categories: [operations, system]
+  tags: [infrascope, inventory, marketplace, infra, subnet]
+publication:
+  stage: alpha
+  visibility: listed
+  channel: stable
+install:
+  default: false
+  features:
+  - id: inventory
+    title: Inventory and marketplace
+    default: true
+    optional: false
+    components: [scenario:infrascope, skill:infrascope_skill, skill:infrastate_skill]
+  - id: infra-access
+    title: Managed infra access
+    default: false
+    optional: true
+    components: [skill:infra_access_skill, skill:subnet_env, skill:service_doctor_skill]
+compatibility:
+  required_entrypoints: [infrascope]
+  validation_profiles: [ops.infrascope.local]
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition

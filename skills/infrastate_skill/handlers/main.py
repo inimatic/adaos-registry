@@ -47,6 +47,7 @@ from adaos.services.runtime_refresh import rebuild_webspace_projection_sync, ref
 from adaos.services.capacity import get_local_capacity, install_scenario_in_capacity
 from adaos.services.scenario.webspace_runtime import WebspaceService
 from adaos.services.operations import get_operation_manager, submit_install_operation, submit_update_operation
+from adaos.services.project_install import install_workspace_project, list_workspace_projects, load_installed_projects
 from adaos.services.skill.update import SkillUpdateService
 from adaos.services.scenarios.loader import read_manifest
 from adaos.services.scenario.manager import ScenarioManager
@@ -419,12 +420,20 @@ def _scenarios_receiver() -> str:
     return "infrastate.scenarios"
 
 
+def _projects_receiver() -> str:
+    return "infrastate.projects"
+
+
 def _marketplace_skills_receiver() -> str:
     return "infrastate.marketplace.skills"
 
 
 def _marketplace_scenarios_receiver() -> str:
     return "infrastate.marketplace.scenarios"
+
+
+def _marketplace_projects_receiver() -> str:
+    return "infrastate.marketplace.projects"
 
 
 def _core_update_diagnostics_receiver() -> str:
@@ -451,6 +460,14 @@ def _action_invalidates_marketplace(action_id: str) -> bool:
     }
 
 
+def _env_type() -> str:
+    return str(os.getenv("ENV_TYPE") or os.getenv("ADAOS_ENV_TYPE") or "").strip().lower()
+
+
+def _dev_component_catalog_enabled() -> bool:
+    return _env_type() == "dev"
+
+
 def _patch_first_inventory_action(action_id: str) -> bool:
     return str(action_id or "").strip() in {
         "scenario_hard_pull",
@@ -474,13 +491,16 @@ def _action_inventory_receivers(action_id: str) -> tuple[str, ...]:
         "inventory_activate",
     }:
         return (
+            _projects_receiver(),
             _skills_receiver(),
             _scenarios_receiver(),
+            _marketplace_projects_receiver(),
             _marketplace_skills_receiver(),
             _marketplace_scenarios_receiver(),
         )
     if token in {"inventory_validate", "inventory_test"}:
         return (
+            _projects_receiver(),
             _skills_receiver(),
             _scenarios_receiver(),
         )
@@ -532,8 +552,10 @@ _STREAM_RUNTIME = StreamRuntime(
         StreamReceiver(_steps_receiver(), build=_build_registered_stream_payload, min_interval_s=_stream_min_interval_s()),
         StreamReceiver(_realtime_receiver(), build=_build_registered_stream_payload, min_interval_s=_stream_min_interval_s()),
         StreamReceiver(_slots_receiver(), build=_build_registered_stream_payload, min_interval_s=_stream_min_interval_s()),
+        StreamReceiver(_projects_receiver(), build=_build_registered_stream_payload, min_interval_s=_stream_min_interval_s()),
         StreamReceiver(_skills_receiver(), build=_build_registered_stream_payload, min_interval_s=_stream_min_interval_s()),
         StreamReceiver(_scenarios_receiver(), build=_build_registered_stream_payload, min_interval_s=_stream_min_interval_s()),
+        StreamReceiver(_marketplace_projects_receiver(), build=_build_registered_stream_payload, min_interval_s=_stream_min_interval_s()),
         StreamReceiver(_marketplace_skills_receiver(), build=_build_registered_stream_payload, min_interval_s=_stream_min_interval_s()),
         StreamReceiver(_marketplace_scenarios_receiver(), build=_build_registered_stream_payload, min_interval_s=_stream_min_interval_s()),
         StreamReceiver(_core_update_diagnostics_receiver(), build=_build_registered_stream_payload, min_interval_s=_stream_min_interval_s()),
@@ -768,6 +790,7 @@ def _compact_ui_state_for_yjs(value: Any) -> dict[str, Any]:
         "inventory_bulk_action_finished_at",
         "inventory_bulk_action_failed",
         "inventory_bulk_action_error",
+        "infrastateDevMode",
     )
     return {key: _cache_copy(value.get(key)) for key in keys if key in value}
 
@@ -1111,6 +1134,9 @@ def _stream_payload_for_receiver(snapshot: dict[str, Any], receiver: str) -> Any
         return list(snapshot.get("skills") or [])
     if token == _scenarios_receiver():
         return list(snapshot.get("scenarios") or [])
+    if token == _marketplace_projects_receiver():
+        marketplace = snapshot.get("marketplace") if isinstance(snapshot.get("marketplace"), dict) else {}
+        return list(marketplace.get("projects") or [])
     if token == _marketplace_skills_receiver():
         marketplace = snapshot.get("marketplace") if isinstance(snapshot.get("marketplace"), dict) else {}
         return list(marketplace.get("skills") or [])
@@ -1281,11 +1307,15 @@ def _inventory_kind_for_action(action_id: str) -> str:
         return "skill"
     if token.startswith("scenario_"):
         return "scenario"
+    if token.startswith("project_"):
+        return "project"
     return ""
 
 
 def _inventory_receiver_for_kind(kind: str) -> str:
     token = str(kind or "").strip()
+    if token == "project":
+        return _projects_receiver()
     if token == "skill":
         return _skills_receiver()
     if token == "scenario":
@@ -1296,7 +1326,7 @@ def _inventory_receiver_for_kind(kind: str) -> str:
 def _inventory_item_for_kind(kind: str, name: str) -> dict[str, Any] | None:
     item_kind = str(kind or "").strip()
     token = str(name or "").strip()
-    if item_kind not in {"skill", "scenario"} or not token:
+    if item_kind not in {"project", "skill", "scenario"} or not token:
         return None
     with _inventory_stream_patch_lock:
         cached = _inventory_row_cache.get((item_kind, token))
@@ -3140,6 +3170,44 @@ def _allow_marketplace_git_ref_lookup() -> bool:
     return role == "hub"
 
 
+def _workspace_project_catalog_entries(workspace_root: Path) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for definition in list_workspace_projects(workspace_root, include_hidden=False):
+        project_id = str(definition.get("id") or "").strip()
+        if not project_id:
+            continue
+        catalog = definition.get("catalog") if isinstance(definition.get("catalog"), dict) else {}
+        publication = definition.get("publication") if isinstance(definition.get("publication"), dict) else {}
+        install = definition.get("install") if isinstance(definition.get("install"), dict) else {}
+        components = [
+            str(item.get("ref") or "").strip()
+            for item in (definition.get("components") or {}).get("owned") or []
+            if isinstance(item, dict) and str(item.get("ref") or "").strip()
+        ]
+        entries.append(
+            {
+                "kind": "project",
+                "id": project_id,
+                "name": project_id,
+                "title": str(catalog.get("title") or project_id),
+                "version": str(definition.get("version") or ""),
+                "description": str(catalog.get("description") or ""),
+                "categories": list(catalog.get("categories") or []),
+                "tags": list(catalog.get("tags") or []),
+                "stage": str(publication.get("stage") or ""),
+                "visibility": str(publication.get("visibility") or ""),
+                "channel": str(publication.get("channel") or ""),
+                "install_default": bool(install.get("default") is True),
+                "features": list(install.get("features") or []),
+                "components": components,
+                "components_count": len(components),
+                "source_path": str(definition.get("source_path") or ""),
+            }
+        )
+    entries.sort(key=lambda item: str(item.get("id") or ""))
+    return entries
+
+
 def _marketplace_catalog_entries(kind_plural: str) -> list[dict[str, Any]]:
     try:
         ctx = get_ctx()
@@ -3147,7 +3215,8 @@ def _marketplace_catalog_entries(kind_plural: str) -> list[dict[str, Any]]:
         return []
 
     workspace_root = Path(ctx.paths.workspace_dir())
-    cache_key = (str(workspace_root), str(kind_plural or "").strip())
+    kind_token = str(kind_plural or "").strip()
+    cache_key = (str(workspace_root), kind_token)
     cache_now = time.monotonic()
     cached = _marketplace_catalog_cache.get(cache_key)
     if cached is not None and _MARKETPLACE_CACHE_TTL_S > 0:
@@ -3172,15 +3241,18 @@ def _marketplace_catalog_entries(kind_plural: str) -> list[dict[str, Any]]:
     # opened together and must not perform two identical remote registry reads.
     _merge(_registry_json_catalog_entries(kind_plural, workspace_root))
 
-    try:
-        local_entries = list_workspace_registry_entries(workspace_root, kind=kind_plural)
-    except Exception:
-        local_entries = []
+    if kind_token == "projects":
+        local_entries = _workspace_project_catalog_entries(workspace_root)
+    else:
+        try:
+            local_entries = list_workspace_registry_entries(workspace_root, kind=kind_plural)
+        except Exception:
+            local_entries = []
     _merge(local_entries)
 
     # Registry sync owns normal workspace reconciliation. A full scan here is
     # only a recovery path because it can traverse every installed artifact.
-    if not local_entries:
+    if kind_token != "projects" and not local_entries:
         try:
             scanned_payload = rebuild_workspace_registry(workspace_root)
         except Exception:
@@ -3548,6 +3620,62 @@ def _scenario_items(*, include_all: bool = True, operations: dict[str, Any] | No
     return out
 
 
+def _project_inventory_items() -> list[dict[str, Any]]:
+    try:
+        ctx = get_ctx()
+        installed = load_installed_projects(ctx)
+    except Exception:
+        installed = []
+    out: list[dict[str, Any]] = []
+    for record in installed:
+        if not isinstance(record, dict):
+            continue
+        project_id = str(record.get("id") or "").strip()
+        if not project_id:
+            continue
+        publication = record.get("publication") if isinstance(record.get("publication"), dict) else {}
+        component_refs = [
+            str(ref).strip()
+            for ref in record.get("component_refs") or []
+            if str(ref).strip()
+        ]
+        categories = [
+            str(item).strip()
+            for item in record.get("categories") or []
+            if str(item).strip()
+        ]
+        tags = [
+            str(item).strip()
+            for item in record.get("tags") or []
+            if str(item).strip()
+        ]
+        status = str(record.get("status") or "installed").strip() or "installed"
+        out.append(
+            {
+                "kind": "project",
+                "id": project_id,
+                "name": project_id,
+                "display_name": str(record.get("title") or project_id),
+                "title": str(record.get("title") or project_id),
+                "version": str(record.get("version") or ""),
+                "description": str(record.get("description") or ""),
+                "stage": str(publication.get("stage") or ""),
+                "status": status,
+                "status_icon": "checkmark-circle-outline" if status == "installed" else "ellipse-outline",
+                "status_tooltip": status,
+                "categories": ", ".join(categories),
+                "tags": ", ".join(tags),
+                "components_count": len(component_refs),
+                "component_refs": component_refs,
+                "installed_at": str(record.get("installed_at") or ""),
+                "source": str(record.get("source") or ""),
+                "uninstall_disabled": True,
+            }
+        )
+    out.sort(key=lambda item: str(item.get("name") or ""))
+    return out
+
+
 def _make_skill_manager(ctx) -> SkillManager:
     return SkillManager(
         repo=ctx.skills_repo,
@@ -3863,15 +3991,21 @@ def _marketplace_items(
     try:
         ctx = get_ctx()
     except Exception:
-        return {"skills": [], "scenarios": []}
+        return {"projects": [], "skills": [], "scenarios": []}
 
+    dev_catalog = _dev_component_catalog_enabled()
+    allowed_kinds = {"projects", "skills", "scenarios"} if dev_catalog else {"projects"}
+    default_kinds = {"projects", "skills", "scenarios"} if dev_catalog else {"projects"}
+    requested = requested_kinds or default_kinds
     kinds = {
         str(item or "").strip().lower()
-        for item in (requested_kinds or {"skills", "scenarios"})
-        if str(item or "").strip().lower() in {"skills", "scenarios"}
+        for item in requested
+        if str(item or "").strip().lower() in allowed_kinds
     }
     if not kinds:
-        kinds = {"skills", "scenarios"}
+        if requested_kinds is not None:
+            return {"projects": [], "skills": [], "scenarios": []}
+        kinds = set(default_kinds)
 
     operations = _operations_snapshot(webspace_id=webspace_id)
     active_by_target: dict[tuple[str, str], dict[str, Any]] = {}
@@ -3908,8 +4042,18 @@ def _marketplace_items(
                 if str(item.get("name") or "").strip()
             }
 
+    installed_projects: set[str] = set()
+    if "projects" in kinds:
+        try:
+            installed_projects = {
+                str(item.get("id") or "").strip()
+                for item in load_installed_projects(ctx)
+                if isinstance(item, dict) and str(item.get("id") or "").strip()
+            }
+        except Exception:
+            installed_projects = set()
     installed_skills = _installed_names("skills") if "skills" in kinds else set()
-    installed_scenarios = _installed_names("scenarios")
+    installed_scenarios = _installed_names("scenarios") if "scenarios" in kinds else set()
     installed_elapsed_ms = (time.perf_counter() - started_at) * 1000.0
 
     selected_node_token = str(selected_node_id or "").strip()
@@ -3941,6 +4085,8 @@ def _marketplace_items(
 
     def _rows(kind_plural: str, installed: set[str]) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
+        if kind_plural == "projects" and selected_node_token and local_node_token and selected_node_token != local_node_token:
+            return rows
         for entry in _marketplace_catalog_entries(kind_plural):
             artifact = entry if isinstance(entry, dict) else {}
             target_kind = str(artifact.get("kind") or kind_plural[:-1]).strip() or kind_plural[:-1]
@@ -3956,6 +4102,10 @@ def _marketplace_items(
                     "version": str(artifact.get("version") or ""),
                     "description": str(artifact.get("description") or ""),
                     "tags": ", ".join(str(tag) for tag in (artifact.get("tags") or []) if str(tag).strip()),
+                    "categories": ", ".join(str(category) for category in (artifact.get("categories") or []) if str(category).strip()),
+                    "stage": str(artifact.get("stage") or ""),
+                    "install_default": bool(artifact.get("install_default") is True),
+                    "components_count": int(artifact.get("components_count") or 0),
                     "publisher": str(((artifact.get("publisher") or {}) if isinstance(artifact.get("publisher"), dict) else {}).get("owner_id") or ""),
                     "install_disabled": bool(op),
                     "operation_status": str(op.get("status") or "") if isinstance(op, dict) else "",
@@ -3985,7 +4135,9 @@ def _marketplace_items(
                 if dep_name:
                     deps.add(dep_name)
         return deps
-    scenario_rows = _rows("scenarios", installed_scenarios)
+
+    project_rows = _rows("projects", installed_projects) if "projects" in kinds else []
+    scenario_rows = _rows("scenarios", installed_scenarios) if "scenarios" in kinds else []
     skill_rows: list[dict[str, Any]] = []
     if "skills" in kinds:
         hidden_skill_ids = _scenario_depends([str(item.get("id") or "") for item in scenario_rows])
@@ -3998,15 +4150,17 @@ def _marketplace_items(
     elapsed_ms = (time.perf_counter() - started_at) * 1000.0
     if elapsed_ms >= 1000.0:
         _log.warning(
-            "infrastate marketplace build slow kinds=%s total_ms=%.1f installed_ms=%.1f skills=%d scenarios=%d",
+            "infrastate marketplace build slow kinds=%s total_ms=%.1f installed_ms=%.1f projects=%d skills=%d scenarios=%d",
             ",".join(sorted(kinds)),
             elapsed_ms,
             installed_elapsed_ms,
+            len(project_rows),
             len(skill_rows),
             len(scenario_rows),
         )
 
     return {
+        "projects": project_rows if "projects" in kinds else [],
         "skills": skill_rows if "skills" in kinds else [],
         "scenarios": scenario_rows if "scenarios" in kinds else [],
     }
@@ -5089,7 +5243,9 @@ def _ui_state() -> dict[str, Any]:
         raw = skill_memory_get(_UI_STATE_KEY, {})
     except SdkRuntimeNotInitialized:
         raw = _UI_STATE_FALLBACK
-    return raw if isinstance(raw, dict) else {}
+    payload = dict(raw) if isinstance(raw, dict) else {}
+    payload["infrastateDevMode"] = _dev_component_catalog_enabled()
+    return payload
 
 
 def _write_ui_state(**updates: Any) -> dict[str, Any]:
@@ -5205,10 +5361,39 @@ _SCENARIO_INVENTORY_STREAM_KEYS = {
     "last_error",
 }
 
+_PROJECT_INVENTORY_STREAM_KEYS = {
+    "name",
+    "display_name",
+    "title",
+    "version",
+    "description",
+    "stage",
+    "status",
+    "status_icon",
+    "status_tooltip",
+    "categories",
+    "tags",
+    "components_count",
+    "installed_at",
+    "source",
+    "uninstall_disabled",
+    "pending",
+    "last_request_id",
+    "last_action_at",
+    "updated_at",
+    "operation_status",
+    "last_error",
+}
+
 
 def _compact_inventory_stream_item(kind: str, item: dict[str, Any]) -> dict[str, Any]:
     token = str(kind or "").strip().lower()
-    allowed = _SCENARIO_INVENTORY_STREAM_KEYS if token == "scenario" else _SKILL_INVENTORY_STREAM_KEYS
+    if token == "project":
+        allowed = _PROJECT_INVENTORY_STREAM_KEYS
+    elif token == "scenario":
+        allowed = _SCENARIO_INVENTORY_STREAM_KEYS
+    else:
+        allowed = _SKILL_INVENTORY_STREAM_KEYS
     compact = {key: item.get(key) for key in allowed if key in item}
     name = str(item.get("name") or item.get("id") or "").strip()
     if name and not compact.get("name"):
@@ -8421,8 +8606,50 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
             or ""
         ).strip()
         webspace_id = str(value_map.get("webspace_id") or payload.get("webspace_id") or default_webspace_id()).strip() or default_webspace_id()
-        if target_kind not in {"skill", "scenario"} or not target_id:
+        if target_kind not in {"project", "skill", "scenario"} or not target_id:
             raise ValueError("marketplace install requires target kind and id")
+        if target_kind == "project":
+            if target_node_id and local_node_id and target_node_id != local_node_id:
+                raise ValueError("project marketplace install is local only in this iteration")
+            raw_feature_ids = value_map.get("feature_ids") or value_map.get("features") or _extract_param(payload, "feature_ids") or []
+            if isinstance(raw_feature_ids, str):
+                feature_ids = [item.strip() for item in raw_feature_ids.split(",") if item.strip()]
+            else:
+                feature_ids = [
+                    str(item).strip()
+                    for item in list(raw_feature_ids or [])
+                    if str(item).strip()
+                ]
+            include_optional = bool(
+                value_map.get("include_optional")
+                or _extract_param(payload, "include_optional")
+            )
+            ctx = get_ctx()
+            result = install_workspace_project(
+                target_id,
+                ctx=ctx,
+                scenario_mgr=_make_scenario_manager(ctx),
+                skill_mgr=_make_skill_manager(ctx),
+                webspace_id=webspace_id,
+                feature_ids=feature_ids,
+                include_optional=include_optional,
+            )
+            result = {"ok": True, **result}
+            _write_ui_state(
+                selected_node_id=target_node_id or selected_node_id or local_node_id,
+                last_action=action_id,
+                last_action_ts=time.time(),
+                last_refresh_ts=time.time(),
+                last_result=result,
+                last_error="",
+            )
+            return {
+                "ok": True,
+                "accepted": False,
+                "project": result,
+            }
+        if not _dev_component_catalog_enabled():
+            raise ValueError("component marketplace install is available only when ENV_TYPE=dev")
         result = submit_install_operation(
             target_kind=target_kind,
             target_id=target_id,
@@ -9074,7 +9301,11 @@ def _build_stream_payload_for_receiver(
             ),
             include_content=False,
         )
+    if token == _projects_receiver():
+        return _compact_inventory_stream_items("project", _project_inventory_items())
     if token == _skills_receiver():
+        if not _dev_component_catalog_enabled():
+            return _compact_inventory_stream_items("skill", [])
         try:
             conf = load_config()
             ui_state = _ui_state()
@@ -9103,6 +9334,8 @@ def _build_stream_payload_for_receiver(
             ),
         )
     if token == _scenarios_receiver():
+        if not _dev_component_catalog_enabled():
+            return _compact_inventory_stream_items("scenario", [])
         try:
             conf = load_config()
             ui_state = _ui_state()
@@ -9130,7 +9363,7 @@ def _build_stream_payload_for_receiver(
                 drift_only=_inventory_drift_only_enabled(),
             ),
         )
-    if token in {_marketplace_skills_receiver(), _marketplace_scenarios_receiver()}:
+    if token in {_marketplace_projects_receiver(), _marketplace_skills_receiver(), _marketplace_scenarios_receiver()}:
         try:
             conf = load_config()
             requested_node_id = str(selected_node_id or "").strip()
@@ -9143,10 +9376,16 @@ def _build_stream_payload_for_receiver(
                 selected_node_id=selected_node_id,
                 local_node_id=str(getattr(conf, "node_id", "") or "").strip() or None,
                 requested_kinds={
-                    "skills" if token == _marketplace_skills_receiver() else "scenarios"
+                    "projects"
+                    if token == _marketplace_projects_receiver()
+                    else ("skills" if token == _marketplace_skills_receiver() else "scenarios")
                 },
             )
-            key = "skills" if token == _marketplace_skills_receiver() else "scenarios"
+            key = (
+                "projects"
+                if token == _marketplace_projects_receiver()
+                else ("skills" if token == _marketplace_skills_receiver() else "scenarios")
+            )
             return list(marketplace.get(key) or [])
         except Exception:
             _log.debug("failed to build direct marketplace stream payload", exc_info=True)
@@ -9564,6 +9803,7 @@ def get_snapshot(
                 _steps_receiver(),
                 _realtime_receiver(),
                 _slots_receiver(),
+                _projects_receiver(),
                 _skills_receiver(),
                 _scenarios_receiver(),
                 _logs_receiver(),
@@ -9576,7 +9816,7 @@ def get_snapshot(
 
 @tool("get_marketplace")
 def get_marketplace(
-    kind: str = "skills",
+    kind: str = "projects",
     webspace_id: str | None = None,
     node_id: str | None = None,
     target_node_id: str | None = None,
@@ -9584,8 +9824,13 @@ def get_marketplace(
     allow_cache: bool = True,
     **_: Any,
 ) -> dict[str, Any]:
-    token = str(kind or "skills").strip().lower()
-    key = "scenarios" if token.startswith("scenario") else "skills"
+    token = str(kind or "projects").strip().lower()
+    if token.startswith("project"):
+        key = "projects"
+    elif token.startswith("scenario"):
+        key = "scenarios"
+    else:
+        key = "skills"
     requested_node_id = str(target_node_id or node_id or "").strip()
     if not requested_node_id:
         try:
@@ -9627,7 +9872,7 @@ def get_marketplace(
 
 @tool("get_inventory")
 def get_inventory(
-    kind: str = "skills",
+    kind: str = "projects",
     webspace_id: str | None = None,
     node_id: str | None = None,
     target_node_id: str | None = None,
@@ -9636,8 +9881,13 @@ def get_inventory(
     **_: Any,
 ) -> dict[str, Any]:
     started_at = time.perf_counter()
-    token = str(kind or "skills").strip().lower()
-    key = "scenarios" if token.startswith("scenario") else "skills"
+    token = str(kind or "projects").strip().lower()
+    if token.startswith("project"):
+        key = "projects"
+    elif token.startswith("scenario"):
+        key = "scenarios"
+    else:
+        key = "skills"
     requested_node_id = str(target_node_id or node_id or "").strip()
     if not requested_node_id:
         try:
@@ -9650,7 +9900,14 @@ def get_inventory(
     try:
         conf = load_config()
         local_node_id = str(getattr(conf, "node_id", "") or "").strip()
-        if requested_node_id and requested_node_id != local_node_id:
+        if key == "projects":
+            if requested_node_id and local_node_id and requested_node_id != local_node_id:
+                items = []
+            else:
+                items = _project_inventory_items()
+        elif not _dev_component_catalog_enabled():
+            items = []
+        elif requested_node_id and requested_node_id != local_node_id:
             lifecycle = runtime_lifecycle_snapshot()
             reliability = _lightweight_member_reliability(
                 conf,

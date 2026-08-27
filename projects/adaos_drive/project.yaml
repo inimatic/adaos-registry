@@ -1,0 +1,51 @@
+schema: adaos.project.v1
+kind: project
+id: adaos_drive
+version: 0.1.3
+profiles: [adaos.drive.v1]
+components:
+  owned:
+  - ref: scenario:adaos_drive
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [presents]
+  - ref: skill:adaos_drive
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  dependencies: []
+entrypoints:
+- id: drive
+  presentation: scenario:adaos_drive
+  default: true
+  bindings:
+    surface: files
+catalog:
+  title: AdaOS Drive
+  description: Two-panel browser file manager for explicitly connected local folders.
+  categories: [files, productivity]
+  tags: [drive, file-manager, local-folders]
+publication:
+  stage: alpha
+  visibility: listed
+  channel: stable
+install:
+  default: false
+  features:
+  - id: drive
+    title: Drive
+    default: true
+    optional: false
+    components: [scenario:adaos_drive, skill:adaos_drive]
+compatibility:
+  required_entrypoints: [drive]
+  validation_profiles: [drive.local]
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition

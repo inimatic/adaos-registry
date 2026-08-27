@@ -1,0 +1,45 @@
+schema: adaos.project.v1
+kind: project
+id: streaming_recipe_book_eval
+version: 0.0.4
+profiles: [adaos.home.recipes.eval.v1]
+components:
+  owned:
+  - ref: scenario:streaming_recipe_book_eval
+    role: primary
+    exposure: advanced
+    lifecycle: bound
+    relations: [presents]
+  - ref: skill:streaming_recipe_book_eval_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  dependencies: []
+entrypoints:
+- id: recipes
+  presentation: scenario:streaming_recipe_book_eval
+  default: true
+  bindings:
+    category: home
+catalog:
+  title: Streaming Recipe Book Eval
+  description: Deprecated recipe catalog evaluation instance retained for comparison.
+  categories: [home]
+  tags: [recipes, eval, deprecated]
+publication:
+  stage: deprecated
+  visibility: hidden
+  channel: stable
+install:
+  default: false
+compatibility:
+  required_entrypoints: [recipes]
+  validation_profiles: [home.recipes.eval]
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition

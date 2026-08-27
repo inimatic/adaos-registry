@@ -4,7 +4,7 @@
     "type": "desktop",
     "title": "Builder — рабочее место разработки",
     "description": "Safe local Builder prototype for the dependent Prototype, Automation, Trial, and Publication lifecycle.",
-    "version": "0.2.57",
+    "version": "0.2.63",
     "title_i18n": {
         "fallback": "Builder",
         "key": "scenario.builder.title"
@@ -489,7 +489,7 @@
                             "id": "artifact-workbench",
                             "type": "item.textEditor",
                             "title": "Редактор/просмотр файла",
-                            "visibleIf": "$state.activeView === 'files' && $state.selectedFileProtected !== true",
+                            "visibleIf": "$state.activeView === 'files' && $state.selectedFilePath && $state.selectedFileProtected !== true",
                             "dataSource": {
                                 "kind": "skill",
                                 "name": "builder_sdk_control_skill.read_project_file",
@@ -545,7 +545,7 @@
                             "id": "artifact-readonly",
                             "type": "item.codeViewer",
                             "title": "Просмотр защищенного файла",
-                            "visibleIf": "$state.activeView === 'files' && $state.selectedFileProtected === true",
+                            "visibleIf": "$state.activeView === 'files' && $state.selectedFilePath && $state.selectedFileProtected === true",
                             "dataSource": {
                                 "kind": "skill",
                                 "name": "builder_sdk_control_skill.read_project_file",
@@ -2040,10 +2040,20 @@
                             "actions": [
                                 {
                                     "on": "click:open-dev-link",
-                                    "type": "openWorkspace",
+                                    "type": "callSkill",
+                                    "target": "builder_sdk_control_skill.get_preview",
                                     "params": {
-                                        "webspaceId": "$client.webspaceId",
-                                        "newWindow": true
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
+                                    },
+                                    "openResultUrl": true,
+                                    "resultUrlPath": "preview_url",
+                                    "resultPreferCurrentOrigin": true,
+                                    "feedback": {
+                                        "pending": {
+                                            "disable": true
+                                        }
                                     }
                                 },
                                 {
@@ -2444,6 +2454,43 @@
                         "widgets": [
                             {
                                 "area": "main",
+                                "id": "project-component-actions",
+                                "type": "ui.actions",
+                                "visibleIf": "$state.selectedProjectKind === 'project'",
+                                "inputs": {
+                                    "variant": "toolbar",
+                                    "buttons": [
+                                        {
+                                            "id": "add-scenario",
+                                            "label": "Добавить сценарий",
+                                            "icon": "add-circle-outline"
+                                        },
+                                        {
+                                            "id": "add-skill",
+                                            "label": "Добавить навык",
+                                            "icon": "add-circle-outline"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:add-scenario",
+                                        "type": "openModal",
+                                        "params": {
+                                            "modalId": "add-project-scenario"
+                                        }
+                                    },
+                                    {
+                                        "on": "click:add-skill",
+                                        "type": "openModal",
+                                        "params": {
+                                            "modalId": "add-project-skill"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "area": "main",
                                 "id": "project-object-list",
                                 "type": "ui.list",
                                 "title": "Состав проекта",
@@ -2538,6 +2585,169 @@
                     },
                     "title_i18n": {
                         "key": "builder.text.project.files"
+                    }
+                },
+                "add-project-scenario": {
+                    "title": "Добавить сценарий",
+                    "presentation": {
+                        "kind": "modal",
+                        "restoreFocus": true
+                    },
+                    "schema": {
+                        "id": "add-project-scenario",
+                        "title": "add-project-scenario",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [
+                                {
+                                    "id": "main",
+                                    "role": "main"
+                                }
+                            ]
+                        },
+                        "widgets": [
+                            {
+                                "area": "main",
+                                "id": "add-project-scenario-form",
+                                "type": "ui.form",
+                                "title": "Добавить сценарий",
+                                "inputs": {
+                                    "layout": "responsiveGrid",
+                                    "submitLabel": "Добавить",
+                                    "fields": [
+                                        {
+                                            "id": "scenario_id",
+                                            "type": "shortText",
+                                            "label": "Scenario ID",
+                                            "required": true
+                                        },
+                                        {
+                                            "id": "template",
+                                            "type": "shortText",
+                                            "label": "Template",
+                                            "default": "scenario_default"
+                                        }
+                                    ],
+                                    "autoCommit": true
+                                },
+                                "actions": [
+                                    {
+                                        "on": "submit",
+                                        "type": "callSkill",
+                                        "target": "builder_sdk_control_skill.add_project_scenario",
+                                        "params": {
+                                            "project_id": "$state.selectedProjectId",
+                                            "scenario_id": "$event.values.scenario_id",
+                                            "template": "$event.values.template",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
+                                        },
+                                        "invalidates": [
+                                            "builder.project.files",
+                                            "builder.project.metadata",
+                                            "builder.project.lifecycle"
+                                        ]
+                                    },
+                                    {
+                                        "on": "submit",
+                                        "type": "closeModal"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "add-project-skill": {
+                    "title": "Добавить навык",
+                    "presentation": {
+                        "kind": "modal",
+                        "restoreFocus": true
+                    },
+                    "schema": {
+                        "id": "add-project-skill",
+                        "title": "add-project-skill",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [
+                                {
+                                    "id": "main",
+                                    "role": "main"
+                                }
+                            ]
+                        },
+                        "widgets": [
+                            {
+                                "area": "main",
+                                "id": "add-project-skill-form",
+                                "type": "ui.form",
+                                "title": "Добавить навык",
+                                "inputs": {
+                                    "layout": "responsiveGrid",
+                                    "submitLabel": "Добавить",
+                                    "fields": [
+                                        {
+                                            "id": "skill_id",
+                                            "type": "shortText",
+                                            "label": "Skill ID",
+                                            "required": true
+                                        },
+                                        {
+                                            "id": "template",
+                                            "type": "shortText",
+                                            "label": "Template",
+                                            "default": "skill_default"
+                                        },
+                                        {
+                                            "id": "role",
+                                            "type": "select",
+                                            "label": "Role",
+                                            "default": "supporting",
+                                            "options": [
+                                                {
+                                                    "label": "Supporting",
+                                                    "value": "supporting"
+                                                },
+                                                {
+                                                    "label": "Implementation",
+                                                    "value": "implementation"
+                                                },
+                                                {
+                                                    "label": "Primary",
+                                                    "value": "primary"
+                                                }
+                                            ]
+                                        }
+                                    ],
+                                    "autoCommit": true
+                                },
+                                "actions": [
+                                    {
+                                        "on": "submit",
+                                        "type": "callSkill",
+                                        "target": "builder_sdk_control_skill.add_project_skill",
+                                        "params": {
+                                            "project_id": "$state.selectedProjectId",
+                                            "skill_id": "$event.values.skill_id",
+                                            "template": "$event.values.template",
+                                            "role": "$event.values.role",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
+                                        },
+                                        "invalidates": [
+                                            "builder.project.files",
+                                            "builder.project.metadata",
+                                            "builder.project.lifecycle"
+                                        ]
+                                    },
+                                    {
+                                        "on": "submit",
+                                        "type": "closeModal"
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 },
                 "preview-qr": {
@@ -2653,8 +2863,9 @@
                                 "dataSource": {
                                     "kind": "skill",
                                     "name": "builder_sdk_control_skill.list_projects",
+                                    "scope": "local",
                                     "params": {
-                                        "limit": 200,
+                                        "limit": 50,
                                         "selected_object_type": "$state.selectedProjectKind",
                                         "selected_object_id": "$state.selectedProjectId",
                                         "include_archived": "$state.projectPickerArchived",
@@ -2736,11 +2947,12 @@
                                     ]
                                 },
                                 "actions": [
-                                    {
-                                        "on": "select",
-                                        "type": "callSkill",
-                                        "target": "builder_sdk_control_skill.select_preview",
-                                        "params": {
+                                {
+                                    "on": "select",
+                                    "type": "callSkill",
+                                    "target": "builder_sdk_control_skill.select_preview",
+                                    "scope": "local",
+                                    "params": {
                                             "object_type": "$event.object_type",
                                             "object_id": "$event.object_id",
                                             "_meta": {
@@ -2853,6 +3065,13 @@
                                                     "value": "skill",
                                                     "label_i18n": {
                                                         "key": "builder.text.skill"
+                                                    }
+                                                },
+                                                {
+                                                    "label": "Project",
+                                                    "value": "project",
+                                                    "label_i18n": {
+                                                        "key": "builder.text.project"
                                                     }
                                                 }
                                             ],
@@ -4047,7 +4266,7 @@
                 }
             }
         },
-        "version": "0.2.57",
+        "version": "0.2.63",
         "user_summary": {
             "assumptions": [
                 "Lifecycle selection is navigation only; it never changes the editable process or Preview target.",
@@ -4074,5 +4293,5 @@
         },
         "manifest": "webui.json"
     },
-    "updated_at": "2026-08-06T09:25:02+00:00"
+    "updated_at": "2026-08-15T21:40:44+00:00"
 }

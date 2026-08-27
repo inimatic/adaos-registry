@@ -1,0 +1,100 @@
+schema: adaos.project.v1
+kind: project
+id: adaos_builder
+version: 0.3.1
+profiles: [adaos.builder.v1, adaos.development.workbench.v1]
+components:
+  owned:
+  - ref: scenario:builder
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [presents]
+  - ref: scenario:prompt_engineer_scenario
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
+    relations: [presents]
+  - ref: scenario:skill_preview
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
+    relations: [presents]
+  - ref: skill:builder_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  - ref: skill:builder_sdk_control_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  - ref: skill:builder_automation_skill
+    role: supporting
+    exposure: project_only
+    lifecycle: bound
+    relations: [uses]
+  - ref: skill:prompt_engineer_skill
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
+    relations: [uses]
+  dependencies: []
+entrypoints:
+- id: builder
+  presentation: scenario:builder
+  default: true
+  bindings:
+    workbench: builder
+- id: prompt-ide
+  presentation: scenario:prompt_engineer_scenario
+  bindings:
+    workbench: prompt
+- id: skill-preview
+  presentation: scenario:skill_preview
+  bindings:
+    preview: skill
+catalog:
+  title: AdaOS Builder
+  description: Project-scoped development workbench for prototypes, automation, trials, and publication.
+  categories: [development]
+  tags: [builder, prompt-ide, project, devspace]
+publication:
+  stage: alpha
+  visibility: listed
+  channel: stable
+install:
+  default: false
+  features:
+  - id: builder-workbench
+    title: Builder workbench
+    default: true
+    optional: false
+    components: [scenario:builder, skill:builder_skill, skill:builder_sdk_control_skill]
+  - id: automation
+    title: Automation loop
+    default: true
+    optional: false
+    components: [skill:builder_automation_skill]
+  - id: prompt-ide
+    title: Prompt IDE
+    default: false
+    optional: true
+    components: [scenario:prompt_engineer_scenario, skill:prompt_engineer_skill]
+  - id: skill-preview
+    title: Skill preview
+    default: true
+    optional: false
+    components: [scenario:skill_preview]
+compatibility:
+  required_entrypoints: [builder]
+  required_contracts: [adaos.project.v1, adaos.builder.development_session.v1]
+  validation_profiles: [builder.local]
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition

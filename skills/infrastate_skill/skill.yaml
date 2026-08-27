@@ -1,5 +1,5 @@
 name: infrastate_skill
-version: 0.75.75
+version: 0.75.76
 description: Локальный обзор состояния ядра, graceful update, A/B слотов и последнего
   результата обновления.
 runtime:
@@ -260,6 +260,26 @@ data_routes:
     degraded_state: Active operations list keeps last stream value.
     log: service.infrastate_skill.runtime.log
     quarantine: false
+- surface: modal:installed_projects
+  route: stream
+  owner: skill:infrastate_skill
+  receiver: infrastate.projects
+  first_paint: loading projects initial state
+  recovery: stream snapshot requested on stream subscribe
+  update_source:
+  - project.installed
+  - skill.installed
+  - scenario.installed
+  budget:
+    max_payload_bytes: 65536
+    max_publish_hz: 0.5
+    max_items: 256
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: Projects table keeps last stream value with loading/degraded
+      state.
+    log: service.infrastate_skill.runtime.log
+    quarantine: false
 - surface: modal:installed_skills
   route: stream
   owner: skill:infrastate_skill
@@ -298,6 +318,25 @@ data_routes:
   guard_visibility:
     degraded_state: Scenarios table keeps last stream value with loading/degraded
       state.
+    log: service.infrastate_skill.runtime.log
+    quarantine: false
+- surface: modal:marketplace
+  route: stream
+  owner: skill:infrastate_skill
+  receiver: infrastate.marketplace.projects
+  first_paint: empty marketplace project list
+  recovery: marketplace snapshot requested on stream subscribe
+  update_source:
+  - project.installed
+  - skills.updated
+  - scenarios.synced
+  budget:
+    max_payload_bytes: 65536
+    max_publish_hz: 0.2
+    max_items: 256
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: Marketplace project list keeps last stream value.
     log: service.infrastate_skill.runtime.log
     quarantine: false
 - surface: modal:marketplace
@@ -629,8 +668,9 @@ tools:
     - steps
     - logs
 - name: get_marketplace
-  description: Return installable marketplace rows for the selected node without relying
-    on the stream snapshot path.
+  description: Return installable project rows for the selected node without relying
+    on the stream snapshot path. Raw skills/scenarios are returned only in dev
+    environments.
   entry: handlers.main:get_marketplace
   side_effects: read
   input_schema:
@@ -639,6 +679,7 @@ tools:
       kind:
         type: string
         enum:
+        - projects
         - skills
         - scenarios
       webspace_id:
@@ -655,8 +696,9 @@ tools:
     - ok
     - items
 - name: get_inventory
-  description: Return installed skill/scenario rows for the selected node without
-    relying on the stream snapshot path.
+  description: Return installed project rows for the selected node without relying
+    on the stream snapshot path. Raw skills/scenarios are returned only in dev
+    environments.
   entry: handlers.main:get_inventory
   side_effects: read
   input_schema:
@@ -665,6 +707,7 @@ tools:
       kind:
         type: string
         enum:
+        - projects
         - skills
         - scenarios
       webspace_id:

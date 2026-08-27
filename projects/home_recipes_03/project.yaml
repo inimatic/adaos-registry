@@ -1,0 +1,34 @@
+schema: adaos.project.v1
+kind: project
+id: home_recipes_03
+version: 0.2.6
+profiles: [adaos.home.recipes.v1]
+components:
+  owned:
+  - ref: skill:test03_recipes_skill
+    role: primary
+    exposure: advanced
+    lifecycle: bound
+    relations: [realizes]
+  dependencies: []
+entrypoints: []
+catalog:
+  title: Home Recipes 03
+  description: Published alpha recipe catalog instance used for current home-category development.
+  categories: [home]
+  tags: [recipes, alpha, instance, test03]
+publication:
+  stage: alpha
+  visibility: listed
+  channel: alpha
+install:
+  default: false
+compatibility:
+  validation_profiles: [home.recipes.alpha]
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition

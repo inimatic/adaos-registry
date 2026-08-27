@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: media_center
-version: 0.6.82
+version: 0.6.83
 profiles:
 - adaos.media_center.v1
 - adaos.media_center.tv.v1
@@ -30,11 +30,12 @@ components:
     exposure: advanced
     lifecycle: bound
     relations: [uses]
-  dependencies:
   - ref: skill:mediaserver
-    version: '>=0.1.0'
-    lifecycle: shared
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
     relations: [uses]
+  dependencies: []
 entrypoints:
 - id: library
   presentation: scenario:media_center
@@ -66,6 +67,28 @@ catalog:
   description: Distributed in-place household media library, playback, and remote control.
   categories: [media, home]
   tags: [audio, video, tv, remote-control, distributed]
+publication:
+  stage: beta
+  visibility: listed
+  channel: stable
+install:
+  default: false
+  features:
+  - id: library
+    title: Media library
+    default: true
+    optional: false
+    components: [scenario:media_center, skill:media_center_skill, skill:media_library_agent]
+  - id: playback-control
+    title: Playback control
+    default: true
+    optional: false
+    components: [skill:media_control_skill]
+  - id: legacy-mediaserver
+    title: Legacy media server
+    default: false
+    optional: true
+    components: [skill:mediaserver]
 compatibility:
   required_entrypoints: [library, tv, remote]
   required_contracts:

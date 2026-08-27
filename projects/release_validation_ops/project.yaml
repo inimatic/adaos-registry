@@ -1,0 +1,51 @@
+schema: adaos.project.v1
+kind: project
+id: release_validation_ops
+version: 0.1.7
+profiles: [adaos.release_validation.v1]
+components:
+  owned:
+  - ref: scenario:release_validation_ops
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [presents]
+  - ref: skill:release_validation_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  dependencies: []
+entrypoints:
+- id: validation
+  presentation: scenario:release_validation_ops
+  default: true
+  bindings:
+    mode: observe
+catalog:
+  title: Release Validation Operations
+  description: Observe-only release validation campaign runner and evidence log.
+  categories: [operations, release]
+  tags: [release-validation, campaigns, evidence]
+publication:
+  stage: alpha
+  visibility: listed
+  channel: stable
+install:
+  default: false
+  features:
+  - id: validation
+    title: Release validation
+    default: true
+    optional: false
+    components: [scenario:release_validation_ops, skill:release_validation_skill]
+compatibility:
+  required_entrypoints: [validation]
+  validation_profiles: [release_validation.observe]
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition

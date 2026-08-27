@@ -1,0 +1,86 @@
+schema: adaos.project.v1
+kind: project
+id: web_desktop
+version: 0.3.12
+profiles: [adaos.desktop.shell.v1, adaos.default_install.v1]
+components:
+  owned:
+  - ref: scenario:web_desktop
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [presents]
+  - ref: skill:web_desktop_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  - ref: skill:greet_on_boot_skill
+    role: supporting
+    exposure: project_only
+    lifecycle: bound
+    relations: [uses]
+  - ref: skill:pair_new_device_skill
+    role: supporting
+    exposure: project_only
+    lifecycle: bound
+    relations: [uses]
+  - ref: skill:adaos_connect
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
+    relations: [uses]
+  - ref: skill:voice_chat_skill
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
+    relations: [uses]
+  - ref: skill:browsers_skill
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
+    relations: [uses]
+  dependencies: []
+entrypoints:
+- id: desktop
+  presentation: scenario:web_desktop
+  default: true
+  bindings:
+    shell: web_desktop
+catalog:
+  title: Web Desktop
+  description: Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.
+  categories: [system, desktop]
+  tags: [default-install, shell, browser, voice, onboarding]
+publication:
+  stage: beta
+  visibility: listed
+  channel: stable
+install:
+  default: true
+  features:
+  - id: shell
+    title: Desktop shell
+    default: true
+    optional: false
+    components: [scenario:web_desktop, skill:web_desktop_skill]
+  - id: onboarding
+    title: Node onboarding
+    default: true
+    optional: false
+    components: [skill:greet_on_boot_skill, skill:pair_new_device_skill, skill:adaos_connect]
+  - id: browser-voice
+    title: Browser and voice bridge
+    default: true
+    optional: false
+    components: [skill:browsers_skill, skill:voice_chat_skill]
+compatibility:
+  required_entrypoints: [desktop]
+  validation_profiles: [desktop.default]
+lifecycle:
+  uninstall:
+    components: retain
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-27T00:00:00+00:00'
+created_by: AdaOS Project Composition
