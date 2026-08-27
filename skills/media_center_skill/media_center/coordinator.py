@@ -2586,6 +2586,7 @@ class MediaCatalogCoordinator:
         base_metadata: Mapping[str, Any],
         *,
         work_id: str = "",
+        collection_id: str = "",
     ) -> tuple[dict[str, Any], dict[str, str]]:
         metadata = dict(base_metadata)
         provenance = {
@@ -2596,6 +2597,8 @@ class MediaCatalogCoordinator:
         subjects = [f"item:{item_id}"]
         if _text(work_id):
             subjects.append(f"work:{_text(work_id)}")
+        if _text(collection_id):
+            subjects.append(f"collection:{_text(collection_id)}")
         placeholders = ",".join("?" for _ in subjects)
         rows = connection.execute(
             f"SELECT * FROM metadata_claims WHERE subject_ref IN ({placeholders})",
@@ -2630,7 +2633,8 @@ class MediaCatalogCoordinator:
         self, connection: sqlite3.Connection, item_id: str
     ) -> None:
         row = connection.execute(
-            "SELECT id,name,source_path,folder_path,metadata_json,work_id,title "
+            "SELECT id,name,source_path,folder_path,metadata_json,work_id,"
+            "collection_id,title "
             "FROM catalog_items WHERE id=?",
             (_text(item_id),),
         ).fetchone()
@@ -2642,6 +2646,7 @@ class MediaCatalogCoordinator:
             str(row["id"]),
             base if isinstance(base, Mapping) else {},
             work_id=str(row["work_id"]),
+            collection_id=str(row["collection_id"]),
         )
         stored_metadata, stored_provenance = _projection_storage(
             metadata,
@@ -2770,7 +2775,8 @@ class MediaCatalogCoordinator:
     ) -> dict[str, Any]:
         bounded = max(10, min(int(limit or 250), 1000))
         query_cursor = connection.execute(
-            "SELECT id,name,source_path,folder_path,metadata_json,work_id,title "
+            "SELECT id,name,source_path,folder_path,metadata_json,work_id,"
+            "collection_id,title "
             "FROM catalog_items WHERE id>? AND NOT EXISTS ("
             "SELECT 1 FROM catalog_metadata_projection projection "
             "WHERE projection.item_id=catalog_items.id) ORDER BY id LIMIT ?",
@@ -8738,6 +8744,15 @@ class MediaCatalogCoordinator:
                 ).fetchall()
                 for row in item_rows:
                     self._refresh_metadata_projection(connection, str(row["id"]))
+            elif result.get("ok") and _text(subject_ref).startswith("collection:"):
+                collection_id = _text(subject_ref).removeprefix("collection:")
+                item_rows = connection.execute(
+                    "SELECT id FROM catalog_items WHERE collection_id=? "
+                    "ORDER BY id LIMIT 512",
+                    (collection_id,),
+                ).fetchall()
+                for row in item_rows:
+                    self._refresh_metadata_projection(connection, str(row["id"]))
             connection.commit()
         return result
 
@@ -8764,6 +8779,7 @@ class MediaCatalogCoordinator:
                     "folder_path": str(row["folder_path"]),
                     "media_kind": str(row["media_kind"]),
                     "fingerprint": str(row["fingerprint"]),
+                    "collection_id": str(row["collection_id"]),
                     "metadata": {
                         **(metadata if isinstance(metadata, Mapping) else {}),
                         **(projected if isinstance(projected, Mapping) else {}),

@@ -15,6 +15,7 @@ _ALLOWED_HOSTS = frozenset(
     {
         "image.tmdb.org",
         "coverartarchive.org",
+        "covers.openlibrary.org",
         "archive.org",
     }
 )

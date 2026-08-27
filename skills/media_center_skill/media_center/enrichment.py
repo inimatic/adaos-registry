@@ -109,6 +109,46 @@ class DeterministicLocalProvider:
                                 "confidence": 0.9,
                             }
                         )
+            path_identity = _path_identity(subject)
+            existing_artists = (
+                metadata.get("artists") or metadata.get("artist")
+                if isinstance(metadata, Mapping)
+                else None
+            )
+            if not existing_artists and path_identity.get("artists"):
+                claims.append(
+                    {
+                        "subject_ref": subject_ref,
+                        "field_name": "artists",
+                        "value": path_identity["artists"],
+                        "confidence": 0.58,
+                    }
+                )
+            if (
+                not (
+                    metadata.get("album")
+                    if isinstance(metadata, Mapping)
+                    else None
+                )
+                and path_identity.get("album")
+            ):
+                claims.append(
+                    {
+                        "subject_ref": subject_ref,
+                        "field_name": "album",
+                        "value": path_identity["album"],
+                        "confidence": 0.58,
+                    }
+                )
+            if path_identity.get("audiobook_title"):
+                claims.append(
+                    {
+                        "subject_ref": subject_ref,
+                        "field_name": "audiobook_title",
+                        "value": path_identity["audiobook_title"],
+                        "confidence": 0.72,
+                    }
+                )
         elif job_kind == "technical_probe":
             metadata = subject.get("metadata")
             technical = (
@@ -215,11 +255,91 @@ _TITLE_NOISE_RE = re.compile(
 )
 _EPISODE_RE = re.compile(r"\bS\d{1,2}E\d{1,3}\b", re.IGNORECASE)
 _YEAR_RE = re.compile(r"(?<!\d)(19\d{2}|20\d{2})(?!\d)")
+_PATH_INDEX_RE = re.compile(
+    r"^(?:\d{1,4}|(?:cd|disc|disk|part|book)[ ._-]*\d{1,3})$",
+    re.IGNORECASE,
+)
+_GENERIC_AUDIO_SEGMENTS = frozenset(
+    {
+        "audio",
+        "music",
+        "songs",
+        "tracks",
+        "albums",
+        "discography",
+        "mp3",
+    }
+)
+_AUDIOBOOK_READER_RE = re.compile(
+    r"\s*[\[(](?:reader|read\s+by|narrat(?:ed|or)|\u0447\u0438\u0442\.?)[^\])]*[\])]\s*$",
+    re.IGNORECASE,
+)
 _AUDIOBOOK_PATH_RE = re.compile(r"(?:audio[ ._\-]*books?|аудиокниг)", re.IGNORECASE)
 
 
 def _enabled(value: Any) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _clean_path_segment(value: Any) -> str:
+    segment = re.sub(r"_+", " ", str(value or "").strip())
+    segment = re.sub(r"\s+", " ", segment).strip(" -")
+    return segment[:300]
+
+
+def _path_identity(subject: Mapping[str, Any]) -> dict[str, Any]:
+    raw_path = str(subject.get("folder_path") or "").replace("\\", "/")
+    segments = []
+    for part in raw_path.split("/"):
+        cleaned = _clean_path_segment(part)
+        if cleaned:
+            segments.append(cleaned)
+    while segments and _PATH_INDEX_RE.match(segments[-1]):
+        segments.pop()
+    audiobook = bool(_AUDIOBOOK_PATH_RE.search(raw_path))
+    if audiobook:
+        meaningful = [
+            segment
+            for segment in segments
+            if not _AUDIOBOOK_PATH_RE.search(segment)
+            and not (segment.count(",") >= 3 and len(segment) <= 80)
+        ]
+        if len(meaningful) >= 2:
+            author = meaningful[-2]
+            title = _AUDIOBOOK_READER_RE.sub("", meaningful[-1]).strip()
+            return {
+                "kind": "audiobook",
+                "artists": [author] if author else [],
+                "album": title,
+                "audiobook_title": title,
+                "evidence_source": "normalized_path_segments",
+            }
+        return {
+            "kind": "audiobook",
+            "evidence_source": "normalized_path_segments",
+        }
+    meaningful = [
+        segment
+        for segment in segments
+        if fold_text(segment) not in _GENERIC_AUDIO_SEGMENTS
+    ]
+    album = ""
+    artist = ""
+    if len(segments) >= 2:
+        tail = segments[-1]
+        previous = segments[-2]
+        if fold_text(tail) in _GENERIC_AUDIO_SEGMENTS:
+            artist = previous
+        elif len(meaningful) >= 2:
+            artist, album = meaningful[-2], meaningful[-1]
+        elif meaningful:
+            artist = meaningful[-1]
+    return {
+        "kind": "music",
+        "artists": [artist] if artist else [],
+        "album": album,
+        "evidence_source": "normalized_path_segments",
+    }
 
 
 def _external_subject(subject: Mapping[str, Any]) -> dict[str, Any]:
@@ -247,14 +367,20 @@ def _external_subject(subject: Mapping[str, Any]) -> dict[str, Any]:
         or evidence.get("season")
         or _EPISODE_RE.search(raw_title)
     )
+    path_identity = _path_identity(subject)
+    artists = evidence.get("artists") or evidence.get("artist") or []
+    album = str(evidence.get("album") or "")[:300]
     return {
         "subject_ref": str(subject.get("subject_ref") or ""),
         "title": title[:300],
         "year": year,
         "media_kind": str(subject.get("media_kind") or ""),
         "tmdb_kind": "tv" if series else "movie",
-        "artists": evidence.get("artists") or evidence.get("artist") or [],
-        "album": str(evidence.get("album") or "")[:300],
+        "artists": artists or path_identity.get("artists") or [],
+        "album": album or str(path_identity.get("album") or "")[:300],
+        "content_kind": str(path_identity.get("kind") or "music"),
+        "audiobook_title": str(path_identity.get("audiobook_title") or "")[:300],
+        "evidence_source": str(path_identity.get("evidence_source") or "tags"),
         "external_ids": dict(evidence.get("external_ids") or {})
         if isinstance(evidence.get("external_ids"), Mapping)
         else {},
@@ -814,7 +940,7 @@ class MusicBrainzMetadataProvider:
             "kind": "external",
             "enabled": True,
             "state": "degraded" if self._last_error else "ready",
-            "privacy": "normalized_audio_tags_only",
+            "privacy": "normalized_audio_tags_and_path_identity_only",
             "request_count": self._requests,
             "cache_hit_count": self._cache_hits,
             "failure_count": self._failures,
@@ -822,6 +948,196 @@ class MusicBrainzMetadataProvider:
             "retry_after_seconds": max(
                 0, int(self._retry_after_monotonic - time.monotonic())
             ),
+            "last_success_at": self._last_success_at or None,
+        }
+
+
+class OpenLibraryMetadataProvider:
+    provider_id = "media_center.openlibrary.v1"
+    supported_jobs = frozenset({"metadata_enrichment"})
+
+    def __init__(
+        self,
+        *,
+        api_url: str = "https://openlibrary.org/search.json",
+        language: str = "ru",
+        timeout_seconds: float = 10.0,
+        minimum_interval_seconds: float = 1.0,
+        cache_ttl_seconds: float = 86400.0,
+        session: requests.Session | None = None,
+    ) -> None:
+        self.api_url = str(api_url or "https://openlibrary.org/search.json")
+        self.language = str(language or "ru").split("-", 1)[0][:2]
+        self.timeout_seconds = max(2.0, min(float(timeout_seconds), 30.0))
+        self.minimum_interval_seconds = max(1.0, float(minimum_interval_seconds))
+        self.cache_ttl_seconds = max(60.0, min(float(cache_ttl_seconds), 604800.0))
+        self._session = session or requests.Session()
+        self._lock = threading.Lock()
+        self._last_request_monotonic = 0.0
+        self._cache: OrderedDict[str, tuple[float, dict[str, Any]]] = OrderedDict()
+        self._requests = 0
+        self._cache_hits = 0
+        self._failures = 0
+        self._last_error = ""
+        self._last_success_at = 0.0
+
+    def accepts(self, subject: Mapping[str, Any], *, job_kind: str) -> bool:
+        return (
+            job_kind in self.supported_jobs
+            and str(subject.get("media_kind") or "").strip().lower() == "audio"
+            and _path_identity(subject).get("kind") == "audiobook"
+        )
+
+    def _request(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        cache_key = repr(sorted(dict(params).items()))
+        now = time.monotonic()
+        with self._lock:
+            cached = self._cache.get(cache_key)
+            if cached and now - cached[0] <= self.cache_ttl_seconds:
+                self._cache_hits += 1
+                return dict(cached[1])
+            wait = self.minimum_interval_seconds - (now - self._last_request_monotonic)
+            if wait > 0:
+                time.sleep(wait)
+            self._last_request_monotonic = time.monotonic()
+        self._requests += 1
+        try:
+            response = self._session.get(
+                self.api_url,
+                params=dict(params),
+                headers={
+                    "Accept": "application/json",
+                    "User-Agent": "AdaOS-MediaCenter/1.0 (https://inimatic.com)",
+                },
+                timeout=self.timeout_seconds,
+            )
+            if response.status_code == 429:
+                raise MetadataProviderError("openlibrary_rate_limited")
+            if response.status_code >= 500:
+                raise MetadataProviderError("openlibrary_upstream_unavailable")
+            response.raise_for_status()
+            payload = response.json()
+            result = dict(payload) if isinstance(payload, Mapping) else {}
+        except MetadataProviderError as exc:
+            self._failures += 1
+            self._last_error = exc.code
+            raise
+        except (requests.RequestException, ValueError, TypeError) as exc:
+            self._failures += 1
+            self._last_error = _request_failure_code("openlibrary", exc)
+            raise MetadataProviderError("openlibrary_request_failed") from exc
+        self._cache[cache_key] = (time.monotonic(), result)
+        while len(self._cache) > 1000:
+            self._cache.popitem(last=False)
+        self._last_error = ""
+        self._last_success_at = time.time()
+        return result
+
+    def claims(
+        self, subject: Mapping[str, Any], *, job_kind: str
+    ) -> list[dict[str, Any]]:
+        if job_kind not in self.supported_jobs:
+            raise LookupError("enrichment_provider_unavailable")
+        evidence = _external_subject(subject)
+        if evidence.get("content_kind") != "audiobook":
+            return []
+        title = str(evidence.get("audiobook_title") or evidence.get("album") or "")
+        artists = evidence.get("artists") or []
+        if isinstance(artists, str):
+            artists = [artists]
+        author = str(artists[0] if artists else "")
+        if not title:
+            return []
+        payload = self._request(
+            {
+                "title": title,
+                **({"author": author} if author else {}),
+                "fields": "key,title,author_name,first_publish_year,cover_i,subject,edition_count",
+                "lang": self.language,
+                "limit": 5,
+            }
+        )
+        candidates = [
+            item
+            for item in list(payload.get("docs") or [])[:5]
+            if isinstance(item, Mapping)
+        ]
+        if not candidates:
+            return []
+        expected_title = fold_text(title)
+        expected_author = fold_text(author)
+        book = max(
+            candidates,
+            key=lambda item: (
+                int(fold_text(item.get("title")) == expected_title),
+                int(
+                    bool(expected_author)
+                    and expected_author
+                    in {fold_text(value) for value in item.get("author_name") or []}
+                ),
+                int(item.get("edition_count") or 0),
+            ),
+        )
+        matched_title = fold_text(book.get("title")) == expected_title
+        confidence = 0.92 if matched_title else 0.72
+        book_authors = [
+            str(value).strip()
+            for value in list(book.get("author_name") or [])[:20]
+            if str(value).strip()
+        ]
+        cover_id = int(book.get("cover_i") or 0)
+        subjects = [
+            str(value).strip()
+            for value in list(book.get("subject") or [])[:12]
+            if str(value).strip()
+        ]
+        fields = {
+            "audiobook_title": book.get("title") or title,
+            "album": book.get("title") or title,
+            "artists": book_authors or ([author] if author else []),
+            "year": book.get("first_publish_year"),
+            "genres": subjects,
+            "external_ids": {
+                **dict(evidence.get("external_ids") or {}),
+                "openlibrary_work": str(book.get("key") or "").removeprefix("/works/"),
+            },
+            "artwork_candidates": (
+                [
+                    {
+                        "kind": "cover",
+                        "url": (
+                            f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
+                            "?default=false"
+                        ),
+                        "provider": "openlibrary_covers",
+                    }
+                ]
+                if cover_id
+                else []
+            ),
+        }
+        return [
+            {
+                "subject_ref": str(evidence["subject_ref"]),
+                "field_name": field,
+                "value": value,
+                "confidence": confidence,
+            }
+            for field, value in fields.items()
+            if value not in (None, "", [], {})
+        ][:100]
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "provider_id": self.provider_id,
+            "kind": "external",
+            "enabled": True,
+            "state": "degraded" if self._last_error else "ready",
+            "privacy": "normalized_audiobook_path_identity_only",
+            "request_count": self._requests,
+            "cache_hit_count": self._cache_hits,
+            "failure_count": self._failures,
+            "last_error": self._last_error,
             "last_success_at": self._last_success_at or None,
         }
 
@@ -889,7 +1205,17 @@ def metadata_provider_configuration(
                     else "external_metadata_disabled"
                 )
             ),
-            "privacy": "normalized_audio_tags_only",
+            "privacy": "normalized_audio_tags_and_path_identity_only",
+        },
+        {
+            "provider_id": "media_center.openlibrary.v1",
+            "kind": "external",
+            "enabled": external_enabled,
+            "state": "ready" if external_enabled else "disabled",
+            "reason": (
+                "configured" if external_enabled else "external_metadata_disabled"
+            ),
+            "privacy": "normalized_audiobook_path_identity_only",
         },
     ]
 
@@ -912,6 +1238,12 @@ def default_metadata_providers(
         )
     if external_enabled and _enabled(values.get("musicbrainz_enabled")):
         providers.append(MusicBrainzMetadataProvider())
+    if external_enabled:
+        providers.append(
+            OpenLibraryMetadataProvider(
+                language=str(values.get("locale") or "ru-RU")
+            )
+        )
     return tuple(providers)
 
 
@@ -1130,15 +1462,23 @@ class MediaEnrichmentWorker:
                         ),
                         cached[0],
                     )
+                    artwork_subject_ref = str(job["subject_ref"])
+                    if (
+                        str(subject.get("media_kind") or "").lower() == "audio"
+                        and str(subject.get("collection_id") or "")
+                    ):
+                        artwork_subject_ref = (
+                            f"collection:{str(subject['collection_id'])}"
+                        )
                     self.coordinator.record_metadata_claim(
-                        subject_ref=str(job["subject_ref"]),
+                        subject_ref=artwork_subject_ref,
                         field_name="artwork",
                         value=primary,
                         provenance="media_center.artwork_cache.v1",
                         confidence=0.95,
                     )
                     self.coordinator.record_metadata_claim(
-                        subject_ref=str(job["subject_ref"]),
+                        subject_ref=artwork_subject_ref,
                         field_name="artwork_set",
                         value=cached,
                         provenance="media_center.artwork_cache.v1",
@@ -1341,6 +1681,8 @@ __all__ = [
     "MetadataProviderError",
     "MediaEnrichmentWorker",
     "MetadataProvider",
+    "MusicBrainzMetadataProvider",
+    "OpenLibraryMetadataProvider",
     "TmdbMetadataProvider",
     "default_metadata_providers",
 ]

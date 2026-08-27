@@ -29,6 +29,7 @@ from media_center.enrichment import (  # noqa: E402
     MediaEnrichmentWorker,
     MetadataProviderError,
     MusicBrainzMetadataProvider,
+    OpenLibraryMetadataProvider,
     TmdbMetadataProvider,
     default_metadata_providers,
     metadata_provider_configuration,
@@ -1864,6 +1865,46 @@ def test_confirm_artwork_records_a_preferred_audited_choice(
     assert reviewed["metadata"]["artwork"]["confirmed"] is True
     assert reviewed["metadata"]["artwork_review"]["state"] == "confirmed"
     assert reviewed["metadata_provenance"]["artwork"] == "profile:default"
+
+
+def test_audio_collection_artwork_is_inherited_by_sibling_tracks(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "album-artwork.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(1, "Music/Artist/Album/01.mp3"),
+            _agent_delta(2, "Music/Artist/Album/02.mp3"),
+        )
+    )
+    items = catalog.list_items(media_kind="audio")["items"]
+    assert len({item["collection_id"] for item in items}) == 1
+    collection_id = items[0]["collection_id"]
+
+    catalog.record_metadata_claim(
+        subject_ref=f"collection:{collection_id}",
+        field_name="artwork",
+        value={
+            "schema": "adaos.media.artwork.v1",
+            "state": "ready",
+            "provider_id": "media_center.openlibrary.v1",
+            "source_kind": "external_cached",
+            "descriptor": {"browser_path": "/media/album.jpg"},
+        },
+        provenance="media_center.artwork_cache.v1",
+        confidence=0.95,
+    )
+
+    inherited = [catalog.item_details(item["id"])["item"] for item in items]
+    assert {item["artwork"]["url"] for item in inherited} == {
+        "/media/album.jpg"
+    }
+    assert {item["metadata_provenance"]["artwork"] for item in inherited} == {
+        "media_center.artwork_cache.v1"
+    }
 
 
 def test_background_operations_expose_a_direct_media_item_id(
@@ -5668,12 +5709,92 @@ def test_musicbrainz_provider_is_rate_limited_cached_and_audio_only():
         {
             "subject_ref": "item:audiobook",
             "title": "Chapter 01.mp3",
-            "folder_path": "Аудиокниги/Author/Book",
+            "folder_path": "\u0410\u0443\u0434\u0438\u043e\u043a\u043d\u0438\u0433\u0438/Author/Book",
             "media_kind": "audio",
             "metadata": {},
         },
         job_kind="metadata_enrichment",
     ) is False
+
+
+def test_path_identity_supplies_artist_and_album_for_numbered_audio():
+    provider = DeterministicLocalProvider()
+
+    claims = provider.claims(
+        {
+            "subject_ref": "item:bb-king-09",
+            "title": "09.mp3",
+            "folder_path": "B.B King/Live at the Regal/01",
+            "media_kind": "audio",
+            "metadata": {},
+        },
+        job_kind="metadata_enrichment",
+    )
+    values = {claim["field_name"]: claim["value"] for claim in claims}
+
+    assert values["artists"] == ["B.B King"]
+    assert values["album"] == "Live at the Regal"
+
+
+def test_openlibrary_provider_uses_audiobook_path_once_per_book():
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            return {
+                "docs": [
+                    {
+                        "key": "/works/OL123W",
+                        "title": "\u0421\u0432\u0435\u0442\u043b\u044b\u0439 \u043b\u0438\u043a \u0441\u043c\u0435\u0440\u0442\u0438",
+                        "author_name": ["\u0410\u043b\u0435\u043a\u0441\u0430\u043d\u0434\u0440\u0430 \u041c\u0430\u0440\u0438\u043d\u0438\u043d\u0430"],
+                        "first_publish_year": 1996,
+                        "cover_i": 12345,
+                        "subject": ["Detective fiction"],
+                        "edition_count": 12,
+                    }
+                ]
+            }
+
+    class Session:
+        def __init__(self):
+            self.calls = []
+
+        def get(self, url, **kwargs):
+            self.calls.append((url, kwargs))
+            return Response()
+
+    session = Session()
+    provider = OpenLibraryMetadataProvider(session=session)
+    subject = {
+        "subject_ref": "item:audiobook-1",
+        "title": "11_08.mp3",
+        "folder_path": (
+            "!\u0410\u0443\u0434\u0438\u043e\u043a\u043d\u0438\u0433\u0438/\u0410\u0423\u0414\u0418\u041e\u041a\u041d\u0418\u0413\u0410 (\u041a,\u041b,\u041c,\u041d,\u041e,\u041f,\u0420)/"
+            "\u041c\u0430\u0440\u0438\u043d\u0438\u043d\u0430 \u0410\u043b\u0435\u043a\u0441\u0430\u043d\u0434\u0440\u0430/\u0421\u0432\u0435\u0442\u043b\u044b\u0439 \u043b\u0438\u043a \u0441\u043c\u0435\u0440\u0442\u0438 "
+            "(\u0447\u0438\u0442.\u0415.\u0422\u0435\u0440\u043d\u043e\u0432\u0441\u043a\u0438\u0439)/11"
+        ),
+        "media_kind": "audio",
+        "metadata": {},
+    }
+
+    first = provider.claims(subject, job_kind="metadata_enrichment")
+    second = provider.claims(subject, job_kind="metadata_enrichment")
+    values = {claim["field_name"]: claim["value"] for claim in first}
+
+    assert first == second
+    assert len(session.calls) == 1
+    assert session.calls[0][1]["params"]["title"] == "\u0421\u0432\u0435\u0442\u043b\u044b\u0439 \u043b\u0438\u043a \u0441\u043c\u0435\u0440\u0442\u0438"
+    assert session.calls[0][1]["params"]["author"] == "\u041c\u0430\u0440\u0438\u043d\u0438\u043d\u0430 \u0410\u043b\u0435\u043a\u0441\u0430\u043d\u0434\u0440\u0430"
+    assert values["album"] == "\u0421\u0432\u0435\u0442\u043b\u044b\u0439 \u043b\u0438\u043a \u0441\u043c\u0435\u0440\u0442\u0438"
+    assert values["artwork_candidates"][0]["url"].startswith(
+        "https://covers.openlibrary.org/b/id/12345-L.jpg"
+    )
+    assert provider.status()["cache_hit_count"] == 1
 
 
 def test_musicbrainz_tls_failure_opens_a_bounded_circuit_breaker():
@@ -5728,6 +5849,7 @@ def test_external_metadata_providers_follow_managed_settings():
         "media_center.deterministic_local.v1",
         "media_center.tmdb.v1",
         "media_center.musicbrainz.v1",
+        "media_center.openlibrary.v1",
     ]
     missing_credential = metadata_provider_configuration(
         settings, tmdb_credential_configured=False
