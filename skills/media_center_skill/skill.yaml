@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.85
+version: 0.8.86
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -731,6 +731,11 @@ tools:
   description: Move an ordered media context to one available playback endpoint.
   entry: handlers.main:play_on
   side_effects: external_write
+  approval_scope:
+    name: media.playback.control
+    resource_argument: target_id
+    principal_meta_key: controller_device_id
+    ttl_seconds: 31536000
   timeout_seconds: 90
   input_schema:
     type: object
@@ -2459,12 +2464,13 @@ nlu_hints:
           type: object
       additionalProperties: true
   entities: []
-updated_at: '2026-08-27T08:30:24+00:00'
+updated_at: '2026-08-27T16:06:07+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.943+5718.ac09ac9d
-    recorded_at: '2026-08-27T08:30:24+00:00'
+    min_version: 0.1.945+5732.00ddc563
+    recorded_at: '2026-08-27T16:06:07+00:00'
     source: skill_push
-    min_commit: ac09ac9d0615edccb934faa27bc2641101cb95ae
-    min_short_commit: ac09ac9d
-    build_date: '2026-08-27T11:29:39+03:00'
+    min_commit: 00ddc5633eb5bcdb0944743fd64eb29e6966f1ba
+    min_short_commit: 00ddc563
+    build_date: '2026-08-27T18:24:24+03:00'
+

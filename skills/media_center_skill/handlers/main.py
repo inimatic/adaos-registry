@@ -2200,6 +2200,14 @@ def get_item(
     profile_id: str = "default",
     **_: Any,
 ) -> dict[str, Any]:
+    if not str(item_id or "").strip():
+        return {
+            "ok": True,
+            "schema": "adaos.media_center.item_details.v1",
+            "item": None,
+            "empty": True,
+            "reason": "no_item_selected",
+        }
     return _coordinator().item_details(item_id, profile_id=profile_id)
 
 
@@ -2317,6 +2325,7 @@ def ensure_rendition(
         endpoint_capabilities=endpoint_capabilities,
         profile_id=profile_id,
         preferred_language=preferred_language,
+        allow_unprepared=True,
     )
     if not plan.get("ok"):
         return plan
@@ -2564,6 +2573,12 @@ def build_playback_queue(
 @tool(
     summary="Move one bounded playback context to an available endpoint.",
     side_effects="external_write",
+    approval_scope={
+        "name": "media.playback.control",
+        "resource_argument": "target_id",
+        "principal_meta_key": "controller_device_id",
+        "ttl_seconds": 31_536_000,
+    },
 )
 def play_on(
     target_id: str = "",
@@ -2581,12 +2596,38 @@ def play_on(
             "playback_target_required",
             message="Choose an online playback device.",
         )
+    targets_result, targets_error = _invoke_skill(
+        "media_control_skill",
+        "list_targets",
+        {"include_unavailable": True, "limit": 100},
+        timeout=10.0,
+    )
+    playback_target = next(
+        (
+            dict(item)
+            for item in (targets_result or {}).get("items") or []
+            if isinstance(item, Mapping)
+            and target in {str(item.get("id") or ""), str(item.get("endpoint_id") or "")}
+        ),
+        None,
+    )
+    if not playback_target or str(playback_target.get("status") or "") != "available":
+        return _skill_error(
+            "playback_target_unavailable",
+            message="The selected playback device is not available.",
+            detail=str(targets_error or "target_not_available"),
+            target_id=target,
+            retryable=True,
+        )
     queue_result = build_playback_queue(
         source_type=source_type,
         source_id=source_id,
         source_context=source_context or {},
         profile_id=profile_id,
         limit=500,
+        endpoint_id=str(playback_target.get("endpoint_id") or target),
+        endpoint_node_id=str(playback_target.get("node_id") or ""),
+        endpoint_capabilities=dict(playback_target.get("capabilities") or {}),
         start_item_id=start_item_id,
     )
     if not queue_result.get("ok"):

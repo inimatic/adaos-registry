@@ -4112,9 +4112,17 @@ class MediaCatalogCoordinator:
         selected_audio = selected_audio or (audio_tracks[0] if audio_tracks else {})
         source_codec = _text(quality.get("codec")).lower()
         audio_codec = _text(selected_audio.get("codec")).lower()
-        source_container = _text(
-            quality.get("file_container") or quality.get("container")
-        ).lower()
+        source_container_tokens = {
+            item.strip().lower()
+            for item in re.split(",|/", _text(
+                quality.get("file_container") or quality.get("container")
+            ))
+            if item.strip()
+        }
+        if source_container_tokens.intersection(
+            {"mov", "mp4", "m4a", "3gp", "3g2", "mj2"}
+        ):
+            source_container_tokens.add("mp4")
         source_mime = _text(mime_type).lower().split(";", 1)[0].strip()
         reasons: list[str] = []
         if supported_codecs and source_codec and source_codec not in supported_codecs:
@@ -4132,8 +4140,8 @@ class MediaCatalogCoordinator:
             reasons.append("audio_codec_not_supported")
         if (
             supported_containers
-            and source_container
-            and source_container not in supported_containers
+            and source_container_tokens
+            and source_container_tokens.isdisjoint(supported_containers)
         ):
             reasons.append("container_not_supported")
         if supported_mime_types and source_mime not in supported_mime_types:
@@ -4141,6 +4149,9 @@ class MediaCatalogCoordinator:
         maximum_height = max(0, int(capabilities.get("max_video_height") or 0))
         if maximum_height and int(quality.get("height") or 0) > maximum_height:
             reasons.append("height_above_endpoint_limit")
+        maximum_width = max(0, int(capabilities.get("max_video_width") or 0))
+        if maximum_width and int(quality.get("width") or 0) > maximum_width:
+            reasons.append("width_above_endpoint_limit")
         maximum_bitrate = max(0, int(capabilities.get("max_bitrate") or 0))
         if maximum_bitrate and int(quality.get("bitrate") or 0) > maximum_bitrate:
             reasons.append("bitrate_above_endpoint_limit")
@@ -4160,6 +4171,7 @@ class MediaCatalogCoordinator:
             or supported_containers
             or supported_mime_types
             or maximum_height
+            or maximum_width
             or maximum_bitrate
             or endpoint_hdr
         )
@@ -6963,6 +6975,7 @@ class MediaCatalogCoordinator:
         preferred_language: str = "",
         variant_id: str = "",
         profile_id: str = "default",
+        allow_unprepared: bool = False,
     ) -> dict[str, Any]:
         token = _text(item_id)
         profile = _text(profile_id) or "default"
@@ -6971,7 +6984,13 @@ class MediaCatalogCoordinator:
         capabilities = dict(endpoint_capabilities or {})
         with self.repository.connect() as connection:
             selected_item = connection.execute(
-                "SELECT * FROM catalog_items WHERE id=?", (token,)
+                """
+                SELECT c.*,w.canonical_title AS work_canonical_title
+                FROM catalog_items c
+                LEFT JOIN media_works w ON w.id=c.work_id
+                WHERE c.id=?
+                """,
+                (token,),
             ).fetchone()
             if selected_item is None:
                 return {"ok": False, "error": "item_not_found", "item_id": token}
@@ -7101,12 +7120,30 @@ class MediaCatalogCoordinator:
         ranked.sort(
             key=lambda item: (-item[0], str(item[1]["selected_variant_id"]))
         )
+        candidate_count = len(ranked)
         if not ranked or ranked[0][0] < -9000:
             return {
                 "ok": False,
                 "error": "playback_source_unavailable",
                 "item_id": token,
             }
+        ready_ranked = [
+            candidate
+            for candidate in ranked
+            if bool(candidate[4].get("ready"))
+        ]
+        if not allow_unprepared and not ready_ranked:
+            _score, _row, _quality, _reasons, required = ranked[0]
+            return {
+                "ok": False,
+                "error": "playback_rendition_required",
+                "item_id": token,
+                "work_id": str(selected_item["work_id"]),
+                "compatibility": required,
+                "candidate_count": candidate_count,
+            }
+        if not allow_unprepared:
+            ranked = ready_ranked
         score, selected, quality, reasons, compatibility = ranked[0]
         descriptor = _json_loads(selected["variant_descriptor_json"]) or {}
         if not descriptor:
@@ -7153,6 +7190,9 @@ class MediaCatalogCoordinator:
                 ),
             },
         }
+        display_title = _text(selected_item["work_canonical_title"]) or str(
+            selected_item["title"]
+        )
         return {
             "ok": True,
             "schema": PLAYBACK_PLAN_SCHEMA,
@@ -7162,7 +7202,7 @@ class MediaCatalogCoordinator:
             "source_id": str(selected["selected_source_id"]),
             "media_kind": str(selected["selected_media_kind"]),
             "mime_type": str(selected["selected_mime_type"]),
-            "title": str(selected_item["title"]),
+            "title": display_title,
             "profile_id": profile,
             "quality": quality,
             "descriptor": _public_resource_descriptor(
@@ -7178,7 +7218,7 @@ class MediaCatalogCoordinator:
                 "policy": "deterministic_variant_route_v2",
                 "score": round(score, 3),
                 "reasons": reasons,
-                "candidate_count": len(ranked),
+                "candidate_count": candidate_count,
                 "requested_variant_id": override,
                 "preferred_quality": quality_preference,
                 "preferred_language": language_preference,
@@ -7324,6 +7364,7 @@ class MediaCatalogCoordinator:
             item_ids = [str(row["id"]) for row in rows]
             ownership = "derived_snapshot"
         queue = []
+        requested_start = _text(start_item_id)
         for item_id_value in item_ids[:bounded]:
             plan = self.playback_plan(
                 item_id_value,
@@ -7351,6 +7392,15 @@ class MediaCatalogCoordinator:
                         endpoint_node_id=endpoint_node_id,
                     )
             if not plan.get("ok"):
+                if kind == "item" or item_id_value == requested_start:
+                    return {
+                        **plan,
+                        "queue_source": {
+                            "type": kind,
+                            "id": token,
+                            "ownership": ownership,
+                        },
+                    }
                 continue
             queue.append(
                 {
@@ -7408,7 +7458,6 @@ class MediaCatalogCoordinator:
                 }
                 and value not in (None, "", False)
             }
-        requested_start = _text(start_item_id)
         initial_index = next(
             (
                 index

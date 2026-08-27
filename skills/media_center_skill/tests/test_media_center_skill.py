@@ -573,10 +573,11 @@ def test_playback_queue_includes_effective_control_settings(monkeypatch):
 
 
 def test_play_on_creates_a_durable_remote_session_and_sends_play(monkeypatch):
-    monkeypatch.setattr(
-        main,
-        "build_playback_queue",
-        lambda **_kwargs: {
+    queue_requests = []
+
+    def build_queue(**kwargs):
+        queue_requests.append(kwargs)
+        return {
             "ok": True,
             "items": [
                 {"id": "episode-1", "title": "Episode 1", "route": {}},
@@ -586,12 +587,30 @@ def test_play_on_creates_a_durable_remote_session_and_sends_play(monkeypatch):
             "playback_control": {
                 "queue_source": {"type": "collection", "id": "series-1"}
             },
-        },
+        }
+
+    monkeypatch.setattr(
+        main,
+        "build_playback_queue",
+        build_queue,
     )
     calls = []
 
     def invoke(skill, method, params, **_kwargs):
         calls.append((skill, method, params))
+        if method == "list_targets":
+            return {
+                "ok": True,
+                "items": [
+                    {
+                        "id": "target-tv",
+                        "endpoint_id": "android-tv",
+                        "node_id": "node-tv",
+                        "status": "available",
+                        "capabilities": {"codecs": ["h264"], "containers": ["mp4"]},
+                    }
+                ],
+            }, ""
         if method == "now_playing":
             return {"ok": True, "items": []}, ""
         if method == "create_session":
@@ -620,16 +639,20 @@ def test_play_on_creates_a_durable_remote_session_and_sends_play(monkeypatch):
     assert result["ok"] is True
     assert result["queue_count"] == 2
     assert [method for _skill, method, _params in calls] == [
+        "list_targets",
         "now_playing",
         "create_session",
         "command",
     ]
-    assert calls[1][2]["active_index"] == 1
-    assert calls[1][2]["queue_source"] == {
+    assert queue_requests[0]["endpoint_id"] == "android-tv"
+    assert queue_requests[0]["endpoint_node_id"] == "node-tv"
+    assert queue_requests[0]["endpoint_capabilities"]["codecs"] == ["h264"]
+    assert calls[2][2]["active_index"] == 1
+    assert calls[2][2]["queue_source"] == {
         "type": "collection",
         "id": "series-1",
     }
-    assert calls[2][2]["session_id"] == "session-tv"
+    assert calls[3][2]["session_id"] == "session-tv"
 
 
 def test_play_on_requires_a_target_without_masking_the_skill_error():
@@ -663,6 +686,19 @@ def test_play_on_selects_requested_item_in_existing_remote_session(monkeypatch):
 
     def invoke(skill, method, params, **_kwargs):
         calls.append((skill, method, params))
+        if method == "list_targets":
+            return {
+                "ok": True,
+                "items": [
+                    {
+                        "id": "target-tv",
+                        "endpoint_id": "android-tv",
+                        "node_id": "node-tv",
+                        "status": "available",
+                        "capabilities": {"codecs": ["h264"]},
+                    }
+                ],
+            }, ""
         if method == "now_playing":
             return {
                 "ok": True,
@@ -700,12 +736,13 @@ def test_play_on_selects_requested_item_in_existing_remote_session(monkeypatch):
 
     assert result["ok"] is True
     assert [method for _skill, method, _params in calls] == [
+        "list_targets",
         "now_playing",
         "update_queue",
         "command",
     ]
-    assert calls[1][2]["active_index"] == 1
-    assert calls[2][2]["expected_revision"] == 5
+    assert calls[2][2]["active_index"] == 1
+    assert calls[3][2]["expected_revision"] == 5
 
 
 def test_catalog_page_queue_preserves_current_query_sort_and_start_item(
@@ -4579,6 +4616,38 @@ def test_derived_rendition_is_a_hidden_exact_source_variant(monkeypatch, tmp_pat
         "container": "mkv",
     }
     catalog.apply_agent_page(_agent_page(original), instance_id="instance-a")
+    original_item = catalog.list_items(media_kind="video")["items"][0]
+    blocked = catalog.playback_plan(
+        original_item["id"],
+        endpoint_capabilities={
+            "codecs": ["h264"],
+            "containers": ["mp4"],
+            "mime_types": ["video/mp4"],
+            "max_video_height": 720,
+        },
+    )
+    preparation = catalog.playback_plan(
+        original_item["id"],
+        endpoint_capabilities={"codecs": ["h264"], "max_video_height": 720},
+        allow_unprepared=True,
+    )
+    blocked_queue = catalog.build_queue(
+        source_type="item",
+        source_id=original_item["id"],
+        start_item_id=original_item["id"],
+        endpoint_capabilities={
+            "codecs": ["h264"],
+            "containers": ["mp4"],
+            "mime_types": ["video/mp4"],
+            "max_video_height": 720,
+        },
+    )
+
+    assert blocked["error"] == "playback_rendition_required"
+    assert blocked["compatibility"]["ready"] is False
+    assert blocked_queue["error"] == "playback_rendition_required"
+    assert preparation["ok"] is True
+    assert preparation["compatibility"]["mode"] == "transcode"
 
     updated = _agent_delta(1, "Movies/Example.mkv", kind="video", revision=2)
     updated["source"]["mime_type"] = "video/x-matroska"
@@ -4632,11 +4701,39 @@ def test_derived_rendition_is_a_hidden_exact_source_variant(monkeypatch, tmp_pat
         ("rendition-source-1-browser", 1),
     ]
     assert plan["source_id"] == "rendition-source-1-browser"
+    assert plan["title"] == "Example"
     assert plan["descriptor"]["metadata"]["storage_mode"] == "derived_copy"
     assert plan["decision"]["derived"] is True
     assert plan["decision"]["exact_source_id"] == "source-1"
     assert plan["decision"]["exact_source_revision"] == 1
     _validate_schema("playback-plan.v2.schema.json", plan)
+
+
+def test_endpoint_compatibility_enforces_width_and_avi_container():
+    decision = MediaCatalogCoordinator._endpoint_compatibility(
+        {
+            "width": 2112,
+            "height": 1188,
+            "codec": "xvid",
+            "container": "avi",
+            "audio_tracks": [{"index": 1, "codec": "mp3"}],
+        },
+        media_kind="video",
+        mime_type="video/x-msvideo",
+        capabilities={
+            "codecs": ["h264", "aac"],
+            "containers": ["mp4", "webm"],
+            "mime_types": ["video/mp4", "video/webm"],
+            "max_video_width": 1920,
+            "max_video_height": 1080,
+        },
+        preferred_language="",
+    )
+
+    assert decision["mode"] == "transcode"
+    assert decision["ready"] is False
+    assert "container_not_supported" in decision["reasons"]
+    assert "width_above_endpoint_limit" in decision["reasons"]
 
 
 def test_federated_deep_search_is_bounded_policy_filtered_and_observable(
@@ -6702,3 +6799,15 @@ def test_perceptual_duplicate_claims_never_merge_or_delete_sources(
     assert candidate["disposition"] == "review_only"
     assert result["automatic_merge"] is False
     assert result["source_deletion"] is False
+
+
+def test_get_item_projects_empty_selection_without_a_data_source_error():
+    result = main.get_item(item_id="", profile_id="default")
+
+    assert result == {
+        "ok": True,
+        "schema": "adaos.media_center.item_details.v1",
+        "item": None,
+        "empty": True,
+        "reason": "no_item_selected",
+    }
