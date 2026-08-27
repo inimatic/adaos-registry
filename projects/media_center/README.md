@@ -7,7 +7,7 @@ dependency and remains the owner of core media resource registration and byte
 delivery.
 
 The unreleased 2026-08-26 local candidate combines
-`media_center_skill@0.8.80`, `media_library_agent@0.6.42`,
+`media_center_skill@0.8.81`, `media_library_agent@0.6.42`,
 `media_control_skill@0.2.12`, scenario `media_center@0.6.27`, and client
 `dcee3b4`. It adds durable queue auto-advance and endpoint selection, compact
 fullscreen/PiP/Play On controls, playlists, reviewed metadata correction,
@@ -27,10 +27,12 @@ Metadata activity now reconciles live counters with current provider settings
 and secret readiness, and its bounded operation rows open the corresponding
 media object. Numbered audio receives normalized artist/album evidence from its
 folder context without exposing the source path. Credential-free Open Library
-search and covers enrich audiobook collections once per normalized book, while
+search and covers enrich audiobook collections once per normalized book and
+persist matched/no-match receipts so sibling chapters do not repeat lookup, while
 MusicBrainz/Cover Art Archive remains the music path. Cached audio artwork is a
 collection claim inherited by sibling tracks; a profile can confirm or replace
-one guessed cover through an audited preferred claim.
+one guessed cover through an audited preferred claim. Newly cached external
+artwork is explicitly marked as suggested until that review occurs.
 
 Existing large coordinator databases activate without synchronous FTS,
 projection, favorite, or background-history rebuilds. A single paced

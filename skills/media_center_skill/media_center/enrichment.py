@@ -124,14 +124,9 @@ class DeterministicLocalProvider:
                         "confidence": 0.58,
                     }
                 )
-            if (
-                not (
-                    metadata.get("album")
-                    if isinstance(metadata, Mapping)
-                    else None
-                )
-                and path_identity.get("album")
-            ):
+            if not (
+                metadata.get("album") if isinstance(metadata, Mapping) else None
+            ) and path_identity.get("album"):
                 claims.append(
                     {
                         "subject_ref": subject_ref,
@@ -256,7 +251,9 @@ _TITLE_NOISE_RE = re.compile(
 _EPISODE_RE = re.compile(r"\bS\d{1,2}E\d{1,3}\b", re.IGNORECASE)
 _YEAR_RE = re.compile(r"(?<!\d)(19\d{2}|20\d{2})(?!\d)")
 _PATH_INDEX_RE = re.compile(
-    r"^(?:\d{1,4}|(?:cd|disc|disk|part|book)[ ._-]*\d{1,3})$",
+    r"^(?:\d{1,4}(?:[ ._-]\d{1,4})*|"
+    r"(?:cd|disc|disk|part|book|vol(?:ume)?|tom|\u0442\u043e\u043c|\u0447\u0430\u0441\u0442\u044c)"
+    r"[ ._-]*\d{1,3})$",
     re.IGNORECASE,
 )
 _GENERIC_AUDIO_SEGMENTS = frozenset(
@@ -294,8 +291,6 @@ def _path_identity(subject: Mapping[str, Any]) -> dict[str, Any]:
         cleaned = _clean_path_segment(part)
         if cleaned:
             segments.append(cleaned)
-    while segments and _PATH_INDEX_RE.match(segments[-1]):
-        segments.pop()
     audiobook = bool(_AUDIOBOOK_PATH_RE.search(raw_path))
     if audiobook:
         meaningful = [
@@ -304,6 +299,17 @@ def _path_identity(subject: Mapping[str, Any]) -> dict[str, Any]:
             if not _AUDIOBOOK_PATH_RE.search(segment)
             and not (segment.count(",") >= 3 and len(segment) <= 80)
         ]
+        while len(meaningful) > 2 and _PATH_INDEX_RE.match(meaningful[-1]):
+            meaningful.pop()
+        if len(meaningful) == 2 and _PATH_INDEX_RE.match(meaningful[-1]):
+            title = _AUDIOBOOK_READER_RE.sub("", meaningful[-2]).strip()
+            return {
+                "kind": "audiobook",
+                "artists": [],
+                "album": title,
+                "audiobook_title": title,
+                "evidence_source": "normalized_path_segments",
+            }
         if len(meaningful) >= 2:
             author = meaningful[-2]
             title = _AUDIOBOOK_READER_RE.sub("", meaningful[-1]).strip()
@@ -314,10 +320,21 @@ def _path_identity(subject: Mapping[str, Any]) -> dict[str, Any]:
                 "audiobook_title": title,
                 "evidence_source": "normalized_path_segments",
             }
+        if meaningful:
+            title = _AUDIOBOOK_READER_RE.sub("", meaningful[-1]).strip()
+            return {
+                "kind": "audiobook",
+                "artists": [],
+                "album": title,
+                "audiobook_title": title,
+                "evidence_source": "normalized_path_segments",
+            }
         return {
             "kind": "audiobook",
             "evidence_source": "normalized_path_segments",
         }
+    while segments and _PATH_INDEX_RE.match(segments[-1]):
+        segments.pop()
     meaningful = [
         segment
         for segment in segments
@@ -384,6 +401,7 @@ def _external_subject(subject: Mapping[str, Any]) -> dict[str, Any]:
         "external_ids": dict(evidence.get("external_ids") or {})
         if isinstance(evidence.get("external_ids"), Mapping)
         else {},
+        "collection_id": str(subject.get("collection_id") or ""),
     }
 
 
@@ -982,11 +1000,56 @@ class OpenLibraryMetadataProvider:
         self._last_success_at = 0.0
 
     def accepts(self, subject: Mapping[str, Any], *, job_kind: str) -> bool:
-        return (
-            job_kind in self.supported_jobs
-            and str(subject.get("media_kind") or "").strip().lower() == "audio"
-            and _path_identity(subject).get("kind") == "audiobook"
+        if (
+            job_kind not in self.supported_jobs
+            or str(subject.get("media_kind") or "").strip().lower() != "audio"
+            or _path_identity(subject).get("kind") != "audiobook"
+        ):
+            return False
+        identity = self._identity(subject)
+        if not identity:
+            return False
+        metadata = subject.get("metadata")
+        lookup = (
+            metadata.get("openlibrary_lookup")
+            if isinstance(metadata, Mapping)
+            else None
         )
+        return not (
+            isinstance(lookup, Mapping)
+            and str(lookup.get("query_key") or "") == identity["query_key"]
+            and str(lookup.get("state") or "") in {"matched", "no_match"}
+        )
+
+    def _identity(self, subject: Mapping[str, Any]) -> dict[str, str]:
+        evidence = _external_subject(subject)
+        if evidence.get("content_kind") != "audiobook":
+            return {}
+        title = str(
+            evidence.get("audiobook_title") or evidence.get("album") or ""
+        ).strip()
+        artists = evidence.get("artists") or []
+        if isinstance(artists, str):
+            artists = [artists]
+        author = str(artists[0] if artists else "").strip()
+        if not re.search(r"[^\W\d_]{2,}", title, flags=re.UNICODE):
+            return {}
+        if author and not re.search(r"[^\W\d_]{2,}", author, flags=re.UNICODE):
+            author = ""
+        collection_id = str(evidence.get("collection_id") or "").strip()
+        subject_ref = (
+            f"collection:{collection_id}"
+            if collection_id
+            else str(evidence.get("subject_ref") or "")
+        )
+        return {
+            "title": title,
+            "author": author,
+            "query_key": (
+                f"openlibrary-v1:{self.language}:{fold_text(title)}:{fold_text(author)}"
+            ),
+            "subject_ref": subject_ref,
+        }
 
     def _request(self, params: Mapping[str, Any]) -> dict[str, Any]:
         cache_key = repr(sorted(dict(params).items()))
@@ -1039,15 +1102,15 @@ class OpenLibraryMetadataProvider:
         if job_kind not in self.supported_jobs:
             raise LookupError("enrichment_provider_unavailable")
         evidence = _external_subject(subject)
-        if evidence.get("content_kind") != "audiobook":
+        identity = self._identity(subject)
+        if not identity:
             return []
-        title = str(evidence.get("audiobook_title") or evidence.get("album") or "")
-        artists = evidence.get("artists") or []
-        if isinstance(artists, str):
-            artists = [artists]
-        author = str(artists[0] if artists else "")
-        if not title:
-            return []
+        title = identity["title"]
+        author = identity["author"]
+        lookup = {
+            "provider_id": self.provider_id,
+            "query_key": identity["query_key"],
+        }
         payload = self._request(
             {
                 "title": title,
@@ -1063,7 +1126,14 @@ class OpenLibraryMetadataProvider:
             if isinstance(item, Mapping)
         ]
         if not candidates:
-            return []
+            return [
+                {
+                    "subject_ref": identity["subject_ref"],
+                    "field_name": "openlibrary_lookup",
+                    "value": lookup | {"state": "no_match"},
+                    "confidence": 1.0,
+                }
+            ]
         expected_title = fold_text(title)
         expected_author = fold_text(author)
         book = max(
@@ -1092,6 +1162,7 @@ class OpenLibraryMetadataProvider:
             if str(value).strip()
         ]
         fields = {
+            "openlibrary_lookup": lookup | {"state": "matched"},
             "audiobook_title": book.get("title") or title,
             "album": book.get("title") or title,
             "artists": book_authors or ([author] if author else []),
@@ -1118,10 +1189,10 @@ class OpenLibraryMetadataProvider:
         }
         return [
             {
-                "subject_ref": str(evidence["subject_ref"]),
+                "subject_ref": identity["subject_ref"],
                 "field_name": field,
                 "value": value,
-                "confidence": confidence,
+                "confidence": 1.0 if field == "openlibrary_lookup" else confidence,
             }
             for field, value in fields.items()
             if value not in (None, "", [], {})
@@ -1240,9 +1311,7 @@ def default_metadata_providers(
         providers.append(MusicBrainzMetadataProvider())
     if external_enabled:
         providers.append(
-            OpenLibraryMetadataProvider(
-                language=str(values.get("locale") or "ru-RU")
-            )
+            OpenLibraryMetadataProvider(language=str(values.get("locale") or "ru-RU"))
         )
     return tuple(providers)
 
@@ -1349,9 +1418,13 @@ class MediaEnrichmentWorker:
             return None
         refill = getattr(self.coordinator, "refill_background_job_windows", None)
         admission_at = time.monotonic()
-        if callable(refill) and not self._queue_admission_paused and (
-            self._last_admission_monotonic == 0.0
-            or admission_at - self._last_admission_monotonic >= 2.0
+        if (
+            callable(refill)
+            and not self._queue_admission_paused
+            and (
+                self._last_admission_monotonic == 0.0
+                or admission_at - self._last_admission_monotonic >= 2.0
+            )
         ):
             admission = refill()
             if isinstance(admission, Mapping):
@@ -1463,9 +1536,8 @@ class MediaEnrichmentWorker:
                         cached[0],
                     )
                     artwork_subject_ref = str(job["subject_ref"])
-                    if (
-                        str(subject.get("media_kind") or "").lower() == "audio"
-                        and str(subject.get("collection_id") or "")
+                    if str(subject.get("media_kind") or "").lower() == "audio" and str(
+                        subject.get("collection_id") or ""
                     ):
                         artwork_subject_ref = (
                             f"collection:{str(subject['collection_id'])}"
@@ -1484,7 +1556,18 @@ class MediaEnrichmentWorker:
                         provenance="media_center.artwork_cache.v1",
                         confidence=0.95,
                     )
-                    claim_count += 2
+                    self.coordinator.record_metadata_claim(
+                        subject_ref=artwork_subject_ref,
+                        field_name="artwork_review",
+                        value={
+                            "state": "suggested",
+                            "provider_id": str(primary.get("provider_id") or ""),
+                            "source_kind": str(primary.get("source_kind") or ""),
+                        },
+                        provenance="media_center.artwork_cache.v1",
+                        confidence=0.95,
+                    )
+                    claim_count += 3
                     provider_ids.append("media_center.artwork_cache.v1")
             result = self.coordinator.finish_background_job(
                 job_id,
@@ -1563,9 +1646,7 @@ class MediaEnrichmentWorker:
             return
 
     def _run_queue_maintenance(self, *, batch_size: int) -> None:
-        maintenance = getattr(
-            self.coordinator, "compact_background_job_queue", None
-        )
+        maintenance = getattr(self.coordinator, "compact_background_job_queue", None)
         if not callable(maintenance):
             self._queue_compaction_complete = True
             self._queue_admission_paused = False

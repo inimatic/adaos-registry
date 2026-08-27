@@ -4016,6 +4016,7 @@ def test_infrastate_runtime_event_invalidates_snapshot_cache(monkeypatch):
         "_invalidate_runtime_caches",
         lambda *, webspace_id=None, marketplace=False: invalidated.append(webspace_id),
     )
+    monkeypatch.setattr(mod, "active_projection_demand_snapshot", lambda: [])
     monkeypatch.setattr(mod, "_append_event", lambda event_type, payload: appended.append(event_type))
     monkeypatch.setattr(
         mod,
@@ -4042,10 +4043,26 @@ def test_infrastate_runtime_event_invalidates_snapshot_cache(monkeypatch):
 
     loop_thread_id = asyncio.run(_run())
 
-    assert invalidated == ["default"]
+    assert invalidated == [mod.default_webspace_id()]
     assert appended == ["core.update.status"]
-    assert scheduled == [{"webspace_id": "default", "reason": "core.update.status.terminal"}]
+    assert scheduled == [{"webspace_id": "*", "reason": "core.update.status.terminal"}]
     assert scheduler_threads == [loop_thread_id]
+
+
+def test_infrastate_node_update_targets_all_demanded_webspaces(monkeypatch):
+    mod = _load_infrastate_module()
+    monkeypatch.setattr(
+        mod,
+        "active_projection_demand_snapshot",
+        lambda: [
+            {"webspace_id": "desktop", "slot": "infrastate.summary", "subscribers": 1},
+            {"webspace_id": "tv", "slot": "infrastate.summary", "subscribers": 1},
+            {"webspace_id": "desktop", "slot": "weather.current", "subscribers": 1},
+        ],
+    )
+
+    assert mod._refresh_target_webspace_ids("*") == ["desktop", "tv"]
+    assert mod._refresh_target_webspace_ids("mobile") == ["mobile"]
 
 
 def test_infrastate_sys_ready_defers_first_paint_refresh(monkeypatch):

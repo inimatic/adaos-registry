@@ -354,8 +354,8 @@
       "kind": "skill",
       "id": "infrastate_skill",
       "name": "infrastate_skill",
-      "version": "0.75.74",
-      "updated_at": "2026-08-26T18:44:26+00:00",
+      "version": "0.75.75",
+      "updated_at": "2026-08-27T06:30:00+00:00",
       "path": "skills/infrastate_skill",
       "manifest": "skills/infrastate_skill/skill.yaml",
       "source": {
@@ -380,8 +380,8 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.8.80",
-      "updated_at": "2026-08-27T05:10:00+00:00",
+      "version": "0.8.81",
+      "updated_at": "2026-08-27T05:29:18+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
       "source": {

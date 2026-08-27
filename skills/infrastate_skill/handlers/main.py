@@ -27,6 +27,7 @@ from adaos.sdk.data import (
     ProjectionSlot,
     StreamReceiver,
     StreamRuntime,
+    active_projection_demand_snapshot,
     ctx_subnet,
     skill_memory_get,
     skill_memory_set,
@@ -5373,6 +5374,7 @@ async def _background_refresh_worker() -> None:
         while True:
             await asyncio.sleep(_BACKGROUND_REFRESH_DEBOUNCE_S)
             webspace_id = _background_refresh_webspace_id
+            target_webspaces = _refresh_target_webspace_ids(webspace_id)
             reason = _background_refresh_reason or "runtime.event"
             requested_at = _background_refresh_requested_at or time.time()
             _background_refresh_pending = False
@@ -5391,10 +5393,11 @@ async def _background_refresh_worker() -> None:
                 background_refresh_error="",
             )
             try:
-                await asyncio.wait_for(
-                    _refresh_snapshot_async(webspace_id=webspace_id, allow_cache=True),
-                    timeout=_BACKGROUND_REFRESH_TIMEOUT_S,
-                )
+                for target_webspace in target_webspaces:
+                    await asyncio.wait_for(
+                        _refresh_snapshot_async(webspace_id=target_webspace, allow_cache=True),
+                        timeout=_BACKGROUND_REFRESH_TIMEOUT_S,
+                    )
             except (asyncio.CancelledError, RuntimeError) as exc:
                 if isinstance(exc, RuntimeError) and "Executor shutdown has been called" not in str(exc):
                     raise
@@ -9155,6 +9158,26 @@ def _projection_webspace_ids(webspace_id: str | None = None) -> list[str]:
     return [token]
 
 
+def _refresh_target_webspace_ids(webspace_id: str | None = None) -> list[str]:
+    """Resolve a scheduled refresh to concrete webspaces.
+
+    Node-wide lifecycle events use ``*`` so every browser that currently
+    consumes an Infra State projection gets the same authoritative status.
+    """
+
+    token = str(webspace_id or "").strip()
+    if token != "*":
+        return [token or default_webspace_id()]
+    webspaces = {
+        str(item.get("webspace_id") or "").strip()
+        for item in active_projection_demand_snapshot()
+        if isinstance(item, dict)
+        and str(item.get("slot") or "").strip().startswith("infrastate.")
+        and str(item.get("webspace_id") or "").strip()
+    }
+    return sorted(webspaces) or [default_webspace_id()]
+
+
 async def _project_async(snapshot: dict[str, Any], webspace_id: str | None = None) -> None:
     sections = _projection_sections_from_snapshot(snapshot)
     fingerprint = _snapshot_projection_fingerprint(sections)
@@ -9857,8 +9880,11 @@ async def on_runtime_event(evt: Any) -> None:
         or "runtime.event"
     )
     webspace_id = _webspace_id_from_payload(payload)
+    node_wide_update = event_type in {"core.update.status", "hub.core_update.status"}
+    refresh_webspace_id = "*" if node_wide_update else webspace_id
     try:
-        _invalidate_runtime_caches(webspace_id=webspace_id)
+        for target_webspace in _refresh_target_webspace_ids(refresh_webspace_id):
+            _invalidate_runtime_caches(webspace_id=target_webspace)
     except Exception:
         _log.debug(
             "failed to invalidate infrastate caches for runtime event type=%s webspace=%s",
@@ -9891,7 +9917,7 @@ async def on_runtime_event(evt: Any) -> None:
         _projection_diag["last_lifecycle_refresh_event"] = event_type
         _projection_diag["last_lifecycle_refresh_deferred_at"] = time.time()
         _schedule_snapshot_refresh(
-            webspace_id=webspace_id,
+            webspace_id=refresh_webspace_id,
             reason=(f"{event_type}.terminal" if terminal_core_update else event_type),
         )
     except Exception:

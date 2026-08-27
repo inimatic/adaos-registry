@@ -94,7 +94,9 @@ def test_background_runtime_reuses_and_disposes_process_owned_workers() -> None:
     assert receipt["stopped"] is True
 
 
-def test_background_runtime_restarts_running_enrichment_when_configuration_changes() -> None:
+def test_background_runtime_restarts_running_enrichment_when_configuration_changes() -> (
+    None
+):
     runtime = MediaCenterBackgroundRuntime()
     events: list[str] = []
 
@@ -184,9 +186,15 @@ def test_rehydrate_defers_runtime_workers_until_sys_ready(monkeypatch) -> None:
         "_run_agent_sync",
         lambda *_args, **_kwargs: pytest.fail("sync must be deferred"),
     )
-    monkeypatch.setattr(main, "_agent_sync_runtime", lambda _catalog=None: Worker("sync"))
-    monkeypatch.setattr(main, "_enrichment_runtime", lambda _catalog=None: Worker("enrichment"))
-    monkeypatch.setattr(main, "_publish_library_snapshot", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        main, "_agent_sync_runtime", lambda _catalog=None: Worker("sync")
+    )
+    monkeypatch.setattr(
+        main, "_enrichment_runtime", lambda _catalog=None: Worker("enrichment")
+    )
+    monkeypatch.setattr(
+        main, "_publish_library_snapshot", lambda *_args, **_kwargs: None
+    )
 
     result = main.rehydrate()
 
@@ -223,10 +231,18 @@ def test_sys_ready_schedules_catalog_bootstrap_without_running_it_inline(
     monkeypatch.setattr(main, "background_runtime", lambda: Runtime())
     monkeypatch.setattr(main, "default_db_path", lambda: tmp_path / "catalog.sqlite3")
     monkeypatch.setattr(main, "_coordinator", lambda: catalog)
-    monkeypatch.setattr(main, "_agent_sync_runtime", lambda _catalog=None: Worker("sync"))
-    monkeypatch.setattr(main, "_enrichment_runtime", lambda _catalog=None: Worker("enrichment"))
-    monkeypatch.setattr(main, "_publish_library_snapshot", lambda *_args: started.append("library"))
-    monkeypatch.setattr(main, "_publish_operation_snapshot", lambda *_args: started.append("operations"))
+    monkeypatch.setattr(
+        main, "_agent_sync_runtime", lambda _catalog=None: Worker("sync")
+    )
+    monkeypatch.setattr(
+        main, "_enrichment_runtime", lambda _catalog=None: Worker("enrichment")
+    )
+    monkeypatch.setattr(
+        main, "_publish_library_snapshot", lambda *_args: started.append("library")
+    )
+    monkeypatch.setattr(
+        main, "_publish_operation_snapshot", lambda *_args: started.append("operations")
+    )
 
     main.on_sys_ready(None)
 
@@ -264,7 +280,9 @@ def test_catalog_change_during_bootstrap_does_not_open_the_catalog(
     assert scheduled == [(str(db_path), main._start_live_runtime)]
 
 
-def test_schema_lock_never_falls_through_to_full_migration(monkeypatch, tmp_path) -> None:
+def test_schema_lock_never_falls_through_to_full_migration(
+    monkeypatch, tmp_path
+) -> None:
     db_path = tmp_path / "media_center.sqlite3"
     db_path.write_bytes(b"catalog")
     calls = 0
@@ -313,7 +331,9 @@ def test_coordinator_schema_lock_never_falls_through_to_migration(
     assert migration_attempted is False
 
 
-def test_repository_connect_keeps_default_sync_during_lock(monkeypatch, tmp_path) -> None:
+def test_repository_connect_keeps_default_sync_during_lock(
+    monkeypatch, tmp_path
+) -> None:
     statements: list[str] = []
 
     class Connection:
@@ -362,7 +382,13 @@ def test_coordinator_cache_fast_path_does_not_repeat_schema_check(
 
 def _resource(resource_id: str = "clip.mp4", *, source: str = "media_server") -> dict:
     suffix = Path(resource_id).suffix.lower()
-    mime = "audio/mpeg" if suffix == ".mp3" else "image/jpeg" if suffix in {".jpg", ".jpeg"} else "video/mp4"
+    mime = (
+        "audio/mpeg"
+        if suffix == ".mp3"
+        else "image/jpeg"
+        if suffix in {".jpg", ".jpeg"}
+        else "video/mp4"
+    )
     return {
         "schema": "adaos.media.resource.v1",
         "id": resource_id,
@@ -426,7 +452,10 @@ def _agent_delta(
                 "content_path": f"/api/node/media/resources/content/ref-{sequence}",
                 "routed_content_path": f"/media/resources/content/ref-{sequence}",
                 "source_path": f"/mnt/library/{relative_path}",
-                "metadata": {"storage_mode": "reference", "folder_segments": list(Path(folder).parts)},
+                "metadata": {
+                    "storage_mode": "reference",
+                    "folder_segments": list(Path(folder).parts),
+                },
             },
             "metadata": {
                 "storage_mode": "reference",
@@ -591,11 +620,14 @@ def test_play_on_creates_a_durable_remote_session_and_sends_play(monkeypatch):
     assert result["ok"] is True
     assert result["queue_count"] == 2
     assert [method for _skill, method, _params in calls] == [
-        "now_playing", "create_session", "command",
+        "now_playing",
+        "create_session",
+        "command",
     ]
     assert calls[1][2]["active_index"] == 1
     assert calls[1][2]["queue_source"] == {
-        "type": "collection", "id": "series-1",
+        "type": "collection",
+        "id": "series-1",
     }
     assert calls[2][2]["session_id"] == "session-tv"
 
@@ -668,7 +700,9 @@ def test_play_on_selects_requested_item_in_existing_remote_session(monkeypatch):
 
     assert result["ok"] is True
     assert [method for _skill, method, _params in calls] == [
-        "now_playing", "update_queue", "command",
+        "now_playing",
+        "update_queue",
+        "command",
     ]
     assert calls[1][2]["active_index"] == 1
     assert calls[2][2]["expected_revision"] == 5
@@ -677,9 +711,7 @@ def test_play_on_selects_requested_item_in_existing_remote_session(monkeypatch):
 def test_catalog_page_queue_preserves_current_query_sort_and_start_item(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(
@@ -729,7 +761,11 @@ def test_catalog_page_queue_preserves_current_query_sort_and_start_item(
 
 def test_library_auto_scan_uses_sdk_discovery_boundary(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
-    monkeypatch.setattr(main, "_discover_resources", lambda source="all", limit=5000: ([_resource("song.mp3")], {"ok": True}))
+    monkeypatch.setattr(
+        main,
+        "_discover_resources",
+        lambda source="all", limit=5000: ([_resource("song.mp3")], {"ok": True}),
+    )
     monkeypatch.setattr(
         main,
         "_sync_agents",
@@ -745,7 +781,10 @@ def test_library_auto_scan_uses_sdk_discovery_boundary(monkeypatch, tmp_path):
 
     assert payload["ok"] is True
     assert payload["scan"]["discovered_count"] == 1
-    assert payload["runtime"]["resource_boundary"] == "adaos.sdk.io.media.list_media_resources"
+    assert (
+        payload["runtime"]["resource_boundary"]
+        == "adaos.sdk.io.media.list_media_resources"
+    )
     assert payload["items"][0]["playable"] is True
 
 
@@ -760,14 +799,18 @@ def test_catalog_marks_previous_rows_missing_for_scanned_source(monkeypatch, tmp
 
     assert [item["resource_id"] for item in available] == ["new.mp4"]
     assert {item["resource_id"] for item in all_items} == {"old.mp4", "new.mp4"}
-    assert any(item["resource_id"] == "old.mp4" and item["missing"] for item in all_items)
+    assert any(
+        item["resource_id"] == "old.mp4" and item["missing"] for item in all_items
+    )
 
 
 def test_playable_filter_excludes_images_by_default(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
 
-    repo.scan_resources([_resource("clip.mp4"), _resource("song.mp3"), _resource("poster.jpg")])
+    repo.scan_resources(
+        [_resource("clip.mp4"), _resource("song.mp3"), _resource("poster.jpg")]
+    )
     playable = repo.list_items(media_kind="playable", sort="title", limit=20)["items"]
 
     assert [item["media_kind"] for item in playable] == ["video", "audio"]
@@ -777,8 +820,14 @@ def test_playable_filter_excludes_images_by_default(monkeypatch, tmp_path):
 def test_kind_and_favorites_filters_are_exact(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
-    repo.scan_resources([_resource("clip.mp4"), _resource("song.mp3"), _resource("poster.jpg")])
-    clip = next(item for item in repo.list_items(limit=20)["items"] if item["resource_id"] == "clip.mp4")
+    repo.scan_resources(
+        [_resource("clip.mp4"), _resource("song.mp3"), _resource("poster.jpg")]
+    )
+    clip = next(
+        item
+        for item in repo.list_items(limit=20)["items"]
+        if item["resource_id"] == "clip.mp4"
+    )
     repo.set_favorite(clip["id"], favorite=True)
 
     videos = main.library(media_kind="video", auto_scan=False, limit=20)["items"]
@@ -799,11 +848,16 @@ def test_library_defaults_to_playable_media(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
 
-    repo.scan_resources([_resource("clip.mp4"), _resource("song.mp3"), _resource("poster.jpg")])
+    repo.scan_resources(
+        [_resource("clip.mp4"), _resource("song.mp3"), _resource("poster.jpg")]
+    )
     payload = main.library(auto_scan=False, sort="title", limit=20)
 
     assert [item["media_kind"] for item in payload["items"]] == ["video", "audio"]
-    assert {item["resource_id"] for item in payload["items"]} == {"clip.mp4", "song.mp3"}
+    assert {item["resource_id"] for item in payload["items"]} == {
+        "clip.mp4",
+        "song.mp3",
+    }
 
 
 def test_library_summary_projection_is_bounded_to_card_fields(monkeypatch, tmp_path):
@@ -824,12 +878,16 @@ def test_library_summary_projection_is_bounded_to_card_fields(monkeypatch, tmp_p
     assert "metadata" not in payload["items"][0]
 
 
-def test_incremental_root_scan_does_not_mark_existing_media_server_rows_missing(monkeypatch, tmp_path):
+def test_incremental_root_scan_does_not_mark_existing_media_server_rows_missing(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
 
     repo.scan_resources([_resource("old.mp4")], source="media_server")
-    repo.scan_resources([_resource("new.mp4")], source="media_server", mark_missing=False)
+    repo.scan_resources(
+        [_resource("new.mp4")], source="media_server", mark_missing=False
+    )
     available = repo.list_items(sort="title")["items"]
 
     assert {item["resource_id"] for item in available} == {"old.mp4", "new.mp4"}
@@ -841,7 +899,9 @@ def test_discovery_excludes_legacy_media_center_copies(monkeypatch):
     legacy = _resource("media-center-0123456789abcdef01234567-import.mp4")
     current = _resource("movie.mp4")
     current["metadata"] = {"storage_mode": "reference"}
-    monkeypatch.setattr(media_sdk, "list_media_resources", lambda **_: [legacy, current])
+    monkeypatch.setattr(
+        media_sdk, "list_media_resources", lambda **_: [legacy, current]
+    )
 
     resources, status = main._discover_resources()
 
@@ -866,9 +926,7 @@ def test_schema_retires_pre_reference_media_center_catalog_rows(monkeypatch, tmp
 
 
 def test_current_schema_reopens_without_waiting_for_a_writer(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/track.mp3")))
     writer = sqlite3.connect(str(catalog.repository.db_path), timeout=1)
@@ -887,9 +945,7 @@ def test_current_schema_reopens_without_waiting_for_a_writer(monkeypatch, tmp_pa
 
 
 def test_playback_variant_lookup_has_durable_indexes(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
 
     with catalog.repository.connect() as connection:
@@ -913,9 +969,7 @@ def test_playback_variant_lookup_has_durable_indexes(monkeypatch, tmp_path):
 def test_base_variant_reuses_catalog_descriptor_without_losing_playback(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(_agent_delta(1, "Movies/Example.mp4", kind="video"))
@@ -992,9 +1046,7 @@ def test_coordinator_stores_source_routing_and_metadata_only_once(
 def test_storage_compaction_is_bounded_resumable_and_preserves_public_metadata(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "legacy-storage.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "legacy-storage.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(_agent_delta(1, "Movies/Legacy.mp4", kind="video"))
@@ -1071,8 +1123,7 @@ def test_storage_compaction_is_bounded_resumable_and_preserves_public_metadata(
         )
         projection = json.loads(
             connection.execute(
-                "SELECT metadata_json FROM catalog_metadata_projection "
-                "WHERE item_id=?",
+                "SELECT metadata_json FROM catalog_metadata_projection WHERE item_id=?",
                 (item["id"],),
             ).fetchone()[0]
         )
@@ -1102,9 +1153,7 @@ def test_storage_optimization_reports_settled_file_size(monkeypatch, tmp_path):
 
 
 def test_agent_delta_retires_same_path_legacy_catalog_row(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
     legacy = _resource("legacy-track.mp3")
     legacy["source_path"] = "/mnt/library/Music/track-1.mp3"
@@ -1116,9 +1165,9 @@ def test_agent_delta_retires_same_path_legacy_catalog_row(monkeypatch, tmp_path)
         _agent_page(_agent_delta(1, "Music/track-1.mp3"))
     )
     available = catalog.list_items(media_kind="audio", limit=30)["items"]
-    all_items = catalog.list_items(
-        media_kind="audio", include_missing=True, limit=30
-    )["items"]
+    all_items = catalog.list_items(media_kind="audio", include_missing=True, limit=30)[
+        "items"
+    ]
 
     assert applied["applied_count"] == 1
     assert len(available) == 1
@@ -1130,9 +1179,7 @@ def test_agent_delta_retires_same_path_legacy_catalog_row(monkeypatch, tmp_path)
 def test_agent_delta_retires_legacy_row_reached_through_path_alias(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
     legacy = _resource("track-1.mp3")
     legacy["size_bytes"] = 1001
@@ -1143,9 +1190,7 @@ def test_agent_delta_retires_legacy_row_reached_through_path_alias(
     repo.set_favorite(legacy_item["id"], True)
     catalog = MediaCatalogCoordinator(repo)
 
-    catalog.apply_agent_page(
-        _agent_page(_agent_delta(1, "Music/track-1.mp3"))
-    )
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/track-1.mp3")))
     available = catalog.list_items(media_kind="audio", limit=30)["items"]
 
     assert len(available) == 1
@@ -1156,9 +1201,7 @@ def test_agent_delta_retires_legacy_row_reached_through_path_alias(
 def test_schema_migration_retires_path_alias_without_losing_personal_state(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
     legacy = _resource("track-1.mp3")
     legacy["size_bytes"] = 1001
@@ -1166,12 +1209,10 @@ def test_schema_migration_retires_path_alias_without_losing_personal_state(
     legacy["path"] = legacy["source_path"]
     repo.scan_resources([legacy], source="media_server", mark_missing=False)
     catalog = MediaCatalogCoordinator(repo)
-    catalog.apply_agent_page(
-        _agent_page(_agent_delta(1, "Music/track-1.mp3"))
-    )
-    all_items = catalog.list_items(
-        media_kind="audio", include_missing=True, limit=30
-    )["items"]
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/track-1.mp3")))
+    all_items = catalog.list_items(media_kind="audio", include_missing=True, limit=30)[
+        "items"
+    ]
     legacy_id = next(item["id"] for item in all_items if not item["agent_id"])
     canonical_id = next(item["id"] for item in all_items if item["agent_id"])
     with repo.connect() as connection:
@@ -1247,16 +1288,16 @@ def test_import_folder_registers_playable_files_without_copying(monkeypatch, tmp
     assert listing["items"][0]["resource"]["metadata"]["storage_mode"] == "reference"
 
 
-def test_catalog_projection_redacts_local_paths_and_embedded_credentials(monkeypatch, tmp_path):
+def test_catalog_projection_redacts_local_paths_and_embedded_credentials(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     delta = _agent_delta(1, "Author/Book/001.mp3")
     descriptor = delta["source"]["descriptor"]
     descriptor["path"] = "/mnt/library/Author/Book/001.mp3"
     descriptor["content_ref"] = "root-a:/mnt/library/Author/Book/001.mp3"
-    descriptor["direct_urls"] = [
-        "http://node-a.local/media/ref-1?token=private-token"
-    ]
+    descriptor["direct_urls"] = ["http://node-a.local/media/ref-1?token=private-token"]
     descriptor["content_url_candidates"] = [
         "http://user:password@node-a.local/media/ref-1"
     ]
@@ -1296,7 +1337,10 @@ def test_reference_registration_keeps_original_media_bytes(monkeypatch, tmp_path
     media_dir.mkdir()
     movie = media_dir / "movie.mp4"
     movie.write_bytes(b"original-video")
-    monkeypatch.setenv("ADAOS_MEDIA_REFERENCE_DB_PATH", str(tmp_path / "state" / "media_references.sqlite3"))
+    monkeypatch.setenv(
+        "ADAOS_MEDIA_REFERENCE_DB_PATH",
+        str(tmp_path / "state" / "media_references.sqlite3"),
+    )
 
     descriptor, error = main._register_media_file_descriptor(
         movie,
@@ -1308,11 +1352,15 @@ def test_reference_registration_keeps_original_media_bytes(monkeypatch, tmp_path
     assert descriptor["path"] == str(movie.resolve())
     assert descriptor["source_path"] == str(movie.resolve())
     assert descriptor["metadata"]["storage_mode"] == "reference"
-    assert descriptor["content_path"].startswith("/api/node/media/resources/content/ref_")
+    assert descriptor["content_path"].startswith(
+        "/api/node/media/resources/content/ref_"
+    )
     assert list(tmp_path.rglob("*.mp4")) == [movie]
 
 
-def test_delete_root_removes_catalog_and_core_links_but_preserves_media(monkeypatch, tmp_path):
+def test_delete_root_removes_catalog_and_core_links_but_preserves_media(
+    monkeypatch, tmp_path
+):
     from adaos.services import media_core
 
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
@@ -1360,7 +1408,11 @@ def test_playback_queue_puts_selection_first_and_clamps_to_ten(monkeypatch, tmp_
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
     repo.scan_resources([_resource(f"clip-{index:02d}.mp4") for index in range(15)])
-    selected = next(item for item in repo.list_items(limit=15)["items"] if item["resource_id"] == "clip-12.mp4")
+    selected = next(
+        item
+        for item in repo.list_items(limit=15)["items"]
+        if item["resource_id"] == "clip-12.mp4"
+    )
 
     payload = main.playback_queue(
         item_id=selected["id"],
@@ -1382,7 +1434,9 @@ def test_playback_queue_puts_selection_first_and_clamps_to_ten(monkeypatch, tmp_
     assert payload["capabilities"]["playlist"]["max_items"] == 10
 
 
-def test_scan_roots_without_active_roots_returns_human_i18n_error(monkeypatch, tmp_path):
+def test_scan_roots_without_active_roots_returns_human_i18n_error(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
 
     result = main.scan_roots(limit=20)
@@ -1411,7 +1465,9 @@ def test_skill_declares_media_center_i18n_resources() -> None:
     assert (SKILL_ROOT / "assets" / "i18n" / "ru.json").is_file()
 
 
-def test_coordinator_applies_agent_deltas_and_searches_folder_segments(monkeypatch, tmp_path):
+def test_coordinator_applies_agent_deltas_and_searches_folder_segments(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     page = _agent_page(
@@ -1510,10 +1566,10 @@ def test_coordinator_projects_safe_versioned_artwork_url(monkeypatch, tmp_path):
         "source_revision": 1,
         "source_fingerprint": "fingerprint-1-1",
         "width": 720,
-            "height": 720,
-            "error_code": "",
-            "fallback_urls": [],
-        }
+        "height": 720,
+        "error_code": "",
+        "fallback_urls": [],
+    }
     assert "/mnt/private" not in str(artwork)
 
 
@@ -1522,8 +1578,7 @@ def test_playback_observation_updates_profile_recent_once_per_bucket(monkeypatch
     published = []
     catalog = SimpleNamespace(
         checkpoint=lambda item_id, **kwargs: (
-            checkpoints.append((item_id, kwargs))
-            or {"ok": True}
+            checkpoints.append((item_id, kwargs)) or {"ok": True}
         )
     )
     monkeypatch.setattr(main, "_coordinator", lambda: catalog)
@@ -1560,7 +1615,9 @@ def test_playback_observation_updates_profile_recent_once_per_bucket(monkeypatch
     assert len(published) == 2
 
 
-def test_playback_observation_ignores_loading_and_coalesces_home_projection(monkeypatch):
+def test_playback_observation_ignores_loading_and_coalesces_home_projection(
+    monkeypatch,
+):
     checkpoints = []
     published = []
     catalog = SimpleNamespace(
@@ -1675,26 +1732,42 @@ def test_playback_pressure_session_cache_is_bounded(monkeypatch):
     assert len(main._PLAYBACK_PRESSURE_SESSIONS) == main._PLAYBACK_PRESSURE_LIMIT
 
 
-def test_coordinator_builds_typed_collections_and_bounded_cursor_pages(monkeypatch, tmp_path):
+def test_coordinator_builds_typed_collections_and_bounded_cursor_pages(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     deltas = [
-        _agent_delta(index, f"Series Name/Season 01/Series.Name.S01E{index:02d}.mp4", kind="video")
+        _agent_delta(
+            index,
+            f"Series Name/Season 01/Series.Name.S01E{index:02d}.mp4",
+            kind="video",
+        )
         for index in range(1, 36)
     ]
     catalog.apply_agent_page(_agent_page(*deltas))
 
     first = catalog.list_items(media_kind="video", sort="title", limit=100)
-    second = catalog.list_items(media_kind="video", sort="title", limit=30, cursor=first["pagination"]["next_cursor"])
+    second = catalog.list_items(
+        media_kind="video",
+        sort="title",
+        limit=30,
+        cursor=first["pagination"]["next_cursor"],
+    )
     collections = catalog.collections(kind="series")
 
     assert first["count"] == 30
     assert first["pagination"]["has_more"] is True
     assert second["count"] == 5
-    assert {item["id"] for item in first["items"]}.isdisjoint({item["id"] for item in second["items"]})
+    assert {item["id"] for item in first["items"]}.isdisjoint(
+        {item["id"] for item in second["items"]}
+    )
     assert collections["items"][0]["title"] == "Series Name"
     assert collections["items"][0]["item_count"] == 35
-    assert all(item["work_id"] and item["variant_id"] and item["collection_id"] for item in first["items"])
+    assert all(
+        item["work_id"] and item["variant_id"] and item["collection_id"]
+        for item in first["items"]
+    )
 
     series = collections["items"][0]
     contents = catalog.collection_contents(series["id"], limit=30)
@@ -1806,19 +1879,19 @@ def test_external_artwork_candidate_falls_back_for_items_and_collections(
     )
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
-        _agent_page(
-            _agent_delta(1, "Show/Season 01/Show.S01E01.mp4", kind="video")
-        )
+        _agent_page(_agent_delta(1, "Show/Season 01/Show.S01E01.mp4", kind="video"))
     )
     item = catalog.list_items(media_kind="video")["items"][0]
     catalog.record_metadata_claim(
         subject_ref=f"item:{item['id']}",
         field_name="artwork_candidates",
-        value=[{
-            "kind": "poster",
-            "url": "https://image.tmdb.org/t/p/w500/poster.jpg?token=private",
-            "provider": "tmdb",
-        }],
+        value=[
+            {
+                "kind": "poster",
+                "url": "https://image.tmdb.org/t/p/w500/poster.jpg?token=private",
+                "provider": "tmdb",
+            }
+        ],
         provenance="media_center.tmdb.v1",
         confidence=0.9,
     )
@@ -1832,9 +1905,7 @@ def test_external_artwork_candidate_falls_back_for_items_and_collections(
     assert collection["artwork"]["url"] == enriched["artwork"]["url"]
 
 
-def test_confirm_artwork_records_a_preferred_audited_choice(
-    monkeypatch, tmp_path
-):
+def test_confirm_artwork_records_a_preferred_audited_choice(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "MEDIA_CENTER_DB_PATH", str(tmp_path / "confirmed-artwork.sqlite3")
     )
@@ -1846,10 +1917,12 @@ def test_confirm_artwork_records_a_preferred_audited_choice(
     catalog.record_metadata_claim(
         subject_ref=f"item:{item['id']}",
         field_name="artwork_candidates",
-        value=[{
-            "kind": "cover",
-            "url": "https://coverartarchive.org/release/release-1/front-500",
-        }],
+        value=[
+            {
+                "kind": "cover",
+                "url": "https://coverartarchive.org/release/release-1/front-500",
+            }
+        ],
         provenance="media_center.musicbrainz.v1",
         confidence=0.9,
     )
@@ -1867,12 +1940,8 @@ def test_confirm_artwork_records_a_preferred_audited_choice(
     assert reviewed["metadata_provenance"]["artwork"] == "profile:default"
 
 
-def test_audio_collection_artwork_is_inherited_by_sibling_tracks(
-    monkeypatch, tmp_path
-):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "album-artwork.sqlite3")
-    )
+def test_audio_collection_artwork_is_inherited_by_sibling_tracks(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "album-artwork.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(
@@ -1899,17 +1968,13 @@ def test_audio_collection_artwork_is_inherited_by_sibling_tracks(
     )
 
     inherited = [catalog.item_details(item["id"])["item"] for item in items]
-    assert {item["artwork"]["url"] for item in inherited} == {
-        "/media/album.jpg"
-    }
+    assert {item["artwork"]["url"] for item in inherited} == {"/media/album.jpg"}
     assert {item["metadata_provenance"]["artwork"] for item in inherited} == {
         "media_center.artwork_cache.v1"
     }
 
 
-def test_background_operations_expose_a_direct_media_item_id(
-    monkeypatch, tmp_path
-):
+def test_background_operations_expose_a_direct_media_item_id(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "MEDIA_CENTER_DB_PATH", str(tmp_path / "operation-item-id.sqlite3")
     )
@@ -2066,9 +2131,15 @@ def test_personal_state_is_profile_scoped_and_revisioned(monkeypatch, tmp_path):
     item_id = catalog.list_items(media_kind="audio")["items"][0]["id"]
 
     alice = catalog.set_favorite(item_id, profile_id="alice", favorite=True)
-    catalog.checkpoint(item_id, profile_id="alice", position_ms=45_000, duration_ms=180_000)
-    alice_page = catalog.list_items(media_kind="audio", profile_id="alice", favorites_only=True)
-    bob_page = catalog.list_items(media_kind="audio", profile_id="bob", favorites_only=True)
+    catalog.checkpoint(
+        item_id, profile_id="alice", position_ms=45_000, duration_ms=180_000
+    )
+    alice_page = catalog.list_items(
+        media_kind="audio", profile_id="alice", favorites_only=True
+    )
+    bob_page = catalog.list_items(
+        media_kind="audio", profile_id="bob", favorites_only=True
+    )
 
     assert alice["revision"] == 1
     assert alice_page["items"][0]["favorite"] is True
@@ -2076,17 +2147,19 @@ def test_personal_state_is_profile_scoped_and_revisioned(monkeypatch, tmp_path):
     assert bob_page["items"] == []
 
 
-def test_profiles_enforce_query_playback_and_shared_surface_policy(monkeypatch, tmp_path):
+def test_profiles_enforce_query_playback_and_shared_surface_policy(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     clean = _agent_delta(1, "Movies/Family.mp4", kind="video")
     restricted = _agent_delta(2, "Movies/Restricted.mp4", kind="video")
-    restricted["source"]["metadata"].update(
-        {"maturity_rating": 18, "explicit": True}
-    )
+    restricted["source"]["metadata"].update({"maturity_rating": 18, "explicit": True})
     catalog.apply_agent_page(_agent_page(clean, restricted))
     items = catalog.list_items(media_kind="video", profile_id="default", sort="title")
-    restricted_item = next(item for item in items["items"] if item["title"] == "Restricted")
+    restricted_item = next(
+        item for item in items["items"] if item["title"] == "Restricted"
+    )
 
     kids = catalog.list_items(media_kind="video", profile_id="kids", sort="title")
     denied = catalog.playback_plan(restricted_item["id"], profile_id="kids")
@@ -2094,9 +2167,7 @@ def test_profiles_enforce_query_playback_and_shared_surface_policy(monkeypatch, 
         restricted_item["id"], profile_id="default", rating=4, hidden=True
     )
     hidden = catalog.list_items(media_kind="video", profile_id="default")
-    household_home = catalog.home(
-        profile_id="household", limit=3, shared_surface=True
-    )
+    household_home = catalog.home(profile_id="household", limit=3, shared_surface=True)
     profile = catalog.get_profile("alice")["profile"]
     conflict = catalog.set_profile_policy(
         "alice", expected_revision=9, values={"maximum_maturity_rating": 16}
@@ -2126,7 +2197,9 @@ def test_profiles_enforce_query_playback_and_shared_surface_policy(monkeypatch, 
     _validate_schema("profile.v1.schema.json", updated["profile"])
 
 
-def test_recommendations_are_bounded_explainable_and_support_opt_out(monkeypatch, tmp_path):
+def test_recommendations_are_bounded_explainable_and_support_opt_out(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
@@ -2160,7 +2233,9 @@ def test_recommendations_are_bounded_explainable_and_support_opt_out(monkeypatch
     assert disabled["items"] == []
 
 
-def test_voice_request_uses_catalog_policy_and_existing_control_tools(monkeypatch, tmp_path):
+def test_voice_request_uses_catalog_policy_and_existing_control_tools(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/Track.mp3")))
@@ -2216,10 +2291,7 @@ def test_compound_voice_request_is_bounded_and_requires_governed_approval(
         lambda: (_ for _ in ()).throw(AssertionError("catalog must stay lazy")),
     )
     result = main.voice_request(
-        text=(
-            "play the next episode in the living room and "
-            "lower volume after 10 PM"
-        ),
+        text=("play the next episode in the living room and lower volume after 10 PM"),
         profile_id="alice",
         actor_ref="profile:alice",
     )
@@ -2247,7 +2319,9 @@ def test_unavailable_agent_makes_catalog_truthfully_partial(monkeypatch, tmp_pat
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/track.mp3")))
-    catalog.mark_agent_unavailable("agent-node-a", node_id="node-a", reason="lease_expired")
+    catalog.mark_agent_unavailable(
+        "agent-node-a", node_id="node-a", reason="lease_expired"
+    )
 
     page = catalog.list_items(media_kind="audio")
 
@@ -2269,7 +2343,9 @@ def test_coordinator_public_contracts_validate_strictly(monkeypatch, tmp_path):
         ("media-source.v1.schema.json", source),
         ("media-collection.v1.schema.json", collection),
     ):
-        schema = __import__("json").loads((SKILL_ROOT / "schemas" / filename).read_text(encoding="utf-8"))
+        schema = __import__("json").loads(
+            (SKILL_ROOT / "schemas" / filename).read_text(encoding="utf-8")
+        )
         jsonschema.Draft202012Validator(schema).validate(payload)
 
 
@@ -2281,10 +2357,28 @@ def test_twenty_thousand_item_catalog_remains_server_paged(monkeypatch, tmp_path
         name = f"movie-{index:05d}.mp4"
         rows.append(
             (
-                f"mc-{index:05d}", "media_server", name, name, f"Movie {index:05d}", "video", "video/mp4", 1000 + index,
-                "2026-08-19T00:00:00+00:00", f"/api/node/media/files/content/{name}", f"/media/files/content/{name}", "",
-                f"/mnt/library/Movies/{name}", "{}", "{}", f"fp-{index}", "2026-08-19T00:00:00+00:00",
-                "2026-08-19T00:00:00+00:00", 0, 0, 0, "[]",
+                f"mc-{index:05d}",
+                "media_server",
+                name,
+                name,
+                f"Movie {index:05d}",
+                "video",
+                "video/mp4",
+                1000 + index,
+                "2026-08-19T00:00:00+00:00",
+                f"/api/node/media/files/content/{name}",
+                f"/media/files/content/{name}",
+                "",
+                f"/mnt/library/Movies/{name}",
+                "{}",
+                "{}",
+                f"fp-{index}",
+                "2026-08-19T00:00:00+00:00",
+                "2026-08-19T00:00:00+00:00",
+                0,
+                0,
+                0,
+                "[]",
             )
         )
     with repo.connect() as connection:
@@ -2331,9 +2425,7 @@ def test_twenty_thousand_item_catalog_remains_server_paged(monkeypatch, tmp_path
     assert time.monotonic() - started < 30
 
 
-def test_search_indexes_use_catalog_rowids_for_addressed_updates(
-    monkeypatch, tmp_path
-):
+def test_search_indexes_use_catalog_rowids_for_addressed_updates(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repository = MediaCenterRepository()
     catalog = MediaCatalogCoordinator(repository)
@@ -2347,24 +2439,28 @@ def test_search_indexes_use_catalog_rowids_for_addressed_updates(
             "SELECT rowid AS catalog_rowid,id FROM catalog_items WHERE source_id='source-1'"
         ).fetchone()
         catalog_rowid = int(row["catalog_rowid"])
-        assert int(
-            connection.execute(
-                "SELECT rowid FROM catalog_search "
-                "WHERE catalog_search MATCH 'example*'"
-            ).fetchone()[0]
-        ) == catalog_rowid
-        assert int(
-            connection.execute(
-                "SELECT rowid FROM catalog_fuzzy_search "
-                "WHERE catalog_fuzzy_search MATCH 'exa'",
-            ).fetchone()[0]
-        ) == catalog_rowid
+        assert (
+            int(
+                connection.execute(
+                    "SELECT rowid FROM catalog_search "
+                    "WHERE catalog_search MATCH 'example*'"
+                ).fetchone()[0]
+            )
+            == catalog_rowid
+        )
+        assert (
+            int(
+                connection.execute(
+                    "SELECT rowid FROM catalog_fuzzy_search "
+                    "WHERE catalog_fuzzy_search MATCH 'exa'",
+                ).fetchone()[0]
+            )
+            == catalog_rowid
+        )
 
     updated = catalog.apply_agent_page(
         _agent_page(
-            _agent_delta(
-                1, "Movies/Example/movie.mp4", kind="video", revision=2
-            )
+            _agent_delta(1, "Movies/Example/movie.mp4", kind="video", revision=2)
         )
     )
     assert updated["applied_count"] == 1
@@ -2375,18 +2471,24 @@ def test_search_indexes_use_catalog_rowids_for_addressed_updates(
         ).fetchone()
         assert indexed is not None
         assert "Example" in str(indexed["search_text"])
-        assert connection.execute(
-            "SELECT COUNT(*) FROM catalog_search "
-            "WHERE catalog_search MATCH 'example*'"
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "SELECT COUNT(*) FROM catalog_search "
+                "WHERE catalog_search MATCH 'example*'"
+            ).fetchone()[0]
+            == 1
+        )
     assert catalog.list_items(query="Example", media_kind="video")["count"] == 1
     with repository.connect() as connection:
-        assert connection.execute("SELECT COUNT(*) FROM catalog_search").fetchone()[
-            0
-        ] == 1
-        assert connection.execute(
-            "SELECT COUNT(*) FROM catalog_fuzzy_search"
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute("SELECT COUNT(*) FROM catalog_search").fetchone()[0] == 1
+        )
+        assert (
+            connection.execute("SELECT COUNT(*) FROM catalog_fuzzy_search").fetchone()[
+                0
+            ]
+            == 1
+        )
         definitions = {
             str(row["name"]): str(row["sql"] or "")
             for row in connection.execute(
@@ -2430,9 +2532,7 @@ def test_diagnostics_never_count_scans_the_fts_virtual_table(monkeypatch, tmp_pa
 
 
 def test_status_and_collection_state_avoid_wide_catalog_summary(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "compact-status.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "compact-status.sqlite3"))
     repository = MediaCenterRepository()
     catalog = MediaCatalogCoordinator(repository)
     catalog.apply_agent_page(
@@ -2493,8 +2593,7 @@ def test_search_rowid_migration_rebuilds_legacy_fts_rows(monkeypatch, tmp_path):
             (str(item["search_text"]),),
         )
         connection.execute(
-            "INSERT INTO catalog_fuzzy_search(rowid,fuzzy_text) "
-            "VALUES (999999,?)",
+            "INSERT INTO catalog_fuzzy_search(rowid,fuzzy_text) VALUES (999999,?)",
             (str(item["search_text"]),),
         )
         connection.execute(
@@ -2521,21 +2620,29 @@ def test_search_rowid_migration_rebuilds_legacy_fts_rows(monkeypatch, tmp_path):
                 "SELECT rowid FROM catalog_items WHERE source_id='source-1'"
             ).fetchone()[0]
         )
-        assert int(
-            connection.execute(
-                "SELECT rowid FROM catalog_search "
-                "WHERE catalog_search MATCH 'example*'"
-            ).fetchone()[0]
-        ) == catalog_rowid
-        assert int(
-            connection.execute(
-                "SELECT rowid FROM catalog_fuzzy_search "
-                "WHERE catalog_fuzzy_search MATCH 'exa'"
-            ).fetchone()[0]
-        ) == catalog_rowid
+        assert (
+            int(
+                connection.execute(
+                    "SELECT rowid FROM catalog_search "
+                    "WHERE catalog_search MATCH 'example*'"
+                ).fetchone()[0]
+            )
+            == catalog_rowid
+        )
+        assert (
+            int(
+                connection.execute(
+                    "SELECT rowid FROM catalog_fuzzy_search "
+                    "WHERE catalog_fuzzy_search MATCH 'exa'"
+                ).fetchone()[0]
+            )
+            == catalog_rowid
+        )
 
 
-def test_current_search_schema_preserves_completed_rowid_revision(monkeypatch, tmp_path):
+def test_current_search_schema_preserves_completed_rowid_revision(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repository = MediaCenterRepository()
     catalog = MediaCatalogCoordinator(repository)
@@ -2610,19 +2717,19 @@ def test_legacy_search_schema_is_deferred_and_rebuilt_in_bounded_batches(
         "catalog_search_legacy_1",
         "catalog_fuzzy_search_legacy_1",
     ]
-    partial_search = migrated.list_items(
-        query="Example", media_kind="video", limit=10
-    )
+    partial_search = migrated.list_items(query="Example", media_kind="video", limit=10)
     assert partial_search["count"] == 1
     assert partial_search["ranking"]["version"] == "legacy-fts-fallback-v1"
     while not first["complete"]:
         first = migrated.compact_search_index_batch(limit=10)
     assert migrated.search_index_status()["ready"] is True
     with repository.connect() as connection:
-        assert connection.execute(
-            "SELECT rowid FROM catalog_search "
-            "WHERE catalog_search MATCH 'example*'"
-        ).fetchone() is not None
+        assert (
+            connection.execute(
+                "SELECT rowid FROM catalog_search WHERE catalog_search MATCH 'example*'"
+            ).fetchone()
+            is not None
+        )
 
 
 def test_media_topology_uses_public_sdk_and_builds_safe_default_placement(monkeypatch):
@@ -2647,7 +2754,11 @@ def test_media_topology_uses_public_sdk_and_builds_safe_default_placement(monkey
         "plan",
         lambda deployment_id: SimpleNamespace(
             status="ready",
-            to_dict=lambda: {"deployment_id": deployment_id, "status": "ready", "digest": "plan-1"},
+            to_dict=lambda: {
+                "deployment_id": deployment_id,
+                "status": "ready",
+                "digest": "plan-1",
+            },
         ),
     )
 
@@ -2661,7 +2772,10 @@ def test_media_topology_uses_public_sdk_and_builds_safe_default_placement(monkey
     assert result["dry_run"] is True
     assert placements["skill:media_center_skill"].mode == "singleton"
     assert placements["skill:media_library_agent"].mode == "co_located_with"
-    assert placements["skill:media_library_agent"].co_located_with == "skill:media_center_skill"
+    assert (
+        placements["skill:media_library_agent"].co_located_with
+        == "skill:media_center_skill"
+    )
     assert captured["expected_revision"] == 0
 
 
@@ -3189,7 +3303,9 @@ def test_deployment_apply_submits_durable_operation_and_reads_status(monkeypatch
     assert observed["operation"]["state"] == "running"
 
 
-def test_repository_connection_context_commits_rolls_back_and_closes(tmp_path: Path) -> None:
+def test_repository_connection_context_commits_rolls_back_and_closes(
+    tmp_path: Path,
+) -> None:
     repository = MediaCenterRepository(tmp_path / "connection-lifecycle.sqlite3")
 
     with repository.connect() as committed:
@@ -3319,7 +3435,9 @@ def test_media_topology_owns_agent_membership_and_commits_remote_observation(
 
     def fake_register(instance, *, expected_revision, lease_seconds):
         captured["register"] = (instance, expected_revision, lease_seconds)
-        return SimpleNamespace(to_dict=lambda: {"instance_id": "agent-b", "revision": 1})
+        return SimpleNamespace(
+            to_dict=lambda: {"instance_id": "agent-b", "revision": 1}
+        )
 
     monkeypatch.setattr(topology_module.distributed_sdk, "register", fake_register)
     partition_value = SimpleNamespace(
@@ -3359,9 +3477,7 @@ def test_media_topology_owns_agent_membership_and_commits_remote_observation(
     monkeypatch.setattr(
         topology_module.distributed_sdk,
         "inspect",
-        lambda **kwargs: SimpleNamespace(
-            partitions=(), replicas=(), cursors={}
-        ),
+        lambda **kwargs: SimpleNamespace(partitions=(), replicas=(), cursors={}),
     )
     topology = MediaCenterTopology()
     topology.invoke_agent = lambda *args, **kwargs: {
@@ -3371,9 +3487,7 @@ def test_media_topology_owns_agent_membership_and_commits_remote_observation(
         "external_media_copied": False,
     }
 
-    registered = topology.register_agent(
-        {"instance_id": "agent-b"}, lease_seconds=999
-    )
+    registered = topology.register_agent({"instance_id": "agent-b"}, lease_seconds=999)
     observed = topology.observe_agent_topology(
         "agent-b",
         partition={"partition_id": "catalog-home"},
@@ -3495,9 +3609,7 @@ def test_media_topology_explains_only_declared_media_datasets(monkeypatch):
 def test_distributed_agent_sync_tracks_independent_cursors_and_partial_state(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
 
     class FakeTopology:
         active = ["instance-a", "instance-b"]
@@ -3554,18 +3666,14 @@ def test_distributed_agent_sync_tracks_independent_cursors_and_partial_state(
 def test_distributed_agent_sync_adapts_to_bounded_result_envelope(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     observed_limits = []
 
     class BoundedTopology:
         def agent_instances(self, *, limit=100):
             return [{"instance_id": "instance-a", "node_id": "node-a"}][:limit]
 
-        def invoke_agent(
-            self, instance_id, operation, arguments, *, timeout_seconds
-        ):
+        def invoke_agent(self, instance_id, operation, arguments, *, timeout_seconds):
             observed_limits.append(arguments["limit"])
             if arguments["limit"] > 125:
                 raise RuntimeError("service_invocation_result_too_large")
@@ -3669,17 +3777,13 @@ def test_agent_sync_worker_does_not_wake_or_republish_for_unchanged_reads() -> N
 def test_complete_distributed_sync_retires_local_compatibility_state(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
 
     class DistributedTopology:
         def agent_instances(self, *, limit=100):
             return [{"instance_id": "instance-a", "node_id": "node-a"}][:limit]
 
-        def invoke_agent(
-            self, instance_id, operation, arguments, *, timeout_seconds
-        ):
+        def invoke_agent(self, instance_id, operation, arguments, *, timeout_seconds):
             assert instance_id == "instance-a"
             assert operation == "pull_deltas"
             page = _agent_page(_agent_delta(1, "Music/track.mp3"))
@@ -3707,17 +3811,13 @@ def test_complete_distributed_sync_retires_local_compatibility_state(
 def test_incomplete_distributed_sync_preserves_local_compatibility_state(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
 
     class DistributedTopology:
         def agent_instances(self, *, limit=100):
             return [{"instance_id": "instance-a", "node_id": "node-a"}][:limit]
 
-        def invoke_agent(
-            self, instance_id, operation, arguments, *, timeout_seconds
-        ):
+        def invoke_agent(self, instance_id, operation, arguments, *, timeout_seconds):
             page = _agent_page(_agent_delta(1, "Music/track.mp3"))
             page["agent"] = {"id": "agent-a", "node_id": "node-a"}
             page["has_more"] = True
@@ -3733,14 +3833,13 @@ def test_incomplete_distributed_sync_preserves_local_compatibility_state(
 
     assert result["retired_compatibility"]["deferred"] is True
     assert {item["agent_id"] for item in result["participation"]["agents"]} == {
-        "agent-a", "agent-local"
+        "agent-a",
+        "agent-local",
     }
 
 
 def test_local_agent_sync_resumes_from_its_durable_cursor(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
 
     class LocalTopology:
         def agent_instances(self, *, limit=100):
@@ -3762,9 +3861,7 @@ def test_local_agent_sync_resumes_from_its_durable_cursor(monkeypatch, tmp_path)
         cursor = str(arguments.get("cursor") or "")
         observed_cursors.append(cursor)
         sequence = 2 if cursor else 1
-        page = _agent_page(
-            _agent_delta(sequence, f"Music/track-{sequence}.mp3")
-        )
+        page = _agent_page(_agent_delta(sequence, f"Music/track-{sequence}.mp3"))
         page["agent"] = {"id": "agent-local", "node_id": "node-local"}
         page["next_cursor"] = f"cursor-{sequence}"
         page["has_more"] = sequence == 1
@@ -3785,9 +3882,7 @@ def test_local_agent_sync_resumes_from_its_durable_cursor(monkeypatch, tmp_path)
 
 
 def test_personal_mutation_publishes_subscription_snapshot(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/track.mp3")))
     item_id = catalog.list_items(media_kind="audio")["items"][0]["id"]
@@ -3798,9 +3893,7 @@ def test_personal_mutation_publishes_subscription_snapshot(monkeypatch, tmp_path
     monkeypatch.setattr(
         sdk_io,
         "stream_variable_publish",
-        lambda receiver, value, **kwargs: published.append(
-            (receiver, value, kwargs)
-        ),
+        lambda receiver, value, **kwargs: published.append((receiver, value, kwargs)),
     )
     monkeypatch.setattr(main, "_coordinator", lambda repository=None: catalog)
     monkeypatch.setattr(main, "_agent_sync_status", lambda: {"state": "idle"})
@@ -3824,10 +3917,10 @@ def test_personal_mutation_publishes_subscription_snapshot(monkeypatch, tmp_path
     }
 
 
-def test_library_snapshot_sequence_advances_across_revision_planes(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+def test_library_snapshot_sequence_advances_across_revision_planes(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/first.mp3")))
     item_id = catalog.list_items(media_kind="audio")["items"][0]["id"]
@@ -3840,9 +3933,7 @@ def test_library_snapshot_sequence_advances_across_revision_planes(monkeypatch, 
     monkeypatch.setattr(
         sdk_io,
         "stream_variable_publish",
-        lambda receiver, value, **kwargs: published.append(
-            (receiver, value, kwargs)
-        ),
+        lambda receiver, value, **kwargs: published.append((receiver, value, kwargs)),
     )
     monkeypatch.setattr(main, "_agent_sync_status", lambda: {"state": "idle"})
 
@@ -3858,9 +3949,7 @@ def test_library_snapshot_sequence_advances_across_revision_planes(monkeypatch, 
 
 
 def test_profile_revision_advances_for_changes_to_distinct_items(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(
@@ -4015,9 +4104,7 @@ def test_operation_snapshot_request_is_workspace_scoped(monkeypatch):
 
 
 def test_library_snapshot_publish_failure_is_observable(monkeypatch, tmp_path, caplog):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
 
     import adaos.sdk.io as sdk_io
@@ -4043,9 +4130,7 @@ def test_library_snapshot_publish_failure_is_observable(monkeypatch, tmp_path, c
 
 
 def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(
@@ -4088,7 +4173,9 @@ def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp
     assert second["items"][0]["path"] != root["items"][0]["path"]
     assert nested["items"][0]["path"] == "Shows/Example/Season 2"
     assert nested["folder_count"] == 1
-    assert nested["items"][0]["queue_ref"] == "agent-node-a:root-a:Shows/Example/Season 2"
+    assert (
+        nested["items"][0]["queue_ref"] == "agent-node-a:root-a:Shows/Example/Season 2"
+    )
     assert nested["breadcrumbs"][0] == {
         "name": "Folders",
         "name_i18n": {"key": "runtime.media_center.ui.folders"},
@@ -4136,9 +4223,7 @@ def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp
 
 
 def test_home_exposes_bounded_flattened_shelf_items(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(
@@ -4155,9 +4240,7 @@ def test_home_exposes_bounded_flattened_shelf_items(monkeypatch, tmp_path):
 
 
 def test_home_history_shelves_are_personal_index_driven(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(_agent_delta(1, "Movies/Example.mp4", kind="video"))
@@ -4205,9 +4288,7 @@ def test_home_history_shelves_are_personal_index_driven(monkeypatch, tmp_path):
 def test_collection_state_distinguishes_configuration_indexing_and_empty(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     page = _agent_page()
     page["library_state"] = {
@@ -4241,15 +4322,11 @@ def test_collection_state_distinguishes_configuration_indexing_and_empty(
     }
     catalog.apply_agent_page(page, instance_id="instance-a")
 
-    assert catalog.collection_state(agent_sync={"state": "idle"})["state"] == (
-        "empty"
-    )
+    assert catalog.collection_state(agent_sync={"state": "idle"})["state"] == ("empty")
 
 
 def test_playlists_are_profile_scoped_ordered_and_revision_safe(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(
@@ -4303,9 +4380,7 @@ def test_playlists_are_profile_scoped_ordered_and_revision_safe(monkeypatch, tmp
 def test_playback_plan_selects_endpoint_compatible_variant_and_route(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     high = _agent_delta(1, "Movies/UHD/Example.mp4", kind="video")
     high["source"]["metadata"]["technical"] = {
@@ -4313,9 +4388,7 @@ def test_playback_plan_selects_endpoint_compatible_variant_and_route(
         "bitrate": 24_000_000,
         "codec": "hevc",
     }
-    high["source"]["descriptor"]["direct_urls"] = [
-        "http://node-a.local/media/ref-1"
-    ]
+    high["source"]["descriptor"]["direct_urls"] = ["http://node-a.local/media/ref-1"]
     catalog.apply_agent_page(_agent_page(high), instance_id="instance-a")
 
     compatible = _agent_delta(2, "Movies/FHD/Example.mp4", kind="video")
@@ -4372,9 +4445,7 @@ def test_playback_plan_selects_endpoint_compatible_variant_and_route(
 def test_audio_identity_uses_folder_context_and_migrates_existing_collisions(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repository = MediaCenterRepository()
     catalog = MediaCatalogCoordinator(repository)
     catalog.apply_agent_page(
@@ -4383,16 +4454,14 @@ def test_audio_identity_uses_folder_context_and_migrates_existing_collisions(
             _agent_delta(2, "Audiobooks/Author B/Book B/01/0.mp3"),
         )
     )
-    items = catalog.list_items(media_kind="audio", sort="title", limit=30)[
-        "items"
-    ]
+    items = catalog.list_items(media_kind="audio", sort="title", limit=30)["items"]
     by_source = {item["source_id"]: item for item in items}
     source_two_variant_id = by_source["source-2"]["variant_id"]
 
     assert by_source["source-1"]["work_id"] != by_source["source-2"]["work_id"]
-    assert by_source["source-1"]["collection_id"] != by_source["source-2"][
-        "collection_id"
-    ]
+    assert (
+        by_source["source-1"]["collection_id"] != by_source["source-2"]["collection_id"]
+    )
     for source_id in ("source-1", "source-2"):
         plan = catalog.playback_plan(by_source[source_id]["id"])
         assert plan["source_id"] == source_id
@@ -4415,26 +4484,26 @@ def test_audio_identity_uses_folder_context_and_migrates_existing_collisions(
             "WHERE key='coordinator_schema_revision'"
         )
         connection.execute(
-            "DELETE FROM coordinator_meta "
-            "WHERE key='audio_context_identity_revision'"
+            "DELETE FROM coordinator_meta WHERE key='audio_context_identity_revision'"
         )
         connection.commit()
 
     migrated = MediaCatalogCoordinator(repository)
-    repaired = migrated.list_items(media_kind="audio", sort="title", limit=30)[
-        "items"
-    ]
+    repaired = migrated.list_items(media_kind="audio", sort="title", limit=30)["items"]
     repaired_by_source = {item["source_id"]: item for item in repaired}
 
-    assert repaired_by_source["source-1"]["work_id"] != repaired_by_source[
-        "source-2"
-    ]["work_id"]
-    assert repaired_by_source["source-1"]["collection_id"] != repaired_by_source[
-        "source-2"
-    ]["collection_id"]
-    assert migrated.playback_plan(repaired_by_source["source-2"]["id"])[
-        "source_id"
-    ] == "source-2"
+    assert (
+        repaired_by_source["source-1"]["work_id"]
+        != repaired_by_source["source-2"]["work_id"]
+    )
+    assert (
+        repaired_by_source["source-1"]["collection_id"]
+        != repaired_by_source["source-2"]["collection_id"]
+    )
+    assert (
+        migrated.playback_plan(repaired_by_source["source-2"]["id"])["source_id"]
+        == "source-2"
+    )
     update = migrated.apply_agent_page(
         _agent_page(
             _agent_delta(
@@ -4446,9 +4515,9 @@ def test_audio_identity_uses_folder_context_and_migrates_existing_collisions(
     )
     updated_source_two = next(
         item
-        for item in migrated.list_items(
-            media_kind="audio", sort="title", limit=30
-        )["items"]
+        for item in migrated.list_items(media_kind="audio", sort="title", limit=30)[
+            "items"
+        ]
         if item["source_id"] == "source-2"
     )
     assert update["applied_count"] == 1
@@ -4458,9 +4527,7 @@ def test_audio_identity_uses_folder_context_and_migrates_existing_collisions(
 def test_replicated_audio_path_remains_one_work_with_multiple_variants(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(_agent_delta(1, "Music/Artist/Album/01 Track.mp3")),
@@ -4473,17 +4540,13 @@ def test_replicated_audio_path_remains_one_work_with_multiple_variants(
     page["agent"] = {"id": "agent-node-b", "node_id": "node-b"}
     catalog.apply_agent_page(page, instance_id="instance-b")
 
-    items = catalog.list_items(media_kind="audio", sort="title", limit=30)[
-        "items"
-    ]
+    items = catalog.list_items(media_kind="audio", sort="title", limit=30)["items"]
     assert len({item["work_id"] for item in items}) == 1
     assert catalog.playback_plan(items[0]["id"])["decision"]["candidate_count"] == 2
 
 
 def test_derived_rendition_is_a_hidden_exact_source_variant(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     original = _agent_delta(1, "Movies/Example.mkv", kind="video")
     original["source"]["mime_type"] = "video/x-matroska"
@@ -4556,9 +4619,7 @@ def test_derived_rendition_is_a_hidden_exact_source_variant(monkeypatch, tmp_pat
 def test_federated_deep_search_is_bounded_policy_filtered_and_observable(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = main._coordinator()
     source = _agent_delta(1, "Архив/Книга/01.mkv", kind="video")
     source["source"]["metadata"]["technical"] = {
@@ -4577,7 +4638,10 @@ def test_federated_deep_search_is_bounded_policy_filtered_and_observable(
             assert arguments["query"] == "hevc"
             return {
                 "ok": True,
-                "items": [source["source"] | {"match": {"stage": "agent_technical_fts", "rank": -1.0}}],
+                "items": [
+                    source["source"]
+                    | {"match": {"stage": "agent_technical_fts", "rank": -1.0}}
+                ],
                 "has_more": False,
                 "agent": {"id": "agent-node-a", "node_id": "node-a"},
             }
@@ -4595,9 +4659,7 @@ def test_federated_deep_search_is_bounded_policy_filtered_and_observable(
 
 
 def test_coordinator_queues_rendition_on_exact_source_agent(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = main._coordinator()
     source = _agent_delta(1, "Movies/Legacy.mkv", kind="video")
     source["source"]["metadata"]["technical"] = {
@@ -4772,9 +4834,7 @@ def test_rendition_operations_settles_with_observable_error(monkeypatch):
 
 
 def test_profile_customizes_home_order_view_density_and_target(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     current = catalog.get_profile("default")["profile"]
     updated = catalog.set_profile_policy(
@@ -4800,9 +4860,7 @@ def test_profile_customizes_home_order_view_density_and_target(monkeypatch, tmp_
 def test_diagnostic_export_is_bounded_redacted_and_proposes_reviewed_repair(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
 
     class Topology:
         def deployment_status(self, deployment_id, *, limit):
@@ -4843,9 +4901,7 @@ def test_diagnostic_export_is_bounded_redacted_and_proposes_reviewed_repair(
 def test_queue_builder_preserves_large_playlist_order_and_bounds_sources(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     deltas = [
         _agent_delta(
@@ -4901,10 +4957,10 @@ def test_queue_builder_preserves_large_playlist_order_and_bounds_sources(
     _validate_schema("queue-source.v1.schema.json", playlist_queue)
 
 
-def test_catalog_keyset_cursor_matches_legacy_offset_without_gaps(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+def test_catalog_keyset_cursor_matches_legacy_offset_without_gaps(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(
@@ -4968,9 +5024,7 @@ def test_catalog_keyset_cursor_matches_legacy_offset_without_gaps(monkeypatch, t
 def test_catalog_search_bounds_broad_window_but_finds_rare_late_match(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     monkeypatch.delenv("MEDIA_CENTER_SEARCH_CANDIDATE_LIMIT", raising=False)
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
@@ -5004,21 +5058,15 @@ def test_catalog_search_bounds_broad_window_but_finds_rare_late_match(
     assert first["ranking"]["candidate_window_full"] is True
     assert first["total_count_exact"] is False
 
-    late = catalog.list_items(
-        query="Window Episode 300", media_kind="video", limit=30
-    )
-    assert [item["name"] for item in late["items"]] == [
-        "Window Episode 300.mp4"
-    ]
+    late = catalog.list_items(query="Window Episode 300", media_kind="video", limit=30)
+    assert [item["name"] for item in late["items"]] == ["Window Episode 300.mp4"]
     assert late["ranking"]["candidate_count"] == 1
 
 
 def test_catalog_search_filters_media_kind_before_bounded_candidate_window(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     monkeypatch.delenv("MEDIA_CENTER_SEARCH_CANDIDATE_LIMIT", raising=False)
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
@@ -5042,9 +5090,7 @@ def test_catalog_search_filters_media_kind_before_bounded_candidate_window(
         )
     )
 
-    page = catalog.list_items(
-        query="Music", media_kind="audio", limit=30, sort="title"
-    )
+    page = catalog.list_items(query="Music", media_kind="audio", limit=30, sort="title")
 
     assert page["count"] == 10
     assert {item["media_kind"] for item in page["items"]} == {"audio"}
@@ -5055,9 +5101,7 @@ def test_catalog_search_filters_media_kind_before_bounded_candidate_window(
 def test_source_revision_coalesces_queued_enrichment_and_bounds_history(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repository = MediaCenterRepository()
     catalog = MediaCatalogCoordinator(repository)
 
@@ -5090,9 +5134,7 @@ def test_source_revision_coalesces_queued_enrichment_and_bounds_history(
 def test_catalog_corrections_are_audited_reversible_and_non_destructive(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(
@@ -5118,9 +5160,7 @@ def test_catalog_corrections_are_audited_reversible_and_non_destructive(
     assert correction["source_deletion"] is False
     assert claims["items"][0]["provenance"] == "profile:alice"
     assert reversed_result["ok"] is True
-    _validate_schema(
-        "catalog-correction.v1.schema.json", correction["correction"]
-    )
+    _validate_schema("catalog-correction.v1.schema.json", correction["correction"])
     with catalog.repository.connect() as connection:
         title = connection.execute(
             "SELECT canonical_title FROM media_works WHERE id=?", (target,)
@@ -5162,13 +5202,9 @@ def test_catalog_corrections_are_audited_reversible_and_non_destructive(
 def test_enrichment_worker_persists_provider_claims_and_terminal_progress(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
-    catalog.apply_agent_page(
-        _agent_page(_agent_delta(1, "Author/Book/001.mp3"))
-    )
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Author/Book/001.mp3")))
     queued = catalog.operations(limit=10)["items"]
     worker = MediaEnrichmentWorker(catalog, poll_seconds=0.2)
 
@@ -5189,9 +5225,7 @@ def test_enrichment_worker_persists_provider_claims_and_terminal_progress(
 def test_optional_provider_failure_completes_local_enrichment_with_warning(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
 
     class UnavailableProvider:
         provider_id = "fixture.external.v1"
@@ -5206,9 +5240,7 @@ def test_optional_provider_failure_completes_local_enrichment_with_warning(
             raise MetadataProviderError("fixture_upstream_unavailable")
 
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
-    catalog.apply_agent_page(
-        _agent_page(_agent_delta(1, "Music/Artist/Track.mp3"))
-    )
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/Artist/Track.mp3")))
     worker = MediaEnrichmentWorker(
         catalog,
         providers=[DeterministicLocalProvider(), UnavailableProvider()],
@@ -5226,17 +5258,13 @@ def test_optional_provider_failure_completes_local_enrichment_with_warning(
         }
     ]
     assert operation["status"] == "completed"
-    assert operation["progress"]["provider_warnings"] == result[
-        "provider_warnings"
-    ]
+    assert operation["progress"]["provider_warnings"] == result["provider_warnings"]
 
 
 def test_manual_metadata_override_rejects_and_reverses_an_external_match(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(_agent_delta(1, "Lectures/AI systems.mp4", kind="video"))
@@ -5278,9 +5306,7 @@ def test_manual_metadata_override_rejects_and_reverses_an_external_match(
 def test_local_nfo_claims_drive_public_metadata_search_and_precedence(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     delta = _agent_delta(1, "Movies/opaque-file.mkv", kind="video")
     delta["source"]["metadata"].update(
@@ -5341,9 +5367,7 @@ def test_local_nfo_claims_drive_public_metadata_search_and_precedence(
 def test_metadata_facets_filters_and_plex_style_sorts_are_server_bounded(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     deltas = []
     for sequence, title, year, rating, genres in (
@@ -5393,12 +5417,8 @@ def test_metadata_facets_filters_and_plex_style_sorts_are_server_bounded(
     assert [item["title"] for item in second["items"]] == ["Old Drama"]
 
 
-def test_release_date_claim_populates_year_projection_and_facet(
-    monkeypatch, tmp_path
-):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+def test_release_date_claim_populates_year_projection_and_facet(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(_agent_delta(1, "Movies/Movie.mp4", kind="video"))
@@ -5562,27 +5582,47 @@ def test_tmdb_provider_sends_only_normalized_evidence_and_caches_details():
         def get(self, url, **kwargs):
             self.calls.append((url, kwargs))
             if "/search/" in url:
-                return Response({"results": [{
+                return Response(
+                    {
+                        "results": [
+                            {
+                                "id": 671,
+                                "title": "Harry Potter and the Philosopher's Stone",
+                                "original_title": "Harry Potter and the Philosopher's Stone",
+                                "release_date": "2001-11-16",
+                                "poster_path": "/poster.jpg",
+                                "popularity": 100,
+                            }
+                        ]
+                    }
+                )
+            return Response(
+                {
                     "id": 671,
                     "title": "Harry Potter and the Philosopher's Stone",
-                    "original_title": "Harry Potter and the Philosopher's Stone",
                     "release_date": "2001-11-16",
                     "poster_path": "/poster.jpg",
-                    "popularity": 100,
-                }]})
-            return Response({
-                "id": 671,
-                "title": "Harry Potter and the Philosopher's Stone",
-                "release_date": "2001-11-16",
-                "poster_path": "/poster.jpg",
-                "genres": [{"name": "Fantasy"}],
-                "runtime": 152,
-                "vote_average": 7.9,
-                "credits": {"cast": [{"name": "Daniel Radcliffe", "character": "Harry", "order": 0}]},
-                "videos": {"results": [{"site": "YouTube", "type": "Trailer", "key": "trailer-1"}]},
-                "external_ids": {"imdb_id": "tt0241527"},
-                "release_dates": {"results": []},
-            })
+                    "genres": [{"name": "Fantasy"}],
+                    "runtime": 152,
+                    "vote_average": 7.9,
+                    "credits": {
+                        "cast": [
+                            {
+                                "name": "Daniel Radcliffe",
+                                "character": "Harry",
+                                "order": 0,
+                            }
+                        ]
+                    },
+                    "videos": {
+                        "results": [
+                            {"site": "YouTube", "type": "Trailer", "key": "trailer-1"}
+                        ]
+                    },
+                    "external_ids": {"imdb_id": "tt0241527"},
+                    "release_dates": {"results": []},
+                }
+            )
 
     session = Session()
     provider = TmdbMetadataProvider(
@@ -5634,9 +5674,7 @@ def test_tmdb_provider_sends_only_normalized_evidence_and_caches_details():
     api_key_provider.claims(subject, job_kind="metadata_enrichment")
     api_key_request = api_key_session.calls[0][1]
     assert "Authorization" not in api_key_request["headers"]
-    assert api_key_request["params"]["api_key"] == (
-        "0123456789abcdef0123456789abcdef"
-    )
+    assert api_key_request["params"]["api_key"] == ("0123456789abcdef0123456789abcdef")
     assert api_key_provider.validate()["ok"] is True
     assert api_key_session.calls[-1][0].endswith("/authentication")
     assert api_key_provider.status()["credential_kind"] == "api_key"
@@ -5652,17 +5690,25 @@ def test_musicbrainz_provider_is_rate_limited_cached_and_audio_only():
 
         @staticmethod
         def json():
-            return {"recordings": [{
-                "id": "recording-1", "title": "Track", "score": 100,
-                "artist-credit": [{"artist": {"name": "Artist"}}],
-                "releases": [{"id": "release-1", "title": "Album", "date": "2020"}],
-                "genres": [],
-                "tags": [
-                    {"name": "Alternative rock", "count": 12},
-                    {"name": "Rock", "count": 42},
-                    {"name": "rock", "count": 3},
-                ],
-            }]}
+            return {
+                "recordings": [
+                    {
+                        "id": "recording-1",
+                        "title": "Track",
+                        "score": 100,
+                        "artist-credit": [{"artist": {"name": "Artist"}}],
+                        "releases": [
+                            {"id": "release-1", "title": "Album", "date": "2020"}
+                        ],
+                        "genres": [],
+                        "tags": [
+                            {"name": "Alternative rock", "count": 12},
+                            {"name": "Rock", "count": 42},
+                            {"name": "rock", "count": 3},
+                        ],
+                    }
+                ]
+            }
 
     class Session:
         def __init__(self):
@@ -5691,30 +5737,40 @@ def test_musicbrainz_provider_is_rate_limited_cached_and_audio_only():
     assert provider.status()["last_success_at"] is not None
     assert session.calls[0][1]["headers"]["User-Agent"].startswith("AdaOS-MediaCenter")
     assert {claim["field_name"] for claim in first} >= {
-        "title", "artists", "album", "genres", "artwork_candidates",
+        "title",
+        "artists",
+        "album",
+        "genres",
+        "artwork_candidates",
     }
     genre_claim = next(claim for claim in first if claim["field_name"] == "genres")
     assert genre_claim["value"] == ["Rock", "Alternative rock"]
-    assert provider.claims(
-        {
-            "subject_ref": "item:numeric",
-            "title": "3 08 01 04.mp3",
-            "media_kind": "audio",
-            "metadata": {},
-        },
-        job_kind="metadata_enrichment",
-    ) == []
+    assert (
+        provider.claims(
+            {
+                "subject_ref": "item:numeric",
+                "title": "3 08 01 04.mp3",
+                "media_kind": "audio",
+                "metadata": {},
+            },
+            job_kind="metadata_enrichment",
+        )
+        == []
+    )
     assert len(session.calls) == 1
-    assert provider.accepts(
-        {
-            "subject_ref": "item:audiobook",
-            "title": "Chapter 01.mp3",
-            "folder_path": "\u0410\u0443\u0434\u0438\u043e\u043a\u043d\u0438\u0433\u0438/Author/Book",
-            "media_kind": "audio",
-            "metadata": {},
-        },
-        job_kind="metadata_enrichment",
-    ) is False
+    assert (
+        provider.accepts(
+            {
+                "subject_ref": "item:audiobook",
+                "title": "Chapter 01.mp3",
+                "folder_path": "\u0410\u0443\u0434\u0438\u043e\u043a\u043d\u0438\u0433\u0438/Author/Book",
+                "media_kind": "audio",
+                "metadata": {},
+            },
+            job_kind="metadata_enrichment",
+        )
+        is False
+    )
 
 
 def test_path_identity_supplies_artist_and_album_for_numbered_audio():
@@ -5736,6 +5792,32 @@ def test_path_identity_supplies_artist_and_album_for_numbered_audio():
     assert values["album"] == "Live at the Regal"
 
 
+def test_path_identity_treats_audiobook_volume_as_part_not_book_title():
+    provider = DeterministicLocalProvider()
+
+    claims = provider.claims(
+        {
+            "subject_ref": "item:gone-with-the-wind-volume-2",
+            "title": "03.mp3",
+            "folder_path": "\u0410\u0443\u0434\u0438\u043e\u043a\u043d\u0438\u0433\u0438/\u0423\u043d\u0435\u0441\u0451\u043d\u043d\u044b\u0435 \u0432\u0435\u0442\u0440\u043e\u043c/Tom2",
+            "media_kind": "audio",
+            "metadata": {},
+        },
+        job_kind="metadata_enrichment",
+    )
+    values = {claim["field_name"]: claim["value"] for claim in claims}
+
+    assert "artists" not in values
+    assert (
+        values["album"]
+        == "\u0423\u043d\u0435\u0441\u0451\u043d\u043d\u044b\u0435 \u0432\u0435\u0442\u0440\u043e\u043c"
+    )
+    assert (
+        values["audiobook_title"]
+        == "\u0423\u043d\u0435\u0441\u0451\u043d\u043d\u044b\u0435 \u0432\u0435\u0442\u0440\u043e\u043c"
+    )
+
+
 def test_openlibrary_provider_uses_audiobook_path_once_per_book():
     class Response:
         status_code = 200
@@ -5751,7 +5833,9 @@ def test_openlibrary_provider_uses_audiobook_path_once_per_book():
                     {
                         "key": "/works/OL123W",
                         "title": "\u0421\u0432\u0435\u0442\u043b\u044b\u0439 \u043b\u0438\u043a \u0441\u043c\u0435\u0440\u0442\u0438",
-                        "author_name": ["\u0410\u043b\u0435\u043a\u0441\u0430\u043d\u0434\u0440\u0430 \u041c\u0430\u0440\u0438\u043d\u0438\u043d\u0430"],
+                        "author_name": [
+                            "\u0410\u043b\u0435\u043a\u0441\u0430\u043d\u0434\u0440\u0430 \u041c\u0430\u0440\u0438\u043d\u0438\u043d\u0430"
+                        ],
                         "first_publish_year": 1996,
                         "cover_i": 12345,
                         "subject": ["Detective fiction"],
@@ -5772,6 +5856,7 @@ def test_openlibrary_provider_uses_audiobook_path_once_per_book():
     provider = OpenLibraryMetadataProvider(session=session)
     subject = {
         "subject_ref": "item:audiobook-1",
+        "collection_id": "book-light-face-of-death",
         "title": "11_08.mp3",
         "folder_path": (
             "!\u0410\u0443\u0434\u0438\u043e\u043a\u043d\u0438\u0433\u0438/\u0410\u0423\u0414\u0418\u041e\u041a\u041d\u0418\u0413\u0410 (\u041a,\u041b,\u041c,\u041d,\u041e,\u041f,\u0420)/"
@@ -5788,13 +5873,93 @@ def test_openlibrary_provider_uses_audiobook_path_once_per_book():
 
     assert first == second
     assert len(session.calls) == 1
-    assert session.calls[0][1]["params"]["title"] == "\u0421\u0432\u0435\u0442\u043b\u044b\u0439 \u043b\u0438\u043a \u0441\u043c\u0435\u0440\u0442\u0438"
-    assert session.calls[0][1]["params"]["author"] == "\u041c\u0430\u0440\u0438\u043d\u0438\u043d\u0430 \u0410\u043b\u0435\u043a\u0441\u0430\u043d\u0434\u0440\u0430"
-    assert values["album"] == "\u0421\u0432\u0435\u0442\u043b\u044b\u0439 \u043b\u0438\u043a \u0441\u043c\u0435\u0440\u0442\u0438"
+    assert (
+        session.calls[0][1]["params"]["title"]
+        == "\u0421\u0432\u0435\u0442\u043b\u044b\u0439 \u043b\u0438\u043a \u0441\u043c\u0435\u0440\u0442\u0438"
+    )
+    assert (
+        session.calls[0][1]["params"]["author"]
+        == "\u041c\u0430\u0440\u0438\u043d\u0438\u043d\u0430 \u0410\u043b\u0435\u043a\u0441\u0430\u043d\u0434\u0440\u0430"
+    )
+    assert (
+        values["album"]
+        == "\u0421\u0432\u0435\u0442\u043b\u044b\u0439 \u043b\u0438\u043a \u0441\u043c\u0435\u0440\u0442\u0438"
+    )
     assert values["artwork_candidates"][0]["url"].startswith(
         "https://covers.openlibrary.org/b/id/12345-L.jpg"
     )
+    assert {claim["subject_ref"] for claim in first} == {
+        "collection:book-light-face-of-death"
+    }
+    lookup = values["openlibrary_lookup"]
+    assert lookup["state"] == "matched"
+    assert (
+        provider.accepts(
+            subject | {"metadata": {"openlibrary_lookup": lookup}},
+            job_kind="metadata_enrichment",
+        )
+        is False
+    )
     assert provider.status()["cache_hit_count"] == 1
+
+
+def test_openlibrary_provider_persists_collection_no_match_and_skips_numeric_noise():
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            return {"docs": []}
+
+    class Session:
+        def __init__(self):
+            self.calls = []
+
+        def get(self, url, **kwargs):
+            self.calls.append((url, kwargs))
+            return Response()
+
+    session = Session()
+    provider = OpenLibraryMetadataProvider(session=session)
+    subject = {
+        "subject_ref": "item:audiobook-no-match",
+        "collection_id": "book-no-match",
+        "title": "11_08.mp3",
+        "folder_path": "\u0410\u0443\u0434\u0438\u043e\u043a\u043d\u0438\u0433\u0438/\u0410\u0432\u0442\u043e\u0440/\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u0430\u044f \u043a\u043d\u0438\u0433\u0430/11",
+        "media_kind": "audio",
+        "metadata": {},
+    }
+
+    claims = provider.claims(subject, job_kind="metadata_enrichment")
+
+    assert len(session.calls) == 1
+    assert claims[0]["subject_ref"] == "collection:book-no-match"
+    assert claims[0]["field_name"] == "openlibrary_lookup"
+    assert claims[0]["value"]["state"] == "no_match"
+    assert (
+        provider.accepts(
+            subject | {"metadata": {"openlibrary_lookup": claims[0]["value"]}},
+            job_kind="metadata_enrichment",
+        )
+        is False
+    )
+    assert (
+        provider.accepts(
+            {
+                "subject_ref": "item:numeric-audiobook",
+                "title": "04.mp3",
+                "folder_path": "\u0410\u0443\u0434\u0438\u043e\u043a\u043d\u0438\u0433\u0438/4/4 16/04",
+                "media_kind": "audio",
+                "metadata": {},
+            },
+            job_kind="metadata_enrichment",
+        )
+        is False
+    )
 
 
 def test_musicbrainz_tls_failure_opens_a_bounded_circuit_breaker():
@@ -5842,9 +6007,7 @@ def test_external_metadata_providers_follow_managed_settings():
     }
     assert [
         provider.provider_id
-        for provider in default_metadata_providers(
-            settings, tmdb_credential="token"
-        )
+        for provider in default_metadata_providers(settings, tmdb_credential="token")
     ] == [
         "media_center.deterministic_local.v1",
         "media_center.tmdb.v1",
@@ -5862,9 +6025,7 @@ def test_external_metadata_providers_follow_managed_settings():
 def test_metadata_settings_are_durable_and_default_to_managed_enrichment(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
 
     initial = catalog.metadata_settings()["settings"]
@@ -5876,9 +6037,9 @@ def test_metadata_settings_are_durable_and_default_to_managed_enrichment(
         {"musicbrainz_enabled": False, "locale": "en-US"}
     )
     assert updated["changed"] is True
-    restored = MediaCatalogCoordinator(
-        MediaCenterRepository()
-    ).metadata_settings()["settings"]
+    restored = MediaCatalogCoordinator(MediaCenterRepository()).metadata_settings()[
+        "settings"
+    ]
     assert restored["musicbrainz_enabled"] is False
     assert restored["locale"] == "en-US"
     assert restored["revision"] == 1
@@ -5887,9 +6048,7 @@ def test_metadata_settings_are_durable_and_default_to_managed_enrichment(
 def test_metadata_credential_revision_requeues_current_catalog_once(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repository = MediaCenterRepository()
     catalog = MediaCatalogCoordinator(repository)
     catalog.apply_agent_page(
@@ -5907,17 +6066,13 @@ def test_metadata_credential_revision_requeues_current_catalog_once(
             "SELECT status,COUNT(*) AS count FROM media_background_jobs "
             "WHERE kind='metadata_enrichment' GROUP BY status"
         ).fetchall()
-    assert {row["status"]: int(row["count"]) for row in rows} == {
-        "queued": 1
-    }
+    assert {row["status"]: int(row["count"]) for row in rows} == {"queued": 1}
 
 
 def test_large_catalog_background_jobs_stay_inside_admission_windows(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     monkeypatch.setenv("MEDIA_CENTER_METADATA_ENRICHMENT_QUEUE_WINDOW", "64")
     monkeypatch.setenv("MEDIA_CENTER_FINGERPRINT_QUEUE_WINDOW", "32")
     monkeypatch.setenv("MEDIA_CENTER_EMBEDDING_QUEUE_WINDOW", "32")
@@ -5943,9 +6098,7 @@ def test_large_catalog_background_jobs_stay_inside_admission_windows(
 def test_background_queue_compaction_preserves_window_and_cursor_refill(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     monkeypatch.setenv("MEDIA_CENTER_METADATA_ENRICHMENT_QUEUE_WINDOW", "32")
     repository = MediaCenterRepository()
     catalog = MediaCatalogCoordinator(repository)
@@ -5988,17 +6141,15 @@ def test_background_queue_compaction_preserves_window_and_cursor_refill(
     assert compacted["complete"] is True
     assert queued == 32
     assert refilled["kinds"]["metadata_enrichment"]["admitted"] > 0
-    assert catalog.background_job_counts_by_kind()["metadata_enrichment"][
-        "queued"
-    ] <= 32
+    assert (
+        catalog.background_job_counts_by_kind()["metadata_enrichment"]["queued"] <= 32
+    )
 
 
 def test_large_legacy_queue_uses_bounded_counts_and_resumable_reset(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repository = MediaCenterRepository()
     catalog = MediaCatalogCoordinator(repository)
     with repository.connect() as connection:
@@ -6086,9 +6237,7 @@ def test_enrichment_worker_runs_all_eligible_providers(monkeypatch, tmp_path):
                 "state": "ready",
             }
 
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(_agent_page(_agent_delta(1, "Movies/Movie.mp4")))
     subject_ref = catalog.operations(limit=10)["items"][0]["subject_ref"]
@@ -6129,9 +6278,7 @@ def test_enrichment_worker_routes_external_providers_by_media_kind(
         def claims(subject, *, job_kind):
             raise AssertionError("audio job must not reach video provider")
 
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/Track.mp3")))
     worker = MediaEnrichmentWorker(
@@ -6149,9 +6296,7 @@ def test_enrichment_worker_routes_external_providers_by_media_kind(
 def test_storage_maintenance_fence_pauses_enrichment_and_agent_sync(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/Track.mp3")))
     worker = MediaEnrichmentWorker(catalog)
@@ -6168,9 +6313,7 @@ def test_storage_maintenance_fence_pauses_enrichment_and_agent_sync(
 def test_enrichment_worker_coalesces_publication_and_exposes_pacing(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(
@@ -6197,9 +6340,7 @@ def test_enrichment_worker_coalesces_publication_and_exposes_pacing(
 def test_enrichment_worker_publishes_full_snapshot_only_when_queue_settles(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/one.mp3")))
     progress = []
@@ -6274,9 +6415,7 @@ def test_enrichment_loop_retries_transient_repository_lock() -> None:
 
 
 def test_background_job_indexes_recovery_and_exact_active_count(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(
@@ -6375,9 +6514,7 @@ def test_background_job_indexes_recovery_and_exact_active_count(monkeypatch, tmp
 
 
 def test_library_stream_snapshot_is_compact(monkeypatch, tmp_path):
-    monkeypatch.setenv(
-        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
-    )
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
     catalog.apply_agent_page(
         _agent_page(
@@ -6422,14 +6559,10 @@ def test_local_discovery_is_phonetic_semantic_and_resource_bounded(
     while worker.run_once() is not None:
         pass
 
-    result = catalog.discovery_search(
-        "Sherlok Holms", profile_id="default", limit=5
-    )
+    result = catalog.discovery_search("Sherlok Holms", profile_id="default", limit=5)
 
     assert result["items"][0]["name"] == "01.mp3"
-    assert result["items"][0]["deep_match"]["stage"] == (
-        "coordinator_local_discovery"
-    )
+    assert result["items"][0]["deep_match"]["stage"] == ("coordinator_local_discovery")
     assert set(result["items"][0]["deep_match"]["reasons"]) & {
         "phonetic_overlap",
         "trigram_similarity",
