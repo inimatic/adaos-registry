@@ -2109,14 +2109,20 @@ def deep_search(
                 "truncated_candidates": bool(discovery.get("truncated_candidates")),
             }
         )
+    # The coordinator is the subnet search index. Source-agent queries are a
+    # recovery path for an empty/stale index, not a synchronous page filler.
+    # Otherwise every successful query inherits the latency of every agent.
     agent_limit = max(1, min(16, int(max_agents or 4)))
-    try:
-        instances = _topology().agent_instances(limit=agent_limit)
-    except Exception as exc:
-        instances = []
-        failures.append({"stage": "agent_technical_fts", "error": str(exc)[:500]})
-    if not instances:
-        instances = [None]
+    instances: list[dict[str, Any] | None] = []
+    if not items:
+        try:
+            instances = list(_topology().agent_instances(limit=agent_limit))
+        except Exception as exc:
+            failures.append(
+                {"stage": "agent_technical_fts", "error": str(exc)[:500]}
+            )
+        if not instances:
+            instances = [None]
     for instance in instances[:agent_limit]:
         if len(items) >= bounded:
             break

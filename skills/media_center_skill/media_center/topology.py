@@ -29,11 +29,14 @@ class MediaCenterTopology:
         now = datetime.now(timezone.utc)
         lease_cursor: str | None = None
         active_leases: dict[str, Any] = {}
+        desired_generations: dict[str, int] = {}
         while True:
             inspection = distributed_sdk.inspect(
                 cursors={"leases": lease_cursor} if lease_cursor else None,
                 limit=100,
             )
+            for group in getattr(inspection, "groups", ()):
+                desired_generations[group.group_id] = group.desired_generation
             for lease in inspection.leases:
                 if lease.kind != "membership" or lease.status != "active":
                     continue
@@ -61,6 +64,12 @@ class MediaCenterTopology:
                 if instance.component_ref != "skill:media_library_agent":
                     continue
                 if instance.status != "ready" or not instance.readiness:
+                    continue
+                desired_generation = desired_generations.get(instance.group_id)
+                if (
+                    desired_generation is not None
+                    and instance.topology_generation != desired_generation
+                ):
                     continue
                 lease = active_leases.get(instance.instance_id)
                 if (

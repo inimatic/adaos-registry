@@ -3675,6 +3675,7 @@ def test_media_topology_only_returns_instances_with_active_membership_leases(
     instances = (
         SimpleNamespace(
             instance_id="instance-ready",
+            group_id="media-library-home",
             component_ref="skill:media_library_agent",
             status="ready",
             readiness=True,
@@ -3684,12 +3685,23 @@ def test_media_topology_only_returns_instances_with_active_membership_leases(
         ),
         SimpleNamespace(
             instance_id="instance-expired",
+            group_id="media-library-home",
             component_ref="skill:media_library_agent",
             status="ready",
             readiness=True,
             lease_id="lease-expired",
             topology_generation=2,
             to_dict=lambda: {"instance_id": "instance-expired"},
+        ),
+        SimpleNamespace(
+            instance_id="instance-old-generation",
+            group_id="media-library-home",
+            component_ref="skill:media_library_agent",
+            status="ready",
+            readiness=True,
+            lease_id="lease-old-generation",
+            topology_generation=1,
+            to_dict=lambda: {"instance_id": "instance-old-generation"},
         ),
     )
     leases = (
@@ -3709,11 +3721,25 @@ def test_media_topology_only_returns_instances_with_active_membership_leases(
             topology_generation=2,
             valid_until=now,
         ),
+        SimpleNamespace(
+            owner_instance_id="instance-old-generation",
+            kind="membership",
+            status="active",
+            lease_id="lease-old-generation",
+            topology_generation=1,
+            valid_until=now,
+        ),
     )
     monkeypatch.setattr(
         topology_module.distributed_sdk,
         "inspect",
         lambda **kwargs: SimpleNamespace(
+            groups=(
+                SimpleNamespace(
+                    group_id="media-library-home",
+                    desired_generation=2,
+                ),
+            ),
             instances=instances,
             leases=leases,
             cursors={},
@@ -3723,6 +3749,28 @@ def test_media_topology_only_returns_instances_with_active_membership_leases(
     assert MediaCenterTopology().agent_instances() == [
         {"instance_id": "instance-ready"}
     ]
+
+
+def test_deep_search_does_not_query_agents_after_a_coordinator_hit(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    catalog = main._coordinator()
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Movies/Aerograd.1935.avi", kind="video"))
+    )
+
+    class Topology:
+        def agent_instances(self, *, limit):
+            pytest.fail("coordinator hits must not wait for source-agent discovery")
+
+    monkeypatch.setattr(main, "_topology", lambda: Topology())
+
+    result = main.deep_search(query="Aerograd", limit=5, max_agents=4)
+
+    assert result["count"] == 1
+    assert result["items"][0]["deep_match"]["stage"] == "coordinator_fts"
+    assert not any(stage["id"] == "agent_technical_fts" for stage in result["stages"])
 
 
 def test_distributed_agent_sync_tracks_independent_cursors_and_partial_state(
