@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Mapping
 from uuid import uuid4
 
@@ -22,9 +23,33 @@ class MediaCenterTopology:
     """Media policy projected over public deployment and distributed SDKs."""
 
     def agent_instances(self, *, limit: int = 100) -> list[dict[str, Any]]:
-        """Return ready library agents without exposing core runtime internals."""
+        """Return ready library agents with a current membership lease."""
 
         bounded = max(1, min(int(limit or 100), 1000))
+        now = datetime.now(timezone.utc)
+        lease_cursor: str | None = None
+        active_leases: dict[str, Any] = {}
+        while True:
+            inspection = distributed_sdk.inspect(
+                cursors={"leases": lease_cursor} if lease_cursor else None,
+                limit=100,
+            )
+            for lease in inspection.leases:
+                if lease.kind != "membership" or lease.status != "active":
+                    continue
+                try:
+                    valid_until = datetime.fromisoformat(
+                        lease.valid_until.replace("Z", "+00:00")
+                    )
+                except ValueError:
+                    continue
+                if valid_until <= now:
+                    continue
+                active_leases[lease.owner_instance_id] = lease
+            lease_cursor = inspection.cursors.get("leases")
+            if not lease_cursor:
+                break
+
         cursor: str | None = None
         instances: list[dict[str, Any]] = []
         while len(instances) < bounded:
@@ -36,6 +61,13 @@ class MediaCenterTopology:
                 if instance.component_ref != "skill:media_library_agent":
                     continue
                 if instance.status != "ready" or not instance.readiness:
+                    continue
+                lease = active_leases.get(instance.instance_id)
+                if (
+                    lease is None
+                    or lease.lease_id != instance.lease_id
+                    or lease.topology_generation != instance.topology_generation
+                ):
                     continue
                 instances.append(instance.to_dict())
                 if len(instances) >= bounded:

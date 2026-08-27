@@ -2127,13 +2127,13 @@ def deep_search(
                     instance_id,
                     "search_sources",
                     {"query": token, "limit": min(30, bounded - len(items))},
-                    timeout_seconds=20.0,
+                    timeout_seconds=3.0,
                 )
             else:
                 page, error = _invoke_agent(
                     "search_sources",
                     {"query": token, "limit": min(30, bounded - len(items))},
-                    timeout=20.0,
+                    timeout=3.0,
                 )
                 if page is None:
                     raise RuntimeError(error or "media_library_agent_unavailable")

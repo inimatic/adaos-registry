@@ -3666,6 +3666,65 @@ def test_media_topology_explains_only_declared_media_datasets(monkeypatch):
         topology.explain_route([], dataset_id="media-center-sources")
 
 
+def test_media_topology_only_returns_instances_with_active_membership_leases(
+    monkeypatch,
+):
+    from media_center import topology as topology_module
+
+    now = "2099-01-01T00:00:00+00:00"
+    instances = (
+        SimpleNamespace(
+            instance_id="instance-ready",
+            component_ref="skill:media_library_agent",
+            status="ready",
+            readiness=True,
+            lease_id="lease-ready",
+            topology_generation=2,
+            to_dict=lambda: {"instance_id": "instance-ready"},
+        ),
+        SimpleNamespace(
+            instance_id="instance-expired",
+            component_ref="skill:media_library_agent",
+            status="ready",
+            readiness=True,
+            lease_id="lease-expired",
+            topology_generation=2,
+            to_dict=lambda: {"instance_id": "instance-expired"},
+        ),
+    )
+    leases = (
+        SimpleNamespace(
+            owner_instance_id="instance-ready",
+            kind="membership",
+            status="active",
+            lease_id="lease-ready",
+            topology_generation=2,
+            valid_until=now,
+        ),
+        SimpleNamespace(
+            owner_instance_id="instance-expired",
+            kind="membership",
+            status="expired",
+            lease_id="lease-expired",
+            topology_generation=2,
+            valid_until=now,
+        ),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "inspect",
+        lambda **kwargs: SimpleNamespace(
+            instances=instances,
+            leases=leases,
+            cursors={},
+        ),
+    )
+
+    assert MediaCenterTopology().agent_instances() == [
+        {"instance_id": "instance-ready"}
+    ]
+
+
 def test_distributed_agent_sync_tracks_independent_cursors_and_partial_state(
     monkeypatch, tmp_path
 ):
@@ -4756,6 +4815,7 @@ def test_federated_deep_search_is_bounded_policy_filtered_and_observable(
         def invoke_agent(self, instance_id, operation, arguments, *, timeout_seconds):
             assert (instance_id, operation) == ("instance-a", "search_sources")
             assert arguments["query"] == "hevc"
+            assert timeout_seconds == 3.0
             return {
                 "ok": True,
                 "items": [

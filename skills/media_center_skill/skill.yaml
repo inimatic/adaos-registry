@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.86
+version: 0.8.87
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -2464,13 +2464,13 @@ nlu_hints:
           type: object
       additionalProperties: true
   entities: []
-updated_at: '2026-08-27T16:06:07+00:00'
+updated_at: '2026-08-27T17:57:27+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.945+5732.00ddc563
-    recorded_at: '2026-08-27T16:06:07+00:00'
+    min_version: 0.1.946+5740.62066c703
+    recorded_at: '2026-08-27T17:57:27+00:00'
     source: skill_push
-    min_commit: 00ddc5633eb5bcdb0944743fd64eb29e6966f1ba
-    min_short_commit: 00ddc563
-    build_date: '2026-08-27T18:24:24+03:00'
+    min_commit: 62066c703a3a9eef219cf074c74357cf7ffe55c6
+    min_short_commit: 62066c70
+    build_date: '2026-08-27T20:42:52+03:00'
 
