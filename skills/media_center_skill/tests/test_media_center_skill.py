@@ -5818,6 +5818,78 @@ def test_path_identity_treats_audiobook_volume_as_part_not_book_title():
     )
 
 
+def test_path_identity_treats_numbered_part_directory_as_audiobook_part():
+    provider = DeterministicLocalProvider()
+
+    claims = provider.claims(
+        {
+            "subject_ref": "item:ordinary-story-part-2",
+            "title": "41-Part 2.mp3",
+            "folder_path": (
+                "\u0410\u0443\u0434\u0438\u043e\u043a\u043d\u0438\u0433\u0438/\u0413\u043e\u043d\u0447\u0430\u0440\u043e\u0432 \u0418 \u0410/"
+                "\u041e\u0431\u044b\u043a\u043d\u043e\u0432\u0435\u043d\u043d\u0430\u044f \u0438\u0441\u0442\u043e\u0440\u0438\u044f(\u0447\u0438\u0442.\u041d.\u0421\u0430\u0432\u0438\u0446\u043a\u0438\u0439)/02-Part 2"
+            ),
+            "media_kind": "audio",
+            "metadata": {},
+        },
+        job_kind="metadata_enrichment",
+    )
+    values = {claim["field_name"]: claim["value"] for claim in claims}
+
+    assert values["artists"] == ["\u0413\u043e\u043d\u0447\u0430\u0440\u043e\u0432 \u0418 \u0410"]
+    assert values["audiobook_title"] == "\u041e\u0431\u044b\u043a\u043d\u043e\u0432\u0435\u043d\u043d\u0430\u044f \u0438\u0441\u0442\u043e\u0440\u0438\u044f"
+
+
+def test_audiobook_reclassification_suppresses_stale_musicbrainz_claims(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(
+                1,
+                "\u0410\u0443\u0434\u0438\u043e\u043a\u043d\u0438\u0433\u0438/\u0413\u043e\u043d\u0447\u0430\u0440\u043e\u0432 \u0418 \u0410/"
+                "\u041e\u0431\u044b\u043a\u043d\u043e\u0432\u0435\u043d\u043d\u0430\u044f \u0438\u0441\u0442\u043e\u0440\u0438\u044f(\u0447\u0438\u0442.\u041d.\u0421\u0430\u0432\u0438\u0446\u043a\u0438\u0439)/02-Part 2/41-Part 2.mp3",
+            )
+        )
+    )
+    item = catalog.list_items(media_kind="audio", limit=1)["items"][0]
+    catalog.record_metadata_claim(
+        subject_ref=f"item:{item['id']}",
+        field_name="album",
+        value="Tom Clancy's Enemy Contact",
+        provenance="media_center.musicbrainz.v1",
+        confidence=0.95,
+    )
+    worker = MediaEnrichmentWorker(
+        catalog,
+        providers=(DeterministicLocalProvider(),),
+    )
+
+    for _attempt in range(12):
+        worker.run_once()
+        details = catalog.item_details(item["id"])
+        if details["item"]["metadata"].get("audiobook_title"):
+            break
+
+    details = catalog.item_details(item["id"])["item"]
+    assert details["metadata"].get("album") != "Tom Clancy's Enemy Contact"
+    assert (
+        details["metadata_provenance"].get("album")
+        != "media_center.musicbrainz.v1"
+    )
+    with catalog.repository.connect() as connection:
+        rejection = connection.execute(
+            "SELECT reason,active FROM metadata_rejections "
+            "WHERE subject_ref=? AND provenance=?",
+            (f"item:{item['id']}", "media_center.musicbrainz.v1"),
+        ).fetchone()
+    assert rejection is not None
+    assert rejection["reason"] == "media_kind_incompatible"
+    assert bool(rejection["active"]) is True
+
+
 def test_openlibrary_provider_uses_audiobook_path_once_per_book():
     class Response:
         status_code = 200

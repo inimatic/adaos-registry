@@ -122,6 +122,9 @@ receipt at collection scope. Sibling chapters therefore inherit book metadata
 and artwork without repeating the same external query, while numeric chapter,
 disc, and volume directories are excluded from provider identity. Newly cached
 external artwork is marked `suggested` until a profile confirms or replaces it.
+Reclassifying a source as an audiobook records a system rejection for stale
+MusicBrainz claims instead of deleting evidence, and immediately rebuilds the
+resolved metadata projection without that incompatible match.
 
 ## Personal State
 

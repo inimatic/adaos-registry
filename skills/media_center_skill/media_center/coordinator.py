@@ -8756,6 +8756,65 @@ class MediaCatalogCoordinator:
             connection.commit()
         return result
 
+    def reject_metadata_provider(
+        self,
+        *,
+        subject_ref: str,
+        provenance: str,
+        reason: str,
+        actor_ref: str,
+    ) -> dict[str, Any]:
+        """Suppress one provider for a subject without deleting its evidence."""
+
+        subject = _text(subject_ref)
+        provider = _text(provenance)
+        actor = _text(actor_ref)
+        rejection_reason = _text(reason) or "incorrect_match"
+        if not subject or not provider or not actor:
+            return {"ok": False, "error": "metadata_rejection_invalid"}
+        rejection_id = _stable_id(
+            "metadata-rejection", subject, provider, actor, size=24
+        )
+        with self.repository.connect() as connection:
+            previous = connection.execute(
+                "SELECT reason,active FROM metadata_rejections WHERE id=?",
+                (rejection_id,),
+            ).fetchone()
+            changed = previous is None or not bool(previous["active"]) or str(
+                previous["reason"]
+            ) != rejection_reason
+            connection.execute(
+                """
+                INSERT INTO metadata_rejections(
+                    id,subject_ref,provenance,field_name,actor_ref,reason,
+                    correction_id,created_at,active
+                ) VALUES (?, ?, ?, '', ?, ?, '', ?, 1)
+                ON CONFLICT(id) DO UPDATE SET reason=excluded.reason,
+                    created_at=excluded.created_at,active=1
+                """,
+                (
+                    rejection_id,
+                    subject,
+                    provider,
+                    actor,
+                    rejection_reason,
+                    now_iso(),
+                ),
+            )
+            if changed and subject.startswith("item:"):
+                self._refresh_metadata_projection(
+                    connection, subject.removeprefix("item:")
+                )
+            connection.commit()
+        return {
+            "ok": True,
+            "rejection_id": rejection_id,
+            "subject_ref": subject,
+            "provenance": provider,
+            "reason": rejection_reason,
+            "changed": changed,
+        }
+
     def enrichment_subject(self, subject_ref: str) -> dict[str, Any] | None:
         subject = _text(subject_ref)
         if subject.startswith("item:"):

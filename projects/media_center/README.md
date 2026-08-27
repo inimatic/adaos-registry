@@ -7,7 +7,7 @@ dependency and remains the owner of core media resource registration and byte
 delivery.
 
 The unreleased 2026-08-26 local candidate combines
-`media_center_skill@0.8.81`, `media_library_agent@0.6.42`,
+`media_center_skill@0.8.82`, `media_library_agent@0.6.42`,
 `media_control_skill@0.2.12`, scenario `media_center@0.6.27`, and client
 `dcee3b4`. It adds durable queue auto-advance and endpoint selection, compact
 fullscreen/PiP/Play On controls, playlists, reviewed metadata correction,
@@ -33,6 +33,9 @@ MusicBrainz/Cover Art Archive remains the music path. Cached audio artwork is a
 collection claim inherited by sibling tracks; a profile can confirm or replace
 one guessed cover through an audited preferred claim. Newly cached external
 artwork is explicitly marked as suggested until that review occurs.
+When a path is reclassified as an audiobook, incompatible historical
+MusicBrainz claims remain available as evidence but are rejected from the live
+projection; numbered part/volume directories no longer become book titles.
 
 Existing large coordinator databases activate without synchronous FTS,
 projection, favorite, or background-history rebuilds. A single paced

@@ -252,6 +252,8 @@ _EPISODE_RE = re.compile(r"\bS\d{1,2}E\d{1,3}\b", re.IGNORECASE)
 _YEAR_RE = re.compile(r"(?<!\d)(19\d{2}|20\d{2})(?!\d)")
 _PATH_INDEX_RE = re.compile(
     r"^(?:\d{1,4}(?:[ ._-]\d{1,4})*|"
+    r"\d{1,4}[ ._-]*(?:part|book|vol(?:ume)?|tom|\u0442\u043e\u043c|\u0447\u0430\u0441\u0442\u044c)"
+    r"[ ._-]*\d{1,3}|"
     r"(?:cd|disc|disk|part|book|vol(?:ume)?|tom|\u0442\u043e\u043c|\u0447\u0430\u0441\u0442\u044c)"
     r"[ ._-]*\d{1,3})$",
     re.IGNORECASE,
@@ -1441,6 +1443,22 @@ class MediaEnrichmentWorker:
             return self.coordinator.fail_background_job(
                 job_id, error_code="enrichment_subject_not_found", retryable=False
             )
+        if (
+            kind == "metadata_enrichment"
+            and _path_identity(subject).get("kind") == "audiobook"
+        ):
+            rejection = self.coordinator.reject_metadata_provider(
+                subject_ref=str(job["subject_ref"]),
+                provenance="media_center.musicbrainz.v1",
+                reason="media_kind_incompatible",
+                actor_ref="system:media_center_classifier",
+            )
+            if rejection.get("changed"):
+                refreshed = self.coordinator.enrichment_subject(
+                    str(job["subject_ref"])
+                )
+                if refreshed is not None:
+                    subject = refreshed
         providers = []
         for item in self.providers:
             if kind not in item.supported_jobs:
