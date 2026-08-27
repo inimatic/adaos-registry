@@ -7,6 +7,26 @@
     "display_label": {"type": "string"}, "device_label": {"type": "string"}, "endpoint_label": {"type": "string"},
     "authorization_state": {"enum": ["authorized", "guest"]},
     "kind": {"enum": ["browser", "tv", "mobile", "speaker", "native"]}, "capabilities": {"type": "object"},
-    "status": {"enum": ["available", "unavailable", "draining"]}, "last_seen_at": {"type": "string"}, "revision": {"type": "integer", "minimum": 1}
+    "status": {"enum": ["available", "unavailable", "draining"]},
+    "presence_state": {"enum": ["online", "grace", "offline"]},
+    "heartbeat_age_seconds": {"type": ["number", "null"], "minimum": 0},
+    "freshness_seconds": {"type": "integer", "minimum": 15},
+    "device_presence": {
+      "type": "object",
+      "required": ["schema", "state", "available"],
+      "properties": {
+        "schema": {"const": "adaos.device_presence.v1"},
+        "device_ref": {"type": "string"},
+        "state": {"enum": ["online", "grace", "offline"]},
+        "available": {"type": "boolean"},
+        "reported_online": {"type": "boolean"},
+        "connection_state": {"type": ["string", "null"]},
+        "last_seen_at": {},
+        "age_seconds": {"type": ["number", "null"], "minimum": 0},
+        "grace_seconds": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "last_seen_at": {"type": "string"}, "revision": {"type": "integer", "minimum": 1}
   }, "additionalProperties": false
 }

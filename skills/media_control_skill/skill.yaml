@@ -1,5 +1,5 @@
 name: media_control_skill
-version: 0.2.13
+version: 0.2.14
 description: Persistent Media Center control plane for playback targets, sessions,
   queues, commands, checkpoints, and settings.
 supported_locales:
@@ -105,7 +105,8 @@ tools:
     type: object
 - name: endpoint_inbox
   entry: handlers.main:endpoint_inbox
-  description: Refresh an endpoint heartbeat and return its active assignment with a bounded queue window.
+  description: Refresh an endpoint heartbeat and return its active assignment with
+    a bounded queue window.
   side_effects: local_write
   input_schema:
     type: object
@@ -660,7 +661,8 @@ data_routes:
   owner: skill:media_control_skill
   first_paint: endpoint_inbox registers presence and returns the latest active assignment
   recovery: repeat endpoint_inbox every 15 seconds and after assignment events
-  guard_visibility: exact endpoint identity, bounded queue window and current session only
+  guard_visibility: exact endpoint identity, bounded queue window and current session
+    only
   update_source:
   - media_control.playback.assigned
   - media_control_skill.endpoint_inbox
@@ -790,12 +792,13 @@ llm_hints:
     intent: media.playback.control
     tool: voice_command
     side_effect_class: local_write
-updated_at: '2026-08-26T04:31:05+00:00'
+updated_at: '2026-08-27T16:05:34+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.939+5685.a8e1dfd0
-    recorded_at: '2026-08-26T04:31:05+00:00'
+    min_version: 0.1.945+5732.00ddc563
+    recorded_at: '2026-08-27T16:05:34+00:00'
     source: skill_push
-    min_commit: a8e1dfd019f9bfd9ba2f188596b5d314ec88786a
-    min_short_commit: a8e1dfd0
-    build_date: '2026-08-26T07:29:43+03:00'
+    min_commit: 00ddc5633eb5bcdb0944743fd64eb29e6966f1ba
+    min_short_commit: 00ddc563
+    build_date: '2026-08-27T18:24:24+03:00'
+

@@ -282,6 +282,26 @@ def test_stale_targets_are_not_available_to_remote_controllers():
     assert unavailable[0]["status"] == "unavailable"
 
 
+def test_all_targets_expire_without_a_recent_heartbeat():
+    repository = MediaControlRepository()
+    registered = repository.register_target(
+        "legacy-browser-target",
+        webspace_id="desktop",
+        label="Historical Chrome",
+        kind="browser",
+        capabilities={},
+    )["target"]
+    with repository.connect() as connection:
+        connection.execute(
+            "UPDATE playback_targets SET last_seen_at='2000-01-01T00:00:00+00:00' WHERE id=?",
+            (registered["id"],),
+        )
+        connection.commit()
+
+    assert repository.list_targets()["items"] == []
+    assert repository.get_target(registered["id"])["presence_state"] == "offline"
+
+
 def test_remote_session_creation_publishes_targeted_assignment(monkeypatch):
     repository = MediaControlRepository()
     target = repository.register_target(
@@ -596,6 +616,7 @@ def test_endpoint_reconciliation_is_idempotent_and_acks_command_revisions():
     observed = {
         "active_item_id": session["active_item_id"],
         "state": "playing",
+        "playback_confirmed": True,
         "position_ms": 42_000,
         "duration_ms": 180_000,
         "rate": 1.0,
@@ -646,6 +667,71 @@ def test_endpoint_reconciliation_is_idempotent_and_acks_command_revisions():
     pytest.importorskip("jsonschema").Draft202012Validator(schema).validate(
         converged
     )
+
+
+def test_endpoint_cannot_ack_play_for_a_different_active_item():
+    repository = MediaControlRepository()
+    session = _session(repository)
+    played = repository.command(
+        session["id"],
+        command="play",
+        arguments={},
+        actor_ref="profile:alice",
+        expected_revision=session["revision"],
+        idempotency_key="wrong-item-play",
+    )
+
+    reconciled = repository.reconcile_endpoint(
+        session["id"],
+        target_id=session["target_id"],
+        endpoint_revision=1,
+        acknowledged_command_revision=played["command"]["command_revision"],
+        observed={
+            "active_item_id": "item-2",
+            "state": "playing",
+            "playback_confirmed": True,
+            "position_ms": 1000,
+            "duration_ms": 180_000,
+        },
+    )
+
+    assert reconciled["action"]["type"] == "load"
+    assert reconciled["action"]["item_id"] == session["active_item_id"]
+    assert reconciled["session"]["observed_command_revision"] == 0
+    pending = repository.pull_commands(session["target_id"])["items"][0]
+    assert pending["status"] == "pending"
+    assert pending["arguments"]["_playback_contract"]["active_item_id"] == "item-0"
+
+
+@pytest.mark.parametrize(
+    ("initial_state", "expected_state"),
+    [("playing", "playing"), ("paused", "paused"), ("stopped", "stopped")],
+)
+def test_queue_navigation_preserves_transport_state(initial_state, expected_state):
+    repository = MediaControlRepository()
+    session = _session(repository)
+    with repository.connect() as connection:
+        connection.execute(
+            "UPDATE playback_sessions SET state=? WHERE id=?",
+            (initial_state, session["id"]),
+        )
+        connection.commit()
+    current = repository.get_session(session["id"])["session"]
+
+    changed = repository.command(
+        session["id"],
+        command="next",
+        arguments={},
+        actor_ref="profile:alice",
+        expected_revision=current["revision"],
+        idempotency_key=f"next-{initial_state}",
+    )
+
+    assert changed["session"]["active_item_id"] == "item-2"
+    assert changed["session"]["state"] == expected_state
+    expectation = changed["command"]["arguments"]["_playback_contract"]
+    assert expectation["active_item_id"] == "item-2"
+    assert expectation["desired_state"] == expected_state
 
 
 def test_coordinator_preferred_reconcile_does_not_repeat_seek():
@@ -840,6 +926,7 @@ def test_media_remote_surfaces_are_owned_by_media_control_skill():
     compact = webui["widgets"][0]
     assert [button["id"] for button in compact["inputs"]["buttons"]] == [
         "open",
+        "target",
         "previous",
         "toggle",
         "next",

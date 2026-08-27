@@ -22,7 +22,8 @@ QOE_SUMMARY_SCHEMA = "adaos.media_control.qoe_summary.v1"
 MAX_QUEUE_ITEMS = 500
 MAX_QUEUE_PAGE = 30
 MAX_COMMAND_PAGE = 100
-TARGET_FRESHNESS_SECONDS = 120
+TARGET_ONLINE_SECONDS = 30
+TARGET_FRESHNESS_SECONDS = 60
 
 
 def now_iso() -> str:
@@ -41,6 +42,22 @@ def timestamp_is_fresh(value: Any, *, freshness_seconds: int = TARGET_FRESHNESS_
         return False
     age = (datetime.now(tz=timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds()
     return age <= max(15, int(freshness_seconds or TARGET_FRESHNESS_SECONDS))
+
+
+def timestamp_age_seconds(value: Any) -> float | None:
+    token = text(value)
+    if not token:
+        return None
+    try:
+        parsed = datetime.fromisoformat(token.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return None
+    return max(
+        0.0,
+        (datetime.now(tz=timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds(),
+    )
 
 
 def text(value: Any) -> str:
@@ -566,6 +583,16 @@ class MediaControlRepository:
             updates = self._command_updates(connection, row, command_token, args)
             next_revision = current_revision + 1
             command_revision = int(row["command_revision"]) + 1
+            args["_playback_contract"] = {
+                "schema": "adaos.media_control.command_expectation.v1",
+                "session_id": token,
+                "command_revision": command_revision,
+                "queue_revision": int(row["queue_revision"]),
+                "active_item_id": text(
+                    updates.get("active_item_id", row["active_item_id"])
+                ),
+                "desired_state": text(updates.get("state", row["state"])),
+            }
             updates.update(
                 {
                     "revision": next_revision,
@@ -639,7 +666,18 @@ class MediaControlRepository:
                         "variant_id": str(next_item["variant_id"]),
                         "source_id": str(next_item["source_id"]),
                         "position_ms": 0,
-                        "state": "playing" if bool(row["autoplay"]) else "ready",
+                        "state": (
+                            "playing"
+                            if str(row["state"])
+                            in {
+                                "requested",
+                                "playing",
+                                "loading",
+                                "buffering",
+                                "recovering",
+                            }
+                            else str(row["state"])
+                        ),
                         "route_json": dumps((loads(next_item["descriptor_json"], {}) or {}).get("route") or {}),
                     }
                 )
@@ -858,6 +896,56 @@ class MediaControlRepository:
             return {"ok": False, "error": "playback_command_not_found"}
         return {"ok": True, "schema": SCHEMA_VERSION, "changed": bool(changed), "command": self._public_command(row)}
 
+    @staticmethod
+    def _accepted_endpoint_acknowledgement(
+        connection: sqlite3.Connection,
+        row: sqlite3.Row,
+        *,
+        target_id: str,
+        requested_revision: int,
+        observed: Mapping[str, Any],
+    ) -> tuple[int, str]:
+        accepted = int(row["observed_command_revision"])
+        if requested_revision <= accepted:
+            return accepted, "already_observed"
+        commands = connection.execute(
+            """
+            SELECT * FROM playback_commands
+            WHERE session_id=? AND target_id=? AND command_revision>?
+                AND command_revision<=?
+            ORDER BY command_revision
+            """,
+            (str(row["id"]), target_id, accepted, requested_revision),
+        ).fetchall()
+        if not commands:
+            return accepted, "command_revision_gap"
+        expected = accepted + 1
+        for command_row in commands:
+            if int(command_row["command_revision"]) != expected:
+                return accepted, "command_revision_gap"
+            expected += 1
+
+        observed_item_id = text(observed.get("active_item_id"))
+        desired_item_id = str(row["active_item_id"])
+        if not observed_item_id or observed_item_id != desired_item_id:
+            return accepted, "active_item_not_confirmed"
+
+        desired_state = str(row["state"])
+        observed_state = text(observed.get("state")).lower()
+        final_command = str(commands[-1]["command"])
+        state_matches = {
+            "play": observed_state == "playing",
+            "pause": observed_state == "paused",
+            "stop": observed_state in {"stopped", "ended"},
+            "next": observed_state == desired_state,
+            "previous": observed_state == desired_state,
+        }.get(final_command, True)
+        if not state_matches:
+            return accepted, "transport_state_not_confirmed"
+        if desired_state == "playing" and not bool(observed.get("playback_confirmed")):
+            return accepted, "decoded_playback_not_confirmed"
+        return requested_revision, "confirmed"
+
     def reconcile_endpoint(
         self,
         session_id: str,
@@ -919,14 +1007,25 @@ class MediaControlRepository:
                         row["endpoint_observation_revision"]
                     ),
                 }
-            acknowledged = max(0, int(acknowledged_command_revision or 0))
-            if acknowledged > int(row["command_revision"]):
+            requested_acknowledgement = max(
+                0, int(acknowledged_command_revision or 0)
+            )
+            if requested_acknowledgement > int(row["command_revision"]):
                 connection.rollback()
                 return {
                     "ok": False,
                     "error": "invalid_acknowledged_command_revision",
                     "current_command_revision": int(row["command_revision"]),
                 }
+            acknowledged, acknowledgement_reason = (
+                self._accepted_endpoint_acknowledgement(
+                    connection,
+                    row,
+                    target_id=target["id"],
+                    requested_revision=requested_acknowledgement,
+                    observed=payload,
+                )
+            )
             connection.execute(
                 """
                 UPDATE playback_commands
@@ -1024,6 +1123,8 @@ class MediaControlRepository:
                     "from_command_revision": acknowledged + 1,
                     "commands": [self._public_command(item) for item in pending_rows],
                 }
+                if requested_acknowledgement > acknowledged:
+                    action["acknowledgement_rejected"] = acknowledgement_reason
             elif authority_token == "coordinator_preferred":
                 observed_position = max(0, int(payload.get("position_ms") or 0))
                 desired_position = int(row["position_ms"])
@@ -1469,10 +1570,17 @@ class MediaControlRepository:
             "authorized" if bool(capabilities.get("authorized")) else "guest"
         )
         stored_status = str(row["status"])
-        heartbeat_presence = text(capabilities.get("presence_mode")) == "heartbeat"
+        heartbeat_age_seconds = timestamp_age_seconds(row["last_seen_at"])
         effective_status = stored_status
-        if stored_status == "available" and heartbeat_presence and not timestamp_is_fresh(row["last_seen_at"]):
+        if stored_status == "available" and not timestamp_is_fresh(row["last_seen_at"]):
             effective_status = "unavailable"
+        presence_state = (
+            "offline"
+            if effective_status != "available"
+            else "online"
+            if heartbeat_age_seconds is not None and heartbeat_age_seconds <= TARGET_ONLINE_SECONDS
+            else "grace"
+        )
         return {
             "schema": TARGET_SCHEMA,
             "id": str(row["id"]),
@@ -1487,6 +1595,9 @@ class MediaControlRepository:
             "kind": str(row["kind"]),
             "capabilities": capabilities,
             "status": effective_status,
+            "presence_state": presence_state,
+            "heartbeat_age_seconds": heartbeat_age_seconds,
+            "freshness_seconds": TARGET_FRESHNESS_SECONDS,
             "last_seen_at": str(row["last_seen_at"]),
             "revision": int(row["revision"]),
         }

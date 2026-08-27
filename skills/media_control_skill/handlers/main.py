@@ -201,6 +201,24 @@ def _localized_text(key: str, fallback: str) -> str:
 
 def _target_for_ui(target: Mapping[str, Any]) -> dict[str, Any]:
     item = dict(target)
+    capabilities = item.get("capabilities")
+    capabilities = dict(capabilities) if isinstance(capabilities, Mapping) else {}
+    device_ref = text(capabilities.get("device_ref"))
+    if device_ref:
+        try:
+            from adaos.sdk.data.devices import get_device_presence
+
+            registry_presence = get_device_presence(
+                device_ref,
+                grace_seconds=int(item.get("freshness_seconds") or 60),
+            )
+        except Exception:
+            registry_presence = None
+        if isinstance(registry_presence, Mapping):
+            item["device_presence"] = dict(registry_presence)
+            if not bool(registry_presence.get("available")):
+                item["status"] = "unavailable"
+                item["presence_state"] = "offline"
     authorization_state = text(item.get("authorization_state")).lower()
     if authorization_state == "authorized":
         key = "runtime.media_control.ui.authorized"

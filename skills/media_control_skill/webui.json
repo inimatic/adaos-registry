@@ -46,6 +46,21 @@
         "variant": "toolbar",
         "size": "small",
         "stretch": true,
+        "statusDataSource": {
+          "kind": "stream",
+          "receiver": "media_control.now_playing",
+          "params": {
+            "profile_id": "default",
+            "target_id": "$state.mediaControlTargetId"
+          },
+          "scope": "workspace",
+          "invalidationTags": ["media_control.sessions"]
+        },
+        "statusTitlePath": "title",
+        "statusSubtitlePath": "target_label",
+        "statusBadgePath": "state",
+        "statusImagePath": "artwork.url",
+        "statusEmptyText": "Nothing is playing",
         "buttons": [
           {
             "id": "open",
@@ -53,6 +68,28 @@
             "label": "Remote",
             "label_i18n": {
               "key": "runtime.media_control.ui.remote"
+            }
+          },
+          {
+            "id": "target",
+            "icon": "tv-outline",
+            "label": "Playback device",
+            "selectedStateKey": "mediaControlTargetId",
+            "optionLabelPath": "display_label",
+            "optionValuePath": "id",
+            "optionIcon": "tv-outline",
+            "persistFallback": true,
+            "optionsDataSource": {
+              "kind": "skill",
+              "name": "media_control_skill.list_targets",
+              "params": {"limit": 50},
+              "cacheTtlMs": 1000,
+              "invalidationTags": ["media_control.targets"],
+              "preserveLastValue": true,
+              "maxRequestHz": 1
+            },
+            "label_i18n": {
+              "key": "runtime.media_control.ui.control_device"
             }
           },
           {
@@ -100,12 +137,20 @@
           }
         },
         {
+          "on": "select:target",
+          "type": "updateState",
+          "params": {
+            "mediaControlTargetId": "$event.value"
+          }
+        },
+        {
           "on": "click:previous",
           "type": "callSkill",
           "target": "media_control_skill.voice_command",
           "params": {
             "action": "previous",
-            "profile_id": "default"
+            "profile_id": "default",
+            "target_id": "$state.mediaControlTargetId"
           },
           "invalidates": [
             "media_control.sessions"
@@ -117,7 +162,8 @@
           "target": "media_control_skill.voice_command",
           "params": {
             "action": "toggle",
-            "profile_id": "default"
+            "profile_id": "default",
+            "target_id": "$state.mediaControlTargetId"
           },
           "invalidates": [
             "media_control.sessions"
@@ -129,7 +175,8 @@
           "target": "media_control_skill.voice_command",
           "params": {
             "action": "next",
-            "profile_id": "default"
+            "profile_id": "default",
+            "target_id": "$state.mediaControlTargetId"
           },
           "invalidates": [
             "media_control.sessions"
@@ -141,7 +188,8 @@
           "target": "media_control_skill.voice_command",
           "params": {
             "action": "stop",
-            "profile_id": "default"
+            "profile_id": "default",
+            "target_id": "$state.mediaControlTargetId"
           },
           "invalidates": [
             "media_control.sessions"
