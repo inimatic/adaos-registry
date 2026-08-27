@@ -1,5 +1,5 @@
 name: infrastate_skill
-version: 0.75.79
+version: 0.75.80
 description: Локальный обзор состояния ядра, graceful update, A/B слотов и последнего
   результата обновления.
 runtime:
@@ -38,6 +38,7 @@ events:
   - hub.core_update.status
   - node.names.changed
   - operations.
+  - project.installed
 data_routes:
 - surface: widget:infrastate_widget
   route: yjs

@@ -888,10 +888,10 @@ def test_infrastate_marketplace_defaults_to_workspace_projects(monkeypatch, tmp_
 
     assert items["skills"] == []
     assert items["scenarios"] == []
-    assert items["projects"][0]["id"] == "demo_project"
-    assert items["projects"][0]["name"] == "Demo Project"
-    assert items["projects"][0]["stage"] == "alpha"
-    assert items["projects"][0]["categories"] == "home"
+    demo = next(item for item in items["projects"] if item["id"] == "demo_project")
+    assert demo["name"] == "Demo Project"
+    assert demo["stage"] == "alpha"
+    assert demo["categories"] == "home"
 
 
 def test_infrastate_project_catalog_merges_remote_registry_projects(monkeypatch, tmp_path: Path):
@@ -1132,6 +1132,292 @@ def test_infrastate_project_inventory_keeps_explicit_project_record(monkeypatch)
     assert rows[0]["name"] == "web_desktop"
     assert rows[0]["source"] == "workspace"
     assert rows[0].get("inferred") is None
+
+
+def test_infrastate_project_detail_streams_show_components_and_local_nodes(monkeypatch):
+    mod = _load_infrastate_module()
+    definition = {
+        "id": "media_center",
+        "version": "0.6.83",
+        "catalog": {
+            "title": "Media Center",
+            "description": "Distributed media",
+            "categories": ["home", "media"],
+            "tags": ["distributed"],
+        },
+        "publication": {"stage": "beta"},
+        "components": {
+            "owned": [
+                {"ref": "scenario:media_center", "role": "primary", "exposure": "application", "relations": ["presents"]},
+                {"ref": "skill:media_center_skill", "role": "implementation", "exposure": "project_only", "relations": ["realizes"]},
+                {"ref": "skill:media_control_skill", "role": "supporting", "exposure": "advanced", "relations": ["uses"]},
+            ],
+            "dependencies": [],
+        },
+        "install": {
+            "default": False,
+            "features": [
+                {
+                    "id": "library",
+                    "title": "Media library",
+                    "default": True,
+                    "optional": False,
+                    "components": ["scenario:media_center", "skill:media_center_skill"],
+                },
+                {
+                    "id": "playback-control",
+                    "title": "Playback control",
+                    "default": True,
+                    "optional": False,
+                    "components": ["skill:media_control_skill"],
+                },
+            ],
+        },
+        "compatibility": {
+            "required_contracts": ["adaos.project.deployment.v1", "adaos.distributed.service.v1"],
+            "validation_profiles": ["media_center.distributed"],
+        },
+    }
+    ctx = SimpleNamespace(paths=SimpleNamespace(workspace_dir=lambda: Path("workspace")))
+    monkeypatch.setattr(mod, "get_ctx", lambda: ctx)
+    monkeypatch.setattr(mod, "load_installed_projects", lambda ctx: [])
+    monkeypatch.setattr(mod, "list_workspace_projects", lambda workspace_root, include_hidden=False: [definition])
+    monkeypatch.setattr(
+        mod,
+        "_installed_project_component_refs",
+        lambda ctx, workspace_root: {"scenario:media_center", "skill:media_center_skill"},
+    )
+    monkeypatch.setattr(
+        mod,
+        "_scenario_items",
+        lambda include_all=True, operations=None: [
+            {
+                "name": "media_center",
+                "version_display": "0.6.83",
+                "workspace_display": "0.6.83",
+                "runtime_display": "0.6.83",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        mod,
+        "_skills_items",
+        lambda include_all=True: [
+            {
+                "name": "media_center_skill",
+                "version_display": "0.6.83",
+                "workspace_display": "0.6.83",
+                "runtime_display": "0.6.83 A",
+            }
+        ],
+    )
+    monkeypatch.setattr(mod, "_operations_snapshot", lambda webspace_id=None: {})
+    monkeypatch.setattr(
+        mod,
+        "_project_deployment_facts",
+        lambda project_id: {"available": False, "error": "runtime unavailable", "deployments": [], "activations": [], "operations": []},
+    )
+    monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="hub-1"))
+
+    components = mod._build_stream_payload_for_receiver(
+        "infrastate.details.project_components.media_center",
+        "desktop",
+    )
+    nodes = mod._build_stream_payload_for_receiver(
+        "infrastate.details.project_nodes.media_center",
+        "desktop",
+    )
+    overview = mod._build_stream_payload_for_receiver(
+        "infrastate.details.project_overview.media_center",
+        "desktop",
+    )
+    actions = mod._build_stream_payload_for_receiver(
+        "infrastate.details.project_actions.media_center",
+        "desktop",
+    )
+
+    by_ref = {item["component_ref"]: item for item in components}
+    assert by_ref["scenario:media_center"]["installed"] is True
+    assert by_ref["skill:media_center_skill"]["node_count"] == 1
+    assert by_ref["skill:media_control_skill"]["status"] == "missing"
+    assert [item["source"] for item in nodes] == ["local_fallback", "local_fallback", "local_fallback"]
+    distribution = next(item for item in overview if item["id"] == "distribution")
+    assert distribution["subtitle"] == "distributed-ready"
+    reconcile = next(item for item in actions if item["id"] == "project_reconcile")
+    assert reconcile["disabled"] is True
+    assert "default components are missing" in reconcile["title"]
+
+
+def test_infrastate_project_detail_streams_include_deployment_activations(monkeypatch):
+    mod = _load_infrastate_module()
+    definition = {
+        "id": "media_center",
+        "version": "0.6.83",
+        "catalog": {"title": "Media Center", "description": ""},
+        "publication": {"stage": "beta"},
+        "components": {
+            "owned": [
+                {"ref": "scenario:media_center", "role": "primary"},
+                {"ref": "skill:media_center_skill", "role": "implementation"},
+            ],
+            "dependencies": [],
+        },
+        "install": {
+            "features": [
+                {
+                    "id": "library",
+                    "default": True,
+                    "optional": False,
+                    "components": ["scenario:media_center", "skill:media_center_skill"],
+                }
+            ]
+        },
+        "compatibility": {"required_contracts": ["adaos.project.deployment.v1"]},
+    }
+    monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace(paths=SimpleNamespace(workspace_dir=lambda: Path("workspace"))))
+    monkeypatch.setattr(mod, "load_installed_projects", lambda ctx: [])
+    monkeypatch.setattr(mod, "list_workspace_projects", lambda workspace_root, include_hidden=False: [definition])
+    monkeypatch.setattr(
+        mod,
+        "_installed_project_component_refs",
+        lambda ctx, workspace_root: {"scenario:media_center", "skill:media_center_skill"},
+    )
+    monkeypatch.setattr(mod, "_scenario_items", lambda include_all=True, operations=None: [])
+    monkeypatch.setattr(mod, "_skills_items", lambda include_all=True: [])
+    monkeypatch.setattr(mod, "_operations_snapshot", lambda webspace_id=None: {})
+    monkeypatch.setattr(
+        mod,
+        "_project_deployment_facts",
+        lambda project_id: {
+            "available": True,
+            "error": "",
+            "deployments": [
+                {
+                    "deployment_id": "dep-1",
+                    "project_ref": "project:media_center",
+                    "subnet_id": "home",
+                    "release_digest": "sha256:" + "1" * 64,
+                    "revision": 3,
+                    "status": "active",
+                    "placements": [],
+                    "updated_at": "2026-08-27T00:00:00Z",
+                }
+            ],
+            "activations": [
+                {
+                    "activation_id": "act-1",
+                    "deployment_id": "dep-1",
+                    "component_ref": "skill:media_center_skill",
+                    "node_id": "tv-1",
+                    "release_digest": "sha256:" + "1" * 64,
+                    "package_digest": "sha256:" + "2" * 64,
+                    "generation": 3,
+                    "status": "active",
+                    "health": {"status": "ready"},
+                    "updated_at": "2026-08-27T00:00:01Z",
+                }
+            ],
+            "operations": [
+                {
+                    "operation_id": "op-1",
+                    "deployment_id": "dep-1",
+                    "kind": "reconcile",
+                    "state": "succeeded",
+                    "node_results": [{"node_id": "tv-1"}],
+                    "uncertain": False,
+                    "updated_at": "2026-08-27T00:00:02Z",
+                }
+            ],
+        },
+    )
+
+    nodes = mod._build_stream_payload_for_receiver("infrastate.details.project_nodes.media_center", "desktop")
+    operations = mod._build_stream_payload_for_receiver("infrastate.details.project_operations.media_center", "desktop")
+    overview = mod._build_stream_payload_for_receiver("infrastate.details.project_overview.media_center", "desktop")
+
+    assert nodes == [
+        {
+            "id": "act-1",
+            "project_id": "media_center",
+            "deployment_id": "dep-1",
+            "subnet_id": "home",
+            "node_id": "tv-1",
+            "component_ref": "skill:media_center_skill",
+            "status": "active",
+            "status_icon": "checkmark-circle-outline",
+            "health": "ready",
+            "generation": "3",
+            "release": "sha256:111111111111",
+            "package": "sha256:222222222222",
+            "updated_at": "2026-08-27T00:00:01Z",
+            "source": "deployment_activation",
+        }
+    ]
+    assert operations[0]["operation_id"] == "op-1"
+    assert operations[0]["kind"] == "deployment.reconcile"
+    assert next(item for item in overview if item["id"] == "distribution")["subtitle"] == "distributed"
+
+
+def test_infrastate_project_reconcile_records_explicit_install(monkeypatch):
+    mod = _load_infrastate_module()
+    definition = {
+        "id": "web_desktop",
+        "version": "0.3.12",
+        "catalog": {"title": "Web Desktop", "description": ""},
+        "publication": {"stage": "beta"},
+        "components": {
+            "owned": [
+                {"ref": "scenario:web_desktop", "role": "primary"},
+                {"ref": "skill:web_desktop_skill"},
+            ],
+            "dependencies": [],
+        },
+        "install": {
+            "features": [
+                {
+                    "id": "shell",
+                    "default": True,
+                    "optional": False,
+                    "components": ["scenario:web_desktop", "skill:web_desktop_skill"],
+                }
+            ]
+        },
+    }
+    ctx = SimpleNamespace(paths=SimpleNamespace(workspace_dir=lambda: Path("workspace")))
+    recorded: list[dict[str, object]] = []
+    monkeypatch.setattr(mod, "get_ctx", lambda: ctx)
+    monkeypatch.setattr(mod, "list_workspace_projects", lambda workspace_root, include_hidden=False: [definition])
+    monkeypatch.setattr(
+        mod,
+        "_installed_project_component_refs",
+        lambda ctx, workspace_root: {"scenario:web_desktop", "skill:web_desktop_skill"},
+    )
+    monkeypatch.setattr(
+        mod,
+        "record_project_install",
+        lambda ctx, definition, *, component_refs, webspace_id: recorded.append(
+            {"id": definition["id"], "component_refs": list(component_refs), "webspace_id": webspace_id}
+        )
+        or recorded[-1],
+    )
+    monkeypatch.setattr(mod, "_write_ui_state", lambda **kwargs: kwargs)
+    monkeypatch.setattr(mod, "default_webspace_id", lambda: "desktop")
+
+    result = mod._perform_action(
+        "project_reconcile",
+        SimpleNamespace(node_id="hub-1"),
+        {"project_id": "web_desktop", "webspace_id": "desktop"},
+    )
+
+    assert result["ok"] is True
+    assert result["component_refs"] == ["scenario:web_desktop", "skill:web_desktop_skill"]
+    assert recorded == [
+        {
+            "id": "web_desktop",
+            "component_refs": ["scenario:web_desktop", "skill:web_desktop_skill"],
+            "webspace_id": "desktop",
+        }
+    ]
 
 
 def test_infrastate_marketplace_install_rejects_raw_components_outside_dev(monkeypatch):
@@ -4125,6 +4411,43 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
     }
     assert webui["webio"]["receivers"]["infrastate.projects"]["scope"] == "node"
     assert by_id["infrastate-projects"]["title"] == "Installed projects"
+    project_columns = by_id["infrastate-projects"]["inputs"]["columns"]
+    project_action_column = next(column for column in project_columns if column.get("key") == "_project_actions")
+    assert project_action_column["kind"] == "buttons"
+    assert project_action_column["buttons"][0]["id"] == "manage"
+    project_actions = by_id["infrastate-projects"]["actions"]
+    assert any(
+        action.get("on") == "click:manage"
+        and action.get("type") == "updateState"
+        and ((action.get("params") or {}).get("infrastateProjectId") == "$event.name")
+        for action in project_actions
+    )
+    assert any(
+        action.get("on") == "click:manage"
+        and action.get("type") == "navigate"
+        and ((action.get("params") or {}).get("to") == "infrastate_skill.project_detail_modal")
+        and ((action.get("params") or {}).get("modalId") == "project_detail_modal")
+        for action in project_actions
+    )
+    project_modal = webui["registry"]["modals"]["project_detail_modal"]
+    assert project_modal["implements"] == ["infrastate_skill.project_detail_modal"]
+    assert "infrastate_skill.project_detail_modal" in webui["interface"]["views"]
+    project_modal_widgets = {
+        widget.get("id"): widget
+        for widget in project_modal["schema"]["widgets"]
+    }
+    assert project_modal_widgets["project-detail-actions"]["dataSource"]["receiver"] == (
+        "infrastate.details.project_actions.$state.infrastateProjectId"
+    )
+    assert project_modal_widgets["project-components"]["dataSource"]["receiver"] == (
+        "infrastate.details.project_components.$state.infrastateProjectId"
+    )
+    assert project_modal_widgets["project-nodes"]["dataSource"]["receiver"] == (
+        "infrastate.details.project_nodes.$state.infrastateProjectId"
+    )
+    assert project_modal_widgets["project-operations"]["dataSource"]["receiver"] == (
+        "infrastate.details.project_operations.$state.infrastateProjectId"
+    )
     assert by_id["infrastate-skills"]["dataSource"] == {
         "kind": "stream",
         "scope": "node",

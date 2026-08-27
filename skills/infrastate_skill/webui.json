@@ -1365,9 +1365,42 @@
                     "label": "Installed",
                     "mono": true,
                     "width": "170px"
+                  },
+                  {
+                    "key": "_project_actions",
+                    "label": "Actions",
+                    "kind": "buttons",
+                    "width": "88px",
+                    "buttons": [
+                      {
+                        "id": "manage",
+                        "icon": "layers-outline",
+                        "tooltip": "Manage project"
+                      }
+                    ]
                   }
                 ]
-              }
+              },
+              "actions": [
+                {
+                  "on": "click:manage",
+                  "type": "updateState",
+                  "params": {
+                    "infrastateProjectId": "$event.name",
+                    "infrastateProjectTitle": "$event.display_name",
+                    "infrastateProjectRefreshSeq": 0
+                  }
+                },
+                {
+                  "on": "click:manage",
+                  "type": "navigate",
+                  "params": {
+                    "to": "infrastate_skill.project_detail_modal",
+                    "surface": "modal",
+                    "modalId": "project_detail_modal"
+                  }
+                }
+              ]
             },
             {
               "id": "infrastate-skills",
@@ -1840,6 +1873,399 @@
         },
         "implements": [
           "infrastate_skill.infrastate_modal"
+        ]
+      },
+      "project_detail_modal": {
+        "title": "Project",
+        "schema": {
+          "id": "project_detail_modal",
+          "initialState": {
+            "infrastateProjectRefreshSeq": 0
+          },
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "project-detail-actions",
+              "type": "ui.actions",
+              "area": "main",
+              "title": "Project actions",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "infrastate.details.project_actions.$state.infrastateProjectId",
+                "params": {
+                  "refresh": "$state.infrastateProjectRefreshSeq"
+                }
+              },
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small"
+              },
+              "actions": [
+                {
+                  "on": "click:project_refresh",
+                  "type": "callHost",
+                  "target": "infrastate.action",
+                  "params": {
+                    "id": "project_refresh",
+                    "project_id": "$state.infrastateProjectId",
+                    "name": "$state.infrastateProjectId",
+                    "request_id": "$client.requestId",
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "feedback": {
+                    "pending": {
+                      "label": "Refreshing",
+                      "disable": true
+                    }
+                  }
+                },
+                {
+                  "on": "click:project_refresh",
+                  "type": "mutateState",
+                  "params": {
+                    "operations": [
+                      {
+                        "op": "increment",
+                        "path": "infrastateProjectRefreshSeq",
+                        "amount": 1
+                      }
+                    ]
+                  }
+                },
+                {
+                  "on": "click:project_reconcile",
+                  "type": "callHost",
+                  "target": "infrastate.action",
+                  "params": {
+                    "id": "project_reconcile",
+                    "project_id": "$state.infrastateProjectId",
+                    "name": "$state.infrastateProjectId",
+                    "request_id": "$client.requestId",
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "feedback": {
+                    "pending": {
+                      "label": "Reconciling",
+                      "disable": true
+                    }
+                  }
+                },
+                {
+                  "on": "click:project_reconcile",
+                  "type": "mutateState",
+                  "params": {
+                    "operations": [
+                      {
+                        "op": "increment",
+                        "path": "infrastateProjectRefreshSeq",
+                        "amount": 1
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "id": "project-overview",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Overview",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "infrastate.details.project_overview.$state.infrastateProjectId",
+                "params": {
+                  "refresh": "$state.infrastateProjectRefreshSeq"
+                }
+              },
+              "inputs": {
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "detailsPath": "content",
+                "detailsPresentation": "body",
+                "showDetails": true,
+                "itemAccordion": false,
+                "emptyText": "No project overview"
+              }
+            },
+            {
+              "id": "project-features",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Features",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "infrastate.details.project_features.$state.infrastateProjectId",
+                "params": {
+                  "refresh": "$state.infrastateProjectRefreshSeq"
+                }
+              },
+              "inputs": {
+                "emptyText": "No project features",
+                "columns": [
+                  {
+                    "key": "id",
+                    "label": "Feature",
+                    "mono": true,
+                    "width": "160px"
+                  },
+                  {
+                    "key": "title",
+                    "label": "Title"
+                  },
+                  {
+                    "key": "default",
+                    "label": "Default",
+                    "kind": "boolean",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "optional",
+                    "label": "Optional",
+                    "kind": "boolean",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "status",
+                    "label": "State",
+                    "width": "100px"
+                  },
+                  {
+                    "key": "installed",
+                    "label": "Installed",
+                    "mono": true,
+                    "width": "100px"
+                  },
+                  {
+                    "key": "components",
+                    "label": "Components",
+                    "mono": true,
+                    "width": "110px"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "project-components",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Components",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "infrastate.details.project_components.$state.infrastateProjectId",
+                "params": {
+                  "refresh": "$state.infrastateProjectRefreshSeq"
+                }
+              },
+              "inputs": {
+                "emptyText": "No project components",
+                "pagination": true,
+                "pageSize": 25,
+                "columns": [
+                  {
+                    "key": "status_icon",
+                    "label": "",
+                    "kind": "icon",
+                    "tooltipKey": "status_tooltip",
+                    "width": "44px"
+                  },
+                  {
+                    "key": "component_ref",
+                    "label": "Component",
+                    "mono": true,
+                    "width": "210px"
+                  },
+                  {
+                    "key": "role",
+                    "label": "Role",
+                    "width": "120px"
+                  },
+                  {
+                    "key": "exposure",
+                    "label": "Exposure",
+                    "width": "120px"
+                  },
+                  {
+                    "key": "install_scope",
+                    "label": "Scope",
+                    "width": "100px"
+                  },
+                  {
+                    "key": "workspace_display",
+                    "label": "Workspace",
+                    "mono": true,
+                    "width": "120px"
+                  },
+                  {
+                    "key": "runtime_display",
+                    "label": "Runtime",
+                    "mono": true,
+                    "width": "130px"
+                  },
+                  {
+                    "key": "node_count",
+                    "label": "Nodes",
+                    "mono": true,
+                    "width": "80px"
+                  },
+                  {
+                    "key": "features",
+                    "label": "Features"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "project-nodes",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Node placement",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "infrastate.details.project_nodes.$state.infrastateProjectId",
+                "params": {
+                  "refresh": "$state.infrastateProjectRefreshSeq"
+                }
+              },
+              "inputs": {
+                "emptyText": "No project node placement",
+                "pagination": true,
+                "pageSize": 25,
+                "columns": [
+                  {
+                    "key": "status_icon",
+                    "label": "",
+                    "kind": "icon",
+                    "width": "44px"
+                  },
+                  {
+                    "key": "node_id",
+                    "label": "Node",
+                    "mono": true,
+                    "width": "180px"
+                  },
+                  {
+                    "key": "component_ref",
+                    "label": "Component",
+                    "mono": true,
+                    "width": "210px"
+                  },
+                  {
+                    "key": "status",
+                    "label": "State",
+                    "width": "100px"
+                  },
+                  {
+                    "key": "health",
+                    "label": "Health",
+                    "width": "130px"
+                  },
+                  {
+                    "key": "deployment_id",
+                    "label": "Deployment",
+                    "mono": true,
+                    "width": "150px"
+                  },
+                  {
+                    "key": "generation",
+                    "label": "Gen",
+                    "mono": true,
+                    "width": "70px"
+                  },
+                  {
+                    "key": "release",
+                    "label": "Release",
+                    "mono": true,
+                    "width": "130px"
+                  },
+                  {
+                    "key": "source",
+                    "label": "Source",
+                    "width": "150px"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "project-operations",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Operations",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "infrastate.details.project_operations.$state.infrastateProjectId",
+                "params": {
+                  "refresh": "$state.infrastateProjectRefreshSeq"
+                }
+              },
+              "inputs": {
+                "emptyText": "No project operations",
+                "pagination": true,
+                "pageSize": 25,
+                "columns": [
+                  {
+                    "key": "operation_id",
+                    "label": "Operation",
+                    "mono": true,
+                    "width": "190px"
+                  },
+                  {
+                    "key": "kind",
+                    "label": "Kind",
+                    "width": "150px"
+                  },
+                  {
+                    "key": "state",
+                    "label": "State",
+                    "width": "100px"
+                  },
+                  {
+                    "key": "target",
+                    "label": "Target",
+                    "mono": true,
+                    "width": "210px"
+                  },
+                  {
+                    "key": "node_id",
+                    "label": "Node",
+                    "mono": true,
+                    "width": "170px"
+                  },
+                  {
+                    "key": "source",
+                    "label": "Source",
+                    "width": "140px"
+                  },
+                  {
+                    "key": "updated_at",
+                    "label": "Updated",
+                    "mono": true,
+                    "width": "170px"
+                  }
+                ]
+              }
+            }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "project_detail": {
+                "view": "infrastate_skill.project_detail_modal"
+              }
+            },
+            "defaultRoute": "project_detail"
+          }
+        },
+        "implements": [
+          "infrastate_skill.project_detail_modal"
         ]
       },
       "event_history_modal": {
@@ -2398,6 +2824,13 @@
       },
       "infrastate_skill.marketplace_modal": {
         "title": "Marketplace",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      },
+      "infrastate_skill.project_detail_modal": {
+        "title": "Project",
         "surfaces": [
           "modal"
         ],

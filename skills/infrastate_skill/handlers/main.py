@@ -51,6 +51,7 @@ from adaos.services.project_install import (
     install_workspace_project,
     list_workspace_projects,
     load_installed_projects,
+    record_project_install,
     selected_project_component_refs,
 )
 from adaos.services.skill.update import SkillUpdateService
@@ -191,6 +192,9 @@ _marketplace_catalog_cache: dict[tuple[str, str], tuple[float, list[dict[str, An
 _registry_catalog_cache: dict[tuple[str, str], tuple[float, list[dict[str, Any]]]] = {}
 _registry_catalog_meta_cache: dict[tuple[str, str], tuple[float, dict[str, str]]] = {}
 _registry_payload_cache: dict[str, tuple[float, dict[str, Any], dict[str, str]]] = {}
+_PROJECT_DETAIL_CACHE_TTL_S = max(0.0, float(os.getenv("ADAOS_INFRASTATE_PROJECT_DETAIL_CACHE_TTL_S") or "1.0"))
+_project_detail_cache: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
+_project_detail_cache_lock = threading.Lock()
 _scenario_reconciled_at: dict[str, float] = {}
 _scenario_reconcile_guard = threading.Lock()
 _snapshot_cache: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -455,6 +459,7 @@ def _action_invalidates_marketplace(action_id: str) -> bool:
         "marketplace",
         "marketplace_install",
         "inventory_activate",
+        "project_reconcile",
         "scenario_hard_pull",
         "scenario_uninstall",
         "skill_activate",
@@ -494,6 +499,8 @@ def _action_inventory_receivers(action_id: str) -> tuple[str, ...]:
         "marketplace",
         "marketplace_install",
         "inventory_activate",
+        "project_refresh",
+        "project_reconcile",
     }:
         return (
             _projects_receiver(),
@@ -969,6 +976,9 @@ def _detail_payload_for_receiver(snapshot: dict[str, Any], receiver: str) -> Any
             "status": "warn",
             "content": f"Details item not found: operations/{item_id}",
         }
+    project_detail = _project_detail_payload_for_section(section, item_id)
+    if project_detail is not None:
+        return project_detail
     if not snapshot_key:
         return {
             "id": item_id,
@@ -1695,6 +1705,8 @@ def _snapshot_cache_entry_is_current(cache_key: str) -> bool:
 
 
 def _invalidate_runtime_caches(*, webspace_id: str | None = None, marketplace: bool = False) -> None:
+    with _project_detail_cache_lock:
+        _project_detail_cache.clear()
     cache_key = _snapshot_cache_key(webspace_id)
     with _snapshot_cache_guard:
         cache_keys = {
@@ -3802,6 +3814,867 @@ def _inferred_project_inventory_items(ctx: Any, explicit_project_ids: set[str]) 
     return inferred
 
 
+def _project_id_token(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _short_digest(value: Any, *, prefix: int = 12) -> str:
+    token = str(value or "").strip()
+    if not token:
+        return ""
+    if token.startswith("sha256:") and len(token) > 7 + prefix:
+        return f"sha256:{token[7:7 + max(6, prefix)]}"
+    return token
+
+
+def _join_project_texts(value: Any, *, limit: int = 12) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if not isinstance(value, (list, tuple, set)):
+        return ""
+    items = [str(item).strip() for item in value if str(item).strip()]
+    if not items:
+        return ""
+    bounded = items[: max(1, limit)]
+    if len(items) > len(bounded):
+        bounded.append(f"+{len(items) - len(bounded)}")
+    return ", ".join(bounded)
+
+
+def _component_ref_parts(component_ref: Any) -> tuple[str, str]:
+    token = str(component_ref or "").strip()
+    kind, sep, artifact_id = token.partition(":")
+    if sep != ":":
+        return "", token
+    return kind.strip(), artifact_id.strip()
+
+
+def _project_status_icon(status: Any, *, fallback: str = "ellipse-outline") -> str:
+    token = str(status or "").strip().lower()
+    if token in {"installed", "active", "ready", "succeeded", "ok", "local"}:
+        return "checkmark-circle-outline"
+    if token in {"failed", "degraded", "missing", "blocked", "partial", "uncertain"}:
+        return "alert-circle-outline"
+    if token in {"running", "pending", "applying", "accepted", "refreshing"}:
+        return "sync-outline"
+    return fallback
+
+
+def _project_definition_by_id(project_id: str) -> dict[str, Any]:
+    token = _project_id_token(project_id)
+    if not token:
+        return {}
+    try:
+        ctx = get_ctx()
+        workspace_root = Path(ctx.paths.workspace_dir())
+    except Exception:
+        return {}
+    try:
+        definitions = list_workspace_projects(workspace_root, include_hidden=True)
+    except Exception:
+        definitions = []
+    for definition in definitions:
+        if isinstance(definition, dict) and _project_id_token(definition.get("id")) == token:
+            return dict(definition)
+    return {}
+
+
+def _project_inventory_item_by_id(project_id: str) -> dict[str, Any]:
+    token = _project_id_token(project_id)
+    if not token:
+        return {}
+    try:
+        rows = _project_inventory_items()
+    except Exception:
+        rows = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if _project_id_token(row.get("id") or row.get("name")) == token:
+            return dict(row)
+    return {}
+
+
+def _project_definition_fallback_row(project_id: str, definition: dict[str, Any]) -> dict[str, Any]:
+    catalog = definition.get("catalog") if isinstance(definition.get("catalog"), dict) else {}
+    publication = definition.get("publication") if isinstance(definition.get("publication"), dict) else {}
+    component_refs = [
+        str(item.get("ref") or "").strip()
+        for item in (definition.get("components") or {}).get("owned") or []
+        if str(item.get("ref") or "").strip()
+    ]
+    return {
+        "kind": "project",
+        "id": project_id,
+        "name": project_id,
+        "display_name": str(catalog.get("title") or project_id),
+        "title": str(catalog.get("title") or project_id),
+        "version": str(definition.get("version") or ""),
+        "description": str(catalog.get("description") or ""),
+        "stage": str(publication.get("stage") or ""),
+        "status": "available",
+        "status_icon": "layers-outline",
+        "status_tooltip": "project manifest is present in workspace",
+        "categories": _join_project_texts(catalog.get("categories")),
+        "tags": _join_project_texts(catalog.get("tags")),
+        "components_count": len(component_refs),
+        "component_refs": component_refs,
+        "installed_at": "",
+        "source": "workspace",
+        "inferred": False,
+        "uninstall_disabled": True,
+    }
+
+
+def _component_inventory_by_ref(operations: dict[str, Any] | None = None) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    try:
+        skill_rows = _inventory_items_from(_skills_items)
+    except Exception:
+        skill_rows = []
+    for row in skill_rows:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name") or row.get("id") or "").strip()
+        if name:
+            out[f"skill:{name}"] = {**row, "component_kind": "skill", "component_id": name}
+    try:
+        scenario_rows = _inventory_items_from(
+            lambda include_all=True: _scenario_items(include_all=include_all, operations=operations)
+        )
+    except Exception:
+        scenario_rows = []
+    for row in scenario_rows:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name") or row.get("id") or "").strip()
+        if name:
+            out[f"scenario:{name}"] = {**row, "component_kind": "scenario", "component_id": name}
+    return out
+
+
+def _installed_component_refs_for_project_detail(inventory_by_ref: dict[str, dict[str, Any]]) -> set[str]:
+    installed = set(inventory_by_ref)
+    try:
+        ctx = get_ctx()
+        installed.update(_installed_project_component_refs(ctx, Path(ctx.paths.workspace_dir())))
+    except Exception:
+        pass
+    return {ref for ref in installed if ref}
+
+
+def _project_feature_index(definition: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    out: dict[str, list[dict[str, Any]]] = {}
+    install = definition.get("install") if isinstance(definition.get("install"), dict) else {}
+    for feature in install.get("features") or []:
+        if not isinstance(feature, dict):
+            continue
+        feature_id = str(feature.get("id") or "").strip()
+        if not feature_id:
+            continue
+        for ref in feature.get("components") or []:
+            token = str(ref or "").strip()
+            if token:
+                out.setdefault(token, []).append(feature)
+    return out
+
+
+def _project_deployment_store() -> tuple[Any | None, str]:
+    try:
+        from adaos.services.project_deployment import get_project_deployment_runtime
+
+        runtime = get_project_deployment_runtime()
+        store = getattr(runtime, "store", None)
+        if store is None:
+            return None, "project deployment runtime has no store"
+        return store, ""
+    except Exception as exc:
+        return None, f"{type(exc).__name__}: {exc}"
+
+
+def _project_deployment_facts(project_id: str) -> dict[str, Any]:
+    token = _project_id_token(project_id)
+    facts: dict[str, Any] = {
+        "available": False,
+        "error": "",
+        "deployments": [],
+        "activations": [],
+        "operations": [],
+    }
+    if not token:
+        facts["error"] = "project id is empty"
+        return facts
+    store, error = _project_deployment_store()
+    if store is None:
+        facts["error"] = error
+        return facts
+    facts["available"] = True
+    project_ref = f"project:{token}"
+    try:
+        deployments, _cursor = store.list_deployments(limit=200)
+    except Exception as exc:
+        facts["error"] = f"{type(exc).__name__}: {exc}"
+        return facts
+    for deployment in deployments:
+        deployment_map = deployment.to_dict() if hasattr(deployment, "to_dict") else dict(deployment or {})
+        if str(deployment_map.get("project_ref") or "").strip() != project_ref:
+            continue
+        facts["deployments"].append(deployment_map)
+        deployment_id = str(deployment_map.get("deployment_id") or "").strip()
+        if not deployment_id:
+            continue
+        try:
+            activations, _activation_cursor = store.list_activations(
+                deployment_id=deployment_id,
+                limit=500,
+            )
+        except Exception:
+            activations = []
+        for activation in activations:
+            facts["activations"].append(
+                activation.to_dict() if hasattr(activation, "to_dict") else dict(activation or {})
+            )
+        try:
+            operations, _operation_cursor = store.list_operations(
+                deployment_id=deployment_id,
+                limit=200,
+            )
+        except Exception:
+            operations = []
+        for operation in operations:
+            facts["operations"].append(
+                operation.to_dict() if hasattr(operation, "to_dict") else dict(operation or {})
+            )
+    facts["deployments"].sort(key=lambda item: str(item.get("deployment_id") or ""))
+    facts["activations"].sort(key=lambda item: (str(item.get("node_id") or ""), str(item.get("component_ref") or "")))
+    facts["operations"].sort(
+        key=lambda item: (str(item.get("updated_at") or ""), str(item.get("operation_id") or "")),
+        reverse=True,
+    )
+    return facts
+
+
+def _activation_health_display(health: Any) -> str:
+    if not isinstance(health, dict) or not health:
+        return ""
+    for key in ("status", "state", "summary", "message"):
+        value = str(health.get(key) or "").strip()
+        if value:
+            return value
+    if "ok" in health:
+        return "ok" if bool(health.get("ok")) else "not ok"
+    return "reported"
+
+
+def _project_component_rows(
+    project_id: str,
+    definition: dict[str, Any],
+    row: dict[str, Any],
+    facts: dict[str, Any],
+    operations: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    inventory_by_ref = _component_inventory_by_ref(operations=operations)
+    installed_refs = _installed_component_refs_for_project_detail(inventory_by_ref)
+    selected_refs = set()
+    if definition:
+        try:
+            selected_refs = set(selected_project_component_refs(definition, include_optional=False))
+        except Exception:
+            selected_refs = set()
+    if not selected_refs:
+        selected_refs = {
+            str(ref).strip()
+            for ref in row.get("component_refs") or []
+            if str(ref).strip()
+        }
+    feature_by_ref = _project_feature_index(definition)
+    component_records: list[dict[str, Any]] = []
+    components = definition.get("components") if isinstance(definition.get("components"), dict) else {}
+    for source, ownership in (
+        (components.get("owned") or [], "owned"),
+        (components.get("dependencies") or [], "dependency"),
+    ):
+        for raw in source:
+            if not isinstance(raw, dict):
+                continue
+            ref = str(raw.get("ref") or "").strip()
+            if not ref:
+                continue
+            component_records.append({**raw, "ref": ref, "ownership": ownership})
+    for ref in row.get("component_refs") or []:
+        token = str(ref or "").strip()
+        if token and not any(item.get("ref") == token for item in component_records):
+            component_records.append({"ref": token, "ownership": "installed", "role": "selected"})
+    for deployment in facts.get("deployments") or []:
+        if not isinstance(deployment, dict):
+            continue
+        for placement in deployment.get("placements") or []:
+            if not isinstance(placement, dict):
+                continue
+            ref = str(placement.get("component_ref") or "").strip()
+            if ref and not any(item.get("ref") == ref for item in component_records):
+                component_records.append({"ref": ref, "ownership": "deployment", "role": "placement"})
+
+    nodes_by_ref: dict[str, set[str]] = {}
+    activation_status_by_ref: dict[str, set[str]] = {}
+    for activation in facts.get("activations") or []:
+        if not isinstance(activation, dict):
+            continue
+        ref = str(activation.get("component_ref") or "").strip()
+        if not ref:
+            continue
+        node_id = str(activation.get("node_id") or "").strip()
+        if node_id:
+            nodes_by_ref.setdefault(ref, set()).add(node_id)
+        status = str(activation.get("status") or "").strip()
+        if status:
+            activation_status_by_ref.setdefault(ref, set()).add(status)
+
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for record in component_records:
+        ref = str(record.get("ref") or "").strip()
+        if not ref or ref in seen:
+            continue
+        seen.add(ref)
+        component_kind, component_id = _component_ref_parts(ref)
+        inventory = inventory_by_ref.get(ref) or {}
+        installed = ref in installed_refs
+        activation_statuses = sorted(activation_status_by_ref.get(ref) or [])
+        if activation_statuses:
+            status = ", ".join(activation_statuses)
+            status_icon = _project_status_icon(status, fallback="layers-outline")
+            status_tooltip = f"observed activation: {status}"
+        elif inventory.get("has_drift"):
+            status = str(inventory.get("status") or "drift").strip()
+            status_icon = str(inventory.get("status_icon") or _project_status_icon(status)).strip()
+            status_tooltip = str(inventory.get("status_tooltip") or status).strip()
+        elif installed:
+            status = "installed"
+            status_icon = "checkmark-circle-outline"
+            status_tooltip = "installed on this node"
+        elif str(record.get("ownership") or "") == "dependency":
+            status = "external"
+            status_icon = "layers-outline"
+            status_tooltip = "declared as shared project dependency"
+        else:
+            status = "missing"
+            status_icon = "alert-circle-outline"
+            status_tooltip = "component is not installed"
+        features = feature_by_ref.get(ref) or []
+        feature_ids = [str(item.get("id") or "").strip() for item in features if str(item.get("id") or "").strip()]
+        feature_titles = [str(item.get("title") or item.get("id") or "").strip() for item in features if str(item.get("title") or item.get("id") or "").strip()]
+        nodes = sorted(nodes_by_ref.get(ref) or [])
+        out.append(
+            {
+                "id": ref,
+                "project_id": project_id,
+                "component_ref": ref,
+                "component_kind": component_kind,
+                "component_id": component_id,
+                "kind": component_kind,
+                "ownership": str(record.get("ownership") or "owned"),
+                "role": str(record.get("role") or ""),
+                "exposure": str(record.get("exposure") or ""),
+                "lifecycle": str(record.get("lifecycle") or ""),
+                "relations": _join_project_texts(record.get("relations"), limit=8),
+                "install_scope": "default" if ref in selected_refs else ("feature" if feature_ids else "manifest"),
+                "selected": ref in selected_refs,
+                "installed": installed,
+                "features": ", ".join(feature_titles or feature_ids),
+                "feature_ids": ", ".join(feature_ids),
+                "status": status,
+                "status_icon": status_icon,
+                "status_tooltip": status_tooltip,
+                "catalog_display": str(inventory.get("catalog_display") or "unknown"),
+                "workspace_display": str(inventory.get("workspace_display") or "missing"),
+                "runtime_display": str(inventory.get("runtime_display") or "none"),
+                "version": str(inventory.get("version_display") or inventory.get("version") or ""),
+                "node_count": len(nodes) if nodes else (1 if installed else 0),
+                "nodes": ", ".join(nodes) if nodes else ("local" if installed else ""),
+                "updated_at": str(inventory.get("updated_at") or ""),
+            }
+        )
+    out.sort(key=lambda item: (not bool(item.get("selected")), str(item.get("component_ref") or "")))
+    return out
+
+
+def _project_feature_rows(definition: dict[str, Any], component_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    components_by_ref = {str(item.get("component_ref") or ""): item for item in component_rows}
+    install = definition.get("install") if isinstance(definition.get("install"), dict) else {}
+    features = [item for item in install.get("features") or [] if isinstance(item, dict)]
+    if not features and component_rows:
+        refs = [str(item.get("component_ref") or "").strip() for item in component_rows if str(item.get("component_ref") or "").strip()]
+        installed_count = sum(1 for ref in refs if bool((components_by_ref.get(ref) or {}).get("installed")))
+        return [
+            {
+                "id": "manifest",
+                "title": "Manifest components",
+                "default": True,
+                "optional": False,
+                "components": len(refs),
+                "installed": installed_count,
+                "status": "ready" if refs and installed_count == len(refs) else ("partial" if installed_count else "missing"),
+                "component_refs": ", ".join(refs),
+            }
+        ]
+    out: list[dict[str, Any]] = []
+    for feature in features:
+        refs = [str(ref or "").strip() for ref in feature.get("components") or [] if str(ref or "").strip()]
+        installed_count = sum(1 for ref in refs if bool((components_by_ref.get(ref) or {}).get("installed")))
+        if not refs:
+            status = "empty"
+        elif installed_count == len(refs):
+            status = "ready"
+        elif installed_count:
+            status = "partial"
+        else:
+            status = "optional" if bool(feature.get("optional")) else "missing"
+        out.append(
+            {
+                "id": str(feature.get("id") or ""),
+                "title": str(feature.get("title") or feature.get("id") or ""),
+                "default": bool(feature.get("default")),
+                "optional": bool(feature.get("optional")),
+                "components": len(refs),
+                "installed": installed_count,
+                "status": status,
+                "component_refs": ", ".join(refs),
+            }
+        )
+    return out
+
+
+def _project_node_rows(
+    project_id: str,
+    component_rows: list[dict[str, Any]],
+    facts: dict[str, Any],
+) -> list[dict[str, Any]]:
+    deployment_by_id = {
+        str(item.get("deployment_id") or "").strip(): item
+        for item in facts.get("deployments") or []
+        if isinstance(item, dict) and str(item.get("deployment_id") or "").strip()
+    }
+    out: list[dict[str, Any]] = []
+    activated_placements: set[tuple[str, str]] = set()
+    for activation in facts.get("activations") or []:
+        if not isinstance(activation, dict):
+            continue
+        deployment_id = str(activation.get("deployment_id") or "").strip()
+        component_ref = str(activation.get("component_ref") or "").strip()
+        if deployment_id and component_ref:
+            activated_placements.add((deployment_id, component_ref))
+        deployment = deployment_by_id.get(deployment_id) or {}
+        health = activation.get("health") if isinstance(activation.get("health"), dict) else {}
+        out.append(
+            {
+                "id": str(activation.get("activation_id") or f"{deployment_id}:{activation.get('node_id')}:{activation.get('component_ref')}"),
+                "project_id": project_id,
+                "deployment_id": deployment_id,
+                "subnet_id": str(deployment.get("subnet_id") or ""),
+                "node_id": str(activation.get("node_id") or ""),
+                "component_ref": str(activation.get("component_ref") or ""),
+                "status": str(activation.get("status") or ""),
+                "status_icon": _project_status_icon(activation.get("status")),
+                "health": _activation_health_display(health),
+                "generation": str(activation.get("generation") or ""),
+                "release": _short_digest(activation.get("release_digest")),
+                "package": _short_digest(activation.get("package_digest")),
+                "updated_at": str(activation.get("updated_at") or ""),
+                "source": "deployment_activation",
+            }
+        )
+
+    for deployment in facts.get("deployments") or []:
+        if not isinstance(deployment, dict):
+            continue
+        deployment_id = str(deployment.get("deployment_id") or "").strip()
+        for placement in deployment.get("placements") or []:
+            if not isinstance(placement, dict):
+                continue
+            component_ref = str(placement.get("component_ref") or "").strip()
+            if (deployment_id, component_ref) in activated_placements:
+                continue
+            selected_nodes = [
+                str(item).strip()
+                for item in placement.get("selected_node_ids") or []
+                if str(item).strip()
+            ]
+            mode = str(placement.get("mode") or "placement").strip()
+            out.append(
+                {
+                    "id": f"{deployment_id}:{placement.get('component_ref')}",
+                    "project_id": project_id,
+                    "deployment_id": deployment_id,
+                    "subnet_id": str(deployment.get("subnet_id") or ""),
+                    "node_id": ", ".join(selected_nodes) if selected_nodes else mode,
+                    "component_ref": component_ref,
+                    "status": str(deployment.get("status") or "desired"),
+                    "status_icon": _project_status_icon(deployment.get("status"), fallback="layers-outline"),
+                    "health": "desired",
+                    "generation": str(deployment.get("revision") or ""),
+                    "release": _short_digest(deployment.get("release_digest")),
+                    "package": "",
+                    "updated_at": str(deployment.get("updated_at") or ""),
+                    "source": "deployment_placement",
+                }
+            )
+    if out:
+        return sorted(out, key=lambda item: (str(item.get("deployment_id") or ""), str(item.get("component_ref") or "")))
+
+    try:
+        conf = load_config()
+        local_node_id = str(getattr(conf, "node_id", "") or "").strip() or "local"
+    except Exception:
+        local_node_id = "local"
+    for component in component_rows:
+        if not isinstance(component, dict):
+            continue
+        out.append(
+            {
+                "id": f"local:{component.get('component_ref')}",
+                "project_id": project_id,
+                "deployment_id": "",
+                "subnet_id": "",
+                "node_id": local_node_id,
+                "component_ref": str(component.get("component_ref") or ""),
+                "status": "installed" if bool(component.get("installed")) else "missing",
+                "status_icon": "checkmark-circle-outline" if bool(component.get("installed")) else "alert-circle-outline",
+                "health": "local registry" if bool(component.get("installed")) else "not installed",
+                "generation": "",
+                "release": "",
+                "package": "",
+                "updated_at": str(component.get("updated_at") or ""),
+                "source": "local_fallback",
+            }
+        )
+    return sorted(out, key=lambda item: (str(item.get("component_ref") or ""), str(item.get("node_id") or "")))
+
+
+def _project_operation_rows(
+    project_id: str,
+    component_rows: list[dict[str, Any]],
+    facts: dict[str, Any],
+    *,
+    webspace_id: str | None = None,
+) -> list[dict[str, Any]]:
+    component_refs = {str(item.get("component_ref") or "").strip() for item in component_rows if str(item.get("component_ref") or "").strip()}
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for operation in facts.get("operations") or []:
+        if not isinstance(operation, dict):
+            continue
+        operation_id = str(operation.get("operation_id") or "").strip()
+        if operation_id:
+            seen.add(operation_id)
+        node_results = operation.get("node_results") if isinstance(operation.get("node_results"), list) else []
+        node_ids = [
+            str(item.get("node_id") or "").strip()
+            for item in node_results
+            if isinstance(item, dict) and str(item.get("node_id") or "").strip()
+        ]
+        rows.append(
+            {
+                "id": operation_id,
+                "operation_id": operation_id,
+                "kind": f"deployment.{operation.get('kind') or ''}".rstrip("."),
+                "state": str(operation.get("state") or ""),
+                "status": str(operation.get("state") or ""),
+                "target": str(operation.get("deployment_id") or ""),
+                "node_id": ", ".join(node_ids),
+                "updated_at": str(operation.get("updated_at") or ""),
+                "uncertain": bool(operation.get("uncertain")),
+                "source": "project_deployment",
+            }
+        )
+    try:
+        operations = _operations_snapshot(webspace_id=webspace_id)
+    except Exception:
+        operations = {}
+    for item in _iter_operation_items(operations):
+        if not isinstance(item, dict):
+            continue
+        operation_id = str(item.get("operation_id") or item.get("id") or "").strip()
+        if operation_id and operation_id in seen:
+            continue
+        target_kind = str(item.get("target_kind") or "").strip()
+        target_id = str(item.get("target_id") or "").strip()
+        component_ref = f"{target_kind}:{target_id}" if target_kind in {"skill", "scenario"} and target_id else ""
+        project_target = target_kind == "project" and target_id == project_id
+        component_target = bool(component_ref and component_ref in component_refs)
+        if not project_target and not component_target:
+            continue
+        if operation_id:
+            seen.add(operation_id)
+        rows.append(
+            {
+                "id": operation_id,
+                "operation_id": operation_id,
+                "kind": str(item.get("kind") or item.get("current_step") or target_kind or ""),
+                "state": str(item.get("status") or item.get("state") or ""),
+                "status": str(item.get("status") or item.get("state") or ""),
+                "target": component_ref or target_id,
+                "node_id": str(item.get("target_node_id") or item.get("node_id") or ""),
+                "updated_at": str(item.get("updated_at") or item.get("created_at") or ""),
+                "uncertain": bool(item.get("uncertain")),
+                "source": "operations",
+            }
+        )
+    rows.sort(key=lambda item: (str(item.get("updated_at") or ""), str(item.get("operation_id") or "")), reverse=True)
+    return rows
+
+
+def _project_detail_bundle(project_id: str, *, webspace_id: str | None = None) -> dict[str, Any]:
+    token = _project_id_token(project_id)
+    if not token:
+        return {
+            "id": "",
+            "title": "Project unavailable",
+            "status": "warn",
+            "error": "project id is empty",
+            "row": {},
+            "definition": {},
+            "components": [],
+            "features": [],
+            "nodes": [],
+            "operations": [],
+            "facts": {},
+        }
+    cache_key = (str(webspace_id or "").strip() or default_webspace_id(), token)
+    if _PROJECT_DETAIL_CACHE_TTL_S > 0:
+        with _project_detail_cache_lock:
+            cached = _project_detail_cache.get(cache_key)
+            if cached and time.monotonic() - float(cached[0]) <= _PROJECT_DETAIL_CACHE_TTL_S:
+                return _cache_copy(cached[1])
+    row = _project_inventory_item_by_id(token)
+    definition = _project_definition_by_id(token)
+    if not row and definition:
+        row = _project_definition_fallback_row(token, definition)
+    operations = _operations_snapshot(webspace_id=webspace_id)
+    facts = _project_deployment_facts(token)
+    components = _project_component_rows(token, definition, row, facts, operations=operations)
+    features = _project_feature_rows(definition, components)
+    nodes = _project_node_rows(token, components, facts)
+    project_operations = _project_operation_rows(token, components, facts, webspace_id=webspace_id)
+    bundle = {
+        "id": token,
+        "title": str(row.get("title") or row.get("display_name") or token),
+        "status": str(row.get("status") or ("installed" if row else "missing")),
+        "row": row,
+        "definition": definition,
+        "components": components,
+        "features": features,
+        "nodes": nodes,
+        "operations": project_operations,
+        "facts": facts,
+    }
+    if _PROJECT_DETAIL_CACHE_TTL_S > 0:
+        with _project_detail_cache_lock:
+            _project_detail_cache[cache_key] = (time.monotonic(), _cache_copy(bundle))
+            while len(_project_detail_cache) > 128:
+                _project_detail_cache.pop(next(iter(_project_detail_cache)), None)
+    return bundle
+
+
+def _project_distribution_summary(definition: dict[str, Any], facts: dict[str, Any], nodes: list[dict[str, Any]]) -> tuple[str, str]:
+    compatibility = definition.get("compatibility") if isinstance(definition.get("compatibility"), dict) else {}
+    contracts = {str(item).strip() for item in compatibility.get("required_contracts") or [] if str(item).strip()}
+    distributed_ready = bool({"adaos.project.deployment.v1", "adaos.distributed.service.v1"}.intersection(contracts))
+    deployment_count = len(facts.get("deployments") or [])
+    activation_count = len(facts.get("activations") or [])
+    node_ids = {
+        str(item.get("node_id") or "").strip()
+        for item in nodes
+        if isinstance(item, dict) and str(item.get("node_id") or "").strip()
+    }
+    if deployment_count:
+        return (
+            "distributed",
+            f"{deployment_count} deployment(s), {activation_count} activation(s), {len(node_ids)} node(s)",
+        )
+    if distributed_ready:
+        return (
+            "distributed-ready",
+            "project declares distributed contracts, but no deployment record is present",
+        )
+    return ("local", "local component registry fallback")
+
+
+def _project_overview_items(project_id: str, *, webspace_id: str | None = None) -> list[dict[str, Any]]:
+    bundle = _project_detail_bundle(project_id, webspace_id=webspace_id)
+    row = bundle.get("row") if isinstance(bundle.get("row"), dict) else {}
+    definition = bundle.get("definition") if isinstance(bundle.get("definition"), dict) else {}
+    facts = bundle.get("facts") if isinstance(bundle.get("facts"), dict) else {}
+    components = list(bundle.get("components") or [])
+    features = list(bundle.get("features") or [])
+    nodes = list(bundle.get("nodes") or [])
+    installed_count = sum(1 for item in components if isinstance(item, dict) and bool(item.get("installed")))
+    selected_count = sum(1 for item in components if isinstance(item, dict) and bool(item.get("selected")))
+    distribution_state, distribution_detail = _project_distribution_summary(definition, facts, nodes)
+    catalog = definition.get("catalog") if isinstance(definition.get("catalog"), dict) else {}
+    compatibility = definition.get("compatibility") if isinstance(definition.get("compatibility"), dict) else {}
+    install = definition.get("install") if isinstance(definition.get("install"), dict) else {}
+    required_contracts = _join_project_texts(compatibility.get("required_contracts"), limit=6)
+    validation_profiles = _join_project_texts(compatibility.get("validation_profiles"), limit=6)
+    source_path = str(definition.get("source_path") or "").strip()
+    description = str(row.get("description") or catalog.get("description") or "").strip()
+    return [
+        {
+            "id": "identity",
+            "title": str(row.get("display_name") or row.get("title") or project_id),
+            "subtitle": f"project:{project_id} | {row.get('version') or 'unknown'} | {row.get('stage') or 'unlisted'}",
+            "content": description,
+            "icon": str(row.get("status_icon") or _project_status_icon(row.get("status"))),
+        },
+        {
+            "id": "inventory",
+            "title": "Inventory",
+            "subtitle": f"{installed_count}/{len(components)} installed, {selected_count} default-selected",
+            "content": f"source={row.get('source') or 'unknown'}; inferred={bool(row.get('inferred'))}; installed_at={row.get('installed_at') or '-'}",
+            "icon": "layers-outline",
+        },
+        {
+            "id": "distribution",
+            "title": "Distribution",
+            "subtitle": distribution_state,
+            "content": distribution_detail,
+            "icon": "git-compare-outline" if distribution_state != "local" else "checkmark-circle-outline",
+        },
+        {
+            "id": "features",
+            "title": "Features",
+            "subtitle": f"{len(features)} feature group(s); default_install={bool(install.get('default'))}",
+            "content": "; ".join(
+                f"{item.get('id')}={item.get('status')}"
+                for item in features
+                if isinstance(item, dict) and item.get("id")
+            ),
+            "icon": "checkmark-done-outline",
+        },
+        {
+            "id": "contracts",
+            "title": "Contracts",
+            "subtitle": validation_profiles or "no validation profile",
+            "content": required_contracts or "no required contracts declared",
+            "icon": "document-text-outline",
+        },
+        {
+            "id": "source",
+            "title": "Source",
+            "subtitle": source_path or str(row.get("source") or "unknown"),
+            "content": f"categories={row.get('categories') or ''}; tags={row.get('tags') or ''}",
+            "icon": "document-text-outline",
+        },
+    ]
+
+
+def _project_action_items(project_id: str, *, webspace_id: str | None = None) -> list[dict[str, Any]]:
+    bundle = _project_detail_bundle(project_id, webspace_id=webspace_id)
+    row = bundle.get("row") if isinstance(bundle.get("row"), dict) else {}
+    definition = bundle.get("definition") if isinstance(bundle.get("definition"), dict) else {}
+    components = list(bundle.get("components") or [])
+    selected_missing = [
+        str(item.get("component_ref") or "")
+        for item in components
+        if isinstance(item, dict) and bool(item.get("selected")) and not bool(item.get("installed"))
+    ]
+    can_reconcile = bool(definition) and bool(row.get("inferred")) and not selected_missing
+    reconcile_title = (
+        "Write explicit project install record from the installed component set"
+        if can_reconcile
+        else (
+            f"Cannot reconcile while default components are missing: {', '.join(selected_missing[:4])}"
+            if selected_missing
+            else "Project is already explicit or manifest is unavailable"
+        )
+    )
+    return [
+        {
+            "id": "project_refresh",
+            "label": "Refresh",
+            "title": "Refresh project inventory, deployment, and operation streams",
+            "kind": "secondary",
+        },
+        {
+            "id": "project_reconcile",
+            "label": "Reconcile",
+            "title": reconcile_title,
+            "kind": "secondary",
+            "disabled": not can_reconcile,
+        },
+        {
+            "id": "project_update",
+            "label": "Update",
+            "title": "Project-level update will use the deployment command ABI; not enabled in this slice",
+            "kind": "secondary",
+            "disabled": True,
+        },
+        {
+            "id": "project_components",
+            "label": "Components",
+            "title": "Per-component node operations require the project deployment controller",
+            "kind": "secondary",
+            "disabled": True,
+        },
+    ]
+
+
+def _project_detail_payload(project_id: str, *, webspace_id: str | None = None) -> dict[str, Any]:
+    bundle = _project_detail_bundle(project_id, webspace_id=webspace_id)
+    row = bundle.get("row") if isinstance(bundle.get("row"), dict) else {}
+    facts = bundle.get("facts") if isinstance(bundle.get("facts"), dict) else {}
+    distribution_state, distribution_detail = _project_distribution_summary(
+        bundle.get("definition") if isinstance(bundle.get("definition"), dict) else {},
+        facts,
+        list(bundle.get("nodes") or []),
+    )
+    if not row:
+        return {
+            "id": project_id,
+            "title": "Project unavailable",
+            "status": "warn",
+            "content": f"Project was not found in installed inventory or workspace manifests: {project_id}",
+        }
+    return {
+        "id": project_id,
+        "title": str(row.get("display_name") or row.get("title") or project_id),
+        "status": str(row.get("status") or "installed"),
+        "description": str(row.get("description") or ""),
+        "version": str(row.get("version") or ""),
+        "stage": str(row.get("stage") or ""),
+        "source": str(row.get("source") or ""),
+        "inferred": bool(row.get("inferred")),
+        "components": len(bundle.get("components") or []),
+        "features": len(bundle.get("features") or []),
+        "nodes": len(bundle.get("nodes") or []),
+        "operations": len(bundle.get("operations") or []),
+        "distribution": distribution_state,
+        "distribution_detail": distribution_detail,
+        "deployment_error": str(facts.get("error") or ""),
+    }
+
+
+def _project_detail_payload_for_section(section: str, project_id: str, *, webspace_id: str | None = None) -> Any:
+    token = _project_id_token(project_id)
+    if not token:
+        return []
+    if section in {"project", "projects"}:
+        return _project_detail_payload(token, webspace_id=webspace_id)
+    if section == "project_overview":
+        return _project_overview_items(token, webspace_id=webspace_id)
+    if section == "project_components":
+        return _project_detail_bundle(token, webspace_id=webspace_id).get("components") or []
+    if section == "project_features":
+        return _project_detail_bundle(token, webspace_id=webspace_id).get("features") or []
+    if section == "project_nodes":
+        return _project_detail_bundle(token, webspace_id=webspace_id).get("nodes") or []
+    if section == "project_operations":
+        return _project_detail_bundle(token, webspace_id=webspace_id).get("operations") or []
+    if section == "project_actions":
+        return _project_action_items(token, webspace_id=webspace_id)
+    return None
+
+
 def _make_skill_manager(ctx) -> SkillManager:
     return SkillManager(
         repo=ctx.skills_repo,
@@ -5488,6 +6361,7 @@ _SCENARIO_INVENTORY_STREAM_KEYS = {
 }
 
 _PROJECT_INVENTORY_STREAM_KEYS = {
+    "id",
     "name",
     "display_name",
     "title",
@@ -8518,6 +9392,68 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
             last_error="",
         )
         return result
+    if action_id in {"project_refresh", "project_reconcile"}:
+        value_map = payload.get("value") if isinstance(payload, dict) and isinstance(payload.get("value"), dict) else {}
+        project_id = str(
+            _extract_param(payload, "project_id")
+            or _extract_param(payload, "name")
+            or value_map.get("project_id")
+            or value_map.get("name")
+            or value_map.get("id")
+            or ""
+        ).strip()
+        if not project_id:
+            raise ValueError("project action requires project id")
+        webspace_id = str(_extract_param(payload, "webspace_id") or default_webspace_id()).strip() or default_webspace_id()
+        if action_id == "project_refresh":
+            result = {
+                "ok": True,
+                "action": action_id,
+                "project_id": project_id,
+                "webspace_id": webspace_id,
+            }
+        else:
+            ctx = get_ctx()
+            definition = _project_definition_by_id(project_id)
+            if not definition:
+                raise ValueError(f"project:{project_id} was not found in workspace")
+            try:
+                component_refs = [
+                    str(ref).strip()
+                    for ref in selected_project_component_refs(definition, include_optional=False)
+                    if str(ref).strip()
+                ]
+            except Exception as exc:
+                raise ValueError(f"failed to select project components for {project_id}: {exc}") from exc
+            installed_refs = _installed_project_component_refs(ctx, Path(ctx.paths.workspace_dir()))
+            missing_refs = [ref for ref in component_refs if ref not in installed_refs]
+            if missing_refs:
+                raise ValueError(
+                    f"cannot reconcile project:{project_id}; missing default components: {', '.join(missing_refs)}"
+                )
+            record = record_project_install(
+                ctx,
+                definition,
+                component_refs=component_refs,
+                webspace_id=webspace_id,
+            )
+            result = {
+                "ok": True,
+                "action": action_id,
+                "project_id": project_id,
+                "component_refs": component_refs,
+                "record": record,
+                "webspace_id": webspace_id,
+            }
+        _write_ui_state(
+            infrastateProjectId=project_id,
+            last_action=action_id,
+            last_action_ts=time.time(),
+            last_refresh_ts=time.time(),
+            last_result=result,
+            last_error="",
+        )
+        return result
     if action_id == "refresh":
         if selected_node_id and selected_node_id != str(getattr(conf, "node_id", "") or ""):
             if str(getattr(conf, "role", "") or "").strip().lower() != "hub":
@@ -9298,6 +10234,9 @@ def _lookup_direct_detail(receiver: str, *, webspace_id: str | None = None) -> A
             "status": "warn",
             "content": f"Details item not found: operations/{item_id}",
         }
+    project_detail = _project_detail_payload_for_section(section, item_id, webspace_id=webspace_id)
+    if project_detail is not None:
+        return project_detail
     rows: list[dict[str, Any]]
     if section == "realtime":
         ctx = _lightweight_control_context(webspace_id=webspace_id, include_member_state=True)
@@ -10186,6 +11125,7 @@ def on_skill_activated(evt: Any) -> None:
 
 @subscribe("skill.installed")
 @subscribe("skill.uninstalled")
+@subscribe("project.installed")
 @subscribe("scenario.installed")
 @subscribe("scenario.removed")
 @subscribe("scenarios.synced")
