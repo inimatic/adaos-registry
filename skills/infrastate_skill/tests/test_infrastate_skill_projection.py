@@ -260,6 +260,29 @@ def test_infrastate_compact_snapshot_excludes_yjs_controls():
     assert "yjs_webspaces" not in compact
 
 
+def test_infrastate_compact_summary_preserves_i18n_fields():
+    mod = _load_infrastate_module()
+
+    compact = mod._compact_summary_for_yjs(
+        {
+            "label": "Core update",
+            "label_i18n": {"key": "infrastate.text.core_update"},
+            "value": "succeeded",
+            "value_i18n": {"key": "infrastate.state.succeeded"},
+            "status": "ok",
+            "status_i18n": {"key": "infrastate.state.ok"},
+            "subtitle": "slot B",
+            "description": "runtime boot validated",
+            "description_i18n": {"key": "infrastate.text.no_update_in_progress"},
+        }
+    )
+
+    assert compact["label_i18n"] == {"key": "infrastate.text.core_update"}
+    assert compact["value_i18n"] == {"key": "infrastate.state.succeeded"}
+    assert compact["status_i18n"] == {"key": "infrastate.state.ok"}
+    assert compact["description_i18n"] == {"key": "infrastate.text.no_update_in_progress"}
+
+
 def test_infrastate_compact_snapshot_projects_yjs_balancer():
     mod = _load_infrastate_module()
 
@@ -384,11 +407,27 @@ def test_infrastate_compact_action_list_preserves_disabled_state():
     mod = _load_infrastate_module()
 
     compact = mod._compact_action_list_for_yjs(
-        [{"id": "inventory_activate", "label": "Activating...", "title": "Activating...", "disabled": True}]
+        [
+            {
+                "id": "inventory_activate",
+                "label": "Activating...",
+                "label_i18n": {"key": "infrastate.action.inventory_activate.running"},
+                "title": "Activating...",
+                "title_i18n": {"key": "infrastate.action.inventory_activate.running"},
+                "disabled": True,
+            }
+        ]
     )
 
     assert compact == [
-        {"id": "inventory_activate", "label": "Activating...", "title": "Activating...", "disabled": True}
+        {
+            "id": "inventory_activate",
+            "label": "Activating...",
+            "label_i18n": {"key": "infrastate.action.inventory_activate.running"},
+            "title": "Activating...",
+            "title_i18n": {"key": "infrastate.action.inventory_activate.running"},
+            "disabled": True,
+        }
     ]
 
 
@@ -979,9 +1018,15 @@ def test_infrastate_inventory_defaults_to_installed_projects(monkeypatch):
             "description": "",
             "stage": "beta",
             "status": "installed",
+            "status_i18n": {"key": "infrastate.state.installed"},
             "status_icon": "checkmark-circle-outline",
             "status_tooltip": "installed",
+            "status_tooltip_i18n": {"key": "infrastate.state.installed"},
             "categories": "system, desktop",
+            "categories_i18n": {
+                "en": "system, desktop",
+                "ru": "\u0441\u0438\u0441\u0442\u0435\u043c\u0430, \u0440\u0430\u0431\u043e\u0447\u0438\u0439 \u0441\u0442\u043e\u043b",
+            },
             "tags": "default-install",
             "components_count": 2,
             "component_refs": ["scenario:web_desktop", "skill:web_desktop_skill"],
@@ -1429,6 +1474,7 @@ def test_infrastate_project_detail_streams_include_deployment_activations(monkey
             "node_id": "tv-1",
             "component_ref": "skill:media_center_skill",
             "status": "active",
+            "status_i18n": {"key": "infrastate.state.active"},
             "status_icon": "checkmark-circle-outline",
             "health": "ready",
             "generation": "3",
@@ -4713,6 +4759,79 @@ def test_infrastate_project_detail_empty_states_are_i18n_backed():
 
     project_modal_json = json.dumps(webui["registry"]["modals"]["project_detail_modal"], ensure_ascii=False)
     assert "No project selected" not in project_modal_json
+
+
+def test_infrastate_project_rows_propagate_manifest_i18n(monkeypatch):
+    mod = _load_infrastate_module()
+    definition = {
+        "id": "adaos_builder",
+        "version": "0.3.1",
+        "catalog": {
+            "title": "AdaOS Builder",
+            "title_i18n": {
+                "en": "AdaOS Builder",
+                "ru": "\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440 AdaOS",
+            },
+            "description": "Project workbench.",
+            "description_i18n": {
+                "en": "Project workbench.",
+                "ru": "\u041f\u0440\u043e\u0435\u043a\u0442\u043d\u0430\u044f \u0440\u0430\u0431\u043e\u0447\u0430\u044f \u0441\u0440\u0435\u0434\u0430.",
+            },
+            "categories": ["development"],
+            "tags": ["builder"],
+        },
+        "publication": {"stage": "alpha", "visibility": "listed"},
+        "components": {
+            "owned": [{"ref": "scenario:builder", "role": "primary"}],
+            "dependencies": [],
+        },
+        "install": {
+            "default": False,
+            "features": [
+                {
+                    "id": "builder-workbench",
+                    "title": "Builder workbench",
+                    "title_i18n": {
+                        "en": "Builder workbench",
+                        "ru": "\u0420\u0430\u0431\u043e\u0447\u0430\u044f \u0441\u0440\u0435\u0434\u0430 Builder",
+                    },
+                    "default": True,
+                    "optional": False,
+                    "components": ["scenario:builder"],
+                }
+            ],
+        },
+    }
+
+    row = mod._project_definition_fallback_row("adaos_builder", definition)
+    assert row["display_name_i18n"]["ru"] == "\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440 AdaOS"
+    assert row["description_i18n"]["ru"] == "\u041f\u0440\u043e\u0435\u043a\u0442\u043d\u0430\u044f \u0440\u0430\u0431\u043e\u0447\u0430\u044f \u0441\u0440\u0435\u0434\u0430."
+    assert row["categories_i18n"]["ru"] == "\u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0430"
+
+    monkeypatch.setattr(
+        mod,
+        "_project_detail_bundle",
+        lambda *_args, **_kwargs: {
+            "row": row,
+            "definition": definition,
+            "facts": {},
+            "components": [{"component_ref": "scenario:builder", "installed": True, "selected": True}],
+            "features": [],
+            "nodes": [],
+            "operations": [],
+        },
+    )
+
+    overview = mod._project_overview_items("adaos_builder")
+    assert overview[0]["title_i18n"]["ru"] == "\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440 AdaOS"
+    assert overview[0]["content_i18n"]["ru"] == "\u041f\u0440\u043e\u0435\u043a\u0442\u043d\u0430\u044f \u0440\u0430\u0431\u043e\u0447\u0430\u044f \u0441\u0440\u0435\u0434\u0430."
+
+    features = mod._project_feature_rows(
+        definition,
+        [{"component_ref": "scenario:builder", "installed": True}],
+    )
+    assert features[0]["title_i18n"]["ru"] == "\u0420\u0430\u0431\u043e\u0447\u0430\u044f \u0441\u0440\u0435\u0434\u0430 Builder"
+    assert features[0]["status_i18n"] == {"key": "infrastate.state.ready"}
 
 
 def test_infrastate_marketplace_project_stream_uses_snapshot_payload():

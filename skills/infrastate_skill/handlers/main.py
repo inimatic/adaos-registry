@@ -695,15 +695,146 @@ def _compact_snapshot_for_yjs(snapshot: dict[str, Any]) -> dict[str, Any]:
     return compact
 
 
+def _i18n(key: str, **params: Any) -> dict[str, Any]:
+    spec: dict[str, Any] = {"key": key}
+    clean_params = {str(k): v for k, v in params.items() if v is not None}
+    if clean_params:
+        spec["params"] = clean_params
+    return spec
+
+
+def _with_i18n_fields(
+    item: dict[str, Any],
+    *,
+    label: str | None = None,
+    title: str | None = None,
+    subtitle: str | None = None,
+    description: str | None = None,
+    content: str | None = None,
+    **params: Any,
+) -> dict[str, Any]:
+    for field, key in (
+        ("label", label),
+        ("title", title),
+        ("subtitle", subtitle),
+        ("description", description),
+        ("content", content),
+    ):
+        if key:
+            item[f"{field}_i18n"] = _i18n(key, **params)
+    return item
+
+
+def _clean_i18n_spec(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, Mapping):
+        return None
+    out: dict[str, Any] = {}
+    for key, item in value.items():
+        token = str(key or "").strip()
+        if not token or item is None:
+            continue
+        if isinstance(item, (str, int, float, bool)) or isinstance(item, (dict, list)):
+            out[token] = _cache_copy(item)
+    return out or None
+
+
+def _first_i18n_spec(*values: Any) -> dict[str, Any] | None:
+    for value in values:
+        spec = _clean_i18n_spec(value)
+        if spec:
+            return spec
+    return None
+
+
+_PROJECT_CATEGORY_LABELS: dict[str, dict[str, str]] = {
+    "default": {"en": "default", "ru": "по умолчанию"},
+    "desktop": {"en": "desktop", "ru": "рабочий стол"},
+    "development": {"en": "development", "ru": "разработка"},
+    "files": {"en": "files", "ru": "файлы"},
+    "home": {"en": "home", "ru": "дом"},
+    "lab": {"en": "lab", "ru": "лаборатория"},
+    "media": {"en": "media", "ru": "медиа"},
+    "nlu": {"en": "NLU", "ru": "NLU"},
+    "operations": {"en": "operations", "ru": "операции"},
+    "research": {"en": "research", "ru": "исследования"},
+    "system": {"en": "system", "ru": "система"},
+    "vision": {"en": "vision", "ru": "зрение"},
+}
+
+
+def _project_category_i18n(tokens: list[str]) -> dict[str, Any] | None:
+    clean = [str(item).strip() for item in tokens if str(item).strip()]
+    if not clean:
+        return None
+    values: dict[str, str] = {}
+    for locale in ("en", "ru"):
+        values[locale] = ", ".join(
+            _PROJECT_CATEGORY_LABELS.get(item, {}).get(locale, item)
+            for item in clean
+        )
+    return values if values.get("ru") != ", ".join(clean) else None
+
+
+_SEMANTIC_STATE_I18N_TOKENS = {
+    "active",
+    "applying",
+    "available",
+    "blocked",
+    "cancelled",
+    "canceled",
+    "connected",
+    "countdown",
+    "degraded",
+    "desired",
+    "draining",
+    "empty",
+    "external",
+    "failed",
+    "idle",
+    "installed",
+    "local",
+    "missing",
+    "offline",
+    "ok",
+    "optional",
+    "partial",
+    "pending",
+    "planned",
+    "preparing",
+    "ready",
+    "refreshing",
+    "restarting",
+    "rolled_back",
+    "running",
+    "stopping",
+    "succeeded",
+    "uncertain",
+    "unknown",
+    "validated",
+    "warn",
+}
+
+
+def _semantic_state_i18n(value: Any) -> dict[str, Any] | None:
+    token = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if token in _SEMANTIC_STATE_I18N_TOKENS:
+        return _i18n(f"infrastate.state.{token}")
+    return None
+
+
 def _compact_summary_for_yjs(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
     out: dict[str, Any] = {}
     for key in (
         "label",
+        "label_i18n",
         "value",
+        "value_i18n",
         "status",
+        "status_i18n",
         "subtitle",
+        "subtitle_i18n",
         "version",
         "role",
         "selected_node_id",
@@ -727,9 +858,11 @@ def _compact_summary_for_yjs(value: Any) -> dict[str, Any]:
     description = str(value.get("description") or "").strip()
     if description:
         out["description"] = _truncate_text(description, 1200)
+        if "description_i18n" in value:
+            out["description_i18n"] = _cache_copy(value.get("description_i18n"))
     buttons = value.get("buttons")
     if isinstance(buttons, list):
-        out["buttons"] = [_compact_mapping(item, max_keys=8) for item in buttons if isinstance(item, dict)]
+        out["buttons"] = _compact_action_list_for_yjs(buttons)
     return out
 
 
@@ -743,7 +876,21 @@ def _compact_action_list_for_yjs(value: Any) -> list[dict[str, Any]]:
         out.append(
             {
                 key: _cache_copy(item.get(key))
-                for key in ("id", "label", "title", "status", "subtitle", "description", "disabled")
+                for key in (
+                    "id",
+                    "label",
+                    "label_i18n",
+                    "title",
+                    "title_i18n",
+                    "status",
+                    "subtitle",
+                    "subtitle_i18n",
+                    "description",
+                    "description_i18n",
+                    "disabled",
+                    "kind",
+                    "icon",
+                )
                 if key in item
             }
         )
@@ -3673,6 +3820,7 @@ def _project_inventory_items() -> list[dict[str, Any]]:
     except Exception:
         ctx = None
         installed = []
+    definitions_by_id = _workspace_project_definitions_by_id(ctx) if ctx is not None else {}
     out: list[dict[str, Any]] = []
     explicit_project_ids: set[str] = set()
     for record in installed:
@@ -3682,49 +3830,87 @@ def _project_inventory_items() -> list[dict[str, Any]]:
         if not project_id:
             continue
         explicit_project_ids.add(project_id)
+        definition = definitions_by_id.get(project_id) or {}
+        catalog = definition.get("catalog") if isinstance(definition.get("catalog"), dict) else {}
         publication = record.get("publication") if isinstance(record.get("publication"), dict) else {}
+        if not publication and isinstance(definition.get("publication"), dict):
+            publication = definition.get("publication") or {}
         component_refs = [
             str(ref).strip()
             for ref in record.get("component_refs") or []
             if str(ref).strip()
         ]
+        if not component_refs and definition:
+            try:
+                component_refs = [
+                    str(ref).strip()
+                    for ref in selected_project_component_refs(definition, include_optional=False)
+                    if str(ref).strip()
+                ]
+            except Exception:
+                component_refs = []
         categories = [
             str(item).strip()
-            for item in record.get("categories") or []
+            for item in (record.get("categories") or catalog.get("categories") or [])
             if str(item).strip()
         ]
         tags = [
             str(item).strip()
-            for item in record.get("tags") or []
+            for item in (record.get("tags") or catalog.get("tags") or [])
             if str(item).strip()
         ]
         status = str(record.get("status") or "installed").strip() or "installed"
-        out.append(
-            {
-                "kind": "project",
-                "id": project_id,
-                "name": project_id,
-                "display_name": str(record.get("title") or project_id),
-                "title": str(record.get("title") or project_id),
-                "version": str(record.get("version") or ""),
-                "description": str(record.get("description") or ""),
-                "stage": str(publication.get("stage") or ""),
-                "status": status,
-                "status_icon": "checkmark-circle-outline" if status == "installed" else "ellipse-outline",
-                "status_tooltip": status,
-                "categories": ", ".join(categories),
-                "tags": ", ".join(tags),
-                "components_count": len(component_refs),
-                "component_refs": component_refs,
-                "installed_at": str(record.get("installed_at") or ""),
-                "source": str(record.get("source") or ""),
-                "uninstall_disabled": True,
-            }
-        )
+        title_i18n = _first_i18n_spec(record.get("title_i18n"), catalog.get("title_i18n"))
+        description_i18n = _first_i18n_spec(record.get("description_i18n"), catalog.get("description_i18n"))
+        item = {
+            "kind": "project",
+            "id": project_id,
+            "name": project_id,
+            "display_name": str(record.get("title") or catalog.get("title") or project_id),
+            "title": str(record.get("title") or catalog.get("title") or project_id),
+            "version": str(record.get("version") or definition.get("version") or ""),
+            "description": str(record.get("description") or catalog.get("description") or ""),
+            "stage": str(publication.get("stage") or ""),
+            "status": status,
+            "status_i18n": _semantic_state_i18n(status),
+            "status_icon": "checkmark-circle-outline" if status == "installed" else "ellipse-outline",
+            "status_tooltip": status,
+            "status_tooltip_i18n": _semantic_state_i18n(status),
+            "categories": ", ".join(categories),
+            "categories_i18n": _project_category_i18n(categories),
+            "tags": ", ".join(tags),
+            "components_count": len(component_refs),
+            "component_refs": component_refs,
+            "installed_at": str(record.get("installed_at") or ""),
+            "source": str(record.get("source") or ""),
+            "uninstall_disabled": True,
+        }
+        if title_i18n:
+            item["display_name_i18n"] = title_i18n
+            item["title_i18n"] = title_i18n
+        if description_i18n:
+            item["description_i18n"] = description_i18n
+        out.append(item)
     if ctx is not None:
-        out.extend(_inferred_project_inventory_items(ctx, explicit_project_ids))
+        out.extend(_inferred_project_inventory_items(ctx, explicit_project_ids, definitions_by_id=definitions_by_id))
     out.sort(key=lambda item: str(item.get("name") or ""))
     return out
+
+
+def _workspace_project_definitions_by_id(ctx: Any) -> dict[str, dict[str, Any]]:
+    try:
+        workspace_root = Path(ctx.paths.workspace_dir())
+    except Exception:
+        return {}
+    try:
+        definitions = list_workspace_projects(workspace_root, include_hidden=True)
+    except Exception:
+        return {}
+    return {
+        str(item.get("id") or "").strip(): dict(item)
+        for item in definitions
+        if isinstance(item, dict) and str(item.get("id") or "").strip()
+    }
 
 
 def _installed_project_component_refs(ctx: Any, workspace_root: Path) -> set[str]:
@@ -3770,7 +3956,12 @@ def _installed_project_component_refs(ctx: Any, workspace_root: Path) -> set[str
     return refs
 
 
-def _inferred_project_inventory_items(ctx: Any, explicit_project_ids: set[str]) -> list[dict[str, Any]]:
+def _inferred_project_inventory_items(
+    ctx: Any,
+    explicit_project_ids: set[str],
+    *,
+    definitions_by_id: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     try:
         workspace_root = Path(ctx.paths.workspace_dir())
     except Exception:
@@ -3780,15 +3971,15 @@ def _inferred_project_inventory_items(ctx: Any, explicit_project_ids: set[str]) 
         return []
 
     inferred: list[dict[str, Any]] = []
-    try:
-        definitions = list_workspace_projects(workspace_root, include_hidden=False)
-    except Exception:
-        definitions = []
+    definitions = list((definitions_by_id or _workspace_project_definitions_by_id(ctx)).values())
     for definition in definitions:
         if not isinstance(definition, dict):
             continue
         project_id = str(definition.get("id") or "").strip()
         if not project_id or project_id in explicit_project_ids:
+            continue
+        publication = definition.get("publication") if isinstance(definition.get("publication"), dict) else {}
+        if str(publication.get("visibility") or "unlisted").strip().lower() == "hidden":
             continue
         selected_refs = [
             str(ref).strip()
@@ -3798,7 +3989,6 @@ def _inferred_project_inventory_items(ctx: Any, explicit_project_ids: set[str]) 
         if not selected_refs or any(ref not in installed_refs for ref in selected_refs):
             continue
         catalog = definition.get("catalog") if isinstance(definition.get("catalog"), dict) else {}
-        publication = definition.get("publication") if isinstance(definition.get("publication"), dict) else {}
         categories = [
             str(item).strip()
             for item in catalog.get("categories") or []
@@ -3809,29 +3999,38 @@ def _inferred_project_inventory_items(ctx: Any, explicit_project_ids: set[str]) 
             for item in catalog.get("tags") or []
             if str(item).strip()
         ]
-        inferred.append(
-            {
-                "kind": "project",
-                "id": project_id,
-                "name": project_id,
-                "display_name": str(catalog.get("title") or project_id),
-                "title": str(catalog.get("title") or project_id),
-                "version": str(definition.get("version") or ""),
-                "description": str(catalog.get("description") or ""),
-                "stage": str(publication.get("stage") or ""),
-                "status": "installed",
-                "status_icon": "checkmark-circle-outline",
-                "status_tooltip": "inferred from installed components",
-                "categories": ", ".join(categories),
-                "tags": ", ".join(tags),
-                "components_count": len(selected_refs),
-                "component_refs": selected_refs,
-                "installed_at": "",
-                "source": "inferred",
-                "inferred": True,
-                "uninstall_disabled": True,
-            }
-        )
+        title_i18n = _clean_i18n_spec(catalog.get("title_i18n"))
+        description_i18n = _clean_i18n_spec(catalog.get("description_i18n"))
+        item = {
+            "kind": "project",
+            "id": project_id,
+            "name": project_id,
+            "display_name": str(catalog.get("title") or project_id),
+            "title": str(catalog.get("title") or project_id),
+            "version": str(definition.get("version") or ""),
+            "description": str(catalog.get("description") or ""),
+            "stage": str(publication.get("stage") or ""),
+            "status": "installed",
+            "status_i18n": _semantic_state_i18n("installed"),
+            "status_icon": "checkmark-circle-outline",
+            "status_tooltip": "inferred from installed components",
+            "status_tooltip_i18n": _i18n("infrastate.project.status_tooltip.inferred"),
+            "categories": ", ".join(categories),
+            "categories_i18n": _project_category_i18n(categories),
+            "tags": ", ".join(tags),
+            "components_count": len(selected_refs),
+            "component_refs": selected_refs,
+            "installed_at": "",
+            "source": "inferred",
+            "inferred": True,
+            "uninstall_disabled": True,
+        }
+        if title_i18n:
+            item["display_name_i18n"] = title_i18n
+            item["title_i18n"] = title_i18n
+        if description_i18n:
+            item["description_i18n"] = description_i18n
+        inferred.append(item)
     return inferred
 
 
@@ -3924,7 +4123,11 @@ def _project_definition_fallback_row(project_id: str, definition: dict[str, Any]
         for item in (definition.get("components") or {}).get("owned") or []
         if str(item.get("ref") or "").strip()
     ]
-    return {
+    title_i18n = _clean_i18n_spec(catalog.get("title_i18n"))
+    description_i18n = _clean_i18n_spec(catalog.get("description_i18n"))
+    categories = _join_project_texts(catalog.get("categories"))
+    category_tokens = [str(item).strip() for item in catalog.get("categories") or [] if str(item).strip()]
+    item = {
         "kind": "project",
         "id": project_id,
         "name": project_id,
@@ -3934,9 +4137,12 @@ def _project_definition_fallback_row(project_id: str, definition: dict[str, Any]
         "description": str(catalog.get("description") or ""),
         "stage": str(publication.get("stage") or ""),
         "status": "available",
+        "status_i18n": _semantic_state_i18n("available"),
         "status_icon": "layers-outline",
         "status_tooltip": "project manifest is present in workspace",
-        "categories": _join_project_texts(catalog.get("categories")),
+        "status_tooltip_i18n": _i18n("infrastate.project.status_tooltip.workspace_manifest"),
+        "categories": categories,
+        "categories_i18n": _project_category_i18n(category_tokens),
         "tags": _join_project_texts(catalog.get("tags")),
         "components_count": len(component_refs),
         "component_refs": component_refs,
@@ -3945,6 +4151,12 @@ def _project_definition_fallback_row(project_id: str, definition: dict[str, Any]
         "inferred": False,
         "uninstall_disabled": True,
     }
+    if title_i18n:
+        item["display_name_i18n"] = title_i18n
+        item["title_i18n"] = title_i18n
+    if description_i18n:
+        item["description_i18n"] = description_i18n
+    return item
 
 
 def _component_inventory_by_ref(operations: dict[str, Any] | None = None) -> dict[str, dict[str, Any]]:
@@ -4205,8 +4417,10 @@ def _project_component_rows(
                 "features": ", ".join(feature_titles or feature_ids),
                 "feature_ids": ", ".join(feature_ids),
                 "status": status,
+                "status_i18n": _semantic_state_i18n(status),
                 "status_icon": status_icon,
                 "status_tooltip": status_tooltip,
+                "status_tooltip_i18n": _semantic_state_i18n(status),
                 "catalog_display": str(inventory.get("catalog_display") or "unknown"),
                 "workspace_display": str(inventory.get("workspace_display") or "missing"),
                 "runtime_display": str(inventory.get("runtime_display") or "none"),
@@ -4231,11 +4445,13 @@ def _project_feature_rows(definition: dict[str, Any], component_rows: list[dict[
             {
                 "id": "manifest",
                 "title": "Manifest components",
+                "title_i18n": _i18n("infrastate.project_detail.features.manifest_components"),
                 "default": True,
                 "optional": False,
                 "components": len(refs),
                 "installed": installed_count,
                 "status": "ready" if refs and installed_count == len(refs) else ("partial" if installed_count else "missing"),
+                "status_i18n": _semantic_state_i18n("ready" if refs and installed_count == len(refs) else ("partial" if installed_count else "missing")),
                 "component_refs": ", ".join(refs),
             }
         ]
@@ -4251,18 +4467,24 @@ def _project_feature_rows(definition: dict[str, Any], component_rows: list[dict[
             status = "partial"
         else:
             status = "optional" if bool(feature.get("optional")) else "missing"
-        out.append(
-            {
-                "id": str(feature.get("id") or ""),
-                "title": str(feature.get("title") or feature.get("id") or ""),
-                "default": bool(feature.get("default")),
-                "optional": bool(feature.get("optional")),
-                "components": len(refs),
-                "installed": installed_count,
-                "status": status,
-                "component_refs": ", ".join(refs),
-            }
-        )
+        item = {
+            "id": str(feature.get("id") or ""),
+            "title": str(feature.get("title") or feature.get("id") or ""),
+            "default": bool(feature.get("default")),
+            "optional": bool(feature.get("optional")),
+            "components": len(refs),
+            "installed": installed_count,
+            "status": status,
+            "status_i18n": _semantic_state_i18n(status),
+            "component_refs": ", ".join(refs),
+        }
+        title_i18n = _clean_i18n_spec(feature.get("title_i18n"))
+        description_i18n = _clean_i18n_spec(feature.get("description_i18n"))
+        if title_i18n:
+            item["title_i18n"] = title_i18n
+        if description_i18n:
+            item["description_i18n"] = description_i18n
+        out.append(item)
     return out
 
 
@@ -4305,6 +4527,7 @@ def _project_node_rows(
                 "node_id": str(activation.get("node_id") or ""),
                 "component_ref": str(activation.get("component_ref") or ""),
                 "status": activation_status,
+                "status_i18n": _semantic_state_i18n(activation_status),
                 "status_icon": _project_status_icon(activation_status),
                 "health": _activation_health_display(health),
                 "generation": str(activation.get("generation") or ""),
@@ -4344,6 +4567,7 @@ def _project_node_rows(
                     "node_id": ", ".join(selected_nodes) if selected_nodes else mode,
                     "component_ref": component_ref,
                     "status": str(deployment.get("status") or "desired"),
+                    "status_i18n": _semantic_state_i18n(deployment.get("status") or "desired"),
                     "status_icon": _project_status_icon(deployment.get("status"), fallback="layers-outline"),
                     "health": "desired",
                     "generation": str(deployment.get("revision") or ""),
@@ -4377,6 +4601,7 @@ def _project_node_rows(
                 "node_id": local_node_id,
                 "component_ref": str(component.get("component_ref") or ""),
                 "status": "installed" if bool(component.get("installed")) else "missing",
+                "status_i18n": _semantic_state_i18n("installed" if bool(component.get("installed")) else "missing"),
                 "status_icon": "checkmark-circle-outline" if bool(component.get("installed")) else "alert-circle-outline",
                 "health": "local registry" if bool(component.get("installed")) else "not installed",
                 "generation": "",
@@ -4471,6 +4696,7 @@ def _project_detail_bundle(project_id: str, *, webspace_id: str | None = None) -
         return {
             "id": "",
             "title": "Project unavailable",
+            "title_i18n": _i18n("infrastate.project_detail.unavailable.title"),
             "status": "warn",
             "error": "project id is empty",
             "row": {},
@@ -4509,6 +4735,9 @@ def _project_detail_bundle(project_id: str, *, webspace_id: str | None = None) -
         "operations": project_operations,
         "facts": facts,
     }
+    title_i18n = _first_i18n_spec(row.get("display_name_i18n"), row.get("title_i18n"))
+    if title_i18n:
+        bundle["title_i18n"] = title_i18n
     if _PROJECT_DETAIL_CACHE_TTL_S > 0:
         with _project_detail_cache_lock:
             _project_detail_cache[cache_key] = (time.monotonic(), _cache_copy(bundle))
@@ -4552,6 +4781,26 @@ def _project_overview_items(project_id: str, *, webspace_id: str | None = None) 
     installed_count = sum(1 for item in components if isinstance(item, dict) and bool(item.get("installed")))
     selected_count = sum(1 for item in components if isinstance(item, dict) and bool(item.get("selected")))
     distribution_state, distribution_detail = _project_distribution_summary(definition, facts, nodes)
+    deployment_count = len(facts.get("deployments") or [])
+    activation_count = len(facts.get("activations") or [])
+    distribution_node_count = len(
+        {
+            str(item.get("node_id") or "").strip()
+            for item in nodes
+            if isinstance(item, dict) and str(item.get("node_id") or "").strip()
+        }
+    )
+    distribution_state_key = {
+        "distributed": "infrastate.project_detail.overview.distribution.state.distributed",
+        "distributed-ready": "infrastate.project_detail.overview.distribution.state.distributed_ready",
+        "local": "infrastate.project_detail.overview.distribution.state.local",
+    }.get(distribution_state, "")
+    if deployment_count:
+        distribution_detail_key = "infrastate.project_detail.overview.distribution.detail.deployments"
+    elif distribution_state == "distributed-ready":
+        distribution_detail_key = "infrastate.project_detail.overview.distribution.detail.distributed_ready"
+    else:
+        distribution_detail_key = "infrastate.project_detail.overview.distribution.detail.local_component_registry_fallback"
     catalog = definition.get("catalog") if isinstance(definition.get("catalog"), dict) else {}
     compatibility = definition.get("compatibility") if isinstance(definition.get("compatibility"), dict) else {}
     install = definition.get("install") if isinstance(definition.get("install"), dict) else {}
@@ -4563,28 +4812,57 @@ def _project_overview_items(project_id: str, *, webspace_id: str | None = None) 
         {
             "id": "identity",
             "title": str(row.get("display_name") or row.get("title") or project_id),
+            "title_i18n": _first_i18n_spec(row.get("display_name_i18n"), row.get("title_i18n")),
             "subtitle": f"project:{project_id} | {row.get('version') or 'unknown'} | {row.get('stage') or 'unlisted'}",
             "content": description,
+            "content_i18n": _clean_i18n_spec(row.get("description_i18n")),
             "icon": str(row.get("status_icon") or _project_status_icon(row.get("status"))),
         },
         {
             "id": "inventory",
             "title": "Inventory",
+            "title_i18n": _i18n("infrastate.text.inventory"),
             "subtitle": f"{installed_count}/{len(components)} installed, {selected_count} default-selected",
+            "subtitle_i18n": _i18n(
+                "infrastate.project_detail.overview.inventory.subtitle",
+                installed=installed_count,
+                total=len(components),
+                selected=selected_count,
+            ),
             "content": f"source={row.get('source') or 'unknown'}; inferred={bool(row.get('inferred'))}; installed_at={row.get('installed_at') or '-'}",
+            "content_i18n": _i18n(
+                "infrastate.project_detail.overview.inventory.content",
+                source=row.get("source") or "unknown",
+                inferred="yes" if bool(row.get("inferred")) else "no",
+                installed_at=row.get("installed_at") or "-",
+            ),
             "icon": "layers-outline",
         },
         {
             "id": "distribution",
             "title": "Distribution",
+            "title_i18n": _i18n("infrastate.text.distribution"),
             "subtitle": distribution_state,
+            "subtitle_i18n": _i18n(distribution_state_key) if distribution_state_key else None,
             "content": distribution_detail,
+            "content_i18n": _i18n(
+                distribution_detail_key,
+                deployments=deployment_count,
+                activations=activation_count,
+                nodes=distribution_node_count,
+            ) if distribution_detail_key else None,
             "icon": "git-compare-outline" if distribution_state != "local" else "checkmark-circle-outline",
         },
         {
             "id": "features",
             "title": "Features",
+            "title_i18n": _i18n("infrastate.text.features"),
             "subtitle": f"{len(features)} feature group(s); default_install={bool(install.get('default'))}",
+            "subtitle_i18n": _i18n(
+                "infrastate.project_detail.overview.features.subtitle",
+                features=len(features),
+                default_install="yes" if bool(install.get("default")) else "no",
+            ),
             "content": "; ".join(
                 f"{item.get('id')}={item.get('status')}"
                 for item in features
@@ -4595,15 +4873,32 @@ def _project_overview_items(project_id: str, *, webspace_id: str | None = None) 
         {
             "id": "contracts",
             "title": "Contracts",
+            "title_i18n": _i18n("infrastate.text.contracts"),
             "subtitle": validation_profiles or "no validation profile",
+            "subtitle_i18n": (
+                None
+                if validation_profiles
+                else _i18n("infrastate.project_detail.overview.contracts.no_validation_profile")
+            ),
             "content": required_contracts or "no required contracts declared",
+            "content_i18n": (
+                None
+                if required_contracts
+                else _i18n("infrastate.project_detail.overview.contracts.no_required_contracts")
+            ),
             "icon": "document-text-outline",
         },
         {
             "id": "source",
             "title": "Source",
+            "title_i18n": _i18n("infrastate.text.source"),
             "subtitle": source_path or str(row.get("source") or "unknown"),
             "content": f"categories={row.get('categories') or ''}; tags={row.get('tags') or ''}",
+            "content_i18n": _i18n(
+                "infrastate.project_detail.overview.source.content",
+                categories=row.get("categories") or "",
+                tags=row.get("tags") or "",
+            ),
             "icon": "document-text-outline",
         },
     ]
@@ -4629,34 +4924,60 @@ def _project_action_items(project_id: str, *, webspace_id: str | None = None) ->
             else "Project is already explicit or manifest is unavailable"
         )
     )
+    if can_reconcile:
+        reconcile_title_i18n = _i18n("infrastate.project_action.reconcile.write_install_record")
+    elif selected_missing:
+        reconcile_title_i18n = _i18n(
+            "infrastate.project_action.reconcile.default_components_missing",
+            components=", ".join(selected_missing[:4]),
+        )
+    else:
+        reconcile_title_i18n = _i18n("infrastate.project_action.reconcile.unavailable")
     return [
-        {
-            "id": "project_refresh",
-            "label": "Refresh",
-            "title": "Refresh project inventory, deployment, and operation streams",
-            "kind": "secondary",
-        },
-        {
-            "id": "project_reconcile",
-            "label": "Reconcile",
-            "title": reconcile_title,
-            "kind": "secondary",
-            "disabled": not can_reconcile,
-        },
-        {
-            "id": "project_update",
-            "label": "Update",
-            "title": "Project-level update will use the deployment command ABI; not enabled in this slice",
-            "kind": "secondary",
-            "disabled": True,
-        },
-        {
-            "id": "project_components",
-            "label": "Components",
-            "title": "Use node placement rows for activation drain/remove; placement editing requires the deployment controller",
-            "kind": "secondary",
-            "disabled": True,
-        },
+        _with_i18n_fields(
+            {
+                "id": "project_refresh",
+                "label": "Refresh",
+                "title": "Refresh project inventory, deployment, and operation streams",
+                "kind": "secondary",
+            },
+            label="infrastate.text.refresh",
+            title="infrastate.project_action.refresh.title",
+        ),
+        _with_i18n_fields(
+            {
+                "id": "project_reconcile",
+                "label": "Reconcile",
+                "title": reconcile_title,
+                "kind": "secondary",
+                "disabled": not can_reconcile,
+            },
+            label="infrastate.text.reconcile",
+            title=reconcile_title_i18n["key"],
+            **(reconcile_title_i18n.get("params") or {}),
+        ),
+        _with_i18n_fields(
+            {
+                "id": "project_update",
+                "label": "Update",
+                "title": "Project-level update will use the deployment command ABI; not enabled in this slice",
+                "kind": "secondary",
+                "disabled": True,
+            },
+            label="infrastate.text.update",
+            title="infrastate.project_action.update.disabled",
+        ),
+        _with_i18n_fields(
+            {
+                "id": "project_components",
+                "label": "Components",
+                "title": "Use node placement rows for activation drain/remove; placement editing requires the deployment controller",
+                "kind": "secondary",
+                "disabled": True,
+            },
+            label="infrastate.text.components",
+            title="infrastate.project_action.components.disabled",
+        ),
     ]
 
 
@@ -4673,13 +4994,18 @@ def _project_detail_payload(project_id: str, *, webspace_id: str | None = None) 
         return {
             "id": project_id,
             "title": "Project unavailable",
+            "title_i18n": _i18n("infrastate.project_detail.unavailable.title"),
             "status": "warn",
             "content": f"Project was not found in installed inventory or workspace manifests: {project_id}",
+            "content_i18n": _i18n("infrastate.project_detail.unavailable.content", project_id=project_id),
         }
-    return {
+    title_i18n = _first_i18n_spec(row.get("display_name_i18n"), row.get("title_i18n"))
+    description_i18n = _clean_i18n_spec(row.get("description_i18n"))
+    item = {
         "id": project_id,
         "title": str(row.get("display_name") or row.get("title") or project_id),
         "status": str(row.get("status") or "installed"),
+        "status_i18n": _semantic_state_i18n(row.get("status") or "installed"),
         "description": str(row.get("description") or ""),
         "version": str(row.get("version") or ""),
         "stage": str(row.get("stage") or ""),
@@ -4693,6 +5019,11 @@ def _project_detail_payload(project_id: str, *, webspace_id: str | None = None) 
         "distribution_detail": distribution_detail,
         "deployment_error": str(facts.get("error") or ""),
     }
+    if title_i18n:
+        item["title_i18n"] = title_i18n
+    if description_i18n:
+        item["description_i18n"] = description_i18n
+    return item
 
 
 def _project_header_items(project_id: str, *, webspace_id: str | None = None) -> list[dict[str, Any]]:
@@ -4709,12 +5040,20 @@ def _project_header_items(project_id: str, *, webspace_id: str | None = None) ->
         {
             "id": str(detail.get("id") or project_id),
             "title": str(detail.get("title") or project_id),
+            "title_i18n": _clean_i18n_spec(detail.get("title_i18n")),
             "subtitle": " | ".join(item for item in subtitle_parts if item),
             "content": (
                 f"components={detail.get('components') or 0}; "
                 f"features={detail.get('features') or 0}; "
                 f"nodes={detail.get('nodes') or 0}; "
                 f"operations={detail.get('operations') or 0}"
+            ),
+            "content_i18n": _i18n(
+                "infrastate.project_detail.header.content",
+                components=detail.get("components") or 0,
+                features=detail.get("features") or 0,
+                nodes=detail.get("nodes") or 0,
+                operations=detail.get("operations") or 0,
             ),
             "status": str(detail.get("status") or ""),
             "icon": _project_status_icon(detail.get("status")),
@@ -5241,17 +5580,47 @@ _INVENTORY_BULK_ACTION_LABELS: dict[str, tuple[str, str, str]] = {
     "inventory_test": ("Test", "Testing...", "Tested"),
 }
 
+_INVENTORY_BULK_ACTION_I18N_KEYS: dict[str, dict[str, str]] = {
+    "inventory_activate": {
+        "base": "infrastate.text.activate",
+        "running": "infrastate.action.inventory_activate.running",
+        "done": "infrastate.action.inventory_activate.done",
+        "failed": "infrastate.action.inventory_activate.failed",
+    },
+    "inventory_validate": {
+        "base": "infrastate.text.validate",
+        "running": "infrastate.action.inventory_validate.running",
+        "done": "infrastate.action.inventory_validate.done",
+        "failed": "infrastate.action.inventory_validate.failed",
+    },
+    "inventory_test": {
+        "base": "infrastate.text.test",
+        "running": "infrastate.action.inventory_test.running",
+        "done": "infrastate.action.inventory_test.done",
+        "failed": "infrastate.action.inventory_test.failed",
+    },
+}
+
 
 def _inventory_bulk_action_presentation(action_id: str, ui_state: dict[str, Any]) -> dict[str, Any]:
     base, running_label, done_label = _INVENTORY_BULK_ACTION_LABELS.get(action_id, ("", "", ""))
     if not base:
         return {}
+    i18n_keys = _INVENTORY_BULK_ACTION_I18N_KEYS.get(action_id) or {}
+
+    def _presentation(label: str, *, state_key: str, status: str, disabled: bool) -> dict[str, Any]:
+        out = {"label": label, "title": label, "status": status, "disabled": disabled}
+        if state_key and state_key in i18n_keys:
+            out["label_i18n"] = _i18n(i18n_keys[state_key])
+            out["title_i18n"] = _i18n(i18n_keys[state_key])
+        return out
+
     current = str(ui_state.get("inventory_bulk_action") or "").strip()
     running = bool(ui_state.get("inventory_bulk_action_running"))
     if running:
         if current == action_id:
-            return {"label": running_label, "title": running_label, "status": "pending", "disabled": True}
-        return {"label": base, "title": base, "status": "idle", "disabled": True}
+            return _presentation(running_label, state_key="running", status="pending", disabled=True)
+        return _presentation(base, state_key="base", status="idle", disabled=True)
     try:
         finished_at = float(ui_state.get("inventory_bulk_action_finished_at") or 0.0)
     except Exception:
@@ -5259,8 +5628,13 @@ def _inventory_bulk_action_presentation(action_id: str, ui_state: dict[str, Any]
     if current == action_id and finished_at > 0.0 and (time.time() - finished_at) <= 10.0:
         failed = bool(ui_state.get("inventory_bulk_action_failed"))
         label = f"{base} failed" if failed else done_label
-        return {"label": label, "title": label, "status": "warn" if failed else "ok", "disabled": False}
-    return {"label": base, "title": base, "status": "ok", "disabled": False}
+        return _presentation(
+            label,
+            state_key="failed" if failed else "done",
+            status="warn" if failed else "ok",
+            disabled=False,
+        )
+    return _presentation(base, state_key="base", status="ok", disabled=False)
 
 
 def _update_actions(conf, ui_state: dict[str, Any], reliability: dict[str, Any]) -> list[dict[str, Any]]:
@@ -5276,47 +5650,82 @@ def _update_actions(conf, ui_state: dict[str, Any], reliability: dict[str, Any])
     description = "Sync workspace sources for skills and scenarios and refresh runtime projections."
     if target_kind == "member" and role != "hub":
         return [
+            _with_i18n_fields(
+                {
+                    "id": "adaos_update",
+                    "label": "Update",
+                    "title": title,
+                    "status": "warn",
+                    "description": "Remote update is available only from hub",
+                },
+                label="infrastate.text.update",
+                title=(
+                    "infrastate.action.update_for_node.title"
+                    if target_kind == "member"
+                    else "infrastate.text.update"
+                ),
+                description="infrastate.action.update.remote_hub_only",
+                node=member_label if target_kind == "member" else None,
+            )
+        ]
+    items = [
+        _with_i18n_fields(
             {
                 "id": "adaos_update",
                 "label": "Update",
                 "title": title,
-                "status": "warn",
-                "description": "Remote update is available only from hub",
-            }
-        ]
-    items = [
-        {
-            "id": "adaos_update",
-            "label": "Update",
-            "title": title,
-            "status": "ok",
-            "description": description,
-        }
+                "status": "ok",
+                "description": description,
+            },
+            label="infrastate.text.update",
+            title=(
+                "infrastate.action.update_for_node.title"
+                if target_kind == "member"
+                else "infrastate.text.update"
+            ),
+            description="infrastate.action.update.description",
+            node=member_label if target_kind == "member" else None,
+        )
     ]
     if target_kind == "local":
         items.extend(
             [
-                {
-                    "id": "inventory_activate",
-                    "label": "Activate",
-                    "title": "Activate",
-                    "status": "ok",
-                    "description": "Activate prepared skill runtimes and refresh scenario dependencies.",
-                },
-                {
-                    "id": "inventory_validate",
-                    "label": "Validate",
-                    "title": "Validate",
-                    "status": "ok",
-                    "description": "Validate installed workspace skills and scenarios.",
-                },
-                {
-                    "id": "inventory_test",
-                    "label": "Test",
-                    "title": "Test",
-                    "status": "ok",
-                    "description": "Run available skill and scenario tests.",
-                },
+                _with_i18n_fields(
+                    {
+                        "id": "inventory_activate",
+                        "label": "Activate",
+                        "title": "Activate",
+                        "status": "ok",
+                        "description": "Activate prepared skill runtimes and refresh scenario dependencies.",
+                    },
+                    label="infrastate.text.activate",
+                    title="infrastate.text.activate",
+                    description="infrastate.text.activate_prepared_skill_runtimes_and_refresh_scenario_dependencies",
+                ),
+                _with_i18n_fields(
+                    {
+                        "id": "inventory_validate",
+                        "label": "Validate",
+                        "title": "Validate",
+                        "status": "ok",
+                        "description": "Validate installed workspace skills and scenarios.",
+                    },
+                    label="infrastate.text.validate",
+                    title="infrastate.text.validate",
+                    description="infrastate.text.validate_installed_workspace_skills_and_scenarios",
+                ),
+                _with_i18n_fields(
+                    {
+                        "id": "inventory_test",
+                        "label": "Test",
+                        "title": "Test",
+                        "status": "ok",
+                        "description": "Run available skill and scenario tests.",
+                    },
+                    label="infrastate.text.test",
+                    title="infrastate.text.test",
+                    description="infrastate.text.run_available_skill_and_scenario_tests",
+                ),
             ]
         )
         for item in items:
@@ -5324,13 +5733,18 @@ def _update_actions(conf, ui_state: dict[str, Any], reliability: dict[str, Any])
             if patch:
                 item.update(patch)
     items.append(
-        {
-            "id": "marketplace",
-            "label": "Marketplace",
-            "title": "Marketplace",
-            "status": "ok",
-            "description": "Browse registry catalog and install missing skills or scenarios.",
-        }
+        _with_i18n_fields(
+            {
+                "id": "marketplace",
+                "label": "Marketplace",
+                "title": "Marketplace",
+                "status": "ok",
+                "description": "Browse registry catalog and install missing skills or scenarios.",
+            },
+            label="infrastate.text.marketplace",
+            title="infrastate.text.marketplace",
+            description="infrastate.text.browse_registry_catalog_and_install_missing_skills_or_scenarios",
+        )
     )
     return items
 
@@ -7815,15 +8229,56 @@ def _summary_buttons(status: dict[str, Any]) -> list[dict[str, Any]]:
     if remaining_sec <= 0 and state == "countdown":
         return []
     label = "Cancel update"
+    label_i18n = _i18n("infrastate.text.cancel_update")
     if remaining_sec > 0:
         label = f"{label} ({remaining_sec}s)"
-    buttons = [{"id": "cancel_update", "label": label, "title": label, "kind": "danger"}]
+        label_i18n = _i18n("infrastate.action.cancel_update_seconds", seconds=remaining_sec)
+    buttons = [
+        {
+            "id": "cancel_update",
+            "label": label,
+            "label_i18n": label_i18n,
+            "title": label,
+            "title_i18n": label_i18n,
+            "kind": "danger",
+        }
+    ]
     if state in {"planned", "countdown"}:
-        buttons.insert(0, {"id": "defer_update_15m", "label": "Delay 15m", "title": "Delay 15m", "kind": "secondary"})
-        buttons.insert(0, {"id": "defer_update_5m", "label": "Delay 5m", "title": "Delay 5m", "kind": "secondary"})
+        buttons.insert(
+            0,
+            {
+                "id": "defer_update_15m",
+                "label": "Delay 15m",
+                "label_i18n": _i18n("infrastate.action.delay_15m"),
+                "title": "Delay 15m",
+                "title_i18n": _i18n("infrastate.action.delay_15m"),
+                "kind": "secondary",
+            },
+        )
+        buttons.insert(
+            0,
+            {
+                "id": "defer_update_5m",
+                "label": "Delay 5m",
+                "label_i18n": _i18n("infrastate.action.delay_5m"),
+                "title": "Delay 5m",
+                "title_i18n": _i18n("infrastate.action.delay_5m"),
+                "kind": "secondary",
+            },
+        )
     reason = str(status.get("reason") or "").strip().lower()
     if reason.startswith("github.push:") or reason.startswith("root.release:"):
-        buttons.insert(0, {"id": "refuse_update", "label": "Refuse update", "title": "Refuse update", "kind": "danger"})
+        buttons.insert(
+            0,
+            {
+                "id": "refuse_update",
+                "label": "Refuse update",
+                "label_i18n": _i18n("infrastate.action.refuse_update"),
+                "title": "Refuse update",
+                "title_i18n": _i18n("infrastate.action.refuse_update"),
+                "kind": "danger",
+            },
+        )
     return buttons
 
 
@@ -7843,16 +8298,53 @@ def _member_summary_buttons(
     startable_states = {"idle", "failed", "succeeded", "validated", "cancelled", "rolled_back", "connected"}
     cancelable_states = {"countdown", "draining", "stopping", "restarting", "applying", "validate", "validated"}
     if state in startable_states:
-        buttons.append({"id": "member_start_update", "label": "Start update", "title": "Start update"})
+        buttons.append(
+            {
+                "id": "member_start_update",
+                "label": "Start update",
+                "label_i18n": _i18n("infrastate.text.start_update"),
+                "title": "Start update",
+                "title_i18n": _i18n("infrastate.text.start_update"),
+            }
+        )
     if state in cancelable_states:
         remaining_sec = _countdown_remaining_sec(status)
         label = "Cancel update"
+        label_i18n = _i18n("infrastate.text.cancel_update")
         if remaining_sec > 0 and state == "countdown":
             label = f"{label} ({remaining_sec}s)"
-        buttons.append({"id": "member_cancel_update", "label": label, "title": label, "kind": "danger"})
-    buttons.append({"id": "member_rollback", "label": "Rollback slot", "title": "Rollback slot", "kind": "danger"})
+            label_i18n = _i18n("infrastate.action.cancel_update_seconds", seconds=remaining_sec)
+        buttons.append(
+            {
+                "id": "member_cancel_update",
+                "label": label,
+                "label_i18n": label_i18n,
+                "title": label,
+                "title_i18n": label_i18n,
+                "kind": "danger",
+            }
+        )
+    buttons.append(
+        {
+            "id": "member_rollback",
+            "label": "Rollback slot",
+            "label_i18n": _i18n("infrastate.text.rollback_slot"),
+            "title": "Rollback slot",
+            "title_i18n": _i18n("infrastate.text.rollback_slot"),
+            "kind": "danger",
+        }
+    )
     if not bool(lifecycle.get("draining")):
-        buttons.append({"id": "member_drain", "label": "Drain mode", "title": "Drain mode", "kind": "danger"})
+        buttons.append(
+            {
+                "id": "member_drain",
+                "label": "Drain mode",
+                "label_i18n": _i18n("infrastate.action.drain_mode"),
+                "title": "Drain mode",
+                "title_i18n": _i18n("infrastate.action.drain_mode"),
+                "kind": "danger",
+            }
+        )
     return buttons
 
 
@@ -8632,6 +9124,7 @@ def _summary(
         transport_assessment=strategy_assessment,
     )
     summary_label = "Core update"
+    summary_label_i18n = _i18n("infrastate.text.core_update")
     summary_value = state
     summary_subtitle = _core_slot_summary_subtitle(slots_payload, build, active_slot=active)
     summary_version = _core_slot_version(_core_slot_manifest(slots_payload, active), build) or str(build.get("version") or "")
@@ -8642,6 +9135,7 @@ def _summary(
             selected_member,
         )
         summary_label = "Node state"
+        summary_label_i18n = _i18n("infrastate.summary.node_state")
         remote_connected = _member_effective_connected(selected_member)
         remote_state = str(status.get("state") or lifecycle.get("node_state") or selected_member.get("state") or "connected")
         summary_value = "Offline" if not remote_connected or remote_state.strip().lower() == "offline" else remote_state
@@ -8679,7 +9173,9 @@ def _summary(
             message += f" snapshot_ago={selected_member.get('last_snapshot_ago_s')}"
     summary_payload = {
         "label": summary_label,
+        "label_i18n": summary_label_i18n,
         "value": summary_value,
+        "value_i18n": _semantic_state_i18n(summary_value),
         "subtitle": summary_subtitle,
         "description": message,
         "phase": phase,

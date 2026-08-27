@@ -507,6 +507,9 @@
       "id": "infrastate.state.open",
       "kind": "interface_action",
       "title": "Open Infra State",
+      "title_i18n": {
+        "key": "infrastate.text.open_infra_state"
+      },
       "labels": {
         "en": [
           "infra state",
@@ -544,6 +547,9 @@
       "id": "infrastate.inventory.installed_skills.query",
       "kind": "queryable_ui_section",
       "title": "Installed skills inventory",
+      "title_i18n": {
+        "key": "infrastate.text.installed_skills_inventory"
+      },
       "labels": {
         "en": [
           "installed skills",
@@ -606,6 +612,9 @@
       "id": "infrastate.inventory.installed_scenarios.query",
       "kind": "queryable_ui_section",
       "title": "Installed scenarios inventory",
+      "title_i18n": {
+        "key": "infrastate.text.installed_scenarios_inventory"
+      },
       "labels": {
         "en": [
           "installed scenarios",
@@ -669,6 +678,9 @@
       "kind": "modal_tab",
       "parent": "infrastate_modal",
       "title": "Overview",
+      "title_i18n": {
+        "key": "infrastate.text.overview"
+      },
       "labels": {
         "en": [
           "overview"
@@ -706,6 +718,9 @@
       "kind": "modal_tab",
       "parent": "infrastate_modal",
       "title": "Inventory",
+      "title_i18n": {
+        "key": "infrastate.text.inventory"
+      },
       "labels": {
         "en": [
           "inventory"
@@ -743,6 +758,9 @@
       "kind": "ui_section",
       "parent": "infrastate_modal",
       "title": "Installed skills",
+      "title_i18n": {
+        "key": "infrastate.text.installed_skills"
+      },
       "labels": {
         "en": [
           "installed skills",
@@ -793,6 +811,9 @@
       "kind": "ui_section",
       "parent": "infrastate_modal",
       "title": "Installed scenarios",
+      "title_i18n": {
+        "key": "infrastate.text.installed_scenarios"
+      },
       "labels": {
         "en": [
           "installed scenarios",
@@ -843,6 +864,9 @@
     {
       "id": "infrastate_app",
       "title": "Infra State",
+      "title_i18n": {
+        "key": "infrastate.text.infra_state"
+      },
       "aliases": [
         "infrastate",
         "infra state",
@@ -861,6 +885,9 @@
     {
       "id": "infrastate_widget",
       "title": "Infra State",
+      "title_i18n": {
+        "key": "infrastate.text.infra_state"
+      },
       "type": "visual.metricTile",
       "dataSource": {
         "kind": "y",
@@ -882,6 +909,9 @@
     "modals": {
       "infrastate_modal": {
         "title": "Infrastructure State",
+        "title_i18n": {
+          "key": "infrastate.text.infrastructure_state"
+        },
         "aliases": [
           "Infra State",
           "infrastate",
@@ -918,6 +948,9 @@
               "type": "visual.metricTile",
               "area": "main",
               "title": "Current state",
+              "title_i18n": {
+                "key": "infrastate.text.current_state"
+              },
               "dataSource": {
                 "kind": "y",
                 "path": "data/infrastate/summary"
@@ -943,23 +976,38 @@
                 "buttons": [
                   {
                     "id": "overview",
-                    "label": "Overview"
+                    "label": "Overview",
+                    "label_i18n": {
+                      "key": "infrastate.text.overview"
+                    }
                   },
                   {
                     "id": "update",
-                    "label": "Update"
+                    "label": "Update",
+                    "label_i18n": {
+                      "key": "infrastate.text.update"
+                    }
                   },
                   {
                     "id": "inventory",
-                    "label": "Inventory"
+                    "label": "Inventory",
+                    "label_i18n": {
+                      "key": "infrastate.text.inventory"
+                    }
                   },
                   {
                     "id": "diagnostics",
-                    "label": "Diagnostics"
+                    "label": "Diagnostics",
+                    "label_i18n": {
+                      "key": "infrastate.text.diagnostics"
+                    }
                   },
                   {
                     "id": "yjs_balancer",
-                    "label": "YJS Balancer"
+                    "label": "YJS Balancer",
+                    "label_i18n": {
+                      "key": "infrastate.text.yjs_balancer"
+                    }
                   }
                 ]
               },
@@ -978,6 +1026,9 @@
               "type": "input.commandBar",
               "area": "main",
               "title": "Nodes",
+              "title_i18n": {
+                "key": "infrastate.text.nodes"
+              },
               "visibleIf": "$state.infrastateTab === 'overview'",
               "dataSource": {
                 "kind": "y",
@@ -1003,6 +1054,9 @@
               "type": "input.text",
               "area": "main",
               "title": "Node names",
+              "title_i18n": {
+                "key": "infrastate.text.node_names"
+              },
               "visibleIf": "$state.infrastateTab === 'overview'",
               "dataSource": {
                 "kind": "y",
@@ -1010,7 +1064,10 @@
               },
               "inputs": {
                 "bindField": "names_csv",
-                "placeholder": "hub, alias"
+                "placeholder": "hub, alias",
+                "placeholder_i18n": {
+                  "key": "infrastate.text.hub_alias"
+                }
               },
               "actions": [
                 {
@@ -1055,6 +1112,9 @@
               "type": "ui.list",
               "area": "main",
               "title": "Build",
+              "title_i18n": {
+                "key": "infrastate.text.build"
+              },
               "visibleIf": "$state.infrastateTab === 'update'",
               "dataSource": {
                 "kind": "stream",
@@ -1066,7 +1126,10 @@
                 "detailsPath": "",
                 "showDetails": false,
                 "itemAccordion": false,
-                "emptyText": "No build metadata yet"
+                "emptyText": "No build metadata yet",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_build_metadata_yet"
+                }
               }
             },
             {
@@ -1074,6 +1137,9 @@
               "type": "ui.list",
               "area": "main",
               "title": "Pipeline",
+              "title_i18n": {
+                "key": "infrastate.text.pipeline"
+              },
               "visibleIf": "$state.infrastateTab === 'update'",
               "dataSource": {
                 "kind": "stream",
@@ -1084,7 +1150,10 @@
                 "subtitleKey": "description",
                 "showDetails": false,
                 "itemAccordion": false,
-                "emptyText": "No pipeline state yet"
+                "emptyText": "No pipeline state yet",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_pipeline_state_yet"
+                }
               }
             },
             {
@@ -1092,6 +1161,9 @@
               "type": "ui.list",
               "area": "main",
               "title": "Realtime channels",
+              "title_i18n": {
+                "key": "infrastate.text.realtime_channels"
+              },
               "visibleIf": "$state.infrastateTab === 'update'",
               "dataSource": {
                 "kind": "stream",
@@ -1109,7 +1181,10 @@
                   "kind": "stream",
                   "receiver": "infrastate.details.realtime.$event.id"
                 },
-                "emptyText": "No realtime diagnostics yet"
+                "emptyText": "No realtime diagnostics yet",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_realtime_diagnostics_yet"
+                }
               }
             },
             {
@@ -1117,6 +1192,9 @@
               "type": "ui.list",
               "area": "main",
               "title": "Core slots",
+              "title_i18n": {
+                "key": "infrastate.text.core_slots"
+              },
               "visibleIf": "$state.infrastateTab === 'update'",
               "dataSource": {
                 "kind": "stream",
@@ -1128,7 +1206,10 @@
                 "detailsPath": "",
                 "showDetails": false,
                 "itemAccordion": false,
-                "emptyText": "No slot manifests yet"
+                "emptyText": "No slot manifests yet",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_slot_manifests_yet"
+                }
               }
             },
             {
@@ -1136,6 +1217,9 @@
               "type": "ui.actions",
               "area": "main",
               "title": "Update",
+              "title_i18n": {
+                "key": "infrastate.text.update"
+              },
               "visibleIf": "$state.infrastateTab === 'inventory'",
               "dataSource": {
                 "kind": "y",
@@ -1155,7 +1239,10 @@
                   "feedback": {
                     "pending": {
                       "disable": true,
-                      "label": "Updating"
+                      "label": "Updating",
+                      "label_i18n": {
+                        "key": "infrastate.text.updating"
+                      }
                     }
                   }
                 },
@@ -1169,7 +1256,10 @@
                   "feedback": {
                     "pending": {
                       "disable": true,
-                      "label": "Activating"
+                      "label": "Activating",
+                      "label_i18n": {
+                        "key": "infrastate.text.activating"
+                      }
                     }
                   }
                 },
@@ -1183,7 +1273,10 @@
                   "feedback": {
                     "pending": {
                       "disable": true,
-                      "label": "Validating"
+                      "label": "Validating",
+                      "label_i18n": {
+                        "key": "infrastate.text.validating"
+                      }
                     }
                   }
                 },
@@ -1197,7 +1290,10 @@
                   "feedback": {
                     "pending": {
                       "disable": true,
-                      "label": "Testing"
+                      "label": "Testing",
+                      "label_i18n": {
+                        "key": "infrastate.text.testing"
+                      }
                     }
                   }
                 },
@@ -1232,7 +1328,13 @@
                   "params": {
                     "text": "$event.text",
                     "successMessage": "Diagnostics copied.",
-                    "errorMessage": "Copy failed."
+                    "successMessage_i18n": {
+                      "key": "infrastate.text.diagnostics_copied"
+                    },
+                    "errorMessage": "Copy failed.",
+                    "errorMessage_i18n": {
+                      "key": "infrastate.text.copy_failed"
+                    }
                   }
                 }
               ]
@@ -1242,6 +1344,9 @@
               "type": "ui.list",
               "area": "main",
               "title": "Core update diagnostics",
+              "title_i18n": {
+                "key": "infrastate.text.core_update_diagnostics"
+              },
               "visibleIf": "$state.infrastateTab === 'update'",
               "dataSource": {
                 "kind": "stream",
@@ -1260,10 +1365,16 @@
                   "receiver": "infrastate.details.core_update_diagnostics.$event.id"
                 },
                 "emptyText": "No core update diagnostics yet",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_core_update_diagnostics_yet"
+                },
                 "buttons": [
                   {
                     "id": "copy",
-                    "label": "Copy"
+                    "label": "Copy",
+                    "label_i18n": {
+                      "key": "infrastate.text.copy"
+                    }
                   }
                 ]
               },
@@ -1274,7 +1385,13 @@
                   "params": {
                     "text": "$event.copy_text",
                     "successMessage": "Diagnostic copied.",
-                    "errorMessage": "Copy failed."
+                    "successMessage_i18n": {
+                      "key": "infrastate.text.diagnostic_copied"
+                    },
+                    "errorMessage": "Copy failed.",
+                    "errorMessage_i18n": {
+                      "key": "infrastate.text.copy_failed"
+                    }
                   }
                 }
               ]
@@ -1284,6 +1401,9 @@
               "type": "ui.list",
               "area": "main",
               "title": "Active operations",
+              "title_i18n": {
+                "key": "infrastate.text.active_operations"
+              },
               "visibleIf": "$state.infrastateTab === 'overview'",
               "dataSource": {
                 "kind": "stream",
@@ -1301,7 +1421,10 @@
                   "receiver": "infrastate.details.operations.$event.operation_id"
                 },
                 "itemAccordion": false,
-                "emptyText": "No active operations"
+                "emptyText": "No active operations",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_active_operations"
+                }
               }
             },
             {
@@ -1316,7 +1439,10 @@
                 "buttons": [
                   {
                     "id": "event_history",
-                    "label": "Event history"
+                    "label": "Event history",
+                    "label_i18n": {
+                      "key": "infrastate.text.event_history"
+                    }
                   }
                 ]
               },
@@ -1337,6 +1463,9 @@
               "type": "ui.table",
               "area": "main",
               "title": "Installed projects",
+              "title_i18n": {
+                "key": "infrastate.text.installed_projects"
+              },
               "visibleIf": "$state.infrastateTab === 'inventory'",
               "dataSource": {
                 "kind": "stream",
@@ -1345,6 +1474,9 @@
               },
               "inputs": {
                 "emptyText": "No installed projects",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_installed_projects"
+                },
                 "columns": [
                   {
                     "key": "status_icon",
@@ -1355,45 +1487,69 @@
                   },
                   {
                     "key": "display_name",
-                    "label": "Project"
+                    "label": "Project",
+                    "label_i18n": {
+                      "key": "infrastate.text.project"
+                    }
                   },
                   {
                     "key": "version",
                     "label": "Version",
+                    "label_i18n": {
+                      "key": "infrastate.text.version"
+                    },
                     "mono": true,
                     "width": "110px"
                   },
                   {
                     "key": "stage",
                     "label": "Stage",
+                    "label_i18n": {
+                      "key": "infrastate.text.stage"
+                    },
                     "width": "90px"
                   },
                   {
                     "key": "categories",
                     "label": "Categories",
+                    "label_i18n": {
+                      "key": "infrastate.text.categories"
+                    },
                     "width": "160px"
                   },
                   {
                     "key": "components_count",
                     "label": "Components",
+                    "label_i18n": {
+                      "key": "infrastate.text.components"
+                    },
                     "width": "110px"
                   },
                   {
                     "key": "installed_at",
                     "label": "Installed",
+                    "label_i18n": {
+                      "key": "infrastate.text.installed"
+                    },
                     "mono": true,
                     "width": "170px"
                   },
                   {
                     "key": "_project_actions",
                     "label": "Actions",
+                    "label_i18n": {
+                      "key": "infrastate.text.actions"
+                    },
                     "kind": "buttons",
                     "width": "88px",
                     "buttons": [
                       {
                         "id": "manage",
                         "icon": "layers-outline",
-                        "tooltip": "Manage project"
+                        "tooltip": "Manage project",
+                        "tooltip_i18n": {
+                          "key": "infrastate.text.manage_project"
+                        }
                       }
                     ]
                   }
@@ -1434,6 +1590,9 @@
               "type": "ui.table",
               "area": "main",
               "title": "Installed skills",
+              "title_i18n": {
+                "key": "infrastate.text.installed_skills"
+              },
               "visibleIf": "$state.infrastateTab === 'inventory' && $state.infrastateDevMode === true",
               "dataSource": {
                 "kind": "stream",
@@ -1442,6 +1601,9 @@
               },
               "inputs": {
                 "emptyText": "No installed skills",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_installed_skills"
+                },
                 "columns": [
                   {
                     "key": "status_icon",
@@ -1452,23 +1614,35 @@
                   },
                   {
                     "key": "display_name",
-                    "label": "Name"
+                    "label": "Name",
+                    "label_i18n": {
+                      "key": "infrastate.text.name"
+                    }
                   },
                   {
                     "key": "catalog_display",
                     "label": "Catalog",
+                    "label_i18n": {
+                      "key": "infrastate.text.catalog"
+                    },
                     "mono": true,
                     "width": "120px"
                   },
                   {
                     "key": "workspace_display",
                     "label": "Workspace",
+                    "label_i18n": {
+                      "key": "infrastate.text.workspace"
+                    },
                     "mono": true,
                     "width": "120px"
                   },
                   {
                     "key": "_workspace_actions",
                     "label": "Actions",
+                    "label_i18n": {
+                      "key": "infrastate.text.actions"
+                    },
                     "kind": "buttons",
                     "width": "120px",
                     "buttons": [
@@ -1476,6 +1650,9 @@
                         "id": "hard_pull",
                         "icon": "cloud-download-outline",
                         "tooltip": "Hard pull workspace from catalog",
+                        "tooltip_i18n": {
+                          "key": "infrastate.text.hard_pull_workspace_from_catalog"
+                        },
                         "whenKey": "can_hard_pull",
                         "whenEquals": true,
                         "disabledKey": "pending"
@@ -1484,6 +1661,9 @@
                         "id": "push",
                         "icon": "cloud-upload-outline",
                         "tooltip": "Push workspace changes",
+                        "tooltip_i18n": {
+                          "key": "infrastate.text.push_workspace_changes"
+                        },
                         "whenKey": "can_push",
                         "whenEquals": true
                       }
@@ -1492,12 +1672,18 @@
                   {
                     "key": "runtime_display",
                     "label": "Runtime",
+                    "label_i18n": {
+                      "key": "infrastate.text.runtime"
+                    },
                     "mono": true,
                     "width": "130px"
                   },
                   {
                     "key": "_runtime_actions",
                     "label": "Actions",
+                    "label_i18n": {
+                      "key": "infrastate.text.actions"
+                    },
                     "kind": "buttons",
                     "width": "190px",
                     "buttons": [
@@ -1505,6 +1691,9 @@
                         "id": "activate",
                         "icon": "rocket-outline",
                         "tooltip": "Activate prepared runtime",
+                        "tooltip_i18n": {
+                          "key": "infrastate.text.activate_prepared_runtime"
+                        },
                         "whenKey": "can_activate",
                         "whenEquals": true,
                         "disabledKey": "pending"
@@ -1513,6 +1702,9 @@
                         "id": "validate",
                         "icon": "checkmark-done-outline",
                         "tooltip": "Validate workspace skill",
+                        "tooltip_i18n": {
+                          "key": "infrastate.text.validate_workspace_skill"
+                        },
                         "whenKey": "can_validate",
                         "whenEquals": true
                       },
@@ -1520,6 +1712,9 @@
                         "id": "test",
                         "icon": "flask-outline",
                         "tooltip": "Run skill tests",
+                        "tooltip_i18n": {
+                          "key": "infrastate.text.run_skill_tests"
+                        },
                         "whenKey": "can_test",
                         "whenEquals": true
                       },
@@ -1527,6 +1722,9 @@
                         "id": "logs",
                         "icon": "document-text-outline",
                         "tooltip": "Open skill logs",
+                        "tooltip_i18n": {
+                          "key": "infrastate.text.open_skill_logs"
+                        },
                         "whenKey": "can_logs",
                         "whenEquals": true
                       },
@@ -1534,6 +1732,9 @@
                         "id": "uninstall",
                         "icon": "trash-outline",
                         "tooltip": "Uninstall skill",
+                        "tooltip_i18n": {
+                          "key": "infrastate.text.uninstall_skill"
+                        },
                         "disabledKey": "uninstall_disabled"
                       }
                     ]
@@ -1554,7 +1755,10 @@
                     "pending": {
                       "disable": true,
                       "icon": "sync-outline",
-                      "label": "Activating"
+                      "label": "Activating",
+                      "label_i18n": {
+                        "key": "infrastate.text.activating"
+                      }
                     },
                     "observe": {
                       "kind": "stream",
@@ -1589,7 +1793,10 @@
                     "pending": {
                       "disable": true,
                       "icon": "sync-outline",
-                      "label": "Updating"
+                      "label": "Updating",
+                      "label_i18n": {
+                        "key": "infrastate.text.updating"
+                      }
                     },
                     "observe": {
                       "kind": "stream",
@@ -1670,6 +1877,9 @@
               "type": "ui.table",
               "area": "main",
               "title": "Scenarios",
+              "title_i18n": {
+                "key": "infrastate.text.scenarios"
+              },
               "visibleIf": "$state.infrastateTab === 'inventory' && $state.infrastateDevMode === true",
               "dataSource": {
                 "kind": "stream",
@@ -1678,6 +1888,9 @@
               },
               "inputs": {
                 "emptyText": "No scenarios",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_scenarios"
+                },
                 "columns": [
                   {
                     "key": "status_icon",
@@ -1688,29 +1901,44 @@
                   },
                   {
                     "key": "name",
-                    "label": "Name"
+                    "label": "Name",
+                    "label_i18n": {
+                      "key": "infrastate.text.name"
+                    }
                   },
                   {
                     "key": "catalog_display",
                     "label": "Catalog",
+                    "label_i18n": {
+                      "key": "infrastate.text.catalog"
+                    },
                     "mono": true,
                     "width": "105px"
                   },
                   {
                     "key": "workspace_display",
                     "label": "Workspace",
+                    "label_i18n": {
+                      "key": "infrastate.text.workspace"
+                    },
                     "mono": true,
                     "width": "105px"
                   },
                   {
                     "key": "runtime_display",
                     "label": "Runtime",
+                    "label_i18n": {
+                      "key": "infrastate.text.runtime"
+                    },
                     "mono": true,
                     "width": "105px"
                   },
                   {
                     "key": "_runtime_actions",
                     "label": "Actions",
+                    "label_i18n": {
+                      "key": "infrastate.text.actions"
+                    },
                     "kind": "buttons",
                     "width": "140px",
                     "buttons": [
@@ -1718,6 +1946,9 @@
                         "id": "hard_pull",
                         "icon": "cloud-download-outline",
                         "tooltip": "Restore or update Workspace source from catalog",
+                        "tooltip_i18n": {
+                          "key": "infrastate.text.restore_or_update_workspace_source_from_catalog"
+                        },
                         "whenKey": "can_hard_pull",
                         "whenEquals": true,
                         "disabledKey": "pending"
@@ -1726,6 +1957,9 @@
                         "id": "uninstall",
                         "icon": "trash-outline",
                         "tooltip": "Uninstall scenario",
+                        "tooltip_i18n": {
+                          "key": "infrastate.text.uninstall_scenario"
+                        },
                         "disabledKey": "uninstall_disabled"
                       }
                     ]
@@ -1746,7 +1980,10 @@
                     "pending": {
                       "disable": true,
                       "icon": "sync-outline",
-                      "label": "Syncing source"
+                      "label": "Syncing source",
+                      "label_i18n": {
+                        "key": "infrastate.text.syncing_source"
+                      }
                     },
                     "observe": {
                       "kind": "stream",
@@ -1785,6 +2022,9 @@
               "type": "ui.list",
               "area": "main",
               "title": "Last logs",
+              "title_i18n": {
+                "key": "infrastate.text.last_logs"
+              },
               "visibleIf": "$state.infrastateTab === 'diagnostics'",
               "dataSource": {
                 "kind": "stream",
@@ -1802,7 +2042,10 @@
                   "kind": "stream",
                   "receiver": "infrastate.details.logs.$event.id"
                 },
-                "emptyText": "No logs yet"
+                "emptyText": "No logs yet",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_logs_yet"
+                }
               }
             },
             {
@@ -1810,6 +2053,9 @@
               "type": "ui.table",
               "area": "main",
               "title": "Yjs load mark",
+              "title_i18n": {
+                "key": "infrastate.text.yjs_load_mark"
+              },
               "visibleIf": "$state.infrastateTab === 'diagnostics'",
               "dataSource": {
                 "kind": "stream",
@@ -1817,56 +2063,86 @@
               },
               "inputs": {
                 "emptyText": "No recent Yjs flow",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_recent_yjs_flow"
+                },
                 "columns": [
                   {
                     "key": "kind",
                     "label": "Kind",
+                    "label_i18n": {
+                      "key": "infrastate.text.kind"
+                    },
                     "width": "70px"
                   },
                   {
                     "key": "display",
                     "label": "Owner / Root",
+                    "label_i18n": {
+                      "key": "infrastate.text.owner_root"
+                    },
                     "mono": true,
                     "width": "180px"
                   },
                   {
                     "key": "status",
                     "label": "State",
+                    "label_i18n": {
+                      "key": "infrastate.text.state"
+                    },
                     "width": "90px"
                   },
                   {
                     "key": "avg_bps",
                     "label": "Avg B/s",
+                    "label_i18n": {
+                      "key": "infrastate.text.avg_b_s"
+                    },
                     "mono": true,
                     "width": "120px"
                   },
                   {
                     "key": "peak_bps",
                     "label": "Peak B/s",
+                    "label_i18n": {
+                      "key": "infrastate.text.peak_b_s"
+                    },
                     "mono": true,
                     "width": "120px"
                   },
                   {
                     "key": "avg_wps",
                     "label": "Avg W/s",
+                    "label_i18n": {
+                      "key": "infrastate.text.avg_w_s"
+                    },
                     "mono": true,
                     "width": "110px"
                   },
                   {
                     "key": "peak_wps",
                     "label": "Peak W/s",
+                    "label_i18n": {
+                      "key": "infrastate.text.peak_w_s"
+                    },
                     "mono": true,
                     "width": "110px"
                   },
                   {
                     "key": "recent_writes",
                     "label": "Writes",
+                    "label_i18n": {
+                      "key": "infrastate.text.writes"
+                    },
                     "mono": true,
                     "width": "90px"
                   },
                   {
                     "key": "current_size_bytes",
                     "label": "Size",
+                    "label_i18n": {
+                      "key": "infrastate.text.size"
+                    },
                     "mono": true,
                     "width": "110px"
                   }
@@ -1878,13 +2154,19 @@
               "type": "ui.jsonViewer",
               "area": "main",
               "title": "YJS Balancer",
+              "title_i18n": {
+                "key": "infrastate.text.yjs_balancer"
+              },
               "visibleIf": "$state.infrastateTab === 'yjs_balancer'",
               "dataSource": {
                 "kind": "y",
                 "path": "data/infrastate/yjs_balancer"
               },
               "inputs": {
-                "emptyText": "No YJS balancer snapshot yet"
+                "emptyText": "No YJS balancer snapshot yet",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_yjs_balancer_snapshot_yet"
+                }
               }
             }
           ],
@@ -1904,6 +2186,9 @@
       },
       "project_detail_modal": {
         "title": "Project",
+        "title_i18n": {
+          "key": "infrastate.text.project"
+        },
         "titleStateKey": "infrastateProjectTitle",
         "schema": {
           "id": "project_detail_modal",
@@ -1926,6 +2211,9 @@
               "type": "ui.list",
               "area": "main",
               "title": "Project",
+              "title_i18n": {
+                "key": "infrastate.text.project"
+              },
               "dataSource": {
                 "kind": "stream",
                 "receiver": "infrastate.details.project_header",
@@ -1956,6 +2244,9 @@
               "type": "ui.actions",
               "area": "main",
               "title": "Project actions",
+              "title_i18n": {
+                "key": "infrastate.text.project_actions"
+              },
               "dataSource": {
                 "kind": "stream",
                 "receiver": "infrastate.details.project_actions",
@@ -1983,6 +2274,9 @@
                   "feedback": {
                     "pending": {
                       "label": "Refreshing",
+                      "label_i18n": {
+                        "key": "infrastate.text.refreshing"
+                      },
                       "disable": true
                     }
                   }
@@ -2014,6 +2308,9 @@
                   "feedback": {
                     "pending": {
                       "label": "Reconciling",
+                      "label_i18n": {
+                        "key": "infrastate.text.reconciling"
+                      },
                       "disable": true
                     }
                   }
@@ -2038,6 +2335,9 @@
               "type": "ui.list",
               "area": "main",
               "title": "Overview",
+              "title_i18n": {
+                "key": "infrastate.text.overview"
+              },
               "dataSource": {
                 "kind": "stream",
                 "receiver": "infrastate.details.project_overview",
@@ -2068,6 +2368,9 @@
               "type": "ui.table",
               "area": "main",
               "title": "Features",
+              "title_i18n": {
+                "key": "infrastate.text.features"
+              },
               "dataSource": {
                 "kind": "stream",
                 "receiver": "infrastate.details.project_features",
@@ -2085,39 +2388,60 @@
                   {
                     "key": "id",
                     "label": "Feature",
+                    "label_i18n": {
+                      "key": "infrastate.text.feature"
+                    },
                     "mono": true,
                     "width": "160px"
                   },
                   {
                     "key": "title",
-                    "label": "Title"
+                    "label": "Title",
+                    "label_i18n": {
+                      "key": "infrastate.text.title"
+                    }
                   },
                   {
                     "key": "default",
                     "label": "Default",
+                    "label_i18n": {
+                      "key": "infrastate.text.default"
+                    },
                     "kind": "boolean",
                     "width": "90px"
                   },
                   {
                     "key": "optional",
                     "label": "Optional",
+                    "label_i18n": {
+                      "key": "infrastate.text.optional"
+                    },
                     "kind": "boolean",
                     "width": "90px"
                   },
                   {
                     "key": "status",
                     "label": "State",
+                    "label_i18n": {
+                      "key": "infrastate.text.state"
+                    },
                     "width": "100px"
                   },
                   {
                     "key": "installed",
                     "label": "Installed",
+                    "label_i18n": {
+                      "key": "infrastate.text.installed"
+                    },
                     "mono": true,
                     "width": "100px"
                   },
                   {
                     "key": "components",
                     "label": "Components",
+                    "label_i18n": {
+                      "key": "infrastate.text.components"
+                    },
                     "mono": true,
                     "width": "110px"
                   }
@@ -2129,6 +2453,9 @@
               "type": "ui.table",
               "area": "main",
               "title": "Components",
+              "title_i18n": {
+                "key": "infrastate.text.components"
+              },
               "dataSource": {
                 "kind": "stream",
                 "receiver": "infrastate.details.project_components",
@@ -2155,45 +2482,69 @@
                   {
                     "key": "component_ref",
                     "label": "Component",
+                    "label_i18n": {
+                      "key": "infrastate.text.component"
+                    },
                     "mono": true,
                     "width": "210px"
                   },
                   {
                     "key": "role",
                     "label": "Role",
+                    "label_i18n": {
+                      "key": "infrastate.text.role"
+                    },
                     "width": "120px"
                   },
                   {
                     "key": "exposure",
                     "label": "Exposure",
+                    "label_i18n": {
+                      "key": "infrastate.text.exposure"
+                    },
                     "width": "120px"
                   },
                   {
                     "key": "install_scope",
                     "label": "Scope",
+                    "label_i18n": {
+                      "key": "infrastate.text.scope"
+                    },
                     "width": "100px"
                   },
                   {
                     "key": "workspace_display",
                     "label": "Workspace",
+                    "label_i18n": {
+                      "key": "infrastate.text.workspace"
+                    },
                     "mono": true,
                     "width": "120px"
                   },
                   {
                     "key": "runtime_display",
                     "label": "Runtime",
+                    "label_i18n": {
+                      "key": "infrastate.text.runtime"
+                    },
                     "mono": true,
                     "width": "130px"
                   },
                   {
                     "key": "node_count",
                     "label": "Nodes",
+                    "label_i18n": {
+                      "key": "infrastate.text.nodes"
+                    },
                     "mono": true,
                     "width": "80px"
                   },
                   {
                     "key": "features",
-                    "label": "Features"
+                    "label": "Features",
+                    "label_i18n": {
+                      "key": "infrastate.text.features"
+                    }
                   }
                 ]
               }
@@ -2203,6 +2554,9 @@
               "type": "ui.table",
               "area": "main",
               "title": "Node placement",
+              "title_i18n": {
+                "key": "infrastate.text.node_placement"
+              },
               "dataSource": {
                 "kind": "stream",
                 "receiver": "infrastate.details.project_nodes",
@@ -2228,51 +2582,78 @@
                   {
                     "key": "node_id",
                     "label": "Node",
+                    "label_i18n": {
+                      "key": "infrastate.text.node"
+                    },
                     "mono": true,
                     "width": "180px"
                   },
                   {
                     "key": "component_ref",
                     "label": "Component",
+                    "label_i18n": {
+                      "key": "infrastate.text.component"
+                    },
                     "mono": true,
                     "width": "210px"
                   },
                   {
                     "key": "status",
                     "label": "State",
+                    "label_i18n": {
+                      "key": "infrastate.text.state"
+                    },
                     "width": "100px"
                   },
                   {
                     "key": "health",
                     "label": "Health",
+                    "label_i18n": {
+                      "key": "infrastate.text.health"
+                    },
                     "width": "130px"
                   },
                   {
                     "key": "deployment_id",
                     "label": "Deployment",
+                    "label_i18n": {
+                      "key": "infrastate.text.deployment"
+                    },
                     "mono": true,
                     "width": "150px"
                   },
                   {
                     "key": "generation",
                     "label": "Gen",
+                    "label_i18n": {
+                      "key": "infrastate.text.gen"
+                    },
                     "mono": true,
                     "width": "70px"
                   },
                   {
                     "key": "release",
                     "label": "Release",
+                    "label_i18n": {
+                      "key": "infrastate.text.release"
+                    },
                     "mono": true,
                     "width": "130px"
                   },
                   {
                     "key": "source",
                     "label": "Source",
+                    "label_i18n": {
+                      "key": "infrastate.text.source"
+                    },
                     "width": "150px"
                   },
                   {
                     "key": "_node_actions",
                     "label": "Actions",
+                    "label_i18n": {
+                      "key": "infrastate.text.actions"
+                    },
                     "kind": "buttons",
                     "width": "96px",
                     "buttons": [
@@ -2280,6 +2661,9 @@
                         "id": "drain",
                         "icon": "pause-circle-outline",
                         "tooltip": "Drain activation",
+                        "tooltip_i18n": {
+                          "key": "infrastate.text.drain_activation"
+                        },
                         "whenKey": "can_drain",
                         "whenEquals": true
                       },
@@ -2287,6 +2671,9 @@
                         "id": "remove",
                         "icon": "trash-outline",
                         "tooltip": "Remove activation",
+                        "tooltip_i18n": {
+                          "key": "infrastate.text.remove_activation"
+                        },
                         "whenKey": "can_remove",
                         "whenEquals": true
                       }
@@ -2310,6 +2697,9 @@
                   "feedback": {
                     "pending": {
                       "label": "Draining",
+                      "label_i18n": {
+                        "key": "infrastate.text.draining"
+                      },
                       "disable": true
                     }
                   }
@@ -2342,6 +2732,9 @@
                   "feedback": {
                     "pending": {
                       "label": "Removing",
+                      "label_i18n": {
+                        "key": "infrastate.text.removing"
+                      },
                       "disable": true
                     }
                   }
@@ -2366,6 +2759,9 @@
               "type": "ui.table",
               "area": "main",
               "title": "Operations",
+              "title_i18n": {
+                "key": "infrastate.text.operations"
+              },
               "dataSource": {
                 "kind": "stream",
                 "receiver": "infrastate.details.project_operations",
@@ -2385,39 +2781,60 @@
                   {
                     "key": "operation_id",
                     "label": "Operation",
+                    "label_i18n": {
+                      "key": "infrastate.text.operation"
+                    },
                     "mono": true,
                     "width": "190px"
                   },
                   {
                     "key": "kind",
                     "label": "Kind",
+                    "label_i18n": {
+                      "key": "infrastate.text.kind"
+                    },
                     "width": "150px"
                   },
                   {
                     "key": "state",
                     "label": "State",
+                    "label_i18n": {
+                      "key": "infrastate.text.state"
+                    },
                     "width": "100px"
                   },
                   {
                     "key": "target",
                     "label": "Target",
+                    "label_i18n": {
+                      "key": "infrastate.text.target"
+                    },
                     "mono": true,
                     "width": "210px"
                   },
                   {
                     "key": "node_id",
                     "label": "Node",
+                    "label_i18n": {
+                      "key": "infrastate.text.node"
+                    },
                     "mono": true,
                     "width": "170px"
                   },
                   {
                     "key": "source",
                     "label": "Source",
+                    "label_i18n": {
+                      "key": "infrastate.text.source"
+                    },
                     "width": "140px"
                   },
                   {
                     "key": "updated_at",
                     "label": "Updated",
+                    "label_i18n": {
+                      "key": "infrastate.text.updated"
+                    },
                     "mono": true,
                     "width": "170px"
                   }
@@ -2455,6 +2872,9 @@
       },
       "event_history_modal": {
         "title": "Event history",
+        "title_i18n": {
+          "key": "infrastate.text.event_history"
+        },
         "schema": {
           "id": "event_history_modal",
           "layout": {
@@ -2473,6 +2893,9 @@
               "type": "ui.list",
               "area": "main",
               "title": "Event history",
+              "title_i18n": {
+                "key": "infrastate.text.event_history"
+              },
               "dataSource": {
                 "kind": "stream",
                 "receiver": "infrastate.events.recent"
@@ -2489,7 +2912,10 @@
                   "kind": "stream",
                   "receiver": "infrastate.details.events.$event.id"
                 },
-                "emptyText": "No events yet"
+                "emptyText": "No events yet",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_events_yet"
+                }
               }
             }
           ],
@@ -2509,6 +2935,9 @@
       },
       "marketplace_modal": {
         "title": "Marketplace",
+        "title_i18n": {
+          "key": "infrastate.text.marketplace"
+        },
         "schema": {
           "id": "marketplace_modal",
           "initialStateSource": {
@@ -2534,6 +2963,9 @@
               "type": "ui.table",
               "area": "main",
               "title": "Installable projects",
+              "title_i18n": {
+                "key": "infrastate.text.installable_projects"
+              },
               "dataSource": {
                 "kind": "stream",
                 "scope": "node",
@@ -2541,43 +2973,67 @@
               },
               "inputs": {
                 "emptyText": "No installable projects",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_installable_projects"
+                },
                 "columns": [
                   {
                     "key": "id",
                     "label": "Project",
+                    "label_i18n": {
+                      "key": "infrastate.text.project"
+                    },
                     "mono": true,
                     "width": "190px"
                   },
                   {
                     "key": "version",
                     "label": "Version",
+                    "label_i18n": {
+                      "key": "infrastate.text.version"
+                    },
                     "mono": true,
                     "width": "110px"
                   },
                   {
                     "key": "stage",
                     "label": "Stage",
+                    "label_i18n": {
+                      "key": "infrastate.text.stage"
+                    },
                     "width": "90px"
                   },
                   {
                     "key": "categories",
                     "label": "Categories",
+                    "label_i18n": {
+                      "key": "infrastate.text.categories"
+                    },
                     "width": "160px"
                   },
                   {
                     "key": "components_count",
                     "label": "Components",
+                    "label_i18n": {
+                      "key": "infrastate.text.components"
+                    },
                     "width": "110px"
                   },
                   {
                     "key": "description",
-                    "label": "Description"
+                    "label": "Description",
+                    "label_i18n": {
+                      "key": "infrastate.text.description"
+                    }
                   }
                 ],
                 "buttons": [
                   {
                     "id": "install",
                     "label": "Install",
+                    "label_i18n": {
+                      "key": "infrastate.text.install"
+                    },
                     "disabledKey": "install_disabled"
                   }
                 ]
@@ -2601,6 +3057,9 @@
               "type": "ui.table",
               "area": "main",
               "title": "Installable skills",
+              "title_i18n": {
+                "key": "infrastate.text.installable_skills"
+              },
               "visibleIf": "$state.infrastateDevMode === true",
               "dataSource": {
                 "kind": "stream",
@@ -2609,26 +3068,41 @@
               },
               "inputs": {
                 "emptyText": "No installable skills",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_installable_skills"
+                },
                 "columns": [
                   {
                     "key": "id",
                     "label": "Id",
+                    "label_i18n": {
+                      "key": "infrastate.text.id"
+                    },
                     "mono": true,
                     "width": "180px"
                   },
                   {
                     "key": "version",
                     "label": "Version",
+                    "label_i18n": {
+                      "key": "infrastate.text.version"
+                    },
                     "mono": true,
                     "width": "110px"
                   },
                   {
                     "key": "description",
-                    "label": "Description"
+                    "label": "Description",
+                    "label_i18n": {
+                      "key": "infrastate.text.description"
+                    }
                   },
                   {
                     "key": "operation_status",
                     "label": "Status",
+                    "label_i18n": {
+                      "key": "infrastate.text.status"
+                    },
                     "width": "120px"
                   }
                 ],
@@ -2636,6 +3110,9 @@
                   {
                     "id": "install",
                     "label": "Install",
+                    "label_i18n": {
+                      "key": "infrastate.text.install"
+                    },
                     "disabledKey": "install_disabled"
                   }
                 ]
@@ -2659,6 +3136,9 @@
               "type": "ui.table",
               "area": "main",
               "title": "Installable scenarios",
+              "title_i18n": {
+                "key": "infrastate.text.installable_scenarios"
+              },
               "visibleIf": "$state.infrastateDevMode === true",
               "dataSource": {
                 "kind": "stream",
@@ -2667,26 +3147,41 @@
               },
               "inputs": {
                 "emptyText": "No installable scenarios",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_installable_scenarios"
+                },
                 "columns": [
                   {
                     "key": "id",
                     "label": "Id",
+                    "label_i18n": {
+                      "key": "infrastate.text.id"
+                    },
                     "mono": true,
                     "width": "180px"
                   },
                   {
                     "key": "version",
                     "label": "Version",
+                    "label_i18n": {
+                      "key": "infrastate.text.version"
+                    },
                     "mono": true,
                     "width": "110px"
                   },
                   {
                     "key": "description",
-                    "label": "Description"
+                    "label": "Description",
+                    "label_i18n": {
+                      "key": "infrastate.text.description"
+                    }
                   },
                   {
                     "key": "operation_status",
                     "label": "Status",
+                    "label_i18n": {
+                      "key": "infrastate.text.status"
+                    },
                     "width": "120px"
                   }
                 ],
@@ -2694,6 +3189,9 @@
                   {
                     "id": "install",
                     "label": "Install",
+                    "label_i18n": {
+                      "key": "infrastate.text.install"
+                    },
                     "disabledKey": "install_disabled"
                   }
                 ]
@@ -2717,6 +3215,9 @@
               "type": "ui.list",
               "area": "main",
               "title": "Active operations",
+              "title_i18n": {
+                "key": "infrastate.text.active_operations"
+              },
               "dataSource": {
                 "kind": "stream",
                 "receiver": "infrastate.operations.active"
@@ -2733,7 +3234,10 @@
                   "receiver": "infrastate.details.operations.$event.operation_id"
                 },
                 "itemAccordion": false,
-                "emptyText": "No active operations"
+                "emptyText": "No active operations",
+                "emptyText_i18n": {
+                  "key": "infrastate.text.no_active_operations"
+                }
               }
             }
           ],
@@ -2753,6 +3257,9 @@
       },
       "infrastate_skill_push_modal": {
         "title": "Push skill",
+        "title_i18n": {
+          "key": "infrastate.text.push_skill"
+        },
         "schema": {
           "id": "infrastate_skill_push_modal",
           "layout": {
@@ -2771,16 +3278,28 @@
               "type": "ui.form",
               "area": "main",
               "title": "Push workspace changes",
+              "title_i18n": {
+                "key": "infrastate.text.push_workspace_changes"
+              },
               "inputs": {
                 "fields": [
                   {
                     "id": "message",
                     "type": "textarea",
                     "label": "Message",
-                    "placeholder": "ref: update"
+                    "label_i18n": {
+                      "key": "infrastate.text.message"
+                    },
+                    "placeholder": "ref: update",
+                    "placeholder_i18n": {
+                      "key": "infrastate.text.ref_update"
+                    }
                   }
                 ],
-                "submitLabel": "Push"
+                "submitLabel": "Push",
+                "submitLabel_i18n": {
+                  "key": "infrastate.text.push"
+                }
               },
               "actions": [
                 {
@@ -2817,100 +3336,214 @@
     "data/infrastate": {
       "summary": {
         "label": "Core update",
+        "label_i18n": {
+          "key": "infrastate.text.core_update"
+        },
         "value": "idle",
-        "subtitle": "slot —",
-        "description": "No update in progress"
+        "value_i18n": {
+          "key": "infrastate.state.idle"
+        },
+        "subtitle": "slot -",
+        "subtitle_i18n": {
+          "key": "infrastate.text.slot"
+        },
+        "description": "No update in progress",
+        "description_i18n": {
+          "key": "infrastate.text.no_update_in_progress"
+        }
       },
       "update_actions": [
         {
           "id": "adaos_update",
           "label": "Update",
+          "label_i18n": {
+            "key": "infrastate.text.update"
+          },
           "title": "Update",
+          "title_i18n": {
+            "key": "infrastate.text.update"
+          },
           "status": "ok",
-          "description": "Run workspace sync on the selected node"
+          "description": "Run workspace sync on the selected node",
+          "description_i18n": {
+            "key": "infrastate.text.run_workspace_sync_on_the_selected_node"
+          }
         },
         {
           "id": "inventory_activate",
           "label": "Activate",
+          "label_i18n": {
+            "key": "infrastate.text.activate"
+          },
           "title": "Activate",
+          "title_i18n": {
+            "key": "infrastate.text.activate"
+          },
           "status": "ok",
-          "description": "Activate prepared skill runtimes and refresh scenario dependencies"
+          "description": "Activate prepared skill runtimes and refresh scenario dependencies",
+          "description_i18n": {
+            "key": "infrastate.text.activate_prepared_skill_runtimes_and_refresh_scenario_dependencies"
+          }
         },
         {
           "id": "inventory_validate",
           "label": "Validate",
+          "label_i18n": {
+            "key": "infrastate.text.validate"
+          },
           "title": "Validate",
+          "title_i18n": {
+            "key": "infrastate.text.validate"
+          },
           "status": "ok",
-          "description": "Validate installed workspace skills and scenarios"
+          "description": "Validate installed workspace skills and scenarios",
+          "description_i18n": {
+            "key": "infrastate.text.validate_installed_workspace_skills_and_scenarios"
+          }
         },
         {
           "id": "inventory_test",
           "label": "Test",
+          "label_i18n": {
+            "key": "infrastate.text.test"
+          },
           "title": "Test",
+          "title_i18n": {
+            "key": "infrastate.text.test"
+          },
           "status": "ok",
-          "description": "Run available skill and scenario tests"
+          "description": "Run available skill and scenario tests",
+          "description_i18n": {
+            "key": "infrastate.text.run_available_skill_and_scenario_tests"
+          }
         },
         {
           "id": "marketplace",
           "label": "Marketplace",
+          "label_i18n": {
+            "key": "infrastate.text.marketplace"
+          },
           "title": "Marketplace",
+          "title_i18n": {
+            "key": "infrastate.text.marketplace"
+          },
           "status": "ok",
-          "description": "Browse registry catalog and install missing skills or scenarios"
+          "description": "Browse registry catalog and install missing skills or scenarios",
+          "description_i18n": {
+            "key": "infrastate.text.browse_registry_catalog_and_install_missing_skills_or_scenarios"
+          }
         }
       ],
       "actions": [
         {
           "id": "refresh",
           "title": "Refresh snapshot",
-          "description": "Reload current local update state"
+          "title_i18n": {
+            "key": "infrastate.text.refresh_snapshot"
+          },
+          "description": "Reload current local update state",
+          "description_i18n": {
+            "key": "infrastate.text.reload_current_local_update_state"
+          }
         },
         {
           "id": "cancel_update",
           "title": "Cancel update",
-          "description": "Cancel current countdown/update task"
+          "title_i18n": {
+            "key": "infrastate.text.cancel_update"
+          },
+          "description": "Cancel current countdown/update task",
+          "description_i18n": {
+            "key": "infrastate.text.cancel_current_countdown_update_task"
+          }
         },
         {
           "id": "rollback",
           "title": "Rollback slot",
-          "description": "Switch back to previous active core slot"
+          "title_i18n": {
+            "key": "infrastate.text.rollback_slot"
+          },
+          "description": "Switch back to previous active core slot",
+          "description_i18n": {
+            "key": "infrastate.text.switch_back_to_previous_active_core_slot"
+          }
         },
         {
           "id": "drain",
           "title": "Drain node",
-          "description": "Reject new tool calls and enter draining state"
+          "title_i18n": {
+            "key": "infrastate.text.drain_node"
+          },
+          "description": "Reject new tool calls and enter draining state",
+          "description_i18n": {
+            "key": "infrastate.text.reject_new_tool_calls_and_enter_draining_state"
+          }
         }
       ],
       "core_actions": [
         {
           "id": "start_update",
           "title": "Start update",
-          "description": "Schedule core update with current target rev"
+          "title_i18n": {
+            "key": "infrastate.text.start_update"
+          },
+          "description": "Schedule core update with current target rev",
+          "description_i18n": {
+            "key": "infrastate.text.schedule_core_update_with_current_target_rev"
+          }
         },
         {
           "id": "refresh",
           "title": "Refresh snapshot",
-          "description": "Reload current local update state"
+          "title_i18n": {
+            "key": "infrastate.text.refresh_snapshot"
+          },
+          "description": "Reload current local update state",
+          "description_i18n": {
+            "key": "infrastate.text.reload_current_local_update_state"
+          }
         },
         {
           "id": "cancel_update",
           "title": "Cancel update",
-          "description": "Cancel current countdown/update task"
+          "title_i18n": {
+            "key": "infrastate.text.cancel_update"
+          },
+          "description": "Cancel current countdown/update task",
+          "description_i18n": {
+            "key": "infrastate.text.cancel_current_countdown_update_task"
+          }
         },
         {
           "id": "rollback",
           "title": "Rollback slot",
-          "description": "Switch back to previous active core slot"
+          "title_i18n": {
+            "key": "infrastate.text.rollback_slot"
+          },
+          "description": "Switch back to previous active core slot",
+          "description_i18n": {
+            "key": "infrastate.text.switch_back_to_previous_active_core_slot"
+          }
         },
         {
           "id": "drain",
           "title": "Drain node",
-          "description": "Reject new tool calls and enter draining state"
+          "title_i18n": {
+            "key": "infrastate.text.drain_node"
+          },
+          "description": "Reject new tool calls and enter draining state",
+          "description_i18n": {
+            "key": "infrastate.text.reject_new_tool_calls_and_enter_draining_state"
+          }
         }
       ],
       "nodes": [
         {
           "id": "local",
-          "label": "hub"
+          "label": "hub",
+          "label_i18n": {
+            "key": "infrastate.text.hub"
+          }
         }
       ],
       "node_editor": {
@@ -2995,6 +3628,9 @@
     "views": {
       "infrastate_skill.event_history_modal": {
         "title": "Event history",
+        "title_i18n": {
+          "key": "infrastate.text.event_history"
+        },
         "surfaces": [
           "modal"
         ],
@@ -3002,6 +3638,9 @@
       },
       "infrastate_skill.infrastate_skill_push_modal": {
         "title": "Push skill",
+        "title_i18n": {
+          "key": "infrastate.text.push_skill"
+        },
         "surfaces": [
           "modal"
         ],
@@ -3009,6 +3648,9 @@
       },
       "infrastate_skill.marketplace_modal": {
         "title": "Marketplace",
+        "title_i18n": {
+          "key": "infrastate.text.marketplace"
+        },
         "surfaces": [
           "modal"
         ],
@@ -3016,6 +3658,9 @@
       },
       "infrastate_skill.project_detail_modal": {
         "title": "Project",
+        "title_i18n": {
+          "key": "infrastate.text.project"
+        },
         "surfaces": [
           "modal"
         ],
@@ -3031,6 +3676,9 @@
       },
       "infrastate_skill.infrastate_modal": {
         "title": "Infrastructure State",
+        "title_i18n": {
+          "key": "infrastate.text.infrastructure_state"
+        },
         "surfaces": [
           "modal"
         ],
