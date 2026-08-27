@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: ops_infrascope
-version: 0.10.11
+version: 0.10.12
 profiles: [adaos.operations.infrascope.v1]
 components:
   owned:

@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -501,6 +502,8 @@ def _action_inventory_receivers(action_id: str) -> tuple[str, ...]:
         "inventory_activate",
         "project_refresh",
         "project_reconcile",
+        "project_drain_activation",
+        "project_remove_activation",
     }:
         return (
             _projects_receiver(),
@@ -4266,22 +4269,34 @@ def _project_node_rows(
             activated_placements.add((deployment_id, component_ref))
         deployment = deployment_by_id.get(deployment_id) or {}
         health = activation.get("health") if isinstance(activation.get("health"), dict) else {}
+        activation_status = str(activation.get("status") or "").strip()
+        activation_id = str(activation.get("activation_id") or "").strip()
+        removable = bool(activation_id and activation_status.lower() != "removed")
+        drainable = bool(
+            activation_id
+            and activation_status.lower()
+            not in {"draining", "drained", "removing", "removed"}
+        )
         out.append(
             {
-                "id": str(activation.get("activation_id") or f"{deployment_id}:{activation.get('node_id')}:{activation.get('component_ref')}"),
+                "id": activation_id or f"{deployment_id}:{activation.get('node_id')}:{activation.get('component_ref')}",
+                "activation_id": activation_id,
                 "project_id": project_id,
                 "deployment_id": deployment_id,
                 "subnet_id": str(deployment.get("subnet_id") or ""),
                 "node_id": str(activation.get("node_id") or ""),
                 "component_ref": str(activation.get("component_ref") or ""),
-                "status": str(activation.get("status") or ""),
-                "status_icon": _project_status_icon(activation.get("status")),
+                "status": activation_status,
+                "status_icon": _project_status_icon(activation_status),
                 "health": _activation_health_display(health),
                 "generation": str(activation.get("generation") or ""),
                 "release": _short_digest(activation.get("release_digest")),
                 "package": _short_digest(activation.get("package_digest")),
                 "updated_at": str(activation.get("updated_at") or ""),
                 "source": "deployment_activation",
+                "can_drain": drainable,
+                "can_remove": removable,
+                "action_disabled": not removable,
             }
         )
 
@@ -4304,6 +4319,7 @@ def _project_node_rows(
             out.append(
                 {
                     "id": f"{deployment_id}:{placement.get('component_ref')}",
+                    "activation_id": "",
                     "project_id": project_id,
                     "deployment_id": deployment_id,
                     "subnet_id": str(deployment.get("subnet_id") or ""),
@@ -4317,6 +4333,9 @@ def _project_node_rows(
                     "package": "",
                     "updated_at": str(deployment.get("updated_at") or ""),
                     "source": "deployment_placement",
+                    "can_drain": False,
+                    "can_remove": False,
+                    "action_disabled": True,
                 }
             )
     if out:
@@ -4333,6 +4352,7 @@ def _project_node_rows(
         out.append(
             {
                 "id": f"local:{component.get('component_ref')}",
+                "activation_id": "",
                 "project_id": project_id,
                 "deployment_id": "",
                 "subnet_id": "",
@@ -4346,6 +4366,9 @@ def _project_node_rows(
                 "package": "",
                 "updated_at": str(component.get("updated_at") or ""),
                 "source": "local_fallback",
+                "can_drain": False,
+                "can_remove": False,
+                "action_disabled": True,
             }
         )
     return sorted(out, key=lambda item: (str(item.get("component_ref") or ""), str(item.get("node_id") or "")))
@@ -4612,7 +4635,7 @@ def _project_action_items(project_id: str, *, webspace_id: str | None = None) ->
         {
             "id": "project_components",
             "label": "Components",
-            "title": "Per-component node operations require the project deployment controller",
+            "title": "Use node placement rows for activation drain/remove; placement editing requires the deployment controller",
             "kind": "secondary",
             "disabled": True,
         },
@@ -9392,7 +9415,12 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
             last_error="",
         )
         return result
-    if action_id in {"project_refresh", "project_reconcile"}:
+    if action_id in {
+        "project_refresh",
+        "project_reconcile",
+        "project_drain_activation",
+        "project_remove_activation",
+    }:
         value_map = payload.get("value") if isinstance(payload, dict) and isinstance(payload.get("value"), dict) else {}
         project_id = str(
             _extract_param(payload, "project_id")
@@ -9410,6 +9438,46 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
                 "ok": True,
                 "action": action_id,
                 "project_id": project_id,
+                "webspace_id": webspace_id,
+            }
+        elif action_id in {"project_drain_activation", "project_remove_activation"}:
+            activation_id = str(
+                _extract_param(payload, "activation_id")
+                or value_map.get("activation_id")
+                or value_map.get("id")
+                or ""
+            ).strip()
+            if not activation_id:
+                raise ValueError("project activation action requires activation id")
+            request_id = str(_extract_param(payload, "request_id") or uuid.uuid4()).strip()
+            try:
+                from adaos.sdk import deployment as deployment_sdk
+            except Exception as exc:
+                raise RuntimeError("project deployment SDK is unavailable") from exc
+            if action_id == "project_drain_activation":
+                operation = deployment_sdk.drain(
+                    activation_id,
+                    idempotency_key=request_id,
+                )
+            else:
+                operation = deployment_sdk.remove(
+                    activation_id,
+                    idempotency_key=request_id,
+                )
+            if hasattr(operation, "to_dict"):
+                operation_payload = operation.to_dict()
+            elif isinstance(operation, dict):
+                operation_payload = dict(operation)
+            else:
+                operation_payload = {"repr": repr(operation)}
+            result = {
+                "ok": True,
+                "accepted": True,
+                "action": action_id,
+                "project_id": project_id,
+                "activation_id": activation_id,
+                "operation": operation_payload,
+                "operation_id": str(operation_payload.get("operation_id") or operation_payload.get("id") or ""),
                 "webspace_id": webspace_id,
             }
         else:

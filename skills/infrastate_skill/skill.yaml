@@ -1,5 +1,5 @@
 name: infrastate_skill
-version: 0.75.81
+version: 0.75.82
 description: Локальный обзор состояния ядра, graceful update, A/B слотов и последнего
   результата обновления.
 runtime:
@@ -8,6 +8,11 @@ runtime:
     mode: lazy
     startup_allowed: true
     background_refresh: true
+capabilities:
+- project.deployment.inspect
+- project.deployment.apply
+- project.component.drain
+- project.component.remove
 dependencies: []
 events:
   subscribe:

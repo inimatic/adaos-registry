@@ -1338,6 +1338,7 @@ def test_infrastate_project_detail_streams_include_deployment_activations(monkey
     assert nodes == [
         {
             "id": "act-1",
+            "activation_id": "act-1",
             "project_id": "media_center",
             "deployment_id": "dep-1",
             "subnet_id": "home",
@@ -1351,11 +1352,62 @@ def test_infrastate_project_detail_streams_include_deployment_activations(monkey
             "package": "sha256:222222222222",
             "updated_at": "2026-08-27T00:00:01Z",
             "source": "deployment_activation",
+            "can_drain": True,
+            "can_remove": True,
+            "action_disabled": False,
         }
     ]
     assert operations[0]["operation_id"] == "op-1"
     assert operations[0]["kind"] == "deployment.reconcile"
     assert next(item for item in overview if item["id"] == "distribution")["subtitle"] == "distributed"
+
+
+def test_infrastate_project_activation_actions_call_deployment_sdk(monkeypatch):
+    mod = _load_infrastate_module()
+    import adaos.sdk.deployment as deployment_sdk
+
+    calls: list[tuple[str, str, str]] = []
+
+    def fake_drain(activation_id: str, *, idempotency_key: str):
+        calls.append(("drain", activation_id, idempotency_key))
+        return SimpleNamespace(to_dict=lambda: {"operation_id": "op-drain", "state": "accepted"})
+
+    def fake_remove(activation_id: str, *, idempotency_key: str):
+        calls.append(("remove", activation_id, idempotency_key))
+        return SimpleNamespace(to_dict=lambda: {"operation_id": "op-remove", "state": "accepted"})
+
+    monkeypatch.setattr(deployment_sdk, "drain", fake_drain)
+    monkeypatch.setattr(deployment_sdk, "remove", fake_remove)
+    monkeypatch.setattr(mod, "_write_ui_state", lambda **kwargs: kwargs)
+    monkeypatch.setattr(mod, "default_webspace_id", lambda: "desktop")
+
+    drain = mod._perform_action(
+        "project_drain_activation",
+        SimpleNamespace(node_id="hub-1"),
+        {
+            "project_id": "media_center",
+            "activation_id": "act-1",
+            "request_id": "req-drain",
+            "webspace_id": "desktop",
+        },
+    )
+    remove = mod._perform_action(
+        "project_remove_activation",
+        SimpleNamespace(node_id="hub-1"),
+        {
+            "project_id": "media_center",
+            "value": {"activation_id": "act-2"},
+            "request_id": "req-remove",
+            "webspace_id": "desktop",
+        },
+    )
+
+    assert drain["operation_id"] == "op-drain"
+    assert remove["operation_id"] == "op-remove"
+    assert calls == [
+        ("drain", "act-1", "req-drain"),
+        ("remove", "act-2", "req-remove"),
+    ]
 
 
 def test_infrastate_project_reconcile_records_explicit_install(monkeypatch):
@@ -4444,6 +4496,23 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
     )
     assert project_modal_widgets["project-nodes"]["dataSource"]["receiver"] == (
         "infrastate.details.project_nodes.$state.infrastateProjectId"
+    )
+    node_columns = project_modal_widgets["project-nodes"]["inputs"]["columns"]
+    node_action_column = next(column for column in node_columns if column.get("key") == "_node_actions")
+    assert node_action_column["kind"] == "buttons"
+    assert [button.get("id") for button in node_action_column["buttons"]] == ["drain", "remove"]
+    node_actions = project_modal_widgets["project-nodes"]["actions"]
+    assert any(
+        action.get("on") == "click:drain"
+        and ((action.get("params") or {}).get("id") == "project_drain_activation")
+        and ((action.get("params") or {}).get("activation_id") == "$event.activation_id")
+        for action in node_actions
+    )
+    assert any(
+        action.get("on") == "click:remove"
+        and ((action.get("params") or {}).get("id") == "project_remove_activation")
+        and ((action.get("params") or {}).get("activation_id") == "$event.activation_id")
+        for action in node_actions
     )
     assert project_modal_widgets["project-operations"]["dataSource"]["receiver"] == (
         "infrastate.details.project_operations.$state.infrastateProjectId"

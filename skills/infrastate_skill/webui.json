@@ -2190,9 +2190,97 @@
                     "key": "source",
                     "label": "Source",
                     "width": "150px"
+                  },
+                  {
+                    "key": "_node_actions",
+                    "label": "Actions",
+                    "kind": "buttons",
+                    "width": "96px",
+                    "buttons": [
+                      {
+                        "id": "drain",
+                        "icon": "pause-circle-outline",
+                        "tooltip": "Drain activation",
+                        "whenKey": "can_drain",
+                        "whenEquals": true
+                      },
+                      {
+                        "id": "remove",
+                        "icon": "trash-outline",
+                        "tooltip": "Remove activation",
+                        "whenKey": "can_remove",
+                        "whenEquals": true
+                      }
+                    ]
                   }
                 ]
-              }
+              },
+              "actions": [
+                {
+                  "on": "click:drain",
+                  "type": "callHost",
+                  "target": "infrastate.action",
+                  "params": {
+                    "id": "project_drain_activation",
+                    "project_id": "$event.project_id",
+                    "activation_id": "$event.activation_id",
+                    "name": "$event.project_id",
+                    "request_id": "$client.requestId",
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "feedback": {
+                    "pending": {
+                      "label": "Draining",
+                      "disable": true
+                    }
+                  }
+                },
+                {
+                  "on": "click:drain",
+                  "type": "mutateState",
+                  "params": {
+                    "operations": [
+                      {
+                        "op": "increment",
+                        "path": "infrastateProjectRefreshSeq",
+                        "amount": 1
+                      }
+                    ]
+                  }
+                },
+                {
+                  "on": "click:remove",
+                  "type": "callHost",
+                  "target": "infrastate.action",
+                  "params": {
+                    "id": "project_remove_activation",
+                    "project_id": "$event.project_id",
+                    "activation_id": "$event.activation_id",
+                    "name": "$event.project_id",
+                    "request_id": "$client.requestId",
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "feedback": {
+                    "pending": {
+                      "label": "Removing",
+                      "disable": true
+                    }
+                  }
+                },
+                {
+                  "on": "click:remove",
+                  "type": "mutateState",
+                  "params": {
+                    "operations": [
+                      {
+                        "op": "increment",
+                        "path": "infrastateProjectRefreshSeq",
+                        "amount": 1
+                      }
+                    ]
+                  }
+                }
+              ]
             },
             {
               "id": "project-operations",
