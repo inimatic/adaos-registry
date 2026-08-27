@@ -765,8 +765,18 @@
                     "mediaSearch": "$event.value",
                     "mediaSection": "catalog",
                     "mediaKind": "playable",
+                    "mediaCollectionKind": "",
+                    "mediaCollectionId": "",
+                    "mediaCollectionTitle": "",
                     "mediaFavoritesOnly": false,
                     "mediaSort": "title",
+                    "mediaGenre": "",
+                    "mediaYear": null,
+                    "mediaRatingMin": null,
+                    "mediaContentRating": "",
+                    "mediaFolderAgentId": "",
+                    "mediaFolderRootId": "",
+                    "mediaFolderParent": "",
                     "mediaCursor": ""
                   }
                 }
@@ -1495,18 +1505,23 @@
           "title": "Now Playing",
           "scope": "workspace",
           "presentation": {
-            "kind": "modal",
+            "kind": "fullscreen",
             "restoreFocus": true
           },
           "schema": {
             "id": "media_center_player",
             "title": "Now Playing",
+            "surfaceClass": "workspace",
             "layout": {
               "type": "split",
               "areas": [
                 {
                   "id": "main",
                   "role": "main"
+                },
+                {
+                  "id": "transport",
+                  "role": "aux"
                 },
                 {
                   "id": "actions",
@@ -1518,7 +1533,7 @@
               {
                 "id": "media-center-player-profile",
                 "type": "ui.actions",
-                "area": "main",
+                "area": "transport",
                 "inputs": {
                   "variant": "adaptiveToolbar",
                   "size": "small",
@@ -1548,7 +1563,7 @@
               {
                 "id": "media-center-player",
                 "type": "media.videoBrowser",
-                "area": "main",
+                "area": "transport",
                 "title": "Now Playing",
                 "visibleIf": "$state.playbackSourceId != ''",
                 "dataSource": {

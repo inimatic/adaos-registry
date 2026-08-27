@@ -90,6 +90,26 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     assert widgets["media-search"]["inputs"]["saveLabel"] == "Search"
     assert widgets["media-search"]["inputs"]["clearable"] is True
     assert widgets["media-search"]["inputs"]["clearLabel"] == "Reset"
+    search_action = widgets["media-search"]["actions"][0]
+    assert search_action["on"] == "change"
+    assert search_action["params"] == {
+        "mediaSearch": "$event.value",
+        "mediaSection": "catalog",
+        "mediaKind": "playable",
+        "mediaCollectionKind": "",
+        "mediaCollectionId": "",
+        "mediaCollectionTitle": "",
+        "mediaFavoritesOnly": False,
+        "mediaSort": "title",
+        "mediaGenre": "",
+        "mediaYear": None,
+        "mediaRatingMin": None,
+        "mediaContentRating": "",
+        "mediaFolderAgentId": "",
+        "mediaFolderRootId": "",
+        "mediaFolderParent": "",
+        "mediaCursor": "",
+    }
     toolbar = widgets["media-browse-toolbar"]
     assert toolbar["inputs"]["variant"] == "adaptiveToolbar"
     assert toolbar["visibleIf"] == "$state.surfaceProfile != 'mobile_control'"
@@ -369,10 +389,11 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
 
     player_schema = modals["media_center_player"]["schema"]
     player_widgets = {widget["id"]: widget for widget in player_schema["widgets"]}
+    assert modals["media_center_player"]["presentation"]["kind"] == "fullscreen"
     assert player_schema["layout"]["type"] == "split"
     assert {
         area["id"]: area["role"] for area in player_schema["layout"]["areas"]
-    } == {"main": "main", "actions": "footer"}
+    } == {"main": "main", "transport": "aux", "actions": "footer"}
     player = player_widgets["media-center-player"]
     assert player["type"] == "media.videoBrowser"
     assert player["dataSource"]["name"] == "media_center_skill.build_playback_queue"
@@ -397,6 +418,9 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     assert player_widgets["media-center-player-favorite"]["area"] == "actions"
     assert player_widgets["media-center-player-unfavorite"]["area"] == "actions"
     player_profile = player_widgets["media-center-player-profile"]
+    assert player_profile["area"] == "transport"
+    assert player["area"] == "transport"
+    assert player_widgets["media-center-player-details"]["area"] == "main"
     assert player_profile["inputs"]["variant"] == "adaptiveToolbar"
     assert [option["value"] for option in player_profile["inputs"]["buttons"][0]["options"]] == [
         "default",

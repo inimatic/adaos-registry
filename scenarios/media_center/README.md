@@ -13,7 +13,7 @@ The adaptive UI-as-data toolbar opens Filter and sort through the generic left d
 
 The Project entrypoints declare explicit `desktop`, `tv`, `mobile_control`, and `embedded` presentation profiles independently of viewport width. The client selects the profile from `surfaceProfile` (or the `presentation_profile` entrypoint query), applies stable density/overscan/input semantics, and keeps the same catalog and control contracts. TV uses content rails and D-pad focus; mobile control puts Now Playing, target selection, and transport first while retaining Browse/Search below them.
 
-The main page follows familiar media-center navigation: Home, Movies, Series, Music, Audiobooks, Folders, Playlists, Favorites, and Recent. A single adaptive UI-as-data toolbar combines Remote, profile, section, layout, and Settings without media-specific client code. Its native buttons and menus work with pointer, touch, keyboard, and TV D-pad input; the mobile-control profile keeps its transport-first surface. Search is explicit-submit and has an explicit Reset action that clears both the query field and authoritative catalog filter. Every catalog read uses opaque server cursors with 30 records per page. Selecting a series, album, or audiobook opens a bounded collection browser with breadcrumbs, child seasons/parts, representative artwork, and explicit Play All; selecting it never materializes an unbounded queue in the page. The universal `ui.list` renderer switches between list, grid, and carousel layouts, uses browser rendering virtualization, and provides deterministic spatial keyboard/D-pad focus. Carousel arrows move one bounded viewport while retaining focus on the arrow, so repeated TV-remote clicks remain stable.
+The main page follows familiar media-center navigation: Home, Movies, Series, Music, Audiobooks, Folders, Playlists, Favorites, and Recent. A single adaptive UI-as-data toolbar combines Remote, profile, section, layout, and Settings without media-specific client code. Its native buttons and menus work with pointer, touch, keyboard, and TV D-pad input; the mobile-control profile keeps its transport-first surface. Search is explicit-submit and has an explicit Reset action that clears both the query field and authoritative catalog filter. A submitted global query also clears stale collection, folder, genre, year, rating, and content-rating constraints, so a valid title cannot be hidden by a previous browsing context. Every catalog read uses opaque server cursors with 30 records per page. Selecting a series, album, or audiobook opens a bounded collection browser with breadcrumbs, child seasons/parts, representative artwork, and explicit Play All; selecting it never materializes an unbounded queue in the page. The universal `ui.list` renderer switches between list, grid, and carousel layouts, uses browser rendering virtualization, and provides deterministic spatial keyboard/D-pad focus. Carousel arrows move one bounded viewport while retaining focus on the arrow, so repeated TV-remote clicks remain stable.
 
 Home consumes the subscription-backed `media_center.library_state` snapshot. It keeps the loading state until the first snapshot and maps the skill-owned collection state to distinct indexing, unconfigured, configured-empty, unavailable, and profile-empty presentations. Favorites, recent state, catalog revision, and partial-agent status therefore converge across browsers in the same webspace without synchronizing the full catalog. Folder navigation remains an alternative first-class workflow: Home uses typed UI-as-data selection, so a folder shelf item enters the path browser instead of creating a playback queue. The first folder page contains configured library roots, then drills down within the selected agent/root scope. Root and breadcrumb selections carry those identities in page state, so similarly named folders on different disks or nodes cannot cross-navigate and a root card never opens the player.
 
@@ -41,11 +41,14 @@ capability-gated Picture-in-Picture, and Play on. The fullscreen overlay uses
 the same controls and remains above buffering/recovery diagnostics. On narrow
 touch surfaces toolbar labels collapse to accessible icon controls.
 
-The content-first details surface uses the universal `item.details` media
-presentation: bounded poster/cover, primary metadata, quality, source node,
-safe library-relative path, and available original/derived versions. Favorite,
+The content-first details surface is a fullscreen UI-as-data modal surface, not
+native video fullscreen. Its split layout keeps the universal `item.details`
+media presentation in the primary area and profile plus transport controls in
+a bounded auxiliary area; mobile stacks the same areas. The details projection
+contains a bounded poster/cover, primary metadata, quality, source node, safe
+library-relative path, and available original/derived versions. Favorite,
 Add to playlist, Edit metadata, and Close to mini-player form one peer action
-row. Add to playlist supports both existing profile-owned playlists and an
+row in the modal's non-scrolling docked footer. Add to playlist supports both existing profile-owned playlists and an
 atomic create-and-add flow. Edit metadata shows the immutable source identity,
 accepts reviewed title/overview/year/genre/artist/album/series values, and can
 reject an incorrect TMDb or MusicBrainz match. Corrections are audited and
@@ -139,6 +142,17 @@ and supports an explicit browser-compatible fixture. Its follow-up playback
 probe advanced 29.883 seconds with media error code zero and preserved exactly
 one media element after modal-to-mini transition. This closes the local desktop
 performance investigation, not the separate one-hour physical Android TV gate.
+
+The 2026-08-27 development-bundle `media-home` investigation made generic
+`ui.list` card projections stable, enabled `OnPush`, and retained an existing
+stream subscription when a materialization cycle supplied an equivalent widget
+descriptor. Across comparable 45-second local probes, DOM mutation rate fell
+from the previously observed 300-359/s range through 25.979/s to 6.655/s;
+`media-home` disappeared from the final mutation targets. Final steady main
+thread CPU was 6.096%, renderer CPU was 7.318%, heap growth was -0.204 MiB, and
+no Long Tasks were observed. The development renderer still exceeded the
+strict 5% idle process-CPU gate; production-bundle and physical Android TV
+acceptance remain authoritative.
 
 The harness reports one-time FTS/trigram and folder-index backfill separately
 from p50/p95/max catalog FTS, cursor-page, Home, root-folder, leaf-folder and

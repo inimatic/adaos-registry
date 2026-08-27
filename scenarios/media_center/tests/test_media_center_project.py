@@ -38,17 +38,20 @@ def test_media_center_project_is_a_complete_distribution_boundary() -> None:
         "skill:media_center_skill",
         "skill:media_library_agent",
         "skill:media_control_skill",
+        "skill:mediaserver",
     }
     assert owned["scenario:media_center"]["role"] == "primary"
     assert owned["skill:media_library_agent"]["exposure"] == "project_only"
-    assert manifest["components"]["dependencies"] == [
-        {
-            "ref": "skill:mediaserver",
-            "version": ">=0.1.0",
-            "lifecycle": "shared",
-            "relations": ["uses"],
-        }
-    ]
+    assert owned["skill:mediaserver"]["exposure"] == "advanced"
+    assert owned["skill:mediaserver"]["lifecycle"] == "bound"
+    assert manifest["components"]["dependencies"] == []
+    legacy_feature = next(
+        item for item in manifest["install"]["features"]
+        if item["id"] == "legacy-mediaserver"
+    )
+    assert legacy_feature["optional"] is True
+    assert legacy_feature["default"] is False
+    assert legacy_feature["components"] == ["skill:mediaserver"]
     assert {item["id"] for item in manifest["entrypoints"]} == {
         "library",
         "tv",
