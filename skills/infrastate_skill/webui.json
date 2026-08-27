@@ -462,10 +462,10 @@
         "snapshotPolicy": "on_subscribe",
         "initialState": null,
         "budget": {
-          "maxPayloadBytes": 65536,
+          "maxPayloadBytes": 131072,
           "maxPublishHz": 1,
           "maxSnapshotHz": 1,
-          "maxItems": 1
+          "maxItems": 256
         },
         "guardVisibility": {
           "degradedState": "Detail modal shows stale/degraded placeholder.",

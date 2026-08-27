@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-27T14:14:01+00:00",
+  "updated_at": "2026-08-27T14:23:17+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -354,7 +354,7 @@
       "kind": "skill",
       "id": "infrastate_skill",
       "name": "infrastate_skill",
-      "version": "0.75.80",
+      "version": "0.75.81",
       "updated_at": "2026-08-27T06:30:00+00:00",
       "path": "skills/infrastate_skill",
       "manifest": "skills/infrastate_skill/skill.yaml",
@@ -2410,8 +2410,8 @@
       "kind": "project",
       "id": "ops_infrascope",
       "name": "ops_infrascope",
-      "version": "0.10.10",
-      "updated_at": "2026-08-27T14:14:04+00:00",
+      "version": "0.10.11",
+      "updated_at": "2026-08-27T14:23:20+00:00",
       "path": "projects/ops_infrascope",
       "manifest": "projects/ops_infrascope/project.yaml",
       "source": {
