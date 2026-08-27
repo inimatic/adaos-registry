@@ -1398,6 +1398,10 @@
                     "to": "infrastate_skill.project_detail_modal",
                     "surface": "modal",
                     "modalId": "project_detail_modal",
+                    "params": {
+                      "project_id": "$event.name",
+                      "project_title": "$event.display_name"
+                    },
                     "statePatch": {
                       "infrastateProjectId": "$event.name",
                       "infrastateProjectTitle": "$event.display_name",
@@ -1882,6 +1886,7 @@
       },
       "project_detail_modal": {
         "title": "Project",
+        "titleStateKey": "infrastateProjectTitle",
         "schema": {
           "id": "project_detail_modal",
           "initialState": {
@@ -1898,6 +1903,28 @@
             ]
           },
           "widgets": [
+            {
+              "id": "project-header",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Project",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "infrastate.details.project_header.$state.infrastateProjectId",
+                "params": {
+                  "refresh": "$state.infrastateProjectRefreshSeq"
+                }
+              },
+              "inputs": {
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "detailsPath": "content",
+                "detailsPresentation": "body",
+                "showDetails": true,
+                "itemAccordion": false,
+                "emptyText": "No project selected"
+              }
+            },
             {
               "id": "project-detail-actions",
               "type": "ui.actions",
@@ -2351,7 +2378,21 @@
             "schema": "adaos.ui.modal.interface.v1",
             "routes": {
               "project_detail": {
-                "view": "infrastate_skill.project_detail_modal"
+                "view": "infrastate_skill.project_detail_modal",
+                "params": {
+                  "project_id": {
+                    "type": "string",
+                    "required": true
+                  },
+                  "project_title": {
+                    "type": "string"
+                  }
+                },
+                "state": {
+                  "infrastateProjectId": "$params.project_id",
+                  "infrastateProjectTitle": "$params.project_title",
+                  "infrastateProjectRefreshSeq": 0
+                }
               }
             },
             "defaultRoute": "project_detail"
@@ -2927,7 +2968,15 @@
         "surfaces": [
           "modal"
         ],
-        "params": {}
+        "params": {
+          "project_id": {
+            "type": "string",
+            "required": true
+          },
+          "project_title": {
+            "type": "string"
+          }
+        }
       },
       "infrastate_skill.infrastate_modal": {
         "title": "Infrastructure State",

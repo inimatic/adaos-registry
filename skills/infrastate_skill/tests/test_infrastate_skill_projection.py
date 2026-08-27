@@ -1231,6 +1231,10 @@ def test_infrastate_project_detail_streams_show_components_and_local_nodes(monke
         "infrastate.details.project_overview.media_center",
         "desktop",
     )
+    header = mod._build_stream_payload_for_receiver(
+        "infrastate.details.project_header.media_center",
+        "desktop",
+    )
     actions = mod._build_stream_payload_for_receiver(
         "infrastate.details.project_actions.media_center",
         "desktop",
@@ -1243,6 +1247,8 @@ def test_infrastate_project_detail_streams_show_components_and_local_nodes(monke
     assert [item["source"] for item in nodes] == ["local_fallback", "local_fallback", "local_fallback"]
     distribution = next(item for item in overview if item["id"] == "distribution")
     assert distribution["subtitle"] == "distributed-ready"
+    assert header[0]["title"] == "Media Center"
+    assert "project:media_center" in header[0]["subtitle"]
     reconcile = next(item for item in actions if item["id"] == "project_reconcile")
     assert reconcile["disabled"] is True
     assert "default components are missing" in reconcile["title"]
@@ -4479,16 +4485,24 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
         and action.get("type") == "navigate"
         and ((action.get("params") or {}).get("to") == "infrastate_skill.project_detail_modal")
         and ((action.get("params") or {}).get("modalId") == "project_detail_modal")
+        and (((action.get("params") or {}).get("params") or {}).get("project_id") == "$event.name")
         and (((action.get("params") or {}).get("statePatch") or {}).get("infrastateProjectId") == "$event.name")
         for action in project_actions
     )
     project_modal = webui["registry"]["modals"]["project_detail_modal"]
     assert project_modal["implements"] == ["infrastate_skill.project_detail_modal"]
+    assert project_modal["titleStateKey"] == "infrastateProjectTitle"
+    project_route = project_modal["schema"]["interface"]["routes"]["project_detail"]
+    assert project_route["params"]["project_id"]["required"] is True
+    assert project_route["state"]["infrastateProjectId"] == "$params.project_id"
     assert "infrastate_skill.project_detail_modal" in webui["interface"]["views"]
     project_modal_widgets = {
         widget.get("id"): widget
         for widget in project_modal["schema"]["widgets"]
     }
+    assert project_modal_widgets["project-header"]["dataSource"]["receiver"] == (
+        "infrastate.details.project_header.$state.infrastateProjectId"
+    )
     assert project_modal_widgets["project-detail-actions"]["dataSource"]["receiver"] == (
         "infrastate.details.project_actions.$state.infrastateProjectId"
     )

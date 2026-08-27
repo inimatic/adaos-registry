@@ -4677,12 +4677,41 @@ def _project_detail_payload(project_id: str, *, webspace_id: str | None = None) 
     }
 
 
+def _project_header_items(project_id: str, *, webspace_id: str | None = None) -> list[dict[str, Any]]:
+    detail = _project_detail_payload(project_id, webspace_id=webspace_id)
+    if not isinstance(detail, dict) or not str(detail.get("id") or "").strip():
+        return []
+    subtitle_parts = [
+        f"project:{detail.get('id')}",
+        str(detail.get("version") or "unknown"),
+        str(detail.get("stage") or "unlisted"),
+        str(detail.get("distribution") or "local"),
+    ]
+    return [
+        {
+            "id": str(detail.get("id") or project_id),
+            "title": str(detail.get("title") or project_id),
+            "subtitle": " | ".join(item for item in subtitle_parts if item),
+            "content": (
+                f"components={detail.get('components') or 0}; "
+                f"features={detail.get('features') or 0}; "
+                f"nodes={detail.get('nodes') or 0}; "
+                f"operations={detail.get('operations') or 0}"
+            ),
+            "status": str(detail.get("status") or ""),
+            "icon": _project_status_icon(detail.get("status")),
+        }
+    ]
+
+
 def _project_detail_payload_for_section(section: str, project_id: str, *, webspace_id: str | None = None) -> Any:
     token = _project_id_token(project_id)
     if not token:
         return []
     if section in {"project", "projects"}:
         return _project_detail_payload(token, webspace_id=webspace_id)
+    if section == "project_header":
+        return _project_header_items(token, webspace_id=webspace_id)
     if section == "project_overview":
         return _project_overview_items(token, webspace_id=webspace_id)
     if section == "project_components":
