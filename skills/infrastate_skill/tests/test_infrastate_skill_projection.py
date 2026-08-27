@@ -4667,6 +4667,54 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
     assert "infrastate.marketplace.projects" in registered
 
 
+def test_infrastate_project_detail_empty_states_are_i18n_backed():
+    skill_root = Path(__file__).resolve().parents[1]
+    webui = json.loads((skill_root / "webui.json").read_text(encoding="utf-8"))
+    en = json.loads((skill_root / "i18n" / "en.json").read_text(encoding="utf-8"))
+    ru = json.loads((skill_root / "i18n" / "ru.json").read_text(encoding="utf-8"))
+
+    resources = webui.get("resources") or {}
+    assert resources["infrastate.i18n.en"]["role"] == "i18n"
+    assert resources["infrastate.i18n.en"]["locale"] == "en"
+    assert resources["infrastate.i18n.en"]["path"] == "i18n/en.json"
+    assert resources["infrastate.i18n.ru"]["role"] == "i18n"
+    assert resources["infrastate.i18n.ru"]["locale"] == "ru"
+    assert resources["infrastate.i18n.ru"]["path"] == "i18n/ru.json"
+
+    widgets = {
+        widget.get("id"): widget
+        for widget in webui["registry"]["modals"]["project_detail_modal"]["schema"]["widgets"]
+    }
+    expected = {
+        "project-header": [
+            "infrastate.project_detail.loading.details",
+            "infrastate.project_detail.empty.details",
+        ],
+        "project-overview": [
+            "infrastate.project_detail.loading.overview",
+            "infrastate.project_detail.empty.overview",
+        ],
+        "project-features": ["infrastate.project_detail.empty.features"],
+        "project-components": ["infrastate.project_detail.empty.components"],
+        "project-nodes": ["infrastate.project_detail.empty.nodes"],
+        "project-operations": ["infrastate.project_detail.empty.operations"],
+    }
+    for widget_id, keys in expected.items():
+        inputs = widgets[widget_id]["inputs"]
+        specs = [
+            value.get("key")
+            for key, value in inputs.items()
+            if key.endswith("_i18n") and isinstance(value, dict)
+        ]
+        for key in keys:
+            assert key in specs
+            assert key in en
+            assert key in ru
+
+    project_modal_json = json.dumps(webui["registry"]["modals"]["project_detail_modal"], ensure_ascii=False)
+    assert "No project selected" not in project_modal_json
+
+
 def test_infrastate_marketplace_project_stream_uses_snapshot_payload():
     mod = _load_infrastate_module()
     snapshot = {

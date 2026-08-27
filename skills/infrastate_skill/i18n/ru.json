@@ -1,0 +1,10 @@
+{
+  "infrastate.project_detail.empty.components": "Компоненты проекта пока недоступны",
+  "infrastate.project_detail.empty.details": "Сведения о проекте недоступны",
+  "infrastate.project_detail.empty.features": "Функции проекта пока недоступны",
+  "infrastate.project_detail.empty.nodes": "Размещение проекта по нодам пока недоступно",
+  "infrastate.project_detail.empty.operations": "Нет активных операций проекта",
+  "infrastate.project_detail.empty.overview": "Обзор проекта недоступен",
+  "infrastate.project_detail.loading.details": "Загрузка сведений о проекте...",
+  "infrastate.project_detail.loading.overview": "Загрузка обзора проекта..."
+}

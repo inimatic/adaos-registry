@@ -1,5 +1,23 @@
 {
   "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "resources": {
+    "infrastate.i18n.en": {
+      "kind": "data",
+      "role": "i18n",
+      "locale": "en",
+      "path": "i18n/en.json",
+      "mime": "application/json",
+      "delivery": "core"
+    },
+    "infrastate.i18n.ru": {
+      "kind": "data",
+      "role": "i18n",
+      "locale": "ru",
+      "path": "i18n/ru.json",
+      "mime": "application/json",
+      "delivery": "core"
+    }
+  },
   "webio": {
     "receivers": {
       "infrastate.operations.active": {
@@ -1924,7 +1942,13 @@
                 "showDetails": true,
                 "itemAccordion": false,
                 "loadingText": "Loading project details...",
-                "emptyText": "Project details are not available"
+                "loadingText_i18n": {
+                  "key": "infrastate.project_detail.loading.details"
+                },
+                "emptyText": "Project details are not available",
+                "emptyText_i18n": {
+                  "key": "infrastate.project_detail.empty.details"
+                }
               }
             },
             {
@@ -2030,7 +2054,13 @@
                 "showDetails": true,
                 "itemAccordion": false,
                 "loadingText": "Loading project overview...",
-                "emptyText": "Project overview is not available"
+                "loadingText_i18n": {
+                  "key": "infrastate.project_detail.loading.overview"
+                },
+                "emptyText": "Project overview is not available",
+                "emptyText_i18n": {
+                  "key": "infrastate.project_detail.empty.overview"
+                }
               }
             },
             {
@@ -2048,6 +2078,9 @@
               },
               "inputs": {
                 "emptyText": "Project features are not available yet",
+                "emptyText_i18n": {
+                  "key": "infrastate.project_detail.empty.features"
+                },
                 "columns": [
                   {
                     "key": "id",
@@ -2106,6 +2139,9 @@
               },
               "inputs": {
                 "emptyText": "Project components are not available yet",
+                "emptyText_i18n": {
+                  "key": "infrastate.project_detail.empty.components"
+                },
                 "pagination": true,
                 "pageSize": 25,
                 "columns": [
@@ -2177,6 +2213,9 @@
               },
               "inputs": {
                 "emptyText": "Project node placement is not available yet",
+                "emptyText_i18n": {
+                  "key": "infrastate.project_detail.empty.nodes"
+                },
                 "pagination": true,
                 "pageSize": 25,
                 "columns": [
@@ -2337,6 +2376,9 @@
               },
               "inputs": {
                 "emptyText": "No active project operations",
+                "emptyText_i18n": {
+                  "key": "infrastate.project_detail.empty.operations"
+                },
                 "pagination": true,
                 "pageSize": 25,
                 "columns": [

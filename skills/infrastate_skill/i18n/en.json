@@ -1,2 +1,10 @@
 {
+  "infrastate.project_detail.empty.components": "Project components are not available yet",
+  "infrastate.project_detail.empty.details": "Project details are not available",
+  "infrastate.project_detail.empty.features": "Project features are not available yet",
+  "infrastate.project_detail.empty.nodes": "Project node placement is not available yet",
+  "infrastate.project_detail.empty.operations": "No active project operations",
+  "infrastate.project_detail.empty.overview": "Project overview is not available",
+  "infrastate.project_detail.loading.details": "Loading project details...",
+  "infrastate.project_detail.loading.overview": "Loading project overview..."
 }

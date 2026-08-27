@@ -1,7 +1,10 @@
 name: infrastate_skill
-version: 0.75.87
+version: 0.75.88
 description: Локальный обзор состояния ядра, graceful update, A/B слотов и последнего
   результата обновления.
+supported_locales:
+- en
+- ru
 runtime:
   python: '3.11'
   activation:
@@ -282,8 +285,7 @@ data_routes:
     max_items: 256
     snapshot_policy: on_subscribe
   guard_visibility:
-    degraded_state: Projects table keeps last stream value with loading/degraded
-      state.
+    degraded_state: Projects table keeps last stream value with loading/degraded state.
     log: service.infrastate_skill.runtime.log
     quarantine: false
 - surface: modal:installed_skills
@@ -675,8 +677,7 @@ tools:
     - logs
 - name: get_marketplace
   description: Return installable project rows for the selected node without relying
-    on the stream snapshot path. Raw skills/scenarios are returned only in dev
-    environments.
+    on the stream snapshot path. Raw skills/scenarios are returned only in dev environments.
   entry: handlers.main:get_marketplace
   side_effects: read
   input_schema:
@@ -703,8 +704,7 @@ tools:
     - items
 - name: get_inventory
   description: Return installed project rows for the selected node without relying
-    on the stream snapshot path. Raw skills/scenarios are returned only in dev
-    environments.
+    on the stream snapshot path. Raw skills/scenarios are returned only in dev environments.
   entry: handlers.main:get_inventory
   side_effects: read
   input_schema:
@@ -754,12 +754,13 @@ tools:
   output_schema:
     type: object
     properties: {}
-updated_at: '2026-08-27T06:30:00+00:00'
+updated_at: '2026-08-27T17:20:34+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.943+5714.553b69fa
-    recorded_at: '2026-08-26T18:44:26+00:00'
+    min_version: 0.1.946+5736.5876726e
+    recorded_at: '2026-08-27T17:20:34+00:00'
     source: skill_push
-    min_commit: 553b69fa5e7f75950f42ebfc9772dea06dc56700
-    min_short_commit: 553b69fa
-    build_date: '2026-08-26T21:43:45+03:00'
+    min_commit: 5876726e95b1d7c82323dcf1bde512ef0d3b23b9
+    min_short_commit: 5876726e
+    build_date: '2026-08-27T19:10:55+03:00'
+
