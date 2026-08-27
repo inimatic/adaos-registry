@@ -1,0 +1,213 @@
+{
+  "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "apps": [
+    {
+      "id": "subscription_status_app",
+      "title": "Subscription",
+      "icon": "card-outline",
+      "launchModal": "subscription_status_modal",
+      "action": {
+        "navigate": "subscription_status_skill.subscription_status_modal"
+      }
+    }
+  ],
+  "widgets": [
+    {
+      "id": "subscription_status_widget",
+      "title": "Subscription",
+      "type": "visual.metricTile",
+      "icon": "card-outline",
+      "dataSource": {
+        "kind": "y",
+        "path": "data/subscription_status/current"
+      },
+      "loading": {
+        "loadingText": "Loading subscription...",
+        "emptyText": "--"
+      },
+      "inputs": {
+        "valuePath": "value",
+        "labelPath": "label",
+        "subtitlePath": "subtitle",
+        "descriptionPath": "description",
+        "noticePath": "error",
+        "emptyText": "--",
+        "loadingText": "Loading subscription..."
+      },
+      "actions": [
+        {
+          "on": "click",
+          "type": "navigate",
+          "params": {
+            "to": "subscription_status_skill.subscription_status_modal",
+            "surface": "modal",
+            "modalId": "subscription_status_modal"
+          }
+        }
+      ]
+    }
+  ],
+  "registry": {
+    "modals": {
+      "subscription_status_modal": {
+        "title": "Subscription",
+        "schema": {
+          "id": "subscription_status_modal",
+          "title": "Subscription",
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "subscription-status-actions",
+              "type": "input.commandBar",
+              "area": "main",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "refresh",
+                    "label": "Refresh",
+                    "icon": "refresh-outline"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:refresh",
+                  "type": "callSkill",
+                  "target": "subscription_status_skill.refresh_status",
+                  "params": {
+                    "webspace_id": "$runtime.webspace_id"
+                  },
+                  "invalidates": [
+                    "subscription_status.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "subscription-status-summary",
+              "type": "visual.metricTile",
+              "area": "main",
+              "title": "Current plan",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/subscription_status/current"
+              },
+              "inputs": {
+                "valuePath": "value",
+                "labelPath": "label",
+                "subtitlePath": "subtitle",
+                "descriptionPath": "description",
+                "noticePath": "error",
+                "emptyText": "--"
+              }
+            },
+            {
+              "id": "subscription-status-resources",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Resources",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/subscription_status/resources"
+              },
+              "inputs": {
+                "emptyText": "No subscription resource data",
+                "columns": [
+                  {
+                    "key": "resource",
+                    "label": "Resource",
+                    "mono": true,
+                    "width": "190px"
+                  },
+                  {
+                    "key": "state",
+                    "label": "State",
+                    "width": "95px"
+                  },
+                  {
+                    "key": "used_24h",
+                    "label": "24h",
+                    "mono": true,
+                    "width": "80px"
+                  },
+                  {
+                    "key": "used_30d",
+                    "label": "30d",
+                    "mono": true,
+                    "width": "90px"
+                  },
+                  {
+                    "key": "quota_limit",
+                    "label": "Limit",
+                    "mono": true,
+                    "width": "95px"
+                  },
+                  {
+                    "key": "quota_remaining",
+                    "label": "Left",
+                    "mono": true,
+                    "width": "95px"
+                  },
+                  {
+                    "key": "quota_period",
+                    "label": "Period",
+                    "width": "80px"
+                  },
+                  {
+                    "key": "reason",
+                    "label": "Reason"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "subscription-status-raw",
+              "type": "ui.jsonViewer",
+              "area": "main",
+              "title": "Local entitlement snapshot",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/subscription_status/raw"
+              },
+              "inputs": {
+                "emptyText": "No local economic status"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "contributions": [
+    {
+      "extensionPoint": "desktop.widgets",
+      "type": "widget",
+      "id": "subscription_status_widget",
+      "autoInstall": true
+    }
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "subscription_status_skill.subscription_status_modal": {
+        "title": "Subscription",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "subscription_status_skill.subscription_status_modal"
+  }
+}

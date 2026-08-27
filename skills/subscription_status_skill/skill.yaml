@@ -1,0 +1,65 @@
+name: subscription_status_skill
+version: 0.1.0
+description: User-facing AdaOS subscription status widget and modal backed by the local economic entitlement snapshot.
+runtime:
+  python: '3.11'
+  activation:
+    mode: lazy
+    startup_allowed: true
+    background_refresh: false
+    when:
+      client_presence: true
+      webspace_scope: active
+data_projections:
+- scope: subnet
+  slot: subscription_status.snapshot
+  targets:
+  - backend: yjs
+    path: data/subscription_status
+memory_budget:
+  expected_rss_mb: 48
+lifecycle: {}
+events:
+  subscribe:
+  - sys.ready
+  - desktop.webspace.refresh
+  - desktop.webspace.reload
+default_tool: get_status
+tools:
+- name: get_status
+  description: Return and project the current local AdaOS subscription status.
+  entry: handlers.main:get_status
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type:
+        - string
+        - 'null'
+  output_schema:
+    type: object
+    properties: {}
+- name: refresh_status
+  description: Refresh the local AdaOS subscription status widget projection.
+  entry: handlers.main:refresh_status
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type:
+        - string
+        - 'null'
+  output_schema:
+    type: object
+    properties: {}
+nlu:
+  intents:
+  - id: subscription.status.show
+    examples:
+    - show my subscription
+    - show AdaOS subscription status
+    - показать подписку AdaOS
+    tool: get_status
+updated_at: '2026-08-27T13:35:00+00:00'

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-27T14:36:30+00:00",
+  "updated_at": "2026-08-27T13:35:00+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -977,6 +977,36 @@
         "background_refresh": false
       },
       "tools_count": 4
+    },
+    {
+      "kind": "skill",
+      "id": "subscription_status_skill",
+      "name": "subscription_status_skill",
+      "version": "0.1.0",
+      "updated_at": "2026-08-27T13:35:00+00:00",
+      "path": "skills/subscription_status_skill",
+      "manifest": "skills/subscription_status_skill/skill.yaml",
+      "source": {
+        "path": "skills/subscription_status_skill",
+        "manifest": "skills/subscription_status_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "subscription_status_skill",
+        "id": "subscription_status_skill"
+      },
+      "description": "User-facing AdaOS subscription status widget and modal backed by the local economic entitlement snapshot.",
+      "runtime_python": "3.11",
+      "activation": {
+        "mode": "lazy",
+        "when": {
+          "client_presence": true,
+          "webspace_scope": "active"
+        },
+        "startup_allowed": true,
+        "background_refresh": false
+      },
+      "tools_count": 2
     },
     {
       "kind": "skill",
