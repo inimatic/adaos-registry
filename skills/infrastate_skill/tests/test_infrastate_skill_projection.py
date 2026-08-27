@@ -4479,6 +4479,7 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
         and action.get("type") == "navigate"
         and ((action.get("params") or {}).get("to") == "infrastate_skill.project_detail_modal")
         and ((action.get("params") or {}).get("modalId") == "project_detail_modal")
+        and (((action.get("params") or {}).get("statePatch") or {}).get("infrastateProjectId") == "$event.name")
         for action in project_actions
     )
     project_modal = webui["registry"]["modals"]["project_detail_modal"]

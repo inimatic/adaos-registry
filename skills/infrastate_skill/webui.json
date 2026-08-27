@@ -1397,7 +1397,12 @@
                   "params": {
                     "to": "infrastate_skill.project_detail_modal",
                     "surface": "modal",
-                    "modalId": "project_detail_modal"
+                    "modalId": "project_detail_modal",
+                    "statePatch": {
+                      "infrastateProjectId": "$event.name",
+                      "infrastateProjectTitle": "$event.display_name",
+                      "infrastateProjectRefreshSeq": 0
+                    }
                   }
                 }
               ]
