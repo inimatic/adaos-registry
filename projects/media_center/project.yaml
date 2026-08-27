@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: media_center
-version: 0.6.84
+version: 0.6.85
 profiles:
 - adaos.media_center.v1
 - adaos.media_center.tv.v1
@@ -26,11 +26,6 @@ components:
     lifecycle: bound
     relations: [uses]
   - ref: skill:media_control_skill
-    role: supporting
-    exposure: advanced
-    lifecycle: bound
-    relations: [uses]
-  - ref: skill:mediaserver
     role: supporting
     exposure: advanced
     lifecycle: bound
@@ -84,11 +79,6 @@ install:
     default: true
     optional: false
     components: [skill:media_control_skill]
-  - id: legacy-mediaserver
-    title: Legacy media server
-    default: false
-    optional: true
-    components: [skill:mediaserver]
 compatibility:
   required_entrypoints: [library, tv, remote]
   required_contracts:
