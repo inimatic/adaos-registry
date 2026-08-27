@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.88` combines `media_center_skill@0.8.88`,
+Release `0.6.89` combines `media_center_skill@0.8.89`,
 `media_library_agent@0.6.42`, `media_control_skill@0.2.14`, scenario
 `media_center@0.6.33`, and client `977f7e8`. Media Server remains an independently
 installed shared byte-delivery service rather than a second Project-owned
@@ -27,10 +27,13 @@ embedded tags are backfilled before automatic artwork work, and MusicBrainz
 does not consume its network budget on recognized audiobook chapters. This is
 local validation evidence only. Federated deep search now excludes service
 instances without a current membership lease or the desired topology generation.
-The coordinator returns its aggregated FTS and local-discovery results without
-synchronously filling the page from source agents; agent search is now an
-empty-index recovery path. An unavailable node therefore cannot delay a valid
-local result.
+The coordinator returns a deterministic FTS hit immediately without trying to
+fill the requested page from fuzzy discovery or source agents. Fuzzy discovery
+is an empty-FTS fallback with a 100-row scoring window by default; operators may
+raise `MEDIA_CENTER_DISCOVERY_SCORE_CANDIDATES` for recall-sensitive libraries.
+Source-agent search remains an empty-index recovery path. On the 68,429-item
+`.30` catalog this removed a 26.8-second, 600-candidate page-fill pass from the
+exact `Аэроград` query, so an unavailable node cannot delay a valid local hit.
 
 Metadata activity now reconciles live counters with current provider settings
 and secret readiness, and its bounded operation rows open the corresponding
