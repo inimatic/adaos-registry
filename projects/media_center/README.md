@@ -6,9 +6,9 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.89` combines `media_center_skill@0.8.89`,
+Release `0.6.90` combines `media_center_skill@0.8.89`,
 `media_library_agent@0.6.42`, `media_control_skill@0.2.14`, scenario
-`media_center@0.6.33`, and client `977f7e8`. Media Server remains an independently
+`media_center@0.6.34`, and client `7171052`. Media Server remains an independently
 installed shared byte-delivery service rather than a second Project-owned
 component. This keeps ProjectDeployment ownership unambiguous while the scenario
 consumes its registered media resources without declaring a direct skill dependency.
