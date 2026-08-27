@@ -26,6 +26,12 @@ def current_subnet_economic_status() -> dict[str, Any]:
     return impl()
 
 
+def refresh_entitlement_snapshot_from_root(*, timeout: float = 8.0) -> dict[str, Any]:
+    from adaos.services.economic_policy import refresh_entitlement_snapshot_from_root as impl
+
+    return impl(timeout=timeout)
+
+
 def lang_res() -> dict[str, str]:
     return {}
 
@@ -128,12 +134,19 @@ def _projection_payload(status: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _project_status(*, webspace_id: str = "desktop") -> dict[str, Any]:
+def _project_status(*, webspace_id: str = "desktop", refresh_root: bool = False) -> dict[str, Any]:
     target = _webspace_id(webspace_id)
+    refresh: dict[str, Any] = {"attempted": False}
+    if refresh_root:
+        refresh = {"attempted": True}
+        try:
+            refresh.update(refresh_entitlement_snapshot_from_root())
+        except Exception as exc:
+            refresh.update({"ok": False, "error": type(exc).__name__, "detail": str(exc)})
     status = current_subnet_economic_status()
     payload = _projection_payload(status)
     ctx_subnet.set("subscription_status.snapshot", payload, webspace_id=target)
-    return {"ok": True, "webspace_id": target, **payload}
+    return {"ok": True, "webspace_id": target, "refresh": refresh, **payload}
 
 
 @tool("get_status")
@@ -143,7 +156,7 @@ def get_status(webspace_id: str | None = None) -> dict[str, Any]:
 
 @tool("refresh_status")
 def refresh_status(webspace_id: str | None = None) -> dict[str, Any]:
-    return _project_status(webspace_id=_webspace_id(webspace_id))
+    return _project_status(webspace_id=_webspace_id(webspace_id), refresh_root=True)
 
 
 @subscribe("sys.ready")

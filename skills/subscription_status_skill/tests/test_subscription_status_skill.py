@@ -63,3 +63,35 @@ def test_status_projection_exposes_quota_rows(monkeypatch) -> None:
     assert any(row["resource"] == "codex.api.tokens" for row in payload["resources"]["items"])
     assert projection.values[0][0] == "subscription_status.snapshot"
     assert projection.values[0][2]["webspace_id"] == "desktop-dev"
+
+
+def test_refresh_status_pulls_root_entitlement(monkeypatch) -> None:
+    module = _load_module()
+    projection = _Projection()
+    calls: list[str] = []
+    monkeypatch.setattr(module, "ctx_subnet", projection)
+    monkeypatch.setattr(
+        module,
+        "refresh_entitlement_snapshot_from_root",
+        lambda: calls.append("refresh") or {"ok": True, "plan_id": "builder"},
+    )
+    monkeypatch.setattr(
+        module,
+        "current_subnet_economic_status",
+        lambda: {
+            "generated_at": "2026-08-27T15:00:00Z",
+            "subscription_state": "active",
+            "plan_id": "builder",
+            "entitlement_state": "enabled",
+            "disabled_resource_count": 0,
+            "disabled_resources": [],
+            "usage": {"llm.requests": {"used_24h": 1}},
+        },
+    )
+
+    payload = module.refresh_status(webspace_id="desktop")
+
+    assert calls == ["refresh"]
+    assert payload["refresh"]["ok"] is True
+    assert payload["current"]["value"] == "builder"
+    assert projection.values[0][0] == "subscription_status.snapshot"
