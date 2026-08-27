@@ -1923,7 +1923,8 @@
                 "detailsPresentation": "body",
                 "showDetails": true,
                 "itemAccordion": false,
-                "emptyText": "No project selected"
+                "loadingText": "Loading project details...",
+                "emptyText": "Project details are not available"
               }
             },
             {
@@ -2028,7 +2029,8 @@
                 "detailsPresentation": "body",
                 "showDetails": true,
                 "itemAccordion": false,
-                "emptyText": "No project overview"
+                "loadingText": "Loading project overview...",
+                "emptyText": "Project overview is not available"
               }
             },
             {
@@ -2045,7 +2047,7 @@
                 }
               },
               "inputs": {
-                "emptyText": "No project features",
+                "emptyText": "Project features are not available yet",
                 "columns": [
                   {
                     "key": "id",
@@ -2103,7 +2105,7 @@
                 }
               },
               "inputs": {
-                "emptyText": "No project components",
+                "emptyText": "Project components are not available yet",
                 "pagination": true,
                 "pageSize": 25,
                 "columns": [
@@ -2174,7 +2176,7 @@
                 }
               },
               "inputs": {
-                "emptyText": "No project node placement",
+                "emptyText": "Project node placement is not available yet",
                 "pagination": true,
                 "pageSize": 25,
                 "columns": [
@@ -2334,7 +2336,7 @@
                 }
               },
               "inputs": {
-                "emptyText": "No project operations",
+                "emptyText": "No active project operations",
                 "pagination": true,
                 "pageSize": 25,
                 "columns": [

@@ -1,5 +1,5 @@
 name: infrastate_skill
-version: 0.75.86
+version: 0.75.87
 description: Локальный обзор состояния ядра, graceful update, A/B слотов и последнего
   результата обновления.
 runtime:
