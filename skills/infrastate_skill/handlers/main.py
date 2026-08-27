@@ -1302,6 +1302,7 @@ def _publish_stream_payload(
     webspace_id: str | None,
     force: bool = False,
     node_id: str | None = None,
+    params: Mapping[str, Any] | None = None,
 ) -> None:
     if data is None:
         return
@@ -1319,13 +1320,17 @@ def _publish_stream_payload(
             )
             return
     node_token = str(node_id or "").strip()
-    meta = {"target_node_id": node_token, "node_id": node_token} if node_token else None
+    meta: dict[str, Any] = {}
+    if node_token:
+        meta.update({"target_node_id": node_token, "node_id": node_token})
+    if isinstance(params, Mapping) and params:
+        meta["params"] = dict(params)
     _STREAM_RUNTIME.publish_snapshot(
         receiver,
         data,
         webspace_id=str(webspace_id or "").strip() or default_webspace_id(),
         force=force or bool(node_token),
-        meta=meta,
+        meta=meta or None,
     )
 
 
@@ -10912,6 +10917,7 @@ def on_webio_stream_snapshot_requested(evt: Any) -> None:
             data=_build_stream_payload_for_receiver(receiver, webspace_id, params=params),
             webspace_id=webspace_id,
             force=True,
+            params=params,
         )
     else:
         _schedule_stream_receiver_snapshot(receiver, webspace_id, reason="snapshot_requested", node_id=node_id)

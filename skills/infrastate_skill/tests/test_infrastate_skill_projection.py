@@ -1260,6 +1260,78 @@ def test_infrastate_project_detail_streams_show_components_and_local_nodes(monke
     assert "default components are missing" in reconcile["title"]
 
 
+def test_infrastate_parameterized_project_detail_snapshot_echoes_params(monkeypatch):
+    mod = _load_infrastate_module()
+    published: list[dict[str, object]] = []
+    params = {"project_id": "media_center", "refresh": 0}
+
+    monkeypatch.setattr(mod, "_consume_stream_snapshot_request", lambda **kwargs: True)
+    monkeypatch.setattr(
+        mod,
+        "_build_stream_payload_for_receiver",
+        lambda receiver, webspace_id=None, **kwargs: [{"id": kwargs.get("params", {}).get("project_id")}],
+    )
+    monkeypatch.setattr(mod, "_publish_stream_payload", lambda **kwargs: published.append(dict(kwargs)))
+
+    mod.on_webio_stream_snapshot_requested(
+        SimpleNamespace(
+            payload={
+                "receiver": "infrastate.details.project_header",
+                "webspace_id": "desktop",
+                "params": params,
+            }
+        )
+    )
+
+    assert published == [
+        {
+            "receiver": "infrastate.details.project_header",
+            "data": [{"id": "media_center"}],
+            "webspace_id": "desktop",
+            "force": True,
+            "params": params,
+        }
+    ]
+
+
+def test_infrastate_stream_publish_payload_echoes_params_in_meta(monkeypatch):
+    mod = _load_infrastate_module()
+    published: list[dict[str, object]] = []
+    params = {"project_id": "media_center", "refresh": 0}
+
+    monkeypatch.setattr(
+        mod._STREAM_RUNTIME,
+        "publish_snapshot",
+        lambda receiver, data, *, webspace_id, force=False, meta=None: published.append(
+            {
+                "receiver": receiver,
+                "data": data,
+                "webspace_id": webspace_id,
+                "force": force,
+                "meta": meta,
+            }
+        ),
+    )
+
+    mod._publish_stream_payload(
+        receiver="infrastate.details.project_header",
+        data=[{"id": "media_center"}],
+        webspace_id="desktop",
+        force=True,
+        params=params,
+    )
+
+    assert published == [
+        {
+            "receiver": "infrastate.details.project_header",
+            "data": [{"id": "media_center"}],
+            "webspace_id": "desktop",
+            "force": True,
+            "meta": {"params": params},
+        }
+    ]
+
+
 def test_infrastate_project_detail_streams_include_deployment_activations(monkeypatch):
     mod = _load_infrastate_module()
     definition = {
