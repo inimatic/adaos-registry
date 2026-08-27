@@ -1235,6 +1235,11 @@ def test_infrastate_project_detail_streams_show_components_and_local_nodes(monke
         "infrastate.details.project_header.media_center",
         "desktop",
     )
+    header_from_params = mod._build_stream_payload_for_receiver(
+        "infrastate.details.project_header",
+        "desktop",
+        params={"project_id": "media_center"},
+    )
     actions = mod._build_stream_payload_for_receiver(
         "infrastate.details.project_actions.media_center",
         "desktop",
@@ -1249,6 +1254,7 @@ def test_infrastate_project_detail_streams_show_components_and_local_nodes(monke
     assert distribution["subtitle"] == "distributed-ready"
     assert header[0]["title"] == "Media Center"
     assert "project:media_center" in header[0]["subtitle"]
+    assert header_from_params == header
     reconcile = next(item for item in actions if item["id"] == "project_reconcile")
     assert reconcile["disabled"] is True
     assert "default components are missing" in reconcile["title"]
@@ -4477,7 +4483,7 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
     assert any(
         action.get("on") == "click:manage"
         and action.get("type") == "updateState"
-        and ((action.get("params") or {}).get("infrastateProjectId") == "$event.name")
+        and ((action.get("params") or {}).get("infrastateProjectId") == "$event.id")
         for action in project_actions
     )
     assert any(
@@ -4485,8 +4491,8 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
         and action.get("type") == "navigate"
         and ((action.get("params") or {}).get("to") == "infrastate_skill.project_detail_modal")
         and ((action.get("params") or {}).get("modalId") == "project_detail_modal")
-        and (((action.get("params") or {}).get("params") or {}).get("project_id") == "$event.name")
-        and (((action.get("params") or {}).get("statePatch") or {}).get("infrastateProjectId") == "$event.name")
+        and (((action.get("params") or {}).get("params") or {}).get("project_id") == "$event.id")
+        and (((action.get("params") or {}).get("statePatch") or {}).get("infrastateProjectId") == "$event.id")
         for action in project_actions
     )
     project_modal = webui["registry"]["modals"]["project_detail_modal"]
@@ -4500,18 +4506,14 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
         widget.get("id"): widget
         for widget in project_modal["schema"]["widgets"]
     }
-    assert project_modal_widgets["project-header"]["dataSource"]["receiver"] == (
-        "infrastate.details.project_header.$state.infrastateProjectId"
-    )
-    assert project_modal_widgets["project-detail-actions"]["dataSource"]["receiver"] == (
-        "infrastate.details.project_actions.$state.infrastateProjectId"
-    )
-    assert project_modal_widgets["project-components"]["dataSource"]["receiver"] == (
-        "infrastate.details.project_components.$state.infrastateProjectId"
-    )
-    assert project_modal_widgets["project-nodes"]["dataSource"]["receiver"] == (
-        "infrastate.details.project_nodes.$state.infrastateProjectId"
-    )
+    assert project_modal_widgets["project-header"]["dataSource"]["receiver"] == "infrastate.details.project_header"
+    assert project_modal_widgets["project-header"]["dataSource"]["params"]["project_id"] == "$state.infrastateProjectId"
+    assert project_modal_widgets["project-detail-actions"]["dataSource"]["receiver"] == "infrastate.details.project_actions"
+    assert project_modal_widgets["project-detail-actions"]["dataSource"]["params"]["project_id"] == "$state.infrastateProjectId"
+    assert project_modal_widgets["project-components"]["dataSource"]["receiver"] == "infrastate.details.project_components"
+    assert project_modal_widgets["project-components"]["dataSource"]["params"]["project_id"] == "$state.infrastateProjectId"
+    assert project_modal_widgets["project-nodes"]["dataSource"]["receiver"] == "infrastate.details.project_nodes"
+    assert project_modal_widgets["project-nodes"]["dataSource"]["params"]["project_id"] == "$state.infrastateProjectId"
     node_columns = project_modal_widgets["project-nodes"]["inputs"]["columns"]
     node_action_column = next(column for column in node_columns if column.get("key") == "_node_actions")
     assert node_action_column["kind"] == "buttons"
@@ -4529,9 +4531,8 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
         and ((action.get("params") or {}).get("activation_id") == "$event.activation_id")
         for action in node_actions
     )
-    assert project_modal_widgets["project-operations"]["dataSource"]["receiver"] == (
-        "infrastate.details.project_operations.$state.infrastateProjectId"
-    )
+    assert project_modal_widgets["project-operations"]["dataSource"]["receiver"] == "infrastate.details.project_operations"
+    assert project_modal_widgets["project-operations"]["dataSource"]["params"]["project_id"] == "$state.infrastateProjectId"
     assert by_id["infrastate-skills"]["dataSource"] == {
         "kind": "stream",
         "scope": "node",

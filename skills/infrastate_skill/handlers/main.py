@@ -12,7 +12,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 from weakref import WeakValueDictionary
 
 import requests
@@ -942,7 +942,20 @@ def _minimal_snapshot_for_client(snapshot: dict[str, Any]) -> dict[str, Any]:
     return compact
 
 
-def _detail_section_for_receiver(receiver: str) -> tuple[str, str] | None:
+def _detail_item_id_from_params(params: Mapping[str, Any] | None) -> str:
+    if not isinstance(params, Mapping):
+        return ""
+    for key in ("project_id", "projectId", "item_id", "itemId", "id", "name"):
+        token = str(params.get(key) or "").strip()
+        if token:
+            return token
+    return ""
+
+
+def _detail_section_for_receiver(
+    receiver: str,
+    params: Mapping[str, Any] | None = None,
+) -> tuple[str, str] | None:
     token = str(receiver or "").strip()
     prefix = _details_receiver_prefix()
     if not token.startswith(prefix):
@@ -950,7 +963,7 @@ def _detail_section_for_receiver(receiver: str) -> tuple[str, str] | None:
     rest = token[len(prefix):]
     section, sep, item_id = rest.partition(".")
     section = section.strip()
-    item_id = item_id.strip() if sep else ""
+    item_id = item_id.strip() if sep else _detail_item_id_from_params(params)
     if not section or not item_id:
         return None
     return section, item_id
@@ -10314,8 +10327,13 @@ def _projection_sections_from_snapshot(snapshot: dict[str, Any]) -> dict[str, An
     return sections
 
 
-def _lookup_direct_detail(receiver: str, *, webspace_id: str | None = None) -> Any:
-    parsed = _detail_section_for_receiver(receiver)
+def _lookup_direct_detail(
+    receiver: str,
+    *,
+    webspace_id: str | None = None,
+    params: Mapping[str, Any] | None = None,
+) -> Any:
+    parsed = _detail_section_for_receiver(receiver, params=params)
     if not parsed:
         return None
     section, item_id = parsed
@@ -10387,9 +10405,10 @@ def _build_stream_payload_for_receiver(
     webspace_id: str | None = None,
     *,
     selected_node_id: str | None = None,
+    params: Mapping[str, Any] | None = None,
 ) -> Any:
     token = str(receiver or "").strip()
-    detail_payload = _lookup_direct_detail(token, webspace_id=webspace_id)
+    detail_payload = _lookup_direct_detail(token, webspace_id=webspace_id, params=params)
     if detail_payload is not None:
         return detail_payload
     if token == _operations_receiver():
@@ -10887,9 +10906,10 @@ def on_webio_stream_snapshot_requested(evt: Any) -> None:
     if is_detail_receiver:
         # Dynamic detail receivers are request-only; they are not registered as
         # stable stream declarations because the item id is part of the receiver.
+        params = payload.get("params") if isinstance(payload.get("params"), dict) else None
         _publish_stream_payload(
             receiver=receiver,
-            data=_build_stream_payload_for_receiver(receiver, webspace_id),
+            data=_build_stream_payload_for_receiver(receiver, webspace_id, params=params),
             webspace_id=webspace_id,
             force=True,
         )

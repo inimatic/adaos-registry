@@ -1386,7 +1386,7 @@
                   "on": "click:manage",
                   "type": "updateState",
                   "params": {
-                    "infrastateProjectId": "$event.name",
+                    "infrastateProjectId": "$event.id",
                     "infrastateProjectTitle": "$event.display_name",
                     "infrastateProjectRefreshSeq": 0
                   }
@@ -1399,11 +1399,11 @@
                     "surface": "modal",
                     "modalId": "project_detail_modal",
                     "params": {
-                      "project_id": "$event.name",
+                      "project_id": "$event.id",
                       "project_title": "$event.display_name"
                     },
                     "statePatch": {
-                      "infrastateProjectId": "$event.name",
+                      "infrastateProjectId": "$event.id",
                       "infrastateProjectTitle": "$event.display_name",
                       "infrastateProjectRefreshSeq": 0
                     }
@@ -1910,8 +1910,9 @@
               "title": "Project",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "infrastate.details.project_header.$state.infrastateProjectId",
+                "receiver": "infrastate.details.project_header",
                 "params": {
+                  "project_id": "$state.infrastateProjectId",
                   "refresh": "$state.infrastateProjectRefreshSeq"
                 }
               },
@@ -1932,8 +1933,9 @@
               "title": "Project actions",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "infrastate.details.project_actions.$state.infrastateProjectId",
+                "receiver": "infrastate.details.project_actions",
                 "params": {
+                  "project_id": "$state.infrastateProjectId",
                   "refresh": "$state.infrastateProjectRefreshSeq"
                 }
               },
@@ -2013,8 +2015,9 @@
               "title": "Overview",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "infrastate.details.project_overview.$state.infrastateProjectId",
+                "receiver": "infrastate.details.project_overview",
                 "params": {
+                  "project_id": "$state.infrastateProjectId",
                   "refresh": "$state.infrastateProjectRefreshSeq"
                 }
               },
@@ -2035,8 +2038,9 @@
               "title": "Features",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "infrastate.details.project_features.$state.infrastateProjectId",
+                "receiver": "infrastate.details.project_features",
                 "params": {
+                  "project_id": "$state.infrastateProjectId",
                   "refresh": "$state.infrastateProjectRefreshSeq"
                 }
               },
@@ -2092,8 +2096,9 @@
               "title": "Components",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "infrastate.details.project_components.$state.infrastateProjectId",
+                "receiver": "infrastate.details.project_components",
                 "params": {
+                  "project_id": "$state.infrastateProjectId",
                   "refresh": "$state.infrastateProjectRefreshSeq"
                 }
               },
@@ -2162,8 +2167,9 @@
               "title": "Node placement",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "infrastate.details.project_nodes.$state.infrastateProjectId",
+                "receiver": "infrastate.details.project_nodes",
                 "params": {
+                  "project_id": "$state.infrastateProjectId",
                   "refresh": "$state.infrastateProjectRefreshSeq"
                 }
               },
@@ -2321,8 +2327,9 @@
               "title": "Operations",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "infrastate.details.project_operations.$state.infrastateProjectId",
+                "receiver": "infrastate.details.project_operations",
                 "params": {
+                  "project_id": "$state.infrastateProjectId",
                   "refresh": "$state.infrastateProjectRefreshSeq"
                 }
               },
