@@ -15,6 +15,19 @@
           "interaction": {
             "initialFocus": "widget:media-search"
           },
+          "playbackEndpoint": {
+            "schema": "adaos.playback.endpoint_provider.v1",
+            "adapter": {
+              "skill": "media_control_skill",
+              "inbox_method": "endpoint_inbox",
+              "open_session_method": "open_endpoint_session",
+              "pull_commands_method": "pull_commands",
+              "reconcile_method": "reconcile_endpoint"
+            },
+            "heartbeat_interval_ms": 15000,
+            "command_poll_interval_ms": 3000,
+            "queue_window_limit": 30
+          },
           "initialState": {
             "profileId": "default",
             "mediaNavigation": "home",

@@ -63,6 +63,19 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
 
     assert page["layout"]["type"] == "single"
     assert page["interaction"]["initialFocus"] == "widget:media-search"
+    assert page["playbackEndpoint"] == {
+        "schema": "adaos.playback.endpoint_provider.v1",
+        "adapter": {
+            "skill": "media_control_skill",
+            "inbox_method": "endpoint_inbox",
+            "open_session_method": "open_endpoint_session",
+            "pull_commands_method": "pull_commands",
+            "reconcile_method": "reconcile_endpoint",
+        },
+        "heartbeat_interval_ms": 15000,
+        "command_poll_interval_ms": 3000,
+        "queue_window_limit": 30,
+    }
     assert page["initialState"]["mediaPageSize"] == 30
     assert page["initialState"]["mediaFavoritesOnly"] is False
     assert page["initialState"]["mediaNavigation"] == "home"

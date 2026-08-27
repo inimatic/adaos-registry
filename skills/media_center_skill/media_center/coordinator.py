@@ -7430,6 +7430,7 @@ class MediaCatalogCoordinator:
                 "schema": "adaos.playback.endpoint_control.v1",
                 "adapter": {
                     "skill": "media_control_skill",
+                    "inbox_method": "endpoint_inbox",
                     "open_session_method": "open_endpoint_session",
                     "pull_commands_method": "pull_commands",
                     "reconcile_method": "reconcile_endpoint",

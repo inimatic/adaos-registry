@@ -23,9 +23,10 @@
         "schema": {"const": "adaos.playback.endpoint_control.v1"},
         "adapter": {
           "type": "object",
-          "required": ["skill", "open_session_method", "pull_commands_method", "reconcile_method"],
+          "required": ["skill", "inbox_method", "open_session_method", "pull_commands_method", "reconcile_method"],
           "properties": {
             "skill": {"type": "string", "minLength": 1},
+            "inbox_method": {"type": "string", "minLength": 1},
             "open_session_method": {"type": "string", "minLength": 1},
             "pull_commands_method": {"type": "string", "minLength": 1},
             "reconcile_method": {"type": "string", "minLength": 1}
