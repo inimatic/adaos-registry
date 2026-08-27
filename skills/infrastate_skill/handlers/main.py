@@ -47,7 +47,12 @@ from adaos.services.runtime_refresh import rebuild_webspace_projection_sync, ref
 from adaos.services.capacity import get_local_capacity, install_scenario_in_capacity
 from adaos.services.scenario.webspace_runtime import WebspaceService
 from adaos.services.operations import get_operation_manager, submit_install_operation, submit_update_operation
-from adaos.services.project_install import install_workspace_project, list_workspace_projects, load_installed_projects
+from adaos.services.project_install import (
+    install_workspace_project,
+    list_workspace_projects,
+    load_installed_projects,
+    selected_project_component_refs,
+)
 from adaos.services.skill.update import SkillUpdateService
 from adaos.services.scenarios.loader import read_manifest
 from adaos.services.scenario.manager import ScenarioManager
@@ -3633,14 +3638,17 @@ def _project_inventory_items() -> list[dict[str, Any]]:
         ctx = get_ctx()
         installed = load_installed_projects(ctx)
     except Exception:
+        ctx = None
         installed = []
     out: list[dict[str, Any]] = []
+    explicit_project_ids: set[str] = set()
     for record in installed:
         if not isinstance(record, dict):
             continue
         project_id = str(record.get("id") or "").strip()
         if not project_id:
             continue
+        explicit_project_ids.add(project_id)
         publication = record.get("publication") if isinstance(record.get("publication"), dict) else {}
         component_refs = [
             str(ref).strip()
@@ -3680,8 +3688,118 @@ def _project_inventory_items() -> list[dict[str, Any]]:
                 "uninstall_disabled": True,
             }
         )
+    if ctx is not None:
+        out.extend(_inferred_project_inventory_items(ctx, explicit_project_ids))
     out.sort(key=lambda item: str(item.get("name") or ""))
     return out
+
+
+def _installed_project_component_refs(ctx: Any, workspace_root: Path) -> set[str]:
+    refs: set[str] = set()
+
+    def _kind_refs(kind_plural: str, registry: Any) -> set[str]:
+        try:
+            rows = registry.list() or []
+        except Exception:
+            rows = []
+        try:
+            names, _fallback_used = effective_registry_names(
+                ctx,
+                installed_names(rows),
+                workspace_root,
+                kind_plural,
+            )
+        except Exception:
+            names = installed_names(rows)
+        prefix = "skill" if kind_plural == "skills" else "scenario"
+        return {
+            f"{prefix}:{str(name).strip()}"
+            for name in names
+            if str(name).strip()
+        }
+
+    try:
+        refs.update(_kind_refs("skills", SqliteSkillRegistry(ctx.sql)))
+    except Exception:
+        pass
+    try:
+        refs.update(_kind_refs("scenarios", SqliteScenarioRegistry(ctx.sql)))
+    except Exception:
+        pass
+    try:
+        refs.update(
+            f"scenario:{str(name).strip()}"
+            for name in _capacity_scenario_entry_map()
+            if str(name).strip()
+        )
+    except Exception:
+        pass
+    return refs
+
+
+def _inferred_project_inventory_items(ctx: Any, explicit_project_ids: set[str]) -> list[dict[str, Any]]:
+    try:
+        workspace_root = Path(ctx.paths.workspace_dir())
+    except Exception:
+        return []
+    installed_refs = _installed_project_component_refs(ctx, workspace_root)
+    if not installed_refs:
+        return []
+
+    inferred: list[dict[str, Any]] = []
+    try:
+        definitions = list_workspace_projects(workspace_root, include_hidden=False)
+    except Exception:
+        definitions = []
+    for definition in definitions:
+        if not isinstance(definition, dict):
+            continue
+        project_id = str(definition.get("id") or "").strip()
+        if not project_id or project_id in explicit_project_ids:
+            continue
+        selected_refs = [
+            str(ref).strip()
+            for ref in selected_project_component_refs(definition, include_optional=False)
+            if str(ref).strip()
+        ]
+        if not selected_refs or any(ref not in installed_refs for ref in selected_refs):
+            continue
+        catalog = definition.get("catalog") if isinstance(definition.get("catalog"), dict) else {}
+        publication = definition.get("publication") if isinstance(definition.get("publication"), dict) else {}
+        categories = [
+            str(item).strip()
+            for item in catalog.get("categories") or []
+            if str(item).strip()
+        ]
+        tags = [
+            str(item).strip()
+            for item in catalog.get("tags") or []
+            if str(item).strip()
+        ]
+        inferred.append(
+            {
+                "kind": "project",
+                "id": project_id,
+                "name": project_id,
+                "display_name": str(catalog.get("title") or project_id),
+                "title": str(catalog.get("title") or project_id),
+                "version": str(definition.get("version") or ""),
+                "description": str(catalog.get("description") or ""),
+                "stage": str(publication.get("stage") or ""),
+                "status": "installed",
+                "status_icon": "checkmark-circle-outline",
+                "status_tooltip": "inferred from installed components",
+                "categories": ", ".join(categories),
+                "tags": ", ".join(tags),
+                "components_count": len(selected_refs),
+                "component_refs": selected_refs,
+                "installed_at": "",
+                "source": "inferred",
+                "inferred": True,
+                "uninstall_disabled": True,
+            }
+        )
+    return inferred
 
 
 def _make_skill_manager(ctx) -> SkillManager:
@@ -5384,6 +5502,7 @@ _PROJECT_INVENTORY_STREAM_KEYS = {
     "components_count",
     "installed_at",
     "source",
+    "inferred",
     "uninstall_disabled",
     "pending",
     "last_request_id",

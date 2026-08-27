@@ -977,6 +977,148 @@ def test_infrastate_inventory_defaults_to_installed_projects(monkeypatch):
     ]
 
 
+def test_infrastate_project_inventory_infers_projects_from_installed_components(monkeypatch):
+    mod = _load_infrastate_module()
+    ctx = SimpleNamespace(paths=SimpleNamespace(workspace_dir=lambda: Path("workspace")))
+    monkeypatch.setattr(mod, "get_ctx", lambda: ctx)
+    monkeypatch.setattr(mod, "load_installed_projects", lambda ctx: [])
+    monkeypatch.setattr(
+        mod,
+        "_installed_project_component_refs",
+        lambda ctx, workspace_root: {
+            "scenario:web_desktop",
+            "skill:web_desktop_skill",
+            "skill:greet_on_boot_skill",
+        },
+    )
+    monkeypatch.setattr(
+        mod,
+        "list_workspace_projects",
+        lambda workspace_root, include_hidden=False: [
+            {
+                "id": "web_desktop",
+                "version": "0.3.12",
+                "catalog": {
+                    "title": "Web Desktop",
+                    "description": "Desktop shell",
+                    "categories": ["system", "desktop"],
+                    "tags": ["default-install"],
+                },
+                "publication": {"stage": "beta"},
+                "components": {
+                    "owned": [
+                        {"ref": "scenario:web_desktop", "role": "primary"},
+                        {"ref": "skill:web_desktop_skill"},
+                        {"ref": "skill:greet_on_boot_skill"},
+                    ]
+                },
+                "install": {
+                    "features": [
+                        {
+                            "id": "shell",
+                            "default": True,
+                            "optional": False,
+                            "components": [
+                                "scenario:web_desktop",
+                                "skill:web_desktop_skill",
+                                "skill:greet_on_boot_skill",
+                            ],
+                        }
+                    ]
+                },
+            },
+            {
+                "id": "default_app_bundle",
+                "version": "0.1.1",
+                "catalog": {"title": "Default App Bundle"},
+                "components": {
+                    "owned": [
+                        {"ref": "skill:notebook_skill", "role": "primary"},
+                        {"ref": "skill:weather_skill"},
+                    ]
+                },
+                "install": {
+                    "features": [
+                        {
+                            "id": "personal-tools",
+                            "default": True,
+                            "optional": False,
+                            "components": ["skill:notebook_skill", "skill:weather_skill"],
+                        }
+                    ]
+                },
+            },
+        ],
+    )
+
+    rows = mod._project_inventory_items()
+
+    assert [row["name"] for row in rows] == ["web_desktop"]
+    assert rows[0]["source"] == "inferred"
+    assert rows[0]["inferred"] is True
+    assert rows[0]["components_count"] == 3
+    assert rows[0]["status_tooltip"] == "inferred from installed components"
+
+
+def test_infrastate_project_inventory_keeps_explicit_project_record(monkeypatch):
+    mod = _load_infrastate_module()
+    ctx = SimpleNamespace(paths=SimpleNamespace(workspace_dir=lambda: Path("workspace")))
+    monkeypatch.setattr(mod, "get_ctx", lambda: ctx)
+    monkeypatch.setattr(
+        mod,
+        "load_installed_projects",
+        lambda ctx: [
+            {
+                "id": "web_desktop",
+                "version": "0.3.11",
+                "title": "Web Desktop",
+                "publication": {"stage": "beta"},
+                "component_refs": ["scenario:web_desktop"],
+                "status": "installed",
+                "source": "workspace",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        mod,
+        "_installed_project_component_refs",
+        lambda ctx, workspace_root: {"scenario:web_desktop", "skill:web_desktop_skill"},
+    )
+    monkeypatch.setattr(
+        mod,
+        "list_workspace_projects",
+        lambda workspace_root, include_hidden=False: [
+            {
+                "id": "web_desktop",
+                "version": "0.3.12",
+                "catalog": {"title": "Web Desktop"},
+                "components": {
+                    "owned": [
+                        {"ref": "scenario:web_desktop", "role": "primary"},
+                        {"ref": "skill:web_desktop_skill"},
+                    ]
+                },
+                "install": {
+                    "features": [
+                        {
+                            "default": True,
+                            "optional": False,
+                            "components": ["scenario:web_desktop", "skill:web_desktop_skill"],
+                        }
+                    ]
+                },
+            }
+        ],
+    )
+
+    rows = mod._project_inventory_items()
+
+    assert len(rows) == 1
+    assert rows[0]["name"] == "web_desktop"
+    assert rows[0]["source"] == "workspace"
+    assert rows[0].get("inferred") is None
+
+
 def test_infrastate_marketplace_install_rejects_raw_components_outside_dev(monkeypatch):
     mod = _load_infrastate_module()
 

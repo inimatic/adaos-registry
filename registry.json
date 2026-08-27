@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-27T11:57:08+00:00",
+  "updated_at": "2026-08-27T12:33:12+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -354,7 +354,7 @@
       "kind": "skill",
       "id": "infrastate_skill",
       "name": "infrastate_skill",
-      "version": "0.75.77",
+      "version": "0.75.78",
       "updated_at": "2026-08-27T06:30:00+00:00",
       "path": "skills/infrastate_skill",
       "manifest": "skills/infrastate_skill/skill.yaml",
@@ -380,7 +380,7 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.8.84",
+      "version": "0.8.85",
       "updated_at": "2026-08-27T08:30:24+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
@@ -402,7 +402,7 @@
       "kind": "skill",
       "id": "media_control_skill",
       "name": "media_control_skill",
-      "version": "0.2.12",
+      "version": "0.2.13",
       "updated_at": "2026-08-26T04:31:05+00:00",
       "path": "skills/media_control_skill",
       "manifest": "skills/media_control_skill/skill.yaml",
@@ -418,7 +418,7 @@
       "description": "Persistent Media Center control plane for playback targets, sessions, queues, commands, checkpoints, and settings.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 20
+      "tools_count": 21
     },
     {
       "kind": "skill",
@@ -1270,7 +1270,7 @@
       "kind": "scenario",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.6.28",
+      "version": "0.6.29",
       "updated_at": "2026-08-27T08:31:04+00:00",
       "path": "scenarios/media_center",
       "manifest": "scenarios/media_center/scenario.yaml",
@@ -1627,7 +1627,7 @@
       "id": "adaos_builder",
       "name": "adaos_builder",
       "version": "0.3.1",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/adaos_builder",
       "manifest": "projects/adaos_builder/project.yaml",
       "source": {
@@ -1720,7 +1720,7 @@
       "id": "adaos_drive",
       "name": "adaos_drive",
       "version": "0.1.3",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/adaos_drive",
       "manifest": "projects/adaos_drive/project.yaml",
       "source": {
@@ -1778,7 +1778,7 @@
       "id": "ai_event_analysis_lab",
       "name": "ai_event_analysis_lab",
       "version": "0.2.22",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/ai_event_analysis_lab",
       "manifest": "projects/ai_event_analysis_lab/project.yaml",
       "source": {
@@ -1823,7 +1823,7 @@
       "id": "builder_pipeline_smoke_1784408500",
       "name": "builder_pipeline_smoke_1784408500",
       "version": "0.0.3",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/builder_pipeline_smoke_1784408500",
       "manifest": "projects/builder_pipeline_smoke_1784408500/project.yaml",
       "source": {
@@ -1868,7 +1868,7 @@
       "id": "cv_descriptor_lab",
       "name": "cv_descriptor_lab",
       "version": "0.1.4",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/cv_descriptor_lab",
       "manifest": "projects/cv_descriptor_lab/project.yaml",
       "source": {
@@ -1914,7 +1914,7 @@
       "id": "default_app_bundle",
       "name": "default_app_bundle",
       "version": "0.1.1",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/default_app_bundle",
       "manifest": "projects/default_app_bundle/project.yaml",
       "source": {
@@ -1994,7 +1994,7 @@
       "id": "home_recipes_03",
       "name": "home_recipes_03",
       "version": "0.2.6",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/home_recipes_03",
       "manifest": "projects/home_recipes_03/project.yaml",
       "source": {
@@ -2039,7 +2039,7 @@
       "id": "home_recipes_05",
       "name": "home_recipes_05",
       "version": "0.1.5",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/home_recipes_05",
       "manifest": "projects/home_recipes_05/project.yaml",
       "source": {
@@ -2097,7 +2097,7 @@
       "id": "home_shopping_list_14504c40",
       "name": "home_shopping_list_14504c40",
       "version": "0.0.3",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/home_shopping_list_14504c40",
       "manifest": "projects/home_shopping_list_14504c40/project.yaml",
       "source": {
@@ -2155,7 +2155,7 @@
       "id": "media_center",
       "name": "media_center",
       "version": "0.6.83",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/media_center",
       "manifest": "projects/media_center/project.yaml",
       "source": {
@@ -2241,7 +2241,7 @@
       "id": "media_indexer_lab",
       "name": "media_indexer_lab",
       "version": "0.1.36",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/media_indexer_lab",
       "manifest": "projects/media_indexer_lab/project.yaml",
       "source": {
@@ -2286,7 +2286,7 @@
       "id": "new_face_vision",
       "name": "new_face_vision",
       "version": "0.2.17",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/new_face_vision",
       "manifest": "projects/new_face_vision/project.yaml",
       "source": {
@@ -2344,7 +2344,7 @@
       "id": "nlu_runtime",
       "name": "nlu_runtime",
       "version": "0.1.1",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/nlu_runtime",
       "manifest": "projects/nlu_runtime/project.yaml",
       "source": {
@@ -2410,8 +2410,8 @@
       "kind": "project",
       "id": "ops_infrascope",
       "name": "ops_infrascope",
-      "version": "0.10.7",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "version": "0.10.8",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/ops_infrascope",
       "manifest": "projects/ops_infrascope/project.yaml",
       "source": {
@@ -2487,7 +2487,7 @@
       "id": "redevice_control",
       "name": "redevice_control",
       "version": "0.1.8",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/redevice_control",
       "manifest": "projects/redevice_control/project.yaml",
       "source": {
@@ -2569,7 +2569,7 @@
       "id": "release_validation_ops",
       "name": "release_validation_ops",
       "version": "0.1.7",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/release_validation_ops",
       "manifest": "projects/release_validation_ops/project.yaml",
       "source": {
@@ -2627,7 +2627,7 @@
       "id": "research_platform",
       "name": "research_platform",
       "version": "0.1.1",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/research_platform",
       "manifest": "projects/research_platform/project.yaml",
       "source": {
@@ -2710,7 +2710,7 @@
       "id": "research_tlp",
       "name": "research_tlp",
       "version": "0.3.7",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/research_tlp",
       "manifest": "projects/research_tlp/project.yaml",
       "source": {
@@ -2770,7 +2770,7 @@
       "id": "semantic_ui_demo",
       "name": "semantic_ui_demo",
       "version": "0.10.3",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/semantic_ui_demo",
       "manifest": "projects/semantic_ui_demo/project.yaml",
       "source": {
@@ -2829,7 +2829,7 @@
       "id": "streaming_recipe_book_eval",
       "name": "streaming_recipe_book_eval",
       "version": "0.0.4",
-      "updated_at": "2026-08-27T11:57:16+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/streaming_recipe_book_eval",
       "manifest": "projects/streaming_recipe_book_eval/project.yaml",
       "source": {
@@ -2874,7 +2874,7 @@
       "id": "web_desktop",
       "name": "web_desktop",
       "version": "0.3.12",
-      "updated_at": "2026-08-27T11:57:17+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/web_desktop",
       "manifest": "projects/web_desktop/project.yaml",
       "source": {
@@ -2961,7 +2961,7 @@
       "id": "workflow_lab",
       "name": "workflow_lab",
       "version": "0.1.3",
-      "updated_at": "2026-08-27T11:57:17+00:00",
+      "updated_at": "2026-08-27T12:33:15+00:00",
       "path": "projects/workflow_lab",
       "manifest": "projects/workflow_lab/project.yaml",
       "source": {
