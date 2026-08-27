@@ -73,6 +73,21 @@ def _run_stream_snapshots_inline(mod, monkeypatch) -> None:
     )
 
 
+def test_infrastate_modals_hydrate_dev_mode_from_projection() -> None:
+    webui_path = Path(__file__).resolve().parents[1] / "webui.json"
+    payload = json.loads(webui_path.read_text(encoding="utf-8"))
+    modals = payload["registry"]["modals"]
+
+    for modal_id in ("infrastate_modal", "marketplace_modal"):
+        schema = modals[modal_id]["schema"]
+        source = schema.get("initialStateSource")
+        assert source == {
+            "kind": "y",
+            "path": "data/infrastate/ui_state",
+            "map": {"infrastateDevMode": "infrastateDevMode"},
+        }
+
+
 def test_infrastate_summary_projection_stays_current_without_browser_demand():
     mod = _load_infrastate_module()
 

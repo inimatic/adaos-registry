@@ -877,6 +877,13 @@
           "initialState": {
             "infrastateTab": "overview"
           },
+          "initialStateSource": {
+            "kind": "y",
+            "path": "data/infrastate/ui_state",
+            "map": {
+              "infrastateDevMode": "infrastateDevMode"
+            }
+          },
           "layout": {
             "type": "single",
             "pattern": "stack",
@@ -1893,6 +1900,13 @@
         "title": "Marketplace",
         "schema": {
           "id": "marketplace_modal",
+          "initialStateSource": {
+            "kind": "y",
+            "path": "data/infrastate/ui_state",
+            "map": {
+              "infrastateDevMode": "infrastateDevMode"
+            }
+          },
           "layout": {
             "type": "single",
             "pattern": "stack",
