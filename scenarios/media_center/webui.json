@@ -3734,7 +3734,10 @@
                       "selectedMediaItemId": "$event.item_id",
                       "selectedMediaTitle": "$event.subject_title",
                       "selectedMediaKind": "$event.media_kind",
-                      "selectedMediaSourceType": "item"
+                      "selectedMediaSourceType": "item",
+                      "playbackSourceType": "item",
+                      "playbackSourceId": "$event.item_id",
+                      "playbackSourceContext": {}
                     }
                   },
                   {"on": "select", "type": "openModal", "params": {"modalId": "media_center_player"}}

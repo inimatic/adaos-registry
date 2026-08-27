@@ -485,6 +485,9 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     assert operation_actions[0]["params"]["selectedMediaItemId"] == (
         "$event.item_id"
     )
+    assert operation_actions[0]["params"]["playbackSourceType"] == "item"
+    assert operation_actions[0]["params"]["playbackSourceId"] == "$event.item_id"
+    assert operation_actions[0]["params"]["playbackSourceContext"] == {}
     assert operation_actions[1] == {
         "on": "select",
         "type": "openModal",
