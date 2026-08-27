@@ -1473,16 +1473,23 @@ def test_coordinator_applies_agent_deltas_and_searches_folder_segments(
     page = _agent_page(
         _agent_delta(1, "Author Name/Important Book/001.mp3"),
         _agent_delta(2, "Artist/Album/02.mp3"),
+        _agent_delta(3, "Classics/Аэроград. 1935.avi", kind="video"),
     )
 
     applied = catalog.apply_agent_page(page)
     by_folder = catalog.list_items(query="Important Book", media_kind="audio", limit=30)
     by_filename = catalog.list_items(query="001", media_kind="audio", limit=30)
+    by_cyrillic_title = catalog.list_items(
+        query="Аэроград", media_kind="video", limit=30
+    )
     replay = catalog.apply_agent_page(page)
 
-    assert applied["applied_count"] == 2
+    assert applied["applied_count"] == 3
     assert [item["name"] for item in by_folder["items"]] == ["001.mp3"]
     assert [item["name"] for item in by_filename["items"]] == ["001.mp3"]
+    assert [item["name"] for item in by_cyrillic_title["items"]] == [
+        "Аэроград. 1935.avi"
+    ]
     assert by_folder["ranking"] == {
         "version": "deterministic-fts-v2",
         "query_mode": "explicit_submit",
@@ -1494,7 +1501,7 @@ def test_coordinator_applies_agent_deltas_and_searches_folder_segments(
     assert by_folder["total_count_exact"] is False
     assert by_folder["partial"] is False
     assert replay["applied_count"] == 0
-    assert replay["ignored_count"] == 2
+    assert replay["ignored_count"] == 3
 
 
 def test_coordinator_keeps_unresolved_agent_sources_distinct(monkeypatch, tmp_path):
@@ -1787,7 +1794,10 @@ def test_coordinator_builds_typed_collections_and_bounded_cursor_pages(
     ]
     assert continued["items"][-1]["name"] == "Series.Name.S01E35.mp4"
     assert contents["children"][0]["kind"] == "season"
-    assert contents["breadcrumbs"] == [
+    assert [
+        {key: breadcrumb[key] for key in ("id", "title", "kind")}
+        for breadcrumb in contents["breadcrumbs"]
+    ] == [
         {
             "id": series["id"],
             "title": "Series Name",
@@ -1825,6 +1835,19 @@ def test_collection_uses_a_ready_member_artwork_when_first_episode_has_none(
 
     assert collection["artwork"]["state"] == "ready"
     assert collection["artwork"]["url"] == "/media/show-episode-2.jpg"
+
+    series_contents = catalog.collection_contents(collection["id"])
+    season = series_contents["children"][0]
+    season_contents = catalog.collection_contents(season["id"])
+
+    assert series_contents["breadcrumbs"][0]["artwork"]["url"] == (
+        "/media/show-episode-2.jpg"
+    )
+    assert season["artwork"]["url"] == "/media/show-episode-2.jpg"
+    assert [
+        breadcrumb["artwork"]["url"]
+        for breadcrumb in season_contents["breadcrumbs"]
+    ] == ["/media/show-episode-2.jpg", "/media/show-episode-2.jpg"]
 
 
 def test_artwork_revision_preserves_series_identity_and_replaces_membership(

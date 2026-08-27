@@ -6004,6 +6004,52 @@ class MediaCatalogCoordinator:
             ),
         }
 
+    @staticmethod
+    def _collection_with_preview(
+        connection: sqlite3.Connection, collection_id: str
+    ) -> sqlite3.Row | None:
+        return connection.execute(
+            """
+            SELECT c.*,
+                (SELECT COUNT(DISTINCT m.work_id)
+                 FROM collection_memberships m
+                 WHERE m.collection_id=c.id
+                     AND EXISTS (
+                         SELECT 1 FROM catalog_items available
+                             INDEXED BY idx_media_center_catalog_work_variant
+                         WHERE available.work_id=m.work_id
+                             AND available.variant_id=m.variant_id
+                             AND available.missing=0
+                     )) AS item_count,
+                (
+                    SELECT json_patch(
+                        ci.metadata_json,COALESCE(mp.metadata_json,'{}')
+                    )
+                    FROM collection_memberships preview_membership
+                        INDEXED BY idx_media_center_membership_preview
+                    CROSS JOIN catalog_items ci
+                        INDEXED BY idx_media_center_catalog_work_variant
+                        ON ci.work_id=preview_membership.work_id
+                        AND ci.variant_id=preview_membership.variant_id
+                    LEFT JOIN catalog_metadata_projection mp
+                        ON mp.item_id=ci.id
+                    WHERE preview_membership.collection_id=c.id
+                        AND ci.missing=0
+                    ORDER BY CASE
+                            WHEN json_extract(ci.metadata_json, '$.artwork.state')='ready'
+                                OR json_array_length(json_extract(
+                                    mp.metadata_json,'$.artwork_candidates'
+                                ))>0
+                            THEN 0 ELSE 1 END,
+                        preview_membership.season_number,
+                        preview_membership.episode_number,
+                        preview_membership.ordinal,ci.id LIMIT 1
+                ) AS representative_metadata_json
+            FROM media_collections c WHERE c.id=?
+            """,
+            (collection_id,),
+        ).fetchone()
+
     def collection_contents(
         self,
         collection_id: str,
@@ -6016,23 +6062,7 @@ class MediaCatalogCoordinator:
         if not token:
             return {"ok": False, "error": "collection_id_required"}
         with self.repository.connect() as connection:
-            collection = connection.execute(
-                """
-                SELECT c.*,
-                    (SELECT COUNT(DISTINCT m.work_id)
-                     FROM collection_memberships m
-                     WHERE m.collection_id=c.id
-                         AND EXISTS (
-                             SELECT 1 FROM catalog_items available
-                                 INDEXED BY idx_media_center_catalog_work_variant
-                             WHERE available.work_id=m.work_id
-                                 AND available.variant_id=m.variant_id
-                                 AND available.missing=0
-                         )) AS item_count
-                FROM media_collections c WHERE c.id=?
-                """,
-                (token,),
-            ).fetchone()
+            collection = self._collection_with_preview(connection, token)
             if collection is None:
                 return {
                     "ok": False,
@@ -6085,19 +6115,11 @@ class MediaCatalogCoordinator:
             breadcrumbs: list[dict[str, Any]] = []
             current = collection
             for _depth in range(8):
-                breadcrumbs.append(
-                    {
-                        "id": str(current["id"]),
-                        "title": str(current["title"]),
-                        "kind": str(current["kind"]),
-                    }
-                )
+                breadcrumbs.append(self._public_collection(current))
                 parent_id = str(current["parent_id"] or "")
                 if not parent_id:
                     break
-                parent = connection.execute(
-                    "SELECT * FROM media_collections WHERE id=?", (parent_id,)
-                ).fetchone()
+                parent = self._collection_with_preview(connection, parent_id)
                 if parent is None:
                     break
                 current = parent
@@ -6110,15 +6132,22 @@ class MediaCatalogCoordinator:
             sort="collection",
         )
         children = [self._public_collection(row) for row in child_rows]
-        collection_value = dict(collection) | {
-            "schema": COLLECTION_SCHEMA,
-            "item_count": int(collection["item_count"]),
-            "artwork": (
+        collection_value = self._public_collection(collection)
+        collection_artwork = dict(collection_value.get("artwork") or {})
+        if not (
+            collection_artwork.get("state") == "ready"
+            or collection_artwork.get("url")
+            or collection_artwork.get("descriptor")
+        ):
+            collection_value["artwork"] = (
                 children[0]["artwork"]
                 if children
-                else (page["items"][0]["artwork"] if page["items"] else _public_artwork({}))
-            ),
-        }
+                else (
+                    page["items"][0]["artwork"]
+                    if page["items"]
+                    else _public_artwork({})
+                )
+            )
         return {
             **page,
             "schema": COORDINATOR_SCHEMA,
