@@ -4058,6 +4058,63 @@ def test_infrastate_marketplace_project_stream_uses_snapshot_payload():
     ]
 
 
+def test_infrastate_project_inventory_stream_uses_snapshot_payload():
+    mod = _load_infrastate_module()
+    snapshot = {
+        "projects": [
+            {
+                "kind": "project",
+                "id": "web_desktop",
+                "name": "web_desktop",
+                "display_name": "Web Desktop",
+                "version": "0.3.12",
+                "status": "installed",
+            }
+        ]
+    }
+
+    assert mod._stream_payload_for_receiver(
+        snapshot,
+        mod._projects_receiver(),
+    ) == [
+        {
+            "kind": "project",
+            "id": "web_desktop",
+            "name": "web_desktop",
+            "display_name": "Web Desktop",
+            "version": "0.3.12",
+            "status": "installed",
+        }
+    ]
+
+
+def test_infrastate_project_inventory_stream_falls_back_to_installed_projects(monkeypatch):
+    mod = _load_infrastate_module()
+    monkeypatch.setattr(
+        mod,
+        "_project_inventory_items",
+        lambda: [
+            {
+                "kind": "project",
+                "id": "default_app_bundle",
+                "name": "default_app_bundle",
+                "display_name": "Default App Bundle",
+                "status": "installed",
+            }
+        ],
+    )
+
+    assert mod._stream_payload_for_receiver({}, mod._projects_receiver()) == [
+        {
+            "kind": "project",
+            "id": "default_app_bundle",
+            "name": "default_app_bundle",
+            "display_name": "Default App Bundle",
+            "status": "installed",
+        }
+    ]
+
+
 def test_infrastate_skill_inventory_stream_payload_is_compact(monkeypatch):
     mod = _load_infrastate_module()
 

@@ -1130,6 +1130,14 @@ def _stream_payload_for_receiver(snapshot: dict[str, Any], receiver: str) -> Any
         return _compact_card_list(snapshot.get("realtime"), include_content=False)
     if token == _slots_receiver():
         return _compact_card_list(snapshot.get("slots"), include_content=False)
+    if token == _projects_receiver():
+        projects = snapshot.get("projects") if isinstance(snapshot.get("projects"), list) else None
+        if projects is None:
+            try:
+                projects = _project_inventory_items()
+            except Exception:
+                projects = []
+        return list(projects or [])
     if token == _skills_receiver():
         return list(snapshot.get("skills") or [])
     if token == _scenarios_receiver():
@@ -8888,6 +8896,10 @@ def _snapshot(webspace_id: str | None = None, selected_node_id: str | None = Non
     except Exception:
         slot_items = []
     try:
+        project_items = [] if selected_member else _project_inventory_items()
+    except Exception:
+        project_items = []
+    try:
         if selected_member:
             skills_items = _remote_capacity_inventory_items(selected_member, "skills")
         else:
@@ -8952,6 +8964,7 @@ def _snapshot(webspace_id: str | None = None, selected_node_id: str | None = Non
         "steps": step_items,
         "realtime": realtime_items,
         "slots": slot_items,
+        "projects": project_items,
         "skills": skills_items,
         "scenarios": scenario_items,
         "operations": {
