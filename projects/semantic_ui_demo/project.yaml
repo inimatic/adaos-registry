@@ -24,7 +24,13 @@ entrypoints:
     ui_demo: semantic
 catalog:
   title: Semantic UI Demo
+  title_i18n:
+    en: "Semantic UI Demo"
+    ru: "\u0414\u0435\u043c\u043e Semantic UI"
   description: Semantic Web UI demo with table, chart payload, and live event stream.
+  description_i18n:
+    en: "Semantic Web UI demo with table, chart payload, and live event stream."
+    ru: "\u0414\u0435\u043c\u043e Semantic Web UI \u0441 \u0442\u0430\u0431\u043b\u0438\u0446\u0435\u0439, chart payload \u0438 live event stream."
   categories: [demo, development]
   tags: [semantic-ui, taiga, metrics, alpha]
 publication:
@@ -36,6 +42,9 @@ install:
   features:
   - id: demo
     title: Demo
+    title_i18n:
+      en: "Demo"
+      ru: "\u0414\u0435\u043c\u043e"
     default: true
     optional: false
     components: [scenario:taiga_ui_demo_scenario, skill:demo_metrics_skill]

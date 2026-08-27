@@ -19,7 +19,13 @@ components:
 entrypoints: []
 catalog:
   title: NLU Runtime Modules
+  title_i18n:
+    en: "NLU Runtime Modules"
+    ru: "\u041c\u043e\u0434\u0443\u043b\u0438 NLU runtime"
   description: Optional research-stage neural and lightweight local NLU runtimes.
+  description_i18n:
+    en: "Optional research-stage neural and lightweight local NLU runtimes."
+    ru: "\u041e\u043f\u0446\u0438\u043e\u043d\u0430\u043b\u044c\u043d\u044b\u0435 \u0438\u0441\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u0441\u043a\u0438\u0435 \u043d\u0435\u0439\u0440\u043e\u043d\u043d\u044b\u0435 \u0438 \u043b\u0451\u0433\u043a\u0438\u0435 \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u044b\u0435 NLU runtime."
   categories: [system, nlu]
   tags: [optional, research, neural, lite]
 publication:
@@ -31,11 +37,17 @@ install:
   features:
   - id: neural-nlu
     title: Neural NLU service
+    title_i18n:
+      en: "Neural NLU service"
+      ru: "\u041d\u0435\u0439\u0440\u043e\u043d\u043d\u0430\u044f \u0441\u043b\u0443\u0436\u0431\u0430 NLU"
     default: false
     optional: true
     components: [skill:neural_nlu_service_skill]
   - id: lite-nlu
     title: Lite NLU service
+    title_i18n:
+      en: "Lite NLU service"
+      ru: "\u041b\u0451\u0433\u043a\u0430\u044f \u0441\u043b\u0443\u0436\u0431\u0430 NLU"
     default: false
     optional: true
     components: [skill:neuro_nlu_lite_skill]

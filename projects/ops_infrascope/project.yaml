@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: ops_infrascope
-version: 0.10.18
+version: 0.10.19
 profiles: [adaos.operations.infrascope.v1]
 components:
   owned:
@@ -44,7 +44,13 @@ entrypoints:
     operator_surface: infrascope
 catalog:
   title: Infrascope Operations
+  title_i18n:
+    en: "Infrascope Operations"
+    ru: "\u041e\u043f\u0435\u0440\u0430\u0446\u0438\u0438 Infrascope"
   description: Operator inventory, infrastructure state, access, subnet, and service diagnostics.
+  description_i18n:
+    en: "Operator inventory, infrastructure state, access, subnet, and service diagnostics."
+    ru: "\u0418\u043d\u0432\u0435\u043d\u0442\u0430\u0440\u0438\u0437\u0430\u0446\u0438\u044f \u043e\u043f\u0435\u0440\u0430\u0442\u043e\u0440\u0430, \u0441\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u0435 \u0438\u043d\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043a\u0442\u0443\u0440\u044b, \u0434\u043e\u0441\u0442\u0443\u043f, \u043f\u043e\u0434\u0441\u0435\u0442\u044c \u0438 \u0434\u0438\u0430\u0433\u043d\u043e\u0441\u0442\u0438\u043a\u0430 \u0441\u0435\u0440\u0432\u0438\u0441\u043e\u0432."
   categories: [operations, system]
   tags: [infrascope, inventory, marketplace, infra, subnet]
 publication:
@@ -56,11 +62,17 @@ install:
   features:
   - id: inventory
     title: Inventory and marketplace
+    title_i18n:
+      en: "Inventory and marketplace"
+      ru: "Inventory \u0438 Marketplace"
     default: true
     optional: false
     components: [scenario:infrascope, skill:infrascope_skill, skill:infrastate_skill]
   - id: infra-access
     title: Managed infra access
+    title_i18n:
+      en: "Managed infra access"
+      ru: "\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u043c\u044b\u0439 infra access"
     default: false
     optional: true
     components: [skill:infra_access_skill, skill:subnet_env, skill:service_doctor_skill]

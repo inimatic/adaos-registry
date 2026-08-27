@@ -44,7 +44,13 @@ entrypoints:
     platform: research
 catalog:
   title: Research Platform
+  title_i18n:
+    en: "Research Platform"
+    ru: "\u0418\u0441\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u0441\u043a\u0430\u044f \u043f\u043b\u0430\u0442\u0444\u043e\u0440\u043c\u0430"
   description: Reusable governed research workbench, orchestration, experiment management, evaluation, and tracking.
+  description_i18n:
+    en: "Reusable governed research workbench, orchestration, experiment management, evaluation, and tracking."
+    ru: "\u041f\u0435\u0440\u0435\u0438\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0435\u043c\u0430\u044f \u0443\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u043c\u0430\u044f \u0438\u0441\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u0441\u043a\u0430\u044f \u0440\u0430\u0431\u043e\u0447\u0430\u044f \u0441\u0440\u0435\u0434\u0430, \u043e\u0440\u043a\u0435\u0441\u0442\u0440\u0430\u0446\u0438\u044f, \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u044d\u043a\u0441\u043f\u0435\u0440\u0438\u043c\u0435\u043d\u0442\u0430\u043c\u0438, \u043e\u0446\u0435\u043d\u043a\u0430 \u0438 \u0442\u0440\u0435\u043a\u0438\u043d\u0433."
   categories: [research]
   tags: [workbench, orchestration, experiments, evaluator, mlflow]
 publication:
@@ -56,16 +62,25 @@ install:
   features:
   - id: workbench
     title: Research workbench
+    title_i18n:
+      en: "Research workbench"
+      ru: "\u0418\u0441\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u0441\u043a\u0430\u044f \u0440\u0430\u0431\u043e\u0447\u0430\u044f \u0441\u0440\u0435\u0434\u0430"
     default: true
     optional: false
     components: [scenario:research_workbench, skill:research_orchestrator_skill, skill:research_manager_skill]
   - id: evaluation
     title: Evaluation and calibration
+    title_i18n:
+      en: "Evaluation and calibration"
+      ru: "\u041e\u0446\u0435\u043d\u043a\u0430 \u0438 \u043a\u0430\u043b\u0438\u0431\u0440\u043e\u0432\u043a\u0430"
     default: true
     optional: false
     components: [skill:research_evaluator_skill, skill:research_calibration_runner_skill]
   - id: tracker
     title: MLflow tracker
+    title_i18n:
+      en: "MLflow tracker"
+      ru: "\u0422\u0440\u0435\u043a\u0435\u0440 MLflow"
     default: false
     optional: true
     components: [skill:mlflow_tracker_skill]

@@ -33,7 +33,13 @@ entrypoints:
     research_category: tlp
 catalog:
   title: TLP Mechanistic Research
+  title_i18n:
+    en: "TLP Mechanistic Research"
+    ru: "\u041c\u0435\u0445\u0430\u043d\u0438\u0441\u0442\u0438\u0447\u0435\u0441\u043a\u043e\u0435 \u0438\u0441\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u043d\u0438\u0435 TLP"
   description: Governed TLP research instance with STL-10 proof runner and experiment provider.
+  description_i18n:
+    en: "Governed TLP research instance with STL-10 proof runner and experiment provider."
+    ru: "\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u043c\u044b\u0439 \u044d\u043a\u0437\u0435\u043c\u043f\u043b\u044f\u0440 \u0438\u0441\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u043d\u0438\u044f TLP \u0441\u043e STL-10 proof runner \u0438 experiment provider."
   categories: [research]
   tags: [tlp, alpha, max-plus, pooling]
 publication:
@@ -45,6 +51,9 @@ install:
   features:
   - id: tlp-study
     title: TLP study
+    title_i18n:
+      en: "TLP study"
+      ru: "\u0418\u0441\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u043d\u0438\u0435 TLP"
     default: true
     optional: false
     components: [scenario:tlp_research, skill:tlp_structured_proof_02, skill:tlp_experiment_skill]

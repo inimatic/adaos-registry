@@ -14,7 +14,13 @@ components:
 entrypoints: []
 catalog:
   title: CV Descriptor Lab
+  title_i18n:
+    en: "CV Descriptor Lab"
+    ru: "\u041b\u0430\u0431\u043e\u0440\u0430\u0442\u043e\u0440\u0438\u044f CV-\u0434\u0435\u0441\u043a\u0440\u0438\u043f\u0442\u043e\u0440\u043e\u0432"
   description: Browser-side visual object descriptor pilot for embeddings, signatures, thumbnails, and descriptions.
+  description_i18n:
+    en: "Browser-side visual object descriptor pilot for embeddings, signatures, thumbnails, and descriptions."
+    ru: "\u041f\u0438\u043b\u043e\u0442 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u043d\u044b\u0445 CV-\u0434\u0435\u0441\u043a\u0440\u0438\u043f\u0442\u043e\u0440\u043e\u0432 \u0434\u043b\u044f \u044d\u043c\u0431\u0435\u0434\u0434\u0438\u043d\u0433\u043e\u0432, \u0441\u0438\u0433\u043d\u0430\u0442\u0443\u0440, \u043c\u0438\u043d\u0438\u0430\u0442\u044e\u0440 \u0438 \u043e\u043f\u0438\u0441\u0430\u043d\u0438\u0439."
   categories: [vision, demo]
   tags: [cv, descriptors, lab, alpha]
 publication:

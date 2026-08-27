@@ -14,7 +14,13 @@ components:
 entrypoints: []
 catalog:
   title: Home Recipes 03
+  title_i18n:
+    en: "Home Recipes 03"
+    ru: "\u0414\u043e\u043c\u0430\u0448\u043d\u0438\u0435 \u0440\u0435\u0446\u0435\u043f\u0442\u044b 03"
   description: Published alpha recipe catalog instance used for current home-category development.
+  description_i18n:
+    en: "Published alpha recipe catalog instance used for current home-category development."
+    ru: "\u041e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u043d\u044b\u0439 alpha-\u044d\u043a\u0437\u0435\u043c\u043f\u043b\u044f\u0440 \u043a\u0430\u0442\u0430\u043b\u043e\u0433\u0430 \u0440\u0435\u0446\u0435\u043f\u0442\u043e\u0432 \u0434\u043b\u044f \u0442\u0435\u043a\u0443\u0449\u0435\u0439 \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0438 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0438 home."
   categories: [home]
   tags: [recipes, alpha, instance, test03]
 publication:

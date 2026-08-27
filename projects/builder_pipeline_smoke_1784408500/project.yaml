@@ -24,7 +24,13 @@ entrypoints:
     fixture: builder_pipeline
 catalog:
   title: Builder Pipeline Smoke
+  title_i18n:
+    en: "Builder Pipeline Smoke"
+    ru: "Smoke-\u0442\u0435\u0441\u0442 Builder Pipeline"
   description: Internal SDK-only fixture for Builder pipeline proof.
+  description_i18n:
+    en: "Internal SDK-only fixture for Builder pipeline proof."
+    ru: "\u0412\u043d\u0443\u0442\u0440\u0435\u043d\u043d\u0438\u0439 SDK-only \u0441\u0442\u0435\u043d\u0434 \u0434\u043b\u044f \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438 pipeline Builder."
   categories: [development]
   tags: [internal, smoke, fixture]
 publication:

@@ -19,7 +19,13 @@ components:
 entrypoints: []
 catalog:
   title: Workflow Lab
+  title_i18n:
+    en: "Workflow Lab"
+    ru: "\u041b\u0430\u0431\u043e\u0440\u0430\u0442\u043e\u0440\u0438\u044f workflow"
   description: Internal conversational workflow control and dashboard reference lab.
+  description_i18n:
+    en: "Internal conversational workflow control and dashboard reference lab."
+    ru: "\u0412\u043d\u0443\u0442\u0440\u0435\u043d\u043d\u044f\u044f reference-\u043b\u0430\u0431\u043e\u0440\u0430\u0442\u043e\u0440\u0438\u044f conversational workflow control \u0438 dashboard."
   categories: [development]
   tags: [workflow, lab, internal]
 publication:

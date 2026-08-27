@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-27T21:04:53+00:00",
+  "updated_at": "2026-08-27T21:05:59+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1656,7 +1656,7 @@
       "id": "adaos_builder",
       "name": "adaos_builder",
       "version": "0.3.1",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/adaos_builder",
       "manifest": "projects/adaos_builder/project.yaml",
       "source": {
@@ -1669,7 +1669,15 @@
         "id": "adaos_builder"
       },
       "title": "AdaOS Builder",
+      "title_i18n": {
+        "en": "AdaOS Builder",
+        "ru": "Конструктор AdaOS"
+      },
       "description": "Project-scoped development workbench for prototypes, automation, trials, and publication.",
+      "description_i18n": {
+        "en": "Project-scoped development workbench for prototypes, automation, trials, and publication.",
+        "ru": "Проектная рабочая среда разработки для прототипов, автоматизации, испытаний и публикации."
+      },
       "categories": [
         "development"
       ],
@@ -1692,6 +1700,10 @@
         {
           "id": "builder-workbench",
           "title": "Builder workbench",
+          "title_i18n": {
+            "en": "Builder workbench",
+            "ru": "Рабочая среда Builder"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -1703,6 +1715,10 @@
         {
           "id": "automation",
           "title": "Automation loop",
+          "title_i18n": {
+            "en": "Automation loop",
+            "ru": "Контур автоматизации"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -1712,6 +1728,10 @@
         {
           "id": "prompt-ide",
           "title": "Prompt IDE",
+          "title_i18n": {
+            "en": "Prompt IDE",
+            "ru": "Prompt IDE"
+          },
           "default": false,
           "optional": true,
           "components": [
@@ -1722,6 +1742,10 @@
         {
           "id": "skill-preview",
           "title": "Skill preview",
+          "title_i18n": {
+            "en": "Skill preview",
+            "ru": "Предпросмотр навыка"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -1749,7 +1773,7 @@
       "id": "adaos_drive",
       "name": "adaos_drive",
       "version": "0.1.3",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/adaos_drive",
       "manifest": "projects/adaos_drive/project.yaml",
       "source": {
@@ -1762,7 +1786,15 @@
         "id": "adaos_drive"
       },
       "title": "AdaOS Drive",
+      "title_i18n": {
+        "en": "AdaOS Drive",
+        "ru": "Диск AdaOS"
+      },
       "description": "Two-panel browser file manager for explicitly connected local folders.",
+      "description_i18n": {
+        "en": "Two-panel browser file manager for explicitly connected local folders.",
+        "ru": "Двухпанельный файловый менеджер браузера для явно подключённых локальных папок."
+      },
       "categories": [
         "files",
         "productivity"
@@ -1785,6 +1817,10 @@
         {
           "id": "drive",
           "title": "Drive",
+          "title_i18n": {
+            "en": "Drive",
+            "ru": "Диск"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -1807,7 +1843,7 @@
       "id": "ai_event_analysis_lab",
       "name": "ai_event_analysis_lab",
       "version": "0.2.22",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/ai_event_analysis_lab",
       "manifest": "projects/ai_event_analysis_lab/project.yaml",
       "source": {
@@ -1820,7 +1856,15 @@
         "id": "ai_event_analysis_lab"
       },
       "title": "AI Event Analysis Lab",
+      "title_i18n": {
+        "en": "AI Event Analysis Lab",
+        "ru": "Лаборатория анализа AI-событий"
+      },
       "description": "Measurable AI/ML analysis of AdaOS operational event windows.",
+      "description_i18n": {
+        "en": "Measurable AI/ML analysis of AdaOS operational event windows.",
+        "ru": "Измеримый AI/ML-анализ окон операционных событий AdaOS."
+      },
       "categories": [
         "operations",
         "research"
@@ -1852,7 +1896,7 @@
       "id": "builder_pipeline_smoke_1784408500",
       "name": "builder_pipeline_smoke_1784408500",
       "version": "0.0.3",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/builder_pipeline_smoke_1784408500",
       "manifest": "projects/builder_pipeline_smoke_1784408500/project.yaml",
       "source": {
@@ -1865,7 +1909,15 @@
         "id": "builder_pipeline_smoke_1784408500"
       },
       "title": "Builder Pipeline Smoke",
+      "title_i18n": {
+        "en": "Builder Pipeline Smoke",
+        "ru": "Smoke-тест Builder Pipeline"
+      },
       "description": "Internal SDK-only fixture for Builder pipeline proof.",
+      "description_i18n": {
+        "en": "Internal SDK-only fixture for Builder pipeline proof.",
+        "ru": "Внутренний SDK-only стенд для проверки pipeline Builder."
+      },
       "categories": [
         "development"
       ],
@@ -1897,7 +1949,7 @@
       "id": "cv_descriptor_lab",
       "name": "cv_descriptor_lab",
       "version": "0.1.4",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/cv_descriptor_lab",
       "manifest": "projects/cv_descriptor_lab/project.yaml",
       "source": {
@@ -1910,7 +1962,15 @@
         "id": "cv_descriptor_lab"
       },
       "title": "CV Descriptor Lab",
+      "title_i18n": {
+        "en": "CV Descriptor Lab",
+        "ru": "Лаборатория CV-дескрипторов"
+      },
       "description": "Browser-side visual object descriptor pilot for embeddings, signatures, thumbnails, and descriptions.",
+      "description_i18n": {
+        "en": "Browser-side visual object descriptor pilot for embeddings, signatures, thumbnails, and descriptions.",
+        "ru": "Пилот браузерных CV-дескрипторов для эмбеддингов, сигнатур, миниатюр и описаний."
+      },
       "categories": [
         "vision",
         "demo"
@@ -1943,7 +2003,7 @@
       "id": "default_app_bundle",
       "name": "default_app_bundle",
       "version": "0.1.1",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/default_app_bundle",
       "manifest": "projects/default_app_bundle/project.yaml",
       "source": {
@@ -1956,7 +2016,15 @@
         "id": "default_app_bundle"
       },
       "title": "Default Apps Bundle",
+      "title_i18n": {
+        "en": "Default Apps Bundle",
+        "ru": "Набор приложений по умолчанию"
+      },
       "description": "Small default AdaOS apps and the current stable NLU service baseline.",
+      "description_i18n": {
+        "en": "Small default AdaOS apps and the current stable NLU service baseline.",
+        "ru": "Небольшие стандартные приложения AdaOS и текущая стабильная базовая служба NLU."
+      },
       "categories": [
         "system",
         "productivity"
@@ -1981,6 +2049,10 @@
         {
           "id": "personal-tools",
           "title": "Personal tools",
+          "title_i18n": {
+            "en": "Personal tools",
+            "ru": "Персональные инструменты"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -1991,6 +2063,10 @@
         {
           "id": "conversation-companions",
           "title": "Conversation companions",
+          "title_i18n": {
+            "en": "Conversation companions",
+            "ru": "Собеседники"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2000,6 +2076,10 @@
         {
           "id": "rasa-nlu",
           "title": "Rasa NLU service",
+          "title_i18n": {
+            "en": "Rasa NLU service",
+            "ru": "Служба Rasa NLU"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2023,7 +2103,7 @@
       "id": "home_recipes_03",
       "name": "home_recipes_03",
       "version": "0.2.6",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/home_recipes_03",
       "manifest": "projects/home_recipes_03/project.yaml",
       "source": {
@@ -2036,7 +2116,15 @@
         "id": "home_recipes_03"
       },
       "title": "Home Recipes 03",
+      "title_i18n": {
+        "en": "Home Recipes 03",
+        "ru": "Домашние рецепты 03"
+      },
       "description": "Published alpha recipe catalog instance used for current home-category development.",
+      "description_i18n": {
+        "en": "Published alpha recipe catalog instance used for current home-category development.",
+        "ru": "Опубликованный alpha-экземпляр каталога рецептов для текущей разработки категории home."
+      },
       "categories": [
         "home"
       ],
@@ -2068,7 +2156,7 @@
       "id": "home_recipes_05",
       "name": "home_recipes_05",
       "version": "0.1.5",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/home_recipes_05",
       "manifest": "projects/home_recipes_05/project.yaml",
       "source": {
@@ -2081,7 +2169,15 @@
         "id": "home_recipes_05"
       },
       "title": "Home Recipes 05",
+      "title_i18n": {
+        "en": "Home Recipes 05",
+        "ru": "Домашние рецепты 05"
+      },
       "description": "Published alpha home recipe catalog with search, creation, and favorites.",
+      "description_i18n": {
+        "en": "Published alpha home recipe catalog with search, creation, and favorites.",
+        "ru": "Опубликованный alpha-каталог домашних рецептов с поиском, созданием и избранным."
+      },
       "categories": [
         "home"
       ],
@@ -2104,6 +2200,10 @@
         {
           "id": "recipes",
           "title": "Recipes",
+          "title_i18n": {
+            "en": "Recipes",
+            "ru": "Рецепты"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2126,7 +2226,7 @@
       "id": "home_shopping_list_14504c40",
       "name": "home_shopping_list_14504c40",
       "version": "0.0.3",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/home_shopping_list_14504c40",
       "manifest": "projects/home_shopping_list_14504c40/project.yaml",
       "source": {
@@ -2139,7 +2239,15 @@
         "id": "home_shopping_list_14504c40"
       },
       "title": "Home Shopping List 14504c40",
+      "title_i18n": {
+        "en": "Home Shopping List 14504c40",
+        "ru": "Домашний список покупок 14504c40"
+      },
       "description": "Published alpha recipe book and shopping-list instance.",
+      "description_i18n": {
+        "en": "Published alpha recipe book and shopping-list instance.",
+        "ru": "Опубликованный alpha-экземпляр книги рецептов и списка покупок."
+      },
       "categories": [
         "home"
       ],
@@ -2162,6 +2270,10 @@
         {
           "id": "shopping-list",
           "title": "Shopping list",
+          "title_i18n": {
+            "en": "Shopping list",
+            "ru": "Список покупок"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2183,8 +2295,8 @@
       "kind": "project",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.6.83",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "version": "0.6.90",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/media_center",
       "manifest": "projects/media_center/project.yaml",
       "source": {
@@ -2197,7 +2309,15 @@
         "id": "media_center"
       },
       "title": "Media Center",
+      "title_i18n": {
+        "en": "Media Center",
+        "ru": "Медиацентр"
+      },
       "description": "Distributed in-place household media library, playback, and remote control.",
+      "description_i18n": {
+        "en": "Distributed in-place household media library, playback, and remote control.",
+        "ru": "Распределённая домашняя медиатека, воспроизведение и дистанционное управление на месте."
+      },
       "categories": [
         "media",
         "home"
@@ -2222,6 +2342,10 @@
         {
           "id": "library",
           "title": "Media library",
+          "title_i18n": {
+            "en": "Media library",
+            "ru": "Медиатека"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2233,19 +2357,14 @@
         {
           "id": "playback-control",
           "title": "Playback control",
+          "title_i18n": {
+            "en": "Playback control",
+            "ru": "Управление воспроизведением"
+          },
           "default": true,
           "optional": false,
           "components": [
             "skill:media_control_skill"
-          ]
-        },
-        {
-          "id": "legacy-mediaserver",
-          "title": "Legacy media server",
-          "default": false,
-          "optional": true,
-          "components": [
-            "skill:mediaserver"
           ]
         }
       ],
@@ -2253,10 +2372,9 @@
         "scenario:media_center",
         "skill:media_center_skill",
         "skill:media_library_agent",
-        "skill:media_control_skill",
-        "skill:mediaserver"
+        "skill:media_control_skill"
       ],
-      "components_count": 5,
+      "components_count": 4,
       "profiles": [
         "adaos.media_center.v1",
         "adaos.media_center.tv.v1",
@@ -2270,7 +2388,7 @@
       "id": "media_indexer_lab",
       "name": "media_indexer_lab",
       "version": "0.1.36",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/media_indexer_lab",
       "manifest": "projects/media_indexer_lab/project.yaml",
       "source": {
@@ -2283,7 +2401,15 @@
         "id": "media_indexer_lab"
       },
       "title": "Media Indexer Lab",
+      "title_i18n": {
+        "en": "Media Indexer Lab",
+        "ru": "Лаборатория медиаиндексатора"
+      },
       "description": "Legacy semantic media indexing pilot retained for diagnosis and possible Media Center reintegration.",
+      "description_i18n": {
+        "en": "Legacy semantic media indexing pilot retained for diagnosis and possible Media Center reintegration.",
+        "ru": "Устаревший пилот семантического индексирования медиа для диагностики и возможной реинтеграции в Media Center."
+      },
       "categories": [
         "media",
         "demo"
@@ -2315,7 +2441,7 @@
       "id": "new_face_vision",
       "name": "new_face_vision",
       "version": "0.2.17",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/new_face_vision",
       "manifest": "projects/new_face_vision/project.yaml",
       "source": {
@@ -2328,7 +2454,15 @@
         "id": "new_face_vision"
       },
       "title": "New Face Vision",
+      "title_i18n": {
+        "en": "New Face Vision",
+        "ru": "Инспекция New Face Vision"
+      },
       "description": "Desktop video frame analysis for stone defect inspection.",
+      "description_i18n": {
+        "en": "Desktop video frame analysis for stone defect inspection.",
+        "ru": "Анализ видеокадров на рабочем столе для инспекции дефектов камня."
+      },
       "categories": [
         "vision"
       ],
@@ -2351,6 +2485,10 @@
         {
           "id": "inspection",
           "title": "Vision inspection",
+          "title_i18n": {
+            "en": "Vision inspection",
+            "ru": "Визуальная инспекция"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2373,7 +2511,7 @@
       "id": "nlu_runtime",
       "name": "nlu_runtime",
       "version": "0.1.1",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/nlu_runtime",
       "manifest": "projects/nlu_runtime/project.yaml",
       "source": {
@@ -2386,7 +2524,15 @@
         "id": "nlu_runtime"
       },
       "title": "NLU Runtime Modules",
+      "title_i18n": {
+        "en": "NLU Runtime Modules",
+        "ru": "Модули NLU runtime"
+      },
       "description": "Optional research-stage neural and lightweight local NLU runtimes.",
+      "description_i18n": {
+        "en": "Optional research-stage neural and lightweight local NLU runtimes.",
+        "ru": "Опциональные исследовательские нейронные и лёгкие локальные NLU runtime."
+      },
       "categories": [
         "system",
         "nlu"
@@ -2410,6 +2556,10 @@
         {
           "id": "neural-nlu",
           "title": "Neural NLU service",
+          "title_i18n": {
+            "en": "Neural NLU service",
+            "ru": "Нейронная служба NLU"
+          },
           "default": false,
           "optional": true,
           "components": [
@@ -2419,6 +2569,10 @@
         {
           "id": "lite-nlu",
           "title": "Lite NLU service",
+          "title_i18n": {
+            "en": "Lite NLU service",
+            "ru": "Лёгкая служба NLU"
+          },
           "default": false,
           "optional": true,
           "components": [
@@ -2439,8 +2593,8 @@
       "kind": "project",
       "id": "ops_infrascope",
       "name": "ops_infrascope",
-      "version": "0.10.18",
-      "updated_at": "2026-08-27T17:21:10+00:00",
+      "version": "0.10.19",
+      "updated_at": "2026-08-27T21:05:59+00:00",
       "path": "projects/ops_infrascope",
       "manifest": "projects/ops_infrascope/project.yaml",
       "source": {
@@ -2453,7 +2607,15 @@
         "id": "ops_infrascope"
       },
       "title": "Infrascope Operations",
+      "title_i18n": {
+        "en": "Infrascope Operations",
+        "ru": "Операции Infrascope"
+      },
       "description": "Operator inventory, infrastructure state, access, subnet, and service diagnostics.",
+      "description_i18n": {
+        "en": "Operator inventory, infrastructure state, access, subnet, and service diagnostics.",
+        "ru": "Инвентаризация оператора, состояние инфраструктуры, доступ, подсеть и диагностика сервисов."
+      },
       "categories": [
         "operations",
         "system"
@@ -2478,6 +2640,10 @@
         {
           "id": "inventory",
           "title": "Inventory and marketplace",
+          "title_i18n": {
+            "en": "Inventory and marketplace",
+            "ru": "Inventory и Marketplace"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2489,6 +2655,10 @@
         {
           "id": "infra-access",
           "title": "Managed infra access",
+          "title_i18n": {
+            "en": "Managed infra access",
+            "ru": "Управляемый infra access"
+          },
           "default": false,
           "optional": true,
           "components": [
@@ -2516,7 +2686,7 @@
       "id": "redevice_control",
       "name": "redevice_control",
       "version": "0.1.8",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/redevice_control",
       "manifest": "projects/redevice_control/project.yaml",
       "source": {
@@ -2529,7 +2699,15 @@
         "id": "redevice_control"
       },
       "title": "ReDevice Control",
+      "title_i18n": {
+        "en": "ReDevice Control",
+        "ru": "Управление ReDevice"
+      },
       "description": "Endpoint inventory, settings, slideshow projection, and voice endpoint controls.",
+      "description_i18n": {
+        "en": "Endpoint inventory, settings, slideshow projection, and voice endpoint controls.",
+        "ru": "Инвентаризация endpoint, настройки, проекция слайдшоу и управление голосовыми endpoint."
+      },
       "categories": [
         "devices",
         "home"
@@ -2554,6 +2732,10 @@
         {
           "id": "endpoint-control",
           "title": "Endpoint control",
+          "title_i18n": {
+            "en": "Endpoint control",
+            "ru": "Управление endpoint"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2565,6 +2747,10 @@
         {
           "id": "voice",
           "title": "Voice endpoint",
+          "title_i18n": {
+            "en": "Voice endpoint",
+            "ru": "Голосовой endpoint"
+          },
           "default": false,
           "optional": true,
           "components": [
@@ -2574,6 +2760,10 @@
         {
           "id": "slideshow",
           "title": "Slideshow endpoint",
+          "title_i18n": {
+            "en": "Slideshow endpoint",
+            "ru": "Endpoint слайдшоу"
+          },
           "default": false,
           "optional": true,
           "components": [
@@ -2598,7 +2788,7 @@
       "id": "release_validation_ops",
       "name": "release_validation_ops",
       "version": "0.1.7",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/release_validation_ops",
       "manifest": "projects/release_validation_ops/project.yaml",
       "source": {
@@ -2611,7 +2801,15 @@
         "id": "release_validation_ops"
       },
       "title": "Release Validation Operations",
+      "title_i18n": {
+        "en": "Release Validation Operations",
+        "ru": "Операции валидации релизов"
+      },
       "description": "Observe-only release validation campaign runner and evidence log.",
+      "description_i18n": {
+        "en": "Observe-only release validation campaign runner and evidence log.",
+        "ru": "Observe-only runner кампаний валидации релизов и журнал evidence."
+      },
       "categories": [
         "operations",
         "release"
@@ -2634,6 +2832,10 @@
         {
           "id": "validation",
           "title": "Release validation",
+          "title_i18n": {
+            "en": "Release validation",
+            "ru": "Валидация релизов"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2656,7 +2858,7 @@
       "id": "research_platform",
       "name": "research_platform",
       "version": "0.1.1",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/research_platform",
       "manifest": "projects/research_platform/project.yaml",
       "source": {
@@ -2669,7 +2871,15 @@
         "id": "research_platform"
       },
       "title": "Research Platform",
+      "title_i18n": {
+        "en": "Research Platform",
+        "ru": "Исследовательская платформа"
+      },
       "description": "Reusable governed research workbench, orchestration, experiment management, evaluation, and tracking.",
+      "description_i18n": {
+        "en": "Reusable governed research workbench, orchestration, experiment management, evaluation, and tracking.",
+        "ru": "Переиспользуемая управляемая исследовательская рабочая среда, оркестрация, управление экспериментами, оценка и трекинг."
+      },
       "categories": [
         "research"
       ],
@@ -2693,6 +2903,10 @@
         {
           "id": "workbench",
           "title": "Research workbench",
+          "title_i18n": {
+            "en": "Research workbench",
+            "ru": "Исследовательская рабочая среда"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2704,6 +2918,10 @@
         {
           "id": "evaluation",
           "title": "Evaluation and calibration",
+          "title_i18n": {
+            "en": "Evaluation and calibration",
+            "ru": "Оценка и калибровка"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2714,6 +2932,10 @@
         {
           "id": "tracker",
           "title": "MLflow tracker",
+          "title_i18n": {
+            "en": "MLflow tracker",
+            "ru": "Трекер MLflow"
+          },
           "default": false,
           "optional": true,
           "components": [
@@ -2739,7 +2961,7 @@
       "id": "research_tlp",
       "name": "research_tlp",
       "version": "0.3.7",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/research_tlp",
       "manifest": "projects/research_tlp/project.yaml",
       "source": {
@@ -2752,7 +2974,15 @@
         "id": "research_tlp"
       },
       "title": "TLP Mechanistic Research",
+      "title_i18n": {
+        "en": "TLP Mechanistic Research",
+        "ru": "Механистическое исследование TLP"
+      },
       "description": "Governed TLP research instance with STL-10 proof runner and experiment provider.",
+      "description_i18n": {
+        "en": "Governed TLP research instance with STL-10 proof runner and experiment provider.",
+        "ru": "Управляемый экземпляр исследования TLP со STL-10 proof runner и experiment provider."
+      },
       "categories": [
         "research"
       ],
@@ -2775,6 +3005,10 @@
         {
           "id": "tlp-study",
           "title": "TLP study",
+          "title_i18n": {
+            "en": "TLP study",
+            "ru": "Исследование TLP"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2799,7 +3033,7 @@
       "id": "semantic_ui_demo",
       "name": "semantic_ui_demo",
       "version": "0.10.3",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/semantic_ui_demo",
       "manifest": "projects/semantic_ui_demo/project.yaml",
       "source": {
@@ -2812,7 +3046,15 @@
         "id": "semantic_ui_demo"
       },
       "title": "Semantic UI Demo",
+      "title_i18n": {
+        "en": "Semantic UI Demo",
+        "ru": "Демо Semantic UI"
+      },
       "description": "Semantic Web UI demo with table, chart payload, and live event stream.",
+      "description_i18n": {
+        "en": "Semantic Web UI demo with table, chart payload, and live event stream.",
+        "ru": "Демо Semantic Web UI с таблицей, chart payload и live event stream."
+      },
       "categories": [
         "demo",
         "development"
@@ -2836,6 +3078,10 @@
         {
           "id": "demo",
           "title": "Demo",
+          "title_i18n": {
+            "en": "Demo",
+            "ru": "Демо"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2858,7 +3104,7 @@
       "id": "streaming_recipe_book_eval",
       "name": "streaming_recipe_book_eval",
       "version": "0.0.4",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:39+00:00",
       "path": "projects/streaming_recipe_book_eval",
       "manifest": "projects/streaming_recipe_book_eval/project.yaml",
       "source": {
@@ -2871,7 +3117,15 @@
         "id": "streaming_recipe_book_eval"
       },
       "title": "Streaming Recipe Book Eval",
+      "title_i18n": {
+        "en": "Streaming Recipe Book Eval",
+        "ru": "Оценка потоковой книги рецептов"
+      },
       "description": "Deprecated recipe catalog evaluation instance retained for comparison.",
+      "description_i18n": {
+        "en": "Deprecated recipe catalog evaluation instance retained for comparison.",
+        "ru": "Deprecated-экземпляр оценки каталога рецептов, сохранённый для сравнения."
+      },
       "categories": [
         "home"
       ],
@@ -2903,7 +3157,7 @@
       "id": "web_desktop",
       "name": "web_desktop",
       "version": "0.3.12",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:40+00:00",
       "path": "projects/web_desktop",
       "manifest": "projects/web_desktop/project.yaml",
       "source": {
@@ -2916,7 +3170,15 @@
         "id": "web_desktop"
       },
       "title": "Web Desktop",
+      "title_i18n": {
+        "en": "Web Desktop",
+        "ru": "Веб-рабочий стол"
+      },
       "description": "Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.",
+      "description_i18n": {
+        "en": "Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.",
+        "ru": "Стандартная web-оболочка AdaOS, join flow, voice bridge и поддержка browser surface."
+      },
       "categories": [
         "system",
         "desktop"
@@ -2941,6 +3203,10 @@
         {
           "id": "shell",
           "title": "Desktop shell",
+          "title_i18n": {
+            "en": "Desktop shell",
+            "ru": "Оболочка рабочего стола"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2951,6 +3217,10 @@
         {
           "id": "onboarding",
           "title": "Node onboarding",
+          "title_i18n": {
+            "en": "Node onboarding",
+            "ru": "Подключение ноды"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2962,6 +3232,10 @@
         {
           "id": "browser-voice",
           "title": "Browser and voice bridge",
+          "title_i18n": {
+            "en": "Browser and voice bridge",
+            "ru": "Браузерный и голосовой мост"
+          },
           "default": true,
           "optional": false,
           "components": [
@@ -2990,7 +3264,7 @@
       "id": "workflow_lab",
       "name": "workflow_lab",
       "version": "0.1.3",
-      "updated_at": "2026-08-27T12:33:15+00:00",
+      "updated_at": "2026-08-27T21:05:40+00:00",
       "path": "projects/workflow_lab",
       "manifest": "projects/workflow_lab/project.yaml",
       "source": {
@@ -3003,7 +3277,15 @@
         "id": "workflow_lab"
       },
       "title": "Workflow Lab",
+      "title_i18n": {
+        "en": "Workflow Lab",
+        "ru": "Лаборатория workflow"
+      },
       "description": "Internal conversational workflow control and dashboard reference lab.",
+      "description_i18n": {
+        "en": "Internal conversational workflow control and dashboard reference lab.",
+        "ru": "Внутренняя reference-лаборатория conversational workflow control и dashboard."
+      },
       "categories": [
         "development"
       ],
