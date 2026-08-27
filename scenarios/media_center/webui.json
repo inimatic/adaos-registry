@@ -438,6 +438,28 @@
                     }
                   },
                   {
+                    "id": "target",
+                    "label": "Playback device",
+                    "icon": "tv-outline",
+                    "selectedStateKey": "selectedPlaybackTargetId",
+                    "optionLabelPath": "display_label",
+                    "optionValuePath": "id",
+                    "optionIcon": "tv-outline",
+                    "persistFallback": true,
+                    "optionsDataSource": {
+                      "kind": "skill",
+                      "name": "media_control_skill.list_targets",
+                      "params": {"limit": 50},
+                      "cacheTtlMs": 1000,
+                      "invalidationTags": ["media_control.targets"],
+                      "preserveLastValue": true,
+                      "maxRequestHz": 1
+                    },
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.control_device"
+                    }
+                  },
+                  {
                     "id": "settings",
                     "label": "Settings",
                     "icon": "settings-outline",
@@ -499,6 +521,13 @@
                   "type": "openModal",
                   "params": {
                     "modalId": "media_center_filters"
+                  }
+                },
+                {
+                  "on": "select:target",
+                  "type": "updateState",
+                  "params": {
+                    "selectedPlaybackTargetId": "$event.value"
                   }
                 },
                 {
