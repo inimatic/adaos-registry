@@ -65,6 +65,8 @@ MANUAL_METADATA_FIELDS = frozenset(
         "series",
         "rating",
         "content_rating",
+        "artwork",
+        "artwork_review",
     }
 )
 
@@ -8802,7 +8804,14 @@ class MediaCatalogCoordinator:
             "schema": COORDINATOR_SCHEMA,
             "items": [
                 dict(row)
-                | {"progress": _json_loads(row["progress_json"]) or {}}
+                | {
+                    "item_id": (
+                        str(row["subject_ref"]).removeprefix("item:")
+                        if str(row["subject_ref"]).startswith("item:")
+                        else ""
+                    ),
+                    "progress": _json_loads(row["progress_json"]) or {},
+                }
                 for row in rows
             ],
             "count": len(rows),

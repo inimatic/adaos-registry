@@ -1831,6 +1831,57 @@ def test_external_artwork_candidate_falls_back_for_items_and_collections(
     assert collection["artwork"]["url"] == enriched["artwork"]["url"]
 
 
+def test_confirm_artwork_records_a_preferred_audited_choice(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "confirmed-artwork.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Music/Artist/Album/Track.mp3"))
+    )
+    item = catalog.list_items(media_kind="audio")["items"][0]
+    catalog.record_metadata_claim(
+        subject_ref=f"item:{item['id']}",
+        field_name="artwork_candidates",
+        value=[{
+            "kind": "cover",
+            "url": "https://coverartarchive.org/release/release-1/front-500",
+        }],
+        provenance="media_center.musicbrainz.v1",
+        confidence=0.9,
+    )
+    monkeypatch.setattr(main, "_publish_library_snapshot", lambda *_a, **_k: True)
+    monkeypatch.setattr(main, "_publish_operation_snapshot", lambda *_a, **_k: True)
+
+    result = main.review_item_artwork(
+        item_id=item["id"], profile_id="default", action="confirm"
+    )
+    reviewed = catalog.item_details(item["id"])["item"]
+
+    assert result["ok"] is True
+    assert reviewed["metadata"]["artwork"]["confirmed"] is True
+    assert reviewed["metadata"]["artwork_review"]["state"] == "confirmed"
+    assert reviewed["metadata_provenance"]["artwork"] == "profile:default"
+
+
+def test_background_operations_expose_a_direct_media_item_id(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "operation-item-id.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Music/Artist/Album/Track.mp3"))
+    )
+    operation = catalog.operations(limit=1)["items"][0]
+
+    assert operation["subject_ref"] == f"item:{operation['item_id']}"
+    assert operation["subject_title"] == "Track"
+
+
 def test_collection_counts_only_available_logical_works_after_agent_rebind(
     monkeypatch, tmp_path
 ):
@@ -5350,6 +5401,52 @@ def test_metadata_provider_configuration_explains_managed_provider_state():
     assert statuses["media_center.tmdb.v1"]["reason"] == "credentials_missing"
     assert statuses["media_center.tmdb.v1"]["language"] == "ru-RU"
     assert statuses["media_center.musicbrainz.v1"]["enabled"] is True
+
+
+def test_operation_snapshot_uses_authoritative_provider_configuration():
+    runtime = {
+        "state": "running",
+        "providers": [
+            {
+                "provider_id": "media_center.tmdb.v1",
+                "state": "credentials_missing",
+                "reason": "credentials_missing",
+                "request_count": 7,
+            },
+            {
+                "provider_id": "media_center.musicbrainz.v1",
+                "state": "degraded",
+                "last_error": "musicbrainz_request_timeout",
+                "failure_count": 2,
+            },
+        ],
+    }
+    configured = [
+        {
+            "provider_id": "media_center.tmdb.v1",
+            "enabled": True,
+            "ready": True,
+            "state": "ready",
+            "reason": "configured",
+        },
+        {
+            "provider_id": "media_center.musicbrainz.v1",
+            "enabled": True,
+            "state": "ready",
+            "reason": "configured",
+        },
+    ]
+
+    merged = main._authoritative_enrichment_runtime(runtime, configured)
+    providers = {item["provider_id"]: item for item in merged["providers"]}
+
+    assert providers["media_center.tmdb.v1"]["state"] == "ready"
+    assert providers["media_center.tmdb.v1"]["reason"] == "configured"
+    assert providers["media_center.tmdb.v1"]["request_count"] == 7
+    assert providers["media_center.musicbrainz.v1"]["state"] == "degraded"
+    assert providers["media_center.musicbrainz.v1"]["reason"] == (
+        "musicbrainz_request_timeout"
+    )
 
 
 def test_tmdb_secret_store_failure_is_not_reported_as_missing_credentials():

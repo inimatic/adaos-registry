@@ -481,6 +481,28 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "receiver": "media_center.operation_state",
         "scope": "workspace",
     }
+    operation_actions = metadata_widgets["media-metadata-operations"]["actions"]
+    assert operation_actions[0]["params"]["selectedMediaItemId"] == (
+        "$event.item_id"
+    )
+    assert operation_actions[1] == {
+        "on": "select",
+        "type": "openModal",
+        "params": {"modalId": "media_center_player"},
+    }
+    metadata_edit_widgets = {
+        widget["id"]: widget
+        for widget in modals["media_center_metadata_edit"]["schema"]["widgets"]
+    }
+    assert metadata_edit_widgets["media-metadata-artwork-url"]["type"] == (
+        "input.text"
+    )
+    artwork_actions = metadata_edit_widgets["media-metadata-artwork-actions"]
+    assert {
+        action["target"]
+        for action in artwork_actions["actions"]
+        if action["type"] == "callSkill"
+    } == {"media_center_skill.review_item_artwork"}
     settings_widgets = {
         widget["id"]: widget
         for widget in modals["media_center_settings"]["schema"]["widgets"]

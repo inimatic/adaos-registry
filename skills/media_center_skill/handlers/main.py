@@ -38,7 +38,10 @@ _READY_LIBRARY_SNAPSHOT_CACHE: dict[tuple[str, str, bool], dict[str, Any]] = {}
 _ready_library_snapshot_cache_lock = threading.Lock()
 
 from media_center.background import background_runtime  # noqa: E402
-from media_center.artwork_cache import ExternalArtworkCache  # noqa: E402
+from media_center.artwork_cache import (  # noqa: E402
+    ArtworkCacheError,
+    ExternalArtworkCache,
+)
 from media_center.catalog import (  # noqa: E402
     MediaCenterRepository,
     SCHEMA_VERSION,
@@ -239,6 +242,54 @@ def _metadata_provider_configuration(
                 }
             )
     return providers
+
+
+def _authoritative_enrichment_runtime(
+    runtime: Mapping[str, Any],
+    configured: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Combine live counters with the current durable provider configuration."""
+    result = dict(runtime)
+    live_by_id = {
+        str(item.get("provider_id") or ""): dict(item)
+        for item in runtime.get("providers") or []
+        if isinstance(item, Mapping) and str(item.get("provider_id") or "")
+    }
+    providers: list[dict[str, Any]] = []
+    configured_ids: set[str] = set()
+    for source in configured:
+        provider_id = str(source.get("provider_id") or "")
+        if not provider_id:
+            continue
+        configured_ids.add(provider_id)
+        authoritative = dict(source)
+        live = live_by_id.get(provider_id, {})
+        merged = {**authoritative, **live}
+        configured_state = str(authoritative.get("state") or "unknown")
+        live_state = str(live.get("state") or "unknown")
+        live_error = str(live.get("last_error") or "")
+        if configured_state != "ready":
+            for key in ("enabled", "ready", "state", "reason", "privacy", "language"):
+                if key in authoritative:
+                    merged[key] = authoritative[key]
+        elif live_state in {"degraded", "error", "unavailable"} and live_error:
+            merged["state"] = live_state
+            merged["reason"] = live_error
+            merged["enabled"] = True
+            merged["ready"] = False
+        else:
+            merged["state"] = "ready"
+            merged["reason"] = str(authoritative.get("reason") or "configured")
+            merged["enabled"] = True
+            merged["ready"] = True
+        providers.append(merged)
+    providers.extend(
+        live
+        for provider_id, live in live_by_id.items()
+        if provider_id not in configured_ids
+    )
+    result["providers"] = providers
+    return result
 
 
 def _run_agent_sync(
@@ -593,7 +644,13 @@ def _publish_operation_snapshot(
         from adaos.sdk.io import stream_variable_publish
 
         snapshot = catalog.operation_state(limit=30)
-        snapshot["runtime"] = _enrichment_runtime(catalog).status()
+        settings = dict(catalog.metadata_settings()["settings"])
+        configured = _metadata_provider_configuration(
+            settings, _read_tmdb_credential_state()
+        )
+        snapshot["runtime"] = _authoritative_enrichment_runtime(
+            _enrichment_runtime(catalog).status(), configured
+        )
         snapshot["coverage"] = catalog.metadata_coverage()
         stream_variable_publish(
             "media_center.operation_state",
@@ -4075,6 +4132,95 @@ def update_item_metadata(
             catalog,
             profile_id=profile_id,
             webspace_id=str(_.get("webspace_id") or ""),
+        )
+    return result
+
+
+@tool(
+    summary="Confirm or replace one item's artwork with an audited manual choice.",
+    side_effects="local_write",
+)
+def review_item_artwork(
+    item_id: str = "",
+    profile_id: str = "default",
+    action: str = "confirm",
+    artwork_url: str = "",
+    **_: Any,
+) -> dict[str, Any]:
+    token = str(item_id or "").strip()
+    if not token:
+        return _skill_error(
+            "item_id_required", message="Choose a media item to review."
+        )
+    operation = str(action or "confirm").strip().lower()
+    if operation not in {"confirm", "replace"}:
+        return _skill_error(
+            "artwork_review_action_invalid",
+            message="Choose Confirm or Replace artwork.",
+        )
+    catalog = _coordinator()
+    details = catalog.item_details(token, profile_id=profile_id)
+    if not details.get("ok"):
+        return details
+    item = dict(details.get("item") or {})
+    subject = catalog.enrichment_subject(f"item:{token}")
+    if subject is None:
+        return _skill_error(
+            "enrichment_subject_not_found", message="The media item is unavailable."
+        )
+    if operation == "replace":
+        source_url = str(artwork_url or "").strip()
+        if not source_url:
+            return _skill_error(
+                "artwork_url_required", message="Enter an artwork URL to replace it."
+            )
+        try:
+            artwork = ExternalArtworkCache(_external_artwork_cache_root()).cache(
+                subject,
+                {"kind": "cover", "url": source_url},
+                provider_id="media_center.manual_artwork.v1",
+            )
+        except ArtworkCacheError as exc:
+            return _skill_error(
+                exc.code,
+                message="The artwork URL is unavailable or is not an approved source.",
+            )
+    else:
+        artwork = dict(item.get("artwork") or {})
+        if artwork.get("state") != "ready":
+            return _skill_error(
+                "artwork_not_ready", message="There is no artwork to confirm yet."
+            )
+    reviewed_at = now_iso()
+    actor_ref = f"profile:{str(profile_id or 'default').strip() or 'default'}"
+    reviewed_artwork = {
+        **artwork,
+        "confirmed": True,
+        "confirmed_at": reviewed_at,
+        "confirmed_by": actor_ref,
+    }
+    result = catalog.apply_correction(
+        operation="metadata",
+        subject_ref=f"item:{token}",
+        values={
+            "artwork": reviewed_artwork,
+            "artwork_review": {
+                "state": "confirmed",
+                "action": operation,
+                "actor_ref": actor_ref,
+                "reviewed_at": reviewed_at,
+            },
+        },
+        actor_ref=actor_ref,
+    )
+    if result.get("ok"):
+        _publish_library_snapshot(
+            catalog,
+            profile_id=profile_id,
+            webspace_id=str(_.get("webspace_id") or ""),
+        )
+        _publish_operation_snapshot(
+            catalog, webspace_id=str(_.get("webspace_id") or "")
         )
     return result
 

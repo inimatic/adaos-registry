@@ -124,6 +124,7 @@ exports:
   - delete_playlist
   - apply_correction
   - update_item_metadata
+  - review_item_artwork
   - reverse_correction
   - metadata_claims
   - duplicate_candidates
@@ -1309,6 +1310,31 @@ tools:
         type: array
         items:
           type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: review_item_artwork
+  description: Confirm or replace one media item's artwork as an audited manual choice.
+  entry: handlers.main:review_item_artwork
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - item_id
+    properties:
+      item_id:
+        type: string
+      profile_id:
+        type: string
+        default: default
+      action:
+        type: string
+        enum:
+        - confirm
+        - replace
+        default: confirm
+      artwork_url:
+        type: string
     additionalProperties: true
   output_schema:
     type: object

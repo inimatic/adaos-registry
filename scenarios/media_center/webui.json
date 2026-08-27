@@ -1991,6 +1991,9 @@
                     {"key": "file", "label": "File name", "path": "name", "label_i18n": {"key": "runtime.media_center.ui.file_name"}},
                     {"key": "path", "label": "Library path", "path": "library_path", "label_i18n": {"key": "runtime.media_center.ui.library_path"}},
                     {"key": "original", "label": "Original title", "path": "metadata.original_title", "label_i18n": {"key": "runtime.media_center.ui.original_title"}},
+                    {"key": "artwork_state", "label": "Artwork state", "path": "artwork.state", "label_i18n": {"key": "runtime.media_center.ui.artwork_state"}},
+                    {"key": "artwork_provider", "label": "Artwork provider", "path": "artwork.provider_id", "label_i18n": {"key": "runtime.media_center.ui.artwork_provider"}},
+                    {"key": "artwork_review", "label": "Artwork review", "path": "metadata.artwork_review.state", "label_i18n": {"key": "runtime.media_center.ui.artwork_review"}},
                     {"key": "providers", "label": "Metadata sources", "path": "metadata_provenance", "label_i18n": {"key": "runtime.media_center.ui.metadata_sources"}}
                   ]
                 }
@@ -2003,6 +2006,24 @@
               {"id": "media-metadata-artists", "type": "input.text", "area": "main", "title": "Artists", "title_i18n": {"key": "runtime.media_center.ui.artists"}, "dataSource": {"kind": "static", "value": {"value": "$state.metadataArtists"}}, "inputs": {"placeholder": "Artist"}, "actions": [{"on": "change", "type": "updateState", "params": {"metadataArtists": "$event.value"}}]},
               {"id": "media-metadata-album", "type": "input.text", "area": "main", "title": "Album", "title_i18n": {"key": "runtime.media_center.ui.album"}, "dataSource": {"kind": "static", "value": {"value": "$state.metadataAlbum"}}, "inputs": {"placeholder": "Album"}, "actions": [{"on": "change", "type": "updateState", "params": {"metadataAlbum": "$event.value"}}]},
               {"id": "media-metadata-series", "type": "input.text", "area": "main", "title": "Series", "title_i18n": {"key": "runtime.media_center.ui.series"}, "dataSource": {"kind": "static", "value": {"value": "$state.metadataSeries"}}, "inputs": {"placeholder": "Series"}, "actions": [{"on": "change", "type": "updateState", "params": {"metadataSeries": "$event.value"}}]},
+              {"id": "media-metadata-artwork-url", "type": "input.text", "area": "main", "title": "Replacement artwork URL", "title_i18n": {"key": "runtime.media_center.ui.replacement_artwork_url"}, "dataSource": {"kind": "static", "value": {"value": "$state.metadataArtworkUrl"}}, "inputs": {"placeholder": "https://..."}, "actions": [{"on": "change", "type": "updateState", "params": {"metadataArtworkUrl": "$event.value"}}]},
+              {
+                "id": "media-metadata-artwork-actions",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {
+                  "variant": "toolbar",
+                  "buttons": [
+                    {"id": "confirm", "label": "Confirm artwork", "icon": "checkmark-circle-outline", "label_i18n": {"key": "runtime.media_center.ui.confirm_artwork"}},
+                    {"id": "replace", "label": "Replace artwork", "icon": "image-outline", "label_i18n": {"key": "runtime.media_center.ui.replace_artwork"}}
+                  ]
+                },
+                "actions": [
+                  {"on": "click:confirm", "type": "callSkill", "target": "media_center_skill.review_item_artwork", "params": {"item_id": "$state.selectedMediaItemId", "profile_id": "$state.profileId", "action": "confirm"}, "invalidates": ["media_center.catalog"]},
+                  {"on": "click:replace", "type": "callSkill", "target": "media_center_skill.review_item_artwork", "params": {"item_id": "$state.selectedMediaItemId", "profile_id": "$state.profileId", "action": "replace", "artwork_url": "$state.metadataArtworkUrl"}, "invalidates": ["media_center.catalog"]},
+                  {"on": "click:replace", "type": "updateState", "params": {"metadataArtworkUrl": ""}}
+                ]
+              },
               {
                 "id": "media-metadata-actions",
                 "type": "ui.actions",
@@ -3705,6 +3726,19 @@
                     "stateKey": "mediaCursor"
                   }
                 },
+                "actions": [
+                  {
+                    "on": "select",
+                    "type": "updateState",
+                    "params": {
+                      "selectedMediaItemId": "$event.item_id",
+                      "selectedMediaTitle": "$event.subject_title",
+                      "selectedMediaKind": "$event.media_kind",
+                      "selectedMediaSourceType": "item"
+                    }
+                  },
+                  {"on": "select", "type": "openModal", "params": {"modalId": "media_center_player"}}
+                ],
                 "title_i18n": {
                   "key": "runtime.media_center.ui.background_operations"
                 }
