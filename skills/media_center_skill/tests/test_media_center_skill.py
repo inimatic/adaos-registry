@@ -3759,6 +3759,13 @@ def test_deep_search_does_not_query_agents_after_a_coordinator_hit(
     catalog.apply_agent_page(
         _agent_page(_agent_delta(1, "Movies/Aerograd.1935.avi", kind="video"))
     )
+    monkeypatch.setattr(
+        catalog,
+        "discovery_search",
+        lambda *_args, **_kwargs: pytest.fail(
+            "deterministic coordinator hits must not run fuzzy discovery"
+        ),
+    )
 
     class Topology:
         def agent_instances(self, *, limit):
@@ -6870,6 +6877,7 @@ def test_local_discovery_is_phonetic_semantic_and_resource_bounded(
         "local_text_embedding",
     }
     assert result["candidate_limit"] == 100
+    assert result["score_limit"] == 100
     assert result["bounded"] is True
 
 

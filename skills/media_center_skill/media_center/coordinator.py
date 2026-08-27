@@ -5497,10 +5497,10 @@ class MediaCatalogCoordinator:
         candidate_limit = max(100, min(20_000, candidate_limit))
         try:
             score_limit = int(
-                os.environ.get("MEDIA_CENTER_DISCOVERY_SCORE_CANDIDATES") or 600
+                os.environ.get("MEDIA_CENTER_DISCOVERY_SCORE_CANDIDATES") or 100
             )
         except ValueError:
-            score_limit = 600
+            score_limit = 100
         score_limit = max(100, min(candidate_limit, score_limit, 5000))
         query_groups: list[list[str]] = []
         for query_part in re.findall(r"[\w]+", token, flags=re.UNICODE)[:12]:

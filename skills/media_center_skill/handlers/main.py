@@ -2081,12 +2081,12 @@ def deep_search(
         {"id": "coordinator_fts", "status": "completed", "count": len(items)}
     ]
     failures: list[dict[str, Any]] = []
-    if len(items) < bounded:
+    if not items:
         discovery = catalog.discovery_search(
             token,
             profile_id=profile_id,
             media_kind=media_kind,
-            limit=bounded - len(items),
+            limit=bounded,
         )
         added = 0
         for item in discovery.get("items") or []:
