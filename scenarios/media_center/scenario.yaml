@@ -1,6 +1,6 @@
 id: media_center
 name: media_center
-version: 0.6.31
+version: 0.6.33
 title: Media Center
 title_i18n:
   fallback: Media Center
@@ -15,14 +15,12 @@ depends:
 - media_center_skill
 - media_library_agent
 - media_control_skill
-- mediaserver
 runtime:
   skills:
     required:
     - media_center_skill
     - media_library_agent
     - media_control_skill
-    - mediaserver
     optional: []
 ui:
   manifest: webui.json
@@ -90,5 +88,5 @@ nlu:
     entities: []
 steps: []
 prototype: scenario_default
-updated_at: '2026-08-27T16:06:37+00:00'
+updated_at: '2026-08-27T17:24:55+00:00'
 

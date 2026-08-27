@@ -60,7 +60,7 @@ def test_media_center_project_is_a_complete_distribution_boundary() -> None:
     assert manifest["lifecycle"]["uninstall"]["source_artifacts"] == "retain"
 
 
-def test_scenario_requires_every_project_runtime_component() -> None:
+def test_scenario_requires_only_project_owned_runtime_components() -> None:
     scenario = yaml.safe_load(
         (REGISTRY_ROOT / "scenarios" / "media_center" / "scenario.yaml").read_text(encoding="utf-8")
     )
@@ -68,8 +68,8 @@ def test_scenario_requires_every_project_runtime_component() -> None:
         "media_center_skill",
         "media_library_agent",
         "media_control_skill",
-        "mediaserver",
     }
+    assert "mediaserver" not in scenario["depends"]
     assert "media_indexer_skill" not in scenario["depends"]
 
 
