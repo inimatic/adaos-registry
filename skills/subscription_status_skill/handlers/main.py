@@ -111,6 +111,9 @@ def _current_tile(status: Mapping[str, Any], rows: list[Mapping[str, Any]]) -> d
     disabled = _int_value(status.get("disabled_resource_count"))
     exhausted = sum(1 for row in rows if row.get("state") == "exhausted")
     warn = sum(1 for row in rows if row.get("state") == "warn")
+    subscription_state = _text(status.get("subscription_state")) or "unknown"
+    entitlement_state = _text(status.get("entitlement_state")) or "unknown"
+    inactive = subscription_state not in {"active", "trial"}
     llm = _as_mapping(_as_mapping(status.get("usage")).get("llm.requests"))
     codex = next((row for row in rows if row.get("resource") == "codex.api.tokens"), {})
     codex_left = codex.get("quota_remaining")
@@ -118,9 +121,9 @@ def _current_tile(status: Mapping[str, Any], rows: list[Mapping[str, Any]]) -> d
     return {
         "value": _text(status.get("plan_id")) or "none",
         "label": "AdaOS subscription",
-        "subtitle": f"{_text(status.get('subscription_state')) or 'unknown'} / {_text(status.get('entitlement_state')) or 'unknown'}",
+        "subtitle": f"{subscription_state} / {entitlement_state}",
         "description": f"LLM 24h: {_int_value(llm.get('used_24h'))}; disabled: {disabled}; warn: {warn}; exhausted: {exhausted}{suffix}",
-        "color": "danger" if exhausted or disabled else "warning" if warn else "success",
+        "color": "danger" if exhausted or inactive else "warning" if warn or disabled else "success",
         "generated_at": status.get("generated_at"),
     }
 

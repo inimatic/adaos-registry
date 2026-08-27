@@ -1,6 +1,7 @@
 name: subscription_status_skill
-version: 0.1.1
-description: User-facing AdaOS subscription status widget and modal backed by the local economic entitlement snapshot with explicit Root refresh.
+version: 0.1.2
+description: User-facing AdaOS subscription status widget and modal backed by the
+  local economic entitlement snapshot with explicit Root refresh.
 runtime:
   python: '3.11'
   activation:
@@ -41,7 +42,8 @@ tools:
     type: object
     properties: {}
 - name: refresh_status
-  description: Pull the current root entitlement snapshot and refresh the AdaOS subscription status widget projection.
+  description: Pull the current root entitlement snapshot and refresh the AdaOS subscription
+    status widget projection.
   entry: handlers.main:refresh_status
   side_effects: local_write
   input_schema:
@@ -62,4 +64,13 @@ nlu:
     - show AdaOS subscription status
     - показать подписку AdaOS
     tool: get_status
-updated_at: '2026-08-27T15:05:00+00:00'
+updated_at: '2026-08-27T15:16:39+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.945+5731.87d462d7
+    recorded_at: '2026-08-27T15:16:39+00:00'
+    source: skill_push
+    min_commit: 87d462d769320ec5b38021dd0384f28c83922ab5
+    min_short_commit: 87d462d7
+    build_date: '2026-08-27T18:06:25+03:00'
+

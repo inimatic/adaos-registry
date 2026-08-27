@@ -95,3 +95,26 @@ def test_refresh_status_pulls_root_entitlement(monkeypatch) -> None:
     assert payload["refresh"]["ok"] is True
     assert payload["current"]["value"] == "builder"
     assert projection.values[0][0] == "subscription_status.snapshot"
+
+
+def test_active_subscription_with_plan_disabled_resources_is_warning(monkeypatch) -> None:
+    module = _load_module()
+    projection = _Projection()
+    monkeypatch.setattr(module, "ctx_subnet", projection)
+    monkeypatch.setattr(
+        module,
+        "current_subnet_economic_status",
+        lambda: {
+            "generated_at": "2026-08-27T16:00:00Z",
+            "subscription_state": "active",
+            "plan_id": "builder",
+            "entitlement_state": "limited_observed",
+            "disabled_resource_count": 1,
+            "disabled_resources": [{"resource": "media.indexing", "reason_code": "resource_not_in_plan"}],
+            "usage": {"llm.requests": {"used_24h": 1}},
+        },
+    )
+
+    payload = module.get_status(webspace_id="desktop")
+
+    assert payload["current"]["color"] == "warning"
