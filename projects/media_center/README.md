@@ -8,7 +8,7 @@ delivery.
 
 Release `0.6.86` combines `media_center_skill@0.8.86`,
 `media_library_agent@0.6.42`, `media_control_skill@0.2.14`, scenario
-`media_center@0.6.32`, and client `977f7e8`. Media Server remains an independently
+`media_center@0.6.33`, and client `977f7e8`. Media Server remains an independently
 installed shared byte-delivery service rather than a second Project-owned
 component. This keeps ProjectDeployment ownership unambiguous while the scenario
 consumes its registered media resources without declaring a direct skill dependency.
