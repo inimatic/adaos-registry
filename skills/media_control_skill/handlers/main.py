@@ -94,6 +94,50 @@ def _publish_playback_observation(
         return
 
 
+def _publish_endpoint_assignment(
+    repository: MediaControlRepository,
+    result: Mapping[str, Any],
+    *,
+    webspace_id: str = "",
+) -> None:
+    session = result.get("session")
+    if not isinstance(session, Mapping):
+        return
+    target = result.get("target")
+    if not isinstance(target, Mapping):
+        target = repository.get_target(text(session.get("target_id")))
+    if not isinstance(target, Mapping) or not text(target.get("endpoint_id")):
+        return
+    from adaos.sdk.data.events import publish as publish_event
+
+    try:
+        publish_event(
+            "media_control.playback.assigned",
+            {
+                "schema": "adaos.media_control.playback_assigned.v1",
+                "session_id": text(session.get("id")),
+                "session_revision": int(session.get("revision") or 0),
+                "target_id": text(target.get("id")),
+                "endpoint_id": text(target.get("endpoint_id")),
+                "webspace_id": text(webspace_id or target.get("webspace_id")),
+                "adapter": {
+                    "skill": "media_control_skill",
+                    "inbox_method": "endpoint_inbox",
+                    "open_session_method": "open_endpoint_session",
+                    "pull_commands_method": "pull_commands",
+                    "reconcile_method": "reconcile_endpoint",
+                },
+            },
+            source="media_control_skill",
+        )
+    except Exception as exc:
+        _log.warning(
+            "playback assignment publish failed session=%s error=%s",
+            text(session.get("id")),
+            f"{type(exc).__name__}: {exc}"[:300],
+        )
+
+
 def _error(code: str, fallback: str, **extra: Any) -> dict[str, Any]:
     key = f"runtime.media_control.error.{code}"
     try:
@@ -351,6 +395,37 @@ def register_target(
     return _result_or_error(result)
 
 
+@tool(
+    summary="Refresh an idle endpoint heartbeat and read its current assigned session.",
+    side_effects="local_write",
+)
+def endpoint_inbox(
+    endpoint_id: str = "",
+    webspace_id: str = "",
+    label: str = "",
+    kind: str = "browser",
+    node_id: str = "",
+    capabilities: Mapping[str, Any] | None = None,
+    known_session_id: str = "",
+    queue_limit: int = 30,
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        result = _repository().endpoint_inbox(
+            endpoint_id,
+            webspace_id=webspace_id,
+            label=label,
+            kind=kind,
+            node_id=node_id,
+            capabilities=capabilities,
+            known_session_id=known_session_id,
+            queue_limit=queue_limit,
+        )
+    except ValueError:
+        return _error("invalid_media_control_cursor", "The playback list changed. Refresh it.")
+    return _result_or_error(result)
+
+
 @tool(summary="List bounded playback targets visible to a controller.", side_effects="none")
 def list_targets(include_unavailable: bool = False, limit: int = 50, **_: Any) -> dict[str, Any]:
     result = _repository().list_targets(
@@ -387,6 +462,7 @@ def create_session(
     if result.get("ok"):
         _publish_updates(repository, webspace_id=webspace_id)
         _publish_playback_observation(result, webspace_id=webspace_id)
+        _publish_endpoint_assignment(repository, result, webspace_id=webspace_id)
     return _result_or_error(result)
 
 
@@ -476,6 +552,7 @@ def command(
     if result.get("ok"):
         _publish_updates(repository, webspace_id=webspace_id)
         _publish_playback_observation(result, webspace_id=webspace_id)
+        _publish_endpoint_assignment(repository, result, webspace_id=webspace_id)
     return _result_or_error(result)
 
 
@@ -500,6 +577,7 @@ def update_queue(
     if result.get("ok"):
         _publish_updates(repository, webspace_id=webspace_id)
         _publish_playback_observation(result, webspace_id=webspace_id)
+        _publish_endpoint_assignment(repository, result, webspace_id=webspace_id)
     return _result_or_error(result)
 
 

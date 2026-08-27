@@ -1,5 +1,5 @@
 name: media_control_skill
-version: 0.2.12
+version: 0.2.13
 description: Persistent Media Center control plane for playback targets, sessions,
   queues, commands, checkpoints, and settings.
 supported_locales:
@@ -21,6 +21,7 @@ events:
   publish:
   - io.out.stream.publish
   - media_control.playback.observed
+  - media_control.playback.assigned
 lifecycle:
   after_activate: ensure_schema
   rehydrate: rehydrate
@@ -30,6 +31,7 @@ exports:
   - ensure_schema
   - rehydrate
   - register_target
+  - endpoint_inbox
   - list_targets
   - create_session
   - open_endpoint_session
@@ -98,6 +100,45 @@ tools:
         type: string
       capabilities:
         type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: endpoint_inbox
+  entry: handlers.main:endpoint_inbox
+  description: Refresh an endpoint heartbeat and return its active assignment with a bounded queue window.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - endpoint_id
+    properties:
+      endpoint_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+      label:
+        type: string
+      kind:
+        type: string
+        enum:
+        - browser
+        - tv
+        - mobile
+        - speaker
+        - native
+        default: browser
+      node_id:
+        type: string
+      capabilities:
+        type: object
+      known_session_id:
+        type: string
+      queue_limit:
+        type: integer
+        minimum: 1
+        maximum: 30
+        default: 30
     additionalProperties: true
   output_schema:
     type: object
@@ -613,6 +654,30 @@ tools:
   output_schema:
     type: object
 data_routes:
+- surface: app-shell:playback-endpoint-inbox
+  route: tool
+  tool: endpoint_inbox
+  owner: skill:media_control_skill
+  first_paint: endpoint_inbox registers presence and returns the latest active assignment
+  recovery: repeat endpoint_inbox every 15 seconds and after assignment events
+  guard_visibility: exact endpoint identity, bounded queue window and current session only
+  update_source:
+  - media_control.playback.assigned
+  - media_control_skill.endpoint_inbox
+  budget:
+    max_payload_bytes: 262144
+    max_items: 30
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - media_control.endpoint_assignment
 - surface: app-shell:media-playback
   route: stream
   receiver: media_control.now_playing
@@ -734,4 +799,3 @@ compatibility:
     min_commit: a8e1dfd019f9bfd9ba2f188596b5d314ec88786a
     min_short_commit: a8e1dfd0
     build_date: '2026-08-26T07:29:43+03:00'
-

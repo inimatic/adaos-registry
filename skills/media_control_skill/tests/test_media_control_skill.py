@@ -215,6 +215,103 @@ def test_target_projection_exposes_device_endpoint_and_authorization_labels():
     }
 
 
+def test_endpoint_inbox_registers_idle_target_and_returns_bounded_active_window():
+    repository = MediaControlRepository()
+
+    idle = repository.endpoint_inbox(
+        "browser-android-tv",
+        webspace_id="tv",
+        label="Living room TV",
+        kind="tv",
+        capabilities={"video": True},
+    )
+    target = idle["target"]
+    session = repository.create_session(
+        profile_id="alice",
+        target_id=target["id"],
+        actor_ref="profile:alice",
+        queue=_queue(60),
+        active_index=40,
+    )["session"]
+
+    assigned = repository.endpoint_inbox(
+        "browser-android-tv",
+        webspace_id="tv",
+        label="Living room TV",
+        kind="tv",
+        capabilities={"video": True},
+        queue_limit=30,
+    )
+
+    assert idle["assignment"] is None
+    assert assigned["assignment"]["id"] == session["id"]
+    assert assigned["changed"] is True
+    queue = assigned["assignment"]["queue"]
+    assert queue["count"] == 30
+    assert queue["total_count"] == 60
+    assert any(item["item_id"] == "item-40" for item in queue["items"])
+    unchanged = repository.endpoint_inbox(
+        "browser-android-tv",
+        webspace_id="tv",
+        label="Living room TV",
+        kind="tv",
+        known_session_id=session["id"],
+    )
+    assert unchanged["changed"] is False
+
+
+def test_stale_targets_are_not_available_to_remote_controllers():
+    repository = MediaControlRepository()
+    registered = repository.register_target(
+        "browser-stale",
+        webspace_id="tv",
+        label="Old TV tab",
+        kind="tv",
+        capabilities={"presence_mode": "heartbeat"},
+    )["target"]
+    with repository.connect() as connection:
+        connection.execute(
+            "UPDATE playback_targets SET last_seen_at='2000-01-01T00:00:00+00:00' WHERE id=?",
+            (registered["id"],),
+        )
+        connection.commit()
+
+    assert repository.get_target(registered["id"])["status"] == "unavailable"
+    assert repository.list_targets()["items"] == []
+    unavailable = repository.list_targets(include_unavailable=True)["items"]
+    assert unavailable[0]["status"] == "unavailable"
+
+
+def test_remote_session_creation_publishes_targeted_assignment(monkeypatch):
+    repository = MediaControlRepository()
+    target = repository.register_target(
+        "browser-android-tv",
+        webspace_id="tv",
+        label="Living room TV",
+        kind="tv",
+    )["target"]
+    published = []
+    monkeypatch.setattr(main, "_repository", lambda: repository)
+    monkeypatch.setattr(main, "_publish_updates", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        "adaos.sdk.data.events.publish",
+        lambda kind, payload, **kwargs: published.append((kind, payload, kwargs)),
+    )
+
+    result = main.create_session(
+        target_id=target["id"],
+        profile_id="alice",
+        actor_ref="profile:alice",
+        queue=_queue(3),
+        webspace_id="desktop",
+    )
+
+    assignment = next(item for item in published if item[0] == "media_control.playback.assigned")
+    assert assignment[1]["session_id"] == result["session"]["id"]
+    assert assignment[1]["endpoint_id"] == "browser-android-tv"
+    assert assignment[1]["adapter"]["inbox_method"] == "endpoint_inbox"
+
+
 def test_parameterized_now_playing_projection_is_ready_and_kept_current(monkeypatch):
     repository = MediaControlRepository()
     session = _session(repository)

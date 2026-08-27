@@ -22,10 +22,25 @@ QOE_SUMMARY_SCHEMA = "adaos.media_control.qoe_summary.v1"
 MAX_QUEUE_ITEMS = 500
 MAX_QUEUE_PAGE = 30
 MAX_COMMAND_PAGE = 100
+TARGET_FRESHNESS_SECONDS = 120
 
 
 def now_iso() -> str:
     return datetime.now(tz=timezone.utc).isoformat()
+
+
+def timestamp_is_fresh(value: Any, *, freshness_seconds: int = TARGET_FRESHNESS_SECONDS) -> bool:
+    token = text(value)
+    if not token:
+        return False
+    try:
+        parsed = datetime.fromisoformat(token.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return False
+    age = (datetime.now(tz=timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds()
+    return age <= max(15, int(freshness_seconds or TARGET_FRESHNESS_SECONDS))
 
 
 def text(value: Any) -> str:
@@ -328,10 +343,21 @@ class MediaControlRepository:
 
     def list_targets(self, *, include_unavailable: bool = False, limit: int = 50) -> dict[str, Any]:
         bounded = max(1, min(100, int(limit or 50)))
-        where = "" if include_unavailable else "WHERE status='available'"
         with self.connect() as connection:
-            rows = connection.execute(f"SELECT * FROM playback_targets {where} ORDER BY lower(label),id LIMIT ?", (bounded,)).fetchall()
-        return {"ok": True, "schema": SCHEMA_VERSION, "items": [self._public_target(row) for row in rows], "count": len(rows)}
+            rows = connection.execute(
+                "SELECT * FROM playback_targets ORDER BY lower(label),id LIMIT 1000"
+            ).fetchall()
+        items = [self._public_target(row) for row in rows]
+        if not include_unavailable:
+            items = [item for item in items if item["status"] == "available"]
+        items = items[:bounded]
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "items": items,
+            "count": len(items),
+            "freshness_seconds": TARGET_FRESHNESS_SECONDS,
+        }
 
     def create_session(
         self,
@@ -402,6 +428,77 @@ class MediaControlRepository:
         with self.connect() as connection:
             row = connection.execute("SELECT * FROM playback_targets WHERE id=? OR endpoint_id=?", (token, token)).fetchone()
         return self._public_target(row) if row else None
+
+    def endpoint_inbox(
+        self,
+        endpoint_id: str,
+        *,
+        webspace_id: str,
+        label: str,
+        kind: str,
+        node_id: str = "",
+        capabilities: Mapping[str, Any] | None = None,
+        known_session_id: str = "",
+        queue_limit: int = MAX_QUEUE_PAGE,
+    ) -> dict[str, Any]:
+        registered = self.register_target(
+            endpoint_id,
+            webspace_id=webspace_id,
+            label=label,
+            kind=kind,
+            node_id=node_id,
+            capabilities=capabilities,
+        )
+        if not registered.get("ok"):
+            return registered
+        target = registered["target"]
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM playback_sessions
+                WHERE target_id=? AND state NOT IN ('stopped','ended','error','failed')
+                ORDER BY created_at DESC,id DESC
+                LIMIT 1
+                """,
+                (target["id"],),
+            ).fetchone()
+            queue_total = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM playback_queue_items WHERE session_id=?",
+                    (str(row["id"]),),
+                ).fetchone()[0]
+            ) if row is not None else 0
+        if row is None:
+            return {
+                "ok": True,
+                "schema": SCHEMA_VERSION,
+                "target": target,
+                "assignment": None,
+                "changed": bool(known_session_id),
+                "heartbeat_seconds": 15,
+            }
+        active_index = max(0, int(row["active_queue_index"] or 0))
+        bounded = max(1, min(MAX_QUEUE_PAGE, int(queue_limit or MAX_QUEUE_PAGE)))
+        window_start = min(
+            max(0, active_index - min(5, bounded // 3)),
+            max(0, queue_total - bounded),
+        )
+        session_result = self.get_session(
+            str(row["id"]),
+            queue_limit=bounded,
+            queue_cursor=encode_cursor(window_start),
+        )
+        if not session_result.get("ok"):
+            return session_result
+        session = session_result["session"]
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "target": target,
+            "assignment": session,
+            "changed": text(known_session_id) != text(session.get("id")),
+            "heartbeat_seconds": 15,
+        }
 
     def get_session(self, session_id: str, *, queue_limit: int = 10, queue_cursor: str = "") -> dict[str, Any]:
         token = text(session_id)
@@ -1371,6 +1468,11 @@ class MediaControlRepository:
         authorization_state = text(capabilities.get("authorization_state")) or (
             "authorized" if bool(capabilities.get("authorized")) else "guest"
         )
+        stored_status = str(row["status"])
+        heartbeat_presence = text(capabilities.get("presence_mode")) == "heartbeat"
+        effective_status = stored_status
+        if stored_status == "available" and heartbeat_presence and not timestamp_is_fresh(row["last_seen_at"]):
+            effective_status = "unavailable"
         return {
             "schema": TARGET_SCHEMA,
             "id": str(row["id"]),
@@ -1384,7 +1486,7 @@ class MediaControlRepository:
             "authorization_state": authorization_state,
             "kind": str(row["kind"]),
             "capabilities": capabilities,
-            "status": str(row["status"]),
+            "status": effective_status,
             "last_seen_at": str(row["last_seen_at"]),
             "revision": int(row["revision"]),
         }
