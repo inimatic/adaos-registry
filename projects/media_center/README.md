@@ -6,10 +6,11 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-The unreleased 2026-08-26 local candidate combines
-`media_center_skill@0.8.83`, `media_library_agent@0.6.42`,
-`media_control_skill@0.2.12`, scenario `media_center@0.6.27`, and client
-`dcee3b4`. It adds durable queue auto-advance and endpoint selection, compact
+Release `0.6.84` combines `media_center_skill@0.8.86`,
+`media_library_agent@0.6.42`, `media_control_skill@0.2.14`, scenario
+`media_center@0.6.31`, and client `977f7e8`. It adds an authoritative playback
+session contract, durable scoped endpoint grants, capability-aware queue
+handoff, core-backed device presence, dynamic endpoint selection, compact
 fullscreen/PiP/Play On controls, playlists, reviewed metadata correction,
 provider rejection, source identity and compact live rendition history. Requested
 browser conversion preempts scans at file boundaries, unsafe unprobed AVI
