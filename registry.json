@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-27T17:20:34+00:00",
+  "updated_at": "2026-08-27T17:21:10+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -2440,8 +2440,8 @@
       "kind": "project",
       "id": "ops_infrascope",
       "name": "ops_infrascope",
-      "version": "0.10.17",
-      "updated_at": "2026-08-27T16:25:25+00:00",
+      "version": "0.10.18",
+      "updated_at": "2026-08-27T17:21:10+00:00",
       "path": "projects/ops_infrascope",
       "manifest": "projects/ops_infrascope/project.yaml",
       "source": {
