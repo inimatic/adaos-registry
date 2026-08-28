@@ -431,6 +431,56 @@ def test_endpoint_open_retires_previous_session_and_scopes_command_pull():
     assert previous["items"][0]["id"] == command["command"]["id"]
 
 
+def test_endpoint_inbox_retains_terminal_session_until_stop_is_observed():
+    repository = MediaControlRepository()
+    session = _session(repository)
+    stopped = repository.command(
+        session["id"],
+        command="stop",
+        arguments={},
+        actor_ref="profile:alice",
+        expected_revision=session["revision"],
+        idempotency_key="stop-delivery",
+    )
+
+    pending = repository.endpoint_inbox(
+        "browser-tv",
+        webspace_id="tv",
+        label="Living room TV",
+        kind="tv",
+    )
+
+    assert stopped["session"]["state"] == "stopped"
+    assert pending["assignment"]["id"] == session["id"]
+    assert pending["assignment"]["command_revision"] == 1
+    assert pending["assignment"]["observed_command_revision"] == 0
+
+    reconciled = repository.reconcile_endpoint(
+        session["id"],
+        target_id=session["target_id"],
+        endpoint_revision=1,
+        acknowledged_command_revision=1,
+        observed={
+            "active_item_id": session["active_item_id"],
+            "state": "stopped",
+            "position_ms": 0,
+            "duration_ms": 0,
+        },
+    )
+    settled = repository.endpoint_inbox(
+        "browser-tv",
+        webspace_id="tv",
+        label="Living room TV",
+        kind="tv",
+        known_session_id=session["id"],
+    )
+
+    assert reconciled["ok"] is True
+    assert reconciled["session"]["observed_command_revision"] == 1
+    assert settled["assignment"] is None
+    assert settled["changed"] is True
+
+
 def test_commands_are_revision_safe_idempotent_and_lease_guarded():
     repository = MediaControlRepository()
     session = _session(repository)

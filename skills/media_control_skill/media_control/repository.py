@@ -473,7 +473,10 @@ class MediaControlRepository:
             row = connection.execute(
                 """
                 SELECT * FROM playback_sessions
-                WHERE target_id=? AND state NOT IN ('stopped','ended','error','failed')
+                WHERE target_id=? AND (
+                    state NOT IN ('stopped','ended','error','failed')
+                    OR command_revision>observed_command_revision
+                )
                 ORDER BY created_at DESC,id DESC
                 LIMIT 1
                 """,
