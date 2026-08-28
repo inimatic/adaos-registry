@@ -24,7 +24,7 @@ class _Projection:
 def test_status_projection_exposes_quota_rows(monkeypatch) -> None:
     module = _load_module()
     projection = _Projection()
-    monkeypatch.setattr(module, "ctx_subnet", projection)
+    monkeypatch.setattr(module, "ctx_current_user", projection)
     monkeypatch.setattr(
         module,
         "current_subnet_economic_status",
@@ -69,7 +69,7 @@ def test_refresh_status_pulls_root_entitlement(monkeypatch) -> None:
     module = _load_module()
     projection = _Projection()
     calls: list[str] = []
-    monkeypatch.setattr(module, "ctx_subnet", projection)
+    monkeypatch.setattr(module, "ctx_current_user", projection)
     monkeypatch.setattr(
         module,
         "refresh_entitlement_snapshot_from_root",
@@ -100,7 +100,7 @@ def test_refresh_status_pulls_root_entitlement(monkeypatch) -> None:
 def test_active_subscription_with_plan_disabled_resources_is_warning(monkeypatch) -> None:
     module = _load_module()
     projection = _Projection()
-    monkeypatch.setattr(module, "ctx_subnet", projection)
+    monkeypatch.setattr(module, "ctx_current_user", projection)
     monkeypatch.setattr(
         module,
         "current_subnet_economic_status",

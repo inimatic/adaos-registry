@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from adaos.sdk.core.decorators import subscribe, tool
-from adaos.sdk.data import ctx_subnet
+from adaos.sdk.data import ctx_current_user
 
 ROOT_GOVERNED_RESOURCES: tuple[str, ...] = (
     "llm.requests",
@@ -148,7 +148,7 @@ def _project_status(*, webspace_id: str = "desktop", refresh_root: bool = False)
             refresh.update({"ok": False, "error": type(exc).__name__, "detail": str(exc)})
     status = current_subnet_economic_status()
     payload = _projection_payload(status)
-    ctx_subnet.set("subscription_status.snapshot", payload, webspace_id=target)
+    ctx_current_user.set("subscription_status.snapshot", payload, webspace_id=target)
     return {"ok": True, "webspace_id": target, "refresh": refresh, **payload}
 
 

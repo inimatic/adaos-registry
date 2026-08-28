@@ -13,7 +13,7 @@ runtime:
       client_presence: true
       webspace_scope: active
 data_projections:
-- scope: subnet
+- scope: current_user
   slot: subscription_status.snapshot
   targets:
   - backend: yjs
