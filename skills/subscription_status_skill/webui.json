@@ -54,18 +54,8 @@
       "type": "visual.metricTile",
       "icon": "card-outline",
       "dataSource": {
-        "kind": "skill",
-        "name": "subscription_status_skill.get_status",
-        "params": {
-          "webspace_id": "$client.webspaceId",
-          "refresh_root_if_missing": true
-        },
-        "cacheTtlMs": 30000,
-        "invalidationTags": [
-          "subscription_status.snapshot"
-        ],
-        "preserveLastValue": true,
-        "maxRequestHz": 1
+        "kind": "y",
+        "path": "data/subscription_status"
       },
       "loading": {
         "loadingText": "Loading subscription...",
@@ -169,18 +159,8 @@
               "area": "main",
               "title": "Current plan",
               "dataSource": {
-                "kind": "skill",
-                "name": "subscription_status_skill.get_status",
-                "params": {
-                  "webspace_id": "$client.webspaceId",
-                  "refresh_root_if_missing": true
-                },
-                "cacheTtlMs": 30000,
-                "invalidationTags": [
-                  "subscription_status.snapshot"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 1
+                "kind": "y",
+                "path": "data/subscription_status"
               },
               "inputs": {
                 "valuePath": "current.value",
@@ -198,17 +178,8 @@
               "area": "main",
               "title": "Resources",
               "dataSource": {
-                "kind": "skill",
-                "name": "subscription_status_skill.list_resources",
-                "params": {
-                  "webspace_id": "$client.webspaceId"
-                },
-                "cacheTtlMs": 30000,
-                "invalidationTags": [
-                  "subscription_status.snapshot"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 1
+                "kind": "y",
+                "path": "data/subscription_status/resources"
               },
               "inputs": {
                 "emptyText": "No subscription resource data",
@@ -276,17 +247,8 @@
               "area": "main",
               "title": "Usage window",
               "dataSource": {
-                "kind": "skill",
-                "name": "subscription_status_skill.list_usage_history",
-                "params": {
-                  "webspace_id": "$client.webspaceId"
-                },
-                "cacheTtlMs": 30000,
-                "invalidationTags": [
-                  "subscription_status.snapshot"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 1
+                "kind": "y",
+                "path": "data/subscription_status/usage_history"
               },
               "inputs": {
                 "emptyText": "No observed usage yet",
@@ -347,18 +309,8 @@
               "area": "main",
               "title": "Plan request",
               "dataSource": {
-                "kind": "skill",
-                "name": "subscription_status_skill.get_status",
-                "params": {
-                  "webspace_id": "$client.webspaceId",
-                  "refresh_root_if_missing": true
-                },
-                "cacheTtlMs": 30000,
-                "invalidationTags": [
-                  "subscription_status.snapshot"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 1
+                "kind": "y",
+                "path": "data/subscription_status"
               },
               "inputs": {
                 "valuePath": "plan_change.value",
@@ -434,18 +386,8 @@
               "area": "main",
               "title": "Local entitlement snapshot",
               "dataSource": {
-                "kind": "skill",
-                "name": "subscription_status_skill.get_status",
-                "params": {
-                  "webspace_id": "$client.webspaceId",
-                  "refresh_root_if_missing": true
-                },
-                "cacheTtlMs": 30000,
-                "invalidationTags": [
-                  "subscription_status.snapshot"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 1
+                "kind": "y",
+                "path": "data/subscription_status/raw"
               },
               "inputs": {
                 "emptyText": "No local economic status"

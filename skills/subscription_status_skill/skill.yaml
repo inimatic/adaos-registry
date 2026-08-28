@@ -1,5 +1,5 @@
 name: subscription_status_skill
-version: 0.1.11
+version: 0.1.12
 description: User-facing AdaOS subscription status widget and modal backed by the
   local economic entitlement snapshot with explicit Root refresh.
 webui_owner: shared
@@ -122,13 +122,13 @@ nlu:
     - show AdaOS subscription status
     - показать подписку AdaOS
     tool: get_status
-updated_at: '2026-08-28T15:13:30+00:00'
+updated_at: '2026-08-28T15:34:53+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.950+5765.e4ae94b3d
-    recorded_at: '2026-08-28T15:13:30+00:00'
+    min_version: 0.1.950+5766.76010ad67
+    recorded_at: '2026-08-28T15:34:53+00:00'
     source: skill_push
-    min_commit: e4ae94b3d408fe56027cf1bed47e056025256bcc
-    min_short_commit: e4ae94b3
-    build_date: '2026-08-28T18:11:05+03:00'
+    min_commit: 76010ad67decf71a7b8768e5c16ec67bca52ee52
+    min_short_commit: 76010ad6
+    build_date: '2026-08-28T18:18:24+03:00'
 

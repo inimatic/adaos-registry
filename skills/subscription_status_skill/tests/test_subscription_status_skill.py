@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 
@@ -19,6 +20,35 @@ class _Projection:
 
     def set(self, slot, value, **kwargs):
         self.values.append((slot, value, kwargs))
+
+
+def test_webui_reads_subscription_projection_without_calling_write_tools() -> None:
+    skill_dir = Path(__file__).resolve().parents[1]
+    webui = json.loads((skill_dir / "webui.json").read_text(encoding="utf-8"))
+
+    data_sources: list[dict] = []
+
+    def collect(value) -> None:
+        if isinstance(value, dict):
+            source = value.get("dataSource")
+            if isinstance(source, dict):
+                data_sources.append(source)
+            for child in value.values():
+                collect(child)
+        elif isinstance(value, list):
+            for child in value:
+                collect(child)
+
+    collect(webui)
+
+    assert data_sources
+    assert all(source.get("kind") == "y" for source in data_sources)
+    assert {source.get("path") for source in data_sources} == {
+        "data/subscription_status",
+        "data/subscription_status/raw",
+        "data/subscription_status/resources",
+        "data/subscription_status/usage_history",
+    }
 
 
 def test_status_projection_exposes_quota_rows(monkeypatch) -> None:
