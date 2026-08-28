@@ -4067,6 +4067,23 @@ class MediaCatalogCoordinator:
         }
 
     @staticmethod
+    def _endpoint_decode_limit(
+        capabilities: Mapping[str, Any], axis: str
+    ) -> int:
+        explicit = max(
+            0, int(capabilities.get(f"max_decode_video_{axis}") or 0)
+        )
+        if explicit:
+            return explicit
+        legacy = max(0, int(capabilities.get(f"max_video_{axis}") or 0))
+        display = max(0, int(capabilities.get(f"display_{axis}") or 0))
+        # Capability v2 clients historically copied viewport dimensions into
+        # max_video_*. A display size is a scaling target, not a decoder limit.
+        if legacy and legacy != display:
+            return legacy
+        return 0
+
+    @staticmethod
     def _endpoint_compatibility(
         quality: Mapping[str, Any],
         *,
@@ -4146,10 +4163,14 @@ class MediaCatalogCoordinator:
             reasons.append("container_not_supported")
         if supported_mime_types and source_mime not in supported_mime_types:
             reasons.append("mime_type_not_supported")
-        maximum_height = max(0, int(capabilities.get("max_video_height") or 0))
+        maximum_height = MediaCatalogCoordinator._endpoint_decode_limit(
+            capabilities, "height"
+        )
         if maximum_height and int(quality.get("height") or 0) > maximum_height:
             reasons.append("height_above_endpoint_limit")
-        maximum_width = max(0, int(capabilities.get("max_video_width") or 0))
+        maximum_width = MediaCatalogCoordinator._endpoint_decode_limit(
+            capabilities, "width"
+        )
         if maximum_width and int(quality.get("width") or 0) > maximum_width:
             reasons.append("width_above_endpoint_limit")
         maximum_bitrate = max(0, int(capabilities.get("max_bitrate") or 0))
@@ -7031,7 +7052,7 @@ class MediaCatalogCoordinator:
             for item in capabilities.get("codecs") or []
             if _text(item)
         }
-        maximum_height = max(0, int(capabilities.get("max_video_height") or 0))
+        maximum_height = self._endpoint_decode_limit(capabilities, "height")
         maximum_bitrate = max(0, int(capabilities.get("max_bitrate") or 0))
         quality_preference = _text(preferred_quality).lower() or "auto"
         language_preference = _text(preferred_language).lower()
@@ -7148,6 +7169,13 @@ class MediaCatalogCoordinator:
         descriptor = _json_loads(selected["variant_descriptor_json"]) or {}
         if not descriptor:
             descriptor = _json_loads(selected["catalog_descriptor_json"]) or {}
+        public_descriptor = _public_resource_descriptor(
+            descriptor,
+            resource_id=str(selected["variant_resource_id"]),
+            mime_type=str(selected["selected_mime_type"]),
+            content_path=selected["content_path"],
+            routed_content_path=selected["routed_content_path"],
+        )
         direct_candidates = [
             _public_direct_url(item)
             for item in (
@@ -7158,12 +7186,15 @@ class MediaCatalogCoordinator:
             if _public_direct_url(item)
         ][:8]
         routed_path = _public_content_path(
-            descriptor.get("routed_content_path")
+            public_descriptor.get("routed_content_path")
+            or descriptor.get("routed_content_path")
             or descriptor.get("browser_path")
             or selected["routed_content_path"]
         )
         node_path = _public_content_path(
-            descriptor.get("content_path") or selected["content_path"]
+            public_descriptor.get("content_path")
+            or descriptor.get("content_path")
+            or selected["content_path"]
         )
         route = {
             "schema": "adaos.media_center.playback_route.v1",
@@ -7205,13 +7236,7 @@ class MediaCatalogCoordinator:
             "title": display_title,
             "profile_id": profile,
             "quality": quality,
-            "descriptor": _public_resource_descriptor(
-                descriptor,
-                resource_id=str(selected["variant_resource_id"]),
-                mime_type=str(selected["selected_mime_type"]),
-                content_path=node_path,
-                routed_content_path=routed_path,
-            ),
+            "descriptor": public_descriptor,
             "route": route,
             "compatibility": compatibility,
             "decision": {

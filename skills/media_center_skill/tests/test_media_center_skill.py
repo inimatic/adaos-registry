@@ -4782,13 +4782,13 @@ def test_derived_rendition_is_a_hidden_exact_source_variant(monkeypatch, tmp_pat
             "descriptor": {
                 "resource_id": "derived-ref",
                 "mime_type": "video/mp4",
-                "direct_urls": ["http://node-a.local/media/derived-ref"],
-                "content_path": "/api/node/media/files/content/derived-ref",
-                "routed_content_path": "/media/files/content/derived-ref",
+                "route": "node_media_file",
+                "source": "media_server",
                 "metadata": {"storage_mode": "derived_copy"},
             },
             "quality": {
-                "height": 720,
+                "width": 2112,
+                "height": 1188,
                 "codec": "h264",
                 "container": "mp4",
                 "derived": True,
@@ -4802,7 +4802,15 @@ def test_derived_rendition_is_a_hidden_exact_source_variant(monkeypatch, tmp_pat
     listing = catalog.list_items(media_kind="video")
     plan = catalog.playback_plan(
         listing["items"][0]["id"],
-        endpoint_capabilities={"codecs": ["h264"], "max_video_height": 720},
+        endpoint_capabilities={
+            "codecs": ["h264"],
+            "containers": ["mp4"],
+            "mime_types": ["video/mp4"],
+            "display_width": 1920,
+            "display_height": 1080,
+            "max_video_width": 1920,
+            "max_video_height": 1080,
+        },
     )
     with catalog.repository.connect() as connection:
         variants = connection.execute(
@@ -4817,6 +4825,12 @@ def test_derived_rendition_is_a_hidden_exact_source_variant(monkeypatch, tmp_pat
     assert plan["source_id"] == "rendition-source-1-browser"
     assert plan["title"] == "Example"
     assert plan["descriptor"]["metadata"]["storage_mode"] == "derived_copy"
+    assert plan["descriptor"]["content_path"] == (
+        "/api/node/media/files/content/derived-ref"
+    )
+    assert plan["route"]["fallback"]["path"] == (
+        "/media/files/content/derived-ref"
+    )
     assert plan["decision"]["derived"] is True
     assert plan["decision"]["exact_source_id"] == "source-1"
     assert plan["decision"]["exact_source_revision"] == 1
@@ -4848,6 +4862,44 @@ def test_endpoint_compatibility_enforces_width_and_avi_container():
     assert decision["ready"] is False
     assert "container_not_supported" in decision["reasons"]
     assert "width_above_endpoint_limit" in decision["reasons"]
+
+
+def test_endpoint_compatibility_distinguishes_display_size_from_decode_limit():
+    scalable = MediaCatalogCoordinator._endpoint_compatibility(
+        {"width": 2112, "height": 1188, "codec": "h264", "container": "mp4"},
+        media_kind="video",
+        mime_type="video/mp4",
+        capabilities={
+            "codecs": ["h264"],
+            "containers": ["mp4"],
+            "mime_types": ["video/mp4"],
+            "display_width": 1920,
+            "display_height": 1080,
+            "max_video_width": 1920,
+            "max_video_height": 1080,
+        },
+        preferred_language="",
+    )
+    decode_limited = MediaCatalogCoordinator._endpoint_compatibility(
+        {"width": 2112, "height": 1188, "codec": "h264", "container": "mp4"},
+        media_kind="video",
+        mime_type="video/mp4",
+        capabilities={
+            "codecs": ["h264"],
+            "containers": ["mp4"],
+            "mime_types": ["video/mp4"],
+            "display_width": 1920,
+            "display_height": 1080,
+            "max_decode_video_width": 1920,
+            "max_decode_video_height": 1080,
+        },
+        preferred_language="",
+    )
+
+    assert scalable["mode"] == "direct"
+    assert scalable["ready"] is True
+    assert decode_limited["mode"] == "transcode"
+    assert "width_above_endpoint_limit" in decode_limited["reasons"]
 
 
 def test_federated_deep_search_is_bounded_policy_filtered_and_observable(

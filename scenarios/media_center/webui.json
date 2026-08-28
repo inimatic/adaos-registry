@@ -438,6 +438,14 @@
                     }
                   },
                   {
+                    "id": "settings",
+                    "label": "Settings",
+                    "icon": "settings-outline",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.settings"
+                    }
+                  },
+                  {
                     "id": "target",
                     "label": "Playback device",
                     "icon": "tv-outline",
@@ -457,14 +465,6 @@
                     },
                     "label_i18n": {
                       "key": "runtime.media_center.ui.control_device"
-                    }
-                  },
-                  {
-                    "id": "settings",
-                    "label": "Settings",
-                    "icon": "settings-outline",
-                    "label_i18n": {
-                      "key": "runtime.media_center.ui.settings"
                     }
                   }
                 ]
@@ -1645,7 +1645,18 @@
                   "selectedItemKindStateKey": "selectedMediaKind",
                   "selectedItemFavoriteStateKey": "selectedMediaFavorite",
                   "selectedMediaKind": "$state.selectedMediaKind",
-                  "profileId": "$state.profileId"
+                  "profileId": "$state.profileId",
+                  "remotePlaybackTargetId": "$state.selectedPlaybackTargetId",
+                  "remotePlaybackAction": {
+                    "target": "media_center_skill.play_on",
+                    "params": {
+                      "source_type": "$state.playbackSourceType",
+                      "source_id": "$state.playbackSourceId",
+                      "source_context": "$state.playbackSourceContext",
+                      "start_item_id": "$state.selectedMediaItemId",
+                      "profile_id": "$state.profileId"
+                    }
+                  }
                 },
                 "title_i18n": {
                   "key": "runtime.media_center.ui.now_playing"

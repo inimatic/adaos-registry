@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Iterable, Mapping
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 
 SCHEMA_VERSION = "adaos.media_center.catalog.v1"
@@ -968,6 +968,30 @@ def _public_resource_descriptor(
 ) -> dict[str, Any]:
     """Project an internal source descriptor into the browser-safe contract."""
     resolved_resource_id = _text(resource_id or descriptor.get("resource_id") or descriptor.get("id"))
+    delivery = descriptor.get("delivery")
+    delivery = delivery if isinstance(delivery, Mapping) else {}
+    managed_file = bool(
+        resolved_resource_id
+        and (
+            _text(descriptor.get("route")) == "node_media_file"
+            or _text(descriptor.get("source")) == "media_server"
+            or _text(delivery.get("preferred_route")) == "node_media_file"
+        )
+    )
+    encoded_resource_id = quote(resolved_resource_id, safe="")
+    resolved_content_path = content_path or descriptor.get("content_path")
+    resolved_routed_path = (
+        routed_content_path
+        or descriptor.get("routed_content_path")
+        or descriptor.get("browser_path")
+    )
+    if managed_file:
+        resolved_content_path = resolved_content_path or (
+            f"/api/node/media/files/content/{encoded_resource_id}"
+        )
+        resolved_routed_path = resolved_routed_path or (
+            f"/media/files/content/{encoded_resource_id}"
+        )
     result: dict[str, Any] = {
         "schema": _text(descriptor.get("schema")) or "adaos.media.resource.v1",
         "id": resolved_resource_id,
@@ -976,17 +1000,12 @@ def _public_resource_descriptor(
         "mime_type": _text(mime_type or descriptor.get("mime_type") or descriptor.get("mime")),
         "size_bytes": _int(size_bytes or descriptor.get("size_bytes")),
         "modified_at": _text(modified_at or descriptor.get("modified_at")),
-        "content_path": _public_content_path(content_path or descriptor.get("content_path")),
-        "routed_content_path": _public_content_path(
-            routed_content_path
-            or descriptor.get("routed_content_path")
-            or descriptor.get("browser_path")
-        ),
+        "content_path": _public_content_path(resolved_content_path),
+        "routed_content_path": _public_content_path(resolved_routed_path),
         "playback_id": _text(playback_id or descriptor.get("playback_id")),
         "metadata": _public_metadata(descriptor.get("metadata")),
     }
-    delivery = descriptor.get("delivery")
-    if isinstance(delivery, Mapping):
+    if delivery:
         public_delivery = {
             key: delivery.get(key)
             for key in ("storage_mode", "preferred_route", "fallback_route", "range_supported")
