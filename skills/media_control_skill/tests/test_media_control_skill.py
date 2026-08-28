@@ -433,7 +433,7 @@ def test_endpoint_open_retires_previous_session_and_scopes_command_pull():
     assert second["ok"] is True
     assert second["retired_session_count"] == 1
     assert second["session"]["active_item_id"] == "item-1"
-    assert repository.get_session(first["session"]["id"])["session"]["state"] == "stopped"
+    assert repository.get_session(first["session"]["id"])["session"]["state"] == "superseded"
     scoped = repository.pull_commands(
         second["target"]["id"], session_id=second["session"]["id"]
     )
@@ -442,6 +442,63 @@ def test_endpoint_open_retires_previous_session_and_scopes_command_pull():
     )
     assert scoped["items"] == []
     assert previous["items"][0]["id"] == command["command"]["id"]
+
+
+def test_one_target_has_one_visible_session_even_with_legacy_duplicates():
+    repository = MediaControlRepository()
+    first = _session(repository)
+    second = repository.create_session(
+        profile_id="alice",
+        target_id=first["target_id"],
+        actor_ref="profile:alice",
+        queue=_queue(3),
+        active_index=2,
+        retire_existing=False,
+    )["session"]
+
+    visible = repository.now_playing(
+        profile_id="alice", target_id=first["target_id"], limit=10
+    )
+    repaired = repository.reconcile_single_session_invariant()
+
+    assert visible["count"] == 1
+    assert visible["items"][0]["id"] == second["id"]
+    assert repaired["superseded_session_count"] == 1
+    assert repository.get_session(first["id"])["session"]["state"] == "superseded"
+
+
+def test_known_stopped_session_reattaches_and_supersedes_other_history():
+    repository = MediaControlRepository()
+    first = _session(repository)
+    second = repository.create_session(
+        profile_id="alice",
+        target_id=first["target_id"],
+        actor_ref="profile:alice",
+        queue=_queue(3),
+        active_index=2,
+    )["session"]
+    with repository.connect() as connection:
+        connection.execute(
+            "UPDATE playback_sessions SET state='superseded' WHERE id=?",
+            (first["id"],),
+        )
+        connection.execute(
+            "UPDATE playback_sessions SET state='stopped' WHERE id=?",
+            (second["id"],),
+        )
+        connection.commit()
+
+    inbox = repository.endpoint_inbox(
+        "browser-tv",
+        webspace_id="tv",
+        label="Living room TV",
+        kind="tv",
+        known_session_id=first["id"],
+    )
+
+    assert inbox["assignment"] is None
+    assert repository.get_session(first["id"])["session"]["state"] == "stopped"
+    assert repository.get_session(second["id"])["session"]["state"] == "superseded"
 
 
 def test_endpoint_inbox_retains_terminal_session_until_stop_is_observed():
@@ -801,6 +858,7 @@ def test_endpoint_cannot_ack_play_for_a_different_active_item():
         acknowledged_command_revision=played["command"]["command_revision"],
         observed={
             "active_item_id": "item-2",
+            "queue_revision": session["queue_revision"],
             "state": "playing",
             "playback_confirmed": True,
             "position_ms": 1000,
@@ -903,6 +961,7 @@ def test_endpoint_preferred_reconcile_accepts_autonomous_queue_advance():
         acknowledged_command_revision=0,
         observed={
             "active_item_id": "item-2",
+            "queue_revision": session["queue_revision"],
             "state": "playing",
             "position_ms": 1500,
             "duration_ms": 180_000,
@@ -921,6 +980,47 @@ def test_endpoint_preferred_reconcile_accepts_autonomous_queue_advance():
     assert advanced["session"]["active_item_id"] == "item-2"
     assert advanced["session"]["state"] == "playing"
     assert advanced["session"]["position_ms"] == 1500
+
+
+def test_stale_endpoint_queue_cannot_revert_a_remote_selection():
+    repository = MediaControlRepository()
+    session = _session(repository)
+    replaced = repository.update_queue(
+        session["id"],
+        queue=_queue(3),
+        expected_queue_revision=session["queue_revision"],
+        active_index=2,
+        actor_ref="profile:alice",
+    )["session"]
+
+    reconciled = repository.reconcile_endpoint(
+        session["id"],
+        target_id=session["target_id"],
+        endpoint_revision=1,
+        acknowledged_command_revision=0,
+        observed={
+            "active_item_id": session["active_item_id"],
+            "queue_revision": session["queue_revision"],
+            "state": "playing",
+            "playback_confirmed": True,
+            "position_ms": 15_000,
+            "duration_ms": 180_000,
+        },
+        authority="endpoint_preferred",
+    )
+
+    assert replaced["active_item_id"] == "item-2"
+    assert reconciled["action"] == {
+        "type": "load",
+        "item_id": "item-2",
+        "position_ms": 0,
+        "state": "ready",
+        "descriptor": reconciled["action"]["descriptor"],
+        "reason": "endpoint_item_differs",
+        "queue_revision": replaced["queue_revision"],
+    }
+    assert reconciled["session"]["active_item_id"] == "item-2"
+    assert reconciled["session"]["queue_revision"] == replaced["queue_revision"]
 
 
 def test_sleep_timer_expires_to_a_durable_pause_command():

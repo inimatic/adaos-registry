@@ -541,6 +541,7 @@ def create_session(
         route=route,
         queue_source=queue_source,
         lease_seconds=lease_seconds,
+        retire_existing=True,
     )
     if result.get("ok"):
         _publish_updates(repository, webspace_id=webspace_id)

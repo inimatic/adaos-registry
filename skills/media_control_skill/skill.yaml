@@ -1,5 +1,5 @@
 name: media_control_skill
-version: 0.2.18
+version: 0.2.19
 description: Persistent Media Center control plane for playback targets, sessions,
   queues, commands, checkpoints, and settings.
 supported_locales:
@@ -800,13 +800,13 @@ llm_hints:
     intent: media.playback.control
     tool: voice_command
     side_effect_class: local_write
-updated_at: '2026-08-28T12:21:51+00:00'
+updated_at: '2026-08-28T14:55:35+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.950+5757.1ccef5e25
-    recorded_at: '2026-08-28T12:21:51+00:00'
+    min_version: 0.1.950+5764.efc54324a
+    recorded_at: '2026-08-28T14:55:35+00:00'
     source: skill_push
-    min_commit: 1ccef5e259cb27a0267303d8a5d43bd5b941b0f1
-    min_short_commit: 1ccef5e2
-    build_date: '2026-08-28T15:21:38+03:00'
+    min_commit: efc54324aae581c14548fbd50c0432cd280eecb1
+    min_short_commit: efc54324
+    build_date: '2026-08-28T16:45:27+03:00'
 

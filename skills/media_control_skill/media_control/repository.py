@@ -323,7 +323,54 @@ class MediaControlRepository:
                         f"ALTER TABLE playback_settings ADD COLUMN {name} {definition}"
                     )
             connection.commit()
-        return {"ok": True, "schema": SCHEMA_VERSION, "db_path": str(self.db_path)}
+        repaired = self.reconcile_single_session_invariant()
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "db_path": str(self.db_path),
+            "superseded_session_count": repaired["superseded_session_count"],
+        }
+
+    def reconcile_single_session_invariant(self) -> dict[str, Any]:
+        """Keep one endpoint-attached session per physical playback target."""
+        superseded: list[str] = []
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            rows = connection.execute(
+                """
+                SELECT id,target_id,state
+                FROM playback_sessions
+                WHERE state NOT IN ('ended','error','failed','superseded')
+                ORDER BY target_id,
+                    CASE WHEN state='stopped' THEN 1 ELSE 0 END,
+                    COALESCE(NULLIF(endpoint_last_seen_at,''),updated_at,created_at) DESC,
+                    created_at DESC,id DESC
+                """
+            ).fetchall()
+            retained_targets: set[str] = set()
+            for row in rows:
+                target_id = str(row["target_id"])
+                if target_id not in retained_targets:
+                    retained_targets.add(target_id)
+                    continue
+                superseded.append(str(row["id"]))
+            if superseded:
+                placeholders = ",".join("?" for _ in superseded)
+                connection.execute(
+                    f"""
+                    UPDATE playback_sessions
+                    SET state='superseded',revision=revision+1,updated_at=?
+                    WHERE id IN ({placeholders})
+                    """,
+                    (now_iso(), *superseded),
+                )
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "superseded_session_count": len(superseded),
+            "bounded": True,
+        }
 
     def register_target(
         self,
@@ -372,7 +419,7 @@ class MediaControlRepository:
                     SELECT candidate.id
                     FROM playback_sessions AS candidate
                     WHERE candidate.target_id=t.id
-                      AND candidate.state NOT IN ('stopped','ended','error','failed')
+                      AND candidate.state NOT IN ('stopped','ended','error','failed','superseded')
                     ORDER BY candidate.updated_at DESC,candidate.id DESC
                     LIMIT 1
                 )
@@ -405,7 +452,7 @@ class MediaControlRepository:
         route: Mapping[str, Any] | None = None,
         queue_source: Mapping[str, Any] | None = None,
         lease_seconds: int = 120,
-        retire_existing: bool = False,
+        retire_existing: bool = True,
     ) -> dict[str, Any]:
         target = self.get_target(target_id)
         if target is None or target["status"] != "available":
@@ -428,8 +475,9 @@ class MediaControlRepository:
                 retired_session_count = connection.execute(
                     """
                     UPDATE playback_sessions
-                    SET state='stopped',revision=revision+1,updated_at=?
-                    WHERE target_id=? AND state NOT IN ('stopped','ended')
+                    SET state='superseded',revision=revision+1,updated_at=?
+                    WHERE target_id=?
+                      AND state NOT IN ('ended','error','failed','superseded')
                     """,
                     (created_at, target["id"]),
                 ).rowcount
@@ -492,7 +540,7 @@ class MediaControlRepository:
                 """
                 SELECT * FROM playback_sessions
                 WHERE target_id=? AND (
-                    state NOT IN ('stopped','ended','error','failed')
+                    state NOT IN ('stopped','ended','error','failed','superseded')
                     OR command_revision>observed_command_revision
                 )
                 ORDER BY created_at DESC,id DESC
@@ -504,15 +552,28 @@ class MediaControlRepository:
                 resumable = connection.execute(
                     """
                     SELECT id FROM playback_sessions
-                    WHERE id=? AND target_id=? AND state='stopped'
+                    WHERE id=? AND target_id=? AND state IN ('stopped','superseded')
                       AND NULLIF(active_item_id,'') IS NOT NULL
                     """,
                     (text(known_session_id), target["id"]),
                 ).fetchone()
                 if resumable is not None:
                     connection.execute(
-                        "UPDATE playback_sessions SET endpoint_last_seen_at=? WHERE id=?",
-                        (now_iso(), str(resumable["id"])),
+                        """
+                        UPDATE playback_sessions
+                        SET state='superseded',revision=revision+1,updated_at=?
+                        WHERE target_id=? AND id<>?
+                          AND state NOT IN ('ended','error','failed','superseded')
+                        """,
+                        (now_iso(), target["id"], str(resumable["id"])),
+                    )
+                    connection.execute(
+                        """
+                        UPDATE playback_sessions
+                        SET state='stopped',endpoint_last_seen_at=?,updated_at=?
+                        WHERE id=?
+                        """,
+                        (now_iso(), now_iso(), str(resumable["id"])),
                     )
                     connection.commit()
             queue_total = int(
@@ -872,7 +933,7 @@ class MediaControlRepository:
                 """
                 SELECT * FROM playback_sessions
                 WHERE sleep_timer_at>0 AND sleep_timer_at<=?
-                    AND state NOT IN ('paused','stopped','ended')
+                    AND state NOT IN ('paused','stopped','ended','superseded')
                 ORDER BY sleep_timer_at LIMIT 100
                 """,
                 (time.time(),),
@@ -1087,6 +1148,10 @@ class MediaControlRepository:
             ).fetchall()
             observed_item_id = text(payload.get("active_item_id"))
             desired_item_id = str(row["active_item_id"])
+            observed_queue_revision = max(
+                0, int(payload.get("queue_revision") or 0)
+            )
+            current_queue_revision = int(row["queue_revision"])
             action: dict[str, Any]
             if observed_item_id and observed_item_id != desired_item_id:
                 observed_item = connection.execute(
@@ -1101,6 +1166,7 @@ class MediaControlRepository:
                     authority_token == "endpoint_preferred"
                     and not pending_rows
                     and observed_item is not None
+                    and observed_queue_revision == current_queue_revision
                 ):
                     descriptor = loads(observed_item["descriptor_json"], {})
                     connection.execute(
@@ -1157,6 +1223,7 @@ class MediaControlRepository:
                         "state": str(row["state"]),
                         "descriptor": loads(active["descriptor_json"], {}) if active else {},
                         "reason": "endpoint_item_differs",
+                        "queue_revision": current_queue_revision,
                     }
             elif pending_rows:
                 action = {
@@ -1462,7 +1529,7 @@ class MediaControlRepository:
             datetime.now(tz=timezone.utc) - timedelta(seconds=freshness_seconds)
         ).isoformat()
         filters = [
-            "s.state NOT IN ('ended','error','failed')",
+            "s.state NOT IN ('ended','error','failed','superseded')",
             "NULLIF(s.active_item_id,'') IS NOT NULL",
             "COALESCE(NULLIF(s.endpoint_last_seen_at,''),s.created_at)>=?",
         ]
@@ -1476,7 +1543,8 @@ class MediaControlRepository:
                 return {"ok": False, "error": "playback_target_not_found"}
             filters.append("s.target_id=?")
             params.append(target["id"])
-        params.append(max(1, min(50, int(limit or 20))))
+        bounded = max(1, min(50, int(limit or 20)))
+        params.append(500)
         with self.connect() as connection:
             rows = connection.execute(
                 f"""
@@ -1493,13 +1561,21 @@ class MediaControlRepository:
                 LEFT JOIN playback_queue_items AS q
                   ON q.session_id=s.id AND q.ordinal=s.active_queue_index
                 WHERE {' AND '.join(filters)}
-                ORDER BY s.updated_at DESC
+                ORDER BY
+                  CASE WHEN s.state='stopped' THEN 1 ELSE 0 END,
+                  COALESCE(NULLIF(s.endpoint_last_seen_at,''),s.updated_at,s.created_at) DESC,
+                  s.created_at DESC
                 LIMIT ?
                 """,
                 tuple(params),
             ).fetchall()
         items = []
+        visible_targets: set[str] = set()
         for row in rows:
+            row_target_id = str(row["target_id"])
+            if row_target_id in visible_targets:
+                continue
+            visible_targets.add(row_target_id)
             item = self._public_session(row)
             descriptor = loads(row["active_descriptor_json"], {})
             target_capabilities = loads(row["target_capabilities_json"], {})
@@ -1548,6 +1624,8 @@ class MediaControlRepository:
                 if value
             )
             items.append(item)
+            if len(items) >= bounded:
+                break
         return {
             "ok": True,
             "schema": SCHEMA_VERSION,

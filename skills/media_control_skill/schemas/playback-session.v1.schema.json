@@ -3,7 +3,7 @@
   "required": ["schema", "id", "profile_id", "target_id", "state", "active_queue_index", "active_item_id", "route", "position_ms", "duration_ms", "rate", "volume", "muted", "tracks", "autoplay", "auto_fullscreen", "queue_source", "queue_revision", "command_revision", "observed_command_revision", "endpoint_observation_revision", "endpoint_state", "sleep_timer_at", "control_lease", "revision"],
   "properties": {
     "schema": {"const": "adaos.media_control.playback_session.v1"}, "id": {"type": "string"}, "profile_id": {"type": "string"}, "target_id": {"type": "string"},
-    "state": {"enum": ["requested", "ready", "loading", "buffering", "playing", "paused", "stopped", "ended", "recovering", "failed", "error"]}, "active_queue_index": {"type": "integer", "minimum": 0},
+    "state": {"enum": ["requested", "ready", "loading", "buffering", "playing", "paused", "stopped", "superseded", "ended", "recovering", "failed", "error"]}, "active_queue_index": {"type": "integer", "minimum": 0},
     "active_item_id": {"type": "string"}, "work_id": {"type": "string"}, "variant_id": {"type": "string"}, "source_id": {"type": "string"},
     "route": {"type": "object"}, "position_ms": {"type": "integer", "minimum": 0}, "duration_ms": {"type": "integer", "minimum": 0},
     "rate": {"type": "number", "minimum": 0.25, "maximum": 4}, "volume": {"type": "number", "minimum": 0, "maximum": 1}, "muted": {"type": "boolean"},
