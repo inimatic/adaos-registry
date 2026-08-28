@@ -70,6 +70,16 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _timestamp_s(value: Any) -> float | None:
+    text = _text(value)
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return None
+
+
 def _skill_state_dir() -> Path:
     try:
         from adaos.services.runtime_paths import current_state_dir
@@ -136,6 +146,9 @@ def _resource_rows(status: Mapping[str, Any]) -> list[dict[str, Any]]:
         item = _as_mapping(usage.get(resource))
         disabled = disabled_map.get(resource)
         quota = _as_mapping(item.get("quota"))
+        metering = _text(item.get("metering"))
+        if resource == "codex.api.tokens" and metering in {"", "manual_adjustment_pending_codex_stream"}:
+            metering = "codex_usage_stream"
         rows.append(
             {
                 "resource": resource,
@@ -147,7 +160,7 @@ def _resource_rows(status: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "quota_remaining": "" if item.get("quota_remaining") is None else _int_value(item.get("quota_remaining")),
                 "quota_period": _text(item.get("quota_period") or quota.get("period")),
                 "quota_unit": _text(item.get("quota_unit") or quota.get("unit")),
-                "metering": _text(item.get("metering")),
+                "metering": metering,
                 "source": _text(item.get("source")),
                 "accuracy": _text(item.get("accuracy")),
                 "last_model": _text(item.get("last_model")),
@@ -258,6 +271,9 @@ def _needs_root_refresh(status: Mapping[str, Any]) -> bool:
     subscription_state = _text(status.get("subscription_state")).lower()
     plan_id = _text(status.get("plan_id")).lower()
     if snapshot and snapshot.get("loaded") is False:
+        return True
+    updated_at = _timestamp_s(snapshot.get("updated_at"))
+    if updated_at is not None and time.time() - updated_at > _AUTO_ROOT_REFRESH_MIN_INTERVAL_S:
         return True
     return subscription_state in {"", "unknown", "unassigned"} or plan_id in {"", "none", "unknown"}
 

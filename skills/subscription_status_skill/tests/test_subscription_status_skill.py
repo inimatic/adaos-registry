@@ -74,6 +74,37 @@ def test_status_projection_exposes_quota_rows(monkeypatch) -> None:
     assert projection.values[0][2]["webspace_id"] == "desktop-dev"
 
 
+def test_status_projection_normalizes_legacy_codex_metering(monkeypatch) -> None:
+    module = _load_module()
+    projection = _Projection()
+    monkeypatch.setattr(module, "ctx_current_user", projection)
+    monkeypatch.setattr(
+        module,
+        "current_subnet_economic_status",
+        lambda: {
+            "generated_at": "2026-08-28T15:00:00Z",
+            "subscription_state": "active",
+            "plan_id": "builder",
+            "entitlement_state": "limited_observed",
+            "disabled_resource_count": 0,
+            "disabled_resources": [],
+            "usage": {
+                "codex.api.tokens": {
+                    "used_30d": 10,
+                    "quota_limit": 20000000,
+                    "quota_remaining": 19999990,
+                    "metering": "manual_adjustment_pending_codex_stream",
+                }
+            },
+        },
+    )
+
+    payload = module.get_status(webspace_id="desktop")
+
+    codex = next(row for row in payload["resources"]["items"] if row["resource"] == "codex.api.tokens")
+    assert codex["metering"] == "codex_usage_stream"
+
+
 def test_refresh_status_pulls_root_entitlement(monkeypatch) -> None:
     module = _load_module()
     projection = _Projection()
@@ -146,6 +177,48 @@ def test_get_status_refreshes_root_when_entitlement_is_missing(monkeypatch) -> N
     assert payload["current"]["value"] == "builder"
     assert payload["refresh"]["ok"] is True
     assert projection.values[0][1]["current"]["value"] == "builder"
+
+
+def test_get_status_refreshes_stale_entitlement_snapshot(monkeypatch) -> None:
+    module = _load_module()
+    projection = _Projection()
+    calls: list[str] = []
+    statuses = [
+        {
+            "generated_at": "2026-08-28T15:00:00Z",
+            "subscription_state": "active",
+            "plan_id": "personal",
+            "entitlement_state": "enabled",
+            "disabled_resource_count": 0,
+            "disabled_resources": [],
+            "usage": {},
+            "entitlement_snapshot": {"loaded": True, "updated_at": "2026-08-28T14:00:00Z"},
+        },
+        {
+            "generated_at": "2026-08-28T15:00:01Z",
+            "subscription_state": "active",
+            "plan_id": "builder",
+            "entitlement_state": "limited_observed",
+            "disabled_resource_count": 0,
+            "disabled_resources": [],
+            "usage": {},
+            "entitlement_snapshot": {"loaded": True, "updated_at": "2026-08-28T15:00:01Z"},
+        },
+    ]
+    monkeypatch.setattr(module, "_LAST_AUTO_ROOT_REFRESH_AT", 0.0)
+    monkeypatch.setattr(module, "time", type("Clock", (), {"monotonic": staticmethod(lambda: 1000.0), "time": staticmethod(lambda: 1787929200.0)}))
+    monkeypatch.setattr(module, "ctx_current_user", projection)
+    monkeypatch.setattr(module, "current_subnet_economic_status", lambda: statuses.pop(0))
+    monkeypatch.setattr(
+        module,
+        "refresh_entitlement_snapshot_from_root",
+        lambda: calls.append("refresh") or {"ok": True},
+    )
+
+    payload = module.get_status(webspace_id="desktop")
+
+    assert calls == ["refresh"]
+    assert payload["current"]["value"] == "builder"
 
 
 def test_active_subscription_with_plan_disabled_resources_is_warning(monkeypatch) -> None:
