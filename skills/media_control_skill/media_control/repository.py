@@ -576,6 +576,7 @@ class MediaControlRepository:
             "tracks",
             "rate",
             "sleep_timer",
+            "presentation",
         }
         if command_token not in supported:
             return {"ok": False, "error": "unsupported_playback_command"}
@@ -673,6 +674,10 @@ class MediaControlRepository:
         elif command == "sleep_timer":
             seconds = max(0, min(24 * 60 * 60, int(args.get("seconds") or 0)))
             updates["sleep_timer_at"] = time.time() + seconds if seconds else 0
+        elif command == "presentation":
+            mode = text(args.get("mode")).lower()
+            if mode not in {"fullscreen", "picture_in_picture", "mini"}:
+                raise ValueError("playback_presentation_mode_invalid")
         elif command in {"next", "previous"}:
             direction = 1 if command == "next" else -1
             next_item = self._next_available(connection, str(row["id"]), int(row["active_queue_index"]), direction)
@@ -1442,7 +1447,8 @@ class MediaControlRepository:
             datetime.now(tz=timezone.utc) - timedelta(seconds=freshness_seconds)
         ).isoformat()
         filters = [
-            "s.state NOT IN ('stopped','ended','error','failed')",
+            "s.state NOT IN ('ended','error','failed')",
+            "NULLIF(s.active_item_id,'') IS NOT NULL",
             "COALESCE(NULLIF(s.endpoint_last_seen_at,''),s.created_at)>=?",
         ]
         params: list[Any] = [freshness_cutoff]
@@ -1492,6 +1498,10 @@ class MediaControlRepository:
                         descriptor.get("media_kind") or descriptor.get("kind")
                     ),
                     "artwork": dict(descriptor.get("artwork") or {}),
+                    "favorite": bool(descriptor.get("favorite", False)),
+                    "content_item_id": text(
+                        descriptor.get("item_id") or item["active_item_id"]
+                    ),
                     "target_label": target_device_label or item["target_id"],
                     "target_endpoint_label": text(
                         target_capabilities.get("endpoint_display_name")

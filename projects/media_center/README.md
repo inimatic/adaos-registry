@@ -6,6 +6,18 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.6.95` combines `media_center_skill@0.8.92`,
+`media_library_agent@0.6.43`, `media_control_skill@0.2.17`, and scenario
+`media_center@0.6.37`. Stopped playback keeps its selected item and remains
+resumable from subscribed remotes. Remote surfaces add revisioned presentation
+and volume controls plus Media Center-owned Details/Favorite actions; the
+compact widget resubscribes when its target changes. Now Playing is a regular
+maximizable details modal and never substitutes modal expansion for media
+fullscreen. The agent defaults to portable PyAV/system-ffprobe technical
+probing and backfills old partial descriptors during observable scans, yielding
+real codec, stream, duration, bitrate, and dimensions without requiring a
+system package on every node.
+
 Release `0.6.93` combines `media_center_skill@0.8.90`,
 `media_library_agent@0.6.42`, `media_control_skill@0.2.15`, scenario
 `media_center@0.6.35`, and client `d250f5c`. It routes Play from the library

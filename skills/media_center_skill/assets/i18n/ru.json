@@ -285,5 +285,10 @@
   "runtime.media_center.error.playback_target_identity_mismatch": "Выбранная поверхность воспроизведения изменилась. Выберите её повторно.",
   "runtime.media_center.approval.play_on.title": "Разрешить управление воспроизведением",
   "runtime.media_center.approval.play_on.summary": "Разрешить этому пульту запускать воспроизведение на устройстве «{target_label}».",
-  "runtime.media_center.approval.play_on.waiting": "Для управления устройством «{target_label}» требуется разрешение. Запрос отправлен на это устройство."
+  "runtime.media_center.approval.play_on.waiting": "Для управления устройством «{target_label}» требуется разрешение. Запрос отправлен на это устройство.",
+  "runtime.media_center.ui.presentation": "Режим просмотра",
+  "runtime.media_center.ui.fullscreen": "На весь экран",
+  "runtime.media_center.ui.picture_in_picture": "Картинка в картинке",
+  "runtime.media_center.ui.mini_player": "Мини-плеер",
+  "runtime.media_center.ui.volume": "Громкость"
 }

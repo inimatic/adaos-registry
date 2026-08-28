@@ -1560,7 +1560,7 @@
           "title": "Now Playing",
           "scope": "workspace",
           "presentation": {
-            "kind": "fullscreen",
+            "kind": "modal",
             "restoreFocus": true
           },
           "schema": {
@@ -2461,9 +2461,64 @@
                     "key": "runtime.media_center.ui.nothing_is_playing_on_this_device"
                   }
                 },
+                "actions": [
+                  {
+                    "on": "select",
+                    "type": "updateState",
+                    "params": {
+                      "mediaControlSessionId": "$event.id",
+                      "selectedMediaItemId": "$event.content_item_id",
+                      "selectedMediaTitle": "$event.title",
+                      "selectedMediaKind": "$event.media_kind",
+                      "selectedMediaFavorite": "$event.favorite",
+                      "mediaControlVolume": "$event.volume",
+                      "playbackSourceType": "item",
+                      "playbackSourceId": "$event.content_item_id",
+                      "playbackSourceContext": {}
+                    }
+                  }
+                ],
                 "title_i18n": {
                   "key": "runtime.media_center.ui.now_playing"
                 }
+              },
+              {
+                "id": "media-remote-content-actions",
+                "type": "ui.actions",
+                "area": "main",
+                "visibleIf": "$state.selectedMediaItemId != null && $state.selectedMediaFavorite != true",
+                "inputs": {
+                  "variant": "toolbar",
+                  "size": "small",
+                  "buttons": [
+                    {"id": "details", "icon": "information-circle-outline", "label": "Details", "label_i18n": {"key": "runtime.media_center.ui.media_details"}},
+                    {"id": "favorite", "icon": "star-outline", "label": "Favorite", "label_i18n": {"key": "runtime.media_center.ui.favorite"}}
+                  ]
+                },
+                "actions": [
+                  {"on": "click:details", "type": "openModal", "params": {"modalId": "media_center_player"}},
+                  {"on": "click:favorite", "type": "callSkill", "target": "media_center_skill.set_favorite", "params": {"item_id": "$state.selectedMediaItemId", "favorite": true, "profile_id": "$state.profileId"}, "invalidates": ["media_center.catalog", "media_control.sessions"]},
+                  {"on": "click:favorite", "type": "updateState", "params": {"selectedMediaFavorite": true}}
+                ]
+              },
+              {
+                "id": "media-remote-content-actions-favorite",
+                "type": "ui.actions",
+                "area": "main",
+                "visibleIf": "$state.selectedMediaItemId != null && $state.selectedMediaFavorite == true",
+                "inputs": {
+                  "variant": "toolbar",
+                  "size": "small",
+                  "buttons": [
+                    {"id": "details", "icon": "information-circle-outline", "label": "Details", "label_i18n": {"key": "runtime.media_center.ui.media_details"}},
+                    {"id": "unfavorite", "icon": "star-half-outline", "label": "Unfavorite", "label_i18n": {"key": "runtime.media_center.ui.unfavorite"}}
+                  ]
+                },
+                "actions": [
+                  {"on": "click:details", "type": "openModal", "params": {"modalId": "media_center_player"}},
+                  {"on": "click:unfavorite", "type": "callSkill", "target": "media_center_skill.set_favorite", "params": {"item_id": "$state.selectedMediaItemId", "favorite": false, "profile_id": "$state.profileId"}, "invalidates": ["media_center.catalog", "media_control.sessions"]},
+                  {"on": "click:unfavorite", "type": "updateState", "params": {"selectedMediaFavorite": false}}
+                ]
               },
               {
                 "id": "media-remote-transport",
@@ -2565,6 +2620,43 @@
                 "title_i18n": {
                   "key": "runtime.media_center.ui.transport"
                 }
+              },
+              {
+                "id": "media-remote-presentation",
+                "type": "ui.actions",
+                "area": "main",
+                "title": "Presentation",
+                "inputs": {
+                  "variant": "adaptiveToolbar",
+                  "size": "small",
+                  "buttons": [
+                    {"id": "fullscreen", "icon": "scan-outline", "label": "Fullscreen", "label_i18n": {"key": "runtime.media_center.ui.fullscreen"}},
+                    {"id": "pip", "icon": "browsers-outline", "label": "Picture in Picture", "label_i18n": {"key": "runtime.media_center.ui.picture_in_picture"}},
+                    {"id": "mini", "icon": "contract-outline", "label": "Mini-player", "label_i18n": {"key": "runtime.media_center.ui.mini_player"}}
+                  ]
+                },
+                "actions": [
+                  {"on": "click:fullscreen", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "presentation", "arguments": {"mode": "fullscreen"}, "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
+                  {"on": "click:pip", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "presentation", "arguments": {"mode": "picture_in_picture"}, "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
+                  {"on": "click:mini", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "presentation", "arguments": {"mode": "mini"}, "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]}
+                ],
+                "title_i18n": {"key": "runtime.media_center.ui.presentation"}
+              },
+              {
+                "id": "media-remote-volume",
+                "type": "ui.form",
+                "area": "main",
+                "title": "Volume",
+                "inputs": {
+                  "autoCommit": true,
+                  "fields": [
+                    {"id": "volume", "type": "slider", "label": "Volume", "label_i18n": {"key": "runtime.media_center.ui.volume"}, "stateKey": "mediaControlVolume", "defaultValue": 1, "min": 0, "max": 1, "step": 0.05}
+                  ]
+                },
+                "actions": [
+                  {"on": "change:volume", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "volume", "arguments": {"volume": "$event.value"}, "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]}
+                ],
+                "title_i18n": {"key": "runtime.media_center.ui.volume"}
               }
             ],
             "title_i18n": {

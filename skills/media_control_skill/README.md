@@ -26,7 +26,10 @@ selection.
 The skill owns its controller surfaces as well as the control-plane methods. Its
 Web UI contribution installs a Media Remote desktop app and a compact transport
 widget. The modal combines one playback-device selector, one bounded Now
-Playing projection, and one transport row. The single Play/Pause intent is
+Playing projection, transport, presentation mode, and volume controls. Media
+Center composes the same generic projection with domain-owned Details and
+Favorite actions; the reusable control skill does not write another skill's
+catalog. The single Play/Pause intent is
 resolved against the current revision into an ordinary `play` or `pause`
 command, so endpoints receive no ambiguous transport operation. Media Center
 can consume the same methods and stream without owning or duplicating the
@@ -35,6 +38,10 @@ desktop contribution.
 The compact widget also owns a target dropdown and a subscribed Now Playing
 status row. Its stream receives an immediate exact-scope snapshot and later
 authoritative mutation events; it does not poll browser-local playback state.
+Changing the selected target resubscribes the status source instead of retaining
+the first target's empty snapshot. A stopped session with a selected queue item
+remains visible and resumable; `toggle`, Previous, and Next therefore do not
+lose their session merely because the media element is currently stopped.
 Its dynamic target options refresh when the selector opens, so expired
 endpoints disappear without materializing an unbounded browser history.
 

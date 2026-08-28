@@ -14,6 +14,7 @@ from .contracts import text
 
 
 TECHNICAL_DESCRIPTOR_SCHEMA = "adaos.media.technical_descriptor.v2"
+TECHNICAL_PROBE_REVISION = "2"
 EMBEDDED_METADATA_REVISION = "1"
 MAX_STREAMS = 64
 MAX_CHAPTERS = 256
@@ -21,11 +22,7 @@ MAX_CHAPTERS = 256
 
 def _tag_values(value: Any) -> list[str]:
     values = value if isinstance(value, (list, tuple, set)) else [value]
-    return [
-        text(item)[:500]
-        for item in list(values)[:20]
-        if text(item)
-    ]
+    return [text(item)[:500] for item in list(values)[:20] if text(item)]
 
 
 def normalize_embedded_metadata(tags: Mapping[str, Any]) -> dict[str, Any]:
@@ -160,7 +157,11 @@ def _hdr_mode(stream: Mapping[str, Any]) -> str:
 
 
 def _stream_descriptor(stream: Mapping[str, Any]) -> dict[str, Any]:
-    tags = dict(stream.get("tags") or {}) if isinstance(stream.get("tags"), Mapping) else {}
+    tags = (
+        dict(stream.get("tags") or {})
+        if isinstance(stream.get("tags"), Mapping)
+        else {}
+    )
     kind = text(stream.get("codec_type")).lower() or "unknown"
     result: dict[str, Any] = {
         "index": max(0, int(stream.get("index") or 0)),
@@ -222,7 +223,11 @@ def _stream_descriptor(stream: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _chapter_descriptor(chapter: Mapping[str, Any]) -> dict[str, Any]:
-    tags = dict(chapter.get("tags") or {}) if isinstance(chapter.get("tags"), Mapping) else {}
+    tags = (
+        dict(chapter.get("tags") or {})
+        if isinstance(chapter.get("tags"), Mapping)
+        else {}
+    )
     return {
         "id": max(0, int(chapter.get("id") or 0)),
         "start_seconds": max(0.0, float(_number(chapter.get("start_time")))),
@@ -253,6 +258,116 @@ def basic_descriptor(path: Path, *, stat: os.stat_result) -> dict[str, Any]:
     }
 
 
+def _pyav_stream_descriptor(stream: Any) -> dict[str, Any]:
+    codec = getattr(stream, "codec_context", None)
+    metadata = getattr(stream, "metadata", {})
+    tags = dict(metadata) if isinstance(metadata, Mapping) else {}
+    kind = text(getattr(stream, "type", "")).lower() or "unknown"
+    result: dict[str, Any] = {
+        "index": max(0, int(getattr(stream, "index", 0) or 0)),
+        "kind": kind,
+        "codec": text(getattr(codec, "name", "")).lower(),
+        "codec_long_name": text(getattr(codec, "long_name", "")),
+        "profile": text(getattr(codec, "profile", "")),
+        "bitrate": max(0, int(getattr(codec, "bit_rate", 0) or 0)),
+        "language": _language(tags),
+        "title": text(tags.get("title") or tags.get("handler_name")),
+        "disposition": {},
+    }
+    if kind == "video":
+        pixel_format = getattr(codec, "format", None)
+        rate = getattr(stream, "average_rate", None) or getattr(
+            stream, "base_rate", None
+        )
+        result.update(
+            {
+                "width": max(0, int(getattr(codec, "width", 0) or 0)),
+                "height": max(0, int(getattr(codec, "height", 0) or 0)),
+                "pixel_format": text(getattr(pixel_format, "name", "")).lower(),
+                "bit_depth": max(0, int(getattr(codec, "bits_per_raw_sample", 0) or 0)),
+                "frame_rate": round(float(rate), 6) if rate else 0.0,
+                "hdr_mode": "sdr",
+            }
+        )
+    elif kind == "audio":
+        sample_format = getattr(codec, "format", None)
+        layout = getattr(codec, "layout", None)
+        result.update(
+            {
+                "sample_rate": max(0, int(getattr(codec, "sample_rate", 0) or 0)),
+                "channels": max(0, int(getattr(codec, "channels", 0) or 0)),
+                "channel_layout": text(getattr(layout, "name", "")).lower(),
+                "sample_format": text(getattr(sample_format, "name", "")).lower(),
+                "bit_depth": max(0, int(getattr(codec, "bits_per_raw_sample", 0) or 0)),
+            }
+        )
+    return result
+
+
+def _probe_media_pyav(
+    path: Path,
+    *,
+    stat: os.stat_result,
+    timeout_seconds: float,
+) -> dict[str, Any] | None:
+    try:
+        import av  # type: ignore[import-not-found]
+    except ImportError:
+        return None
+    container = None
+    try:
+        container = av.open(
+            str(path),
+            mode="r",
+            metadata_errors="replace",
+            timeout=(timeout_seconds, timeout_seconds),
+        )
+        streams = [
+            _pyav_stream_descriptor(stream)
+            for stream in list(container.streams)[:MAX_STREAMS]
+        ]
+        format_value = getattr(container, "format", None)
+        containers = [
+            token.strip().lower()
+            for token in text(getattr(format_value, "name", "")).split(",")
+            if token.strip()
+        ]
+        counts = {
+            kind: sum(1 for item in streams if item["kind"] == kind)
+            for kind in ("video", "audio", "subtitle", "attachment")
+        }
+        video = next((item for item in streams if item["kind"] == "video"), {})
+        audio = next((item for item in streams if item["kind"] == "audio"), {})
+        time_base = float(getattr(av, "time_base", 1_000_000) or 1_000_000)
+        duration = max(0.0, float(getattr(container, "duration", 0) or 0) / time_base)
+        result = basic_descriptor(path, stat=stat)
+        return result | {
+            "probe": "pyav",
+            "probe_status": "complete",
+            "container": containers[0] if containers else result["container"],
+            "containers": containers or result["containers"],
+            "format": text(getattr(format_value, "long_name", "")),
+            "duration_seconds": round(duration, 6),
+            "bitrate": max(0, int(getattr(container, "bit_rate", 0) or 0)),
+            "streams": streams,
+            "streams_truncated": len(container.streams) > MAX_STREAMS,
+            "stream_counts": counts,
+            "codec": text(video.get("codec") or audio.get("codec")),
+            "width": max(0, int(video.get("width") or 0)),
+            "height": max(0, int(video.get("height") or 0)),
+            "sample_rate": max(0, int(audio.get("sample_rate") or 0)),
+            "channels": max(0, int(audio.get("channels") or 0)),
+        }
+    except Exception:
+        return basic_descriptor(path, stat=stat) | {
+            "probe": "pyav",
+            "probe_status": "failed",
+        }
+    finally:
+        if container is not None:
+            container.close()
+
+
 def probe_media(
     path: Path,
     *,
@@ -262,15 +377,17 @@ def probe_media(
 ) -> dict[str, Any]:
     result = basic_descriptor(path, stat=stat)
     binary = executable or shutil.which("ffprobe")
-    if not binary:
-        return result
     timeout = timeout_seconds
     if timeout is None:
         try:
-            timeout = float(os.environ.get("MEDIA_LIBRARY_AGENT_PROBE_TIMEOUT_SECONDS") or 10)
+            timeout = float(
+                os.environ.get("MEDIA_LIBRARY_AGENT_PROBE_TIMEOUT_SECONDS") or 10
+            )
         except ValueError:
             timeout = 10
     timeout = max(1.0, min(float(timeout), 60.0))
+    if not binary:
+        return _probe_media_pyav(path, stat=stat, timeout_seconds=timeout) or result
     try:
         completed = subprocess.run(
             [
@@ -358,6 +475,7 @@ def probe_media(
 __all__ = [
     "EMBEDDED_METADATA_REVISION",
     "TECHNICAL_DESCRIPTOR_SCHEMA",
+    "TECHNICAL_PROBE_REVISION",
     "basic_descriptor",
     "normalize_embedded_metadata",
     "probe_media",

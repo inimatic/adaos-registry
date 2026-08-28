@@ -7006,12 +7006,15 @@ class MediaCatalogCoordinator:
         with self.repository.connect() as connection:
             selected_item = connection.execute(
                 """
-                SELECT c.*,w.canonical_title AS work_canonical_title
+                SELECT c.*,w.canonical_title AS work_canonical_title,
+                       COALESCE(ps.favorite,c.favorite) AS profile_favorite
                 FROM catalog_items c
                 LEFT JOIN media_works w ON w.id=c.work_id
+                LEFT JOIN personal_media_state ps
+                  ON ps.item_id=c.id AND ps.profile_id=?
                 WHERE c.id=?
                 """,
-                (token,),
+                (profile, token),
             ).fetchone()
             if selected_item is None:
                 return {"ok": False, "error": "item_not_found", "item_id": token}
@@ -7224,6 +7227,7 @@ class MediaCatalogCoordinator:
         display_title = _text(selected_item["work_canonical_title"]) or str(
             selected_item["title"]
         )
+        selected_public = _public_item(selected_item)
         return {
             "ok": True,
             "schema": PLAYBACK_PLAN_SCHEMA,
@@ -7234,6 +7238,8 @@ class MediaCatalogCoordinator:
             "media_kind": str(selected["selected_media_kind"]),
             "mime_type": str(selected["selected_mime_type"]),
             "title": display_title,
+            "favorite": bool(selected_item["profile_favorite"]),
+            "artwork": dict(selected_public.get("artwork") or {}),
             "profile_id": profile,
             "quality": quality,
             "descriptor": public_descriptor,
@@ -7437,6 +7443,8 @@ class MediaCatalogCoordinator:
                     "source_id": plan["source_id"],
                     "title": plan["title"],
                     "name": plan["title"],
+                    "favorite": bool(plan.get("favorite")),
+                    "artwork": dict(plan.get("artwork") or {}),
                     "media_kind": plan["media_kind"],
                     "mime_type": plan["mime_type"],
                     "size_bytes": int(

@@ -26,5 +26,12 @@
   "runtime.media_control.ui.playing": "Воспроизводится",
   "runtime.media_control.ui.paused": "Пауза",
   "runtime.media_control.ui.active": "Активно",
-  "runtime.media_control.ui.idle": "Не воспроизводит"
+  "runtime.media_control.ui.idle": "Не воспроизводит",
+  "runtime.media_control.ui.stopped": "Остановлено",
+  "runtime.media_control.ui.presentation": "Режим просмотра",
+  "runtime.media_control.ui.fullscreen": "На весь экран",
+  "runtime.media_control.ui.picture_in_picture": "Картинка в картинке",
+  "runtime.media_control.ui.mini_player": "Мини-плеер",
+  "runtime.media_control.ui.volume": "Громкость",
+  "runtime.media_control.error.playback_presentation_mode_invalid": "Запрошенный режим воспроизведения не поддерживается."
 }

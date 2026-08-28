@@ -1,6 +1,6 @@
 id: media_center
 name: media_center
-version: 0.6.36
+version: 0.6.37
 title: Media Center
 title_i18n:
   fallback: Media Center
@@ -89,4 +89,3 @@ nlu:
 steps: []
 prototype: scenario_default
 updated_at: '2026-08-28T08:00:02+00:00'
-

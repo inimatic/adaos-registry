@@ -26,5 +26,12 @@
   "runtime.media_control.ui.playing": "Playing",
   "runtime.media_control.ui.paused": "Paused",
   "runtime.media_control.ui.active": "Active",
-  "runtime.media_control.ui.idle": "Idle"
+  "runtime.media_control.ui.idle": "Idle",
+  "runtime.media_control.ui.stopped": "Stopped",
+  "runtime.media_control.ui.presentation": "Presentation",
+  "runtime.media_control.ui.fullscreen": "Fullscreen",
+  "runtime.media_control.ui.picture_in_picture": "Picture in Picture",
+  "runtime.media_control.ui.mini_player": "Mini-player",
+  "runtime.media_control.ui.volume": "Volume",
+  "runtime.media_control.error.playback_presentation_mode_invalid": "The requested playback presentation is not supported."
 }

@@ -1071,7 +1071,12 @@ def test_import_is_async_reference_only_and_excludes_images(tmp_path):
         "Artist",
         "Album",
     ]
-    assert added["source"]["metadata"]["technical"]["probe"] == "basic"
+    assert added["source"]["metadata"]["technical"]["probe"] in {
+        "basic",
+        "ffprobe",
+        "pyav",
+    }
+    assert added["source"]["metadata"]["technical_probe_revision"] == "2"
     assert added["source"]["descriptor"]["metadata"]["storage_mode"] == "reference"
     assert song.read_bytes() == b"audio-data"
     assert poster.read_bytes() == b"image-data"
@@ -3190,6 +3195,7 @@ def test_perceptual_sampling_is_opt_in_bounded_and_never_publishes_bytes(
     source.write_bytes(b"original-media")
     monkeypatch.setenv("MEDIA_LIBRARY_AGENT_PERCEPTUAL_HASH_MODE", "ffmpeg")
     monkeypatch.setenv("MEDIA_LIBRARY_AGENT_PERCEPTUAL_HASH_TIMEOUT_SECONDS", "7")
+    monkeypatch.setenv("MEDIA_LIBRARY_AGENT_PROBE_MODE", "basic")
     monkeypatch.setattr(worker_module.shutil, "which", lambda name: f"/{name}")
     captured = {}
 

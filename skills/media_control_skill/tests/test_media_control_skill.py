@@ -644,6 +644,52 @@ def test_voice_toggle_resolves_to_revisioned_play_and_pause_commands():
     assert paused["session"]["state"] == "paused"
 
 
+def test_stopped_session_remains_resumable_from_remote_controls():
+    repository = MediaControlRepository()
+    session = _session(repository)
+    stopped = repository.command(
+        session["id"],
+        command="stop",
+        arguments={},
+        actor_ref="profile:alice",
+        expected_revision=session["revision"],
+        idempotency_key="remote-stop",
+    )
+
+    visible = repository.now_playing(
+        profile_id="alice", target_id=session["target_id"]
+    )
+    resumed = main.voice_command(
+        action="toggle",
+        profile_id="alice",
+        target_id=session["target_id"],
+        actor_ref="profile:alice",
+    )
+
+    assert stopped["session"]["state"] == "stopped"
+    assert [item["id"] for item in visible["items"]] == [session["id"]]
+    assert resumed["command"]["command"] == "play"
+    assert resumed["session"]["state"] == "playing"
+
+
+def test_presentation_command_is_revisioned_without_changing_transport_state():
+    repository = MediaControlRepository()
+    session = _session(repository)
+
+    changed = repository.command(
+        session["id"],
+        command="presentation",
+        arguments={"mode": "fullscreen"},
+        actor_ref="profile:alice",
+        expected_revision=session["revision"],
+        idempotency_key="presentation-fullscreen",
+    )
+
+    assert changed["command"]["command"] == "presentation"
+    assert changed["command"]["arguments"]["mode"] == "fullscreen"
+    assert changed["session"]["state"] == session["state"]
+
+
 def test_public_playback_contracts_validate_strictly():
     jsonschema = pytest.importorskip("jsonschema")
     repository = MediaControlRepository()

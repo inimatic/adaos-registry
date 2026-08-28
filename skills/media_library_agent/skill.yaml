@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.42
+version: 0.6.43
 description: Distributed node-local media discovery and bounded rendition agent with
   durable jobs and ordered catalog deltas.
 supported_locales:
@@ -40,6 +40,7 @@ dependencies:
 - pillow>=10.0.0
 - mutagen>=1.47.0
 - imageio-ffmpeg>=0.5.1
+- av>=14.0.0,<17.0.0
 events:
   subscribe:
   - sys.ready

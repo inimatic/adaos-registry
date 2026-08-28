@@ -256,6 +256,7 @@ def _target_for_ui(
         "buffering": ("runtime.media_control.ui.buffering", "Buffering"),
         "playing": ("runtime.media_control.ui.playing", "Playing"),
         "paused": ("runtime.media_control.ui.paused", "Paused"),
+        "stopped": ("runtime.media_control.ui.stopped", "Stopped"),
     }
     if playback_state:
         state_key, state_fallback = state_labels.get(

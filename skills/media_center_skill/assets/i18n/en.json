@@ -285,5 +285,10 @@
   "runtime.media_center.error.playback_target_identity_mismatch": "The selected playback surface changed. Choose it again.",
   "runtime.media_center.approval.play_on.title": "Allow playback control",
   "runtime.media_center.approval.play_on.summary": "Allow this controller to start playback on {target_label}.",
-  "runtime.media_center.approval.play_on.waiting": "Permission is required to control {target_label}. The request was sent to that device."
+  "runtime.media_center.approval.play_on.waiting": "Permission is required to control {target_label}. The request was sent to that device.",
+  "runtime.media_center.ui.presentation": "Presentation",
+  "runtime.media_center.ui.fullscreen": "Fullscreen",
+  "runtime.media_center.ui.picture_in_picture": "Picture in Picture",
+  "runtime.media_center.ui.mini_player": "Mini-player",
+  "runtime.media_center.ui.volume": "Volume"
 }

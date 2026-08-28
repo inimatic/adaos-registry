@@ -4,7 +4,7 @@
   "properties": {
     "schema": {"const": "adaos.media_control.playback_command.v1"}, "sequence": {"type": "integer", "minimum": 1}, "id": {"type": "string"},
     "idempotency_key": {"type": "string"}, "session_id": {"type": "string"}, "target_id": {"type": "string"}, "actor_ref": {"type": "string"},
-    "command": {"enum": ["play", "pause", "seek", "volume", "mute", "next", "previous", "stop", "handoff", "tracks", "rate", "sleep_timer"]},
+    "command": {"enum": ["play", "pause", "seek", "volume", "mute", "next", "previous", "stop", "handoff", "tracks", "rate", "sleep_timer", "presentation"]},
     "arguments": {"type": "object"}, "expected_revision": {"type": "integer", "minimum": 1}, "resulting_revision": {"type": "integer", "minimum": 2},
     "command_revision": {"type": "integer", "minimum": 1},
     "status": {"enum": ["pending", "applied", "rejected", "failed"]}, "created_at": {"type": "string"}, "acknowledged_at": {"type": "string"}, "result": {"type": "object"}

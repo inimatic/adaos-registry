@@ -42,6 +42,7 @@ from .repository import MediaLibraryAgentRepository
 from .sidecars import nfo_witness, read_local_nfo
 from .technical import (
     EMBEDDED_METADATA_REVISION,
+    TECHNICAL_PROBE_REVISION,
     basic_descriptor,
     probe_media,
     read_embedded_metadata,
@@ -163,26 +164,19 @@ class MediaLibraryAgentWorker:
             min(
                 300.0,
                 float(
-                    os.environ.get(
-                        "MEDIA_LIBRARY_AGENT_MAINTENANCE_INTERVAL_SECONDS"
-                    )
+                    os.environ.get("MEDIA_LIBRARY_AGENT_MAINTENANCE_INTERVAL_SECONDS")
                     or 30.0
                 ),
             ),
         )
         maintenance_at = time.monotonic()
         maintenance: dict[str, Any] = {"complete": True}
-        if (
-            self._resource_pressure == "normal"
-            and (
-                self._last_storage_maintenance_monotonic == 0.0
-                or maintenance_at - self._last_storage_maintenance_monotonic
-                >= maintenance_interval
-            )
+        if self._resource_pressure == "normal" and (
+            self._last_storage_maintenance_monotonic == 0.0
+            or maintenance_at - self._last_storage_maintenance_monotonic
+            >= maintenance_interval
         ):
-            maintenance = self.repository.compact_storage_batch(
-                limit=maintenance_batch
-            )
+            maintenance = self.repository.compact_storage_batch(limit=maintenance_batch)
             self._last_storage_maintenance_monotonic = maintenance_at
         retention_at = time.monotonic()
         if (
@@ -474,7 +468,9 @@ class MediaLibraryAgentWorker:
             examined += len(items)
             for source in items:
                 metadata = source.get("metadata")
-                artwork = metadata.get("artwork") if isinstance(metadata, Mapping) else {}
+                artwork = (
+                    metadata.get("artwork") if isinstance(metadata, Mapping) else {}
+                )
                 previous_state = (
                     text(artwork.get("state")) if isinstance(artwork, Mapping) else ""
                 )
@@ -552,10 +548,7 @@ class MediaLibraryAgentWorker:
             1,
             min(
                 16,
-                int(
-                    os.environ.get("MEDIA_LIBRARY_AGENT_ARTWORK_BACKFILL_QUEUE")
-                    or 4
-                ),
+                int(os.environ.get("MEDIA_LIBRARY_AGENT_ARTWORK_BACKFILL_QUEUE") or 4),
             ),
         )
         active = self.repository.active_artwork_job_count()
@@ -1197,6 +1190,8 @@ class MediaLibraryAgentWorker:
                         if (
                             text(metadata.get("embedded_metadata_revision"))
                             != EMBEDDED_METADATA_REVISION
+                            or text(metadata.get("technical_probe_revision"))
+                            != TECHNICAL_PROBE_REVISION
                         ):
                             technical = self._technical_metadata(path, stat=stat)
                             metadata["technical"] = technical
@@ -1205,6 +1200,9 @@ class MediaLibraryAgentWorker:
                             )
                             metadata["embedded_metadata_revision"] = (
                                 EMBEDDED_METADATA_REVISION
+                            )
+                            metadata["technical_probe_revision"] = (
+                                TECHNICAL_PROBE_REVISION
                             )
                     else:
                         technical = self._technical_metadata(path, stat=stat)
@@ -1220,6 +1218,7 @@ class MediaLibraryAgentWorker:
                             "storage_mode": "reference",
                             "technical": technical,
                             "embedded_metadata_revision": (EMBEDDED_METADATA_REVISION),
+                            "technical_probe_revision": (TECHNICAL_PROBE_REVISION),
                         }
                         metadata.update(dict(technical.get("embedded_metadata") or {}))
                         descriptor = self._register(path, root, metadata)
@@ -1686,8 +1685,8 @@ class MediaLibraryAgentWorker:
                     "perceptual_hash_algorithm": "ffmpeg_sample_sha256_v1",
                 }
             )
-        mode = text(os.environ.get("MEDIA_LIBRARY_AGENT_PROBE_MODE") or "basic").lower()
-        if mode != "ffprobe":
+        mode = text(os.environ.get("MEDIA_LIBRARY_AGENT_PROBE_MODE") or "auto").lower()
+        if mode == "basic":
             return result
         probed = probe_media(path, stat=stat)
         if embedded_metadata:

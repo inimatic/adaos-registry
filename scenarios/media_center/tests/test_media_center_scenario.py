@@ -402,7 +402,7 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
 
     player_schema = modals["media_center_player"]["schema"]
     player_widgets = {widget["id"]: widget for widget in player_schema["widgets"]}
-    assert modals["media_center_player"]["presentation"]["kind"] == "fullscreen"
+    assert modals["media_center_player"]["presentation"]["kind"] == "modal"
     assert player_schema["layout"]["type"] == "split"
     assert {
         area["id"]: area["role"] for area in player_schema["layout"]["areas"]

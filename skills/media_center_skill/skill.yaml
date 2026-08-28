@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.91
+version: 0.8.92
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -2485,4 +2485,3 @@ compatibility:
     min_commit: 575b2f50895ec5c7598a1ea9ccd276128c13bc1d
     min_short_commit: 575b2f50
     build_date: '2026-08-28T10:52:56+03:00'
-
