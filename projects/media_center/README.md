@@ -6,17 +6,22 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.91` combines `media_center_skill@0.8.90`,
-`media_library_agent@0.6.42`, `media_control_skill@0.2.14`, scenario
+Release `0.6.93` combines `media_center_skill@0.8.90`,
+`media_library_agent@0.6.42`, `media_control_skill@0.2.15`, scenario
 `media_center@0.6.35`, and client `d250f5c`. It routes Play from the library
 surface to the selected remote endpoint instead of starting a second local
 session. Endpoint display dimensions no longer masquerade as hard decoder
 limits, so a ready H.264 rendition may be scaled by the endpoint and reused.
 Managed rendition descriptors also reconstruct stable content and routed media
-paths before handoff. Media Server remains an independently
+paths before handoff. Terminal sessions stay in the endpoint inbox until their
+latest command is observed, which makes remote Stop durable across event and
+poll timing. Media Server remains an independently
 installed shared byte-delivery service rather than a second Project-owned
 component. This keeps ProjectDeployment ownership unambiguous while the scenario
 consumes its registered media resources without declaring a direct skill dependency.
+Release `0.6.92` was not promoted: its package was assembled before the project
+manifest commit, so its immutable source receipt did not identify the exact
+manifest state. `0.6.93` is the first deployable release of this component set.
 The release adds an authoritative playback
 session contract, durable scoped endpoint grants, capability-aware queue
 handoff, core-backed device presence, dynamic endpoint selection, compact
