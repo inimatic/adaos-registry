@@ -18,5 +18,13 @@
   "runtime.media_control.ui.pause": "Pause",
   "runtime.media_control.ui.next": "Next",
   "runtime.media_control.ui.stop": "Stop",
-  "runtime.media_control.ui.play_pause": "Play / Pause"
+  "runtime.media_control.ui.play_pause": "Play / Pause",
+  "runtime.media_control.ui.this_tab": "This tab",
+  "runtime.media_control.ui.requested": "Requested",
+  "runtime.media_control.ui.loading": "Loading",
+  "runtime.media_control.ui.buffering": "Buffering",
+  "runtime.media_control.ui.playing": "Playing",
+  "runtime.media_control.ui.paused": "Paused",
+  "runtime.media_control.ui.active": "Active",
+  "runtime.media_control.ui.idle": "Idle"
 }

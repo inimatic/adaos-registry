@@ -4,6 +4,16 @@
 
 Controllers may live in a different webspace from the playback target. Commands are optimistic, idempotent, and lease-guarded. The endpoint pulls an ordered command stream and acknowledges application; stale controllers receive an explicit revision conflict. A phone therefore controls a TV without becoming part of the source-to-TV data path.
 
+A physical device is not a playback target. Each browser tab or native app
+surface registers a stable `surface_instance_id` and an endpoint identity that
+also includes its authoritative YDoc webspace. Core Device Registry remains the
+source for physical-device presence; this skill owns playback-surface
+heartbeats, capability evidence, active-session summaries, and target expiry.
+`list_targets()` marks the caller's exact endpoint as `This tab`, returns
+webspace/endpoint/authorization context, and projects the active title and
+transport state without reading browser-local state. Multiple webspaces or
+tabs on the same authorized PC consequently remain independently controllable.
+
 Each command carries the expected active item, desired transport state, command
 revision, and queue revision. Reconciliation accepts only a contiguous
 acknowledgement prefix that matches the endpoint's observed item and state;

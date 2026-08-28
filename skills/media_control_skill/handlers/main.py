@@ -199,7 +199,12 @@ def _localized_text(key: str, fallback: str) -> str:
     return translated if translated and translated != key else fallback
 
 
-def _target_for_ui(target: Mapping[str, Any]) -> dict[str, Any]:
+def _target_for_ui(
+    target: Mapping[str, Any],
+    *,
+    controller_endpoint_id: str = "",
+    controller_target_id: str = "",
+) -> dict[str, Any]:
     item = dict(target)
     capabilities = item.get("capabilities")
     capabilities = dict(capabilities) if isinstance(capabilities, Mapping) else {}
@@ -227,6 +232,44 @@ def _target_for_ui(target: Mapping[str, Any]) -> dict[str, Any]:
         key = "runtime.media_control.ui.guest"
         item["authorization_label"] = _localized_text(key, "Guest")
     item["authorization_label_i18n"] = {"key": key}
+    is_current = bool(
+        (text(controller_endpoint_id) and text(item.get("endpoint_id")) == text(controller_endpoint_id))
+        or (text(controller_target_id) and text(item.get("id")) == text(controller_target_id))
+    )
+    item["is_current"] = is_current
+    item["current_label"] = (
+        _localized_text("runtime.media_control.ui.this_tab", "This tab")
+        if is_current
+        else ""
+    )
+    webspace_id = text(item.get("webspace_id")) or "default"
+    endpoint_label = text(item.get("endpoint_label")) or text(item.get("kind"))
+    item["surface_context_label"] = " · ".join(
+        value for value in (webspace_id, endpoint_label) if value
+    )
+    item["control_label"] = item["current_label"] or text(item.get("device_label")) or endpoint_label
+    playback_state = text(item.get("playback_state")).lower()
+    playback_title = text(item.get("playback_title"))
+    state_labels = {
+        "requested": ("runtime.media_control.ui.requested", "Requested"),
+        "loading": ("runtime.media_control.ui.loading", "Loading"),
+        "buffering": ("runtime.media_control.ui.buffering", "Buffering"),
+        "playing": ("runtime.media_control.ui.playing", "Playing"),
+        "paused": ("runtime.media_control.ui.paused", "Paused"),
+    }
+    if playback_state:
+        state_key, state_fallback = state_labels.get(
+            playback_state,
+            ("runtime.media_control.ui.active", "Active"),
+        )
+        state_label = _localized_text(state_key, state_fallback)
+        item["playback_summary"] = " · ".join(
+            value for value in (state_label, playback_title) if value
+        )
+    else:
+        item["playback_summary"] = _localized_text(
+            "runtime.media_control.ui.idle", "Idle"
+        )
     return item
 
 
@@ -445,11 +488,32 @@ def endpoint_inbox(
 
 
 @tool(summary="List bounded playback targets visible to a controller.", side_effects="none")
-def list_targets(include_unavailable: bool = False, limit: int = 50, **_: Any) -> dict[str, Any]:
+def list_targets(
+    include_unavailable: bool = False,
+    limit: int = 50,
+    controller_endpoint_id: str = "",
+    controller_playback_target_id: str = "",
+    **_: Any,
+) -> dict[str, Any]:
     result = _repository().list_targets(
         include_unavailable=bool(include_unavailable), limit=limit
     )
-    result["items"] = [_target_for_ui(item) for item in result.get("items") or []]
+    result["items"] = [
+        _target_for_ui(
+            item,
+            controller_endpoint_id=controller_endpoint_id,
+            controller_target_id=controller_playback_target_id,
+        )
+        for item in result.get("items") or []
+    ]
+    result["items"].sort(
+        key=lambda item: (
+            not bool(item.get("is_current")),
+            text(item.get("control_label")).casefold(),
+            text(item.get("surface_context_label")).casefold(),
+            text(item.get("id")),
+        )
+    )
     return result
 
 

@@ -18,5 +18,13 @@
   "runtime.media_control.ui.pause": "Пауза",
   "runtime.media_control.ui.next": "Далее",
   "runtime.media_control.ui.stop": "Стоп",
-  "runtime.media_control.ui.play_pause": "Воспроизведение / пауза"
+  "runtime.media_control.ui.play_pause": "Воспроизведение / пауза",
+  "runtime.media_control.ui.this_tab": "Эта вкладка",
+  "runtime.media_control.ui.requested": "Запрошено",
+  "runtime.media_control.ui.loading": "Загрузка",
+  "runtime.media_control.ui.buffering": "Буферизация",
+  "runtime.media_control.ui.playing": "Воспроизводится",
+  "runtime.media_control.ui.paused": "Пауза",
+  "runtime.media_control.ui.active": "Активно",
+  "runtime.media_control.ui.idle": "Не воспроизводит"
 }

@@ -196,6 +196,9 @@ def test_target_projection_exposes_device_endpoint_and_authorization_labels():
         label="Chrome on Windows",
         kind="browser",
         capabilities={
+            "device_ref": "device:my-pc",
+            "surface_instance_id": "surface-desktop",
+            "surface_ref": "surface:surface-desktop",
             "device_display_name": "My PC",
             "endpoint_display_name": "Chrome on Windows",
             "authorization_state": "authorized",
@@ -203,11 +206,21 @@ def test_target_projection_exposes_device_endpoint_and_authorization_labels():
         },
     )
 
-    target = main.list_targets(limit=1)["items"][0]
+    target = main.list_targets(
+        limit=1,
+        controller_endpoint_id="browser-desktop",
+    )["items"][0]
 
     assert target["display_label"] == "My PC"
     assert target["device_label"] == "My PC"
     assert target["endpoint_label"] == "Chrome on Windows"
+    assert target["device_ref"] == "device:my-pc"
+    assert target["surface_instance_id"] == "surface-desktop"
+    assert target["is_current"] is True
+    assert target["current_label"]
+    assert target["control_label"] == target["current_label"]
+    assert target["surface_context_label"] == "desktop · Chrome on Windows"
+    assert target["playback_summary"]
     assert target["authorization_state"] == "authorized"
     assert target["authorization_label"]
     assert target["authorization_label_i18n"] == {

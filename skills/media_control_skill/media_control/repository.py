@@ -362,7 +362,25 @@ class MediaControlRepository:
         bounded = max(1, min(100, int(limit or 50)))
         with self.connect() as connection:
             rows = connection.execute(
-                "SELECT * FROM playback_targets ORDER BY lower(label),id LIMIT 1000"
+                """
+                SELECT t.*,
+                       s.state AS playback_state,
+                       s.id AS playback_session_id,
+                       q.title AS playback_title
+                FROM playback_targets AS t
+                LEFT JOIN playback_sessions AS s ON s.id=(
+                    SELECT candidate.id
+                    FROM playback_sessions AS candidate
+                    WHERE candidate.target_id=t.id
+                      AND candidate.state NOT IN ('stopped','ended','error','failed')
+                    ORDER BY candidate.updated_at DESC,candidate.id DESC
+                    LIMIT 1
+                )
+                LEFT JOIN playback_queue_items AS q
+                  ON q.session_id=s.id AND q.ordinal=s.active_queue_index
+                ORDER BY lower(t.label),t.id
+                LIMIT 1000
+                """
             ).fetchall()
         items = [self._public_target(row) for row in rows]
         if not include_unavailable:
@@ -1444,6 +1462,8 @@ class MediaControlRepository:
                 SELECT s.*,
                        t.label AS target_label,
                        t.kind AS target_kind,
+                       t.endpoint_id AS target_endpoint_id,
+                       t.webspace_id AS target_webspace_id,
                        t.capabilities_json AS target_capabilities_json,
                        q.title AS active_title,
                        q.descriptor_json AS active_descriptor_json
@@ -1477,6 +1497,11 @@ class MediaControlRepository:
                         target_capabilities.get("endpoint_display_name")
                     )
                     or text(row["target_label"]),
+                    "target_endpoint_id": text(row["target_endpoint_id"]),
+                    "target_webspace_id": text(row["target_webspace_id"]),
+                    "target_surface_instance_id": text(
+                        target_capabilities.get("surface_instance_id")
+                    ),
                     "target_authorization_state": text(
                         target_capabilities.get("authorization_state")
                     )
@@ -1487,6 +1512,15 @@ class MediaControlRepository:
                     ),
                     "target_kind": text(row["target_kind"]),
                 }
+            )
+            item["target_context_label"] = " · ".join(
+                value
+                for value in (
+                    item["target_label"],
+                    item["target_webspace_id"],
+                    item["target_endpoint_label"],
+                )
+                if value
             )
             items.append(item)
         return {
@@ -1584,6 +1618,9 @@ class MediaControlRepository:
             if heartbeat_age_seconds is not None and heartbeat_age_seconds <= TARGET_ONLINE_SECONDS
             else "grace"
         )
+        columns = set(row.keys())
+        playback_state = text(row["playback_state"]) if "playback_state" in columns else ""
+        playback_title = text(row["playback_title"]) if "playback_title" in columns else ""
         return {
             "schema": TARGET_SCHEMA,
             "id": str(row["id"]),
@@ -1594,6 +1631,9 @@ class MediaControlRepository:
             "display_label": device_label,
             "device_label": device_label,
             "endpoint_label": endpoint_label,
+            "device_ref": text(capabilities.get("device_ref")),
+            "surface_instance_id": text(capabilities.get("surface_instance_id")),
+            "surface_ref": text(capabilities.get("surface_ref")),
             "authorization_state": authorization_state,
             "kind": str(row["kind"]),
             "capabilities": capabilities,
@@ -1603,6 +1643,14 @@ class MediaControlRepository:
             "freshness_seconds": TARGET_FRESHNESS_SECONDS,
             "last_seen_at": str(row["last_seen_at"]),
             "revision": int(row["revision"]),
+            "playback_session_id": (
+                text(row["playback_session_id"])
+                if "playback_session_id" in columns
+                else ""
+            ),
+            "playback_state": playback_state,
+            "playback_title": playback_title,
+            "has_active_playback": bool(playback_state),
         }
 
     @staticmethod
