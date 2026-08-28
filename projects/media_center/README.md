@@ -6,13 +6,16 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.97` combines `media_center_skill@0.8.92`,
-`media_library_agent@0.6.43`, `media_control_skill@0.2.18`, and scenario
+Release `0.6.98` combines `media_center_skill@0.8.92`,
+`media_library_agent@0.6.43`, `media_control_skill@0.2.19`, and scenario
 `media_center@0.6.38`. Stopped playback keeps its selected item and remains
 resumable from subscribed remotes. Endpoint heartbeat refreshes only the exact
 stopped session still held by that surface, preventing Remote from losing it to
-the freshness window without reviving unrelated playback history. Remote
-surfaces add revisioned presentation
+the freshness window without reviving unrelated playback history. One physical
+playback surface now owns exactly one attached session: replacement playback
+supersedes prior history, activation repairs legacy duplicates, and stale queue
+observations cannot restore a previously selected item. Remote surfaces add
+revisioned presentation
 and volume controls plus Media Center-owned Details/Favorite actions; the
 compact widget resubscribes when its target changes. Now Playing is a regular
 maximizable details modal and never substitutes modal expansion for media
@@ -20,6 +23,11 @@ fullscreen. The agent defaults to portable PyAV/system-ffprobe technical
 probing and backfills old partial descriptors during observable scans, yielding
 real codec, stream, duration, bitrate, and dimensions without requiring a
 system package on every node.
+
+Release `0.6.97` was the first release with resumable stopped sessions. It is
+superseded because it could expose more than one recently stopped session for
+the same endpoint and accepted an endpoint observation from an older queue
+revision during remote selection.
 
 Release `0.6.96` was not promoted: its immutable package was assembled before
 the project manifest commit. `0.6.97` carries the same tested component set
