@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
+from typing import Any
 import sys
 import threading
 import time
@@ -4716,16 +4717,16 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
 def test_infrastate_project_detail_empty_states_are_i18n_backed():
     skill_root = Path(__file__).resolve().parents[1]
     webui = json.loads((skill_root / "webui.json").read_text(encoding="utf-8"))
-    en = json.loads((skill_root / "i18n" / "en.json").read_text(encoding="utf-8"))
-    ru = json.loads((skill_root / "i18n" / "ru.json").read_text(encoding="utf-8"))
+    en = json.loads((skill_root / "assets" / "i18n" / "en.json").read_text(encoding="utf-8"))
+    ru = json.loads((skill_root / "assets" / "i18n" / "ru.json").read_text(encoding="utf-8"))
 
     resources = webui.get("resources") or {}
     assert resources["infrastate.i18n.en"]["role"] == "i18n"
     assert resources["infrastate.i18n.en"]["locale"] == "en"
-    assert resources["infrastate.i18n.en"]["path"] == "i18n/en.json"
+    assert resources["infrastate.i18n.en"]["path"] == "assets/i18n/en.json"
     assert resources["infrastate.i18n.ru"]["role"] == "i18n"
     assert resources["infrastate.i18n.ru"]["locale"] == "ru"
-    assert resources["infrastate.i18n.ru"]["path"] == "i18n/ru.json"
+    assert resources["infrastate.i18n.ru"]["path"] == "assets/i18n/ru.json"
 
     widgets = {
         widget.get("id"): widget
