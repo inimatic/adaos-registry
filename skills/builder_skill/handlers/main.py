@@ -3179,6 +3179,128 @@ def _llm_job_telemetry(job: Mapping[str, Any] | None, *, wait_elapsed_ms: int | 
     return {key: _repair_text_tree(value) for key, value in telemetry.items() if value not in (None, "", [], {})}
 
 
+def _positive_int(value: Any) -> int:
+    try:
+        parsed = int(float(str(value)))
+    except Exception:
+        return 0
+    return parsed if parsed > 0 else 0
+
+
+def _codex_usage_payload_from_builder_job(
+    *,
+    session: Mapping[str, Any],
+    request_text: str,
+    before_webui: Mapping[str, Any],
+    output_text: str,
+    job_telemetry: Mapping[str, Any],
+    status: str,
+    job_id: str,
+    request_id: str,
+) -> dict[str, Any]:
+    usage = job_telemetry.get("usage") if isinstance(job_telemetry.get("usage"), Mapping) else {}
+    input_tokens = _positive_int(usage.get("input_tokens"))
+    cached_input_tokens = _positive_int(usage.get("cached_input_tokens"))
+    output_tokens = _positive_int(usage.get("output_tokens"))
+    reasoning_tokens = _positive_int(usage.get("reasoning_tokens"))
+    total_tokens = _positive_int(usage.get("total_tokens"))
+    accuracy = "reported" if total_tokens or input_tokens or output_tokens or reasoning_tokens else "estimated"
+    if not total_tokens and not input_tokens and not output_tokens and not reasoning_tokens:
+        try:
+            from adaos.sdk.llm.llm_client import estimate_token_count_from_text
+
+            input_tokens = estimate_token_count_from_text(request_text, json.dumps(before_webui, ensure_ascii=False, sort_keys=True))
+            output_tokens = estimate_token_count_from_text(output_text)
+            total_tokens = input_tokens + output_tokens
+        except Exception:
+            total_tokens = 0
+    provider = job_telemetry.get("provider") if isinstance(job_telemetry.get("provider"), Mapping) else {}
+    model = str(
+        provider.get("model")
+        or usage.get("model")
+        or session.get("builder_llm_model")
+        or session.get("llm_model")
+        or ""
+    ).strip()
+    scenario_id = str(session.get("scenario_id") or session.get("runtime_scenario_id") or "").strip()
+    project_id = str(session.get("project_id") or session.get("draft_id") or scenario_id or "").strip()
+    return {
+        "schema": "adaos.root_mgmnt.codex_usage_event.v1",
+        "idempotency_key": f"builder:{request_id or job_id}:codex_usage",
+        "run_id": job_id or request_id,
+        "job_id": job_id,
+        "request_id": request_id,
+        "project_id": project_id,
+        "scenario_id": scenario_id,
+        "model": model,
+        "status": status or "succeeded",
+        "source": "builder_llm_job",
+        "accuracy": accuracy,
+        "input_tokens": input_tokens,
+        "cached_input_tokens": cached_input_tokens,
+        "output_tokens": output_tokens,
+        "reasoning_tokens": reasoning_tokens,
+        "total_tokens": total_tokens,
+        "billable_tokens": total_tokens or input_tokens + output_tokens + reasoning_tokens,
+        "note": "Builder LLM/Codex development job",
+    }
+
+
+def _report_builder_codex_usage(
+    *,
+    session: Mapping[str, Any],
+    request_text: str,
+    before_webui: Mapping[str, Any],
+    output_text: str,
+    job_telemetry: Mapping[str, Any],
+    status: str,
+    job_id: str,
+    request_id: str,
+    base_url: str,
+) -> None:
+    if str(os.getenv("ADAOS_BUILDER_REPORT_CODEX_USAGE") or "1").strip().lower() in {"0", "false", "no", "off"}:
+        return
+    payload = _codex_usage_payload_from_builder_job(
+        session=session,
+        request_text=request_text,
+        before_webui=before_webui,
+        output_text=output_text,
+        job_telemetry=job_telemetry,
+        status=status,
+        job_id=job_id,
+        request_id=request_id,
+    )
+    if _positive_int(payload.get("billable_tokens")) <= 0:
+        return
+    scenario_id = str(session.get("scenario_id") or "")
+
+    def _send() -> None:
+        try:
+            from adaos.sdk.llm.llm_client import report_codex_usage
+
+            result = report_codex_usage(payload, root_base_url=base_url or None, timeout=3.0)
+            _LOG.info(
+                "builder Codex usage reported scenario=%s job_id=%s request_id=%s tokens=%s accuracy=%s duplicate=%s",
+                scenario_id,
+                job_id,
+                request_id,
+                str(payload.get("billable_tokens") or 0),
+                str(payload.get("accuracy") or ""),
+                str(bool(result.get("duplicate")) if isinstance(result, Mapping) else False),
+            )
+        except Exception as exc:
+            _LOG.warning(
+                "builder Codex usage report failed scenario=%s job_id=%s request_id=%s detail=%s",
+                scenario_id,
+                job_id,
+                request_id,
+                f"{type(exc).__name__}: {exc}",
+            )
+
+    thread = threading.Thread(target=_send, name=f"builder-codex-usage:{job_id or request_id}", daemon=True)
+    thread.start()
+
+
 def _compact_llm_result(result: Mapping[str, Any] | None) -> dict[str, Any] | None:
     if not isinstance(result, Mapping):
         return None
@@ -12343,6 +12465,18 @@ def _complete_llm_webui_job(
         str(telemetry_tools.get("used_count") or 0),
         str(bool(telemetry_mcp.get("used_mcp"))),
     )
+    output_text = str(job.get("output_text") or "")
+    _report_builder_codex_usage(
+        session=session,
+        request_text=request_text,
+        before_webui=before_webui,
+        output_text=output_text,
+        job_telemetry=job_telemetry,
+        status=status,
+        job_id=job_id,
+        request_id=request_id,
+        base_url=base_url,
+    )
     if status != "succeeded":
         _LOG.warning(
             "builder LLM job returned non-success scenario=%s job_id=%s request_id=%s status=%s error=%s",
@@ -12363,7 +12497,6 @@ def _complete_llm_webui_job(
         )
         return
     try:
-        output_text = str(job.get("output_text") or "")
         previous_preview = (
             before_webui.get("preview_state")
             if isinstance(before_webui, Mapping) and isinstance(before_webui.get("preview_state"), Mapping)

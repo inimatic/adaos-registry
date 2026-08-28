@@ -60,6 +60,57 @@ def _stub_development_context(skill, monkeypatch) -> dict:
     return packet
 
 
+def test_codex_usage_payload_prefers_reported_provider_usage() -> None:
+    skill = _load_module()
+
+    payload = skill._codex_usage_payload_from_builder_job(
+        session={"scenario_id": "root_mgmnt_ops", "project_id": "root_mgmnt"},
+        request_text="change UI",
+        before_webui={},
+        output_text="{}",
+        job_telemetry={
+            "usage": {
+                "input_tokens": 100,
+                "cached_input_tokens": 25,
+                "output_tokens": 40,
+                "reasoning_tokens": 10,
+                "total_tokens": 150,
+            },
+            "provider": {"model": "gpt-5"},
+        },
+        status="succeeded",
+        job_id="llm_job_1",
+        request_id="req_1",
+    )
+
+    assert payload["source"] == "builder_llm_job"
+    assert payload["accuracy"] == "reported"
+    assert payload["billable_tokens"] == 150
+    assert payload["model"] == "gpt-5"
+    assert payload["scenario_id"] == "root_mgmnt_ops"
+    assert payload["idempotency_key"] == "builder:req_1:codex_usage"
+
+
+def test_codex_usage_payload_estimates_when_provider_usage_missing() -> None:
+    skill = _load_module()
+
+    payload = skill._codex_usage_payload_from_builder_job(
+        session={"scenario_id": "demo"},
+        request_text="update the page",
+        before_webui={"widgets": [{"id": "a"}]},
+        output_text='{"ok": true}',
+        job_telemetry={},
+        status="succeeded",
+        job_id="llm_job_2",
+        request_id="req_2",
+    )
+
+    assert payload["accuracy"] == "estimated"
+    assert payload["billable_tokens"] > 0
+    assert payload["input_tokens"] > 0
+    assert payload["output_tokens"] > 0
+
+
 def test_manifest_declares_builder_dialog_agent() -> None:
     manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
 
