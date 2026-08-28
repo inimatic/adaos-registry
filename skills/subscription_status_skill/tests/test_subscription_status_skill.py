@@ -118,3 +118,29 @@ def test_active_subscription_with_plan_disabled_resources_is_warning(monkeypatch
     payload = module.get_status(webspace_id="desktop")
 
     assert payload["current"]["color"] == "warning"
+
+
+def test_list_resources_returns_table_items(monkeypatch) -> None:
+    module = _load_module()
+    projection = _Projection()
+    monkeypatch.setattr(module, "ctx_current_user", projection)
+    monkeypatch.setattr(
+        module,
+        "current_subnet_economic_status",
+        lambda: {
+            "generated_at": "2026-08-28T08:35:00Z",
+            "subscription_state": "active",
+            "plan_id": "builder",
+            "entitlement_state": "limited_observed",
+            "disabled_resource_count": 0,
+            "disabled_resources": [],
+            "usage": {"llm.requests": {"used_24h": 3, "used_30d": 9}},
+        },
+    )
+
+    payload = module.list_resources(webspace_id="desktop")
+
+    assert payload["ok"] is True
+    assert payload["items"][0]["resource"] == "llm.requests"
+    assert payload["items"][0]["used_24h"] == 3
+    assert projection.values[0][0] == "subscription_status.snapshot"

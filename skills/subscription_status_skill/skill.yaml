@@ -1,5 +1,5 @@
 name: subscription_status_skill
-version: 0.1.5
+version: 0.1.6
 description: User-facing AdaOS subscription status widget and modal backed by the
   local economic entitlement snapshot with explicit Root refresh.
 webui_owner: shared
@@ -57,6 +57,20 @@ tools:
   output_schema:
     type: object
     properties: {}
+- name: list_resources
+  description: Return current AdaOS subscription resources and quota status rows.
+  entry: handlers.main:list_resources
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type:
+        - string
+        - 'null'
+  output_schema:
+    type: object
+    properties: {}
 nlu:
   intents:
   - id: subscription.status.show
@@ -65,7 +79,7 @@ nlu:
     - show AdaOS subscription status
     - показать подписку AdaOS
     tool: get_status
-updated_at: '2026-08-28T08:31:00+00:00'
+updated_at: '2026-08-28T08:37:00+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.945+5731.87d462d7

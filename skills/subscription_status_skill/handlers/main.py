@@ -162,6 +162,19 @@ def refresh_status(webspace_id: str | None = None) -> dict[str, Any]:
     return _project_status(webspace_id=_webspace_id(webspace_id), refresh_root=True)
 
 
+@tool("list_resources")
+def list_resources(webspace_id: str | None = None) -> dict[str, Any]:
+    payload = _project_status(webspace_id=_webspace_id(webspace_id))
+    resources = _as_mapping(payload.get("resources"))
+    return {
+        "ok": True,
+        "webspace_id": payload.get("webspace_id"),
+        "items": list(resources.get("items") or []),
+        "generated_at": resources.get("generated_at"),
+        "current": payload.get("current"),
+    }
+
+
 @subscribe("sys.ready")
 @subscribe("desktop.webspace.refresh")
 @subscribe("desktop.webspace.reload")

@@ -44,22 +44,31 @@
       "type": "visual.metricTile",
       "icon": "card-outline",
       "dataSource": {
-        "kind": "y",
-        "path": "data/subscription_status/current",
-        "scope": "shared"
+        "kind": "skill",
+        "name": "subscription_status_skill.get_status",
+        "params": {
+          "webspace_id": "$client.webspaceId"
+        },
+        "cacheTtlMs": 30000,
+        "invalidationTags": [
+          "subscription_status.snapshot"
+        ],
+        "preserveLastValue": true
       },
       "loading": {
         "loadingText": "Loading subscription...",
         "emptyText": "--"
       },
       "inputs": {
-        "valuePath": "value",
-        "labelPath": "label",
-        "subtitlePath": "subtitle",
-        "descriptionPath": "description",
-        "noticePath": "error",
+        "valuePath": "current.value",
+        "labelPath": "current.label",
+        "subtitlePath": "current.subtitle",
+        "descriptionPath": "current.description",
+        "noticePath": "current.error",
+        "colorPath": "current.color",
         "emptyText": "--",
-        "loadingText": "Loading subscription..."
+        "loadingText": "Loading subscription...",
+        "refreshMs": 60000
       },
       "actions": [
         {
@@ -139,16 +148,24 @@
               "area": "main",
               "title": "Current plan",
               "dataSource": {
-                "kind": "y",
-                "path": "data/subscription_status/current",
-                "scope": "shared"
+                "kind": "skill",
+                "name": "subscription_status_skill.get_status",
+                "params": {
+                  "webspace_id": "$client.webspaceId"
+                },
+                "cacheTtlMs": 30000,
+                "invalidationTags": [
+                  "subscription_status.snapshot"
+                ],
+                "preserveLastValue": true
               },
               "inputs": {
-                "valuePath": "value",
-                "labelPath": "label",
-                "subtitlePath": "subtitle",
-                "descriptionPath": "description",
-                "noticePath": "error",
+                "valuePath": "current.value",
+                "labelPath": "current.label",
+                "subtitlePath": "current.subtitle",
+                "descriptionPath": "current.description",
+                "noticePath": "current.error",
+                "colorPath": "current.color",
                 "emptyText": "--"
               }
             },
@@ -158,9 +175,16 @@
               "area": "main",
               "title": "Resources",
               "dataSource": {
-                "kind": "y",
-                "path": "data/subscription_status/resources",
-                "scope": "shared"
+                "kind": "skill",
+                "name": "subscription_status_skill.list_resources",
+                "params": {
+                  "webspace_id": "$client.webspaceId"
+                },
+                "cacheTtlMs": 30000,
+                "invalidationTags": [
+                  "subscription_status.snapshot"
+                ],
+                "preserveLastValue": true
               },
               "inputs": {
                 "emptyText": "No subscription resource data",
@@ -218,9 +242,16 @@
               "area": "main",
               "title": "Local entitlement snapshot",
               "dataSource": {
-                "kind": "y",
-                "path": "data/subscription_status/raw",
-                "scope": "shared"
+                "kind": "skill",
+                "name": "subscription_status_skill.get_status",
+                "params": {
+                  "webspace_id": "$client.webspaceId"
+                },
+                "cacheTtlMs": 30000,
+                "invalidationTags": [
+                  "subscription_status.snapshot"
+                ],
+                "preserveLastValue": true
               },
               "inputs": {
                 "emptyText": "No local economic status"
