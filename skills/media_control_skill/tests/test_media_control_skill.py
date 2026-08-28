@@ -492,6 +492,10 @@ def test_endpoint_inbox_retains_terminal_session_until_stop_is_observed():
     assert reconciled["session"]["observed_command_revision"] == 1
     assert settled["assignment"] is None
     assert settled["changed"] is True
+    visible = repository.now_playing(
+        profile_id=session["profile_id"], target_id=session["target_id"]
+    )
+    assert [item["id"] for item in visible["items"]] == [session["id"]]
 
 
 def test_commands_are_revision_safe_idempotent_and_lease_guarded():

@@ -500,6 +500,21 @@ class MediaControlRepository:
                 """,
                 (target["id"],),
             ).fetchone()
+            if row is None and text(known_session_id):
+                resumable = connection.execute(
+                    """
+                    SELECT id FROM playback_sessions
+                    WHERE id=? AND target_id=? AND state='stopped'
+                      AND NULLIF(active_item_id,'') IS NOT NULL
+                    """,
+                    (text(known_session_id), target["id"]),
+                ).fetchone()
+                if resumable is not None:
+                    connection.execute(
+                        "UPDATE playback_sessions SET endpoint_last_seen_at=? WHERE id=?",
+                        (now_iso(), str(resumable["id"])),
+                    )
+                    connection.commit()
             queue_total = int(
                 connection.execute(
                     "SELECT COUNT(*) FROM playback_queue_items WHERE session_id=?",
