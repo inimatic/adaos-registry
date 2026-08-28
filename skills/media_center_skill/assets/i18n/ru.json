@@ -281,5 +281,9 @@
   "runtime.media_center.error.tmdb_authentication_failed": "TMDb отклонил этот API key или Read Access Token.",
   "runtime.media_center.error.tmdb_rate_limited": "TMDb временно ограничил частоту запросов. Повторите позже.",
   "runtime.media_center.error.tmdb_upstream_unavailable": "TMDb временно недоступен. Повторите позже.",
-  "runtime.media_center.error.tmdb_request_failed": "Не удалось связаться с TMDb. Проверьте соединение и повторите."
+  "runtime.media_center.error.tmdb_request_failed": "Не удалось связаться с TMDb. Проверьте соединение и повторите.",
+  "runtime.media_center.error.playback_target_identity_mismatch": "Выбранная поверхность воспроизведения изменилась. Выберите её повторно.",
+  "runtime.media_center.approval.play_on.title": "Разрешить управление воспроизведением",
+  "runtime.media_center.approval.play_on.summary": "Разрешить этому пульту запускать воспроизведение на устройстве «{target_label}».",
+  "runtime.media_center.approval.play_on.waiting": "Для управления устройством «{target_label}» требуется разрешение. Запрос отправлен на это устройство."
 }

@@ -4837,6 +4837,40 @@ def test_derived_rendition_is_a_hidden_exact_source_variant(monkeypatch, tmp_pat
     _validate_schema("playback-plan.v2.schema.json", plan)
 
 
+def test_play_on_rejects_a_stale_or_substituted_endpoint_identity(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "_invoke_skill",
+        lambda _skill, method, _params, **_kwargs: (
+            {
+                "ok": True,
+                "items": [
+                    {
+                        "id": "target-tv",
+                        "endpoint_id": "android-tv:surface:actual",
+                        "status": "available",
+                    }
+                ],
+            },
+            "",
+        )
+        if method == "list_targets"
+        else (_ for _ in ()).throw(AssertionError(method)),
+    )
+
+    result = main.play_on(
+        target_id="target-tv",
+        target_endpoint_id="browser:surface:controller",
+        target_label="Android TV",
+        source_id="movie-1",
+    )
+
+    assert result["ok"] is False
+    assert result["error"] == "playback_target_identity_mismatch"
+    assert result["expected_endpoint_id"] == "browser:surface:controller"
+    assert result["actual_endpoint_id"] == "android-tv:surface:actual"
+
+
 def test_endpoint_compatibility_enforces_width_and_avi_container():
     decision = MediaCatalogCoordinator._endpoint_compatibility(
         {

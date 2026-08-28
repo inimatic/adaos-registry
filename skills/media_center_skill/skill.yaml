@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.90
+version: 0.8.91
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -730,12 +730,20 @@ tools:
 - name: play_on
   description: Move an ordered media context to one available playback endpoint.
   entry: handlers.main:play_on
-  side_effects: external_write
+  side_effects: device_control
   approval_scope:
     name: media.playback.control
     resource_argument: target_id
     principal_meta_key: controller_device_id
+    local_resource_argument: target_endpoint_id
+    local_principal_meta_key: controller_endpoint_id
     ttl_seconds: 31536000
+    presentation:
+      title: Allow playback control
+      summary: Allow this controller to start playback on the selected device.
+      title_i18n_key: runtime.media_center.approval.play_on.title
+      summary_i18n_key: runtime.media_center.approval.play_on.summary
+      waiting_i18n_key: runtime.media_center.approval.play_on.waiting
   timeout_seconds: 90
   input_schema:
     type: object
@@ -745,6 +753,10 @@ tools:
     - source_id
     properties:
       target_id:
+        type: string
+      target_endpoint_id:
+        type: string
+      target_label:
         type: string
       source_type:
         type: string
@@ -2464,13 +2476,13 @@ nlu_hints:
           type: object
       additionalProperties: true
   entities: []
-updated_at: '2026-08-28T04:59:55+00:00'
+updated_at: '2026-08-28T07:59:32+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.947+5746.4bc46e9cb
-    recorded_at: '2026-08-28T04:59:56+00:00'
+    min_version: 0.1.947+5749.575b2f508
+    recorded_at: '2026-08-28T07:59:32+00:00'
     source: skill_push
-    min_commit: 4bc46e9cb9cff474865f5d187eea6fa911383d0d
-    min_short_commit: 4bc46e9c
-    build_date: '2026-08-28T00:14:44+03:00'
+    min_commit: 575b2f50895ec5c7598a1ea9ccd276128c13bc1d
+    min_short_commit: 575b2f50
+    build_date: '2026-08-28T10:52:56+03:00'
 

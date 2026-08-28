@@ -281,5 +281,9 @@
   "runtime.media_center.error.tmdb_authentication_failed": "TMDb rejected this API key or Read Access Token.",
   "runtime.media_center.error.tmdb_rate_limited": "TMDb is rate limiting requests. Try again later.",
   "runtime.media_center.error.tmdb_upstream_unavailable": "TMDb is temporarily unavailable. Try again later.",
-  "runtime.media_center.error.tmdb_request_failed": "TMDb could not be reached. Check the connection and retry."
+  "runtime.media_center.error.tmdb_request_failed": "TMDb could not be reached. Check the connection and retry.",
+  "runtime.media_center.error.playback_target_identity_mismatch": "The selected playback surface changed. Choose it again.",
+  "runtime.media_center.approval.play_on.title": "Allow playback control",
+  "runtime.media_center.approval.play_on.summary": "Allow this controller to start playback on {target_label}.",
+  "runtime.media_center.approval.play_on.waiting": "Permission is required to control {target_label}. The request was sent to that device."
 }

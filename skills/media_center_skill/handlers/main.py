@@ -2578,16 +2578,27 @@ def build_playback_queue(
 
 @tool(
     summary="Move one bounded playback context to an available endpoint.",
-    side_effects="external_write",
+    side_effects="device_control",
     approval_scope={
         "name": "media.playback.control",
         "resource_argument": "target_id",
         "principal_meta_key": "controller_device_id",
+        "local_resource_argument": "target_endpoint_id",
+        "local_principal_meta_key": "controller_endpoint_id",
         "ttl_seconds": 31_536_000,
+        "presentation": {
+            "title": "Allow playback control",
+            "summary": "Allow this controller to start playback on the selected device.",
+            "title_i18n_key": "runtime.media_center.approval.play_on.title",
+            "summary_i18n_key": "runtime.media_center.approval.play_on.summary",
+            "waiting_i18n_key": "runtime.media_center.approval.play_on.waiting",
+        },
     },
 )
 def play_on(
     target_id: str = "",
+    target_endpoint_id: str = "",
+    target_label: str = "",
     source_type: str = "item",
     source_id: str = "",
     source_context: Mapping[str, Any] | None = None,
@@ -2623,6 +2634,20 @@ def play_on(
             message="The selected playback device is not available.",
             detail=str(targets_error or "target_not_available"),
             target_id=target,
+            retryable=True,
+        )
+    actual_endpoint_id = str(playback_target.get("endpoint_id") or "").strip()
+    requested_endpoint_id = str(target_endpoint_id or "").strip()
+    if requested_endpoint_id and requested_endpoint_id != actual_endpoint_id:
+        return _skill_error(
+            "playback_target_identity_mismatch",
+            message="The selected playback surface changed. Refresh the device list.",
+            human_message="The selected playback surface changed. Choose it again.",
+            i18n_key="runtime.media_center.error.playback_target_identity_mismatch",
+            target_id=target,
+            target_label=str(target_label or playback_target.get("display_label") or target),
+            expected_endpoint_id=requested_endpoint_id,
+            actual_endpoint_id=actual_endpoint_id,
             retryable=True,
         )
     queue_result = build_playback_queue(
