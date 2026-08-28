@@ -1,5 +1,5 @@
 name: subscription_status_skill
-version: 0.1.6
+version: 0.1.8
 description: User-facing AdaOS subscription status widget and modal backed by the
   local economic entitlement snapshot with explicit Root refresh.
 webui_owner: shared
@@ -26,6 +26,9 @@ events:
   - sys.ready
   - desktop.webspace.refresh
   - desktop.webspace.reload
+  - root.mgmnt.snapshot.changed
+  - subnet.member.snapshot.changed
+  - subnet.member.status.changed
 default_tool: get_status
 tools:
 - name: get_status
@@ -38,6 +41,10 @@ tools:
       webspace_id:
         type:
         - string
+        - 'null'
+      refresh_root_if_missing:
+        type:
+        - boolean
         - 'null'
   output_schema:
     type: object
@@ -71,6 +78,42 @@ tools:
   output_schema:
     type: object
     properties: {}
+- name: list_usage_history
+  description: Return current AdaOS subscription usage window rows.
+  entry: handlers.main:list_usage_history
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type:
+        - string
+        - 'null'
+  output_schema:
+    type: object
+    properties: {}
+- name: request_plan_change
+  description: Record a local user request to change the AdaOS subscription plan.
+  entry: handlers.main:request_plan_change
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      desired_plan_id:
+        type: string
+      note:
+        type:
+        - string
+        - 'null'
+      webspace_id:
+        type:
+        - string
+        - 'null'
+    required:
+    - desired_plan_id
+  output_schema:
+    type: object
+    properties: {}
 nlu:
   intents:
   - id: subscription.status.show
@@ -79,12 +122,13 @@ nlu:
     - show AdaOS subscription status
     - показать подписку AdaOS
     tool: get_status
-updated_at: '2026-08-28T08:37:00+00:00'
+updated_at: '2026-08-28T12:03:48+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.945+5731.87d462d7
-    recorded_at: '2026-08-27T15:16:39+00:00'
+    min_version: 0.1.950+5756.599ec3dd5
+    recorded_at: '2026-08-28T12:03:48+00:00'
     source: skill_push
-    min_commit: 87d462d769320ec5b38021dd0384f28c83922ab5
-    min_short_commit: 87d462d7
-    build_date: '2026-08-27T18:06:25+03:00'
+    min_commit: 599ec3dd5da8a88f00c5ff558709493004a528d4
+    min_short_commit: 599ec3dd
+    build_date: '2026-08-28T14:34:19+03:00'
+

@@ -12,6 +12,21 @@
       "items": [],
       "generated_at": ""
     },
+    "data/subscription_status/usage_history": {
+      "items": [],
+      "generated_at": ""
+    },
+    "data/subscription_status/plan_change": {
+      "value": "none",
+      "label": "Plan request",
+      "subtitle": "current plan: unknown",
+      "description": "No pending plan change request. Payments are deferred.",
+      "color": "neutral",
+      "status": "none",
+      "desired_plan_id": "",
+      "requested_at": "",
+      "note": ""
+    },
     "data/subscription_status/raw": {
       "schema": "adaos.subnet.economic_status.v1",
       "subscription_state": "unknown",
@@ -28,12 +43,7 @@
       "icon": "card-outline",
       "launchModal": "subscription_status_modal",
       "action": {
-        "type": "navigate",
-        "params": {
-          "to": "subscription_status_skill.subscription_status_modal",
-          "surface": "modal",
-          "modalId": "subscription_status_modal"
-        }
+        "navigate": "subscription_status_skill.subscription_status_modal"
       }
     }
   ],
@@ -47,13 +57,15 @@
         "kind": "skill",
         "name": "subscription_status_skill.get_status",
         "params": {
-          "webspace_id": "$client.webspaceId"
+          "webspace_id": "$client.webspaceId",
+          "refresh_root_if_missing": true
         },
         "cacheTtlMs": 30000,
         "invalidationTags": [
           "subscription_status.snapshot"
         ],
-        "preserveLastValue": true
+        "preserveLastValue": true,
+        "maxRequestHz": 1
       },
       "loading": {
         "loadingText": "Loading subscription...",
@@ -71,6 +83,15 @@
         "refreshMs": 60000
       },
       "actions": [
+        {
+          "on": "click:details",
+          "type": "navigate",
+          "params": {
+            "to": "subscription_status_skill.subscription_status_modal",
+            "surface": "modal",
+            "modalId": "subscription_status_modal"
+          }
+        },
         {
           "on": "click",
           "type": "navigate",
@@ -151,13 +172,15 @@
                 "kind": "skill",
                 "name": "subscription_status_skill.get_status",
                 "params": {
-                  "webspace_id": "$client.webspaceId"
+                  "webspace_id": "$client.webspaceId",
+                  "refresh_root_if_missing": true
                 },
                 "cacheTtlMs": 30000,
                 "invalidationTags": [
                   "subscription_status.snapshot"
                 ],
-                "preserveLastValue": true
+                "preserveLastValue": true,
+                "maxRequestHz": 1
               },
               "inputs": {
                 "valuePath": "current.value",
@@ -184,7 +207,8 @@
                 "invalidationTags": [
                   "subscription_status.snapshot"
                 ],
-                "preserveLastValue": true
+                "preserveLastValue": true,
+                "maxRequestHz": 1
               },
               "inputs": {
                 "emptyText": "No subscription resource data",
@@ -237,6 +261,149 @@
               }
             },
             {
+              "id": "subscription-status-usage-history",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Usage window",
+              "dataSource": {
+                "kind": "skill",
+                "name": "subscription_status_skill.list_usage_history",
+                "params": {
+                  "webspace_id": "$client.webspaceId"
+                },
+                "cacheTtlMs": 30000,
+                "invalidationTags": [
+                  "subscription_status.snapshot"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 1
+              },
+              "inputs": {
+                "emptyText": "No observed usage yet",
+                "columns": [
+                  {
+                    "key": "resource",
+                    "label": "Resource",
+                    "mono": true,
+                    "width": "190px"
+                  },
+                  {
+                    "key": "state",
+                    "label": "State",
+                    "width": "95px"
+                  },
+                  {
+                    "key": "used_24h",
+                    "label": "24h",
+                    "mono": true,
+                    "width": "80px"
+                  },
+                  {
+                    "key": "used_30d",
+                    "label": "30d",
+                    "mono": true,
+                    "width": "90px"
+                  },
+                  {
+                    "key": "last_seen_at",
+                    "label": "Last seen",
+                    "width": "190px"
+                  },
+                  {
+                    "key": "reason",
+                    "label": "Reason"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "subscription-status-plan-request-state",
+              "type": "visual.metricTile",
+              "area": "main",
+              "title": "Plan request",
+              "dataSource": {
+                "kind": "skill",
+                "name": "subscription_status_skill.get_status",
+                "params": {
+                  "webspace_id": "$client.webspaceId",
+                  "refresh_root_if_missing": true
+                },
+                "cacheTtlMs": 30000,
+                "invalidationTags": [
+                  "subscription_status.snapshot"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 1
+              },
+              "inputs": {
+                "valuePath": "plan_change.value",
+                "labelPath": "plan_change.label",
+                "subtitlePath": "plan_change.subtitle",
+                "descriptionPath": "plan_change.description",
+                "colorPath": "plan_change.color",
+                "emptyText": "--"
+              }
+            },
+            {
+              "id": "subscription-status-plan-request",
+              "type": "ui.form",
+              "area": "main",
+              "title": "Request plan change",
+              "inputs": {
+                "layout": "responsiveGrid",
+                "minFieldWidth": 180,
+                "submitLabel": "Request",
+                "fields": [
+                  {
+                    "id": "desired_plan_id",
+                    "type": "dropdown",
+                    "label": "Desired plan",
+                    "required": true,
+                    "defaultValue": "personal",
+                    "options": [
+                      {
+                        "label": "starter",
+                        "value": "starter"
+                      },
+                      {
+                        "label": "personal",
+                        "value": "personal"
+                      },
+                      {
+                        "label": "builder",
+                        "value": "builder"
+                      },
+                      {
+                        "label": "fleet",
+                        "value": "fleet"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "note",
+                    "type": "shortText",
+                    "label": "Note",
+                    "span": "full"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "subscription_status_skill.request_plan_change",
+                  "params": {
+                    "webspace_id": "$client.webspaceId",
+                    "desired_plan_id": "$event.values.desired_plan_id",
+                    "note": "$event.values.note"
+                  },
+                  "invalidates": [
+                    "subscription_status.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
               "id": "subscription-status-raw",
               "type": "ui.jsonViewer",
               "area": "main",
@@ -245,13 +412,15 @@
                 "kind": "skill",
                 "name": "subscription_status_skill.get_status",
                 "params": {
-                  "webspace_id": "$client.webspaceId"
+                  "webspace_id": "$client.webspaceId",
+                  "refresh_root_if_missing": true
                 },
                 "cacheTtlMs": 30000,
                 "invalidationTags": [
                   "subscription_status.snapshot"
                 ],
-                "preserveLastValue": true
+                "preserveLastValue": true,
+                "maxRequestHz": 1
               },
               "inputs": {
                 "emptyText": "No local economic status"

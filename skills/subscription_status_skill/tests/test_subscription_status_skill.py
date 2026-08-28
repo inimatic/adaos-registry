@@ -59,7 +59,9 @@ def test_status_projection_exposes_quota_rows(monkeypatch) -> None:
     payload = module.get_status(webspace_id="desktop-dev")
 
     assert payload["current"]["value"] == "builder"
+    assert payload["buttons"][0]["id"] == "details"
     assert payload["resources"]["items"][0]["resource"] == "llm.requests"
+    assert payload["usage_history"]["items"][0]["resource"] == "llm.requests"
     assert any(row["resource"] == "codex.api.tokens" for row in payload["resources"]["items"])
     assert projection.values[0][0] == "subscription_status.snapshot"
     assert projection.values[0][2]["webspace_id"] == "desktop-dev"
@@ -95,6 +97,48 @@ def test_refresh_status_pulls_root_entitlement(monkeypatch) -> None:
     assert payload["refresh"]["ok"] is True
     assert payload["current"]["value"] == "builder"
     assert projection.values[0][0] == "subscription_status.snapshot"
+
+
+def test_get_status_refreshes_root_when_entitlement_is_missing(monkeypatch) -> None:
+    module = _load_module()
+    projection = _Projection()
+    calls: list[str] = []
+    statuses = [
+        {
+            "generated_at": "2026-08-28T10:00:00Z",
+            "subscription_state": "unassigned",
+            "plan_id": "none",
+            "entitlement_state": "disabled_observed",
+            "disabled_resource_count": 11,
+            "disabled_resources": [],
+            "usage": {},
+            "entitlement_snapshot": {"loaded": False},
+        },
+        {
+            "generated_at": "2026-08-28T10:00:01Z",
+            "subscription_state": "active",
+            "plan_id": "builder",
+            "entitlement_state": "limited_observed",
+            "disabled_resource_count": 0,
+            "disabled_resources": [],
+            "usage": {"llm.requests": {"used_24h": 4}},
+            "entitlement_snapshot": {"loaded": True},
+        },
+    ]
+    monkeypatch.setattr(module, "ctx_current_user", projection)
+    monkeypatch.setattr(
+        module,
+        "refresh_entitlement_snapshot_from_root",
+        lambda: calls.append("refresh") or {"ok": True},
+    )
+    monkeypatch.setattr(module, "current_subnet_economic_status", lambda: statuses.pop(0))
+
+    payload = module.get_status(webspace_id="desktop")
+
+    assert calls == ["refresh"]
+    assert payload["current"]["value"] == "builder"
+    assert payload["refresh"]["ok"] is True
+    assert projection.values[0][1]["current"]["value"] == "builder"
 
 
 def test_active_subscription_with_plan_disabled_resources_is_warning(monkeypatch) -> None:
@@ -144,3 +188,88 @@ def test_list_resources_returns_table_items(monkeypatch) -> None:
     assert payload["items"][0]["resource"] == "llm.requests"
     assert payload["items"][0]["used_24h"] == 3
     assert projection.values[0][0] == "subscription_status.snapshot"
+
+
+def test_list_usage_history_returns_observed_usage_rows(monkeypatch) -> None:
+    module = _load_module()
+    projection = _Projection()
+    monkeypatch.setattr(module, "ctx_current_user", projection)
+    monkeypatch.setattr(
+        module,
+        "current_subnet_economic_status",
+        lambda: {
+            "generated_at": "2026-08-28T08:35:00Z",
+            "subscription_state": "active",
+            "plan_id": "builder",
+            "entitlement_state": "limited_observed",
+            "disabled_resource_count": 0,
+            "disabled_resources": [],
+            "usage": {"codex.api.tokens": {"used_24h": 500, "used_30d": 1000}},
+        },
+    )
+
+    payload = module.list_usage_history(webspace_id="desktop")
+
+    assert payload["ok"] is True
+    assert payload["items"][0]["resource"] == "codex.api.tokens"
+    assert payload["items"][0]["used_30d"] == 1000
+
+
+def test_request_plan_change_records_local_request(monkeypatch, tmp_path) -> None:
+    module = _load_module()
+    projection = _Projection()
+    request_path = tmp_path / "plan_change_request.json"
+    monkeypatch.setattr(module, "ctx_current_user", projection)
+    monkeypatch.setattr(module, "_plan_change_request_path", lambda: request_path)
+    monkeypatch.setattr(
+        module,
+        "current_subnet_economic_status",
+        lambda: {
+            "generated_at": "2026-08-28T11:15:00Z",
+            "subnet_id": "sn_6f5a69bf",
+            "zone_id": "eu",
+            "subscription_state": "active",
+            "plan_id": "personal",
+            "entitlement_state": "enabled",
+            "disabled_resource_count": 0,
+            "disabled_resources": [],
+            "usage": {},
+        },
+    )
+
+    payload = module.request_plan_change("builder", note="need Codex quota", webspace_id="desktop")
+
+    assert payload["ok"] is True
+    assert payload["plan_change"]["desired_plan_id"] == "builder"
+    assert request_path.exists()
+    assert projection.values[0][1]["plan_change"]["value"] == "builder"
+
+
+def test_root_management_event_refreshes_root_entitlement(monkeypatch) -> None:
+    module = _load_module()
+    projection = _Projection()
+    calls: list[str] = []
+    monkeypatch.setattr(module, "ctx_current_user", projection)
+    monkeypatch.setattr(
+        module,
+        "refresh_entitlement_snapshot_from_root",
+        lambda: calls.append("refresh") or {"ok": True},
+    )
+    monkeypatch.setattr(
+        module,
+        "current_subnet_economic_status",
+        lambda: {
+            "generated_at": "2026-08-28T09:00:00Z",
+            "subscription_state": "active",
+            "plan_id": "personal",
+            "entitlement_state": "enabled",
+            "disabled_resource_count": 0,
+            "disabled_resources": [],
+            "usage": {},
+        },
+    )
+
+    module.on_runtime_refresh(type("Evt", (), {"type": "root.mgmnt.snapshot.changed", "payload": {}})())
+
+    assert calls == ["refresh"]
+    assert projection.values[0][1]["current"]["value"] == "personal"
