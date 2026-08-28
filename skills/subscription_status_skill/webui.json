@@ -1,5 +1,26 @@
 {
   "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "ydoc_defaults": {
+    "data/subscription_status/current": {
+      "value": "unknown",
+      "label": "AdaOS subscription",
+      "subtitle": "loading / unknown",
+      "description": "No local economic status yet",
+      "color": "warning"
+    },
+    "data/subscription_status/resources": {
+      "items": [],
+      "generated_at": ""
+    },
+    "data/subscription_status/raw": {
+      "schema": "adaos.subnet.economic_status.v1",
+      "subscription_state": "unknown",
+      "plan_id": "unknown",
+      "entitlement_state": "unknown",
+      "disabled_resource_count": 0,
+      "usage": {}
+    }
+  },
   "apps": [
     {
       "id": "subscription_status_app",
@@ -51,9 +72,21 @@
     "modals": {
       "subscription_status_modal": {
         "title": "Subscription",
+        "presentation": {
+          "kind": "fullscreen"
+        },
         "schema": {
           "id": "subscription_status_modal",
           "title": "Subscription",
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "subscription_status": {
+                "view": "subscription_status_skill.subscription_status_modal"
+              }
+            },
+            "defaultRoute": "subscription_status"
+          },
           "layout": {
             "type": "single",
             "pattern": "stack",
@@ -185,11 +218,20 @@
               }
             }
           ]
-        }
+        },
+        "implements": [
+          "subscription_status_skill.subscription_status_modal"
+        ]
       }
     }
   },
   "contributions": [
+    {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "subscription_status_app",
+      "autoInstall": true
+    },
     {
       "extensionPoint": "desktop.widgets",
       "type": "widget",
