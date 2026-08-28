@@ -28,7 +28,12 @@
       "icon": "card-outline",
       "launchModal": "subscription_status_modal",
       "action": {
-        "navigate": "subscription_status_skill.subscription_status_modal"
+        "type": "navigate",
+        "params": {
+          "to": "subscription_status_skill.subscription_status_modal",
+          "surface": "modal",
+          "modalId": "subscription_status_modal"
+        }
       }
     }
   ],
@@ -40,7 +45,8 @@
       "icon": "card-outline",
       "dataSource": {
         "kind": "y",
-        "path": "data/subscription_status/current"
+        "path": "data/subscription_status/current",
+        "scope": "shared"
       },
       "loading": {
         "loadingText": "Loading subscription...",
@@ -119,7 +125,7 @@
                   "type": "callSkill",
                   "target": "subscription_status_skill.refresh_status",
                   "params": {
-                    "webspace_id": "$runtime.webspace_id"
+                    "webspace_id": "$client.webspaceId"
                   },
                   "invalidates": [
                     "subscription_status.snapshot"
@@ -134,7 +140,8 @@
               "title": "Current plan",
               "dataSource": {
                 "kind": "y",
-                "path": "data/subscription_status/current"
+                "path": "data/subscription_status/current",
+                "scope": "shared"
               },
               "inputs": {
                 "valuePath": "value",
@@ -152,7 +159,8 @@
               "title": "Resources",
               "dataSource": {
                 "kind": "y",
-                "path": "data/subscription_status/resources"
+                "path": "data/subscription_status/resources",
+                "scope": "shared"
               },
               "inputs": {
                 "emptyText": "No subscription resource data",
@@ -211,7 +219,8 @@
               "title": "Local entitlement snapshot",
               "dataSource": {
                 "kind": "y",
-                "path": "data/subscription_status/raw"
+                "path": "data/subscription_status/raw",
+                "scope": "shared"
               },
               "inputs": {
                 "emptyText": "No local economic status"
