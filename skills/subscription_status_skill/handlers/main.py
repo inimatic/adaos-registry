@@ -147,6 +147,10 @@ def _resource_rows(status: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "quota_remaining": "" if item.get("quota_remaining") is None else _int_value(item.get("quota_remaining")),
                 "quota_period": _text(item.get("quota_period") or quota.get("period")),
                 "quota_unit": _text(item.get("quota_unit") or quota.get("unit")),
+                "metering": _text(item.get("metering")),
+                "source": _text(item.get("source")),
+                "accuracy": _text(item.get("accuracy")),
+                "last_model": _text(item.get("last_model")),
                 "last_seen_at": _text(item.get("last_seen_at")),
             }
         )
@@ -165,9 +169,17 @@ def _current_tile(status: Mapping[str, Any], rows: list[Mapping[str, Any]]) -> d
     llm_limit = llm.get("quota_limit")
     llm_left = llm.get("quota_remaining")
     codex_left = codex.get("quota_remaining")
+    codex_used = _int_value(codex.get("used_30d"))
+    codex_accuracy = _text(codex.get("accuracy"))
     llm_quota = f"/{_int_value(llm_limit)}" if llm_limit not in {"", None} else ""
     llm_remaining = f", left {_int_value(llm_left)}" if llm_left not in {"", None} else ""
-    codex_suffix = f"; Codex left {codex_left}" if codex_left not in {"", None} else ""
+    codex_suffix = ""
+    if codex_left not in {"", None}:
+        codex_suffix = f"; Codex 30d: {codex_used}, left {codex_left}"
+    elif codex_used:
+        codex_suffix = f"; Codex 30d: {codex_used}"
+    if codex_accuracy:
+        codex_suffix = f"{codex_suffix} ({codex_accuracy})" if codex_suffix else f"; Codex: {codex_accuracy}"
     return {
         "value": _text(status.get("plan_id")) or "none",
         "label": "AdaOS subscription",
@@ -218,6 +230,10 @@ def _usage_history_rows(rows: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
                 "state": _text(row.get("state")),
                 "used_24h": _int_value(row.get("used_24h")),
                 "used_30d": _int_value(row.get("used_30d")),
+                "metering": _text(row.get("metering")),
+                "source": _text(row.get("source")),
+                "accuracy": _text(row.get("accuracy")),
+                "last_model": _text(row.get("last_model")),
                 "last_seen_at": _text(row.get("last_seen_at")),
                 "reason": _text(row.get("reason")),
             }

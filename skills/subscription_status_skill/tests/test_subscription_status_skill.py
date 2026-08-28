@@ -51,6 +51,10 @@ def test_status_projection_exposes_quota_rows(monkeypatch) -> None:
                     "quota_remaining": 19999900,
                     "quota_period": "month",
                     "quota_unit": "tokens",
+                    "metering": "codex_usage_stream",
+                    "source": "builder_llm_job",
+                    "accuracy": "reported",
+                    "last_model": "gpt-5",
                 },
             },
         },
@@ -62,7 +66,10 @@ def test_status_projection_exposes_quota_rows(monkeypatch) -> None:
     assert payload["buttons"][0]["id"] == "details"
     assert payload["resources"]["items"][0]["resource"] == "llm.requests"
     assert payload["usage_history"]["items"][0]["resource"] == "llm.requests"
-    assert any(row["resource"] == "codex.api.tokens" for row in payload["resources"]["items"])
+    codex = next(row for row in payload["resources"]["items"] if row["resource"] == "codex.api.tokens")
+    assert codex["metering"] == "codex_usage_stream"
+    assert codex["accuracy"] == "reported"
+    assert "Codex 30d: 100" in payload["current"]["description"]
     assert projection.values[0][0] == "subscription_status.snapshot"
     assert projection.values[0][2]["webspace_id"] == "desktop-dev"
 
@@ -204,7 +211,15 @@ def test_list_usage_history_returns_observed_usage_rows(monkeypatch) -> None:
             "entitlement_state": "limited_observed",
             "disabled_resource_count": 0,
             "disabled_resources": [],
-            "usage": {"codex.api.tokens": {"used_24h": 500, "used_30d": 1000}},
+            "usage": {
+                "codex.api.tokens": {
+                    "used_24h": 500,
+                    "used_30d": 1000,
+                    "source": "builder_llm_job",
+                    "accuracy": "estimated",
+                    "last_model": "gpt-5",
+                }
+            },
         },
     )
 
@@ -213,6 +228,8 @@ def test_list_usage_history_returns_observed_usage_rows(monkeypatch) -> None:
     assert payload["ok"] is True
     assert payload["items"][0]["resource"] == "codex.api.tokens"
     assert payload["items"][0]["used_30d"] == 1000
+    assert payload["items"][0]["accuracy"] == "estimated"
+    assert payload["items"][0]["last_model"] == "gpt-5"
 
 
 def test_request_plan_change_records_local_request(monkeypatch, tmp_path) -> None:

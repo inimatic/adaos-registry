@@ -254,6 +254,16 @@
                     "width": "80px"
                   },
                   {
+                    "key": "metering",
+                    "label": "Metering",
+                    "width": "155px"
+                  },
+                  {
+                    "key": "accuracy",
+                    "label": "Accuracy",
+                    "width": "95px"
+                  },
+                  {
                     "key": "reason",
                     "label": "Reason"
                   }
@@ -303,6 +313,21 @@
                     "label": "30d",
                     "mono": true,
                     "width": "90px"
+                  },
+                  {
+                    "key": "source",
+                    "label": "Source",
+                    "width": "145px"
+                  },
+                  {
+                    "key": "accuracy",
+                    "label": "Accuracy",
+                    "width": "95px"
+                  },
+                  {
+                    "key": "last_model",
+                    "label": "Model",
+                    "width": "130px"
                   },
                   {
                     "key": "last_seen_at",
