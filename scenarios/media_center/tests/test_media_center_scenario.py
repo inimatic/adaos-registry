@@ -128,7 +128,7 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     assert toolbar["visibleIf"] == "$state.surfaceProfile != 'mobile_control'"
     toolbar_buttons = {button["id"]: button for button in toolbar["inputs"]["buttons"]}
     assert list(toolbar_buttons) == [
-        "remote", "profile", "section", "layout", "filters", "settings"
+        "remote", "profile", "section", "layout", "filters", "settings", "target"
     ]
     assert toolbar_buttons["profile"]["selectedStateKey"] == "profileId"
     assert toolbar_buttons["section"]["selectedStateKey"] == "mediaNavigation"
@@ -143,7 +143,7 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     assert toolbar_buttons["layout"]["options"][2]["label"] == "Carousel"
     assert {action["on"] for action in toolbar["actions"]} == {
         "click:remote", "select:profile", "select:section", "select:layout",
-        "click:filters", "click:settings",
+        "click:filters", "click:settings", "select:target",
     }
 
     catalog = widgets["media-catalog"]
@@ -634,11 +634,16 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     }
     assert remote["media-targets"]["type"] == "input.selector"
     assert remote["media-targets"]["dataSource"]["name"] == "media_control_skill.list_targets"
-    assert remote["media-targets"]["inputs"]["optionLabelPath"] == "display_label"
-    assert remote["media-targets"]["inputs"]["optionMetaPaths"][:2] == [
+    assert remote["media-targets"]["inputs"]["optionLabelPath"] == "control_label"
+    assert remote["media-targets"]["inputs"]["optionMetaPaths"] == [
+        "surface_context_label",
+        "playback_summary",
         "authorization_label",
-        "endpoint_label",
+        "presence_state",
     ]
+    assert remote["media-now-playing"]["inputs"]["subtitleKey"] == (
+        "target_context_label"
+    )
     assert remote["media-now-playing"]["dataSource"]["receiver"] == "media_control.now_playing"
     assert remote["media-now-playing"]["inputs"]["titleKey"] == "title"
     assert remote["media-remote-transport"]["actions"][1]["target"] == "media_control_skill.voice_command"

@@ -61,6 +61,10 @@
             "selectedMediaKind": "",
             "selectedMediaFavorite": false,
             "selectedPlaybackTargetId": "",
+            "selectedPlaybackTargetEndpointId": "",
+            "selectedPlaybackTargetLabel": "",
+            "selectedPlaybackTargetIsCurrent": false,
+            "selectedPlaybackTargetWebspaceId": "",
             "selectedMediaTitle": "",
             "metadataTitle": "",
             "metadataOriginalTitle": "",
@@ -450,8 +454,9 @@
                     "label": "Playback device",
                     "icon": "tv-outline",
                     "selectedStateKey": "selectedPlaybackTargetId",
-                    "optionLabelPath": "display_label",
+                    "optionLabelPath": "control_label",
                     "optionValuePath": "id",
+                    "optionMetaPaths": ["surface_context_label", "playback_summary", "authorization_label"],
                     "optionIcon": "tv-outline",
                     "persistFallback": true,
                     "optionsDataSource": {
@@ -527,7 +532,11 @@
                   "on": "select:target",
                   "type": "updateState",
                   "params": {
-                    "selectedPlaybackTargetId": "$event.value"
+                    "selectedPlaybackTargetId": "$event.value",
+                    "selectedPlaybackTargetEndpointId": "$event.endpoint_id",
+                    "selectedPlaybackTargetLabel": "$event.control_label",
+                    "selectedPlaybackTargetIsCurrent": "$event.is_current",
+                    "selectedPlaybackTargetWebspaceId": "$event.webspace_id"
                   }
                 },
                 {
@@ -609,7 +618,11 @@
                   "on": "select",
                   "type": "updateState",
                   "params": {
-                    "selectedPlaybackTargetId": "$event.id"
+                    "selectedPlaybackTargetId": "$event.id",
+                    "selectedPlaybackTargetEndpointId": "$event.endpoint_id",
+                    "selectedPlaybackTargetLabel": "$event.control_label",
+                    "selectedPlaybackTargetIsCurrent": "$event.is_current",
+                    "selectedPlaybackTargetWebspaceId": "$event.webspace_id"
                   }
                 }
               ],
@@ -1650,6 +1663,8 @@
                   "remotePlaybackAction": {
                     "target": "media_center_skill.play_on",
                     "params": {
+                      "target_endpoint_id": "$state.selectedPlaybackTargetEndpointId",
+                      "target_label": "$state.selectedPlaybackTargetLabel",
                       "source_type": "$state.playbackSourceType",
                       "source_id": "$state.playbackSourceId",
                       "source_context": "$state.playbackSourceContext",
@@ -1907,9 +1922,9 @@
                 },
                 "inputs": {
                   "value": "$state.selectedPlaybackTargetId",
-                  "optionLabelPath": "display_label",
+                  "optionLabelPath": "control_label",
                   "optionValuePath": "id",
-                  "optionMetaPaths": ["authorization_label", "endpoint_label", "kind", "status"],
+                  "optionMetaPaths": ["surface_context_label", "playback_summary", "authorization_label"],
                   "persistFallback": true,
                   "searchable": false,
                   "placeholder": "Choose an online playback device",
@@ -1921,7 +1936,13 @@
                   {
                     "on": "change",
                     "type": "updateState",
-                    "params": {"selectedPlaybackTargetId": "$event.value"}
+                    "params": {
+                      "selectedPlaybackTargetId": "$event.value",
+                      "selectedPlaybackTargetEndpointId": "$event.option.endpoint_id",
+                      "selectedPlaybackTargetLabel": "$event.option.control_label",
+                      "selectedPlaybackTargetIsCurrent": "$event.option.is_current",
+                      "selectedPlaybackTargetWebspaceId": "$event.option.webspace_id"
+                    }
                   }
                 ]
               },
@@ -1943,6 +1964,8 @@
                     "target": "media_center_skill.play_on",
                     "params": {
                       "target_id": "$state.selectedPlaybackTargetId",
+                      "target_endpoint_id": "$state.selectedPlaybackTargetEndpointId",
+                      "target_label": "$state.selectedPlaybackTargetLabel",
                       "source_type": "$state.playbackSourceType",
                       "source_id": "$state.playbackSourceId",
                       "source_context": "$state.playbackSourceContext",
@@ -2367,13 +2390,13 @@
                 },
                 "inputs": {
                   "value": "$state.selectedPlaybackTargetId",
-                  "optionLabelPath": "display_label",
+                  "optionLabelPath": "control_label",
                   "optionValuePath": "id",
                   "optionMetaPaths": [
+                    "surface_context_label",
+                    "playback_summary",
                     "authorization_label",
-                    "endpoint_label",
-                    "kind",
-                    "status"
+                    "presence_state"
                   ],
                   "persistFallback": true,
                   "searchable": false,
@@ -2391,7 +2414,11 @@
                     "on": "change",
                     "type": "updateState",
                     "params": {
-                      "selectedPlaybackTargetId": "$event.value"
+                      "selectedPlaybackTargetId": "$event.value",
+                      "selectedPlaybackTargetEndpointId": "$event.option.endpoint_id",
+                      "selectedPlaybackTargetLabel": "$event.option.control_label",
+                      "selectedPlaybackTargetIsCurrent": "$event.option.is_current",
+                      "selectedPlaybackTargetWebspaceId": "$event.option.webspace_id"
                     }
                   }
                 ],
@@ -2426,7 +2453,7 @@
                 },
                 "inputs": {
                   "titleKey": "title",
-                  "subtitleKey": "target_label",
+                  "subtitleKey": "target_context_label",
                   "badgeKey": "state",
                   "imageKey": "artwork",
                   "emptyText": "Nothing is playing on this device.",
