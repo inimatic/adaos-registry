@@ -89,7 +89,7 @@ def test_infrastate_modals_hydrate_dev_mode_from_projection() -> None:
         }
 
 
-def test_infrastate_summary_projection_stays_current_without_browser_demand():
+def test_infrastate_summary_projection_waits_for_browser_demand():
     mod = _load_infrastate_module()
 
     writes: list[tuple[str, object, str | None]] = []
@@ -118,9 +118,9 @@ def test_infrastate_summary_projection_stays_current_without_browser_demand():
         )
     )
 
-    assert summary_slot.demand == "always"
-    assert summary_result.written is True
-    assert writes == [("infrastate.summary", {"value": "succeeded", "subtitle": "slot B"}, "desktop")]
+    assert summary_slot.demand == "active"
+    assert summary_result.reason == "no_active_projection_demand"
+    assert writes == []
     assert actions_result.reason == "no_active_projection_demand"
 
 
@@ -784,7 +784,7 @@ def test_infrastate_first_snapshot_uses_retained_core_update_status() -> None:
     }
 
 
-def test_infrastate_rehydrate_projects_retained_status_before_return(monkeypatch) -> None:
+def test_infrastate_rehydrate_retains_status_without_eager_projection(monkeypatch) -> None:
     get_ctx().bus.publish(
         Event(
             type="core.update.status",
@@ -816,13 +816,7 @@ def test_infrastate_rehydrate_projects_retained_status_before_return(monkeypatch
 
     assert result["ok"] is True
     assert result["state"] == "preparing"
-    assert projected == [
-        (
-            {"infrastate.summary": {"value": "preparing"}},
-            "desktop",
-            "infrastate_control_refresh:legacy.refresh_snapshot",
-        )
-    ]
+    assert projected == []
 
 
 def test_infrastate_scenario_marketplace_does_not_build_skill_inventory(monkeypatch):
@@ -4484,26 +4478,27 @@ def test_infrastate_manifest_wakes_on_webio_stream_controls():
     assert "\n  - webio.stream.subscription.changed\n" in manifest
 
 
-def test_infrastate_manifest_admits_boot_and_background_status_events():
+def test_infrastate_manifest_defers_boot_and_admits_background_status_events():
     mod = _load_infrastate_module()
     skill_dir = Path(__file__).resolve().parents[1]
     manifest = mod.yaml.safe_load((skill_dir / "skill.yaml").read_text(encoding="utf-8"))
     activation = ((manifest.get("runtime") or {}).get("activation") or {})
 
     assert activation.get("mode") == "lazy"
-    assert activation.get("startup_allowed") is True
+    assert activation.get("startup_allowed") is False
     assert activation.get("background_refresh") is True
     assert not activation.get("when")
 
     from adaos.services.skill.activation import load_skill_activation_policy, subscription_event_admission
 
     policy = load_skill_activation_policy(skill_dir.parent, "infrastate_skill")
-    admitted = subscription_event_admission(
+    denied = subscription_event_admission(
         policy,
         SimpleNamespace(type="sys.ready", payload={"ts": 1.0}),
         "sys.ready",
     )
-    assert admitted["allowed"] is True
+    assert denied["allowed"] is False
+    assert denied["reason"] == "startup_not_opted_in"
 
 
 def test_infrastate_marketplace_action_navigates_to_declared_modal_without_host_roundtrip():
@@ -5176,7 +5171,7 @@ def test_infrastate_sys_ready_defers_first_paint_refresh(monkeypatch):
 
     asyncio.run(mod.on_runtime_event(SimpleNamespace(type="sys.ready", payload={"ts": 1.0})))
 
-    assert scheduled == [{"webspace_id": None, "reason": "sys.ready"}]
+    assert scheduled == []
 
 
 def test_infrastate_sys_ready_uses_sdk_envelope_metadata(monkeypatch):
@@ -5203,7 +5198,7 @@ def test_infrastate_sys_ready_uses_sdk_envelope_metadata(monkeypatch):
         )
     )
 
-    assert scheduled == [{"webspace_id": None, "reason": "sys.ready"}]
+    assert scheduled == []
 
 
 def test_infrastate_sys_ready_materializes_when_event_history_is_unavailable(monkeypatch):
@@ -5224,7 +5219,7 @@ def test_infrastate_sys_ready_materializes_when_event_history_is_unavailable(mon
 
     asyncio.run(mod.on_runtime_event(SimpleNamespace(type="sys.ready", payload={"ts": 1.0})))
 
-    assert scheduled == [{"webspace_id": None, "reason": "sys.ready"}]
+    assert scheduled == []
 
 
 def test_infrastate_marketplace_hides_skills_installed_via_scenario_dependencies(monkeypatch):

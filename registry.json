@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-29T05:55:00+00:00",
+  "updated_at": "2026-08-29T05:55:20+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -359,8 +359,8 @@
       "kind": "skill",
       "id": "infrastate_skill",
       "name": "infrastate_skill",
-      "version": "0.75.90",
-      "updated_at": "2026-08-28T15:28:11+00:00",
+      "version": "0.75.91",
+      "updated_at": "2026-08-29T05:55:20+00:00",
       "path": "skills/infrastate_skill",
       "manifest": "skills/infrastate_skill/skill.yaml",
       "source": {
@@ -376,7 +376,7 @@
       "runtime_python": "3.11",
       "activation": {
         "mode": "lazy",
-        "startup_allowed": true,
+        "startup_allowed": false,
         "background_refresh": true
       },
       "tools_count": 8

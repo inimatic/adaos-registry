@@ -30,6 +30,7 @@ from adaos.sdk.data import (
     StreamRuntime,
     active_projection_demand_snapshot,
     ctx_subnet,
+    has_projection_demand,
     skill_memory_get,
     skill_memory_set,
 )
@@ -145,10 +146,9 @@ _PROJECTION_SLOTS = [
     ProjectionSlot(
         slot,
         path,
-        # The compact homepoint widget is first-paint operational state.  Keep
-        # it current even between browser subscriptions; detail/modal slots
-        # remain demand-driven to preserve the Yjs pressure budget.
-        demand="always" if slot == "infrastate.summary" else "active",
+        # YDoc defaults provide first paint. Runtime state is projected only
+        # while a browser actually consumes the corresponding surface.
+        demand="active",
     )
     for slot, path in _PROJECTION_SLOT_PATHS.items()
 ]
@@ -11105,6 +11105,13 @@ def _refresh_target_webspace_ids(webspace_id: str | None = None) -> list[str]:
     return sorted(webspaces) or [default_webspace_id()]
 
 
+def _has_active_infrastate_projection_demand(webspace_id: str | None) -> bool:
+    return any(
+        has_projection_demand(slot, webspace_id=webspace_id)
+        for slot in _PROJECTION_SLOTS
+    )
+
+
 async def _project_async(snapshot: dict[str, Any], webspace_id: str | None = None) -> None:
     sections = _projection_sections_from_snapshot(snapshot)
     fingerprint = _snapshot_projection_fingerprint(sections)
@@ -11278,7 +11285,12 @@ async def _refresh_live_infrastate_async(
     sections: dict[str, Any] = {}
     try:
         await asyncio.to_thread(_write_ui_state, last_refresh_ts=now)
-        if project_control:
+        projection_demanded = project_control and _has_active_infrastate_projection_demand(webspace_id)
+        if project_control and not projection_demanded:
+            _projection_diag["no_demand_refresh_skip_total"] = int(
+                _projection_diag.get("no_demand_refresh_skip_total") or 0
+            ) + 1
+        if projection_demanded:
             sections = await asyncio.to_thread(
                 _lightweight_projection_sections,
                 webspace_id=webspace_id,
@@ -11858,6 +11870,12 @@ async def on_runtime_event(evt: Any) -> None:
         state in {"failed", "cancelled", "canceled", "rolled_back"}
         or (state == "succeeded" and phase == "validate")
     )
+    if event_type == "sys.ready":
+        _projection_diag["startup_refresh_deferred_total"] = int(
+            _projection_diag.get("startup_refresh_deferred_total") or 0
+        ) + 1
+        _projection_diag["last_lifecycle_refresh_event"] = event_type
+        return
     try:
         _projection_diag["lifecycle_refresh_deferred_total"] = int(
             _projection_diag.get("lifecycle_refresh_deferred_total") or 0
