@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: media_center
-version: 0.6.98
+version: 0.6.99
 profiles:
 - adaos.media_center.v1
 - adaos.media_center.tv.v1

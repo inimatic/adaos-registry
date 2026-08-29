@@ -6,9 +6,16 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.98` combines `media_center_skill@0.8.92`,
-`media_library_agent@0.6.43`, `media_control_skill@0.2.19`, and scenario
-`media_center@0.6.38`. Stopped playback keeps its selected item and remains
+Release `0.6.99` combines `media_center_skill@0.8.92`,
+`media_library_agent@0.6.43`, `media_control_skill@0.2.20`, and scenario
+`media_center@0.6.39`. Queue-boundary Previous/Next commands are now no-ops
+instead of terminal playback transitions; only endpoint-observed media end can
+end a session. Pending volume and presentation commands are coalesced, and a
+remote fullscreen request uses the endpoint's AdaOS viewport presentation so
+the command stream cannot block on native browser user activation. The details
+modal places Favorite, Playlist, and Minimize beside transport, keeps metadata
+editing next to descriptive metadata, and moves storage/technical fields into
+an explicit Details modal. Stopped playback keeps its selected item and remains
 resumable from subscribed remotes. Endpoint heartbeat refreshes only the exact
 stopped session still held by that surface, preventing Remote from losing it to
 the freshness window without reviving unrelated playback history. One physical
