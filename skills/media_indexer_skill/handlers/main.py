@@ -2138,14 +2138,38 @@ def dispose() -> Dict[str, Any]:
     return {"status": "ok"}
 
 
-@subscribe("sys.ready")
-async def on_sys_ready(evt: Any) -> None:
+def _is_media_indexer_yjs_projection_payload(payload: Dict[str, Any]) -> bool:
+    slot = str(payload.get("slot") or payload.get("projection") or "").strip()
+    if slot == "media_indexer.snapshot":
+        return True
+    topic = str(payload.get("topic") or "").strip()
+    if topic.endswith(".media_indexer.snapshot"):
+        return True
+    path = str(payload.get("path") or payload.get("projection_path") or "").strip()
+    return path in {"data/media_indexer", "data/media_indexer/status", "data/media_indexer/results"}
+
+
+async def _project_rehydrated_snapshot_on_demand(evt: Any) -> None:
     payload = _event_payload(evt)
+    if not _is_media_indexer_yjs_projection_payload(payload):
+        return
+    if str(payload.get("action") or "").strip().lower() == "unsubscribed":
+        return
     allowed, webspace_id = _target_context(payload)
     if not allowed:
         return
     _, _, snapshot = await asyncio.to_thread(_rehydrated_snapshot)
     await _project_snapshot_async(snapshot, webspace_id=webspace_id or "desktop")
+
+
+@subscribe("webio.yjs.snapshot.requested")
+async def on_yjs_snapshot_requested(evt: Any) -> None:
+    await _project_rehydrated_snapshot_on_demand(evt)
+
+
+@subscribe("webio.yjs.subscription.changed")
+async def on_yjs_subscription_changed(evt: Any) -> None:
+    await _project_rehydrated_snapshot_on_demand(evt)
 
 
 @subscribe("media_indexer.action")

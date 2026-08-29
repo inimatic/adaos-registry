@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-28T15:34:53+00:00",
+  "updated_at": "2026-08-29T05:54:43+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -424,8 +424,8 @@
       "kind": "skill",
       "id": "media_indexer_skill",
       "name": "media_indexer_skill",
-      "version": "0.1.35",
-      "updated_at": "2026-08-14T19:39:51+00:00",
+      "version": "0.1.36",
+      "updated_at": "2026-08-29T05:54:43+00:00",
       "path": "skills/media_indexer_skill",
       "manifest": "skills/media_indexer_skill/skill.yaml",
       "source": {
@@ -439,6 +439,11 @@
       },
       "description": "Semantic indexing and multimodal search for local media files (video, audio, images) using NER, FAISS and CLIP.",
       "runtime_python": "3.11",
+      "activation": {
+        "mode": "on_demand",
+        "startup_allowed": false,
+        "background_refresh": true
+      },
       "tools_count": 6
     },
     {

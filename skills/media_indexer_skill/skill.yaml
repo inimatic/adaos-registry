@@ -1,11 +1,15 @@
 name: media_indexer_skill
-version: 0.1.35
+version: 0.1.36
 description: Semantic indexing and multimodal search for local media files (video,
   audio, images) using NER, FAISS and CLIP.
 runtime:
   kind: service
   in_process_events: true
   python: '3.11'
+  activation:
+    mode: on_demand
+    startup_allowed: false
+    background_refresh: true
   env:
     mode: venv
     python: '3.11'
@@ -13,8 +17,9 @@ dependencies:
 - shazamio
 events:
   subscribe:
-  - sys.ready
   - media_indexer.action
+  - webio.yjs.snapshot.requested
+  - webio.yjs.subscription.changed
   - webio.stream.snapshot.requested
   publish: []
 data_projections:
@@ -225,13 +230,13 @@ tools:
     properties:
       status:
         type: string
-updated_at: '2026-08-14T19:39:51+00:00'
+updated_at: '2026-08-29T05:54:43+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.774+4991.d0c42079
-    recorded_at: '2026-08-14T19:39:51+00:00'
+    min_version: 0.1.950+5767.4e1aaf98b
+    recorded_at: '2026-08-29T05:54:43+00:00'
     source: skill_push
-    min_commit: d0c42079b61fba5df8dbcbb9c481abaee6218717
-    min_short_commit: d0c42079
-    build_date: '2026-08-14T22:38:55+03:00'
+    min_commit: 4e1aaf98b24c921949cad7ace2ae24c8ef4fff30
+    min_short_commit: 4e1aaf98
+    build_date: '2026-08-28T19:07:25+03:00'
 

@@ -25,7 +25,10 @@ def test_manifest_declares_runtime_contracts() -> None:
     assert "requirements.txt" not in {path.name for path in SKILL_ROOT.iterdir()}
     assert manifest.get("dependencies") == ["shazamio"]
     assert not (manifest.get("models") or {}).get("artifacts")
-    assert "sys.ready" in manifest["events"]["subscribe"]
+    assert "sys.ready" not in manifest["events"]["subscribe"]
+    assert "webio.yjs.snapshot.requested" in manifest["events"]["subscribe"]
+    assert "webio.yjs.subscription.changed" in manifest["events"]["subscribe"]
+    assert manifest["runtime"]["activation"]["startup_allowed"] is False
     assert "media_indexer.action" in manifest["events"]["subscribe"]
     assert "webio.stream.snapshot.requested" in manifest["events"]["subscribe"]
     assert any(route["route"] == "stream" and route["receiver"] == "media_indexer.operations" for route in manifest["data_routes"])
@@ -727,7 +730,7 @@ def test_rehydrate_restores_index_metadata_from_skill_data(monkeypatch, tmp_path
     assert stored["media_indexer.index"]["index_dir"] == str(index_dir)
 
 
-def test_sys_ready_projects_compact_persisted_state_without_loading_index(monkeypatch) -> None:
+def test_yjs_demand_projects_compact_persisted_state_without_loading_index(monkeypatch) -> None:
     main = importlib.import_module("handlers.main")
     snapshot = {"form": {"directory": "/media"}, "status": {"value": "indexed"}}
     projected: dict[str, object] = {}
@@ -743,7 +746,13 @@ def test_sys_ready_projects_compact_persisted_state_without_loading_index(monkey
 
     monkeypatch.setattr(main, "_project_snapshot_async", project)
 
-    asyncio.run(main.on_sys_ready(SimpleNamespace(payload={"webspace_id": "desktop"})))
+    asyncio.run(
+        main.on_yjs_snapshot_requested(
+            SimpleNamespace(
+                payload={"webspace_id": "desktop", "slot": "media_indexer.snapshot"},
+            )
+        )
+    )
 
     assert projected == {"snapshot": snapshot, "webspace_id": "desktop"}
 
