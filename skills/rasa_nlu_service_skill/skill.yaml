@@ -1,8 +1,12 @@
 name: rasa_nlu_service_skill
-version: 0.1.14
+version: 0.1.15
 description: Local Rasa NLU-only service for AdaOS intent detection
 runtime:
   kind: service
+  activation:
+    mode: lazy
+    startup_allowed: true
+    background_refresh: true
   env:
     mode: venv
     python: '3.11'
@@ -23,16 +27,16 @@ events:
   - nlp.rasa.train
   publish:
   - nlp.intent.detected
-updated_at: '2026-08-14T19:39:58+00:00'
+updated_at: '2026-08-29T05:55:37+00:00'
 dependencies:
 - --no-deps
 - adaos-rasa-nlu @ git+https://github.com/inimatic/rasa-port.git@main
 compatibility:
   adaos_core:
-    min_version: 0.1.774+4991.d0c42079
-    recorded_at: '2026-08-14T19:39:58+00:00'
+    min_version: 0.1.950+5767.4e1aaf98b
+    recorded_at: '2026-08-29T05:55:37+00:00'
     source: skill_push
-    min_commit: d0c42079b61fba5df8dbcbb9c481abaee6218717
-    min_short_commit: d0c42079
-    build_date: '2026-08-14T22:38:55+03:00'
+    min_commit: 4e1aaf98b24c921949cad7ace2ae24c8ef4fff30
+    min_short_commit: 4e1aaf98
+    build_date: '2026-08-28T19:07:25+03:00'
 

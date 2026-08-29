@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-29T05:55:20+00:00",
+  "updated_at": "2026-08-29T05:55:37+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -666,8 +666,8 @@
       "kind": "skill",
       "id": "rasa_nlu_service_skill",
       "name": "rasa_nlu_service_skill",
-      "version": "0.1.14",
-      "updated_at": "2026-08-14T19:39:58+00:00",
+      "version": "0.1.15",
+      "updated_at": "2026-08-29T05:55:37+00:00",
       "path": "skills/rasa_nlu_service_skill",
       "manifest": "skills/rasa_nlu_service_skill/skill.yaml",
       "source": {
@@ -679,7 +679,12 @@
         "name": "rasa_nlu_service_skill",
         "id": "rasa_nlu_service_skill"
       },
-      "description": "Local Rasa NLU-only service for AdaOS intent detection"
+      "description": "Local Rasa NLU-only service for AdaOS intent detection",
+      "activation": {
+        "mode": "lazy",
+        "startup_allowed": true,
+        "background_refresh": true
+      }
     },
     {
       "kind": "skill",
