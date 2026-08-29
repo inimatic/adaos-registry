@@ -1,5 +1,5 @@
 name: demo_metrics_skill
-version: 0.12.1
+version: 0.13.1
 description: Neutral demo skill for semantic Web UI migration with a metrics table,
   chart payload, Taiga tree, and live event stream.
 runtime:
@@ -31,6 +31,11 @@ data_projections:
   targets:
   - backend: yjs
     path: data/demo_metrics/selection
+- scope: webspace
+  slot: demo.metrics.resource_workbench
+  targets:
+  - backend: yjs
+    path: data/demo_metrics/resource_workbench
 events:
   subscribe:
   - webio.stream.snapshot.requested
@@ -96,13 +101,132 @@ tools:
     required:
     - ok
     - event
-updated_at: '2026-08-11T09:24:45+00:00'
+- name: get_resource_workbench_snapshot
+  description: Return the Declarative Resource Workbench demo snapshot with definitions,
+    synthetic records, role fixtures, events, and traces.
+  entry: handlers.main:get_resource_workbench_snapshot
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+      role:
+        type: string
+      fixture:
+        type: string
+  output_schema:
+    type: object
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+      items:
+        type: array
+    required:
+    - ok
+    - snapshot
+- name: list_resource_role_matrix
+  description: Return role-policy rows for the Declarative Resource Workbench demo.
+  entry: handlers.main:list_resource_role_matrix
+  input_schema:
+    type: object
+    properties:
+      role:
+        type: string
+      fixture:
+        type: string
+  output_schema:
+    type: object
+    properties:
+      ok:
+        type: boolean
+      resource_type:
+        type: string
+      items:
+        type: array
+      count:
+        type: integer
+    required:
+    - ok
+    - items
+- name: query_resource_workbench
+  description: Run a typed resource query for Dev Tickets or demo workbench resources.
+  entry: handlers.main:query_resource_workbench
+  input_schema:
+    type: object
+    properties:
+      resource_type:
+        type: string
+      filters:
+        type: object
+      search:
+        type: string
+      limit:
+        type: integer
+      actor:
+        type: object
+      role:
+        type: string
+  output_schema:
+    type: object
+    properties:
+      ok:
+        type: boolean
+      resource_type:
+        type: string
+      items:
+        type: array
+      count:
+        type: integer
+    required:
+    - ok
+    - resource_type
+    - items
+- name: operate_metric_note
+  description: Execute a typed create, update, or delete operation against the demo.metric_note
+    prototype store.
+  entry: handlers.main:operate_metric_note
+  input_schema:
+    type: object
+    properties:
+      operation_id:
+        type: string
+      record_id:
+        type: string
+      payload:
+        type: object
+      actor:
+        type: object
+      role:
+        type: string
+      expected_revision:
+        oneOf:
+        - type: integer
+        - type: string
+        - type: 'null'
+  output_schema:
+    type: object
+    properties:
+      ok:
+        type: boolean
+      resource_type:
+        type: string
+      operation_id:
+        type: string
+      snapshot:
+        type: object
+    required:
+    - ok
+    - resource_type
+    - operation_id
+updated_at: '2026-08-29T22:32:33+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.741+4834.2acb1c5b
-    recorded_at: '2026-08-11T09:24:45+00:00'
+    min_version: 0.1.950+5772.70493be1b
+    recorded_at: '2026-08-29T22:32:33+00:00'
     source: skill_push
-    min_commit: 2acb1c5b81b7eda3e8584e87efa9b75eebbc202e
-    min_short_commit: 2acb1c5b
-    build_date: '2026-08-11T12:20:36+03:00'
+    min_commit: 70493be1b33f2b00bbda863ce33834e38bac090d
+    min_short_commit: 70493be1
+    build_date: '2026-08-30T01:06:36+03:00'
 

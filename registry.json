@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-29T07:19:31+00:00",
+  "updated_at": "2026-08-29T22:32:33+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -249,8 +249,8 @@
       "kind": "skill",
       "id": "demo_metrics_skill",
       "name": "demo_metrics_skill",
-      "version": "0.12.1",
-      "updated_at": "2026-08-11T09:24:45+00:00",
+      "version": "0.13.1",
+      "updated_at": "2026-08-29T22:32:33+00:00",
       "path": "skills/demo_metrics_skill",
       "manifest": "skills/demo_metrics_skill/skill.yaml",
       "source": {
@@ -264,7 +264,7 @@
       },
       "description": "Neutral demo skill for semantic Web UI migration with a metrics table, chart payload, Taiga tree, and live event stream.",
       "runtime_python": "3.11",
-      "tools_count": 3
+      "tools_count": 7
     },
     {
       "kind": "skill",

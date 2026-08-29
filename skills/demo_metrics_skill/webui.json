@@ -34,6 +34,10 @@
           "label": "Workspace"
         },
         {
+          "id": "open-workbench",
+          "label": "Workbench"
+        },
+        {
           "id": "open-operations",
           "label": "Operations"
         },
@@ -233,6 +237,104 @@
         }
       ]
     },
+    "data/demo_metrics/resource_workbench": {
+      "schema": "adaos.demo_metrics.resource_workbench.v1",
+      "title": "Declarative Resource Workbench",
+      "summary": {
+        "value": "4",
+        "label": "Resource definitions",
+        "description": "Typed definition/query/operation/traces over Dev Tickets and demo resources."
+      },
+      "definitions": {
+        "items": [
+          {
+            "resource_type": "adaos.dev.ticket",
+            "title": "Dev Ticket",
+            "provider": "api",
+            "writes": "governed",
+            "default_query": "open",
+            "filters": 13,
+            "operations": 16,
+            "views": 5,
+            "locales": "en, ru",
+            "readiness": "ready, stale, read_only, permission_denied, unsupported_query"
+          },
+          {
+            "resource_type": "demo.metric",
+            "title": "Demo Metric",
+            "provider": "synthetic",
+            "writes": "read_only",
+            "default_query": "normal",
+            "filters": 6,
+            "operations": 2,
+            "views": 3,
+            "locales": "en, ru",
+            "readiness": "empty, normal, validation_failure, unavailable_provider, long_text"
+          },
+          {
+            "resource_type": "demo.metric_note",
+            "title": "Demo Metric Note",
+            "provider": "synthetic",
+            "writes": "governed",
+            "default_query": "normal",
+            "filters": 6,
+            "operations": 3,
+            "views": 4,
+            "locales": "en, ru",
+            "readiness": "empty, normal, validation_failure, unavailable_provider, long_text, ru, en"
+          },
+          {
+            "resource_type": "demo.metric_event",
+            "title": "Demo Metric Event",
+            "provider": "synthetic",
+            "writes": "append_only",
+            "default_query": "latest",
+            "filters": 5,
+            "operations": 1,
+            "views": 2,
+            "locales": "en, ru",
+            "readiness": "ready, stale, provider_unavailable"
+          }
+        ]
+      },
+      "roles": {
+        "items": [
+          {
+            "resource_type": "demo.metric_note",
+            "role": "owner",
+            "create": "allowed",
+            "update": "allowed",
+            "delete": "allowed"
+          },
+          {
+            "resource_type": "demo.metric_note",
+            "role": "member",
+            "create": "allowed",
+            "update": "allowed",
+            "delete": "disabled"
+          },
+          {
+            "resource_type": "demo.metric_note",
+            "role": "guest",
+            "create": "denied",
+            "update": "denied",
+            "delete": "hidden"
+          }
+        ]
+      },
+      "metrics": {
+        "items": []
+      },
+      "notes": {
+        "items": []
+      },
+      "traces": {
+        "items": []
+      },
+      "events": {
+        "items": []
+      }
+    },
     "data/demo_metrics/selection": {
       "metric_id": "cpu",
       "status_filter": "all",
@@ -276,6 +378,15 @@
             "modalId": "workspace_manager",
             "workspaceRef": "workspace:demo_metrics",
             "entityRef": "skill:demo_metrics_skill"
+          }
+        },
+        {
+          "on": "click:open-workbench",
+          "type": "navigate",
+          "params": {
+            "to": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
+            "surface": "modal",
+            "modalId": "demo_metrics_resource_workbench_modal"
           }
         },
         {
@@ -1036,6 +1147,417 @@
         "implements": [
           "demo_metrics_skill.demo_metrics_operations_modal"
         ]
+      },
+      "demo_metrics_resource_workbench_modal": {
+        "title": "Resource Workbench",
+        "schema": {
+          "id": "demo_metrics_resource_workbench_modal",
+          "layout": {
+            "type": "split",
+            "pattern": "split",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              },
+              {
+                "id": "right",
+                "role": "aux"
+              },
+              {
+                "id": "bottom",
+                "role": "footer"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "workbench-definitions",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Resource definitions",
+              "dataSource": {
+                "kind": "api",
+                "url": "/api/resources/definitions",
+                "method": "GET",
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "resource.demo_metrics"
+                ]
+              },
+              "inputs": {
+                "search": true,
+                "searchKeys": [
+                  "resource_type",
+                  "title",
+                  "authority.provider",
+                  "authority.writes"
+                ],
+                "columns": [
+                  {
+                    "key": "resource_type",
+                    "label": "Resource",
+                    "width": "220px",
+                    "mono": true
+                  },
+                  {
+                    "key": "title",
+                    "label": "Title"
+                  },
+                  {
+                    "key": "authority.provider",
+                    "label": "Provider",
+                    "width": "110px"
+                  },
+                  {
+                    "key": "authority.writes",
+                    "label": "Writes",
+                    "width": "120px"
+                  },
+                  {
+                    "key": "query.default",
+                    "label": "Query",
+                    "width": "100px"
+                  }
+                ],
+                "emptyText": "No resource definitions yet"
+              }
+            },
+            {
+              "id": "workbench-notes",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Metric notes",
+              "dataSource": {
+                "kind": "api",
+                "url": "/api/resources/query",
+                "method": "POST",
+                "body": {
+                  "resource_type": "demo.metric_note",
+                  "limit": 50,
+                  "actor": {
+                    "id": "demo_metrics:browser",
+                    "role": "owner"
+                  }
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "resource.demo_metrics"
+                ]
+              },
+              "inputs": {
+                "search": true,
+                "searchKeys": [
+                  "metric_id",
+                  "title",
+                  "body",
+                  "actor"
+                ],
+                "columns": [
+                  {
+                    "key": "metric_id",
+                    "label": "Metric",
+                    "width": "90px",
+                    "mono": true
+                  },
+                  {
+                    "key": "title",
+                    "label": "Title"
+                  },
+                  {
+                    "key": "revision",
+                    "label": "Rev",
+                    "width": "70px"
+                  },
+                  {
+                    "key": "actor",
+                    "label": "Actor",
+                    "width": "140px"
+                  },
+                  {
+                    "key": "updated_at",
+                    "label": "Updated",
+                    "width": "180px",
+                    "mono": true
+                  }
+                ],
+                "emptyText": "No metric notes yet"
+              }
+            },
+            {
+              "id": "workbench-note-form",
+              "type": "ui.form",
+              "area": "right",
+              "title": "Metric note",
+              "inputs": {
+                "submitLabel": "Create note",
+                "submitPlacement": "top",
+                "resetOnSuccess": true,
+                "fields": [
+                  {
+                    "id": "role",
+                    "type": "dropdown",
+                    "label": "Role",
+                    "default": "owner",
+                    "options": [
+                      {
+                        "label": "Owner",
+                        "value": "owner"
+                      },
+                      {
+                        "label": "Member",
+                        "value": "member"
+                      },
+                      {
+                        "label": "Guest",
+                        "value": "guest"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "metric_id",
+                    "type": "dropdown",
+                    "label": "Metric",
+                    "default": "cpu",
+                    "options": [
+                      {
+                        "label": "CPU Load",
+                        "value": "cpu"
+                      },
+                      {
+                        "label": "Memory Pressure",
+                        "value": "memory"
+                      },
+                      {
+                        "label": "Queue Depth",
+                        "value": "queue"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "title",
+                    "type": "shortText",
+                    "label": "Title",
+                    "required": true,
+                    "placeholder": "What changed?",
+                    "validation": {
+                      "required": true,
+                      "minLength": 3
+                    }
+                  },
+                  {
+                    "id": "body",
+                    "type": "longText",
+                    "label": "Body",
+                    "placeholder": "Optional detail"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "demo_metrics_skill.operate_metric_note",
+                  "invalidates": [
+                    "resource.demo_metrics"
+                  ],
+                  "params": {
+                    "operation_id": "create",
+                    "role": "$event.values.role",
+                    "payload": {
+                      "metric_id": "$event.values.metric_id",
+                      "title": "$event.values.title",
+                      "body": "$event.values.body"
+                    }
+                  },
+                  "feedback": {
+                    "pending": {
+                      "label": "Creating note",
+                      "icon": "sync-outline"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "workbench-actions",
+              "type": "input.commandBar",
+              "area": "right",
+              "title": "Controls",
+              "inputs": {
+                "variant": "stack",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "refresh",
+                    "label": "Refresh"
+                  },
+                  {
+                    "id": "sample",
+                    "label": "Sample"
+                  },
+                  {
+                    "id": "guest-denied",
+                    "label": "Guest denied"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:refresh",
+                  "type": "callSkill",
+                  "target": "demo_metrics_skill.get_resource_workbench_snapshot",
+                  "invalidates": [
+                    "resource.demo_metrics"
+                  ]
+                },
+                {
+                  "on": "click:sample",
+                  "type": "callSkill",
+                  "target": "demo_metrics_skill.operate_metric_note",
+                  "invalidates": [
+                    "resource.demo_metrics"
+                  ],
+                  "params": {
+                    "operation_id": "create",
+                    "role": "owner",
+                    "payload": {
+                      "metric_id": "cpu",
+                      "title": "Sample workbench note",
+                      "body": "Created from the Demo Metrics Resource Workbench surface."
+                    }
+                  }
+                },
+                {
+                  "on": "click:guest-denied",
+                  "type": "callSkill",
+                  "target": "demo_metrics_skill.operate_metric_note",
+                  "invalidates": [
+                    "resource.demo_metrics"
+                  ],
+                  "params": {
+                    "operation_id": "create",
+                    "role": "guest",
+                    "payload": {
+                      "metric_id": "cpu",
+                      "title": "Guest write attempt",
+                      "body": "This should be denied by the resource policy."
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "workbench-roles",
+              "type": "ui.table",
+              "area": "right",
+              "title": "Role matrix",
+              "dataSource": {
+                "kind": "skill",
+                "name": "demo_metrics_skill.list_resource_role_matrix",
+                "params": {},
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "resource.demo_metrics"
+                ]
+              },
+              "inputs": {
+                "columns": [
+                  {
+                    "key": "resource_type",
+                    "label": "Resource",
+                    "mono": true
+                  },
+                  {
+                    "key": "role",
+                    "label": "Role",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "create",
+                    "label": "Create",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "delete",
+                    "label": "Delete",
+                    "width": "90px"
+                  }
+                ],
+                "emptyText": "No role policy rows yet"
+              }
+            },
+            {
+              "id": "workbench-traces",
+              "type": "ui.table",
+              "area": "bottom",
+              "title": "Resource traces",
+              "dataSource": {
+                "kind": "api",
+                "url": "/api/resources/traces",
+                "method": "GET",
+                "params": {
+                  "limit": 30
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "resource.demo_metrics"
+                ]
+              },
+              "inputs": {
+                "search": true,
+                "searchKeys": [
+                  "resource_type",
+                  "status",
+                  "operation_id",
+                  "query_id"
+                ],
+                "columns": [
+                  {
+                    "key": "resource_type",
+                    "label": "Resource",
+                    "width": "160px",
+                    "mono": true
+                  },
+                  {
+                    "key": "operation_id",
+                    "label": "Operation",
+                    "width": "120px"
+                  },
+                  {
+                    "key": "status",
+                    "label": "Status",
+                    "width": "120px"
+                  },
+                  {
+                    "key": "readiness.state",
+                    "label": "Readiness",
+                    "width": "140px"
+                  },
+                  {
+                    "key": "completed_at",
+                    "label": "Completed",
+                    "width": "180px",
+                    "mono": true
+                  }
+                ],
+                "emptyText": "No resource traces yet"
+              }
+            }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "demo_metrics_resource_workbench": {
+                "view": "demo_metrics_skill.demo_metrics_resource_workbench_modal"
+              }
+            },
+            "defaultRoute": "demo_metrics_resource_workbench"
+          }
+        },
+        "implements": [
+          "demo_metrics_skill.demo_metrics_resource_workbench_modal"
+        ]
       }
     }
   },
@@ -1065,6 +1587,13 @@
       },
       "demo_metrics_skill.demo_metrics_operations_modal": {
         "title": "Demo Operations",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      },
+      "demo_metrics_skill.demo_metrics_resource_workbench_modal": {
+        "title": "Resource Workbench",
         "surfaces": [
           "modal"
         ],

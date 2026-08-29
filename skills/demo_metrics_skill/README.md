@@ -37,6 +37,9 @@ Current implementation status:
   workspace-manager bridge
 - the skill now ships a second `operations`-class modal surface that reuses the
   same typed refs while filtering out workspace-only views
+- the skill now ships a `Resource Workbench` modal that exercises declarative
+  resource definitions, typed queries, governed CRUD operations, role policy,
+  synthetic fixtures, and resource traces
 - semantic workspace metadata now also lands in `runtime.surface.*` page state
   and is stamped into typed host/skill action envelopes
 - the skill now declares `webui_owner: shared` so its browser-facing Yjs defaults
@@ -60,6 +63,12 @@ Stand verification checklist:
   manual actions are triggered
 - click `Workspace` and confirm the Webspaces manager opens through the typed
   `open_workspace` path
+- click `Resource Workbench` and confirm definitions, metric notes, role matrix,
+  and resource traces render in one modal
+- create a metric note as `Owner` or `Member` and confirm the note appears in
+  the typed `demo.metric_note` query table
+- run the `Guest denied` action and confirm a denied write appears in resource
+  traces without creating a note
 - click `Operations` and confirm the operations modal opens with event, chart,
   and operator-notes surfaces
 - click `Open modal` and confirm the modal opens through the typed `open_modal`

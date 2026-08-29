@@ -5,8 +5,194 @@ from typing import Any, Mapping
 
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.io.out import stream_publish
+from adaos.services.resources import ResourceAccessDenied, ResourceConflict, ResourceWorkbenchService
 
 _RECEIVER_ID = "demo_metrics.events"
+_WORKBENCH_SCHEMA = "adaos.demo_metrics.resource_workbench.v1"
+_WORKBENCH_RESOURCE_TYPES = (
+    "adaos.dev.ticket",
+    "demo.metric",
+    "demo.metric_note",
+    "demo.metric_event",
+)
+
+
+def _text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _mapping(value: Any) -> dict[str, Any]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    return {}
+
+
+def _workbench_actor(payload: Mapping[str, Any] | None) -> dict[str, Any]:
+    body = _mapping(payload)
+    actor = _mapping(body.get("actor"))
+    role = _text(body.get("role") or actor.get("role") or "owner").lower() or "owner"
+    actor_id = _text(actor.get("id") or body.get("actor_id")) or f"demo_metrics:{role}"
+    return {"id": actor_id, "role": role}
+
+
+def _definition_rows(definitions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for definition in definitions:
+        query = _mapping(definition.get("query"))
+        authority = _mapping(definition.get("authority"))
+        i18n = _mapping(definition.get("i18n"))
+        operations = definition.get("operations") if isinstance(definition.get("operations"), list) else []
+        views = definition.get("views") if isinstance(definition.get("views"), list) else []
+        locales = i18n.get("locales") if isinstance(i18n.get("locales"), list) else []
+        readiness = _mapping(definition.get("readiness"))
+        rows.append(
+            {
+                "resource_type": _text(definition.get("resource_type")),
+                "title": _text(definition.get("title")),
+                "provider": _text(authority.get("provider")),
+                "writes": _text(authority.get("writes")),
+                "default_query": _text(query.get("default")),
+                "filters": len(query.get("filters") or []),
+                "operations": len(operations),
+                "views": len(views),
+                "locales": ", ".join(_text(item) for item in locales if _text(item)),
+                "readiness": ", ".join(_text(item) for item in (readiness.get("states") or readiness.get("fixtures") or []) if _text(item)),
+            }
+        )
+    return rows
+
+
+def _role_rows(definitions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for definition in definitions:
+        resource_type = _text(definition.get("resource_type"))
+        role_fixtures = _mapping(_mapping(definition.get("access")).get("role_fixtures"))
+        if not role_fixtures:
+            continue
+        for role, policy in sorted(role_fixtures.items()):
+            if isinstance(policy, Mapping):
+                rows.append(
+                    {
+                        "resource_type": resource_type,
+                        "role": _text(role),
+                        "create": _text(policy.get("create") or "allowed"),
+                        "update": _text(policy.get("update") or "allowed"),
+                        "delete": _text(policy.get("delete") or "allowed"),
+                    }
+                )
+            else:
+                decision = _text(policy) or "allowed"
+                rows.append(
+                    {
+                        "resource_type": resource_type,
+                        "role": _text(role),
+                        "create": decision,
+                        "update": decision,
+                        "delete": decision,
+                    }
+                )
+    return rows
+
+
+def _compact_trace_rows(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for trace in reversed(traces):
+        actor = _mapping(trace.get("actor"))
+        readiness = _mapping(trace.get("readiness"))
+        result = _mapping(trace.get("result"))
+        result_label = result.get("count")
+        if result_label is None:
+            result_label = result.get("record_id") or result.get("error") or ""
+        rows.append(
+            {
+                "trace_id": _text(trace.get("trace_id")),
+                "resource_type": _text(trace.get("resource_type")),
+                "operation": _text(trace.get("operation_id") or trace.get("query_id")),
+                "status": _text(trace.get("status")),
+                "readiness": _text(readiness.get("state")),
+                "actor": _text(actor.get("id") or actor.get("actor")),
+                "result": str(result_label),
+                "completed_at": _text(trace.get("completed_at")),
+            }
+        )
+    return rows
+
+
+def _event_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for event in reversed(events):
+        rows.append(
+            {
+                "event_id": _text(event.get("event_id")),
+                "resource_type": _text(event.get("resource_type")),
+                "semantic_type": _text(event.get("semantic_type")),
+                "record_ref": _text(event.get("record_ref")),
+                "occurred_at": _text(event.get("occurred_at")),
+            }
+        )
+    return rows
+
+
+def _query_resource(
+    service: ResourceWorkbenchService,
+    resource_type: str,
+    *,
+    filters: Mapping[str, Any] | None = None,
+    search: str = "",
+    limit: int = 50,
+    actor: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    return service.query(
+        {
+            "schema": "adaos.resource.query.v1",
+            "resource_type": resource_type,
+            "filters": _mapping(filters),
+            "search": search,
+            "limit": limit,
+            "actor": _mapping(actor) or {"id": "demo_metrics:owner", "role": "owner"},
+            "relevance_context": {"surface": "demo_metrics_resource_workbench"},
+        }
+    )
+
+
+def _resource_workbench_snapshot(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    body = _mapping(payload)
+    service = ResourceWorkbenchService()
+    actor = _workbench_actor(body)
+    metric_filters = _mapping(body.get("metric_filters"))
+    note_filters = _mapping(body.get("note_filters"))
+    fixture = _text(body.get("fixture"))
+    if fixture:
+        metric_filters.setdefault("fixture", fixture)
+        note_filters.setdefault("fixture", fixture)
+    definitions = service.definitions()
+    metrics = _query_resource(service, "demo.metric", filters=metric_filters, limit=20, actor=actor)
+    notes = _query_resource(service, "demo.metric_note", filters=note_filters, limit=50, actor=actor)
+    traces = service.traces(limit=30)
+    events = service.events(limit=30)
+    return {
+        "schema": _WORKBENCH_SCHEMA,
+        "title": "Declarative Resource Workbench",
+        "summary": {
+            "value": str(len(definitions)),
+            "label": "Resource definitions",
+            "description": "Typed definition/query/operation/traces over Dev Tickets and demo resources.",
+        },
+        "definitions": {"items": _definition_rows(definitions)},
+        "metrics": {"items": metrics.get("items") or [], "count": metrics.get("count", 0)},
+        "notes": {"items": notes.get("items") or [], "count": notes.get("count", 0)},
+        "roles": {"items": _role_rows(definitions)},
+        "traces": {"items": _compact_trace_rows(traces), "count": len(traces)},
+        "events": {"items": _event_rows(events), "count": len(events)},
+        "fixtures": {
+            "items": [
+                {"id": "normal", "label": "Normal", "purpose": "baseline typed query"},
+                {"id": "empty", "label": "Empty", "purpose": "empty-state rendering"},
+                {"id": "long_text", "label": "Long text", "purpose": "layout resilience"},
+                {"id": "unavailable_provider", "label": "Unavailable", "purpose": "provider failure/readiness"},
+            ]
+        },
+    }
 
 
 def _webspace_id_from_payload(payload: Mapping[str, Any] | None) -> str:
@@ -201,6 +387,7 @@ def _snapshot() -> dict[str, Any]:
             "description": "Neutral semantic Web UI control task",
             "buttons": [
                 {"id": "open-demo", "label": "Open modal"},
+                {"id": "open-workbench", "label": "Workbench"},
                 {"id": "emit-skill", "label": "Skill event"},
                 {"id": "emit-host", "label": "Host event"},
             ],
@@ -215,6 +402,7 @@ def _snapshot() -> dict[str, Any]:
         },
         "events": events,
         "chat": chat,
+        "resource_workbench": _resource_workbench_snapshot(),
     }
 
 
@@ -226,6 +414,128 @@ def _snapshot() -> dict[str, Any]:
 def get_demo_snapshot(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
     _ = payload
     return {"ok": True, "snapshot": _snapshot()}
+
+
+@tool(
+    "get_resource_workbench_snapshot",
+    summary="Return the Declarative Resource Workbench demo snapshot.",
+    stability="experimental",
+)
+def get_resource_workbench_snapshot(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    snapshot = _resource_workbench_snapshot(payload)
+    return {"ok": True, "snapshot": snapshot, "items": snapshot["definitions"]["items"]}
+
+
+@tool(
+    "list_resource_role_matrix",
+    summary="Return resource role-policy rows for the Demo Metrics Resource Workbench.",
+    stability="experimental",
+)
+def list_resource_role_matrix(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    snapshot = _resource_workbench_snapshot(payload)
+    items = snapshot["roles"]["items"]
+    return {"ok": True, "resource_type": "resource.role_policy", "items": items, "count": len(items)}
+
+
+@tool(
+    "query_resource_workbench",
+    summary="Run a typed resource query for the demo workbench resource set.",
+    stability="experimental",
+)
+def query_resource_workbench(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    body = _mapping(payload)
+    resource_type = _text(body.get("resource_type")) or "demo.metric"
+    if resource_type not in _WORKBENCH_RESOURCE_TYPES:
+        return {
+            "ok": False,
+            "resource_type": resource_type,
+            "items": [],
+            "count": 0,
+            "error_type": "unsupported_resource_type",
+            "error": f"unsupported demo resource_type: {resource_type}",
+        }
+    try:
+        return _query_resource(
+            ResourceWorkbenchService(),
+            resource_type,
+            filters=_mapping(body.get("filters")),
+            search=_text(body.get("search")),
+            limit=int(body.get("limit") or 50),
+            actor=_workbench_actor(body),
+        )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "resource_type": resource_type,
+            "items": [],
+            "count": 0,
+            "error_type": type(exc).__name__,
+            "error": str(exc),
+        }
+
+
+@tool(
+    "operate_metric_note",
+    summary="Execute a typed CRUD operation against the demo.metric_note prototype store.",
+    stability="experimental",
+)
+def operate_metric_note(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    body = _mapping(payload)
+    operation_id = _text(body.get("operation_id")) or "create"
+    try:
+        result = ResourceWorkbenchService().operate(
+            {
+                "schema": "adaos.resource.operation.v1",
+                "resource_type": "demo.metric_note",
+                "operation_id": operation_id,
+                "record_id": _text(body.get("record_id")),
+                "payload": _mapping(body.get("payload")),
+                "actor": _workbench_actor(body),
+                "subject": _mapping(body.get("subject")),
+                "expected_revision": body.get("expected_revision"),
+                "context": {
+                    "surface": "demo_metrics_resource_workbench",
+                    **_mapping(body.get("context")),
+                },
+            }
+        )
+        item = _publish_demo_event(
+            webspace_id=_webspace_id_from_payload(body),
+            title=f"Workbench operation: {operation_id}",
+            description=f"demo.metric_note {operation_id} completed through the Resource Workbench contract.",
+            source="resource_workbench",
+            severity="success",
+        )
+        return {"ok": True, **result, "event": item, "snapshot": _resource_workbench_snapshot(body)}
+    except ResourceAccessDenied as exc:
+        return _failed_resource_operation(body, operation_id, "permission_denied", str(exc))
+    except ResourceConflict as exc:
+        return _failed_resource_operation(body, operation_id, "conflict", str(exc))
+    except Exception as exc:
+        return _failed_resource_operation(body, operation_id, type(exc).__name__, str(exc))
+
+
+def _failed_resource_operation(
+    payload: Mapping[str, Any],
+    operation_id: str,
+    error_type: str,
+    error: str,
+) -> dict[str, Any]:
+    _publish_demo_event(
+        webspace_id=_webspace_id_from_payload(payload),
+        title=f"Workbench operation failed: {operation_id}",
+        description=error,
+        source="resource_workbench",
+        severity="warning",
+    )
+    return {
+        "ok": False,
+        "resource_type": "demo.metric_note",
+        "operation_id": operation_id,
+        "error_type": error_type,
+        "error": error,
+        "snapshot": _resource_workbench_snapshot(payload),
+    }
 
 
 @tool(
