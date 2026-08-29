@@ -1577,10 +1577,6 @@
                 {
                   "id": "transport",
                   "role": "aux"
-                },
-                {
-                  "id": "actions",
-                  "role": "footer"
                 }
               ]
             },
@@ -1660,6 +1656,34 @@
                   "selectedMediaKind": "$state.selectedMediaKind",
                   "profileId": "$state.profileId",
                   "remotePlaybackTargetId": "$state.selectedPlaybackTargetId",
+                  "supplementalControls": [
+                    {
+                      "id": "favorite",
+                      "label": "Favorite",
+                      "icon": "star-outline",
+                      "visibleIf": "$state.selectedMediaFavorite != true",
+                      "label_i18n": {"key": "runtime.media_center.ui.favorite"}
+                    },
+                    {
+                      "id": "unfavorite",
+                      "label": "Unfavorite",
+                      "icon": "star-half-outline",
+                      "visibleIf": "$state.selectedMediaFavorite == true",
+                      "label_i18n": {"key": "runtime.media_center.ui.unfavorite"}
+                    },
+                    {
+                      "id": "playlist",
+                      "label": "Add to playlist",
+                      "icon": "list-outline",
+                      "label_i18n": {"key": "runtime.media_center.ui.add_to_playlist"}
+                    },
+                    {
+                      "id": "close",
+                      "label": "Close to mini-player",
+                      "icon": "contract-outline",
+                      "label_i18n": {"key": "runtime.media_center.ui.close_to_mini_player"}
+                    }
+                  ],
                   "remotePlaybackAction": {
                     "target": "media_center_skill.play_on",
                     "params": {
@@ -1673,6 +1697,49 @@
                     }
                   }
                 },
+                "actions": [
+                  {
+                    "on": "click:favorite",
+                    "type": "callSkill",
+                    "target": "media_center_skill.set_favorite",
+                    "params": {
+                      "item_id": "$state.selectedMediaItemId",
+                      "favorite": true,
+                      "profile_id": "$state.profileId"
+                    },
+                    "invalidates": ["media_center.catalog", "media_center.agent", "media_center.roots"]
+                  },
+                  {
+                    "on": "click:favorite",
+                    "type": "updateState",
+                    "params": {"selectedMediaFavorite": true}
+                  },
+                  {
+                    "on": "click:unfavorite",
+                    "type": "callSkill",
+                    "target": "media_center_skill.set_favorite",
+                    "params": {
+                      "item_id": "$state.selectedMediaItemId",
+                      "favorite": false,
+                      "profile_id": "$state.profileId"
+                    },
+                    "invalidates": ["media_center.catalog", "media_center.agent", "media_center.roots"]
+                  },
+                  {
+                    "on": "click:unfavorite",
+                    "type": "updateState",
+                    "params": {"selectedMediaFavorite": false}
+                  },
+                  {
+                    "on": "click:playlist",
+                    "type": "openModal",
+                    "params": {"modalId": "media_center_add_to_playlist"}
+                  },
+                  {
+                    "on": "click:close",
+                    "type": "closeModal"
+                  }
+                ],
                 "title_i18n": {
                   "key": "runtime.media_center.ui.now_playing"
                 }
@@ -1724,40 +1791,19 @@
                     {"key": "series", "label": "Series", "path": "series", "label_i18n": {"key": "runtime.media_center.ui.series"}},
                     {"key": "actors", "label": "Cast", "path": "metadata.actors", "label_i18n": {"key": "runtime.media_center.ui.cast"}},
                     {"key": "directors", "label": "Directors", "path": "metadata.directors", "label_i18n": {"key": "runtime.media_center.ui.directors"}},
-                    {"key": "external_ids", "label": "External IDs", "path": "metadata.external_ids", "label_i18n": {"key": "runtime.media_center.ui.external_ids"}},
-                    {"key": "quality", "label": "Media quality", "path": "quality", "label_i18n": {"key": "runtime.media_center.ui.media_quality"}},
-                    {"key": "node", "label": "Storage node", "path": "node_id", "label_i18n": {"key": "runtime.media_center.ui.storage_node"}},
-                    {"key": "path", "label": "Library path", "path": "library_path", "label_i18n": {"key": "runtime.media_center.ui.library_path"}},
-                    {"key": "versions", "label": "Available versions", "path": "versions", "label_i18n": {"key": "runtime.media_center.ui.available_versions"}},
-                    {"key": "provenance", "label": "Metadata sources", "path": "metadata_provenance", "label_i18n": {"key": "runtime.media_center.ui.metadata_sources"}},
-                    {"key": "enrichment_providers", "label": "Enrichment providers", "path": "enrichment.providers", "label_i18n": {"key": "runtime.media_center.ui.providers"}},
-                    {"key": "enrichment_operations", "label": "Enrichment operations", "path": "enrichment.operations", "label_i18n": {"key": "runtime.media_center.ui.background_operations"}}
+                    {"key": "external_ids", "label": "External IDs", "path": "metadata.external_ids", "label_i18n": {"key": "runtime.media_center.ui.external_ids"}}
                   ]
                 }
               },
               {
-                "id": "media-center-player-favorite",
+                "id": "media-center-player-metadata-actions",
                 "type": "ui.actions",
-                "area": "actions",
-                "visibleIf": "$state.selectedMediaItemId != null && $state.selectedMediaFavorite != true",
+                "area": "main",
+                "visibleIf": "$state.selectedMediaItemId != null",
                 "inputs": {
                   "variant": "toolbar",
                   "size": "small",
                   "buttons": [
-                    {
-                      "id": "favorite",
-                      "label": "Favorite",
-                      "icon": "star-outline",
-                      "label_i18n": {
-                        "key": "runtime.media_center.ui.favorite"
-                      }
-                    },
-                    {
-                      "id": "playlist",
-                      "label": "Add to playlist",
-                      "icon": "list-outline",
-                      "label_i18n": {"key": "runtime.media_center.ui.add_to_playlist"}
-                    },
                     {
                       "id": "edit",
                       "label": "Edit metadata",
@@ -1765,123 +1811,23 @@
                       "label_i18n": {"key": "runtime.media_center.ui.edit_metadata"}
                     },
                     {
-                      "id": "close",
-                      "label": "Close to mini-player",
-                      "icon": "contract-outline",
-                      "label_i18n": {"key": "runtime.media_center.ui.close_to_mini_player"}
+                      "id": "details",
+                      "label": "Details",
+                      "icon": "information-circle-outline",
+                      "label_i18n": {"key": "runtime.media_center.ui.media_details"}
                     }
                   ]
                 },
                 "actions": [
-                  {
-                    "on": "click:favorite",
-                    "type": "callSkill",
-                    "target": "media_center_skill.set_favorite",
-                    "params": {
-                      "item_id": "$state.selectedMediaItemId",
-                      "favorite": true,
-                      "profile_id": "$state.profileId"
-                    },
-                    "invalidates": [
-                      "media_center.catalog",
-                      "media_center.agent",
-                      "media_center.roots"
-                    ]
-                  },
-                  {
-                    "on": "click:favorite",
-                    "type": "updateState",
-                    "params": {
-                      "selectedMediaFavorite": true
-                    }
-                  },
-                  {
-                    "on": "click:playlist",
-                    "type": "openModal",
-                    "params": {"modalId": "media_center_add_to_playlist"}
-                  },
                   {
                     "on": "click:edit",
                     "type": "openModal",
                     "params": {"modalId": "media_center_metadata_edit"}
                   },
                   {
-                    "on": "click:close",
-                    "type": "closeModal"
-                  }
-                ]
-              },
-              {
-                "id": "media-center-player-unfavorite",
-                "type": "ui.actions",
-                "area": "actions",
-                "visibleIf": "$state.selectedMediaItemId != null && $state.selectedMediaFavorite == true",
-                "inputs": {
-                  "variant": "toolbar",
-                  "size": "small",
-                  "buttons": [
-                    {
-                      "id": "unfavorite",
-                      "label": "Unfavorite",
-                      "icon": "star-half-outline",
-                      "label_i18n": {
-                        "key": "runtime.media_center.ui.unfavorite"
-                      }
-                    },
-                    {
-                      "id": "playlist",
-                      "label": "Add to playlist",
-                      "icon": "list-outline",
-                      "label_i18n": {"key": "runtime.media_center.ui.add_to_playlist"}
-                    },
-                    {
-                      "id": "edit",
-                      "label": "Edit metadata",
-                      "icon": "create-outline",
-                      "label_i18n": {"key": "runtime.media_center.ui.edit_metadata"}
-                    },
-                    {
-                      "id": "close",
-                      "label": "Close to mini-player",
-                      "icon": "contract-outline",
-                      "label_i18n": {"key": "runtime.media_center.ui.close_to_mini_player"}
-                    }
-                  ]
-                },
-                "actions": [
-                  {
-                    "on": "click:unfavorite",
-                    "type": "callSkill",
-                    "target": "media_center_skill.set_favorite",
-                    "params": {
-                      "item_id": "$state.selectedMediaItemId",
-                      "favorite": false,
-                      "profile_id": "$state.profileId"
-                    },
-                    "invalidates": [
-                      "media_center.catalog"
-                    ]
-                  },
-                  {
-                    "on": "click:unfavorite",
-                    "type": "updateState",
-                    "params": {
-                      "selectedMediaFavorite": false
-                    }
-                  },
-                  {
-                    "on": "click:playlist",
+                    "on": "click:details",
                     "type": "openModal",
-                    "params": {"modalId": "media_center_add_to_playlist"}
-                  },
-                  {
-                    "on": "click:edit",
-                    "type": "openModal",
-                    "params": {"modalId": "media_center_metadata_edit"}
-                  },
-                  {
-                    "on": "click:close",
-                    "type": "closeModal"
+                    "params": {"modalId": "media_center_item_details"}
                   }
                 ]
               }
@@ -1892,6 +1838,50 @@
           },
           "title_i18n": {
             "key": "runtime.media_center.ui.now_playing"
+          }
+        },
+        "media_center_item_details": {
+          "title": "Details",
+          "title_i18n": {"key": "runtime.media_center.ui.media_details"},
+          "scope": "workspace",
+          "presentation": {"kind": "modal", "restoreFocus": true},
+          "schema": {
+            "id": "media_center_item_details",
+            "title": "Details",
+            "title_i18n": {"key": "runtime.media_center.ui.media_details"},
+            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "widgets": [
+              {
+                "id": "media-center-item-technical-details",
+                "type": "item.details",
+                "area": "main",
+                "title": "$state.selectedMediaTitle",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.get_item",
+                  "params": {
+                    "item_id": "$state.selectedMediaItemId",
+                    "profile_id": "$state.profileId"
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["media_center.catalog"],
+                  "preserveLastValue": false,
+                  "maxRequestHz": 5
+                },
+                "inputs": {
+                  "bindField": "item",
+                  "fields": [
+                    {"key": "quality", "label": "Media quality", "path": "quality", "label_i18n": {"key": "runtime.media_center.ui.media_quality"}},
+                    {"key": "node", "label": "Storage node", "path": "node_id", "label_i18n": {"key": "runtime.media_center.ui.storage_node"}},
+                    {"key": "path", "label": "Library path", "path": "library_path", "label_i18n": {"key": "runtime.media_center.ui.library_path"}},
+                    {"key": "versions", "label": "Available versions", "path": "versions", "label_i18n": {"key": "runtime.media_center.ui.available_versions"}},
+                    {"key": "provenance", "label": "Metadata sources", "path": "metadata_provenance", "label_i18n": {"key": "runtime.media_center.ui.metadata_sources"}},
+                    {"key": "enrichment_providers", "label": "Enrichment providers", "path": "enrichment.providers", "label_i18n": {"key": "runtime.media_center.ui.providers"}},
+                    {"key": "enrichment_operations", "label": "Enrichment operations", "path": "enrichment.operations", "label_i18n": {"key": "runtime.media_center.ui.background_operations"}}
+                  ]
+                }
+              }
+            ]
           }
         },
         "media_center_play_on": {

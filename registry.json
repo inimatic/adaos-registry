@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-29T07:19:14+00:00",
+  "updated_at": "2026-08-29T07:19:31+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1315,8 +1315,8 @@
       "kind": "scenario",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.6.38",
-      "updated_at": "2026-08-28T11:36:51+00:00",
+      "version": "0.6.39",
+      "updated_at": "2026-08-29T07:19:31+00:00",
       "path": "scenarios/media_center",
       "manifest": "scenarios/media_center/scenario.yaml",
       "source": {

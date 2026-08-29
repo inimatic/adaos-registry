@@ -2,7 +2,7 @@
 
 Media Center is a Project-composed household media application. Its scenario is UI-as-data only; domain identity, indexing, playback, control, and byte delivery remain in skills, app shell, and core boundaries.
 
-Version `0.6.29` keeps a path-centric folder browser and adds the app-shell endpoint inbox required for remote playback.
+Version `0.6.39` keeps a path-centric folder browser and the app-shell endpoint inbox required for remote playback.
 Folders and direct media share one cursor-backed page, but declarative typed
 selection sends a folder into drill-down and sends only a media item to the
 player. Breadcrumbs navigate back without materializing a directory tree.
@@ -45,10 +45,12 @@ The content-first details surface is a regular maximizable UI-as-data modal,
 not a video surface and not native video fullscreen. Its split layout keeps the universal `item.details`
 media presentation in the primary area and profile plus transport controls in
 a bounded auxiliary area; mobile stacks the same areas. The details projection
-contains a bounded poster/cover, primary metadata, quality, source node, safe
-library-relative path, and available original/derived versions. Favorite,
-Add to playlist, Edit metadata, and Close to mini-player form one peer action
-row in the modal's non-scrolling docked footer. Add to playlist supports both existing profile-owned playlists and an
+contains a bounded poster/cover and primary descriptive metadata. Favorite,
+Add to playlist, and Close to mini-player are declarative supplemental controls
+in the same transport surface as Play on. Edit metadata and Details follow the
+descriptive metadata; Details opens source node, safe library-relative path,
+quality, provenance, enrichment, and available original/derived versions in a
+separate UI-as-data modal. Add to playlist supports both existing profile-owned playlists and an
 atomic create-and-add flow. Edit metadata shows the immutable source identity,
 accepts reviewed title/overview/year/genre/artist/album/series values, and can
 reject an incorrect TMDb or MusicBrainz match. Corrections are audited and

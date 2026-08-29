@@ -389,6 +389,7 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         for modal_id, modal in modals.items()
         } == {
             "media_center_player": "workspace",
+            "media_center_item_details": "workspace",
             "media_center_play_on": "workspace",
             "media_center_add_to_playlist": "workspace",
             "media_center_metadata_edit": "workspace",
@@ -406,7 +407,7 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     assert player_schema["layout"]["type"] == "split"
     assert {
         area["id"]: area["role"] for area in player_schema["layout"]["areas"]
-    } == {"main": "main", "transport": "aux", "actions": "footer"}
+    } == {"main": "main", "transport": "aux"}
     player = player_widgets["media-center-player"]
     assert player["type"] == "media.videoBrowser"
     assert player["dataSource"]["name"] == "media_center_skill.build_playback_queue"
@@ -424,16 +425,34 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     assert player["inputs"]["autoSelectFirst"] is True
     assert player["inputs"]["showDiagnostics"] is False
     assert {
-        "media-center-player-favorite",
-        "media-center-player-unfavorite",
+        "media-center-player-metadata-actions",
         "media-center-player-profile",
     } <= set(player_widgets)
-    assert player_widgets["media-center-player-favorite"]["area"] == "actions"
-    assert player_widgets["media-center-player-unfavorite"]["area"] == "actions"
+    supplemental_ids = {
+        button["id"] for button in player["inputs"]["supplementalControls"]
+    }
+    assert supplemental_ids == {"favorite", "unfavorite", "playlist", "close"}
+    assert {action["on"] for action in player["actions"]} >= {
+        "click:favorite",
+        "click:unfavorite",
+        "click:playlist",
+        "click:close",
+    }
     player_profile = player_widgets["media-center-player-profile"]
     assert player_profile["area"] == "transport"
     assert player["area"] == "transport"
     assert player_widgets["media-center-player-details"]["area"] == "main"
+    assert player_widgets["media-center-player-metadata-actions"]["area"] == "main"
+    main_detail_fields = {
+        field["key"]
+        for field in player_widgets["media-center-player-details"]["inputs"]["fields"]
+    }
+    assert "node" not in main_detail_fields
+    technical_details = modals["media_center_item_details"]["schema"]["widgets"][0]
+    technical_detail_fields = {
+        field["key"] for field in technical_details["inputs"]["fields"]
+    }
+    assert {"quality", "node", "path", "versions"} <= technical_detail_fields
     assert player_profile["inputs"]["variant"] == "adaptiveToolbar"
     assert [option["value"] for option in player_profile["inputs"]["buttons"][0]["options"]] == [
         "default",
