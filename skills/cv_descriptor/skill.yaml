@@ -1,10 +1,14 @@
 name: cv_descriptor
-version: 0.1.3
+version: 0.1.4
 description: Browser-side CV descriptor pilot. Stores visual-object embeddings, model
   signatures, thumbnails, and text descriptions while the AdaOS client CV runtime
   is being built.
 runtime:
   python: '3.11'
+  activation:
+    mode: on_demand
+    startup_allowed: false
+    background_refresh: true
 webui_owner: shared
 tools:
 - name: cv_descriptor_status
@@ -157,7 +161,8 @@ events:
   - cv_descriptor.runtime.diagnostics
   - webio.stream.snapshot.requested
   - webio.stream.subscription.changed
-  - sys.ready
+  - webio.yjs.snapshot.requested
+  - webio.yjs.subscription.changed
   publish:
   - cv_descriptor.updated
   - cv_descriptor.command
@@ -265,13 +270,13 @@ data_projections:
   targets:
   - backend: yjs
     path: data/cv_descriptor/runtime
-updated_at: '2026-08-11T09:24:30+00:00'
+updated_at: '2026-08-29T05:55:00+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.741+4834.2acb1c5b
-    recorded_at: '2026-08-11T09:24:30+00:00'
+    min_version: 0.1.950+5767.4e1aaf98b
+    recorded_at: '2026-08-29T05:55:00+00:00'
     source: skill_push
-    min_commit: 2acb1c5b81b7eda3e8584e87efa9b75eebbc202e
-    min_short_commit: 2acb1c5b
-    build_date: '2026-08-11T12:20:36+03:00'
+    min_commit: 4e1aaf98b24c921949cad7ace2ae24c8ef4fff30
+    min_short_commit: 4e1aaf98
+    build_date: '2026-08-28T19:07:25+03:00'
 

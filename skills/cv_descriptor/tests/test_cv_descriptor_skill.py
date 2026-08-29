@@ -4,6 +4,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import yaml
+
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 
@@ -22,6 +24,35 @@ def _load_module(tmp_path: Path, monkeypatch):
     module._publish_event = lambda *args, **kwargs: None
     module._publish_stream_event = lambda *args, **kwargs: None
     return module
+
+
+def test_manifest_defers_projection_until_yjs_demand() -> None:
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+
+    assert "sys.ready" not in manifest["events"]["subscribe"]
+    assert "webio.yjs.snapshot.requested" in manifest["events"]["subscribe"]
+    assert "webio.yjs.subscription.changed" in manifest["events"]["subscribe"]
+    assert manifest["runtime"]["activation"]["mode"] == "on_demand"
+    assert manifest["runtime"]["activation"]["startup_allowed"] is False
+
+
+def test_yjs_demand_projects_only_cv_descriptor_slots(tmp_path: Path, monkeypatch) -> None:
+    mod = _load_module(tmp_path, monkeypatch)
+    projected: list[str | None] = []
+    monkeypatch.setattr(
+        mod,
+        "_project",
+        lambda *args, **kwargs: projected.append(kwargs.get("webspace_id")),
+    )
+
+    mod.on_yjs_snapshot_requested(
+        {"webspace_id": "desktop", "slot": "cv_descriptor.current"}
+    )
+    mod.on_yjs_snapshot_requested(
+        {"webspace_id": "desktop", "slot": "infrastate.summary"}
+    )
+
+    assert projected == ["desktop"]
 
 
 def test_status_projects_public_empty_state(tmp_path: Path, monkeypatch) -> None:

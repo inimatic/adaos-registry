@@ -905,7 +905,31 @@ def on_webio_stream_subscription_changed(evt: Any) -> None:
     on_webio_stream_snapshot_requested(payload)
 
 
-@subscribe("sys.ready")
-def on_sys_ready(evt: Any) -> None:
+def _is_cv_descriptor_yjs_projection_payload(payload: Mapping[str, Any]) -> bool:
+    slot = str(payload.get("slot") or payload.get("projection") or "").strip()
+    if slot in {CURRENT_SLOT, DESCRIPTORS_SLOT, RUNTIME_SLOT}:
+        return True
+    topic = str(payload.get("topic") or "").strip()
+    if any(topic.endswith(f".{slot_name}") for slot_name in (CURRENT_SLOT, DESCRIPTORS_SLOT, RUNTIME_SLOT)):
+        return True
+    path = str(payload.get("path") or payload.get("projection_path") or "").strip()
+    return path.startswith("data/cv_descriptor/")
+
+
+def _project_on_yjs_demand(evt: Any) -> None:
     payload = _payload(evt)
+    if not _is_cv_descriptor_yjs_projection_payload(payload):
+        return
+    if str(payload.get("action") or "").strip().lower() == "unsubscribed":
+        return
     _project(webspace_id=_webspace_id_from_payload(payload))
+
+
+@subscribe("webio.yjs.snapshot.requested")
+def on_yjs_snapshot_requested(evt: Any) -> None:
+    _project_on_yjs_demand(evt)
+
+
+@subscribe("webio.yjs.subscription.changed")
+def on_yjs_subscription_changed(evt: Any) -> None:
+    _project_on_yjs_demand(evt)
