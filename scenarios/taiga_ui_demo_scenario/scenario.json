@@ -56,6 +56,10 @@
                     "label": "Workspace"
                   },
                   {
+                    "id": "open-workbench",
+                    "label": "Resource Workbench"
+                  },
+                  {
                     "id": "open-workspace-shell",
                     "label": "Workspace shell"
                   },
@@ -91,6 +95,15 @@
                     "modalId": "workspace_manager",
                     "workspaceRef": "workspace:demo_metrics",
                     "entityRef": "scenario:taiga_ui_demo_scenario"
+                  }
+                },
+                {
+                  "on": "click:open-workbench",
+                  "type": "navigate",
+                  "params": {
+                    "to": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
+                    "surface": "modal",
+                    "modalId": "demo_metrics_resource_workbench_modal"
                   }
                 },
                 {
@@ -153,6 +166,15 @@
                     "modalId": "workspace_manager",
                     "workspaceRef": "workspace:demo_metrics",
                     "entityRef": "scenario:taiga_ui_demo_scenario"
+                  }
+                },
+                {
+                  "on": "click:open-workbench",
+                  "type": "navigate",
+                  "params": {
+                    "to": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
+                    "surface": "modal",
+                    "modalId": "demo_metrics_resource_workbench_modal"
                   }
                 },
                 {
