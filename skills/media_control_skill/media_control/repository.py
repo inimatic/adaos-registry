@@ -703,6 +703,21 @@ class MediaControlRepository:
             )
             assignments = ",".join(f"{name}=?" for name in updates)
             connection.execute(f"UPDATE playback_sessions SET {assignments} WHERE id=?", (*updates.values(), token))
+            if command_token in {"volume", "presentation"}:
+                connection.execute(
+                    """
+                    UPDATE playback_commands
+                    SET status='superseded',acknowledged_at=?,result_json=?
+                    WHERE session_id=? AND target_id=? AND command=? AND status='pending'
+                    """,
+                    (
+                        now_iso(),
+                        dumps({"reason": "replaced_by_newer_command"}),
+                        token,
+                        str(row["target_id"]),
+                        command_token,
+                    ),
+                )
             command_id = stable_id("command", token, key, size=24)
             connection.execute(
                 """
@@ -758,7 +773,9 @@ class MediaControlRepository:
             direction = 1 if command == "next" else -1
             next_item = self._next_available(connection, str(row["id"]), int(row["active_queue_index"]), direction)
             if next_item is None:
-                updates["state"] = "ended" if direction > 0 else str(row["state"])
+                # A navigation request at the queue boundary is a no-op. Only
+                # the endpoint can report that decoded media actually ended.
+                args["queue_boundary"] = "end" if direction > 0 else "start"
             else:
                 updates.update(
                     {

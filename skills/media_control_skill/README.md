@@ -21,7 +21,11 @@ Play additionally requires media-element-confirmed playback. Wrong-item or
 premature acknowledgements remain pending for bounded replay. Manual Previous
 and Next preserve transport intent: a playing/requested session continues from
 the beginning of the new item, while paused or stopped sessions only change the
-selection.
+selection. A command at the start or end of the queue is an acknowledged no-op;
+it never marks the session ended. Only an endpoint observation after actual
+media completion can make that transition. Pending volume and presentation
+commands are coalesced per session and target so a slider gesture or repeated
+TV input cannot starve later transport commands.
 
 The skill owns its controller surfaces as well as the control-plane methods. Its
 Web UI contribution installs a Media Remote desktop app and a compact transport

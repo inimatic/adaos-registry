@@ -617,6 +617,77 @@ def test_autonext_skips_unavailable_queue_items():
     assert result["session"]["state"] == "playing"
 
 
+def test_queue_boundary_navigation_does_not_end_active_playback():
+    repository = MediaControlRepository()
+    session = _session(repository)
+    current = repository.get_session(session["id"])["session"]
+    selected = repository.update_queue(
+        session["id"],
+        queue=_queue(3),
+        expected_queue_revision=current["queue_revision"],
+        active_index=2,
+        actor_ref="profile:alice",
+    )["session"]
+    current = repository.get_session(session["id"])["session"]
+    boundary = repository.command(
+        session["id"],
+        command="next",
+        arguments={},
+        actor_ref="profile:alice",
+        expected_revision=current["revision"],
+        idempotency_key="next-past-end",
+    )
+
+    assert selected["active_queue_index"] == 2
+    assert boundary["session"]["state"] == current["state"]
+    assert boundary["command"]["arguments"]["queue_boundary"] == "end"
+    assert boundary["command"]["arguments"]["_playback_contract"]["desired_state"] == current["state"]
+
+
+def test_pending_volume_and_presentation_commands_are_coalesced():
+    repository = MediaControlRepository()
+    session = _session(repository)
+    for index, volume in enumerate((0.2, 0.4, 0.8)):
+        current = repository.get_session(session["id"])["session"]
+        repository.command(
+            session["id"],
+            command="volume",
+            arguments={"volume": volume},
+            actor_ref="profile:alice",
+            expected_revision=current["revision"],
+            idempotency_key=f"volume-{index}",
+        )
+    current = repository.get_session(session["id"])["session"]
+    repository.command(
+        session["id"],
+        command="presentation",
+        arguments={"mode": "mini"},
+        actor_ref="profile:alice",
+        expected_revision=current["revision"],
+        idempotency_key="presentation-mini",
+    )
+    current = repository.get_session(session["id"])["session"]
+    repository.command(
+        session["id"],
+        command="presentation",
+        arguments={"mode": "fullscreen"},
+        actor_ref="profile:alice",
+        expected_revision=current["revision"],
+        idempotency_key="presentation-fullscreen",
+    )
+
+    pending = [
+        item
+        for item in repository.pull_commands(session["target_id"])["items"]
+        if item["status"] == "pending"
+    ]
+
+    assert [(item["command"], item["arguments"].get("volume"), item["arguments"].get("mode")) for item in pending] == [
+        ("volume", 0.8, None),
+        ("presentation", None, "fullscreen"),
+    ]
+
+
 def test_checkpoint_and_target_command_cursor_support_recovery():
     repository = MediaControlRepository()
     session = _session(repository)

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-29T05:55:37+00:00",
+  "updated_at": "2026-08-29T07:19:14+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -407,8 +407,8 @@
       "kind": "skill",
       "id": "media_control_skill",
       "name": "media_control_skill",
-      "version": "0.2.19",
-      "updated_at": "2026-08-28T14:55:35+00:00",
+      "version": "0.2.20",
+      "updated_at": "2026-08-29T07:19:14+00:00",
       "path": "skills/media_control_skill",
       "manifest": "skills/media_control_skill/skill.yaml",
       "source": {
