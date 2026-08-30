@@ -27,6 +27,20 @@ def _mapping(value: Any) -> dict[str, Any]:
     return {}
 
 
+def _command_body(payload: Mapping[str, Any] | None) -> dict[str, Any]:
+    body = _mapping(payload)
+    params = _mapping(body.get("params"))
+    if not params:
+        return body
+    command = dict(params)
+    for key in ("webspace_id", "workspace_id", "scenario_id", "node_id", "target_node_id", "_meta"):
+        if key in body and key not in command:
+            command[key] = body[key]
+    if "context" in body and "context" not in command:
+        command["context"] = body["context"]
+    return command
+
+
 def _workbench_actor(payload: Mapping[str, Any] | None) -> dict[str, Any]:
     body = _mapping(payload)
     actor = _mapping(body.get("actor"))
@@ -156,7 +170,7 @@ def _query_resource(
 
 
 def _resource_workbench_snapshot(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    body = _mapping(payload)
+    body = _command_body(payload)
     service = ResourceWorkbenchService()
     actor = _workbench_actor(body)
     metric_filters = _mapping(body.get("metric_filters"))
@@ -422,7 +436,7 @@ def get_demo_snapshot(payload: Mapping[str, Any] | None = None) -> dict[str, Any
     stability="experimental",
 )
 def get_resource_workbench_snapshot(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    snapshot = _resource_workbench_snapshot(payload)
+    snapshot = _resource_workbench_snapshot(_command_body(payload))
     return {"ok": True, "snapshot": snapshot, "items": snapshot["definitions"]["items"]}
 
 
@@ -432,7 +446,7 @@ def get_resource_workbench_snapshot(payload: Mapping[str, Any] | None = None) ->
     stability="experimental",
 )
 def list_resource_role_matrix(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    snapshot = _resource_workbench_snapshot(payload)
+    snapshot = _resource_workbench_snapshot(_command_body(payload))
     items = snapshot["roles"]["items"]
     return {"ok": True, "resource_type": "resource.role_policy", "items": items, "count": len(items)}
 
@@ -443,7 +457,7 @@ def list_resource_role_matrix(payload: Mapping[str, Any] | None = None) -> dict[
     stability="experimental",
 )
 def query_resource_workbench(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    body = _mapping(payload)
+    body = _command_body(payload)
     resource_type = _text(body.get("resource_type")) or "demo.metric"
     if resource_type not in _WORKBENCH_RESOURCE_TYPES:
         return {
@@ -480,7 +494,7 @@ def query_resource_workbench(payload: Mapping[str, Any] | None = None) -> dict[s
     stability="experimental",
 )
 def operate_metric_note(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    body = _mapping(payload)
+    body = _command_body(payload)
     operation_id = _text(body.get("operation_id")) or "create"
     try:
         result = ResourceWorkbenchService().operate(
