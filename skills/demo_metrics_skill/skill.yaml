@@ -1,5 +1,5 @@
 name: demo_metrics_skill
-version: 0.13.2
+version: 0.13.3
 description: Neutral demo skill for semantic Web UI migration with a metrics table,
   chart payload, Taiga tree, and live event stream.
 runtime:
@@ -220,13 +220,13 @@ tools:
     - ok
     - resource_type
     - operation_id
-updated_at: '2026-08-30T06:50:35+00:00'
+updated_at: '2026-08-30T07:37:49+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.950+5773.ae14206c2
-    recorded_at: '2026-08-30T06:50:35+00:00'
+    min_version: 0.1.950+5774.6cd8b118d
+    recorded_at: '2026-08-30T07:37:49+00:00'
     source: skill_push
-    min_commit: ae14206c23e3bb840348d73de9525aa78372b9cf
-    min_short_commit: ae14206c
-    build_date: '2026-08-30T01:39:34+03:00'
+    min_commit: 6cd8b118db193dff3eb4ae89155b010f1e10c10f
+    min_short_commit: 6cd8b118
+    build_date: '2026-08-30T09:54:12+03:00'
 

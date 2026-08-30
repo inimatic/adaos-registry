@@ -655,7 +655,10 @@
                   "buttons": [
                     {
                       "id": "open-workbench",
-                      "label": "Resource Workbench"
+                      "label": "Open Workbench",
+                      "icon": "construct-outline",
+                      "kind": "primary",
+                      "title": "Open Resource Workbench"
                     }
                   ]
                 },
@@ -1056,7 +1059,10 @@
                   "buttons": [
                     {
                       "id": "open-workbench",
-                      "label": "Resource Workbench"
+                      "label": "Open Workbench",
+                      "icon": "construct-outline",
+                      "kind": "primary",
+                      "title": "Open Resource Workbench"
                     }
                   ]
                 },
