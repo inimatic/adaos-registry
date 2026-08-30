@@ -444,6 +444,35 @@
             ],
             "views": [
               {
+                "id": "demo_metric_actions",
+                "kind": "action_bar",
+                "area": "main",
+                "title": "Demo actions",
+                "variant": "toolbar",
+                "config": {
+                  "size": "small",
+                  "buttons": [
+                    {
+                      "id": "open-workbench",
+                      "label": "Resource Workbench"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "ref": "action:demo_metrics.open_workbench",
+                    "kind": "open_modal",
+                    "trigger": "click:open-workbench",
+                    "target": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
+                    "payload": {
+                      "modalId": "demo_metrics_resource_workbench_modal",
+                      "route": "demo_metrics_resource_workbench",
+                      "view": "demo_metrics_skill.demo_metrics_resource_workbench_modal"
+                    }
+                  }
+                ]
+              },
+              {
                 "id": "demo_metrics_grid",
                 "kind": "collection_grid",
                 "area": "main",
@@ -663,6 +692,35 @@
             ],
             "views": [
               {
+                "id": "workspace_metric_actions",
+                "kind": "action_bar",
+                "area": "main",
+                "title": "Workspace actions",
+                "variant": "toolbar",
+                "config": {
+                  "size": "small",
+                  "buttons": [
+                    {
+                      "id": "open-workbench",
+                      "label": "Resource Workbench"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "ref": "action:demo_metrics.open_workbench",
+                    "kind": "open_modal",
+                    "trigger": "click:open-workbench",
+                    "target": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
+                    "payload": {
+                      "modalId": "demo_metrics_resource_workbench_modal",
+                      "route": "demo_metrics_resource_workbench",
+                      "view": "demo_metrics_skill.demo_metrics_resource_workbench_modal"
+                    }
+                  }
+                ]
+              },
+              {
                 "id": "workspace_metrics_grid",
                 "kind": "collection_grid",
                 "area": "main",
@@ -880,6 +938,35 @@
               }
             ],
             "views": [
+              {
+                "id": "operations_metric_actions",
+                "kind": "action_bar",
+                "area": "main",
+                "title": "Operations actions",
+                "variant": "toolbar",
+                "config": {
+                  "size": "small",
+                  "buttons": [
+                    {
+                      "id": "open-workbench",
+                      "label": "Resource Workbench"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "ref": "action:demo_metrics.open_workbench",
+                    "kind": "open_modal",
+                    "trigger": "click:open-workbench",
+                    "target": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
+                    "payload": {
+                      "modalId": "demo_metrics_resource_workbench_modal",
+                      "route": "demo_metrics_resource_workbench",
+                      "view": "demo_metrics_skill.demo_metrics_resource_workbench_modal"
+                    }
+                  }
+                ]
+              },
               {
                 "id": "operations_metric_events",
                 "kind": "event_log",
