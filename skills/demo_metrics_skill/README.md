@@ -67,6 +67,10 @@ Stand verification checklist:
   and resource traces render in one modal
 - create a metric note as `Owner` or `Member` and confirm the note appears in
   the typed `demo.metric_note` query table
+- select a metric note row, edit its title/body in `Selected note`, and confirm
+  `Update selected` changes the row revision through the typed CRUD operation
+- delete a metric note from the row actions and confirm the record disappears
+  while the delete trace is recorded
 - run the `Guest denied` action and confirm a denied write appears in resource
   traces without creating a note
 - click `Operations` and confirm the operations modal opens with event, chart,

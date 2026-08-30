@@ -113,6 +113,71 @@ def test_metric_note_operation_records_success_and_denial(tmp_path, monkeypatch)
     assert any(item["status"] == "permission_denied" for item in traces)
 
 
+def test_metric_note_operation_updates_and_deletes_with_revision(tmp_path, monkeypatch):
+    monkeypatch.setenv("ADAOS_BASE_DIR", str(tmp_path))
+    handler = _load_handler()
+    state_dir = tmp_path / "state"
+    _bind_state_dir(handler, state_dir)
+
+    created = handler.operate_metric_note(
+        {
+            "role": "owner",
+            "payload": {
+                "metric_id": "cpu",
+                "title": "Editable workbench note",
+                "body": "Before update.",
+            },
+        }
+    )
+    record = created["result"]["record"]
+
+    updated = handler.operate_metric_note(
+        {
+            "operation_id": "update",
+            "role": "owner",
+            "record_id": record["id"],
+            "expected_revision": record["revision"],
+            "payload": {
+                "metric_id": "memory",
+                "title": "Updated workbench note",
+                "body": "After update.",
+            },
+        }
+    )
+    stale = handler.operate_metric_note(
+        {
+            "operation_id": "update",
+            "role": "owner",
+            "record_id": record["id"],
+            "expected_revision": record["revision"],
+            "payload": {
+                "title": "Stale update",
+            },
+        }
+    )
+    deleted = handler.operate_metric_note(
+        {
+            "operation_id": "delete",
+            "role": "owner",
+            "record_id": record["id"],
+            "expected_revision": updated["result"]["record"]["revision"],
+        }
+    )
+
+    assert updated["ok"] is True
+    assert updated["result"]["record"]["metric_id"] == "memory"
+    assert updated["result"]["record"]["title"] == "Updated workbench note"
+    assert updated["result"]["record"]["revision"] == 2
+    assert stale["ok"] is False
+    assert stale["error_type"] == "conflict"
+    assert deleted["ok"] is True
+    assert deleted["result"]["deleted"] is True
+
+    notes = handler.query_resource_workbench({"resource_type": "demo.metric_note", "search": "Updated workbench note"})
+    assert notes["ok"] is True
+    assert notes["count"] == 0
+
+
 def test_metric_note_operation_accepts_ui_action_envelope(tmp_path, monkeypatch):
     monkeypatch.setenv("ADAOS_BASE_DIR", str(tmp_path))
     handler = _load_handler()

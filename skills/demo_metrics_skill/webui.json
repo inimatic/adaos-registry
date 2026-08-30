@@ -1310,6 +1310,7 @@
                 ]
               },
               "inputs": {
+                "rowKey": "id",
                 "search": true,
                 "searchKeys": [
                   "metric_id",
@@ -1345,8 +1346,77 @@
                     "mono": true
                   }
                 ],
+                "buttons": [
+                  {
+                    "id": "edit",
+                    "label": "Edit",
+                    "icon": "create-outline",
+                    "title": "Edit selected note"
+                  },
+                  {
+                    "id": "delete",
+                    "label": "Delete",
+                    "icon": "trash-outline",
+                    "title": "Delete note"
+                  }
+                ],
                 "emptyText": "No metric notes yet"
-              }
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "workbenchSelectedNoteId": "$event.id",
+                    "workbenchSelectedNoteMetricId": "$event.metric_id",
+                    "workbenchSelectedNoteTitle": "$event.title",
+                    "workbenchSelectedNoteBody": "$event.body",
+                    "workbenchSelectedNoteRevision": "$event.revision"
+                  }
+                },
+                {
+                  "on": "click:edit",
+                  "type": "updateState",
+                  "params": {
+                    "workbenchSelectedNoteId": "$event.id",
+                    "workbenchSelectedNoteMetricId": "$event.metric_id",
+                    "workbenchSelectedNoteTitle": "$event.title",
+                    "workbenchSelectedNoteBody": "$event.body",
+                    "workbenchSelectedNoteRevision": "$event.revision"
+                  }
+                },
+                {
+                  "on": "click:delete",
+                  "type": "callSkill",
+                  "target": "demo_metrics_skill.operate_metric_note",
+                  "invalidates": [
+                    "resource.demo_metrics"
+                  ],
+                  "params": {
+                    "operation_id": "delete",
+                    "role": "owner",
+                    "record_id": "$event.id",
+                    "expected_revision": "$event.revision"
+                  },
+                  "feedback": {
+                    "pending": {
+                      "label": "Deleting",
+                      "icon": "sync-outline"
+                    }
+                  }
+                },
+                {
+                  "on": "click:delete",
+                  "type": "updateState",
+                  "params": {
+                    "workbenchSelectedNoteId": "",
+                    "workbenchSelectedNoteMetricId": "",
+                    "workbenchSelectedNoteTitle": "",
+                    "workbenchSelectedNoteBody": "",
+                    "workbenchSelectedNoteRevision": ""
+                  }
+                }
+              ]
             },
             {
               "id": "workbench-note-form",
@@ -1439,6 +1509,165 @@
                       "label": "Creating note",
                       "icon": "sync-outline"
                     }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "workbench-note-editor",
+              "type": "ui.form",
+              "area": "right",
+              "title": "Selected note",
+              "inputs": {
+                "submitLabel": "Update selected",
+                "submitPlacement": "top",
+                "secondaryActions": [
+                  {
+                    "id": "reset",
+                    "label": "Clear selection",
+                    "variant": "tertiary"
+                  }
+                ],
+                "fields": [
+                  {
+                    "id": "empty_selection",
+                    "type": "staticContent",
+                    "content": "No metric note selected.",
+                    "visibleIf": "!$state.workbenchSelectedNoteId"
+                  },
+                  {
+                    "id": "selected_note_id",
+                    "type": "shortText",
+                    "label": "Record",
+                    "stateKey": "workbenchSelectedNoteId",
+                    "disabled": true,
+                    "visibleIf": "$state.workbenchSelectedNoteId"
+                  },
+                  {
+                    "id": "selected_revision",
+                    "type": "integer",
+                    "label": "Revision",
+                    "stateKey": "workbenchSelectedNoteRevision",
+                    "disabled": true,
+                    "visibleIf": "$state.workbenchSelectedNoteId"
+                  },
+                  {
+                    "id": "selected_role",
+                    "type": "dropdown",
+                    "label": "Role",
+                    "default": "owner",
+                    "visibleIf": "$state.workbenchSelectedNoteId",
+                    "options": [
+                      {
+                        "label": "Owner",
+                        "value": "owner"
+                      },
+                      {
+                        "label": "Member",
+                        "value": "member"
+                      },
+                      {
+                        "label": "Guest",
+                        "value": "guest"
+                      }
+                    ],
+                    "answerKey": "role"
+                  },
+                  {
+                    "id": "selected_metric_id",
+                    "type": "dropdown",
+                    "label": "Metric",
+                    "stateKey": "workbenchSelectedNoteMetricId",
+                    "visibleIf": "$state.workbenchSelectedNoteId",
+                    "options": [
+                      {
+                        "label": "CPU Load",
+                        "value": "cpu"
+                      },
+                      {
+                        "label": "Memory Pressure",
+                        "value": "memory"
+                      },
+                      {
+                        "label": "Queue Depth",
+                        "value": "queue"
+                      }
+                    ],
+                    "answerKey": "metric_id"
+                  },
+                  {
+                    "id": "selected_title",
+                    "type": "shortText",
+                    "label": "Title",
+                    "stateKey": "workbenchSelectedNoteTitle",
+                    "required": true,
+                    "placeholder": "What changed?",
+                    "visibleIf": "$state.workbenchSelectedNoteId",
+                    "validation": {
+                      "required": true,
+                      "minLength": 3
+                    },
+                    "answerKey": "title"
+                  },
+                  {
+                    "id": "selected_body",
+                    "type": "longText",
+                    "label": "Body",
+                    "stateKey": "workbenchSelectedNoteBody",
+                    "placeholder": "Optional detail",
+                    "visibleIf": "$state.workbenchSelectedNoteId",
+                    "answerKey": "body"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "enabledIf": "$state.workbenchSelectedNoteId",
+                  "type": "callSkill",
+                  "target": "demo_metrics_skill.operate_metric_note",
+                  "invalidates": [
+                    "resource.demo_metrics"
+                  ],
+                  "params": {
+                    "operation_id": "update",
+                    "role": "$event.values.role",
+                    "record_id": "$state.workbenchSelectedNoteId",
+                    "expected_revision": "$state.workbenchSelectedNoteRevision",
+                    "payload": {
+                      "metric_id": "$event.values.metric_id",
+                      "title": "$event.values.title",
+                      "body": "$event.values.body"
+                    }
+                  },
+                  "feedback": {
+                    "pending": {
+                      "label": "Updating note",
+                      "icon": "sync-outline"
+                    }
+                  }
+                },
+                {
+                  "on": "submit",
+                  "enabledIf": "$state.workbenchSelectedNoteId",
+                  "type": "updateState",
+                  "params": {
+                    "workbenchSelectedNoteId": "",
+                    "workbenchSelectedNoteMetricId": "",
+                    "workbenchSelectedNoteTitle": "",
+                    "workbenchSelectedNoteBody": "",
+                    "workbenchSelectedNoteRevision": ""
+                  }
+                },
+                {
+                  "on": "reset",
+                  "type": "updateState",
+                  "params": {
+                    "workbenchSelectedNoteId": "",
+                    "workbenchSelectedNoteMetricId": "",
+                    "workbenchSelectedNoteTitle": "",
+                    "workbenchSelectedNoteBody": "",
+                    "workbenchSelectedNoteRevision": ""
                   }
                 }
               ]
@@ -1540,6 +1769,11 @@
                   {
                     "key": "create",
                     "label": "Create",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "update",
+                    "label": "Update",
                     "width": "90px"
                   },
                   {
