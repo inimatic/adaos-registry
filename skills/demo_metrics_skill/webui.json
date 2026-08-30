@@ -1330,6 +1330,26 @@
                     "label": "Title"
                   },
                   {
+                    "key": "actions",
+                    "label": "Actions",
+                    "width": "150px",
+                    "kind": "buttons",
+                    "buttons": [
+                      {
+                        "id": "edit",
+                        "label": "Edit",
+                        "icon": "create-outline",
+                        "title": "Edit selected note"
+                      },
+                      {
+                        "id": "delete",
+                        "label": "Delete",
+                        "icon": "trash-outline",
+                        "title": "Delete note"
+                      }
+                    ]
+                  },
+                  {
                     "key": "revision",
                     "label": "Rev",
                     "width": "70px"
@@ -1344,20 +1364,6 @@
                     "label": "Updated",
                     "width": "180px",
                     "mono": true
-                  }
-                ],
-                "buttons": [
-                  {
-                    "id": "edit",
-                    "label": "Edit",
-                    "icon": "create-outline",
-                    "title": "Edit selected note"
-                  },
-                  {
-                    "id": "delete",
-                    "label": "Delete",
-                    "icon": "trash-outline",
-                    "title": "Delete note"
                   }
                 ],
                 "emptyText": "No metric notes yet"
