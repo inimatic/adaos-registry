@@ -249,8 +249,8 @@
       "kind": "skill",
       "id": "demo_metrics_skill",
       "name": "demo_metrics_skill",
-      "version": "0.13.1",
-      "updated_at": "2026-08-29T22:32:33+00:00",
+      "version": "0.13.2",
+      "updated_at": "2026-08-30T06:50:35+00:00",
       "path": "skills/demo_metrics_skill",
       "manifest": "skills/demo_metrics_skill/skill.yaml",
       "source": {
