@@ -425,8 +425,8 @@ def _snapshot() -> dict[str, Any]:
     summary="Return the current static snapshot for the demo metrics browser surfaces.",
     stability="experimental",
 )
-def get_demo_snapshot(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    _ = payload
+def get_demo_snapshot(request: Mapping[str, Any]) -> dict[str, Any]:
+    _ = request
     return {"ok": True, "snapshot": _snapshot()}
 
 
@@ -435,8 +435,8 @@ def get_demo_snapshot(payload: Mapping[str, Any] | None = None) -> dict[str, Any
     summary="Return the Declarative Resource Workbench demo snapshot.",
     stability="experimental",
 )
-def get_resource_workbench_snapshot(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    snapshot = _resource_workbench_snapshot(_command_body(payload))
+def get_resource_workbench_snapshot(request: Mapping[str, Any]) -> dict[str, Any]:
+    snapshot = _resource_workbench_snapshot(_command_body(request))
     return {"ok": True, "snapshot": snapshot, "items": snapshot["definitions"]["items"]}
 
 
@@ -445,8 +445,8 @@ def get_resource_workbench_snapshot(payload: Mapping[str, Any] | None = None) ->
     summary="Return resource role-policy rows for the Demo Metrics Resource Workbench.",
     stability="experimental",
 )
-def list_resource_role_matrix(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    snapshot = _resource_workbench_snapshot(_command_body(payload))
+def list_resource_role_matrix(request: Mapping[str, Any]) -> dict[str, Any]:
+    snapshot = _resource_workbench_snapshot(_command_body(request))
     items = snapshot["roles"]["items"]
     return {"ok": True, "resource_type": "resource.role_policy", "items": items, "count": len(items)}
 
@@ -456,8 +456,8 @@ def list_resource_role_matrix(payload: Mapping[str, Any] | None = None) -> dict[
     summary="Run a typed resource query for the demo workbench resource set.",
     stability="experimental",
 )
-def query_resource_workbench(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    body = _command_body(payload)
+def query_resource_workbench(request: Mapping[str, Any]) -> dict[str, Any]:
+    body = _command_body(request)
     resource_type = _text(body.get("resource_type")) or "demo.metric"
     if resource_type not in _WORKBENCH_RESOURCE_TYPES:
         return {
@@ -493,8 +493,8 @@ def query_resource_workbench(payload: Mapping[str, Any] | None = None) -> dict[s
     summary="Execute a typed CRUD operation against the demo.metric_note prototype store.",
     stability="experimental",
 )
-def operate_metric_note(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    body = _command_body(payload)
+def operate_metric_note(request: Mapping[str, Any]) -> dict[str, Any]:
+    body = _command_body(request)
     operation_id = _text(body.get("operation_id")) or "create"
     try:
         result = ResourceWorkbenchService().operate(
@@ -557,10 +557,10 @@ def _failed_resource_operation(
     summary="Return one chart payload for the demo metrics skill.",
     stability="experimental",
 )
-def list_demo_series(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def list_demo_series(request: Mapping[str, Any]) -> dict[str, Any]:
     metric_id = ""
-    if isinstance(payload, Mapping):
-        metric_id = str(payload.get("metric_id") or "").strip()
+    if isinstance(request, Mapping):
+        metric_id = str(request.get("metric_id") or "").strip()
     snap = _snapshot()
     if metric_id:
         series = snap["chart"].get("series_by_metric", {}).get(metric_id)
@@ -578,8 +578,8 @@ def list_demo_series(payload: Mapping[str, Any] | None = None) -> dict[str, Any]
     summary="Publish one live demo event into the browser event stream.",
     stability="experimental",
 )
-def emit_demo_event(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    body = payload if isinstance(payload, Mapping) else {}
+def emit_demo_event(request: Mapping[str, Any]) -> dict[str, Any]:
+    body = request if isinstance(request, Mapping) else {}
     webspace_id = _webspace_id_from_payload(body)
     action_id = str(body.get("action_id") or "skill_action").strip() or "skill_action"
     metric_id = str(body.get("metric_id") or "").strip() or "current"

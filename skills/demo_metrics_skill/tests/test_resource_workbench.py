@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from adaos.services.resources import ResourceWorkbenchService
+from adaos.skills.runtime_runner import _should_expand_keywords
 
 
 HANDLER_PATH = Path(__file__).resolve().parents[1] / "handlers" / "main.py"
@@ -140,3 +141,20 @@ def test_metric_note_operation_accepts_ui_action_envelope(tmp_path, monkeypatch)
 
     assert created["ok"] is True
     assert created["result"]["record"]["title"] == "Envelope workbench note"
+
+
+def test_metric_note_operation_preserves_runtime_command_payload(monkeypatch, tmp_path):
+    monkeypatch.setenv("ADAOS_BASE_DIR", str(tmp_path))
+    handler = _load_handler()
+
+    assert _should_expand_keywords(
+        handler.operate_metric_note,
+        {
+            "operation_id": "create",
+            "role": "owner",
+            "payload": {
+                "metric_id": "cpu",
+                "title": "Runtime payload",
+            },
+        },
+    ) is False
