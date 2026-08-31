@@ -1326,13 +1326,9 @@
                     "mono": true
                   },
                   {
-                    "key": "title",
-                    "label": "Title"
-                  },
-                  {
                     "key": "actions",
-                    "label": "Actions",
-                    "width": "150px",
+                    "label": "Edit / Delete",
+                    "width": "170px",
                     "kind": "buttons",
                     "buttons": [
                       {
@@ -1348,6 +1344,10 @@
                         "title": "Delete note"
                       }
                     ]
+                  },
+                  {
+                    "key": "title",
+                    "label": "Title"
                   },
                   {
                     "key": "revision",
@@ -1416,7 +1416,7 @@
                   "type": "updateState",
                   "params": {
                     "workbenchSelectedNoteId": "",
-                    "workbenchSelectedNoteMetricId": "",
+                    "workbenchSelectedNoteMetricId": "cpu",
                     "workbenchSelectedNoteTitle": "",
                     "workbenchSelectedNoteBody": "",
                     "workbenchSelectedNoteRevision": ""
@@ -1432,6 +1432,18 @@
               "inputs": {
                 "submitLabel": "Create note",
                 "submitPlacement": "top",
+                "secondaryActions": [
+                  {
+                    "id": "save_draft",
+                    "label": "Update selected",
+                    "variant": "secondary"
+                  },
+                  {
+                    "id": "cancel",
+                    "label": "Delete selected",
+                    "variant": "secondary"
+                  }
+                ],
                 "resetOnSuccess": true,
                 "fields": [
                   {
@@ -1458,6 +1470,7 @@
                     "id": "metric_id",
                     "type": "dropdown",
                     "label": "Metric",
+                    "stateKey": "workbenchSelectedNoteMetricId",
                     "default": "cpu",
                     "options": [
                       {
@@ -1478,6 +1491,7 @@
                     "id": "title",
                     "type": "shortText",
                     "label": "Title",
+                    "stateKey": "workbenchSelectedNoteTitle",
                     "required": true,
                     "placeholder": "What changed?",
                     "validation": {
@@ -1489,6 +1503,7 @@
                     "id": "body",
                     "type": "longText",
                     "label": "Body",
+                    "stateKey": "workbenchSelectedNoteBody",
                     "placeholder": "Optional detail"
                   }
                 ]
@@ -1515,6 +1530,65 @@
                       "label": "Creating note",
                       "icon": "sync-outline"
                     }
+                  }
+                },
+                {
+                  "on": "save_draft",
+                  "enabledIf": "$state.workbenchSelectedNoteId",
+                  "type": "callSkill",
+                  "target": "demo_metrics_skill.operate_metric_note",
+                  "invalidates": [
+                    "resource.demo_metrics"
+                  ],
+                  "params": {
+                    "operation_id": "update",
+                    "role": "$event.values.role",
+                    "record_id": "$state.workbenchSelectedNoteId",
+                    "expected_revision": "$state.workbenchSelectedNoteRevision",
+                    "payload": {
+                      "metric_id": "$event.values.metric_id",
+                      "title": "$event.values.title",
+                      "body": "$event.values.body"
+                    }
+                  },
+                  "feedback": {
+                    "pending": {
+                      "label": "Updating note",
+                      "icon": "sync-outline"
+                    }
+                  }
+                },
+                {
+                  "on": "cancel",
+                  "enabledIf": "$state.workbenchSelectedNoteId",
+                  "type": "callSkill",
+                  "target": "demo_metrics_skill.operate_metric_note",
+                  "invalidates": [
+                    "resource.demo_metrics"
+                  ],
+                  "params": {
+                    "operation_id": "delete",
+                    "role": "$event.values.role",
+                    "record_id": "$state.workbenchSelectedNoteId",
+                    "expected_revision": "$state.workbenchSelectedNoteRevision"
+                  },
+                  "feedback": {
+                    "pending": {
+                      "label": "Deleting note",
+                      "icon": "sync-outline"
+                    }
+                  }
+                },
+                {
+                  "on": "cancel",
+                  "enabledIf": "$state.workbenchSelectedNoteId",
+                  "type": "updateState",
+                  "params": {
+                    "workbenchSelectedNoteId": "",
+                    "workbenchSelectedNoteMetricId": "cpu",
+                    "workbenchSelectedNoteTitle": "",
+                    "workbenchSelectedNoteBody": "",
+                    "workbenchSelectedNoteRevision": ""
                   }
                 }
               ]
@@ -1659,7 +1733,7 @@
                   "type": "updateState",
                   "params": {
                     "workbenchSelectedNoteId": "",
-                    "workbenchSelectedNoteMetricId": "",
+                    "workbenchSelectedNoteMetricId": "cpu",
                     "workbenchSelectedNoteTitle": "",
                     "workbenchSelectedNoteBody": "",
                     "workbenchSelectedNoteRevision": ""
@@ -1670,7 +1744,7 @@
                   "type": "updateState",
                   "params": {
                     "workbenchSelectedNoteId": "",
-                    "workbenchSelectedNoteMetricId": "",
+                    "workbenchSelectedNoteMetricId": "cpu",
                     "workbenchSelectedNoteTitle": "",
                     "workbenchSelectedNoteBody": "",
                     "workbenchSelectedNoteRevision": ""

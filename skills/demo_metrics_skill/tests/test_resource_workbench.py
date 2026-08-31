@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from adaos.skills.runtime_runner import _should_expand_keywords
 
 HANDLER_PATH = Path(__file__).resolve().parents[1] / "handlers" / "main.py"
 SKILL_PATH = Path(__file__).resolve().parents[1] / "skill.yaml"
+WEBUI_PATH = Path(__file__).resolve().parents[1] / "webui.json"
 
 
 def _load_handler():
@@ -71,6 +73,22 @@ def test_workbench_read_tools_declare_read_only_side_effects():
         assert tools[name]["side_effect_class"] == "read_only"
 
     assert tools["operate_metric_note"]["side_effects"] == "local_write"
+
+
+def test_resource_workbench_webui_exposes_visible_crud_controls():
+    webui = json.loads(WEBUI_PATH.read_text(encoding="utf-8"))
+    widgets = webui["registry"]["modals"]["demo_metrics_resource_workbench_modal"]["schema"]["widgets"]
+    notes = next(widget for widget in widgets if widget["id"] == "workbench-notes")
+    form = next(widget for widget in widgets if widget["id"] == "workbench-note-form")
+
+    first_column = notes["inputs"]["columns"][1]
+    assert first_column["kind"] == "buttons"
+    assert [button["id"] for button in first_column["buttons"]] == ["edit", "delete"]
+    assert [item["id"] for item in form["inputs"]["secondaryActions"]] == ["save_draft", "cancel"]
+    skill_actions = {action["on"]: action for action in form["actions"] if action["type"] == "callSkill"}
+    assert skill_actions["submit"]["params"]["operation_id"] == "create"
+    assert skill_actions["save_draft"]["params"]["operation_id"] == "update"
+    assert skill_actions["cancel"]["params"]["operation_id"] == "delete"
 
 
 def test_metric_note_operation_records_success_and_denial(tmp_path, monkeypatch):
