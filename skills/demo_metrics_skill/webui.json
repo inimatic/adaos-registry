@@ -720,7 +720,7 @@
               "id": "demo-metrics-chart-payload",
               "type": "visual.metricChart",
               "area": "right",
-              "title": "Selected metric trend",
+              "title": "Current metric trend",
               "dataSource": {
                 "kind": "y",
                 "path": "data/demo_metrics/chart"
@@ -1070,7 +1070,7 @@
                 "id": "metrics_chart",
                 "kind": "metric_chart",
                 "area": "right",
-                "title": "Selected metric trend",
+                "title": "Current metric trend",
                 "when": {
                   "requiredCapabilities": [
                     "inspectable"
