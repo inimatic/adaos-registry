@@ -340,6 +340,55 @@ def _browser_registration_link(
     ), destination
 
 
+def _node_connect_link(
+    *,
+    app_base_url: str,
+    join_code: str,
+    root_base_url: str,
+    zone_id: str | None,
+    subnet_id: str | None,
+) -> tuple[str, Dict[str, Any]]:
+    root_url = str(root_base_url or "").strip().rstrip("/")
+    if not root_url:
+        raise RuntimeError("root_base_url is not available")
+    node_connect_destination = getattr(sdk_navigation, "node_connect_destination", None)
+    if callable(node_connect_destination):
+        destination = node_connect_destination(
+            join_code,
+            root_url=root_url,
+            zone=zone_id,
+            subnet_id=subnet_id,
+            try_local_hub=True,
+        )
+        return sdk_navigation.build_url(
+            destination,
+            base_url=app_base_url or _APP_BASE_DEFAULT,
+        ), destination
+
+    destination = {
+        "schema": getattr(sdk_navigation, "DESTINATION_SCHEMA", "adaos.navigation.destination.v1"),
+        "intent": "node.connect",
+        "root_url": root_url,
+        "join_code": join_code,
+        "try_local_hub": True,
+    }
+    if zone_id:
+        destination["zone"] = zone_id
+    if subnet_id:
+        destination["subnet_id"] = subnet_id
+    parsed = urlsplit((app_base_url or _APP_BASE_DEFAULT).rstrip("/") or _APP_BASE_DEFAULT)
+    path = parsed.path or "/"
+    query = [
+        ("intent", "node.connect"),
+        *([("zone", zone_id)] if zone_id else []),
+        *([("subnet_id", subnet_id)] if subnet_id else []),
+        ("root_url", root_url),
+        ("join_code", join_code),
+        ("try_local_hub", "1"),
+    ]
+    return urlunsplit((parsed.scheme, parsed.netloc, path, urlencode(query), "")), destination
+
+
 def _linux_bootstrap_command(*, code: str, root_base_url: str, zone_id: str | None) -> str:
     parts = [
         "curl -fsSL",
@@ -629,27 +678,42 @@ def _node_current(context: Dict[str, Any], *, request_id: str) -> Dict[str, Any]
         fallback_ttl_seconds=_NODE_JOIN_CODE_TTL_S,
     )
     zone_id = str(context.get("zone_id") or "").strip() or None
+    root_base_url = str(context.get("root_base_url") or "").strip()
+    app_base_url = str(context.get("app_base_url") or _APP_BASE_DEFAULT)
+    link, navigation_destination = _node_connect_link(
+        app_base_url=app_base_url,
+        join_code=code,
+        root_base_url=root_base_url,
+        zone_id=zone_id,
+        subnet_id=hub_id or None,
+    )
     zone_text = f" in zone {_zone_label(zone_id)}" if zone_id else ""
-    current["summary"] = f"Use the generated join code on Linux or Windows to add a node to subnet {hub_id}{zone_text}."
+    current["summary"] = (
+        f"Scan the QR code on the phone to add its local AdaOS Node to subnet {hub_id}{zone_text}. "
+        "Linux and Windows bootstrap commands are available as fallbacks."
+    )
+    current["qr_text"] = link
+    current["link"] = link
+    current["navigation_destination"] = navigation_destination
     current["code"] = code
     current["node_connect_command"] = _node_connect_command(
         code=code,
-        root_base_url=str(context.get("root_base_url") or ""),
+        root_base_url=root_base_url,
         hub_id=hub_id or None,
     )
     current["linux_command"] = _linux_bootstrap_command(
         code=code,
-        root_base_url=str(context.get("root_base_url") or ""),
+        root_base_url=root_base_url,
         zone_id=zone_id,
     )
     current["windows_ps_command"] = _windows_ps_bootstrap_command(
         code=code,
-        root_base_url=str(context.get("root_base_url") or ""),
+        root_base_url=root_base_url,
         zone_id=zone_id,
     )
     current["windows_cmd_command"] = _windows_cmd_bootstrap_command(
         code=code,
-        root_base_url=str(context.get("root_base_url") or ""),
+        root_base_url=root_base_url,
         zone_id=zone_id,
     )
     return current
