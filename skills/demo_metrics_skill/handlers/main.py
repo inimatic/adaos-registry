@@ -15,6 +15,16 @@ _WORKBENCH_RESOURCE_TYPES = (
     "demo.metric_note",
     "demo.metric_event",
 )
+_BUILDER_E2E_NOTE = {
+    "id": "builder-e2e-validation",
+    "metric_id": "cpu",
+    "title": "Builder E2E validation",
+    "body": "Visible validation note supplied by demo_metrics_skill; it is not persisted.",
+    "actor": "builder",
+    "revision": 0,
+    "updated_at": "2026-08-31T11:07:00Z",
+    "non_persistent": True,
+}
 
 
 def _text(value: Any) -> str:
@@ -169,6 +179,58 @@ def _query_resource(
     )
 
 
+def _with_builder_e2e_note(result: Mapping[str, Any], *, search: str = "") -> dict[str, Any]:
+    visible = dict(result)
+    items = [dict(item) for item in (result.get("items") or []) if isinstance(item, Mapping)]
+    needle = search.strip().casefold()
+    note_text = " ".join(str(value) for value in _BUILDER_E2E_NOTE.values()).casefold()
+    if not needle or needle in note_text:
+        items.append(dict(_BUILDER_E2E_NOTE))
+    visible["items"] = items
+    visible["count"] = len(items)
+    return visible
+
+
+def _with_open_dev_tickets_metric(
+    service: ResourceWorkbenchService,
+    result: Mapping[str, Any],
+    *,
+    actor: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    visible = dict(result)
+    items = [dict(item) for item in (result.get("items") or []) if isinstance(item, Mapping)]
+    source_state = "ready"
+    try:
+        tickets = _query_resource(
+            service,
+            "adaos.dev.ticket",
+            filters={"status_group": "open"},
+            limit=1,
+            actor=actor,
+        )
+        count = int(tickets.get("count", 0))
+    except Exception:
+        count = 0
+        source_state = "degraded"
+    items.append(
+        {
+            "id": "open-dev-tickets",
+            "title": "Open Dev Tickets",
+            "status": source_state,
+            "value": count,
+            "unit": "tickets",
+            "group": "subnet",
+            "source": "adaos.dev.ticket",
+            "source_state": source_state,
+            "non_persistent": True,
+        }
+    )
+    visible["items"] = items
+    visible["count"] = len(items)
+    visible["source_state"] = source_state
+    return visible
+
+
 def _resource_workbench_snapshot(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
     body = _command_body(payload)
     service = ResourceWorkbenchService()
@@ -180,8 +242,14 @@ def _resource_workbench_snapshot(payload: Mapping[str, Any] | None = None) -> di
         metric_filters.setdefault("fixture", fixture)
         note_filters.setdefault("fixture", fixture)
     definitions = service.definitions()
-    metrics = _query_resource(service, "demo.metric", filters=metric_filters, limit=20, actor=actor)
-    notes = _query_resource(service, "demo.metric_note", filters=note_filters, limit=50, actor=actor)
+    metrics = _with_open_dev_tickets_metric(
+        service,
+        _query_resource(service, "demo.metric", filters=metric_filters, limit=20, actor=actor),
+        actor=actor,
+    )
+    notes = _with_builder_e2e_note(
+        _query_resource(service, "demo.metric_note", filters=note_filters, limit=50, actor=actor)
+    )
     traces = service.traces(limit=30)
     events = service.events(limit=30)
     return {
@@ -193,7 +261,11 @@ def _resource_workbench_snapshot(payload: Mapping[str, Any] | None = None) -> di
             "description": "Typed definition/query/operation/traces over Dev Tickets and demo resources.",
         },
         "definitions": {"items": _definition_rows(definitions)},
-        "metrics": {"items": metrics.get("items") or [], "count": metrics.get("count", 0)},
+        "metrics": {
+            "items": metrics.get("items") or [],
+            "count": metrics.get("count", 0),
+            "source_state": metrics.get("source_state", "ready"),
+        },
         "notes": {"items": notes.get("items") or [], "count": notes.get("count", 0)},
         "roles": {"items": _role_rows(definitions)},
         "traces": {"items": _compact_trace_rows(traces), "count": len(traces)},
@@ -401,7 +473,9 @@ def _snapshot() -> dict[str, Any]:
             "description": "Neutral semantic Web UI control task",
             "buttons": [
                 {"id": "open-demo", "label": "Open modal"},
-                {"id": "open-workbench", "label": "Workbench"},
+                {"id": "open-workbench", "label": "Resource Workbench"},
+                {"id": "open-workspace", "label": "Data workspace"},
+                {"id": "open-operations", "label": "Runtime operations"},
                 {"id": "emit-skill", "label": "Skill event"},
                 {"id": "emit-host", "label": "Host event"},
             ],
@@ -469,7 +543,7 @@ def query_resource_workbench(request: Mapping[str, Any]) -> dict[str, Any]:
             "error": f"unsupported demo resource_type: {resource_type}",
         }
     try:
-        return _query_resource(
+        result = _query_resource(
             ResourceWorkbenchService(),
             resource_type,
             filters=_mapping(body.get("filters")),
@@ -477,6 +551,13 @@ def query_resource_workbench(request: Mapping[str, Any]) -> dict[str, Any]:
             limit=int(body.get("limit") or 50),
             actor=_workbench_actor(body),
         )
+        if resource_type == "demo.metric_note":
+            return _with_builder_e2e_note(result, search=_text(body.get("search")))
+        if resource_type == "demo.metric":
+            return _with_open_dev_tickets_metric(
+                ResourceWorkbenchService(), result, actor=_workbench_actor(body)
+            )
+        return result
     except Exception as exc:
         return {
             "ok": False,

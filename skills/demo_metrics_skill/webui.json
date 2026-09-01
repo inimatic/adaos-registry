@@ -30,16 +30,16 @@
           "label": "Open modal"
         },
         {
-          "id": "open-workspace",
-          "label": "Workspace"
+          "id": "open-workbench",
+          "label": "Resource Workbench"
         },
         {
-          "id": "open-workbench",
-          "label": "Workbench"
+          "id": "open-workspace",
+          "label": "Data workspace"
         },
         {
           "id": "open-operations",
-          "label": "Operations"
+          "label": "Runtime operations"
         },
         {
           "id": "emit-skill",
@@ -448,10 +448,13 @@
               "id": "demo-metrics-table",
               "type": "ui.table",
               "area": "main",
-              "title": "Metrics table",
+              "title": "Live metrics",
               "dataSource": {
-                "kind": "y",
-                "path": "data/demo_metrics/table"
+                "kind": "skill",
+                "name": "demo_metrics_skill.query_resource_workbench",
+                "params": {
+                  "resource_type": "demo.metric"
+                }
               },
               "inputs": {
                 "columns": [
@@ -482,7 +485,196 @@
                   }
                 ],
                 "emptyText": "No demo metrics yet"
-              }
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "demo_metrics.selection": {
+                      "metric_id": "$event.id"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "demo-metric-notes",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Related metric notes",
+              "dataSource": {
+                "kind": "skill",
+                "name": "demo_metrics_skill.query_resource_workbench",
+                "params": {
+                  "resource_type": "demo.metric_note",
+                  "search": "$state.demo_metrics.selection.metric_id",
+                  "limit": 50,
+                  "actor": {
+                    "id": "demo_metrics:browser",
+                    "role": "owner"
+                  }
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "resource.demo_metrics"
+                ]
+              },
+              "inputs": {
+                "rowKey": "id",
+                "columns": [
+                  {
+                    "key": "title",
+                    "label": "Note"
+                  },
+                  {
+                    "key": "revision",
+                    "label": "Rev",
+                    "width": "70px"
+                  },
+                  {
+                    "key": "actions",
+                    "label": "Edit / Delete",
+                    "width": "170px",
+                    "kind": "buttons",
+                    "buttons": [
+                      {
+                        "id": "edit",
+                        "label": "Edit"
+                      },
+                      {
+                        "id": "delete",
+                        "label": "Delete"
+                      }
+                    ]
+                  }
+                ],
+                "emptyText": "No notes for the selected metric"
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "demoMetricNoteId": "$event.id",
+                    "demoMetricNoteTitle": "$event.title",
+                    "demoMetricNoteBody": "$event.body",
+                    "demoMetricNoteRevision": "$event.revision"
+                  }
+                },
+                {
+                  "on": "click:edit",
+                  "type": "updateState",
+                  "params": {
+                    "demoMetricNoteId": "$event.id",
+                    "demoMetricNoteTitle": "$event.title",
+                    "demoMetricNoteBody": "$event.body",
+                    "demoMetricNoteRevision": "$event.revision"
+                  }
+                },
+                {
+                  "on": "click:delete",
+                  "type": "callSkill",
+                  "target": "demo_metrics_skill.operate_metric_note",
+                  "invalidates": [
+                    "resource.demo_metrics"
+                  ],
+                  "params": {
+                    "operation_id": "delete",
+                    "role": "owner",
+                    "record_id": "$event.id",
+                    "expected_revision": "$event.revision"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "demo-metric-note-form",
+              "type": "ui.form",
+              "area": "right",
+              "title": "Metric note",
+              "inputs": {
+                "submitLabel": "Create note",
+                "secondaryActions": [
+                  {
+                    "id": "save_draft",
+                    "label": "Update selected"
+                  },
+                  {
+                    "id": "cancel",
+                    "label": "Delete selected"
+                  }
+                ],
+                "fields": [
+                  {
+                    "id": "title",
+                    "type": "shortText",
+                    "label": "Title",
+                    "stateKey": "demoMetricNoteTitle",
+                    "required": true
+                  },
+                  {
+                    "id": "body",
+                    "type": "longText",
+                    "label": "Body",
+                    "stateKey": "demoMetricNoteBody"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "demo_metrics_skill.operate_metric_note",
+                  "invalidates": [
+                    "resource.demo_metrics"
+                  ],
+                  "params": {
+                    "operation_id": "create",
+                    "role": "owner",
+                    "payload": {
+                      "metric_id": "$state.demo_metrics.selection.metric_id",
+                      "title": "$event.values.title",
+                      "body": "$event.values.body"
+                    }
+                  }
+                },
+                {
+                  "on": "save_draft",
+                  "enabledIf": "$state.demoMetricNoteId",
+                  "type": "callSkill",
+                  "target": "demo_metrics_skill.operate_metric_note",
+                  "invalidates": [
+                    "resource.demo_metrics"
+                  ],
+                  "params": {
+                    "operation_id": "update",
+                    "role": "owner",
+                    "record_id": "$state.demoMetricNoteId",
+                    "expected_revision": "$state.demoMetricNoteRevision",
+                    "payload": {
+                      "metric_id": "$state.demo_metrics.selection.metric_id",
+                      "title": "$event.values.title",
+                      "body": "$event.values.body"
+                    }
+                  }
+                },
+                {
+                  "on": "cancel",
+                  "enabledIf": "$state.demoMetricNoteId",
+                  "type": "callSkill",
+                  "target": "demo_metrics_skill.operate_metric_note",
+                  "invalidates": [
+                    "resource.demo_metrics"
+                  ],
+                  "params": {
+                    "operation_id": "delete",
+                    "role": "owner",
+                    "record_id": "$state.demoMetricNoteId",
+                    "expected_revision": "$state.demoMetricNoteRevision"
+                  }
+                }
+              ]
             },
             {
               "id": "demo-metrics-actions",
@@ -528,7 +720,7 @@
               "id": "demo-metrics-chart-payload",
               "type": "visual.metricChart",
               "area": "right",
-              "title": "Metric trend",
+              "title": "Selected metric trend",
               "dataSource": {
                 "kind": "y",
                 "path": "data/demo_metrics/chart"
@@ -680,7 +872,7 @@
                 "id": "metrics_grid",
                 "kind": "collection_grid",
                 "area": "main",
-                "title": "Metrics table",
+                "title": "Live metrics",
                 "when": {
                   "requiredCapabilities": [
                     "listable"
@@ -693,8 +885,11 @@
                   ]
                 },
                 "source": {
-                  "kind": "y",
-                  "ref": "y:data/demo_metrics/table",
+                  "kind": "skill",
+                  "ref": "demo_metrics_skill.query_resource_workbench",
+                  "params": {
+                    "resource_type": "demo.metric"
+                  },
                   "scope": "shared"
                 },
                 "selection": {
@@ -742,10 +937,140 @@
                 ]
               },
               {
+                "id": "metrics_notes",
+                "kind": "collection_grid",
+                "area": "main",
+                "title": "Related metric notes",
+                "source": {
+                  "kind": "skill",
+                  "ref": "demo_metrics_skill.query_resource_workbench",
+                  "params": {
+                    "resource_type": "demo.metric_note",
+                    "search": "$state.demo_metrics.selection.metric_id"
+                  },
+                  "scope": "shared"
+                },
+                "selection": {
+                  "kind": "view",
+                  "ref": "view:demoMetricNote",
+                  "scope": "local"
+                },
+                "config": {
+                  "emptyText": "No notes for the selected metric",
+                  "rowKey": "id",
+                  "columns": [
+                    {
+                      "key": "title",
+                      "label": "Note"
+                    },
+                    {
+                      "key": "revision",
+                      "label": "Rev",
+                      "width": "70px"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "ref": "action:view.demo_metrics.select_metric_note",
+                    "kind": "set_view_state",
+                    "trigger": "select",
+                    "payload": {
+                      "id": "$event.id",
+                      "revision": "$event.revision",
+                      "title": "$event.title",
+                      "body": "$event.body"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "metric_note_form",
+                "kind": "form",
+                "area": "right",
+                "title": "Metric note",
+                "config": {
+                  "fields": [
+                    {
+                      "id": "title",
+                      "label": "Title",
+                      "required": true,
+                      "stateKey": "demoMetricNote.title",
+                      "type": "shortText"
+                    },
+                    {
+                      "id": "body",
+                      "label": "Body",
+                      "stateKey": "demoMetricNote.body",
+                      "type": "longText"
+                    }
+                  ],
+                  "submitLabel": "Create note",
+                  "secondaryActions": [
+                    {
+                      "id": "save_draft",
+                      "label": "Update selected"
+                    },
+                    {
+                      "id": "cancel",
+                      "label": "Delete selected"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "ref": "action:view.demo_metrics.create_metric_note",
+                    "kind": "invoke_skill_action",
+                    "trigger": "submit",
+                    "target": "demo_metrics_skill.operate_metric_note",
+                    "payload": {
+                      "operation_id": "create",
+                      "payload": {
+                        "metric_id": "$state.demo_metrics.selection.metric_id",
+                        "title": "$event.values.title",
+                        "body": "$event.values.body"
+                      },
+                      "role": "owner"
+                    }
+                  },
+                  {
+                    "ref": "action:view.demo_metrics.update_metric_note",
+                    "kind": "invoke_skill_action",
+                    "trigger": "save_draft",
+                    "target": "demo_metrics_skill.operate_metric_note",
+                    "enabledIf": "$state.demoMetricNote.id",
+                    "payload": {
+                      "operation_id": "update",
+                      "record_id": "$state.demoMetricNote.id",
+                      "expected_revision": "$state.demoMetricNote.revision",
+                      "payload": {
+                        "metric_id": "$state.demo_metrics.selection.metric_id",
+                        "title": "$event.values.title",
+                        "body": "$event.values.body"
+                      },
+                      "role": "owner"
+                    }
+                  },
+                  {
+                    "ref": "action:view.demo_metrics.delete_metric_note",
+                    "kind": "invoke_skill_action",
+                    "trigger": "cancel",
+                    "target": "demo_metrics_skill.operate_metric_note",
+                    "enabledIf": "$state.demoMetricNote.id",
+                    "payload": {
+                      "operation_id": "delete",
+                      "record_id": "$state.demoMetricNote.id",
+                      "expected_revision": "$state.demoMetricNote.revision",
+                      "role": "owner"
+                    }
+                  }
+                ]
+              },
+              {
                 "id": "metrics_chart",
                 "kind": "metric_chart",
                 "area": "right",
-                "title": "Metric trend",
+                "title": "Selected metric trend",
                 "when": {
                   "requiredCapabilities": [
                     "inspectable"
@@ -1293,10 +1618,9 @@
               "area": "main",
               "title": "Metric notes",
               "dataSource": {
-                "kind": "api",
-                "url": "/api/resources/query",
-                "method": "POST",
-                "body": {
+                "kind": "skill",
+                "name": "demo_metrics_skill.query_resource_workbench",
+                "params": {
                   "resource_type": "demo.metric_note",
                   "limit": 50,
                   "actor": {
