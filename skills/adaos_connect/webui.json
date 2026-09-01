@@ -148,7 +148,7 @@
                 "emptyText": "Select an action to generate a QR code",
                 "width": 240
               },
-              "visibleIf": "$state.adaosConnectMode === 'browser'"
+              "visibleIf": "$state.adaosConnectMode === 'browser' || $state.adaosConnectMode === 'node'"
             },
             {
               "id": "adaos-connect-qr-tg",
@@ -181,7 +181,7 @@
                 "languageField": "link_language",
                 "copyButton": true
               },
-              "visibleIf": "$state.adaosConnectMode === 'browser'"
+              "visibleIf": "$state.adaosConnectMode === 'browser' || $state.adaosConnectMode === 'node'"
             },
             {
               "id": "adaos-connect-link-tg",
