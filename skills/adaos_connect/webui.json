@@ -148,7 +148,24 @@
                 "emptyText": "Select an action to generate a QR code",
                 "width": 240
               },
-              "visibleIf": "$state.adaosConnectMode === 'browser' || $state.adaosConnectMode === 'node'"
+              "visibleIf": "$state.adaosConnectMode === 'browser'"
+            },
+            {
+              "id": "adaos-connect-qr-node",
+              "type": "visual.qrCode",
+              "area": "main",
+              "title": "QR code",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/adaos_connect/current"
+              },
+              "inputs": {
+                "bindField": "qr_text",
+                "captionField": "code",
+                "emptyText": "Generate a node join code to display its QR code",
+                "width": 240
+              },
+              "visibleIf": "$state.adaosConnectMode === 'node'"
             },
             {
               "id": "adaos-connect-qr-tg",
@@ -181,7 +198,23 @@
                 "languageField": "link_language",
                 "copyButton": true
               },
-              "visibleIf": "$state.adaosConnectMode === 'browser' || $state.adaosConnectMode === 'node'"
+              "visibleIf": "$state.adaosConnectMode === 'browser'"
+            },
+            {
+              "id": "adaos-connect-link-node",
+              "type": "item.codeViewer",
+              "area": "main",
+              "title": "Link",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/adaos_connect/current"
+              },
+              "inputs": {
+                "bindField": "link",
+                "languageField": "link_language",
+                "copyButton": true
+              },
+              "visibleIf": "$state.adaosConnectMode === 'node'"
             },
             {
               "id": "adaos-connect-link-tg",
