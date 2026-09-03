@@ -64,6 +64,7 @@ def test_status_projects_public_empty_state(tmp_path: Path, monkeypatch) -> None
     assert result["current"]["status"] == "init"
     assert result["current"]["model"]["id"] == "tfjs_mobilenet_v2_100_embedding"
     assert result["current"]["model"]["runtime"] == "tfjs-mobilenet"
+    assert result["current"]["matching"]["threshold"] == 0.80
     assert result["current"]["model"]["modelUrl"].startswith("https://storage.googleapis.com/")
     assert any(item["id"] == "browser_embedding_placeholder" for item in result["current"]["model_options"])
     assert result["current"]["stats"]["descriptor_count"] == 0

@@ -83,7 +83,7 @@ def test_demo_metric_query_includes_live_open_dev_tickets_metric(monkeypatch):
     handler.ResourceWorkbenchService = StubService
     result = handler.query_resource_workbench({"resource_type": "demo.metric"})
 
-    metric = next(item for item in result["items"] if item.get("title") == "Open Dev Tickets")
+    metric = next(item for item in result["items"] if item.get("title") == "Open change requests")
     assert metric["value"] == 7
     assert metric["group"] == "subnet"
     assert metric["unit"] == "tickets"
@@ -147,6 +147,7 @@ def test_resource_workbench_webui_exposes_visible_crud_controls():
     notes = next(widget for widget in widgets if widget["id"] == "workbench-notes")
     form = next(widget for widget in widgets if widget["id"] == "workbench-note-form")
 
+    assert notes["title"] == "Metric notes · Builder E2E validation"
     assert notes["dataSource"]["kind"] == "skill"
     assert notes["dataSource"]["name"] == "demo_metrics_skill.query_resource_workbench"
     first_column = notes["inputs"]["columns"][1]
@@ -175,8 +176,8 @@ def test_main_demo_metrics_modal_is_a_resource_workbench():
 
     assert compatibility_table["title"] == "Live metrics"
     assert semantic_table["title"] == "Live metrics"
-    assert compatibility_chart["title"] == "Current metric trend"
-    assert semantic_chart["title"] == "Current metric trend"
+    assert compatibility_chart["title"] == "Recent metric history"
+    assert semantic_chart["title"] == "Recent metric history"
     assert compatibility_table["dataSource"]["name"] == "demo_metrics_skill.query_resource_workbench"
     assert compatibility_table["dataSource"]["params"]["resource_type"] == "demo.metric"
     assert semantic_table["source"]["ref"] == "demo_metrics_skill.query_resource_workbench"

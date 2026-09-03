@@ -1,5 +1,5 @@
 name: cv_descriptor
-version: 0.1.4
+version: 0.1.7
 description: Browser-side CV descriptor pilot. Stores visual-object embeddings, model
   signatures, thumbnails, and text descriptions while the AdaOS client CV runtime
   is being built.
@@ -270,7 +270,7 @@ data_projections:
   targets:
   - backend: yjs
     path: data/cv_descriptor/runtime
-updated_at: '2026-08-29T05:55:00+00:00'
+updated_at: '2026-09-03T00:20:10+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.950+5767.4e1aaf98b
@@ -279,4 +279,3 @@ compatibility:
     min_commit: 4e1aaf98b24c921949cad7ace2ae24c8ef4fff30
     min_short_commit: 4e1aaf98
     build_date: '2026-08-28T19:07:25+03:00'
-

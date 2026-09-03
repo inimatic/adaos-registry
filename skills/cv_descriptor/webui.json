@@ -101,7 +101,7 @@
     {
       "id": "cv_descriptor_app",
       "title": "CV Descriptor",
-      "subtitle": "Text labels for visual objects",
+      "subtitle": "Recognize saved visual objects",
       "icon": "scan-outline",
       "launchModal": "cv_descriptor_setup_modal",
       "action": {
@@ -204,7 +204,7 @@
               "id": "cv-setup-controls",
               "type": "input.commandBar",
               "area": "main",
-              "title": "Setup controls",
+              "title": "Setup actions",
               "inputs": {
                 "variant": "stack",
                 "size": "small",
@@ -214,12 +214,12 @@
                     "label": "Start setup"
                   },
                   {
-                    "id": "stop",
-                    "label": "Stop"
-                  },
-                  {
                     "id": "diagnostics",
                     "label": "Diagnostics"
+                  },
+                  {
+                    "id": "stop",
+                    "label": "Stop"
                   },
                   {
                     "id": "work",

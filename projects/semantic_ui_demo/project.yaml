@@ -1,20 +1,23 @@
 schema: adaos.project.v1
 kind: project
 id: semantic_ui_demo
-version: 0.10.3
-profiles: [adaos.demo.semantic_ui.v1]
+version: 0.10.5
+profiles:
+- adaos.demo.semantic_ui.v1
 components:
   owned:
   - ref: scenario:taiga_ui_demo_scenario
     role: primary
     exposure: application
     lifecycle: bound
-    relations: [presents]
+    relations:
+    - presents
   - ref: skill:demo_metrics_skill
     role: implementation
     exposure: project_only
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   dependencies: []
 entrypoints:
 - id: demo
@@ -25,14 +28,20 @@ entrypoints:
 catalog:
   title: Semantic UI Demo
   title_i18n:
-    en: "Semantic UI Demo"
-    ru: "\u0414\u0435\u043c\u043e Semantic UI"
+    en: Semantic UI Demo
+    ru: Демо Semantic UI
   description: Semantic Web UI demo with table, chart payload, and live event stream.
   description_i18n:
-    en: "Semantic Web UI demo with table, chart payload, and live event stream."
-    ru: "\u0414\u0435\u043c\u043e Semantic Web UI \u0441 \u0442\u0430\u0431\u043b\u0438\u0446\u0435\u0439, chart payload \u0438 live event stream."
-  categories: [demo, development]
-  tags: [semantic-ui, taiga, metrics, alpha]
+    en: Semantic Web UI demo with table, chart payload, and live event stream.
+    ru: Демо Semantic Web UI с таблицей, chart payload и live event stream.
+  categories:
+  - demo
+  - development
+  tags:
+  - semantic-ui
+  - taiga
+  - metrics
+  - alpha
 publication:
   stage: alpha
   visibility: unlisted
@@ -43,14 +52,18 @@ install:
   - id: demo
     title: Demo
     title_i18n:
-      en: "Demo"
-      ru: "\u0414\u0435\u043c\u043e"
+      en: Demo
+      ru: Демо
     default: true
     optional: false
-    components: [scenario:taiga_ui_demo_scenario, skill:demo_metrics_skill]
+    components:
+    - scenario:taiga_ui_demo_scenario
+    - skill:demo_metrics_skill
 compatibility:
-  required_entrypoints: [demo]
-  validation_profiles: [demo.semantic_ui]
+  required_entrypoints:
+  - demo
+  validation_profiles:
+  - demo.semantic_ui
 lifecycle:
   uninstall:
     components: remove_if_unreferenced

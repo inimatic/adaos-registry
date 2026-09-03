@@ -1,1104 +1,1157 @@
 {
-  "$schema": "../../../../src/adaos/abi/scenario.schema.json",
-  "id": "taiga_ui_demo_scenario",
-  "version": "0.1.0",
-  "name": "Taiga UI Demo Scenario",
-  "type": "desktop",
-  "title": "Taiga UI Demo",
-  "description": "Control scenario for semantic Web UI and native Taiga tree, collection grid, metric chart, and shared runtime widgets.",
-  "depends": [
-    "web_desktop_skill",
-    "demo_metrics_skill"
-  ],
-  "ui": {
-    "application": {
-      "version": "0.1",
-      "desktop": {
-        "pageSchema": {
-          "id": "taiga_ui_demo",
-          "title": "Taiga UI Demo",
-          "layout": {
-            "type": "split",
-            "pattern": "split",
-            "areas": [
-              {
-                "id": "sidebar",
-                "role": "sidebar"
-              },
-              {
-                "id": "main",
-                "role": "main"
-              },
-              {
-                "id": "right",
-                "role": "aux"
-              },
-              {
-                "id": "bottom",
-                "role": "footer"
-              }
-            ]
-          },
-          "widgets": [
-            {
-              "id": "demo-launch",
-              "type": "input.commandBar",
-              "area": "sidebar",
-              "title": "Demo",
-              "inputs": {
-                "buttons": [
-                  {
-                    "id": "open-demo",
-                    "label": "Open Demo Metrics"
-                  },
-                  {
-                    "id": "open-workspace",
-                    "label": "Workspace"
-                  },
-                  {
-                    "id": "open-workbench",
-                    "label": "Resource Workbench"
-                  },
-                  {
-                    "id": "open-workspace-shell",
-                    "label": "Workspace shell"
-                  },
-                  {
-                    "id": "open-operations",
-                    "label": "Operations"
-                  },
-                  {
-                    "id": "emit-skill",
-                    "label": "Skill event"
-                  },
-                  {
-                    "id": "emit-host",
-                    "label": "Host event"
-                  }
-                ],
-                "size": "small"
-              },
-              "actions": [
-                {
-                  "on": "click:open-demo",
-                  "type": "navigate",
-                  "params": {
-                    "to": "demo_metrics_skill.demo_metrics_modal",
-                    "surface": "modal",
-                    "modalId": "demo_metrics_modal"
-                  }
-                },
-                {
-                  "on": "click:open-workspace",
-                  "type": "openWorkspace",
-                  "params": {
-                    "modalId": "workspace_manager",
-                    "workspaceRef": "workspace:demo_metrics",
-                    "entityRef": "scenario:taiga_ui_demo_scenario"
-                  }
-                },
-                {
-                  "on": "click:open-workbench",
-                  "type": "navigate",
-                  "params": {
-                    "to": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
-                    "surface": "modal",
-                    "modalId": "demo_metrics_resource_workbench_modal"
-                  }
-                },
-                {
-                  "on": "click:open-workspace-shell",
-                  "type": "openWorkspace",
-                  "params": {
-                    "surfaceRoute": "workspace"
-                  }
-                },
-                {
-                  "on": "click:open-operations",
-                  "type": "openWorkspace",
-                  "params": {
-                    "surfaceRoute": "operations"
-                  }
-                },
-                {
-                  "on": "click:emit-skill",
-                  "type": "callSkill",
-                  "target": "demo_metrics_skill.emit_demo_event",
-                  "params": {
-                    "action_id": "desktop_skill_button",
-                    "metric_id": "$state.demo_metrics.selection.metric_id"
-                  }
-                },
-                {
-                  "on": "click:emit-host",
-                  "type": "callHost",
-                  "target": "demo_metrics.host_action",
-                  "params": {
-                    "action_id": "desktop_host_button",
-                    "metric_id": "$state.demo_metrics.selection.metric_id"
-                  }
+    "$schema": "../../../../src/adaos/abi/scenario.schema.json",
+    "id": "taiga_ui_demo_scenario",
+    "version": "0.11.4",
+    "name": "taiga_ui_demo_scenario",
+    "type": "desktop",
+    "title": "Taiga UI Demo Scenario",
+    "description": "Desktop demo scenario for the first semantic Web UI control task with a table, chart payload, and live event stream.",
+    "depends": [
+        "web_desktop_skill",
+        "demo_metrics_skill"
+    ],
+    "ui": {
+        "application": {
+            "version": "0.1",
+            "desktop": {
+                "pageSchema": {
+                    "id": "taiga_ui_demo",
+                    "title": "Taiga UI Demo",
+                    "layout": {
+                        "type": "split",
+                        "pattern": "split",
+                        "areas": [
+                            {
+                                "id": "sidebar",
+                                "role": "sidebar"
+                            },
+                            {
+                                "id": "main",
+                                "role": "main"
+                            },
+                            {
+                                "id": "right",
+                                "role": "aux"
+                            },
+                            {
+                                "id": "bottom",
+                                "role": "footer"
+                            }
+                        ]
+                    },
+                    "widgets": [
+                        {
+                            "id": "demo-launch",
+                            "type": "input.commandBar",
+                            "area": "sidebar",
+                            "title": "Demo",
+                            "inputs": {
+                                "buttons": [
+                                    {
+                                        "id": "open-demo",
+                                        "label": "Open Demo Metrics"
+                                    },
+                                    {
+                                        "id": "open-workspace",
+                                        "label": "Workspace"
+                                    },
+                                    {
+                                        "id": "open-workbench",
+                                        "label": "Resource Workbench"
+                                    },
+                                    {
+                                        "id": "open-workspace-shell",
+                                        "label": "Workspace shell"
+                                    },
+                                    {
+                                        "id": "open-operations",
+                                        "label": "Operations"
+                                    },
+                                    {
+                                        "id": "emit-skill",
+                                        "label": "Skill event"
+                                    },
+                                    {
+                                        "id": "emit-host",
+                                        "label": "Host event"
+                                    }
+                                ],
+                                "size": "small"
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:open-demo",
+                                    "type": "navigate",
+                                    "params": {
+                                        "to": "demo_metrics_skill.demo_metrics_modal",
+                                        "surface": "modal",
+                                        "modalId": "demo_metrics_modal"
+                                    }
+                                },
+                                {
+                                    "on": "click:open-workspace",
+                                    "type": "openWorkspace",
+                                    "params": {
+                                        "modalId": "workspace_manager",
+                                        "workspaceRef": "workspace:demo_metrics",
+                                        "entityRef": "scenario:taiga_ui_demo_scenario"
+                                    }
+                                },
+                                {
+                                    "on": "click:open-workbench",
+                                    "type": "navigate",
+                                    "params": {
+                                        "to": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
+                                        "surface": "modal",
+                                        "modalId": "demo_metrics_resource_workbench_modal"
+                                    }
+                                },
+                                {
+                                    "on": "click:open-workspace-shell",
+                                    "type": "openWorkspace",
+                                    "params": {
+                                        "surfaceRoute": "workspace"
+                                    }
+                                },
+                                {
+                                    "on": "click:open-operations",
+                                    "type": "openWorkspace",
+                                    "params": {
+                                        "surfaceRoute": "operations"
+                                    }
+                                },
+                                {
+                                    "on": "click:emit-skill",
+                                    "type": "callSkill",
+                                    "target": "demo_metrics_skill.emit_demo_event",
+                                    "params": {
+                                        "action_id": "desktop_skill_button",
+                                        "metric_id": "$state.demo_metrics.selection.metric_id"
+                                    }
+                                },
+                                {
+                                    "on": "click:emit-host",
+                                    "type": "callHost",
+                                    "target": "demo_metrics.host_action",
+                                    "params": {
+                                        "action_id": "desktop_host_button",
+                                        "metric_id": "$state.demo_metrics.selection.metric_id"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "demo-summary",
+                            "type": "visual.metricTile",
+                            "area": "main",
+                            "title": "Summary",
+                            "dataSource": {
+                                "kind": "y",
+                                "path": "data/demo_metrics/summary"
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:open-demo",
+                                    "type": "navigate",
+                                    "params": {
+                                        "to": "demo_metrics_skill.demo_metrics_modal",
+                                        "surface": "modal",
+                                        "modalId": "demo_metrics_modal"
+                                    }
+                                },
+                                {
+                                    "on": "click:open-workspace",
+                                    "type": "openWorkspace",
+                                    "params": {
+                                        "modalId": "workspace_manager",
+                                        "workspaceRef": "workspace:demo_metrics",
+                                        "entityRef": "scenario:taiga_ui_demo_scenario"
+                                    }
+                                },
+                                {
+                                    "on": "click:open-workbench",
+                                    "type": "navigate",
+                                    "params": {
+                                        "to": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
+                                        "surface": "modal",
+                                        "modalId": "demo_metrics_resource_workbench_modal"
+                                    }
+                                },
+                                {
+                                    "on": "click:open-workspace-shell",
+                                    "type": "openWorkspace",
+                                    "params": {
+                                        "surfaceRoute": "workspace"
+                                    }
+                                },
+                                {
+                                    "on": "click:open-operations",
+                                    "type": "openWorkspace",
+                                    "params": {
+                                        "surfaceRoute": "operations"
+                                    }
+                                },
+                                {
+                                    "on": "click:emit-skill",
+                                    "type": "callSkill",
+                                    "target": "demo_metrics_skill.emit_demo_event",
+                                    "params": {
+                                        "action_id": "summary_skill_button",
+                                        "metric_id": "$state.demo_metrics.selection.metric_id"
+                                    }
+                                },
+                                {
+                                    "on": "click:emit-host",
+                                    "type": "callHost",
+                                    "target": "demo_metrics.host_action",
+                                    "params": {
+                                        "action_id": "summary_host_button",
+                                        "metric_id": "$state.demo_metrics.selection.metric_id"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "demo-component-tree",
+                            "type": "collection.tree",
+                            "area": "sidebar",
+                            "title": "Taiga components",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": [
+                                    {
+                                        "id": "data-display",
+                                        "title": "Data display",
+                                        "status": "ready",
+                                        "children": [
+                                            {
+                                                "id": "collection-grid",
+                                                "title": "Collection grid",
+                                                "status": "ready"
+                                            },
+                                            {
+                                                "id": "metric-chart",
+                                                "title": "Metric chart",
+                                                "status": "ready"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "interaction",
+                                        "title": "Interaction",
+                                        "status": "ready",
+                                        "children": [
+                                            {
+                                                "id": "command-bar",
+                                                "title": "Command bar",
+                                                "status": "ready"
+                                            },
+                                            {
+                                                "id": "modal-navigation",
+                                                "title": "Typed modal navigation",
+                                                "status": "ready"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            "inputs": {
+                                "expandedByDefault": true,
+                                "compactIndent": true,
+                                "wrapTitles": true,
+                                "emptyText": "No component groups"
+                            }
+                        },
+                        {
+                            "id": "demo-table",
+                            "type": "ui.table",
+                            "area": "main",
+                            "title": "Metrics table",
+                            "dataSource": {
+                                "kind": "y",
+                                "path": "data/demo_metrics/table"
+                            },
+                            "inputs": {
+                                "columns": [
+                                    {
+                                        "key": "title",
+                                        "label": "Metric"
+                                    },
+                                    {
+                                        "key": "status",
+                                        "label": "Status",
+                                        "width": "120px"
+                                    },
+                                    {
+                                        "key": "value",
+                                        "label": "Value",
+                                        "width": "100px"
+                                    },
+                                    {
+                                        "key": "unit",
+                                        "label": "Unit",
+                                        "width": "90px"
+                                    }
+                                ],
+                                "emptyText": "No demo metrics yet"
+                            }
+                        },
+                        {
+                            "id": "demo-taiga-grid",
+                            "type": "visual.taigaCollectionGrid",
+                            "area": "main",
+                            "title": "Taiga collection grid",
+                            "dataSource": {
+                                "kind": "y",
+                                "path": "data/demo_metrics/table"
+                            },
+                            "inputs": {
+                                "stateKey": "demo_metrics.taigaSelection",
+                                "columns": [
+                                    {
+                                        "key": "title",
+                                        "label": "Metric"
+                                    },
+                                    {
+                                        "key": "status",
+                                        "label": "Status"
+                                    },
+                                    {
+                                        "key": "value",
+                                        "label": "Value"
+                                    },
+                                    {
+                                        "key": "unit",
+                                        "label": "Unit"
+                                    }
+                                ],
+                                "emptyText": "No Taiga grid rows yet"
+                            }
+                        },
+                        {
+                            "id": "demo-chart-payload",
+                            "type": "visual.metricChart",
+                            "area": "right",
+                            "title": "Metric trend",
+                            "dataSource": {
+                                "kind": "y",
+                                "path": "data/demo_metrics/chart"
+                            },
+                            "inputs": {
+                                "stateKey": "demo_metrics.selection",
+                                "xKey": "ts",
+                                "yKey": "value",
+                                "emptyText": "No chart payload yet"
+                            }
+                        },
+                        {
+                            "id": "demo-taiga-chart",
+                            "type": "visual.taigaMetricChart",
+                            "area": "right",
+                            "title": "Taiga metric chart",
+                            "dataSource": {
+                                "kind": "y",
+                                "path": "data/demo_metrics/chart"
+                            },
+                            "inputs": {
+                                "stateKey": "demo_metrics.selection",
+                                "xKey": "ts",
+                                "yKey": "value",
+                                "emptyText": "No Taiga chart payload yet"
+                            }
+                        },
+                        {
+                            "id": "demo-events",
+                            "type": "ui.list",
+                            "area": "bottom",
+                            "title": "Events",
+                            "dataSource": {
+                                "kind": "stream",
+                                "receiver": "demo_metrics.events"
+                            },
+                            "inputs": {
+                                "titleKey": "title",
+                                "subtitleKey": "description",
+                                "showDetails": false,
+                                "itemAccordion": false,
+                                "emptyText": "No demo events yet"
+                            }
+                        },
+                        {
+                            "id": "demo-chat",
+                            "type": "ui.chat",
+                            "area": "bottom",
+                            "title": "Operator notes",
+                            "dataSource": {
+                                "kind": "y",
+                                "path": "data/demo_metrics/chat"
+                            },
+                            "inputs": {
+                                "hint": "Notes are seeded from shared demo state.",
+                                "alignRightFrom": "operator"
+                            }
+                        }
+                    ],
+                    "semantic": {
+                        "$schema": "../../../../src/adaos/abi/webui.semantic.v0.schema.json",
+                        "id": "taiga_ui_demo_surface",
+                        "title": "Taiga UI Demo Surface",
+                        "workspace": {
+                            "surfaceClass": "workspace",
+                            "objectKind": "demo_metric_suite",
+                            "entityRef": "scenario:taiga_ui_demo_scenario",
+                            "capabilities": [
+                                "inspectable",
+                                "listable",
+                                "streamable",
+                                "eventful"
+                            ],
+                            "lifecycleStage": "active"
+                        },
+                        "layout": {
+                            "pattern": "split",
+                            "areas": [
+                                {
+                                    "id": "main",
+                                    "role": "main"
+                                },
+                                {
+                                    "id": "right",
+                                    "role": "aux"
+                                },
+                                {
+                                    "id": "bottom",
+                                    "role": "footer"
+                                }
+                            ]
+                        },
+                        "load": {
+                            "structure": "eager",
+                            "data": "visible",
+                            "focus": "primary",
+                            "offFocusReadyState": "hydrating"
+                        },
+                        "viewState": [
+                            {
+                                "ref": "view:demo_metrics.selection",
+                                "default": {
+                                    "metric_id": "cpu",
+                                    "status_filter": "all",
+                                    "group_filter": "all"
+                                },
+                                "persistence": "local_persisted"
+                            }
+                        ],
+                        "views": [
+                            {
+                                "id": "demo_metric_actions",
+                                "kind": "action_bar",
+                                "area": "main",
+                                "title": "Demo actions",
+                                "variant": "toolbar",
+                                "config": {
+                                    "size": "small",
+                                    "buttons": [
+                                        {
+                                            "id": "open-workbench",
+                                            "label": "Open Workbench",
+                                            "icon": "construct-outline",
+                                            "kind": "primary",
+                                            "title": "Open Resource Workbench"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "ref": "action:demo_metrics.open_workbench",
+                                        "kind": "open_modal",
+                                        "trigger": "click:open-workbench",
+                                        "target": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
+                                        "payload": {
+                                            "modalId": "demo_metrics_resource_workbench_modal",
+                                            "route": "demo_metrics_resource_workbench",
+                                            "view": "demo_metrics_skill.demo_metrics_resource_workbench_modal"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "demo_metrics_grid",
+                                "kind": "collection_grid",
+                                "area": "main",
+                                "title": "Metrics table",
+                                "when": {
+                                    "requiredCapabilities": [
+                                        "listable"
+                                    ],
+                                    "surfaceClasses": [
+                                        "workspace"
+                                    ],
+                                    "lifecycleStages": [
+                                        "active"
+                                    ]
+                                },
+                                "source": {
+                                    "kind": "y",
+                                    "ref": "y:data/demo_metrics/table",
+                                    "scope": "shared"
+                                },
+                                "selection": {
+                                    "kind": "view",
+                                    "ref": "view:demo_metrics.selection",
+                                    "scope": "local"
+                                },
+                                "config": {
+                                    "columns": [
+                                        {
+                                            "key": "title",
+                                            "label": "Metric"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "label": "Status"
+                                        },
+                                        {
+                                            "key": "value",
+                                            "label": "Value"
+                                        },
+                                        {
+                                            "key": "unit",
+                                            "label": "Unit"
+                                        },
+                                        {
+                                            "key": "group",
+                                            "label": "Group"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "ref": "action:view.demo_metrics.select_metric",
+                                        "kind": "set_view_state",
+                                        "trigger": "select",
+                                        "payload": {
+                                            "metric_id": "$event.id"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "demo_metric_chart",
+                                "kind": "metric_chart",
+                                "area": "right",
+                                "title": "Metric trend",
+                                "when": {
+                                    "requiredCapabilities": [
+                                        "inspectable"
+                                    ],
+                                    "surfaceClasses": [
+                                        "workspace"
+                                    ],
+                                    "lifecycleStages": [
+                                        "active"
+                                    ]
+                                },
+                                "source": {
+                                    "kind": "y",
+                                    "ref": "y:data/demo_metrics/chart",
+                                    "scope": "shared"
+                                },
+                                "selection": {
+                                    "kind": "view",
+                                    "ref": "view:demo_metrics.selection",
+                                    "scope": "local"
+                                },
+                                "config": {
+                                    "xKey": "ts",
+                                    "yKey": "value"
+                                }
+                            },
+                            {
+                                "id": "demo_metric_events",
+                                "kind": "event_log",
+                                "area": "bottom",
+                                "title": "Events",
+                                "when": {
+                                    "requiredCapabilities": [
+                                        "eventful"
+                                    ],
+                                    "surfaceClasses": [
+                                        "workspace"
+                                    ],
+                                    "lifecycleStages": [
+                                        "active"
+                                    ]
+                                },
+                                "source": {
+                                    "kind": "stream",
+                                    "ref": "stream:demo_metrics.events",
+                                    "scope": "shared",
+                                    "transport": "auto"
+                                }
+                            },
+                            {
+                                "id": "demo_metric_chat",
+                                "kind": "chat_panel",
+                                "area": "bottom",
+                                "title": "Operator notes",
+                                "when": {
+                                    "requiredCapabilities": [
+                                        "streamable"
+                                    ],
+                                    "surfaceClasses": [
+                                        "workspace"
+                                    ],
+                                    "lifecycleStages": [
+                                        "active"
+                                    ]
+                                },
+                                "source": {
+                                    "kind": "y",
+                                    "ref": "y:data/demo_metrics/chat",
+                                    "scope": "shared"
+                                },
+                                "config": {
+                                    "hint": "Notes are seeded from shared demo state.",
+                                    "alignRightFrom": "operator"
+                                }
+                            }
+                        ]
+                    }
                 }
-              ]
             },
-            {
-              "id": "demo-summary",
-              "type": "visual.metricTile",
-              "area": "main",
-              "title": "Summary",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/demo_metrics/summary"
-              },
-              "actions": [
-                {
-                  "on": "click:open-demo",
-                  "type": "navigate",
-                  "params": {
-                    "to": "demo_metrics_skill.demo_metrics_modal",
-                    "surface": "modal",
-                    "modalId": "demo_metrics_modal"
-                  }
-                },
-                {
-                  "on": "click:open-workspace",
-                  "type": "openWorkspace",
-                  "params": {
-                    "modalId": "workspace_manager",
-                    "workspaceRef": "workspace:demo_metrics",
-                    "entityRef": "scenario:taiga_ui_demo_scenario"
-                  }
-                },
-                {
-                  "on": "click:open-workbench",
-                  "type": "navigate",
-                  "params": {
-                    "to": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
-                    "surface": "modal",
-                    "modalId": "demo_metrics_resource_workbench_modal"
-                  }
-                },
-                {
-                  "on": "click:open-workspace-shell",
-                  "type": "openWorkspace",
-                  "params": {
-                    "surfaceRoute": "workspace"
-                  }
-                },
-                {
-                  "on": "click:open-operations",
-                  "type": "openWorkspace",
-                  "params": {
-                    "surfaceRoute": "operations"
-                  }
-                },
-                {
-                  "on": "click:emit-skill",
-                  "type": "callSkill",
-                  "target": "demo_metrics_skill.emit_demo_event",
-                  "params": {
-                    "action_id": "summary_skill_button",
-                    "metric_id": "$state.demo_metrics.selection.metric_id"
-                  }
-                },
-                {
-                  "on": "click:emit-host",
-                  "type": "callHost",
-                  "target": "demo_metrics.host_action",
-                  "params": {
-                    "action_id": "summary_host_button",
-                    "metric_id": "$state.demo_metrics.selection.metric_id"
-                  }
+            "workspace": {
+                "pageSchema": {
+                    "id": "taiga_ui_demo_workspace",
+                    "title": "Demo Metrics Workspace",
+                    "layout": {
+                        "type": "split",
+                        "pattern": "split",
+                        "areas": [
+                            {
+                                "id": "main",
+                                "role": "main"
+                            },
+                            {
+                                "id": "right",
+                                "role": "aux"
+                            },
+                            {
+                                "id": "bottom",
+                                "role": "footer"
+                            }
+                        ]
+                    },
+                    "widgets": [],
+                    "semantic": {
+                        "$schema": "../../../../src/adaos/abi/webui.semantic.v0.schema.json",
+                        "id": "taiga_ui_demo_workspace_surface",
+                        "title": "Demo Metrics Workspace Surface",
+                        "workspace": {
+                            "surfaceClass": "workspace",
+                            "objectKind": "demo_metric_suite",
+                            "entityRef": "scenario:taiga_ui_demo_scenario",
+                            "capabilities": [
+                                "inspectable",
+                                "listable",
+                                "streamable",
+                                "eventful"
+                            ],
+                            "lifecycleStage": "active"
+                        },
+                        "layout": {
+                            "pattern": "split",
+                            "areas": [
+                                {
+                                    "id": "main",
+                                    "role": "main"
+                                },
+                                {
+                                    "id": "right",
+                                    "role": "aux"
+                                },
+                                {
+                                    "id": "bottom",
+                                    "role": "footer"
+                                }
+                            ]
+                        },
+                        "load": {
+                            "structure": "eager",
+                            "data": "visible",
+                            "focus": "primary",
+                            "offFocusReadyState": "hydrating"
+                        },
+                        "viewState": [
+                            {
+                                "ref": "view:demo_metrics.selection",
+                                "default": {
+                                    "metric_id": "cpu",
+                                    "status_filter": "all",
+                                    "group_filter": "all"
+                                },
+                                "persistence": "local_persisted"
+                            }
+                        ],
+                        "views": [
+                            {
+                                "id": "workspace_metric_actions",
+                                "kind": "action_bar",
+                                "area": "main",
+                                "title": "Workspace actions",
+                                "variant": "toolbar",
+                                "config": {
+                                    "size": "small",
+                                    "buttons": [
+                                        {
+                                            "id": "open-workbench",
+                                            "label": "Open Workbench",
+                                            "icon": "construct-outline",
+                                            "kind": "primary",
+                                            "title": "Open Resource Workbench"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "ref": "action:demo_metrics.open_workbench",
+                                        "kind": "open_modal",
+                                        "trigger": "click:open-workbench",
+                                        "target": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
+                                        "payload": {
+                                            "modalId": "demo_metrics_resource_workbench_modal",
+                                            "route": "demo_metrics_resource_workbench",
+                                            "view": "demo_metrics_skill.demo_metrics_resource_workbench_modal"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "workspace_metrics_grid",
+                                "kind": "collection_grid",
+                                "area": "main",
+                                "title": "Metrics table",
+                                "when": {
+                                    "requiredCapabilities": [
+                                        "listable"
+                                    ],
+                                    "surfaceClasses": [
+                                        "workspace"
+                                    ],
+                                    "lifecycleStages": [
+                                        "active"
+                                    ]
+                                },
+                                "source": {
+                                    "kind": "y",
+                                    "ref": "y:data/demo_metrics/table",
+                                    "scope": "shared"
+                                },
+                                "selection": {
+                                    "kind": "view",
+                                    "ref": "view:demo_metrics.selection",
+                                    "scope": "local"
+                                },
+                                "config": {
+                                    "columns": [
+                                        {
+                                            "key": "title",
+                                            "label": "Metric"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "label": "Status"
+                                        },
+                                        {
+                                            "key": "value",
+                                            "label": "Value"
+                                        },
+                                        {
+                                            "key": "unit",
+                                            "label": "Unit"
+                                        },
+                                        {
+                                            "key": "group",
+                                            "label": "Group"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "ref": "action:view.demo_metrics.select_metric",
+                                        "kind": "set_view_state",
+                                        "trigger": "select",
+                                        "payload": {
+                                            "metric_id": "$event.id"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "workspace_metric_chart",
+                                "kind": "metric_chart",
+                                "area": "right",
+                                "title": "Metric trend",
+                                "when": {
+                                    "requiredCapabilities": [
+                                        "inspectable"
+                                    ],
+                                    "surfaceClasses": [
+                                        "workspace"
+                                    ],
+                                    "lifecycleStages": [
+                                        "active"
+                                    ]
+                                },
+                                "source": {
+                                    "kind": "y",
+                                    "ref": "y:data/demo_metrics/chart",
+                                    "scope": "shared"
+                                },
+                                "selection": {
+                                    "kind": "view",
+                                    "ref": "view:demo_metrics.selection",
+                                    "scope": "local"
+                                },
+                                "config": {
+                                    "xKey": "ts",
+                                    "yKey": "value"
+                                }
+                            },
+                            {
+                                "id": "workspace_metric_events",
+                                "kind": "event_log",
+                                "area": "bottom",
+                                "title": "Events",
+                                "when": {
+                                    "requiredCapabilities": [
+                                        "eventful"
+                                    ],
+                                    "surfaceClasses": [
+                                        "workspace"
+                                    ],
+                                    "lifecycleStages": [
+                                        "active"
+                                    ]
+                                },
+                                "source": {
+                                    "kind": "stream",
+                                    "ref": "stream:demo_metrics.events",
+                                    "scope": "shared",
+                                    "transport": "auto"
+                                }
+                            },
+                            {
+                                "id": "workspace_metric_chat",
+                                "kind": "chat_panel",
+                                "area": "bottom",
+                                "title": "Operator notes",
+                                "when": {
+                                    "requiredCapabilities": [
+                                        "streamable"
+                                    ],
+                                    "surfaceClasses": [
+                                        "workspace"
+                                    ],
+                                    "lifecycleStages": [
+                                        "active"
+                                    ]
+                                },
+                                "source": {
+                                    "kind": "y",
+                                    "ref": "y:data/demo_metrics/chat",
+                                    "scope": "shared"
+                                },
+                                "config": {
+                                    "hint": "Workspace shell reuses the semantic demo surface.",
+                                    "alignRightFrom": "operator"
+                                }
+                            }
+                        ]
+                    }
                 }
-              ]
             },
-            {
-              "id": "demo-component-tree",
-              "type": "collection.tree",
-              "area": "sidebar",
-              "title": "Taiga components",
-              "dataSource": {
-                "kind": "static",
-                "value": [
-                  {
-                    "id": "data-display",
-                    "title": "Data display",
-                    "status": "ready",
-                    "children": [
-                      {
-                        "id": "collection-grid",
-                        "title": "Collection grid",
-                        "status": "ready"
-                      },
-                      {
-                        "id": "metric-chart",
-                        "title": "Metric chart",
-                        "status": "ready"
-                      }
-                    ]
-                  },
-                  {
-                    "id": "interaction",
-                    "title": "Interaction",
-                    "status": "ready",
-                    "children": [
-                      {
-                        "id": "command-bar",
-                        "title": "Command bar",
-                        "status": "ready"
-                      },
-                      {
-                        "id": "modal-navigation",
-                        "title": "Typed modal navigation",
-                        "status": "ready"
-                      }
-                    ]
-                  }
-                ]
-              },
-              "inputs": {
-                "expandedByDefault": true,
-                "compactIndent": true,
-                "wrapTitles": true,
-                "emptyText": "No component groups"
-              }
+            "operations": {
+                "pageSchema": {
+                    "id": "taiga_ui_demo_operations",
+                    "title": "Demo Metrics Operations",
+                    "layout": {
+                        "type": "split",
+                        "pattern": "split",
+                        "areas": [
+                            {
+                                "id": "main",
+                                "role": "main"
+                            },
+                            {
+                                "id": "right",
+                                "role": "aux"
+                            },
+                            {
+                                "id": "bottom",
+                                "role": "footer"
+                            }
+                        ]
+                    },
+                    "widgets": [],
+                    "semantic": {
+                        "$schema": "../../../../src/adaos/abi/webui.semantic.v0.schema.json",
+                        "id": "taiga_ui_demo_operations_surface",
+                        "title": "Demo Metrics Operations Surface",
+                        "workspace": {
+                            "surfaceClass": "operations",
+                            "objectKind": "demo_metric_suite",
+                            "entityRef": "scenario:taiga_ui_demo_scenario",
+                            "capabilities": [
+                                "inspectable",
+                                "streamable",
+                                "eventful"
+                            ],
+                            "lifecycleStage": "active"
+                        },
+                        "layout": {
+                            "pattern": "split",
+                            "areas": [
+                                {
+                                    "id": "main",
+                                    "role": "main"
+                                },
+                                {
+                                    "id": "right",
+                                    "role": "aux"
+                                },
+                                {
+                                    "id": "bottom",
+                                    "role": "footer"
+                                }
+                            ]
+                        },
+                        "load": {
+                            "structure": "eager",
+                            "data": "visible",
+                            "focus": "primary",
+                            "offFocusReadyState": "hydrating"
+                        },
+                        "viewState": [
+                            {
+                                "ref": "view:demo_metrics.selection",
+                                "default": {
+                                    "metric_id": "cpu",
+                                    "status_filter": "all",
+                                    "group_filter": "all"
+                                },
+                                "persistence": "local_persisted"
+                            }
+                        ],
+                        "views": [
+                            {
+                                "id": "operations_metric_actions",
+                                "kind": "action_bar",
+                                "area": "main",
+                                "title": "Operations actions",
+                                "variant": "toolbar",
+                                "config": {
+                                    "size": "small",
+                                    "buttons": [
+                                        {
+                                            "id": "open-workbench",
+                                            "label": "Open Workbench",
+                                            "icon": "construct-outline",
+                                            "kind": "primary",
+                                            "title": "Open Resource Workbench"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "ref": "action:demo_metrics.open_workbench",
+                                        "kind": "open_modal",
+                                        "trigger": "click:open-workbench",
+                                        "target": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
+                                        "payload": {
+                                            "modalId": "demo_metrics_resource_workbench_modal",
+                                            "route": "demo_metrics_resource_workbench",
+                                            "view": "demo_metrics_skill.demo_metrics_resource_workbench_modal"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "operations_metric_events",
+                                "kind": "event_log",
+                                "area": "main",
+                                "title": "Live events",
+                                "when": {
+                                    "requiredCapabilities": [
+                                        "eventful"
+                                    ],
+                                    "surfaceClasses": [
+                                        "operations"
+                                    ],
+                                    "lifecycleStages": [
+                                        "active"
+                                    ]
+                                },
+                                "source": {
+                                    "kind": "stream",
+                                    "ref": "stream:demo_metrics.events",
+                                    "scope": "shared",
+                                    "transport": "auto"
+                                }
+                            },
+                            {
+                                "id": "operations_metric_chart",
+                                "kind": "metric_chart",
+                                "area": "right",
+                                "title": "Selected metric",
+                                "when": {
+                                    "requiredCapabilities": [
+                                        "inspectable"
+                                    ],
+                                    "surfaceClasses": [
+                                        "operations"
+                                    ],
+                                    "lifecycleStages": [
+                                        "active"
+                                    ]
+                                },
+                                "source": {
+                                    "kind": "y",
+                                    "ref": "y:data/demo_metrics/chart",
+                                    "scope": "shared"
+                                },
+                                "selection": {
+                                    "kind": "view",
+                                    "ref": "view:demo_metrics.selection",
+                                    "scope": "local"
+                                },
+                                "config": {
+                                    "xKey": "ts",
+                                    "yKey": "value"
+                                }
+                            },
+                            {
+                                "id": "operations_metric_chat",
+                                "kind": "chat_panel",
+                                "area": "bottom",
+                                "title": "Operator notes",
+                                "when": {
+                                    "requiredCapabilities": [
+                                        "streamable"
+                                    ],
+                                    "surfaceClasses": [
+                                        "operations"
+                                    ],
+                                    "lifecycleStages": [
+                                        "active"
+                                    ]
+                                },
+                                "source": {
+                                    "kind": "y",
+                                    "ref": "y:data/demo_metrics/chat",
+                                    "scope": "shared"
+                                },
+                                "config": {
+                                    "hint": "Operations shell keeps the live feed and operator notes together.",
+                                    "alignRightFrom": "operator"
+                                }
+                            },
+                            {
+                                "id": "operations_workspace_only_grid_proof",
+                                "kind": "collection_grid",
+                                "area": "main",
+                                "title": "Workspace-only grid",
+                                "when": {
+                                    "requiredCapabilities": [
+                                        "listable"
+                                    ],
+                                    "surfaceClasses": [
+                                        "workspace"
+                                    ],
+                                    "lifecycleStages": [
+                                        "active"
+                                    ]
+                                },
+                                "source": {
+                                    "kind": "y",
+                                    "ref": "y:data/demo_metrics/table",
+                                    "scope": "shared"
+                                },
+                                "selection": {
+                                    "kind": "view",
+                                    "ref": "view:demo_metrics.selection",
+                                    "scope": "local"
+                                },
+                                "config": {
+                                    "columns": [
+                                        {
+                                            "key": "title",
+                                            "label": "Metric"
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
             },
-            {
-              "id": "demo-table",
-              "type": "ui.table",
-              "area": "main",
-              "title": "Metrics table",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/demo_metrics/table"
-              },
-              "inputs": {
-                "columns": [
-                  {
-                    "key": "title",
-                    "label": "Metric"
-                  },
-                  {
-                    "key": "status",
-                    "label": "Status",
-                    "width": "120px"
-                  },
-                  {
-                    "key": "value",
-                    "label": "Value",
-                    "width": "100px"
-                  },
-                  {
-                    "key": "unit",
-                    "label": "Unit",
-                    "width": "90px"
-                  }
-                ],
-                "emptyText": "No demo metrics yet"
-              }
-            },
-            {
-              "id": "demo-taiga-grid",
-              "type": "visual.taigaCollectionGrid",
-              "area": "main",
-              "title": "Taiga collection grid",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/demo_metrics/table"
-              },
-              "inputs": {
-                "stateKey": "demo_metrics.taigaSelection",
-                "columns": [
-                  {
-                    "key": "title",
-                    "label": "Metric"
-                  },
-                  {
-                    "key": "status",
-                    "label": "Status"
-                  },
-                  {
-                    "key": "value",
-                    "label": "Value"
-                  },
-                  {
-                    "key": "unit",
-                    "label": "Unit"
-                  }
-                ],
-                "emptyText": "No Taiga grid rows yet"
-              }
-            },
-            {
-              "id": "demo-chart-payload",
-              "type": "visual.metricChart",
-              "area": "right",
-              "title": "Metric trend",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/demo_metrics/chart"
-              },
-              "inputs": {
-                "stateKey": "demo_metrics.selection",
-                "xKey": "ts",
-                "yKey": "value",
-                "emptyText": "No chart payload yet"
-              }
-            },
-            {
-              "id": "demo-taiga-chart",
-              "type": "visual.taigaMetricChart",
-              "area": "right",
-              "title": "Taiga metric chart",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/demo_metrics/chart"
-              },
-              "inputs": {
-                "stateKey": "demo_metrics.selection",
-                "xKey": "ts",
-                "yKey": "value",
-                "emptyText": "No Taiga chart payload yet"
-              }
-            },
-            {
-              "id": "demo-events",
-              "type": "ui.list",
-              "area": "bottom",
-              "title": "Events",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "demo_metrics.events"
-              },
-              "inputs": {
-                "titleKey": "title",
-                "subtitleKey": "description",
-                "showDetails": false,
-                "itemAccordion": false,
-                "emptyText": "No demo events yet"
-              }
-            },
-            {
-              "id": "demo-chat",
-              "type": "ui.chat",
-              "area": "bottom",
-              "title": "Operator notes",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/demo_metrics/chat"
-              },
-              "inputs": {
-                "hint": "Notes are seeded from shared demo state.",
-                "alignRightFrom": "operator"
-              }
+            "modals": {},
+            "interfaces": {
+                "taiga_ui_demo_scenario": {}
             }
-          ],
-          "semantic": {
-            "$schema": "../../../../src/adaos/abi/webui.semantic.v0.schema.json",
-            "id": "taiga_ui_demo_surface",
-            "title": "Taiga UI Demo Surface",
-            "workspace": {
-              "surfaceClass": "workspace",
-              "objectKind": "demo_metric_suite",
-              "entityRef": "scenario:taiga_ui_demo_scenario",
-              "capabilities": [
-                "inspectable",
-                "listable",
-                "streamable",
-                "eventful"
-              ],
-              "lifecycleStage": "active"
-            },
-            "layout": {
-              "pattern": "split",
-              "areas": [
-                {
-                  "id": "main",
-                  "role": "main"
-                },
-                {
-                  "id": "right",
-                  "role": "aux"
-                },
-                {
-                  "id": "bottom",
-                  "role": "footer"
-                }
-              ]
-            },
-            "load": {
-              "structure": "eager",
-              "data": "visible",
-              "focus": "primary",
-              "offFocusReadyState": "hydrating"
-            },
-            "viewState": [
-              {
-                "ref": "view:demo_metrics.selection",
-                "default": {
-                  "metric_id": "cpu",
-                  "status_filter": "all",
-                  "group_filter": "all"
-                },
-                "persistence": "local_persisted"
-              }
-            ],
-            "views": [
-              {
-                "id": "demo_metric_actions",
-                "kind": "action_bar",
-                "area": "main",
-                "title": "Demo actions",
-                "variant": "toolbar",
-                "config": {
-                  "size": "small",
-                  "buttons": [
-                    {
-                      "id": "open-workbench",
-                      "label": "Open Workbench",
-                      "icon": "construct-outline",
-                      "kind": "primary",
-                      "title": "Open Resource Workbench"
-                    }
-                  ]
-                },
-                "actions": [
-                  {
-                    "ref": "action:demo_metrics.open_workbench",
-                    "kind": "open_modal",
-                    "trigger": "click:open-workbench",
-                    "target": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
-                    "payload": {
-                      "modalId": "demo_metrics_resource_workbench_modal",
-                      "route": "demo_metrics_resource_workbench",
-                      "view": "demo_metrics_skill.demo_metrics_resource_workbench_modal"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "demo_metrics_grid",
-                "kind": "collection_grid",
-                "area": "main",
-                "title": "Metrics table",
-                "when": {
-                  "requiredCapabilities": [
-                    "listable"
-                  ],
-                  "surfaceClasses": [
-                    "workspace"
-                  ],
-                  "lifecycleStages": [
-                    "active"
-                  ]
-                },
-                "source": {
-                  "kind": "y",
-                  "ref": "y:data/demo_metrics/table",
-                  "scope": "shared"
-                },
-                "selection": {
-                  "kind": "view",
-                  "ref": "view:demo_metrics.selection",
-                  "scope": "local"
-                },
-                "config": {
-                  "columns": [
-                    {
-                      "key": "title",
-                      "label": "Metric"
-                    },
-                    {
-                      "key": "status",
-                      "label": "Status"
-                    },
-                    {
-                      "key": "value",
-                      "label": "Value"
-                    },
-                    {
-                      "key": "unit",
-                      "label": "Unit"
-                    },
-                    {
-                      "key": "group",
-                      "label": "Group"
-                    }
-                  ]
-                },
-                "actions": [
-                  {
-                    "ref": "action:view.demo_metrics.select_metric",
-                    "kind": "set_view_state",
-                    "trigger": "select",
-                    "payload": {
-                      "metric_id": "$event.id"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "demo_metric_chart",
-                "kind": "metric_chart",
-                "area": "right",
-                "title": "Metric trend",
-                "when": {
-                  "requiredCapabilities": [
-                    "inspectable"
-                  ],
-                  "surfaceClasses": [
-                    "workspace"
-                  ],
-                  "lifecycleStages": [
-                    "active"
-                  ]
-                },
-                "source": {
-                  "kind": "y",
-                  "ref": "y:data/demo_metrics/chart",
-                  "scope": "shared"
-                },
-                "selection": {
-                  "kind": "view",
-                  "ref": "view:demo_metrics.selection",
-                  "scope": "local"
-                },
-                "config": {
-                  "xKey": "ts",
-                  "yKey": "value"
-                }
-              },
-              {
-                "id": "demo_metric_events",
-                "kind": "event_log",
-                "area": "bottom",
-                "title": "Events",
-                "when": {
-                  "requiredCapabilities": [
-                    "eventful"
-                  ],
-                  "surfaceClasses": [
-                    "workspace"
-                  ],
-                  "lifecycleStages": [
-                    "active"
-                  ]
-                },
-                "source": {
-                  "kind": "stream",
-                  "ref": "stream:demo_metrics.events",
-                  "scope": "shared",
-                  "transport": "auto"
-                }
-              },
-              {
-                "id": "demo_metric_chat",
-                "kind": "chat_panel",
-                "area": "bottom",
-                "title": "Operator notes",
-                "when": {
-                  "requiredCapabilities": [
-                    "streamable"
-                  ],
-                  "surfaceClasses": [
-                    "workspace"
-                  ],
-                  "lifecycleStages": [
-                    "active"
-                  ]
-                },
-                "source": {
-                  "kind": "y",
-                  "ref": "y:data/demo_metrics/chat",
-                  "scope": "shared"
-                },
-                "config": {
-                  "hint": "Notes are seeded from shared demo state.",
-                  "alignRightFrom": "operator"
-                }
-              }
-            ]
-          }
         }
-      },
-      "workspace": {
-        "pageSchema": {
-          "id": "taiga_ui_demo_workspace",
-          "title": "Demo Metrics Workspace",
-          "layout": {
-            "type": "split",
-            "pattern": "split",
-            "areas": [
-              {
-                "id": "main",
-                "role": "main"
-              },
-              {
-                "id": "right",
-                "role": "aux"
-              },
-              {
-                "id": "bottom",
-                "role": "footer"
-              }
+    },
+    "updated_at": "2026-09-02T10:07:21+00:00",
+    "data_projections": [
+        {
+            "scope": "webspace",
+            "slot": "demo.metrics.summary",
+            "targets": [
+                {
+                    "backend": "yjs",
+                    "path": "data/demo_metrics/summary"
+                }
             ]
-          },
-          "widgets": [],
-          "semantic": {
-            "$schema": "../../../../src/adaos/abi/webui.semantic.v0.schema.json",
-            "id": "taiga_ui_demo_workspace_surface",
-            "title": "Demo Metrics Workspace Surface",
-            "workspace": {
-              "surfaceClass": "workspace",
-              "objectKind": "demo_metric_suite",
-              "entityRef": "scenario:taiga_ui_demo_scenario",
-              "capabilities": [
-                "inspectable",
-                "listable",
-                "streamable",
-                "eventful"
-              ],
-              "lifecycleStage": "active"
-            },
-            "layout": {
-              "pattern": "split",
-              "areas": [
+        },
+        {
+            "scope": "webspace",
+            "slot": "demo.metrics.table",
+            "targets": [
                 {
-                  "id": "main",
-                  "role": "main"
-                },
-                {
-                  "id": "right",
-                  "role": "aux"
-                },
-                {
-                  "id": "bottom",
-                  "role": "footer"
+                    "backend": "yjs",
+                    "path": "data/demo_metrics/table"
                 }
-              ]
-            },
-            "load": {
-              "structure": "eager",
-              "data": "visible",
-              "focus": "primary",
-              "offFocusReadyState": "hydrating"
-            },
-            "viewState": [
-              {
-                "ref": "view:demo_metrics.selection",
-                "default": {
-                  "metric_id": "cpu",
-                  "status_filter": "all",
-                  "group_filter": "all"
-                },
-                "persistence": "local_persisted"
-              }
-            ],
-            "views": [
-              {
-                "id": "workspace_metric_actions",
-                "kind": "action_bar",
-                "area": "main",
-                "title": "Workspace actions",
-                "variant": "toolbar",
-                "config": {
-                  "size": "small",
-                  "buttons": [
-                    {
-                      "id": "open-workbench",
-                      "label": "Open Workbench",
-                      "icon": "construct-outline",
-                      "kind": "primary",
-                      "title": "Open Resource Workbench"
-                    }
-                  ]
-                },
-                "actions": [
-                  {
-                    "ref": "action:demo_metrics.open_workbench",
-                    "kind": "open_modal",
-                    "trigger": "click:open-workbench",
-                    "target": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
-                    "payload": {
-                      "modalId": "demo_metrics_resource_workbench_modal",
-                      "route": "demo_metrics_resource_workbench",
-                      "view": "demo_metrics_skill.demo_metrics_resource_workbench_modal"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "workspace_metrics_grid",
-                "kind": "collection_grid",
-                "area": "main",
-                "title": "Metrics table",
-                "when": {
-                  "requiredCapabilities": [
-                    "listable"
-                  ],
-                  "surfaceClasses": [
-                    "workspace"
-                  ],
-                  "lifecycleStages": [
-                    "active"
-                  ]
-                },
-                "source": {
-                  "kind": "y",
-                  "ref": "y:data/demo_metrics/table",
-                  "scope": "shared"
-                },
-                "selection": {
-                  "kind": "view",
-                  "ref": "view:demo_metrics.selection",
-                  "scope": "local"
-                },
-                "config": {
-                  "columns": [
-                    {
-                      "key": "title",
-                      "label": "Metric"
-                    },
-                    {
-                      "key": "status",
-                      "label": "Status"
-                    },
-                    {
-                      "key": "value",
-                      "label": "Value"
-                    },
-                    {
-                      "key": "unit",
-                      "label": "Unit"
-                    },
-                    {
-                      "key": "group",
-                      "label": "Group"
-                    }
-                  ]
-                },
-                "actions": [
-                  {
-                    "ref": "action:view.demo_metrics.select_metric",
-                    "kind": "set_view_state",
-                    "trigger": "select",
-                    "payload": {
-                      "metric_id": "$event.id"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "workspace_metric_chart",
-                "kind": "metric_chart",
-                "area": "right",
-                "title": "Metric trend",
-                "when": {
-                  "requiredCapabilities": [
-                    "inspectable"
-                  ],
-                  "surfaceClasses": [
-                    "workspace"
-                  ],
-                  "lifecycleStages": [
-                    "active"
-                  ]
-                },
-                "source": {
-                  "kind": "y",
-                  "ref": "y:data/demo_metrics/chart",
-                  "scope": "shared"
-                },
-                "selection": {
-                  "kind": "view",
-                  "ref": "view:demo_metrics.selection",
-                  "scope": "local"
-                },
-                "config": {
-                  "xKey": "ts",
-                  "yKey": "value"
-                }
-              },
-              {
-                "id": "workspace_metric_events",
-                "kind": "event_log",
-                "area": "bottom",
-                "title": "Events",
-                "when": {
-                  "requiredCapabilities": [
-                    "eventful"
-                  ],
-                  "surfaceClasses": [
-                    "workspace"
-                  ],
-                  "lifecycleStages": [
-                    "active"
-                  ]
-                },
-                "source": {
-                  "kind": "stream",
-                  "ref": "stream:demo_metrics.events",
-                  "scope": "shared",
-                  "transport": "auto"
-                }
-              },
-              {
-                "id": "workspace_metric_chat",
-                "kind": "chat_panel",
-                "area": "bottom",
-                "title": "Operator notes",
-                "when": {
-                  "requiredCapabilities": [
-                    "streamable"
-                  ],
-                  "surfaceClasses": [
-                    "workspace"
-                  ],
-                  "lifecycleStages": [
-                    "active"
-                  ]
-                },
-                "source": {
-                  "kind": "y",
-                  "ref": "y:data/demo_metrics/chat",
-                  "scope": "shared"
-                },
-                "config": {
-                  "hint": "Workspace shell reuses the semantic demo surface.",
-                  "alignRightFrom": "operator"
-                }
-              }
             ]
-          }
+        },
+        {
+            "scope": "webspace",
+            "slot": "demo.metrics.chart",
+            "targets": [
+                {
+                    "backend": "yjs",
+                    "path": "data/demo_metrics/chart"
+                }
+            ]
+        },
+        {
+            "scope": "webspace",
+            "slot": "demo.metrics.selection",
+            "targets": [
+                {
+                    "backend": "yjs",
+                    "path": "data/demo_metrics/selection"
+                }
+            ]
+        },
+        {
+            "scope": "webspace",
+            "slot": "demo.metrics.resource_workbench",
+            "targets": [
+                {
+                    "backend": "yjs",
+                    "path": "data/demo_metrics/resource_workbench"
+                }
+            ]
         }
-      },
-      "operations": {
-        "pageSchema": {
-          "id": "taiga_ui_demo_operations",
-          "title": "Demo Metrics Operations",
-          "layout": {
-            "type": "split",
-            "pattern": "split",
-            "areas": [
-              {
-                "id": "main",
-                "role": "main"
-              },
-              {
-                "id": "right",
-                "role": "aux"
-              },
-              {
-                "id": "bottom",
-                "role": "footer"
-              }
-            ]
-          },
-          "widgets": [],
-          "semantic": {
-            "$schema": "../../../../src/adaos/abi/webui.semantic.v0.schema.json",
-            "id": "taiga_ui_demo_operations_surface",
-            "title": "Demo Metrics Operations Surface",
-            "workspace": {
-              "surfaceClass": "operations",
-              "objectKind": "demo_metric_suite",
-              "entityRef": "scenario:taiga_ui_demo_scenario",
-              "capabilities": [
-                "inspectable",
-                "streamable",
-                "eventful"
-              ],
-              "lifecycleStage": "active"
-            },
-            "layout": {
-              "pattern": "split",
-              "areas": [
-                {
-                  "id": "main",
-                  "role": "main"
-                },
-                {
-                  "id": "right",
-                  "role": "aux"
-                },
-                {
-                  "id": "bottom",
-                  "role": "footer"
-                }
-              ]
-            },
-            "load": {
-              "structure": "eager",
-              "data": "visible",
-              "focus": "primary",
-              "offFocusReadyState": "hydrating"
-            },
-            "viewState": [
-              {
-                "ref": "view:demo_metrics.selection",
-                "default": {
-                  "metric_id": "cpu",
-                  "status_filter": "all",
-                  "group_filter": "all"
-                },
-                "persistence": "local_persisted"
-              }
-            ],
-            "views": [
-              {
-                "id": "operations_metric_actions",
-                "kind": "action_bar",
-                "area": "main",
-                "title": "Operations actions",
-                "variant": "toolbar",
-                "config": {
-                  "size": "small",
-                  "buttons": [
-                    {
-                      "id": "open-workbench",
-                      "label": "Open Workbench",
-                      "icon": "construct-outline",
-                      "kind": "primary",
-                      "title": "Open Resource Workbench"
-                    }
-                  ]
-                },
-                "actions": [
-                  {
-                    "ref": "action:demo_metrics.open_workbench",
-                    "kind": "open_modal",
-                    "trigger": "click:open-workbench",
-                    "target": "demo_metrics_skill.demo_metrics_resource_workbench_modal",
-                    "payload": {
-                      "modalId": "demo_metrics_resource_workbench_modal",
-                      "route": "demo_metrics_resource_workbench",
-                      "view": "demo_metrics_skill.demo_metrics_resource_workbench_modal"
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "operations_metric_events",
-                "kind": "event_log",
-                "area": "main",
-                "title": "Live events",
-                "when": {
-                  "requiredCapabilities": [
-                    "eventful"
-                  ],
-                  "surfaceClasses": [
-                    "operations"
-                  ],
-                  "lifecycleStages": [
-                    "active"
-                  ]
-                },
-                "source": {
-                  "kind": "stream",
-                  "ref": "stream:demo_metrics.events",
-                  "scope": "shared",
-                  "transport": "auto"
-                }
-              },
-              {
-                "id": "operations_metric_chart",
-                "kind": "metric_chart",
-                "area": "right",
-                "title": "Selected metric",
-                "when": {
-                  "requiredCapabilities": [
-                    "inspectable"
-                  ],
-                  "surfaceClasses": [
-                    "operations"
-                  ],
-                  "lifecycleStages": [
-                    "active"
-                  ]
-                },
-                "source": {
-                  "kind": "y",
-                  "ref": "y:data/demo_metrics/chart",
-                  "scope": "shared"
-                },
-                "selection": {
-                  "kind": "view",
-                  "ref": "view:demo_metrics.selection",
-                  "scope": "local"
-                },
-                "config": {
-                  "xKey": "ts",
-                  "yKey": "value"
-                }
-              },
-              {
-                "id": "operations_metric_chat",
-                "kind": "chat_panel",
-                "area": "bottom",
-                "title": "Operator notes",
-                "when": {
-                  "requiredCapabilities": [
-                    "streamable"
-                  ],
-                  "surfaceClasses": [
-                    "operations"
-                  ],
-                  "lifecycleStages": [
-                    "active"
-                  ]
-                },
-                "source": {
-                  "kind": "y",
-                  "ref": "y:data/demo_metrics/chat",
-                  "scope": "shared"
-                },
-                "config": {
-                  "hint": "Operations shell keeps the live feed and operator notes together.",
-                  "alignRightFrom": "operator"
-                }
-              },
-              {
-                "id": "operations_workspace_only_grid_proof",
-                "kind": "collection_grid",
-                "area": "main",
-                "title": "Workspace-only grid",
-                "when": {
-                  "requiredCapabilities": [
-                    "listable"
-                  ],
-                  "surfaceClasses": [
-                    "workspace"
-                  ],
-                  "lifecycleStages": [
-                    "active"
-                  ]
-                },
-                "source": {
-                  "kind": "y",
-                  "ref": "y:data/demo_metrics/table",
-                  "scope": "shared"
-                },
-                "selection": {
-                  "kind": "view",
-                  "ref": "view:demo_metrics.selection",
-                  "scope": "local"
-                },
-                "config": {
-                  "columns": [
-                    {
-                      "key": "title",
-                      "label": "Metric"
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-        }
-      },
-      "modals": {},
-      "interfaces": {
-        "taiga_ui_demo_scenario": {}
-      }
-    }
-  }
+    ]
 }

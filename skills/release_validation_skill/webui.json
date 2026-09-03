@@ -97,7 +97,7 @@
               "id": "release-validation-actions",
               "type": "input.commandBar",
               "area": "right",
-              "title": "Manual controls",
+              "title": "Campaign controls",
               "inputs": {
                 "size": "small",
                 "variant": "stack",

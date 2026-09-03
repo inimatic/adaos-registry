@@ -215,7 +215,7 @@ def _with_open_dev_tickets_metric(
     items.append(
         {
             "id": "open-dev-tickets",
-            "title": "Open Dev Tickets",
+            "title": "Open change requests",
             "status": source_state,
             "value": count,
             "unit": "tickets",

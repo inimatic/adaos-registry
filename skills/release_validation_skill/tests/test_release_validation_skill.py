@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 
@@ -11,6 +12,19 @@ def _load_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_release_validation_actions_title_contract() -> None:
+    path = Path(__file__).resolve().parents[1] / "webui.json"
+    webui = json.loads(path.read_text(encoding="utf-8"))
+    modal = webui["registry"]["modals"]["release_validation_modal"]
+    widget = next(
+        item
+        for item in modal["schema"]["widgets"]
+        if item["id"] == "release-validation-actions"
+    )
+
+    assert widget["title"] == "Campaign controls"
 
 
 class _Service:

@@ -502,7 +502,7 @@
               "id": "demo-metric-notes",
               "type": "ui.table",
               "area": "main",
-              "title": "Related metric notes",
+              "title": "Metric annotations",
               "dataSource": {
                 "kind": "skill",
                 "name": "demo_metrics_skill.query_resource_workbench",
@@ -720,7 +720,7 @@
               "id": "demo-metrics-chart-payload",
               "type": "visual.metricChart",
               "area": "right",
-              "title": "Current metric trend",
+              "title": "Recent metric history",
               "dataSource": {
                 "kind": "y",
                 "path": "data/demo_metrics/chart"
@@ -850,7 +850,7 @@
                       "label": "Open Workbench",
                       "icon": "construct-outline",
                       "kind": "primary",
-                      "title": "Open Resource Workbench"
+                      "title": "Open workbench"
                     }
                   ]
                 },
@@ -940,7 +940,7 @@
                 "id": "metrics_notes",
                 "kind": "collection_grid",
                 "area": "main",
-                "title": "Related metric notes",
+                "title": "Metric annotations",
                 "source": {
                   "kind": "skill",
                   "ref": "demo_metrics_skill.query_resource_workbench",
@@ -1070,7 +1070,7 @@
                 "id": "metrics_chart",
                 "kind": "metric_chart",
                 "area": "right",
-                "title": "Current metric trend",
+                "title": "Recent metric history",
                 "when": {
                   "requiredCapabilities": [
                     "inspectable"
@@ -1387,7 +1387,7 @@
                       "label": "Open Workbench",
                       "icon": "construct-outline",
                       "kind": "primary",
-                      "title": "Open Resource Workbench"
+                      "title": "Open workbench"
                     }
                   ]
                 },
@@ -1616,7 +1616,7 @@
               "id": "workbench-notes",
               "type": "ui.table",
               "area": "main",
-              "title": "Metric notes",
+              "title": "Metric notes · Builder E2E validation",
               "dataSource": {
                 "kind": "skill",
                 "name": "demo_metrics_skill.query_resource_workbench",

@@ -1,10 +1,9 @@
 name: mediaserver
-version: 0.9.18
+version: 0.9.19
 entry: handlers/main.py
 runtime:
   python: '3.11'
-description: Local MVP media debugging skill for upload/playback diagnostics and media-channel
-  readiness checks.
+description: Provides local media upload, playback, and channel health diagnostics.
 dependencies: []
 events: {}
 data_projections:
@@ -130,7 +129,7 @@ tools:
     - items
     - media
     - reliability
-updated_at: '2026-08-14T13:44:00+00:00'
+updated_at: '2026-09-02T19:21:07+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.741+4834.2acb1c5b
@@ -139,4 +138,3 @@ compatibility:
     min_commit: 2acb1c5b81b7eda3e8584e87efa9b75eebbc202e
     min_short_commit: 2acb1c5b
     build_date: '2026-08-11T12:20:36+03:00'
-

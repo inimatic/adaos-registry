@@ -176,7 +176,7 @@ def _default_state() -> dict[str, Any]:
         "model_options": _merged_model_options(DEFAULT_MODEL_OPTIONS),
         "matching": {
             "metric": "cosine",
-            "threshold": 0.82,
+            "threshold": 0.80,
             "top_k": 3,
             "debounce_ms": 300,
             "hysteresis": 0.04,
@@ -311,7 +311,7 @@ def _public_descriptors(state: Mapping[str, Any]) -> list[dict[str, Any]]:
 def _targets(state: Mapping[str, Any], *, include_disabled: bool = False) -> list[dict[str, Any]]:
     model_signature = str((state.get("model") or {}).get("model_signature") or "").strip()
     matching = state.get("matching") if isinstance(state.get("matching"), Mapping) else {}
-    default_threshold = float(matching.get("threshold") or 0.82)
+    default_threshold = float(matching.get("threshold") or 0.80)
     out: list[dict[str, Any]] = []
     for item in state.get("descriptors") or []:
         if not isinstance(item, Mapping):

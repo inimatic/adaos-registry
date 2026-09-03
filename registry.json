@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-31T06:48:22+00:00",
+  "updated_at": "2026-09-03T00:25:56+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -223,13 +223,19 @@
       "kind": "skill",
       "id": "cv_descriptor",
       "name": "cv_descriptor",
-      "version": "0.1.4",
-      "updated_at": "2026-08-29T05:55:00+00:00",
+      "version": "0.1.7",
+      "updated_at": "2026-09-03T00:20:10+00:00",
       "path": "skills/cv_descriptor",
       "manifest": "skills/cv_descriptor/skill.yaml",
       "source": {
         "path": "skills/cv_descriptor",
-        "manifest": "skills/cv_descriptor/skill.yaml"
+        "manifest": "skills/cv_descriptor/skill.yaml",
+        "forge": "adaos-root",
+        "repository": "inimatic/adaos-registry",
+        "revision": "42ab21a24c96057a7842a98512d4a334ef111935",
+        "path_scope": [
+          "projects/cv_descriptor_lab/"
+        ]
       },
       "install": {
         "kind": "skill",
@@ -239,18 +245,29 @@
       "description": "Browser-side CV descriptor pilot. Stores visual-object embeddings, model signatures, thumbnails, and text descriptions while the AdaOS client CV runtime is being built.",
       "runtime_python": "3.11",
       "activation": {
-        "mode": "on_demand",
-        "startup_allowed": false,
-        "background_refresh": true
+        "mode": "package_lock",
+        "project_id": "cv_descriptor_lab",
+        "release": "cv_descriptor_lab@0.1.7",
+        "release_digest": "sha256:7dea1731d1e61d4b3f5a7c11edc7719b9c8c04af9222c21d2a7951a51472c547",
+        "package_digest": "sha256:b462bb3e2eaaa61c680bf980106522278c9309c71ea47fb40bb3e75d6b272dc3"
       },
-      "tools_count": 9
+      "tools_count": 9,
+      "channels": {
+        "stable": {
+          "release": "cv_descriptor_lab@0.1.7",
+          "release_digest": "sha256:7dea1731d1e61d4b3f5a7c11edc7719b9c8c04af9222c21d2a7951a51472c547",
+          "source_revision": "42ab21a24c96057a7842a98512d4a334ef111935",
+          "package_digest": "sha256:b462bb3e2eaaa61c680bf980106522278c9309c71ea47fb40bb3e75d6b272dc3",
+          "version": "0.1.7"
+        }
+      }
     },
     {
       "kind": "skill",
       "id": "demo_metrics_skill",
       "name": "demo_metrics_skill",
-      "version": "0.13.10",
-      "updated_at": "2026-08-31T06:48:22+00:00",
+      "version": "0.13.29",
+      "updated_at": "2026-09-02T19:02:18+00:00",
       "path": "skills/demo_metrics_skill",
       "manifest": "skills/demo_metrics_skill/skill.yaml",
       "source": {
@@ -264,28 +281,57 @@
       },
       "description": "Neutral demo skill for semantic Web UI migration with a metrics table, chart payload, Taiga tree, and live event stream.",
       "runtime_python": "3.11",
-      "tools_count": 7
+      "tools_count": 7,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "semantic_ui_demo",
+        "release": "semantic_ui_demo@0.10.5",
+        "release_digest": "sha256:ea02b1a24a88eed3c686d6b389679e341c97c4c979ab77a779fd5669b7b168fc",
+        "package_digest": "sha256:90a9aca2ca3875e3839c1e6d1ba3cb020989be7deea6354d515aa0cef157341c"
+      }
     },
     {
       "kind": "skill",
       "id": "greet_on_boot_skill",
       "name": "greet_on_boot_skill",
-      "version": "0.2.3",
-      "updated_at": "2026-08-14T19:39:29+00:00",
+      "version": "0.2.4",
+      "updated_at": "2026-09-02T21:06:22+00:00",
       "path": "skills/greet_on_boot_skill",
       "manifest": "skills/greet_on_boot_skill/skill.yaml",
       "source": {
         "path": "skills/greet_on_boot_skill",
-        "manifest": "skills/greet_on_boot_skill/skill.yaml"
+        "manifest": "skills/greet_on_boot_skill/skill.yaml",
+        "forge": "adaos-root",
+        "repository": "inimatic/adaos-registry",
+        "revision": "a6038c69c74efba37b9122338e2710490adcb8e9",
+        "path_scope": [
+          "subnets/sn_6acf0c01/nodes/8db40740-b3ff-44bf-baf5-9fb013b35b01/skills/greet_on_boot_skill/"
+        ]
       },
       "install": {
         "kind": "skill",
         "name": "greet_on_boot_skill",
         "id": "greet_on_boot_skill"
       },
-      "description": "System greeting and infrastructure health-check skill used by the greet_on_boot scenario.",
+      "description": "Greets the user at startup and checks whether local infrastructure is healthy.",
       "runtime_python": "3.11",
-      "tools_count": 2
+      "tools_count": 2,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "greet_on_boot_skill",
+        "release": "greet_on_boot_skill@0.2.4",
+        "release_digest": "sha256:f32701220f9846a75e18fc3561dbf62ec1724cb3ff4af40734cb31edff87d655",
+        "package_digest": "sha256:eb695ac298aed7839c2cb7ac4d098b8313cdcd8887073e4fad8b645304e3feae"
+      },
+      "channels": {
+        "stable": {
+          "release": "greet_on_boot_skill@0.2.4",
+          "release_digest": "sha256:f32701220f9846a75e18fc3561dbf62ec1724cb3ff4af40734cb31edff87d655",
+          "source_revision": "a6038c69c74efba37b9122338e2710490adcb8e9",
+          "package_digest": "sha256:eb695ac298aed7839c2cb7ac4d098b8313cdcd8887073e4fad8b645304e3feae",
+          "version": "0.2.4"
+        }
+      }
     },
     {
       "kind": "skill",
@@ -476,23 +522,45 @@
       "kind": "skill",
       "id": "mediaserver",
       "name": "mediaserver",
-      "version": "0.9.18",
-      "updated_at": "2026-08-14T13:44:00+00:00",
+      "version": "0.9.19",
+      "updated_at": "2026-09-02T19:21:07+00:00",
       "path": "skills/mediaserver",
       "manifest": "skills/mediaserver/skill.yaml",
       "source": {
         "path": "skills/mediaserver",
-        "manifest": "skills/mediaserver/skill.yaml"
+        "manifest": "skills/mediaserver/skill.yaml",
+        "forge": "adaos-root",
+        "repository": "inimatic/adaos-registry",
+        "revision": "d4fc02b417d1f2bf12a6065f13d55634125e5c5a",
+        "path_scope": [
+          "projects/mediaserver/"
+        ]
       },
       "install": {
         "kind": "skill",
         "name": "mediaserver",
         "id": "mediaserver"
       },
-      "description": "Local MVP media debugging skill for upload/playback diagnostics and media-channel readiness checks.",
+      "description": "Provides local media upload, playback, and channel health diagnostics.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 4
+      "tools_count": 4,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "mediaserver",
+        "release": "mediaserver@0.1.1",
+        "release_digest": "sha256:2267588a94126815fa54a3176ac095bc60d94e0cda2fcbe45cb905f8c0a276c7",
+        "package_digest": "sha256:9f2243897b755444c1a49d1b45ba019239bd170d662a675d6e19b8323a5ad7d3"
+      },
+      "channels": {
+        "stable": {
+          "release": "mediaserver@0.1.1",
+          "release_digest": "sha256:2267588a94126815fa54a3176ac095bc60d94e0cda2fcbe45cb905f8c0a276c7",
+          "source_revision": "d4fc02b417d1f2bf12a6065f13d55634125e5c5a",
+          "package_digest": "sha256:9f2243897b755444c1a49d1b45ba019239bd170d662a675d6e19b8323a5ad7d3",
+          "version": "0.9.19"
+        }
+      }
     },
     {
       "kind": "skill",
@@ -756,13 +824,19 @@
       "kind": "skill",
       "id": "release_validation_skill",
       "name": "release_validation_skill",
-      "version": "0.1.6",
-      "updated_at": "2026-08-11T09:28:56+00:00",
+      "version": "0.1.7",
+      "updated_at": "2026-09-01T08:41:31+00:00",
       "path": "skills/release_validation_skill",
       "manifest": "skills/release_validation_skill/skill.yaml",
       "source": {
         "path": "skills/release_validation_skill",
-        "manifest": "skills/release_validation_skill/skill.yaml"
+        "manifest": "skills/release_validation_skill/skill.yaml",
+        "forge": "adaos-root",
+        "repository": "inimatic/adaos-registry",
+        "revision": "b6b839474f110b7b90841b0b53c017bd0bf02c25",
+        "path_scope": [
+          "subnets/sn_6acf0c01/nodes/8db40740-b3ff-44bf-baf5-9fb013b35b01/skills/release_validation_skill/"
+        ]
       },
       "install": {
         "kind": "skill",
@@ -773,18 +847,22 @@
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
       "activation": {
-        "mode": "lazy",
-        "when": {
-          "scenarios_active": [
-            "release_validation_ops"
-          ],
-          "client_presence": true,
-          "webspace_scope": "active"
-        },
-        "startup_allowed": true,
-        "background_refresh": false
+        "mode": "package_lock",
+        "project_id": "release_validation_skill",
+        "release": "release_validation_skill@0.1.7",
+        "release_digest": "sha256:de584cd26a87b0bf2f58fec56dfaf996545f89f31ac2603fc40c9e5196687c65",
+        "package_digest": "sha256:5703a60257c9d5bc06ee82546d8c1dced5005b8f9b8a47aa667894924e8c2edc"
       },
-      "tools_count": 9
+      "tools_count": 9,
+      "channels": {
+        "stable": {
+          "release": "release_validation_skill@0.1.7",
+          "release_digest": "sha256:de584cd26a87b0bf2f58fec56dfaf996545f89f31ac2603fc40c9e5196687c65",
+          "source_revision": "b6b839474f110b7b90841b0b53c017bd0bf02c25",
+          "package_digest": "sha256:5703a60257c9d5bc06ee82546d8c1dced5005b8f9b8a47aa667894924e8c2edc",
+          "version": "0.1.7"
+        }
+      }
     },
     {
       "kind": "skill",
@@ -918,7 +996,14 @@
       "description": "Локальная книга рецептов и список покупок.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 7
+      "tools_count": 7,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "shopping_list_14504c40",
+        "release": "shopping_list_14504c40@0.2.3",
+        "release_digest": "sha256:0386dd98ec902b6ede4135e45697d594f2031b6192b1583e2fda24c898adf6d5",
+        "package_digest": "sha256:a5a0c5d62123874135fdf9fda3a8b2eacd3d5ca0897dde365072e53cb2ec3148"
+      }
     },
     {
       "kind": "skill",
@@ -1184,7 +1269,14 @@
       "description": "Desktop shell skill that handles icon/widget installation via the web desktop SDK.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 0
+      "tools_count": 0,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "semantic_ui_demo",
+        "release": "semantic_ui_demo@0.10.5",
+        "release_digest": "sha256:ea02b1a24a88eed3c686d6b389679e341c97c4c979ab77a779fd5669b7b168fc",
+        "package_digest": "sha256:dc6b9e208019a45a30e2d155e310802559c21a7ff6262acfb9fd524ec4a543de"
+      }
     },
     {
       "kind": "skill",
@@ -1480,25 +1572,47 @@
       "kind": "scenario",
       "id": "shopping_list_14504c40",
       "name": "shopping_list_14504c40",
-      "version": "0.0.2",
-      "updated_at": "2026-08-11T09:31:34+00:00",
+      "version": "0.2.3",
+      "updated_at": "2026-09-01T20:11:11+00:00",
       "path": "scenarios/shopping_list_14504c40",
       "manifest": "scenarios/shopping_list_14504c40/scenario.yaml",
       "source": {
         "path": "scenarios/shopping_list_14504c40",
-        "manifest": "scenarios/shopping_list_14504c40/scenario.yaml"
+        "manifest": "scenarios/shopping_list_14504c40/scenario.yaml",
+        "forge": "adaos-root",
+        "repository": "inimatic/adaos-registry",
+        "revision": "ed5a200e942b208d5b7989e5485782369ddefba2",
+        "path_scope": [
+          "subnets/sn_6acf0c01/nodes/8db40740-b3ff-44bf-baf5-9fb013b35b01/scenarios/shopping_list_14504c40/"
+        ]
       },
       "install": {
         "kind": "scenario",
         "name": "shopping_list_14504c40",
         "id": "shopping_list_14504c40"
       },
-      "title": "Книга рецептов",
-      "description": "Локальная книга рецептов со списком покупок.",
+      "title": "Рецепты и покупки",
+      "description": "Безопасный локальный прототип книги рецептов со списком покупок.",
       "skills": {
         "required": [
           "shopping_list_14504c40_skill"
         ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "shopping_list_14504c40",
+        "release": "shopping_list_14504c40@0.2.3",
+        "release_digest": "sha256:0386dd98ec902b6ede4135e45697d594f2031b6192b1583e2fda24c898adf6d5",
+        "package_digest": "sha256:96e53862745b6fd6b2450ee2196301c7c10c26e9c05339ba169cfd845600ced5"
+      },
+      "channels": {
+        "stable": {
+          "release": "shopping_list_14504c40@0.2.3",
+          "release_digest": "sha256:0386dd98ec902b6ede4135e45697d594f2031b6192b1583e2fda24c898adf6d5",
+          "source_revision": "ed5a200e942b208d5b7989e5485782369ddefba2",
+          "package_digest": "sha256:96e53862745b6fd6b2450ee2196301c7c10c26e9c05339ba169cfd845600ced5",
+          "version": "0.2.3"
+        }
       }
     },
     {
@@ -1556,13 +1670,19 @@
       "kind": "scenario",
       "id": "taiga_ui_demo_scenario",
       "name": "taiga_ui_demo_scenario",
-      "version": "0.11.3",
-      "updated_at": "2026-08-30T07:37:49+00:00",
+      "version": "0.11.4",
+      "updated_at": "2026-09-02T10:07:21+00:00",
       "path": "scenarios/taiga_ui_demo_scenario",
       "manifest": "scenarios/taiga_ui_demo_scenario/scenario.yaml",
       "source": {
         "path": "scenarios/taiga_ui_demo_scenario",
-        "manifest": "scenarios/taiga_ui_demo_scenario/scenario.yaml"
+        "manifest": "scenarios/taiga_ui_demo_scenario/scenario.yaml",
+        "forge": "adaos-root",
+        "repository": "inimatic/adaos-registry",
+        "revision": "bad808088f84a2dbeacef0ec7de3663b18a0b7ed",
+        "path_scope": [
+          "projects/semantic_ui_demo/"
+        ]
       },
       "install": {
         "kind": "scenario",
@@ -1576,6 +1696,22 @@
           "web_desktop_skill",
           "demo_metrics_skill"
         ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "semantic_ui_demo",
+        "release": "semantic_ui_demo@0.10.5",
+        "release_digest": "sha256:ea02b1a24a88eed3c686d6b389679e341c97c4c979ab77a779fd5669b7b168fc",
+        "package_digest": "sha256:cd9522800cac2b9c6ace92f68a283e141ba20da87df2be86b6555ec549f80a6f"
+      },
+      "channels": {
+        "stable": {
+          "release": "semantic_ui_demo@0.10.5",
+          "release_digest": "sha256:ea02b1a24a88eed3c686d6b389679e341c97c4c979ab77a779fd5669b7b168fc",
+          "source_revision": "bad808088f84a2dbeacef0ec7de3663b18a0b7ed",
+          "package_digest": "sha256:cd9522800cac2b9c6ace92f68a283e141ba20da87df2be86b6555ec549f80a6f",
+          "version": "0.11.4"
+        }
       }
     },
     {
@@ -1963,8 +2099,8 @@
       "kind": "project",
       "id": "cv_descriptor_lab",
       "name": "cv_descriptor_lab",
-      "version": "0.1.4",
-      "updated_at": "2026-08-27T21:05:39+00:00",
+      "version": "0.1.7",
+      "updated_at": "2026-09-03T00:25:56+00:00",
       "path": "projects/cv_descriptor_lab",
       "manifest": "projects/cv_descriptor_lab/project.yaml",
       "source": {
@@ -2011,7 +2147,24 @@
       "components_count": 1,
       "profiles": [
         "adaos.cv.descriptor_lab.v1"
-      ]
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "cv_descriptor_lab",
+        "release": "cv_descriptor_lab@0.1.7",
+        "release_digest": "sha256:7dea1731d1e61d4b3f5a7c11edc7719b9c8c04af9222c21d2a7951a51472c547",
+        "primary_component": "skill:cv_descriptor",
+        "package_digest": "sha256:b462bb3e2eaaa61c680bf980106522278c9309c71ea47fb40bb3e75d6b272dc3"
+      },
+      "channels": {
+        "stable": {
+          "release": "cv_descriptor_lab@0.1.7",
+          "release_digest": "sha256:7dea1731d1e61d4b3f5a7c11edc7719b9c8c04af9222c21d2a7951a51472c547",
+          "source_revision": "42ab21a24c96057a7842a98512d4a334ef111935",
+          "package_digest": "sha256:b462bb3e2eaaa61c680bf980106522278c9309c71ea47fb40bb3e75d6b272dc3",
+          "version": "0.1.7"
+        }
+      }
     },
     {
       "kind": "project",
@@ -2450,6 +2603,77 @@
       "profiles": [
         "adaos.media.indexer_lab.v1"
       ]
+    },
+    {
+      "kind": "project",
+      "id": "mediaserver",
+      "name": "mediaserver",
+      "version": "0.1.1",
+      "updated_at": "2026-09-02T19:29:44+00:00",
+      "path": "projects/mediaserver",
+      "manifest": "projects/mediaserver/project.yaml",
+      "source": {
+        "path": "projects/mediaserver",
+        "manifest": "projects/mediaserver/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "mediaserver",
+        "id": "mediaserver"
+      },
+      "title": "mediaserver",
+      "description": "Local MVP media debugging skill for upload/playback diagnostics and media-channel readiness checks.",
+      "categories": [
+        "development"
+      ],
+      "tags": [
+        "builder-managed",
+        "legacy-component"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "default",
+          "title": "mediaserver",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:mediaserver"
+          ]
+        }
+      ],
+      "components": [
+        "skill:mediaserver"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.builder.component_project.v1"
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "mediaserver",
+        "release": "mediaserver@0.1.1",
+        "release_digest": "sha256:2267588a94126815fa54a3176ac095bc60d94e0cda2fcbe45cb905f8c0a276c7",
+        "primary_component": "skill:mediaserver",
+        "package_digest": "sha256:9f2243897b755444c1a49d1b45ba019239bd170d662a675d6e19b8323a5ad7d3"
+      },
+      "channels": {
+        "stable": {
+          "release": "mediaserver@0.1.1",
+          "release_digest": "sha256:2267588a94126815fa54a3176ac095bc60d94e0cda2fcbe45cb905f8c0a276c7",
+          "source_revision": "d4fc02b417d1f2bf12a6065f13d55634125e5c5a",
+          "package_digest": "sha256:9f2243897b755444c1a49d1b45ba019239bd170d662a675d6e19b8323a5ad7d3",
+          "version": "0.1.1"
+        }
+      }
     },
     {
       "kind": "project",
@@ -3047,8 +3271,8 @@
       "kind": "project",
       "id": "semantic_ui_demo",
       "name": "semantic_ui_demo",
-      "version": "0.10.3",
-      "updated_at": "2026-08-27T21:05:39+00:00",
+      "version": "0.10.5",
+      "updated_at": "2026-09-02T22:27:58+00:00",
       "path": "projects/semantic_ui_demo",
       "manifest": "projects/semantic_ui_demo/project.yaml",
       "source": {
@@ -3112,7 +3336,24 @@
       "components_count": 2,
       "profiles": [
         "adaos.demo.semantic_ui.v1"
-      ]
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "semantic_ui_demo",
+        "release": "semantic_ui_demo@0.10.5",
+        "release_digest": "sha256:ea02b1a24a88eed3c686d6b389679e341c97c4c979ab77a779fd5669b7b168fc",
+        "primary_component": "scenario:taiga_ui_demo_scenario",
+        "package_digest": "sha256:cd9522800cac2b9c6ace92f68a283e141ba20da87df2be86b6555ec549f80a6f"
+      },
+      "channels": {
+        "stable": {
+          "release": "semantic_ui_demo@0.10.5",
+          "release_digest": "sha256:ea02b1a24a88eed3c686d6b389679e341c97c4c979ab77a779fd5669b7b168fc",
+          "source_revision": "bad808088f84a2dbeacef0ec7de3663b18a0b7ed",
+          "package_digest": "sha256:cd9522800cac2b9c6ace92f68a283e141ba20da87df2be86b6555ec549f80a6f",
+          "version": "0.10.5"
+        }
+      }
     },
     {
       "kind": "project",
