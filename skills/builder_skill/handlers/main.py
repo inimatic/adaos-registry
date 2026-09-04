@@ -1061,6 +1061,18 @@ def _route_automation_chat(
         return None
     if str(context.get("workflow_state") or "").strip() != "automation":
         return None
+    try:
+        workflow = sdk_builder_workflow.get_state(object_type, object_id)
+        governed = workflow.get("governed") if isinstance(workflow.get("governed"), Mapping) else {}
+        if str(governed.get("state") or "").strip() in {"published", "rejected", "superseded"}:
+            # A durable Automation session can outlive its Change. The first
+            # ordinary turn after a terminal Change starts a new prototype-first
+            # Change instead of being submitted as an iteration of old work.
+            return None
+    except Exception:
+        # The Automation service remains authoritative when the lightweight
+        # workflow projection is temporarily unavailable.
+        pass
 
     try:
         automation_state = sdk_builder_automation.get_state(

@@ -6089,6 +6089,39 @@ def test_chat_routes_followup_to_automation_sdk_at_automation_stage(monkeypatch)
     assert emitted[0]["topic_ref"]["thread_id"] == "prompt-project:scenario:builder"
 
 
+def test_chat_starts_new_prototype_change_after_publication(monkeypatch) -> None:
+    skill = _load_module()
+    session = {"scenario_id": "builder", "artifact_root": "/dev/scenarios/builder"}
+    binding = {"runtime_scenario_id": "builder", "dev_webspace_id": "desktop-dev"}
+    updates: list[dict] = []
+
+    monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
+    monkeypatch.setattr(skill.developer_prompt_context, "get", lambda *_args: {"workflow_state": "automation"})
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *_args: {"governed": {"state": "published"}},
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_automation,
+        "get_state",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("terminal Change must not reuse Automation")),
+    )
+
+    def _update(**kwargs):
+        updates.append(dict(kwargs))
+        return {"ok": True, "status": "llm_pending", "message": "Prototype update queued."}
+
+    monkeypatch.setattr(skill, "update_current_scenario", _update)
+    monkeypatch.setattr(skill, "_schedule_safe_emit_chat", lambda *_args, **_kwargs: None)
+
+    result = skill.chat("Rename Planned to Backlog.", webspace_id="desktop")
+
+    assert result["status"] == "llm_pending"
+    assert updates[0]["instruction"] == "Rename Planned to Backlog."
+    assert updates[0]["webspace_id"] == "desktop"
+
+
 def test_chat_does_not_mutate_prototype_when_automation_session_is_not_started(monkeypatch) -> None:
     skill = _load_module()
     emitted: list[str] = []
