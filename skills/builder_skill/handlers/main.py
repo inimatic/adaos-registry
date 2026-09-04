@@ -6634,6 +6634,10 @@ def _builder_change_issue_lane(clause: str) -> str:
     return "prototype"
 
 
+def _normalized_change_request(value: Any) -> str:
+    return " ".join(str(value or "").split()).casefold()
+
+
 def _builder_change_issues(request_text: str, *, change_id: str) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
     for index, clause in enumerate(_builder_change_issue_clauses(request_text), start=1):
@@ -6680,6 +6684,12 @@ def _register_builder_change_set(
         current_id = str(current.get("change_set_id") or "").strip()
         current_status = str(current.get("status") or "").strip()
         terminal = current_status in {"published", "rejected", "superseded"}
+        normalized_request = _normalized_change_request(request_text)
+        known_requests = {
+            _normalized_change_request(item)
+            for item in [current.get("request"), *(current.get("request_addenda") or [])]
+            if _normalized_change_request(item)
+        }
         members = {
             str(item).strip()
             for item in current.get("member_change_ids") or []
@@ -6687,6 +6697,8 @@ def _register_builder_change_set(
         }
         if current_id and not terminal and change_id in members:
             return {"ok": True, "action": "already_registered", "workflow": state}
+        if current_id and not terminal and normalized_request in known_requests:
+            return {"ok": True, "action": "duplicate_request", "workflow": state}
         if current_id and not terminal:
             result = sdk_builder_workflow.transition(
                 object_type,

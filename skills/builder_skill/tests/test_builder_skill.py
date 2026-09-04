@@ -318,6 +318,43 @@ def test_change_intake_appends_followup_to_active_change_set(monkeypatch) -> Non
     assert transitions[0][1]["source_message_ids"] == ["message-followup"]
 
 
+def test_change_intake_does_not_duplicate_retried_request(monkeypatch) -> None:
+    skill = _load_module()
+    transitions: list[tuple[str, dict]] = []
+    state = {
+        "change_set": {
+            "change_set_id": "CS-active",
+            "status": "in_progress",
+            "request": "Создай канбан-доску.",
+            "request_addenda": ["Добавь поиск задач."],
+            "member_change_ids": ["CS-active"],
+            "issues": [{"issue_id": "CS-active:I01", "title": "Создай канбан-доску."}],
+        }
+    }
+    monkeypatch.setattr(skill.sdk_builder_workflow, "get_state", lambda *args: state)
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "transition",
+        lambda *args, **kwargs: transitions.append((args[2], kwargs["metadata"])),
+    )
+
+    result = skill._register_builder_change_set(
+        session={
+            "id": "session-1",
+            "artifact_kind": "scenario",
+            "scenario_id": "recipes",
+        },
+        patch={"id": "patch-retry"},
+        request_text="  ДОБАВЬ   ПОИСК ЗАДАЧ.  ",
+        _meta={"message_id": "message-retry"},
+    )
+
+    assert result["ok"] is True
+    assert result["action"] == "duplicate_request"
+    assert result["workflow"] is state
+    assert transitions == []
+
+
 def test_explicit_app_title_wins_over_incidental_shopping_list_mention() -> None:
     skill = _load_module()
     idea = (
