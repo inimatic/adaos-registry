@@ -104,6 +104,11 @@ BUILDER_FORM_CHOICE_FIELD_TYPES = {
     "chips",
     "tags",
 }
+
+WEBUI_PAYLOAD_TRANSFORM_OPERATIONS = {
+    "llm_webui_transform",
+    "deterministic_webui_transform",
+}
 BUILDER_FORM_GRID_FIELD_TYPES = {
     "singlechoicegrid",
     "single_choice_grid",
@@ -1582,7 +1587,7 @@ def _handle_builder_pending_action_response(evt: Any) -> None:
     session["user_summary"] = _draft_user_summary(session)
     if (
         matched_patch
-        and matched_patch.get("operation") == "llm_webui_transform"
+        and _is_webui_payload_transform(matched_patch.get("operation"))
         and isinstance(session.get("preview_state"), Mapping)
     ):
         preview = copy.deepcopy(dict(session["preview_state"]))
@@ -1591,7 +1596,7 @@ def _handle_builder_pending_action_response(evt: Any) -> None:
     preview = _repair_text_tree(dict(preview))
     if (
         matched_patch
-        and matched_patch.get("operation") == "llm_webui_transform"
+        and _is_webui_payload_transform(matched_patch.get("operation"))
         and isinstance(session.get("webui_payload"), Mapping)
     ):
         _write_webui_payload(str(session.get("artifact_root") or ""), session["webui_payload"])
@@ -3344,6 +3349,10 @@ def _compact_llm_result(result: Mapping[str, Any] | None) -> dict[str, Any] | No
     return compact
 
 
+def _is_webui_payload_transform(operation: Any) -> bool:
+    return str(operation or "").strip() in WEBUI_PAYLOAD_TRANSFORM_OPERATIONS
+
+
 def _llm_unable_detail(result: Mapping[str, Any] | None) -> str:
     if not isinstance(result, Mapping):
         return ""
@@ -3387,13 +3396,14 @@ def _write_ui_revision(
         before_for_revision["preview_state"]["version"] = revision
     if isinstance(after_for_revision.get("preview_state"), dict):
         after_for_revision["preview_state"]["version"] = revision
+    is_llm_revision = str(patch.get("operation") or "").strip() == "llm_webui_transform"
     model_id = str(
         llm_model
         or (llm_result.get("model") if isinstance(llm_result, Mapping) else "")
-        or _builder_llm_model_for_session(session, None)
+        or (_builder_llm_model_for_session(session, None) if is_llm_revision else "")
         or ""
     ).strip()
-    profile = _builder_llm_prompt_profile(model_id)
+    profile = _builder_llm_prompt_profile(model_id) if model_id else {}
     inference = {
         "provider": str(profile.get("provider") or "").strip() or None,
         "model": model_id or str(profile.get("model") or "").strip() or None,
@@ -7860,6 +7870,139 @@ def _validate_llm_request_postconditions(
     return value
 
 
+def _deterministic_local_webui_transform(
+    *,
+    instruction: str,
+    before_webui: Mapping[str, Any],
+    previous_preview: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    text = _repair_mojibake_text(instruction).strip()
+    patterns = (
+        re.compile(
+            r"^\s*(?:\u043f\u0435\u0440\u0435\u043c\u0435\u0441\u0442\u0438|\u0440\u0430\u0441\u043f\u043e\u043b\u043e\u0436\u0438|\u043f\u043e\u0441\u0442\u0430\u0432\u044c)\s+"
+            r"(?:\u043f\u043e\u043b\u0435\s+\u043f\u043e\u0438\u0441\u043a\u0430|\u043f\u043e\u0438\u0441\u043a)\s+"
+            r"(?:(?:\u043d\u0435\u043f\u043e\u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0435\u043d\u043d\u043e|\u043f\u0440\u044f\u043c\u043e)\s+)?"
+            r"(?:\u043d\u0430\u0434|\u043f\u0435\u0440\u0435\u0434)\s+(?:\u043a\u0430\u043d\u0431\u0430\u043d[- ]?)?\u0434\u043e\u0441\u043a(?:\u043e\u0439|\u0443|\u043e\u0439)?\s+"
+            r"(?:\u0438\s+)?\u043f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u0443\u0439\s+(?:\u0435\u0433\u043e|\u0435[\u0435\u0451]|\u043f\u043e\u043b\u0435(?:\s+\u043f\u043e\u0438\u0441\u043a\u0430)?)\s+\u0432\s+"
+            r"[\u00ab\"']?(?P<title>[^.!?\n\u00bb\"']{1,80}?)[\u00bb\"']?\s*"
+            r"(?:\.\s*(?:\u043e\u0441\u0442\u0430\u043b\u044c\u043d\u043e\u0439\s+\u0438\u043d\u0442\u0435\u0440\u0444\u0435\u0439\u0441\s+\u043d\u0435\s+\u043c\u0435\u043d\u044f\u0439|\u0431\u043e\u043b\u044c\u0448\u0435\s+\u043d\u0438\u0447\u0435\u0433\u043e\s+\u043d\u0435\s+\u043c\u0435\u043d\u044f\u0439)\s*\.?)?\s*$",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"^\s*(?:move|place)\s+(?:the\s+)?search\s+(?:field|input)\s+"
+            r"(?:(?:directly|immediately)\s+)?(?:above|before)\s+(?:the\s+)?(?:kanban\s+)?board\s+"
+            r"(?:and\s+)?rename\s+(?:it|the\s+search\s+(?:field|input))\s+to\s+"
+            r"[\"']?(?P<title>[^.!?\n\"']{1,80}?)[\"']?\s*"
+            r"(?:\.\s*(?:do\s+not|don't)\s+change\s+(?:anything\s+else|the\s+rest\s+of\s+the\s+interface)\s*\.?)?\s*$",
+            re.IGNORECASE,
+        ),
+    )
+    matches = [matched for candidate in patterns if (matched := candidate.fullmatch(text)) is not None]
+    match = matches[0] if len(matches) == 1 else None
+    if match is None:
+        return None
+    new_title = str(match.group("title") or "").strip()
+    if not new_title:
+        return None
+
+    page_schema = _extract_webui_page_schema(before_webui)
+    widgets = page_schema.get("widgets") if isinstance(page_schema.get("widgets"), list) else []
+
+    def searchable(widget: Mapping[str, Any]) -> bool:
+        widget_type = str(widget.get("type") or "").strip().lower()
+        semantic_text = " ".join(
+            str(value or "")
+            for value in (
+                widget.get("id"),
+                widget.get("title"),
+                (widget.get("inputs") or {}).get("placeholder") if isinstance(widget.get("inputs"), Mapping) else "",
+                (widget.get("inputs") or {}).get("stateKey") if isinstance(widget.get("inputs"), Mapping) else "",
+            )
+        ).lower()
+        return widget_type in {"input.text", "input.search"} and any(
+            token in semantic_text for token in ("search", "\u043f\u043e\u0438\u0441\u043a")
+        )
+
+    search_indexes = [
+        index
+        for index, item in enumerate(widgets)
+        if isinstance(item, Mapping) and searchable(item)
+    ]
+    board_indexes = [
+        index
+        for index, item in enumerate(widgets)
+        if isinstance(item, Mapping) and str(item.get("type") or "").strip().lower() == "collection.board"
+    ]
+    if len(search_indexes) != 1 or len(board_indexes) != 1 or search_indexes[0] == board_indexes[0]:
+        return None
+
+    search_index = search_indexes[0]
+    board_id = str(widgets[board_indexes[0]].get("id") or "").strip()
+    if not board_id:
+        return None
+    updated_widgets = copy.deepcopy(widgets)
+    search_widget = updated_widgets.pop(search_index)
+    search_widget["title"] = new_title
+    board_index = next(
+        (index for index, item in enumerate(updated_widgets) if str(item.get("id") or "").strip() == board_id),
+        -1,
+    )
+    if board_index < 0:
+        return None
+    updated_widgets.insert(board_index, search_widget)
+    page_schema["widgets"] = updated_widgets
+    payload = _set_webui_page_schema(copy.deepcopy(dict(before_webui)), page_schema)
+    payload, preview = _normalise_llm_webui_payload(payload, previous_preview=previous_preview)
+    validation = _validate_builder_webui_payload(payload, preview)
+    if not validation.get("ok"):
+        return None
+    capability_validation = developer_ui.validate(payload)
+    request_evaluation = _accept_preexisting_capability_findings(
+        {
+            "ok": bool(capability_validation.get("ok")),
+            "qualification": {
+                "strategy": "deterministic_local_edit_v1",
+                "operation_kinds": ["move", "rename"],
+                "surface_kind": "scenario",
+            },
+            "postconditions": [
+                {"id": "search_immediately_before_board", "ok": True},
+                {"id": "search_title", "ok": True, "value": new_title},
+            ],
+            "capability_validation": capability_validation,
+            "capability_gaps": [],
+        },
+        before_webui=before_webui,
+        after_webui=payload,
+    )
+    if not request_evaluation.get("ok"):
+        return None
+    validation = {**validation, "request_evaluation": request_evaluation}
+    return {
+        "ok": True,
+        "payload": payload,
+        "preview_state": preview,
+        "validation": validation,
+        "comment": "Applied an exact local move and rename without model inference.",
+        "execution": {
+            "strategy": "deterministic_local_edit_v1",
+            "model_calls": 0,
+            "usage": {
+                "input_tokens": 0,
+                "cached_input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+            },
+        },
+        "semantic_changes": {
+            "moved_widget_id": str(search_widget.get("id") or ""),
+            "before_widget_id": board_id,
+            "renamed_widget_id": str(search_widget.get("id") or ""),
+            "title": new_title,
+        },
+    }
+
+
 def _capability_finding_identity(
     finding: Mapping[str, Any],
     *,
@@ -11909,7 +12052,7 @@ def _finalize_scenario_update(
     next_revision = _next_ui_revision_label(session)
     session["version"] = next_revision
     session["user_summary"] = _draft_user_summary(session)
-    if patch.get("operation") == "llm_webui_transform" and isinstance(session.get("preview_state"), Mapping):
+    if _is_webui_payload_transform(patch.get("operation")) and isinstance(session.get("preview_state"), Mapping):
         preview = copy.deepcopy(dict(session["preview_state"]))
         preview["version"] = next_revision
     else:
@@ -11918,7 +12061,7 @@ def _finalize_scenario_update(
     scenario_id = str(session.get("scenario_id") or "").strip()
     if scenario_id:
         preview["scenario_id"] = scenario_id
-    if patch.get("operation") == "llm_webui_transform" and isinstance(session.get("webui_payload"), Mapping):
+    if _is_webui_payload_transform(patch.get("operation")) and isinstance(session.get("webui_payload"), Mapping):
         payload = copy.deepcopy(dict(session["webui_payload"]))
         page_schema = _extract_webui_page_schema(payload)
         if page_schema:
@@ -11955,7 +12098,11 @@ def _finalize_scenario_update(
         after_webui=after_webui,
         preview_state=preview,
         llm_result=llm_result,
-        llm_model=_builder_llm_model_for_session(session, _meta),
+        llm_model=(
+            _builder_llm_model_for_session(session, _meta)
+            if str(patch.get("operation") or "") == "llm_webui_transform"
+            else None
+        ),
         revision=next_revision,
     )
     if revision_info:
@@ -12098,6 +12245,58 @@ def _finalize_llm_webui_transform_result(
         request_text=request_text,
         before_webui=before_webui,
         llm_result=llm_result,
+        auto_apply=auto_apply,
+        _meta=_meta,
+    )
+
+
+def _finalize_deterministic_webui_transform_result(
+    *,
+    ws: str,
+    session: dict[str, Any],
+    binding: Mapping[str, Any],
+    patch: dict[str, Any],
+    request_text: str,
+    before_webui: Mapping[str, Any] | None,
+    transform_result: Mapping[str, Any],
+    auto_apply: bool,
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    preview = transform_result.get("preview_state") if isinstance(transform_result.get("preview_state"), Mapping) else {}
+    payload = transform_result.get("payload") if isinstance(transform_result.get("payload"), Mapping) else None
+    patch["operation"] = "deterministic_webui_transform"
+    patch["created_by"] = "builder_deterministic"
+    patch["diff"] = {
+        "schema_valid": True,
+        "comment": str(transform_result.get("comment") or ""),
+        "validation": (
+            copy.deepcopy(dict(transform_result["validation"]))
+            if isinstance(transform_result.get("validation"), Mapping)
+            else {}
+        ),
+        "execution": (
+            copy.deepcopy(dict(transform_result["execution"]))
+            if isinstance(transform_result.get("execution"), Mapping)
+            else {}
+        ),
+        "semantic_changes": (
+            copy.deepcopy(dict(transform_result["semantic_changes"]))
+            if isinstance(transform_result.get("semantic_changes"), Mapping)
+            else {}
+        ),
+    }
+    session["preview_state"] = copy.deepcopy(dict(preview))
+    if payload is not None:
+        session["webui_payload"] = copy.deepcopy(dict(payload))
+    _merge_session_from_preview(session, preview)
+    return _finalize_scenario_update(
+        ws=ws,
+        session=session,
+        binding=binding,
+        patch=patch,
+        request_text=request_text,
+        before_webui=before_webui,
+        llm_result=None,
         auto_apply=auto_apply,
         _meta=_meta,
     )
@@ -13677,6 +13876,42 @@ def update_current_scenario(
     request_emit_done_at = time.perf_counter()
     llm_result: dict[str, Any] | None = None
     llm_owned_content_change = _wants_llm_owned_content_change(text)
+    deterministic_result = (
+        _deterministic_local_webui_transform(
+            instruction=text,
+            before_webui=before_webui,
+            previous_preview=base_preview,
+        )
+        if text
+        else None
+    )
+    if deterministic_result is not None:
+        execution = (
+            deterministic_result.get("execution")
+            if isinstance(deterministic_result.get("execution"), Mapping)
+            else {}
+        )
+        _upsert_builder_change(
+            webspace_id=ws,
+            session=session,
+            patch=patch,
+            request_text=text,
+            status="accepted",
+            _meta=_meta,
+            model="deterministic",
+            extra_meta={"execution": copy.deepcopy(dict(execution))},
+        )
+        return _finalize_deterministic_webui_transform_result(
+            ws=ws,
+            session=session,
+            binding=binding,
+            patch=patch,
+            request_text=text,
+            before_webui=before_webui,
+            transform_result=deterministic_result,
+            auto_apply=auto_apply,
+            _meta=_meta,
+        )
     if text and _builder_llm_primary_enabled(_meta):
         if not development_context_packet:
             detail = str(
@@ -14096,7 +14331,7 @@ def update_current_scenario(
             "message": message,
             "dialog": _dialog_state(ws, topic_ref=topic),
         }
-    if patch["operation"] != "llm_webui_transform" and isinstance(session.get("preview_state"), dict):
+    if not _is_webui_payload_transform(patch["operation"]) and isinstance(session.get("preview_state"), dict):
         preview_for_rebuild = copy.deepcopy(dict(session["preview_state"]))
         preview_for_rebuild.pop("page_schema", None)
         session["preview_state"] = preview_for_rebuild

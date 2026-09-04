@@ -1952,6 +1952,123 @@ def test_llm_task_telemetry_includes_repair_usage() -> None:
     assert result["repair"]["root_job_id"] == "repair"
 
 
+def test_deterministic_local_edit_moves_and_renames_only_search(monkeypatch) -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "generated_by": "builder_skill",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "flowboard",
+                        "title": "Flowboard",
+                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+                        "widgets": [
+                            {"id": "form", "type": "ui.form", "area": "main", "inputs": {"fields": []}},
+                            {"id": "table", "type": "ui.table", "area": "main", "inputs": {"columns": []}},
+                            {
+                                "id": "board",
+                                "type": "collection.board",
+                                "area": "main",
+                                "title": "Board",
+                                "actions": [{"on": "add", "type": "resourceOperation"}],
+                            },
+                            {
+                                "id": "search",
+                                "type": "input.text",
+                                "area": "main",
+                                "title": "Search",
+                                "actions": [{"on": "change", "type": "updateState", "params": {"query": "$event.value"}}],
+                            },
+                            {"id": "details", "type": "item.details", "area": "main", "title": "Details"},
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    baseline_finding = {
+        "code": "ui.board.create_event_invalid",
+        "severity": "error",
+        "path": "ui.application.desktop.pageSchema.widgets[2].actions[0].params.payload",
+    }
+
+    def _capability_validation(payload):
+        widgets = payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
+        board_index = next(index for index, item in enumerate(widgets) if item["id"] == "board")
+        return {
+            "ok": False,
+            "findings": [{**baseline_finding, "path": f"ui.application.desktop.pageSchema.widgets[{board_index}].actions[0].params.payload"}],
+        }
+
+    monkeypatch.setattr(skill, "_validate_builder_webui_payload", lambda *_args, **_kwargs: {"ok": True})
+    monkeypatch.setattr(skill.developer_ui, "validate", _capability_validation)
+
+    result = skill._deterministic_local_webui_transform(
+        instruction=(
+            "\u041f\u0435\u0440\u0435\u043c\u0435\u0441\u0442\u0438 \u043f\u043e\u043b\u0435 \u043f\u043e\u0438\u0441\u043a\u0430 \u043d\u0435\u043f\u043e\u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0435\u043d\u043d\u043e \u043d\u0430\u0434 \u043a\u0430\u043d\u0431\u0430\u043d-\u0434\u043e\u0441\u043a\u043e\u0439 \u0438 \u043f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u0443\u0439 \u0435\u0433\u043e \u0432 \u041f\u043e\u0438\u0441\u043a \u0437\u0430\u0434\u0430\u0447. "
+            "\u041e\u0441\u0442\u0430\u043b\u044c\u043d\u043e\u0439 \u0438\u043d\u0442\u0435\u0440\u0444\u0435\u0439\u0441 \u043d\u0435 \u043c\u0435\u043d\u044f\u0439."
+        ),
+        before_webui=before,
+        previous_preview={"title": "Flowboard"},
+    )
+
+    assert result is not None
+    widgets = result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
+    assert [item["id"] for item in widgets] == ["form", "table", "search", "board", "details"]
+    assert widgets[2]["title"] == "\u041f\u043e\u0438\u0441\u043a \u0437\u0430\u0434\u0430\u0447"
+    expected = copy.deepcopy(before)
+    expected_widgets = expected["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
+    moved = expected_widgets.pop(3)
+    moved["title"] = "\u041f\u043e\u0438\u0441\u043a \u0437\u0430\u0434\u0430\u0447"
+    expected_widgets.insert(2, moved)
+    assert result["payload"] == expected
+    assert result["execution"]["usage"]["total_tokens"] == 0
+    assert result["validation"]["request_evaluation"]["capability_validation"]["validation_mode"] == "incremental"
+
+
+def test_deterministic_local_edit_falls_back_when_target_is_ambiguous() -> None:
+    skill = _load_module()
+    before = {
+        "ui": {"application": {"desktop": {"pageSchema": {"widgets": [
+            {"id": "search-a", "type": "input.text", "title": "Search"},
+            {"id": "search-b", "type": "input.text", "title": "Search backlog"},
+            {"id": "board", "type": "collection.board", "title": "Board"},
+        ]}}}}
+    }
+
+    result = skill._deterministic_local_webui_transform(
+        instruction="Move the search field directly above the board and rename it to Task search.",
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert result is None
+
+
+def test_deterministic_ui_revision_has_no_inference_metadata(tmp_path) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "deterministic_revision"
+    artifact_root.mkdir()
+    webui = {"schema": "adaos.webui.v1", "ui": {"application": {"desktop": {"pageSchema": {"widgets": []}}}}}
+
+    result = skill._write_ui_revision(
+        session={"id": "session", "scenario_id": "scenario", "artifact_root": str(artifact_root)},
+        request_text="move search",
+        patch={"operation": "deterministic_webui_transform"},
+        before_webui=webui,
+        after_webui=webui,
+        preview_state={},
+        llm_result=None,
+        llm_model=None,
+    )
+
+    revision = json.loads(Path(result["path"]).read_text(encoding="utf-8"))
+    assert revision["inference"] == {}
+    assert revision["llm"] is None
+
+
 def test_save_session_merges_pending_llm_jobs_without_downgrading_terminal_state() -> None:
     skill = _load_module()
     skill._FALLBACK_MEMORY.clear()
