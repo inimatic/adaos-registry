@@ -314,6 +314,17 @@ def test_process_inspection_is_separate_from_the_canonical_conversation() -> Non
         action.get("target") == "builder_sdk_control_skill.select_preview_target"
         for action in process["actions"]
     )
+    process_buttons = {item["id"] for item in process["inputs"]["buttons"]}
+    assert process_buttons == {"show-preview", "open-placement"}
+    placement_action = next(
+        action
+        for action in process["actions"]
+        if action.get("target")
+        == "builder_sdk_control_skill.get_project_placement_navigation"
+    )
+    assert placement_action["openResultUrl"] is True
+    assert placement_action["resultUrlPath"] == "preview_url"
+    assert placement_action["resultPreferCurrentOrigin"] is True
     assert "automation" in widgets["automation-conversation-followup"]["visibleIf"]
     assert "publication" in widgets["publication-workspace-actions"]["visibleIf"]
     lifecycle_buttons = {

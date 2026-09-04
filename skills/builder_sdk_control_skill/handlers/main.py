@@ -2710,6 +2710,7 @@ def get_process(
     implementation = projection.get("automation") if isinstance(projection.get("automation"), Mapping) else {}
     delivery = projection.get("delivery") if isinstance(projection.get("delivery"), Mapping) else {}
     publication = projection.get("publication") if isinstance(projection.get("publication"), Mapping) else {}
+    project = projection.get("project") if isinstance(projection.get("project"), Mapping) else {}
     change_id = str(change.get("change_id") or change.get("change_set_id") or "").strip()
 
     issues = [
@@ -2759,6 +2760,41 @@ def get_process(
                         "children": [],
                     }
                 )
+            trial_placement = next(
+                (
+                    dict(item)
+                    for item in reversed(project.get("placements") or [])
+                    if isinstance(item, Mapping)
+                    and str(item.get("kind") or "") == "trial"
+                    and str(item.get("status") or "") == "active"
+                ),
+                None,
+            )
+            trial_children_nodes: list[dict[str, Any]] = []
+            if trial_placement:
+                target = (
+                    trial_placement.get("target")
+                    if isinstance(trial_placement.get("target"), Mapping)
+                    else {}
+                )
+                result_ref = (
+                    trial_placement.get("result_ref")
+                    if isinstance(trial_placement.get("result_ref"), Mapping)
+                    else {}
+                )
+                trial_children_nodes.append(
+                    {
+                        "id": f"placement:{trial_placement.get('placement_id')}",
+                        "ref": f"placement:{trial_placement.get('placement_id')}",
+                        "kind": "placement",
+                        "title": f"Beta in {target.get('webspace_id') or 'trial workspace'}",
+                        "status": "active",
+                        "placementKind": "trial",
+                        "canOpenPlacement": True,
+                        "revision": str(result_ref.get("version") or "current"),
+                        "children": [],
+                    }
+                )
             trial_children.append(
                 {
                     "id": f"trial:{delivery.get('candidate_id') or 'current'}",
@@ -2767,7 +2803,7 @@ def get_process(
                     "title": "Trial",
                     "status": delivery_status,
                     "updated_at": delivery.get("prepared_at") or delivery.get("decided_at"),
-                    "children": publication_children,
+                    "children": [*trial_children_nodes, *publication_children],
                 }
             )
         implementation_children.append(
@@ -2866,6 +2902,39 @@ def get_process_tree(
     object_id: str = DEFAULT_PROJECT_ID,
 ) -> list[dict[str, Any]]:
     return list(get_process(object_type, object_id).get("tree") or [])
+
+
+@tool(
+    "get_project_placement_navigation",
+    summary="Open one active Project placement through the topology-aware navigation contract.",
+    side_effects="ui_navigation",
+)
+def get_project_placement_navigation(
+    placement_kind: str = "stable",
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    base_url: str | None = None,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    if kind != "project":
+        raise ValueError("Project placement navigation requires object_type=project")
+    workflow_kind, workflow_id = _execution_identity(kind, project_id)
+    placement_token = str(placement_kind or "stable").strip().lower()
+    if placement_token not in {"trial", "stable"}:
+        raise ValueError("placement_kind must be trial or stable")
+    result = workflow.get_project_placement_navigation(
+        workflow_kind,
+        workflow_id,
+        kind=placement_token,
+        base_url=str(base_url or "").strip() or None,
+    )
+    return {
+        **dict(result),
+        "ok": True,
+        "preview_url": str(result.get("url") or ""),
+        "qr_text": str(result.get("url") or ""),
+        "execution_scope": _execution_scope(kind, project_id),
+    }
 
 
 @tool("get_lifecycle", summary="Project the prototype, automation, and publication lifecycle tree.", side_effects="none")

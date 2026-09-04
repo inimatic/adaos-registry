@@ -1245,6 +1245,34 @@ tools:
     type: array
     items:
       type: object
+- name: get_project_placement_navigation
+  description: Open one active Project trial or stable placement through the topology-aware
+    navigation contract.
+  entry: handlers.main:get_project_placement_navigation
+  side_effects: ui_navigation
+  input_schema:
+    type: object
+    required:
+    - object_type
+    - object_id
+    properties:
+      placement_kind:
+        type: string
+        enum:
+        - trial
+        - stable
+        default: stable
+      object_type:
+        type: string
+        enum:
+        - project
+      object_id:
+        type: string
+        minLength: 1
+      base_url:
+        type: string
+  output_schema:
+    type: object
 - name: get_lifecycle
   description: Project dependent Prototype to Automation to Publication lineage.
   entry: handlers.main:get_lifecycle
@@ -2265,4 +2293,3 @@ compatibility:
     min_commit: 3c993c901c11c204a66afc7a29209ba3a28d00a3
     min_short_commit: 3c993c90
     build_date: '2026-09-04T18:37:24+03:00'
-

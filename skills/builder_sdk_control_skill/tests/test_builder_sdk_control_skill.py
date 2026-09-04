@@ -66,6 +66,7 @@ def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None
     assert tools["list_development_feedback"]["side_effects"] == "none"
     assert tools["get_development_feedback"]["side_effects"] == "none"
     assert tools["get_process"]["side_effects"] == "none"
+    assert tools["get_project_placement_navigation"]["side_effects"] == "ui_navigation"
     assert tools["get_change_context"]["side_effects"] == "none"
     assert tools["plan_change_set"]["side_effects"] == "local_write"
     assert tools["add_change_issues"]["side_effects"] == "local_write"
@@ -2782,6 +2783,72 @@ def test_process_nests_implementation_under_its_source_prototype(monkeypatch) ->
     assert implementation["source_prototype_revision"] == "002"
     assert implementation["children"][0]["kind"] == "trial"
     assert result["interaction"]["preview_target"] == "prototype:recipes:002"
+
+
+def test_project_process_exposes_active_trial_placement(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(module.compositions, "get", lambda *_args: _root_mgmnt_project())
+    monkeypatch.setattr(
+        module.workflow,
+        "get_state",
+        lambda *_args: {
+            "generation": 18,
+            "change": {"change_id": "CH-root", "request": "Update root UI", "issues": []},
+            "prototype": {"head_revision": "003", "status": "frozen"},
+            "automation": {
+                "status": "completed",
+                "source_prototype_revision": "003",
+                "head_task_id": "task-root",
+            },
+            "delivery": {"status": "trial", "candidate_id": "candidate-root"},
+            "publication": {"status": "not_started"},
+            "project": {
+                "placements": [
+                    {
+                        "placement_id": "trial:scenario:root_mgmnt_ops:desktop-dev",
+                        "kind": "trial",
+                        "status": "active",
+                        "result_ref": {"id": "candidate-root", "version": "0.1.1"},
+                        "target": {"webspace_id": "desktop-dev"},
+                    }
+                ]
+            },
+        },
+    )
+    monkeypatch.setattr(module.projects, "list_files", lambda *_args, **_kwargs: [])
+
+    result = module.get_process("project", "root_mgmnt")
+    prototype = result["tree"][0]["children"][1]["children"][0]
+    placement = prototype["children"][0]["children"][0]["children"][0]
+
+    assert placement["kind"] == "placement"
+    assert placement["placementKind"] == "trial"
+    assert placement["canOpenPlacement"] is True
+    assert placement["revision"] == "0.1.1"
+
+
+def test_project_placement_navigation_uses_workflow_sdk(monkeypatch) -> None:
+    module = _module()
+    calls: list[tuple] = []
+    monkeypatch.setattr(module.compositions, "get", lambda *_args: _root_mgmnt_project())
+    monkeypatch.setattr(
+        module.workflow,
+        "get_project_placement_navigation",
+        lambda *args, **kwargs: calls.append((args, kwargs))
+        or {"url": "https://inimatic.com/?preview_stage=trial"},
+    )
+
+    result = module.get_project_placement_navigation(
+        "trial",
+        "project",
+        "root_mgmnt",
+    )
+
+    assert calls == [
+        (("scenario", "root_mgmnt_ops"), {"kind": "trial", "base_url": None})
+    ]
+    assert result["preview_url"].endswith("preview_stage=trial")
+    assert result["execution_scope"]["context_ref"] == "project:root_mgmnt"
 
 
 def test_semantic_ui_tool_forwards_typed_local_reversible_operation(monkeypatch) -> None:

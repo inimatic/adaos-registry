@@ -4266,12 +4266,20 @@
                                     "selectedStateKey": "inspectedProcessRef",
                                     "compactIndent": true,
                                     "wrapTitles": true,
-                                    "buttons": {
-                                        "id": "show-preview",
-                                        "label": "Show in Preview",
-                                        "icon": "eye-outline",
-                                        "whenKey": "canPreview"
-                                    }
+                                    "buttons": [
+                                        {
+                                            "id": "show-preview",
+                                            "label": "Show in Preview",
+                                            "icon": "eye-outline",
+                                            "whenKey": "canPreview"
+                                        },
+                                        {
+                                            "id": "open-placement",
+                                            "label": "Open placement",
+                                            "icon": "open-outline",
+                                            "whenKey": "canOpenPlacement"
+                                        }
+                                    ]
                                 },
                                 "actions": [
                                     {
@@ -4313,6 +4321,23 @@
                                             "builder.project.preview",
                                             "builder.project.metadata"
                                         ]
+                                    },
+                                    {
+                                        "on": "click:open-placement",
+                                        "type": "callSkill",
+                                        "target": "builder_sdk_control_skill.get_project_placement_navigation",
+                                        "params": {
+                                            "placement_kind": "$event.item.placementKind",
+                                            "object_type": "$state.selectedProjectKind",
+                                            "object_id": "$state.selectedProjectId",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
+                                        },
+                                        "openResultUrl": true,
+                                        "resultUrlPath": "preview_url",
+                                        "resultPreferCurrentOrigin": true,
+                                        "invalidates": "builder.project.preview"
                                     }
                                 ]
                             }
