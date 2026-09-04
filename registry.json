@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-04T07:08:31+00:00",
+  "updated_at": "2026-09-04T07:34:41+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -155,17 +155,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "builder",
-        "release": "builder@0.2.63",
-        "release_digest": "sha256:5b1c7b253670392daeb8ce4c0aed560791179d8f346ff49c924b9064d23f7840",
-        "package_digest": "sha256:ad6e51783f45aaedbc53604eb39899de8e5172c430e69851c0d2b7171961c9e7"
+        "release": "builder@0.2.65",
+        "release_digest": "sha256:7384db50c82ab17bbbbb5c81f811ab9f6973ab75c0faf31112754c6a2a7bc2ff",
+        "package_digest": "sha256:eda8e71892b3364c1a236cd65bb45a2b6f024cf2a0b084ac1de83b3c92880f18"
       }
     },
     {
       "kind": "skill",
       "id": "builder_skill",
       "name": "builder_skill",
-      "version": "0.3.58",
-      "updated_at": "2026-09-04T06:53:51+00:00",
+      "version": "0.3.59",
+      "updated_at": "2026-09-04T07:32:44+00:00",
       "path": "skills/builder_skill",
       "manifest": "skills/builder_skill/skill.yaml",
       "source": {
@@ -184,9 +184,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "builder",
-        "release": "builder@0.2.63",
-        "release_digest": "sha256:5b1c7b253670392daeb8ce4c0aed560791179d8f346ff49c924b9064d23f7840",
-        "package_digest": "sha256:cfa612deeab8385adb02bfce41f4bb20daf023765e4851657a78eaeefb851515"
+        "release": "builder@0.2.65",
+        "release_digest": "sha256:7384db50c82ab17bbbbb5c81f811ab9f6973ab75c0faf31112754c6a2a7bc2ff",
+        "package_digest": "sha256:d247ba74782412e13c110cb41b936ac0c3a4dd695cd8bb081871b8fca2b80696"
       }
     },
     {
@@ -1244,8 +1244,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "builder",
-        "release": "builder@0.2.63",
-        "release_digest": "sha256:5b1c7b253670392daeb8ce4c0aed560791179d8f346ff49c924b9064d23f7840",
+        "release": "builder@0.2.65",
+        "release_digest": "sha256:7384db50c82ab17bbbbb5c81f811ab9f6973ab75c0faf31112754c6a2a7bc2ff",
         "package_digest": "sha256:53310d271a7db31246955d09030c2ddef07619f37dd28dae74613848be3f207f"
       }
     },
@@ -1362,7 +1362,7 @@
         "manifest": "scenarios/builder/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:e76514473c21e6986d88506efe8f866089f1849ff7b98951b31ae435528b1afc",
+        "revision": "sha256:0ae440e065fb47d89cf5236a2c0457d5ab3f036666e61ce8a63899ced95c0a0f",
         "path_scope": [
           "projects/builder/"
         ]
@@ -1388,16 +1388,16 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "builder",
-        "release": "builder@0.2.63",
-        "release_digest": "sha256:5b1c7b253670392daeb8ce4c0aed560791179d8f346ff49c924b9064d23f7840",
-        "package_digest": "sha256:55ce098bca47b831fec62a89c37350db63a61ee1913ccae2ca06389e66653b88"
+        "release": "builder@0.2.65",
+        "release_digest": "sha256:7384db50c82ab17bbbbb5c81f811ab9f6973ab75c0faf31112754c6a2a7bc2ff",
+        "package_digest": "sha256:2d026e1910d660c48a37d54beb0640efe8ed263163e64d271a9cebb7b6131623"
       },
       "channels": {
         "stable": {
-          "release": "builder@0.2.63",
-          "release_digest": "sha256:5b1c7b253670392daeb8ce4c0aed560791179d8f346ff49c924b9064d23f7840",
-          "source_revision": "sha256:e76514473c21e6986d88506efe8f866089f1849ff7b98951b31ae435528b1afc",
-          "package_digest": "sha256:55ce098bca47b831fec62a89c37350db63a61ee1913ccae2ca06389e66653b88",
+          "release": "builder@0.2.65",
+          "release_digest": "sha256:7384db50c82ab17bbbbb5c81f811ab9f6973ab75c0faf31112754c6a2a7bc2ff",
+          "source_revision": "sha256:0ae440e065fb47d89cf5236a2c0457d5ab3f036666e61ce8a63899ced95c0a0f",
+          "package_digest": "sha256:2d026e1910d660c48a37d54beb0640efe8ed263163e64d271a9cebb7b6131623",
           "version": "0.2.76"
         }
       }
@@ -2089,8 +2089,8 @@
       "kind": "project",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.63",
-      "updated_at": "2026-09-04T07:08:31+00:00",
+      "version": "0.2.65",
+      "updated_at": "2026-09-04T07:34:41+00:00",
       "path": "projects/builder",
       "manifest": "projects/builder/project.yaml",
       "source": {
@@ -2124,18 +2124,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "builder",
-        "release": "builder@0.2.63",
-        "release_digest": "sha256:5b1c7b253670392daeb8ce4c0aed560791179d8f346ff49c924b9064d23f7840",
+        "release": "builder@0.2.65",
+        "release_digest": "sha256:7384db50c82ab17bbbbb5c81f811ab9f6973ab75c0faf31112754c6a2a7bc2ff",
         "primary_component": "scenario:builder",
-        "package_digest": "sha256:55ce098bca47b831fec62a89c37350db63a61ee1913ccae2ca06389e66653b88"
+        "package_digest": "sha256:2d026e1910d660c48a37d54beb0640efe8ed263163e64d271a9cebb7b6131623"
       },
       "channels": {
         "stable": {
-          "release": "builder@0.2.63",
-          "release_digest": "sha256:5b1c7b253670392daeb8ce4c0aed560791179d8f346ff49c924b9064d23f7840",
-          "source_revision": "sha256:e76514473c21e6986d88506efe8f866089f1849ff7b98951b31ae435528b1afc",
-          "package_digest": "sha256:55ce098bca47b831fec62a89c37350db63a61ee1913ccae2ca06389e66653b88",
-          "version": "0.2.63"
+          "release": "builder@0.2.65",
+          "release_digest": "sha256:7384db50c82ab17bbbbb5c81f811ab9f6973ab75c0faf31112754c6a2a7bc2ff",
+          "source_revision": "sha256:0ae440e065fb47d89cf5236a2c0457d5ab3f036666e61ce8a63899ced95c0a0f",
+          "package_digest": "sha256:2d026e1910d660c48a37d54beb0640efe8ed263163e64d271a9cebb7b6131623",
+          "version": "0.2.65"
         }
       }
     },

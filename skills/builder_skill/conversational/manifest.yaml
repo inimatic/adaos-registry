@@ -4,7 +4,7 @@ package_kind: skill
 owner_ref:
   kind: skill
   id: builder_skill
-version: 0.3.58
+version: 0.3.59
 workflow_refs:
 - workflow_type: builder.change
   definition_ref: ../workflow.json
