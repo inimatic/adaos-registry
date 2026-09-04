@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.86
+version: 0.1.87
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -537,7 +537,8 @@ tools:
   output_schema:
     type: object
 - name: accept_prototype
-  description: Accept one exact executable Prototype revision with behavior and compact/wide visual evidence.
+  description: Accept one exact executable Prototype revision with behavior and compact/wide
+    visual evidence.
   entry: handlers.main:accept_prototype
   side_effects: local_write
   input_schema:
@@ -2226,4 +2227,4 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-09-03T16:28:53+00:00'
+updated_at: '2026-09-04T06:54:12+00:00'

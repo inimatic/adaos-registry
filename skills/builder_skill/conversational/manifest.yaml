@@ -4,7 +4,7 @@ package_kind: skill
 owner_ref:
   kind: skill
   id: builder_skill
-version: 0.3.57
+version: 0.3.58
 workflow_refs:
 - workflow_type: builder.change
   definition_ref: ../workflow.json
@@ -43,4 +43,3 @@ compiled_outputs: []
 compatibility_aliases: []
 metadata:
   generated_by: adaos.sdk.developer.conversational
-
