@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: builder
-version: 0.2.69
+version: 0.2.71
 profiles: []
 components:
   owned:
