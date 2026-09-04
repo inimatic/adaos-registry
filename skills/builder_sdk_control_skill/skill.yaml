@@ -1535,6 +1535,8 @@ tools:
         type: string
         minLength: 1
         description: Caller-assigned immutable identity for this checkpoint operation.
+      confirmed:
+        type: boolean
       webspace_id:
         type: string
   output_schema:
@@ -2263,4 +2265,3 @@ compatibility:
     min_commit: aca09eeb7bdeac252a0193f4f546c9c836827b63
     min_short_commit: aca09eeb
     build_date: '2026-09-04T16:57:48+03:00'
-

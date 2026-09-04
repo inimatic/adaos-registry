@@ -291,6 +291,7 @@
                                     "target": "builder_sdk_control_skill.push_project",
                                     "params": {
                                         "checkpoint_id": "chat-first-prototype-approval",
+                                        "confirmed": true,
                                         "message": "Builder prototype approval",
                                         "object_type": "$state.selectedProjectKind",
                                         "object_id": "$state.selectedProjectId",
@@ -984,6 +985,7 @@
                                     "target": "builder_sdk_control_skill.push_project",
                                     "params": {
                                         "checkpoint_id": "$event.id",
+                                        "confirmed": true,
                                         "object_type": "$state.selectedProjectKind",
                                         "object_id": "$state.selectedProjectId",
                                         "_meta": {
@@ -1678,6 +1680,7 @@
                                     "target": "builder_sdk_control_skill.push_project",
                                     "params": {
                                         "checkpoint_id": "$event.id",
+                                        "confirmed": true,
                                         "message": "Builder prototype stabilization",
                                         "object_type": "$state.selectedProjectKind",
                                         "object_id": "$state.selectedProjectId",
@@ -3776,6 +3779,7 @@
                                         "target": "builder_sdk_control_skill.push_project",
                                         "params": {
                                             "checkpoint_id": "$event.id",
+                                            "confirmed": true,
                                             "object_type": "$state.selectedProjectKind",
                                             "object_id": "$state.selectedProjectId",
                                             "_meta": {

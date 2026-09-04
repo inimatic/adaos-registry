@@ -3547,6 +3547,7 @@ def push_project(
     object_id: str = DEFAULT_PROJECT_ID,
     message: str | None = None,
     checkpoint_id: str | None = None,
+    confirmed: bool = False,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -3555,6 +3556,8 @@ def push_project(
     checkpoint_change_id = str(checkpoint_id or "").strip()
     if not checkpoint_change_id:
         raise ValueError("checkpoint_id is required")
+    if not confirmed:
+        raise ValueError("Checkpoint acceptance requires explicit user confirmation")
     checkpoint_message = message or f"chore(builder): checkpoint {kind} {project_id}"
     workflow_before = workflow.get_state(workflow_kind, workflow_id)
     canonical_change_id, context_packet_digest = _workflow_execution_identity(workflow_before)
@@ -3647,6 +3650,7 @@ def push_project(
                 "context_packet_digest": context_packet_digest or None,
                 "package_digest": package_digest,
                 "source_revision": source_revision,
+                "confirmed": True,
             },
         )
         workflow_projection = (
@@ -3751,6 +3755,7 @@ def push_project(
             "context_packet_digest": context_packet_digest or None,
             "package_digest": package_digest,
             "source_revision": source_revision,
+            "confirmed": True,
         },
     )
     workflow_projection = (

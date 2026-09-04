@@ -185,6 +185,17 @@ def test_push_requires_explicit_checkpoint_identity() -> None:
         raise AssertionError("blank checkpoint identity must be rejected")
 
 
+def test_push_requires_explicit_confirmation() -> None:
+    module = _module()
+
+    try:
+        module.push_project(checkpoint_id="checkpoint-1")
+    except ValueError as exc:
+        assert str(exc) == "Checkpoint acceptance requires explicit user confirmation"
+    else:
+        raise AssertionError("unconfirmed checkpoint acceptance must be rejected")
+
+
 def _root_mgmnt_project(manifest_digest: str = "sha256:" + "c" * 64) -> dict:
     return {
         "schema": "adaos.project.v1",
@@ -398,7 +409,9 @@ def test_project_push_checkpoints_owned_components(monkeypatch) -> None:
         or {"ok": True, "workflow": {"change_set": {"change_set_id": "CS-root"}}},
     )
 
-    result = module.push_project("project", "root_mgmnt", checkpoint_id="CP-root")
+    result = module.push_project(
+        "project", "root_mgmnt", checkpoint_id="CP-root", confirmed=True
+    )
 
     assert [call[:2] for call in pushes] == [
         ("scenario", "root_mgmnt_ops"),
@@ -2449,6 +2462,7 @@ def test_project_lifecycle_tools_stay_behind_sdk(monkeypatch) -> None:
         "builder",
         message="checkpoint",
         checkpoint_id="checkpoint-change",
+        confirmed=True,
         webspace_id="desktop",
     )
     result = module.publish_project("scenario", "builder", dry_run=True, confirmed=True)
