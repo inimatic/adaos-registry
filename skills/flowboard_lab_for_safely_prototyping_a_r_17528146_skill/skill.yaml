@@ -1,0 +1,217 @@
+name: flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+version: 0.1.1
+description: Project-owned typed resource provider for the accepted prototype. Implement
+  accepted Flowboard prototype revision 007 exactly. Preserve the accepted three-lane
+  text Kanban, six current accepted records, search, typed create/edit/delete, drag
+  move, accessible lane selector, and successful-submit modal closing. Replace prototype.work_items
+  with a durable project-owned Resource Workbench provider in the existing generated
+  companion skill, declare every tool and data route, add focused tests, validate
+  the owned project, and change only this DEV project.
+supported_locales:
+- en
+- ru
+entry: handlers/main.py
+default_tool: chat
+runtime:
+  python: '3.11'
+dependencies: []
+events:
+  subscribe: []
+  publish:
+  - io.out.chat.append
+  - io.out.say
+exports:
+  tools:
+  - chat
+  - ask_for_details
+  - remember_preference
+tools:
+- name: chat
+  description: Handle a skill-owned dialog turn using the canonical conversation ledger.
+  entry: handlers.main:chat
+  input_schema:
+    type: object
+    properties:
+      text:
+        type: string
+      webspace_id:
+        type: string
+      conversation_context:
+        type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+    - dialog
+- name: ask_for_details
+  description: Ask a bounded follow-up question through adaos.sdk.chat.ask.
+  entry: handlers.main:ask_for_details
+  input_schema:
+    type: object
+    properties:
+      question:
+        type: string
+      required_slot:
+        type: string
+      max_turns:
+        type: integer
+        minimum: 1
+        maximum: 5
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+    - dialog
+- name: remember_preference
+  description: Propose a consent-gated skill preference memory write.
+  entry: handlers.main:remember_preference
+  input_schema:
+    type: object
+    required:
+    - key
+    - text
+    properties:
+      key:
+        type: string
+      text:
+        type: string
+      confidence:
+        type: number
+        minimum: 0
+        maximum: 1
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+    - dialog
+    - pending_action
+data_routes:
+- surface: skill conversation memory
+  route: skill-local
+  path: node_conversation_store:memory.skill_user.flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+  owner: skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+  first_paint: empty skill memory projection
+  recovery: memory.search/list rebuilds from node-local conversation store
+  guard_visibility: memory writes are proposed through Pending Actions before long-term
+    reuse
+  budget:
+    max_payload_bytes: 65536
+conversation:
+  dialog_channel:
+    id: flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+    label: Flowboard Lab For Safely Prototyping A R 17528146 Skill
+    owner: skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+    default_tool: flowboard_lab_for_safely_prototyping_a_r_17528146_skill.chat
+    route_id: voice_chat
+    history:
+      store: node
+      visible_tail_messages: 50
+    retrieval:
+      max_messages: 12
+      max_segments: 2
+      max_memory_items: 4
+      max_tokens: 1200
+    repair:
+      no_match: ask_for_details
+      correction: pass_to_tool
+      cancel: close_active_frame
+    response:
+      default_targets:
+      - text_tail
+      - speech_text
+      renderer: dialog.visible_tail
+  history:
+    store: node
+    owner: skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+    retention_class: normal
+  retrieval:
+    strategy: recent_plus_segments_plus_memory
+    cross_owner_memory: deny_by_default
+  memory:
+    scopes:
+    - conversation
+    - skill_user
+    - agent_user
+    consent: required_for_reusable_memory
+    default_visibility: owner
+  response:
+    default_targets:
+    - text_tail
+    - speech_text
+    structured_envelope: true
+  forms:
+  - id: details
+    kind: slot_collection
+    required_slots:
+    - details
+    repair:
+      max_turns: 3
+      on_exhausted: fallback_to_summary
+  agents:
+  - id: agent:flowboard_lab_for_safely_prototyping_a_r_17528146_skill:assistant
+    label: Assistant
+    owner: skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+    kind: skill_agent
+    channel_id: flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+    skill: flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+    talk_tool: chat
+    gender: neutral
+    voice: default
+    icon: sparkles-outline
+    aliases:
+    - Assistant
+    - new skill
+  - id: agent:flowboard_lab_for_safely_prototyping_a_r_17528146_skill:critic
+    label: Reviewer
+    owner: skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+    kind: skill_agent
+    channel_id: flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+    skill: flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+    talk_tool: chat
+    gender: neutral
+    voice: default
+    icon: search-outline
+    aliases:
+    - Reviewer
+    - critic
+llm_hints:
+  description: Project-owned typed resource provider for the accepted prototype. Implement
+    accepted Flowboard prototype revision 007 exactly. Preserve the accepted three-lane
+    text Kanban, six current accepted records, search, typed create/edit/delete, drag
+    move, accessible lane selector, and successful-submit modal closing. Replace prototype.work_items
+    with a durable project-owned Resource Workbench provider in the existing generated
+    companion skill, declare every tool and data route, add focused tests, validate
+    the owned project, and change only this DEV project.
+  aliases: []
+  primary_actions:
+  - id: flowboard_lab_for_safely_prototyping_a_r_17528146_skill.chat
+    intent: flowboard_lab_for_safely_prototyping_a_r_17528146_skill.chat
+    tool: chat
+    side_effect_class: local_write
+    examples:
+    - Ask the skill for help
+  - id: flowboard_lab_for_safely_prototyping_a_r_17528146_skill.ask_for_details
+    intent: flowboard_lab_for_safely_prototyping_a_r_17528146_skill.ask_for_details
+    tool: ask_for_details
+    side_effect_class: local_write
+    examples:
+    - Ask a follow-up question
+  examples: []
+  owner_hints:
+  - skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+nlu_hints:
+  aliases: []
+  examples: []
+  slot_schemas: {}
+  entities: []
+prototype: skill_default
+updated_at: '2026-09-04T15:07:16+00:00'
+resource_runtime:
+  declarations:
+  - resources/work_items.resource.json

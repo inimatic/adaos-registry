@@ -1,0 +1,208 @@
+{
+  "schema": "adaos.resource.local_crud.v1",
+  "owner_ref": "skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
+  "seed_policy": "if_missing",
+  "resource_definition": {
+    "schema": "adaos.resource.definition.v1",
+    "resource_type": "skill.flowboard_lab_for_safely_prototyping_a_r_17528146_skill.work_items",
+    "version": "1.0.0",
+    "title": "Board",
+    "description": "Disposable typed records for Builder Prototype review.",
+    "authority": {
+      "provider": "local_crud",
+      "binding": "flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
+      "writes": "optimistic",
+      "source_of_truth": "local_skill_state"
+    },
+    "record_schema_ref": "inline:skill.flowboard_lab_for_safely_prototyping_a_r_17528146_skill.work_items",
+    "record_schema": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "status",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "planned",
+            "in_progress",
+            "done"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "query": {
+      "default": "all",
+      "filters": [
+        "id",
+        "status",
+        "search"
+      ],
+      "sort": [
+        "title"
+      ],
+      "cursor": false,
+      "include": []
+    },
+    "operations": [
+      {
+        "id": "list",
+        "kind": "list",
+        "risk": "read"
+      },
+      {
+        "id": "show",
+        "kind": "show",
+        "risk": "read"
+      },
+      {
+        "id": "create",
+        "kind": "create",
+        "risk": "low"
+      },
+      {
+        "id": "update",
+        "kind": "update",
+        "risk": "low"
+      },
+      {
+        "id": "delete",
+        "kind": "delete",
+        "risk": "medium"
+      }
+    ],
+    "views": [
+      {
+        "id": "board",
+        "kind": "board",
+        "title": "Board"
+      },
+      {
+        "id": "detail",
+        "kind": "detail",
+        "title": "Record"
+      },
+      {
+        "id": "form",
+        "kind": "form",
+        "title": "Edit record"
+      }
+    ],
+    "events": {
+      "emits": [
+        "resource.record.created",
+        "resource.record.updated",
+        "resource.record.deleted"
+      ]
+    },
+    "i18n": {
+      "default_locale": "en",
+      "locales": [
+        "en",
+        "ru"
+      ]
+    },
+    "access": {
+      "role_fixtures": {
+        "owner": {
+          "list": "allowed",
+          "show": "allowed",
+          "create": "allowed",
+          "update": "allowed",
+          "delete": "allowed"
+        },
+        "guest": {
+          "create": "denied",
+          "update": "denied",
+          "delete": "denied"
+        }
+      }
+    },
+    "privacy": {
+      "sensitivity": "workspace",
+      "retention": "skill_owned",
+      "external_export": "denied"
+    },
+    "readiness": {
+      "states": [
+        "ready",
+        "empty",
+        "validation_error"
+      ]
+    },
+    "metadata": {
+      "prototype_acceptance_id": "acceptance:flowboard-e2e-20260904:007:8cb5d7a37dc8e7c4",
+      "prototype_records_digest": "sha256:6e63e4747646b8020c231f8fbbe5bf612cd2f5dc7c2319d713ebd5002b303d85"
+    },
+    "scope": {
+      "owner": "skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
+      "target_refs": [
+        "scenario:flowboard_lab_for_safely_prototyping_a_r_17528146",
+        "skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill"
+      ]
+    }
+  },
+  "seed": [
+    {
+      "id": "p1",
+      "title": "Plan hiring kickoff",
+      "status": "done",
+      "notes": "Outline roles and timeline",
+      "revision": 11
+    },
+    {
+      "id": "p2",
+      "title": "Spec v2 requirements",
+      "status": "planned",
+      "notes": "Collect stakeholder input",
+      "revision": 5
+    },
+    {
+      "id": "ip1",
+      "title": "Implement auth flow",
+      "status": "in_progress",
+      "notes": "MFA and recovery codes",
+      "revision": 7
+    },
+    {
+      "id": "ip2",
+      "title": "Refactor board drag",
+      "status": "planned",
+      "notes": "Accessible move path",
+      "revision": 4
+    },
+    {
+      "id": "d1",
+      "title": "Ship 1.0.3 patch",
+      "status": "done",
+      "notes": "Hotfix crashes",
+      "revision": 4
+    },
+    {
+      "id": "d2",
+      "title": "Close Q2 retro",
+      "status": "in_progress",
+      "notes": "Document action items",
+      "revision": 4
+    }
+  ]
+}

@@ -1,0 +1,371 @@
+{
+    "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+    "version": "0.1.10",
+    "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+    "description": "Builder-created rapid prototype scenario.",
+    "triggers": [],
+    "depends": [],
+    "runtime": {
+        "skills": {
+            "required": []
+        }
+    },
+    "slots": {},
+    "params": {},
+    "llm_hints": {
+        "description": "Create a new scenario project named Flowboard Lab for safely prototyping a reusable kanban workbench.",
+        "aliases": [
+            "builder prototype",
+            "rapid prototype"
+        ],
+        "primary_actions": [
+            {
+                "id": "builder.prototype.edit",
+                "intent": "builder.chat",
+                "skill": "builder_skill",
+                "tool": "chat",
+                "side_effect_class": "local_write"
+            }
+        ],
+        "examples": [
+            "Builder, change this prototype",
+            "Строитель, измени этот прототип"
+        ],
+        "owner_hints": [
+            "skill:builder_skill"
+        ]
+    },
+    "nlu": {
+        "nlu_hints": {
+            "aliases": [
+                "prototype",
+                "прототип"
+            ],
+            "examples": [
+                {
+                    "text": "Строитель, измени этот прототип",
+                    "locale": "ru",
+                    "intent": "builder.chat"
+                }
+            ],
+            "slot_schemas": {},
+            "entities": []
+        }
+    },
+    "io": {
+        "input": [
+            "voice",
+            "text"
+        ],
+        "output": [
+            "voice",
+            "text",
+            "web"
+        ],
+        "settings": {
+            "output.active": "voice"
+        }
+    },
+    "steps": [],
+    "prototype": "builder_scenario",
+    "updated_at": "2026-09-04T15:07:21+00:00",
+    "type": "desktop",
+    "title": "Flowboard Lab for safely prototyping a reusable kanban workbench",
+    "title_i18n": {
+        "fallback": "Flowboard Lab for safely prototyping a reusable kanban workbench",
+        "key": "scenario.flowboard_lab_for_safely_prototyping_a_r_17528146.title"
+    },
+    "supported_locales": [
+        "en",
+        "ru"
+    ],
+    "ui": {
+        "application": {
+            "desktop": {
+                "pageSchema": {
+                    "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+                    "layout": {
+                        "areas": [
+                            {
+                                "id": "main",
+                                "role": "main"
+                            }
+                        ],
+                        "pattern": "stack",
+                        "type": "single"
+                    },
+                    "meta": {
+                        "builder": {
+                            "proto": "007",
+                            "scenario_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+                            "ui_revision": "007"
+                        }
+                    },
+                    "title": "Flowboard Lab for safely prototyping a reusable kanban workbench",
+                    "title_i18n": {
+                        "fallback": "Flowboard Lab for safely prototyping a reusable kanban workbench",
+                        "key": "scenario.flowboard_lab_for_safely_prototyping_a_r_17528146.title"
+                    },
+                    "widgets": [
+                        {
+                            "actions": [
+                                {
+                                    "on": "change",
+                                    "params": {
+                                        "searchQuery": "$event.value"
+                                    },
+                                    "type": "updateState"
+                                }
+                            ],
+                            "area": "main",
+                            "id": "work-search",
+                            "title": "Поиск задач",
+                            "type": "input.text"
+                        },
+                        {
+                            "actions": [
+                                {
+                                    "on": "add",
+                                    "params": {
+                                        "modalId": "create-item"
+                                    },
+                                    "type": "openModal"
+                                },
+                                {
+                                    "on": "move",
+                                    "params": {
+                                        "operation_id": "update",
+                                        "payload": "$event.patch",
+                                        "record_id": "$event.id"
+                                    },
+                                    "target": "skill.flowboard_lab_for_safely_prototyping_a_r_17528146_skill.work_items",
+                                    "type": "resourceOperation"
+                                },
+                                {
+                                    "on": "click:edit",
+                                    "params": {
+                                        "selectedRecord": "$event",
+                                        "selectedRecordId": "$event.id"
+                                    },
+                                    "type": "updateState"
+                                },
+                                {
+                                    "on": "click:edit",
+                                    "params": {
+                                        "modalId": "edit-item"
+                                    },
+                                    "type": "openModal"
+                                },
+                                {
+                                    "on": "click:delete",
+                                    "params": {
+                                        "operation_id": "delete",
+                                        "record_id": "$event.id"
+                                    },
+                                    "target": "skill.flowboard_lab_for_safely_prototyping_a_r_17528146_skill.work_items",
+                                    "type": "resourceOperation"
+                                }
+                            ],
+                            "area": "main",
+                            "dataSource": {
+                                "kind": "resourceQuery",
+                                "query": {
+                                    "search": "$state.searchQuery"
+                                },
+                                "resourceType": "skill.flowboard_lab_for_safely_prototyping_a_r_17528146_skill.work_items"
+                            },
+                            "id": "work-board",
+                            "inputs": {
+                                "addItemLabel": "Добавить",
+                                "buttons": [
+                                    {
+                                        "id": "edit",
+                                        "label": "Edit"
+                                    },
+                                    {
+                                        "id": "delete",
+                                        "label": "Delete"
+                                    }
+                                ],
+                                "cardFields": [
+                                    {
+                                        "key": "notes",
+                                        "label": "Notes"
+                                    }
+                                ],
+                                "compact": true,
+                                "dragDrop": true,
+                                "laneKey": "status",
+                                "lanes": [
+                                    {
+                                        "id": "planned",
+                                        "label": "Planned"
+                                    },
+                                    {
+                                        "id": "in_progress",
+                                        "label": "In progress"
+                                    },
+                                    {
+                                        "id": "done",
+                                        "label": "Done"
+                                    }
+                                ],
+                                "moveItemLabel": "Move to…",
+                                "showCounts": true,
+                                "titleKey": "title"
+                            },
+                            "title": "Board",
+                            "type": "collection.board"
+                        }
+                    ],
+                    "initialState": {
+                        "searchQuery": ""
+                    }
+                }
+            },
+            "modals": {
+                "create-item": {
+                    "id": "create-item",
+                    "schema": {
+                        "id": "create-item",
+                        "layout": {
+                            "areas": [
+                                {
+                                    "id": "modal",
+                                    "role": "main"
+                                }
+                            ],
+                            "pattern": "stack",
+                            "type": "single"
+                        },
+                        "widgets": [
+                            {
+                                "actions": [
+                                    {
+                                        "on": "submit",
+                                        "params": {
+                                            "operation_id": "create",
+                                            "payload": "$event.values"
+                                        },
+                                        "target": "skill.flowboard_lab_for_safely_prototyping_a_r_17528146_skill.work_items",
+                                        "type": "resourceOperation"
+                                    },
+                                    {
+                                        "on": "submit",
+                                        "type": "closeModal"
+                                    }
+                                ],
+                                "area": "modal",
+                                "id": "create-form",
+                                "inputs": {
+                                    "fields": [
+                                        {
+                                            "id": "title",
+                                            "label": "Title",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "id": "status",
+                                            "label": "Status",
+                                            "options": [
+                                                {
+                                                    "label": "Planned",
+                                                    "value": "planned"
+                                                },
+                                                {
+                                                    "label": "In progress",
+                                                    "value": "in_progress"
+                                                },
+                                                {
+                                                    "label": "Done",
+                                                    "value": "done"
+                                                }
+                                            ],
+                                            "type": "select"
+                                        }
+                                    ],
+                                    "submitLabel": "Create"
+                                },
+                                "title": "Create item",
+                                "type": "ui.form"
+                            }
+                        ]
+                    }
+                },
+                "edit-item": {
+                    "id": "edit-item",
+                    "schema": {
+                        "id": "edit-item",
+                        "layout": {
+                            "areas": [
+                                {
+                                    "id": "modal",
+                                    "role": "main"
+                                }
+                            ],
+                            "pattern": "stack",
+                            "type": "single"
+                        },
+                        "widgets": [
+                            {
+                                "actions": [
+                                    {
+                                        "on": "submit",
+                                        "params": {
+                                            "operation_id": "update",
+                                            "payload": "$event.values",
+                                            "record_id": "$state.selectedRecordId"
+                                        },
+                                        "target": "skill.flowboard_lab_for_safely_prototyping_a_r_17528146_skill.work_items",
+                                        "type": "resourceOperation"
+                                    },
+                                    {
+                                        "on": "submit",
+                                        "type": "closeModal"
+                                    }
+                                ],
+                                "area": "modal",
+                                "id": "edit-form",
+                                "inputs": {
+                                    "fields": [
+                                        {
+                                            "id": "title",
+                                            "label": "Title",
+                                            "type": "text",
+                                            "stateKey": "selectedRecord.title"
+                                        },
+                                        {
+                                            "id": "status",
+                                            "label": "Status",
+                                            "options": [
+                                                {
+                                                    "label": "Planned",
+                                                    "value": "planned"
+                                                },
+                                                {
+                                                    "label": "In progress",
+                                                    "value": "in_progress"
+                                                },
+                                                {
+                                                    "label": "Done",
+                                                    "value": "done"
+                                                }
+                                            ],
+                                            "type": "select",
+                                            "stateKey": "selectedRecord.status"
+                                        }
+                                    ],
+                                    "submitLabel": "Save"
+                                },
+                                "title": "Edit item",
+                                "type": "ui.form"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        "version": "0.1.10",
+        "manifest": "webui.json"
+    }
+}
