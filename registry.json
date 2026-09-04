@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-04T16:09:18+00:00",
+  "updated_at": "2026-09-04T16:12:34+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1339,19 +1339,13 @@
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.76",
-      "updated_at": "2026-09-04T06:53:39+00:00",
+      "version": "0.2.77",
+      "updated_at": "2026-09-04T16:12:34+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.yaml",
       "source": {
         "path": "scenarios/builder",
-        "manifest": "scenarios/builder/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:9c9dc20ea3b69ef07723624a29810015f812e717e8b4771fc1fb26797150388d",
-        "path_scope": [
-          "projects/builder/"
-        ]
+        "manifest": "scenarios/builder/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -1370,22 +1364,6 @@
           "builder_sdk_control_skill",
           "voice_chat_skill"
         ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "builder",
-        "release": "builder@0.2.73",
-        "release_digest": "sha256:06f26d9bdf074ad8181ae7bbabb5ab07a91880556b45ecea48b886361a1630a7",
-        "package_digest": "sha256:9ddf66886ad659a20f372a04c4fa259a85fb12a583db52722ae22e592d526b9a"
-      },
-      "channels": {
-        "stable": {
-          "release": "builder@0.2.73",
-          "release_digest": "sha256:06f26d9bdf074ad8181ae7bbabb5ab07a91880556b45ecea48b886361a1630a7",
-          "source_revision": "sha256:9c9dc20ea3b69ef07723624a29810015f812e717e8b4771fc1fb26797150388d",
-          "package_digest": "sha256:9ddf66886ad659a20f372a04c4fa259a85fb12a583db52722ae22e592d526b9a",
-          "version": "0.2.76"
-        }
       }
     },
     {
