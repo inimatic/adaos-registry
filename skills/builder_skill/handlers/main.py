@@ -205,6 +205,28 @@ def _requested_scenario_id_from_meta(_meta: Mapping[str, Any] | None = None) -> 
     return ""
 
 
+def _routing_meta_for_explicit_scenario(
+    scenario_id: str | None,
+    _meta: Mapping[str, Any] | None = None,
+) -> Mapping[str, Any] | None:
+    explicit = str(scenario_id or "").strip()
+    if not explicit:
+        return _meta
+    if any(ch in explicit for ch in "\\/"):
+        raise ValueError("scenario_id must be a stable AdaOS identifier")
+    routed = dict(_meta or {})
+    incoming = _requested_scenario_id_from_meta(routed)
+    if incoming and incoming != explicit:
+        raise ValueError(
+            f"Builder target mismatch: scenario_id={explicit}, conversation topic={incoming}"
+        )
+    topic = dict(routed.get("builder_topic") or {}) if isinstance(routed.get("builder_topic"), Mapping) else {}
+    topic["scenario_id"] = explicit
+    topic.setdefault("project_id", explicit)
+    routed["builder_topic"] = topic
+    return routed
+
+
 def _align_workbench_binding_to_meta(webspace_id: str, _meta: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
     scenario_id = _requested_scenario_id_from_meta(_meta)
     if not scenario_id:
@@ -7724,19 +7746,43 @@ def _canonicalize_complete_manifest_modal_keys(payload: dict[str, Any]) -> list[
         if not isinstance(modal, dict):
             continue
         schema = modal.get("schema")
-        if not isinstance(schema, dict) or str(schema.get("id") or "").strip():
+        if not isinstance(schema, dict):
             continue
-        schema_id = str(modal.get("id") or key or "").strip().removeprefix("@")
+        schema_id = str(schema.get("id") or "").strip()
         if not schema_id:
+            schema_id = str(modal.get("id") or key or "").strip().removeprefix("@")
+            if schema_id:
+                schema["id"] = schema_id
+                normalizations.append(
+                    {
+                        "kind": "modal_schema_id",
+                        "from": "",
+                        "to": schema_id,
+                    }
+                )
+        layout = schema.get("layout") if isinstance(schema.get("layout"), Mapping) else {}
+        areas = layout.get("areas") if isinstance(layout.get("areas"), list) else []
+        area_ids = {
+            str(area.get("id") or "").strip()
+            for area in areas
+            if isinstance(area, Mapping) and str(area.get("id") or "").strip()
+        }
+        if len(area_ids) != 1:
             continue
-        schema["id"] = schema_id
-        normalizations.append(
-            {
-                "kind": "modal_schema_id",
-                "from": "",
-                "to": schema_id,
-            }
-        )
+        default_area = next(iter(area_ids))
+        widgets = schema.get("widgets") if isinstance(schema.get("widgets"), list) else []
+        for widget in widgets:
+            if not isinstance(widget, dict) or str(widget.get("area") or "").strip():
+                continue
+            widget["area"] = default_area
+            normalizations.append(
+                {
+                    "kind": "modal_widget_area",
+                    "from": "",
+                    "to": default_area,
+                    "target": f"{schema_id or key}:{str(widget.get('id') or '').strip()}",
+                }
+            )
     return normalizations
 
 
@@ -13718,6 +13764,7 @@ def _local_llm_job_id(session: Mapping[str, Any], instruction: str) -> str:
 def update_current_scenario(
     instruction: str,
     webspace_id: str | None = None,
+    scenario_id: str | None = None,
     auto_apply: bool = True,
     conversation_context: Mapping[str, Any] | None = None,
     _meta: Mapping[str, Any] | None = None,
@@ -13726,7 +13773,8 @@ def update_current_scenario(
     started_at = time.perf_counter()
     ws = _source_webspace_id(webspace_id, _meta)
     source_done_at = time.perf_counter()
-    requested_binding = _align_workbench_binding_to_meta(ws, _meta)
+    routing_meta = _routing_meta_for_explicit_scenario(scenario_id, _meta)
+    requested_binding = _align_workbench_binding_to_meta(ws, routing_meta)
     binding_align_done_at = time.perf_counter()
     session, binding = _target_session(ws)
     if requested_binding is not None:

@@ -136,6 +136,10 @@ tools:
         type: string
       webspace_id:
         type: string
+      scenario_id:
+        type: string
+        description: Explicit target scenario for API and agent calls; must agree
+          with the conversational topic when both are supplied.
       conversation_context:
         type: object
         description: Bounded AdaOS conversation context supplied by the canonical

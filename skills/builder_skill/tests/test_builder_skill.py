@@ -475,6 +475,23 @@ def test_builder_aligns_stale_workbench_binding_to_incoming_prompt_topic(monkeyp
     assert calls[-1]["active_draft_id"] is None
 
 
+def test_builder_explicit_scenario_routing_is_structured_and_fail_closed() -> None:
+    skill = _load_module()
+
+    routed = skill._routing_meta_for_explicit_scenario("flowboard", {"request_id": "req-1"})
+
+    assert routed["request_id"] == "req-1"
+    assert routed["builder_topic"] == {
+        "scenario_id": "flowboard",
+        "project_id": "flowboard",
+    }
+    with pytest.raises(ValueError, match="Builder target mismatch"):
+        skill._routing_meta_for_explicit_scenario(
+            "flowboard",
+            {"conversation_topic_id": "prompt-project:scenario:recipes"},
+        )
+
+
 def test_save_session_batches_sessions_and_current_pointer(monkeypatch) -> None:
     skill = _load_module()
     calls: list[dict] = []
@@ -2922,6 +2939,55 @@ def test_complete_manifest_fills_unambiguous_modal_schema_ids() -> None:
     assert normalizations == [
         {"kind": "modal_schema_id", "from": "", "to": "create-item"},
         {"kind": "modal_schema_id", "from": "", "to": "edit-item"},
+    ]
+
+
+def test_complete_manifest_fills_unambiguous_modal_widget_areas() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "modals": {
+                    "create-item": {
+                        "id": "create-item",
+                        "schema": {
+                            "id": "create-item",
+                            "layout": {
+                                "type": "single",
+                                "areas": [{"id": "main", "role": "main"}],
+                            },
+                            "widgets": [
+                                {"id": "create-form", "type": "ui.form", "inputs": {}}
+                            ],
+                        },
+                    },
+                    "ambiguous": {
+                        "schema": {
+                            "id": "ambiguous",
+                            "layout": {
+                                "type": "split",
+                                "areas": [{"id": "main"}, {"id": "aside"}],
+                            },
+                            "widgets": [{"id": "form", "type": "ui.form", "inputs": {}}],
+                        }
+                    },
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_complete_manifest_modal_keys(payload)
+
+    modals = payload["ui"]["application"]["modals"]
+    assert modals["create-item"]["schema"]["widgets"][0]["area"] == "main"
+    assert "area" not in modals["ambiguous"]["schema"]["widgets"][0]
+    assert normalizations == [
+        {
+            "kind": "modal_widget_area",
+            "from": "",
+            "to": "main",
+            "target": "create-item:create-form",
+        }
     ]
 
 
