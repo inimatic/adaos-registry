@@ -2629,7 +2629,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
         },
         "application_modals": {
             "purpose": "Use ui.application.modals when the user asks for a modal, dialog, popup, drawer, sheet, or separate overlay surface.",
-            "shape": "Add ui.application.modals.<modalId>={title,presentation:{kind:'modal'|'drawer'|'sheet'|'sideSheet'},schema:{id,layout,widgets}} alongside ui.application.desktop.pageSchema.",
+            "shape": "Add ui.application.modals.<modalId>={title,presentation:{kind:'modal'|'drawer'|'sheet'|'sideSheet'},schema:{id,layout,widgets}} alongside ui.application.desktop.pageSchema. Every modal schema must include all three required keys: id, layout, and widgets; for one-area forms use layout:{type:'single',areas:[{id:'main',role:'main'}]} and area:'main' on every widget.",
             "open_action": "Open a declared modal from a button/action with actions=[{on:'click', type:'openModal', params:{modalId:'comment_modal'}}].",
             "rule": "Do not model an explicitly requested modal only as a hidden inline widget; use a declared modal unless the user asks for an inline panel. When replacing an inline detail with a modal, remove the old inline detail/actions and any now-unused layout area instead of retaining a second copy with visibleIf=false. Never return a root-level modals object; modal declarations live only in ui.application.modals. A modal may compose several widgets in one area, for example item.details followed by ui.actions for visible detail commands.",
         },
@@ -7760,6 +7760,20 @@ def _canonicalize_complete_manifest_modal_keys(payload: dict[str, Any]) -> list[
                         "to": schema_id,
                     }
                 )
+        if not isinstance(schema.get("layout"), Mapping):
+            schema["layout"] = {
+                "type": "single",
+                "pattern": "stack",
+                "areas": [{"id": "main", "role": "main"}],
+            }
+            normalizations.append(
+                {
+                    "kind": "modal_schema_layout",
+                    "from": "",
+                    "to": "single:main",
+                    "target": schema_id or str(key),
+                }
+            )
         layout = schema.get("layout") if isinstance(schema.get("layout"), Mapping) else {}
         areas = layout.get("areas") if isinstance(layout.get("areas"), list) else []
         area_ids = {

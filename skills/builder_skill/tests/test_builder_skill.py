@@ -2909,7 +2909,19 @@ def test_complete_manifest_canonicalizes_unambiguous_stable_id_modal_keys() -> N
     assert "@create-item" not in modals
     assert "@mismatch" in modals
     assert normalizations == [
-        {"kind": "stable_id_modal_key", "from": "@create-item", "to": "create-item"}
+        {"kind": "stable_id_modal_key", "from": "@create-item", "to": "create-item"},
+        {
+            "kind": "modal_schema_layout",
+            "from": "",
+            "to": "single:main",
+            "target": "create-item",
+        },
+        {
+            "kind": "modal_schema_layout",
+            "from": "",
+            "to": "single:main",
+            "target": "different",
+        },
     ]
 
 
@@ -2988,6 +3000,52 @@ def test_complete_manifest_fills_unambiguous_modal_widget_areas() -> None:
             "to": "main",
             "target": "create-item:create-form",
         }
+    ]
+
+
+def test_complete_manifest_fills_missing_single_area_modal_layout() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "modals": {
+                    "create-item": {
+                        "id": "create-item",
+                        "schema": {
+                            "widgets": [
+                                {"id": "create-form", "type": "ui.form", "inputs": {}}
+                            ]
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_complete_manifest_modal_keys(payload)
+
+    schema = payload["ui"]["application"]["modals"]["create-item"]["schema"]
+    assert schema["id"] == "create-item"
+    assert schema["layout"] == {
+        "type": "single",
+        "pattern": "stack",
+        "areas": [{"id": "main", "role": "main"}],
+    }
+    assert schema["widgets"][0]["area"] == "main"
+    assert normalizations == [
+        {"kind": "modal_schema_id", "from": "", "to": "create-item"},
+        {
+            "kind": "modal_schema_layout",
+            "from": "",
+            "to": "single:main",
+            "target": "create-item",
+        },
+        {
+            "kind": "modal_widget_area",
+            "from": "",
+            "to": "main",
+            "target": "create-item:create-form",
+        },
     ]
 
 
