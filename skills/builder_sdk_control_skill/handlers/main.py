@@ -2924,13 +2924,44 @@ def get_project_placement_navigation(
     placement_token = str(placement_kind or "stable").strip().lower()
     if placement_token not in {"trial", "stable"}:
         raise ValueError("placement_kind must be trial or stable")
-    result = workflow.get_project_placement_navigation(
-        workflow_kind,
-        workflow_id,
-        kind=placement_token,
-        base_url=str(base_url or "").strip() or None,
-    )
     materialization: dict[str, Any] | None = None
+    try:
+        result = workflow.get_project_placement_navigation(
+            workflow_kind,
+            workflow_id,
+            kind=placement_token,
+            base_url=str(base_url or "").strip() or None,
+        )
+    except ValueError as exc:
+        if placement_token != "stable" or "stable ProjectPlacement is unavailable" not in str(exc):
+            raise
+        published_workflow = workflow.get_state(workflow_kind, workflow_id)
+        publication = (
+            published_workflow.get("publication")
+            if isinstance(published_workflow.get("publication"), Mapping)
+            else {}
+        )
+        if str(publication.get("status") or "").strip() != "published":
+            raise
+        published_workflow, materialization = _ensure_stable_placement(
+            workflow_kind,
+            workflow_id,
+            owner_kind=kind,
+            owner_id=project_id,
+            result={
+                "release": publication.get("release"),
+                "version": publication.get("current_version"),
+            },
+            published_workflow=published_workflow,
+            webspace_id=webspace_id,
+            meta=_meta,
+        )
+        result = workflow.get_project_placement_navigation(
+            workflow_kind,
+            workflow_id,
+            kind=placement_token,
+            base_url=str(base_url or "").strip() or None,
+        )
     if placement_token == "trial":
         placement = (
             result.get("placement")
@@ -4035,6 +4066,128 @@ def _ensure_trial_placement(
     )
 
 
+def _ensure_stable_placement(
+    workflow_kind: str,
+    workflow_id: str,
+    *,
+    owner_kind: str,
+    owner_id: str,
+    result: Mapping[str, Any],
+    published_workflow: Mapping[str, Any],
+    webspace_id: str | None,
+    meta: Mapping[str, Any] | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    publication = (
+        published_workflow.get("publication")
+        if isinstance(published_workflow.get("publication"), Mapping)
+        else {}
+    )
+    delivery = (
+        published_workflow.get("delivery")
+        if isinstance(published_workflow.get("delivery"), Mapping)
+        else {}
+    )
+    release_id = str(result.get("release") or publication.get("release") or "").strip()
+    release_version = release_id.rpartition("@")[2].strip() if "@" in release_id else ""
+    if not release_version:
+        release_version = str(_project_descriptor(owner_kind, owner_id).get("version") or "").strip()
+    release_digest = str(
+        delivery.get("release_digest") or result.get("release_digest") or ""
+    ).strip()
+    if not release_id or not release_version or not release_digest:
+        raise ValueError("Published Project release identity is incomplete")
+
+    target_webspace_id = _preview_source_webspace_id(webspace_id, meta)
+    project_title = str(
+        _project_descriptor(owner_kind, owner_id).get("title") or owner_id
+    ).strip()
+    materialization = preview.materialize_revision(
+        webspace_id=target_webspace_id,
+        scenario_id=workflow_id,
+        revision=release_version,
+        preview_stage="publication",
+        preview_label=project_title,
+        source_fingerprint=release_digest,
+        event_payload={
+            "source": "builder.project.publication",
+            "source_webspace_id": target_webspace_id,
+            "preview_stage": "publication",
+            "preview_revision": release_version,
+        },
+    )
+    if materialization.get("ok") is False:
+        raise ValueError(
+            str(materialization.get("error") or "Project publication materialization failed")
+        )
+
+    project = (
+        published_workflow.get("project")
+        if isinstance(published_workflow.get("project"), Mapping)
+        else {}
+    )
+    for placement in project.get("placements") or []:
+        if not isinstance(placement, Mapping):
+            continue
+        result_ref = (
+            placement.get("result_ref")
+            if isinstance(placement.get("result_ref"), Mapping)
+            else {}
+        )
+        target = (
+            placement.get("target")
+            if isinstance(placement.get("target"), Mapping)
+            else {}
+        )
+        if (
+            str(placement.get("kind") or "") == "stable"
+            and str(placement.get("status") or "") == "active"
+            and str(result_ref.get("id") or "") == release_id
+            and str(target.get("webspace_id") or "") == target_webspace_id
+        ):
+            return dict(published_workflow), dict(materialization)
+
+    apply_evidence = (
+        result.get("apply_evidence")
+        if isinstance(result.get("apply_evidence"), Mapping)
+        else {}
+    )
+    activation = (
+        apply_evidence.get("activation")
+        if isinstance(apply_evidence.get("activation"), Mapping)
+        else delivery.get("activation")
+        if isinstance(delivery.get("activation"), Mapping)
+        else {}
+    )
+    placed = workflow.record_project_placement(
+        workflow_kind,
+        workflow_id,
+        {
+            "kind": "stable",
+            "result_ref": {
+                "kind": "release",
+                "id": release_id,
+                "version": release_version,
+                "digest": release_digest,
+            },
+            "target": {
+                "webspace_id": target_webspace_id,
+                "space_kind": "workspace",
+            },
+            "scenario_id": workflow_id,
+            "data_mode": "real",
+            "runtime_binding": dict(activation),
+            "safety": {"status": "verified", "source": "publication_activation"},
+        },
+        expected_generation=int(published_workflow.get("generation") or 0),
+    )
+    updated = (
+        dict(placed["workflow"])
+        if isinstance(placed.get("workflow"), Mapping)
+        else dict(published_workflow)
+    )
+    return updated, dict(materialization)
+
+
 def _ensure_trial_waiting_before_result(
     kind: str,
     project_id: str,
@@ -4639,6 +4792,18 @@ def publish_project(
         if isinstance(workflow_result.get("workflow"), Mapping)
         else {}
     )
+    stable_materialization: dict[str, Any] | None = None
+    if kind == "project":
+        published_workflow, stable_materialization = _ensure_stable_placement(
+            workflow_kind,
+            workflow_id,
+            owner_kind=kind,
+            owner_id=project_id,
+            result=result,
+            published_workflow=published_workflow,
+            webspace_id=webspace_id,
+            meta=_meta,
+        )
     published_change_set = (
         published_workflow.get("change_set")
         if isinstance(published_workflow.get("change_set"), Mapping)
@@ -4655,6 +4820,7 @@ def publish_project(
         **result,
         "change_id": evidence.get("change_id"),
         "evidence": evidence,
+        "stable_materialization": stable_materialization,
         "workflow": published_workflow,
         "execution_scope": _execution_scope(kind, project_id),
     }

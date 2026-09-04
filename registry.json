@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-04T17:06:06+00:00",
+  "updated_at": "2026-09-04T17:18:01+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -135,8 +135,8 @@
       "kind": "skill",
       "id": "builder_sdk_control_skill",
       "name": "builder_sdk_control_skill",
-      "version": "0.1.93",
-      "updated_at": "2026-09-04T17:06:06+00:00",
+      "version": "0.1.94",
+      "updated_at": "2026-09-04T17:18:01+00:00",
       "path": "skills/builder_sdk_control_skill",
       "manifest": "skills/builder_sdk_control_skill/skill.yaml",
       "source": {
@@ -288,6 +288,35 @@
         "release": "semantic_ui_demo@0.10.5",
         "release_digest": "sha256:ea02b1a24a88eed3c686d6b389679e341c97c4c979ab77a779fd5669b7b168fc",
         "package_digest": "sha256:90a9aca2ca3875e3839c1e6d1ba3cb020989be7deea6354d515aa0cef157341c"
+      }
+    },
+    {
+      "kind": "skill",
+      "id": "flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
+      "name": "flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
+      "version": "0.1.1",
+      "updated_at": "2026-09-04T15:07:16+00:00",
+      "path": "skills/flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
+      "manifest": "skills/flowboard_lab_for_safely_prototyping_a_r_17528146_skill/skill.yaml",
+      "source": {
+        "path": "skills/flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
+        "manifest": "skills/flowboard_lab_for_safely_prototyping_a_r_17528146_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
+        "id": "flowboard_lab_for_safely_prototyping_a_r_17528146_skill"
+      },
+      "description": "Project-owned typed resource provider for the accepted prototype. Implement accepted Flowboard prototype revision 007 exactly. Preserve the accepted three-lane text Kanban, six current accepted records, search, typed create/edit/delete, drag move, accessible lane selector, and successful-submit modal closing. Replace prototype.work_items with a durable project-owned Resource Workbench provider in the existing generated companion skill, declare every tool and data route, add focused tests, validate the owned project, and change only this DEV project.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 3,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.1",
+        "release_digest": "sha256:758a50ddb83a25fba2559075747d5ed9ae220a510fe5aab87851509ebc7b9280",
+        "package_digest": "sha256:784add403a0c1f2af21d41aa55fc1fb1f9ee370f52b3ce799b75a96dd1a4108b"
       }
     },
     {
@@ -1387,6 +1416,63 @@
     },
     {
       "kind": "scenario",
+      "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+      "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+      "version": "0.1.10",
+      "updated_at": "2026-09-04T15:07:21+00:00",
+      "path": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146",
+      "manifest": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146/scenario.yaml",
+      "source": {
+        "path": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146",
+        "manifest": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:3f4168b14fe89d0c7fa03455672c4cea1dedeb0551ab132d22c7f5510728dd10",
+        "path_scope": [
+          "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/"
+        ]
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+        "id": "flowboard_lab_for_safely_prototyping_a_r_17528146"
+      },
+      "title": "Flowboard Lab for safely prototyping a reusable kanban workbench",
+      "title_i18n": {
+        "fallback": "Flowboard Lab for safely prototyping a reusable kanban workbench",
+        "key": "scenario.flowboard_lab_for_safely_prototyping_a_r_17528146.title"
+      },
+      "description": "Builder-created rapid prototype scenario.",
+      "io": {
+        "input": [
+          "voice",
+          "text"
+        ],
+        "output": [
+          "voice",
+          "text",
+          "web"
+        ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.1",
+        "release_digest": "sha256:758a50ddb83a25fba2559075747d5ed9ae220a510fe5aab87851509ebc7b9280",
+        "package_digest": "sha256:ed9ebbd202be9be64a7d4effad7e7758f2281d9722e0b833f05057e12bf15484"
+      },
+      "channels": {
+        "stable": {
+          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.1",
+          "release_digest": "sha256:758a50ddb83a25fba2559075747d5ed9ae220a510fe5aab87851509ebc7b9280",
+          "source_revision": "sha256:3f4168b14fe89d0c7fa03455672c4cea1dedeb0551ab132d22c7f5510728dd10",
+          "package_digest": "sha256:ed9ebbd202be9be64a7d4effad7e7758f2281d9722e0b833f05057e12bf15484",
+          "version": "0.1.10"
+        }
+      }
+    },
+    {
+      "kind": "scenario",
       "id": "infrascope",
       "name": "infrascope",
       "version": "0.10.3",
@@ -2326,6 +2412,59 @@
       "profiles": [
         "adaos.default_apps.v1"
       ]
+    },
+    {
+      "kind": "project",
+      "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+      "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+      "version": "0.1.1",
+      "updated_at": "2026-09-04T17:10:11+00:00",
+      "path": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146",
+      "manifest": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/project.yaml",
+      "source": {
+        "path": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146",
+        "manifest": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+        "id": "flowboard_lab_for_safely_prototyping_a_r_17528146"
+      },
+      "title": "Flowboard Lab for safely prototyping a reusable kanban workbench",
+      "description": "Create a new scenario project named Flowboard Lab for safely prototyping a reusable kanban workbench.",
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "features": [],
+      "components": [
+        "scenario:flowboard_lab_for_safely_prototyping_a_r_17528146",
+        "skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill"
+      ],
+      "components_count": 2,
+      "profiles": [],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.1",
+        "release_digest": "sha256:758a50ddb83a25fba2559075747d5ed9ae220a510fe5aab87851509ebc7b9280",
+        "primary_component": "scenario:flowboard_lab_for_safely_prototyping_a_r_17528146",
+        "package_digest": "sha256:ed9ebbd202be9be64a7d4effad7e7758f2281d9722e0b833f05057e12bf15484"
+      },
+      "channels": {
+        "stable": {
+          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.1",
+          "release_digest": "sha256:758a50ddb83a25fba2559075747d5ed9ae220a510fe5aab87851509ebc7b9280",
+          "source_revision": "sha256:3f4168b14fe89d0c7fa03455672c4cea1dedeb0551ab132d22c7f5510728dd10",
+          "package_digest": "sha256:ed9ebbd202be9be64a7d4effad7e7758f2281d9722e0b833f05057e12bf15484",
+          "version": "0.1.1"
+        }
+      }
     },
     {
       "kind": "project",

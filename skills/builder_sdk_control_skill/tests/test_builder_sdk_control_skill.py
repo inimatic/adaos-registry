@@ -2888,6 +2888,98 @@ def test_project_placement_navigation_uses_workflow_sdk(monkeypatch) -> None:
     assert result["execution_scope"]["context_ref"] == "project:root_mgmnt"
 
 
+def test_project_stable_navigation_recovers_published_placement(monkeypatch) -> None:
+    module = _module()
+    calls: list[tuple] = []
+    placements: list[tuple] = []
+    materializations: list[dict] = []
+    release_digest = "sha256:" + "r" * 64
+    published = {
+        "generation": 21,
+        "publication": {
+            "status": "published",
+            "current_version": "0.4.2",
+            "release": "root_mgmnt@0.2.3",
+        },
+        "delivery": {
+            "status": "published",
+            "release_digest": release_digest,
+            "activation": {"operation_id": "activation-1"},
+        },
+        "project": {"placements": []},
+    }
+    monkeypatch.setattr(module.compositions, "get", lambda *_args: _root_mgmnt_project())
+    monkeypatch.setattr(module, "_preview_source_webspace_id", lambda *_args: "desktop")
+
+    def navigation(*args, **kwargs):
+        calls.append((args, kwargs))
+        if len(calls) == 1:
+            raise ValueError("active stable ProjectPlacement is unavailable")
+        return {
+            "url": "https://inimatic.com/?preview_stage=publication",
+            "placement": placements[0][2],
+        }
+
+    monkeypatch.setattr(module.workflow, "get_project_placement_navigation", navigation)
+    monkeypatch.setattr(module.workflow, "get_state", lambda *_args: published)
+    monkeypatch.setattr(
+        module.preview,
+        "materialize_revision",
+        lambda **kwargs: materializations.append(kwargs) or {"ok": True, "accepted": True},
+    )
+    monkeypatch.setattr(
+        module.workflow,
+        "record_project_placement",
+        lambda kind, object_id, placement, *, expected_generation: placements.append(
+            (kind, object_id, placement, expected_generation)
+        )
+        or {
+            "ok": True,
+            "workflow": {
+                **published,
+                "generation": expected_generation + 1,
+                "project": {"placements": [placement]},
+            },
+        },
+    )
+
+    result = module.get_project_placement_navigation(
+        "stable",
+        "project",
+        "root_mgmnt",
+        webspace_id="desktop",
+    )
+
+    assert len(calls) == 2
+    assert materializations == [
+        {
+            "webspace_id": "desktop",
+            "scenario_id": "root_mgmnt_ops",
+            "revision": "0.2.3",
+            "preview_stage": "publication",
+            "preview_label": "Root Management",
+            "source_fingerprint": release_digest,
+            "event_payload": {
+                "source": "builder.project.publication",
+                "source_webspace_id": "desktop",
+                "preview_stage": "publication",
+                "preview_revision": "0.2.3",
+            },
+        }
+    ]
+    assert placements[0][0:2] == ("scenario", "root_mgmnt_ops")
+    assert placements[0][2]["kind"] == "stable"
+    assert placements[0][2]["result_ref"] == {
+        "kind": "release",
+        "id": "root_mgmnt@0.2.3",
+        "version": "0.2.3",
+        "digest": release_digest,
+    }
+    assert placements[0][3] == 21
+    assert result["materialization"]["accepted"] is True
+    assert result["preview_url"].endswith("preview_stage=publication")
+
+
 def test_semantic_ui_tool_forwards_typed_local_reversible_operation(monkeypatch) -> None:
     module = _module()
     operations: list[dict] = []
