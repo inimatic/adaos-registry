@@ -1,5 +1,5 @@
 id: flowboard_lab_for_safely_prototyping_a_r_17528146
-version: 0.1.10
+version: 0.1.12
 name: flowboard_lab_for_safely_prototyping_a_r_17528146
 description: Builder-created rapid prototype scenario.
 triggers: []
@@ -49,7 +49,7 @@ io:
     output.active: voice
 steps: []
 prototype: builder_scenario
-updated_at: '2026-09-04T15:07:21+00:00'
+updated_at: '2026-09-04T18:15:49+00:00'
 type: desktop
 title: Flowboard Lab for safely prototyping a reusable kanban workbench
 title_i18n:

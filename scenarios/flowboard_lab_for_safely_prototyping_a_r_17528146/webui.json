@@ -17,9 +17,9 @@
                     },
                     "meta": {
                         "builder": {
-                            "proto": "007",
+                            "proto": "008",
                             "scenario_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-                            "ui_revision": "007"
+                            "ui_revision": "008"
                         }
                     },
                     "title": "Flowboard Lab for safely prototyping a reusable kanban workbench",
@@ -120,7 +120,7 @@
                                 "lanes": [
                                     {
                                         "id": "planned",
-                                        "label": "Planned"
+                                        "label": "Бэклог"
                                     },
                                     {
                                         "id": "in_progress",
@@ -286,7 +286,7 @@
                 }
             }
         },
-        "version": "0.1.10",
+        "version": "0.1.12",
         "manifest": "webui.json"
     },
     "generated_by": "builder_skill"
