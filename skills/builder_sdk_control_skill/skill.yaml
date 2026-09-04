@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.88
+version: 0.1.89
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -1366,6 +1366,32 @@ tools:
         type: string
   output_schema:
     type: object
+- name: retry_failed_automation
+  description: Retry the unchanged accepted Builder request after an executor failure.
+  entry: handlers.main:retry_failed_automation
+  side_effects: local_write
+  timeout_seconds: 120
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+      conversation_id:
+        type: string
+      execution_budget:
+        type: object
+        description: Optional bounded replacement budget for this retry.
+  output_schema:
+    type: object
 - name: recover_validated_automation
   description: Activate a preserved, committed, and validated Automation result after
     a retryable post-commit failure without assigning Codex again.
@@ -1814,6 +1840,7 @@ data_routes:
   - update_change_issue
   - start_automation
   - submit_automation
+  - retry_failed_automation
   - return_to_prototype
   - push_project
   - publish_project
@@ -2227,13 +2254,13 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-09-04T12:40:34+00:00'
+updated_at: '2026-09-04T13:58:04+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.986+6098.e3540dd13
-    recorded_at: '2026-09-04T12:40:34+00:00'
+    min_version: 0.1.991+6108.aca09eeb7
+    recorded_at: '2026-09-04T13:58:04+00:00'
     source: skill_push
-    min_commit: e3540dd138cc998836ce61d8819aa0aab9720c3e
-    min_short_commit: e3540dd1
-    build_date: '2026-09-04T15:31:49+03:00'
+    min_commit: aca09eeb7bdeac252a0193f4f546c9c836827b63
+    min_short_commit: aca09eeb
+    build_date: '2026-09-04T16:57:48+03:00'
 

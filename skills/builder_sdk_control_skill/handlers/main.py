@@ -3273,6 +3273,39 @@ def submit_automation(
     return result
 
 
+@tool(
+    "retry_failed_automation",
+    summary="Retry the unchanged accepted Builder request after an executor failure.",
+    side_effects="local_write",
+)
+def retry_failed_automation(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    webspace_id: str | None = None,
+    conversation_id: str | None = None,
+    execution_budget: Mapping[str, Any] | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    source = _webspace_id(webspace_id, _meta)
+    topic = _project_topic(kind, project_id, webspace_id=source)
+    result = dict(
+        automation.retry_failed(
+            object_type=kind,
+            object_id=project_id,
+            webspace_id=source,
+            conversation_id=str(
+                conversation_id or topic.get("conversation_id") or ""
+            ).strip()
+            or None,
+            execution_budget=execution_budget,
+        )
+        or {}
+    )
+    result["execution_scope"] = _execution_scope(kind, project_id)
+    return result
+
+
 @tool("return_to_prototype", summary="Use the built-in LLM to derive a safe Prototype from Automation.", side_effects="local_write")
 def return_to_prototype(
     object_type: str = DEFAULT_PROJECT_KIND,
