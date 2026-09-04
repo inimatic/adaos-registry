@@ -11,7 +11,16 @@ from uuid import uuid4
 import yaml
 
 from adaos.sdk import conversation, navigation
-from adaos.sdk.builder import automation, development_sessions, issues as builder_issues, preview, review, semantic_ui, workflow
+from adaos.sdk.builder import (
+    automation,
+    development_sessions,
+    issues as builder_issues,
+    lifecycle as builder_lifecycle,
+    preview,
+    review,
+    semantic_ui,
+    workflow,
+)
 from adaos.sdk.core.decorators import tool
 from adaos.sdk.developer import compositions, projects, prompt_context
 from adaos.sdk.llm.llm_client import list_llm_models
@@ -4336,6 +4345,8 @@ def publish_project(
         operation = "Trial activation" if dry_run else "Publication"
         raise ValueError(f"{operation} requires explicit user confirmation")
     if dry_run:
+        source_webspace_id = _preview_source_webspace_id(webspace_id, _meta)
+        trial_webspace_id = _preview_dev_webspace_id(source_webspace_id)
         if kind == "project" and str(delivery.get("status") or "").strip() == "trial":
             candidate_id = str(delivery.get("candidate_id") or "").strip()
             existing = projects.get_candidate(candidate_id)
@@ -4441,6 +4452,8 @@ def publish_project(
                     idempotency_key=(
                         f"project:{project_id}:{delivery.get('source_revision')}:{stale_candidate_id or 'initial'}"
                     ),
+                    target_webspace_id=trial_webspace_id,
+                    target_space_kind="development",
                 )
             elif stale_candidate_id:
                 result = projects.prepare_rebased_candidate(
@@ -4835,6 +4848,70 @@ def publish_project(
         "evidence": evidence,
         "stable_materialization": stable_materialization,
         "workflow": published_workflow,
+        "execution_scope": _execution_scope(kind, project_id),
+    }
+
+
+@tool(
+    "decide_project_trial",
+    summary="Accept an exact Project Trial or return it for further work.",
+    side_effects="local_write",
+)
+def decide_project_trial(
+    decision: str,
+    idempotency_key: str,
+    object_type: str = "project",
+    object_id: str = DEFAULT_PROJECT_ID,
+    reviewer_id: str = "user:owner",
+    expected_generation: int | None = None,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    if kind != "project":
+        raise ValueError("Project Trial decision requires object_type=project")
+    normalized = str(decision or "").strip().lower()
+    if normalized not in {"accept", "reject"}:
+        raise ValueError("decision must be accept or reject")
+    selected_key = str(idempotency_key or "").strip()
+    if not selected_key:
+        raise ValueError("idempotency_key is required")
+    workflow_kind, workflow_id = _execution_identity(kind, project_id)
+    current = workflow.get_state(workflow_kind, workflow_id)
+    current_generation = int(current.get("generation") or 0)
+    if expected_generation is not None and int(expected_generation) != current_generation:
+        raise ValueError(
+            "stale Builder action generation: "
+            f"expected {int(expected_generation)}, current {current_generation}"
+        )
+    result = builder_lifecycle.decide_trial(
+        workflow_kind,
+        workflow_id,
+        accepted=normalized == "accept",
+        actor=str(reviewer_id or "user:owner").strip() or "user:owner",
+        idempotency_key=selected_key,
+    )
+    decided_workflow = (
+        dict(result.get("workflow"))
+        if isinstance(result.get("workflow"), Mapping)
+        else dict(workflow.get_state(workflow_kind, workflow_id))
+    )
+    decided_change_set = (
+        decided_workflow.get("change_set")
+        if isinstance(decided_workflow.get("change_set"), Mapping)
+        else {}
+    )
+    if decided_change_set:
+        _sync_change_set_record(
+            kind=kind,
+            project_id=project_id,
+            webspace_id=_webspace_id(webspace_id, _meta),
+            change_set=decided_change_set,
+        )
+    return {
+        **result,
+        "decision": normalized,
+        "workflow": decided_workflow,
         "execution_scope": _execution_scope(kind, project_id),
     }
 

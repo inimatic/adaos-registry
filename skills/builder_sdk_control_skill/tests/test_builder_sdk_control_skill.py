@@ -606,12 +606,73 @@ def test_project_trial_uses_composition_candidate_and_primary_checkpoint(monkeyp
     assert candidate_calls[0][1]["source_name"] == "root_mgmnt_ops"
     assert candidate_calls[0][1]["source_revision"] == "root_mgmnt_ops-commit"
     assert candidate_calls[0][1]["change_ids"] == ["CS-root", "CP-root"]
+    assert candidate_calls[0][1]["target_webspace_id"] == "desktop-dev"
+    assert candidate_calls[0][1]["target_space_kind"] == "development"
     assert result["trial_ready"] is True
     assert result["execution_scope"]["context_ref"] == "project:root_mgmnt"
     assert placements[0][0:2] == ("scenario", "root_mgmnt_ops")
     assert placements[0][2]["kind"] == "trial"
     assert placements[0][2]["result_ref"]["id"] == "candidate-root"
     assert placements[0][2]["target"]["webspace_id"] == "desktop-dev"
+
+
+def test_project_trial_decision_uses_governed_lifecycle(monkeypatch) -> None:
+    module = _module()
+    project = _root_mgmnt_project()
+    decisions: list[tuple[str, str, dict]] = []
+    synced: list[dict] = []
+    monkeypatch.setattr(module.compositions, "get", lambda _project_id: dict(project))
+    monkeypatch.setattr(
+        module.workflow,
+        "get_state",
+        lambda *_args: {"generation": 17, "change_set": {"change_set_id": "CS-root"}},
+    )
+    monkeypatch.setattr(
+        module.builder_lifecycle,
+        "decide_trial",
+        lambda kind, object_id, **kwargs: decisions.append((kind, object_id, kwargs))
+        or {
+            "ok": True,
+            "candidate": {"candidate_id": "candidate-root", "status": "accepted"},
+            "workflow": {
+                "generation": 18,
+                "delivery": {"status": "accepted"},
+                "change_set": {"change_set_id": "CS-root"},
+            },
+        },
+    )
+    monkeypatch.setattr(
+        module,
+        "_sync_change_set_record",
+        lambda **kwargs: synced.append(kwargs) or {},
+    )
+
+    result = module.decide_project_trial(
+        "accept",
+        "trial-decision-1",
+        object_type="project",
+        object_id="root_mgmnt",
+        reviewer_id="user:test",
+        expected_generation=17,
+        webspace_id="desktop",
+    )
+
+    assert decisions == [
+        (
+            "scenario",
+            "root_mgmnt_ops",
+            {
+                "accepted": True,
+                "actor": "user:test",
+                "idempotency_key": "trial-decision-1",
+            },
+        )
+    ]
+    assert synced[0]["kind"] == "project"
+    assert synced[0]["project_id"] == "root_mgmnt"
+    assert synced[0]["webspace_id"] == "desktop"
+    assert result["decision"] == "accept"
+    assert result["execution_scope"]["context_ref"] == "project:root_mgmnt"
 
 
 def test_project_trial_replay_restores_missing_placement(monkeypatch) -> None:

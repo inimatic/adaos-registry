@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.96
+version: 0.1.97
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -1613,6 +1613,41 @@ tools:
         type: string
   output_schema:
     type: object
+- name: decide_project_trial
+  description: Accept an exact Project Trial or return it for further work through
+    the governed Builder lifecycle.
+  entry: handlers.main:decide_project_trial
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - decision
+    - idempotency_key
+    properties:
+      decision:
+        type: string
+        enum:
+        - accept
+        - reject
+      idempotency_key:
+        type: string
+        minLength: 1
+      object_type:
+        type: string
+        enum:
+        - project
+      object_id:
+        type: string
+        minLength: 1
+      reviewer_id:
+        type: string
+      expected_generation:
+        type: integer
+        minimum: 0
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
 - name: delete_project
   description: Plan or execute governed DEV project deletion with explicit confirmation.
   entry: handlers.main:delete_project
@@ -2293,11 +2328,11 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-09-04T19:38:45+00:00'
+updated_at: '2026-09-04T19:53:20+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.1002+6139.cdc1a0cfc
-    recorded_at: '2026-09-04T19:38:45+00:00'
+    recorded_at: '2026-09-04T19:53:20+00:00'
     source: skill_push
     min_commit: cdc1a0cfc10886c891b013e3010fd6bc7ca94856
     min_short_commit: cdc1a0cf
