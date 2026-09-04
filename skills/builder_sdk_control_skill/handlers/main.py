@@ -1225,7 +1225,6 @@ def get_project(
         "stage": "DEV prototype",
         "archived": bool(state.get("archived")),
         "workflow_state": str(workflow_projection.get("active_phase") or "prototype"),
-        "workflow": workflow_projection,
         "workflow_active_phase": str(workflow_projection.get("active_phase") or "prototype"),
         "workflow_generation": workflow_projection.get("generation"),
         "working_label": working_label,
@@ -1244,7 +1243,6 @@ def get_project(
         "change_set_id": change_set_projection.get("change_set_id"),
         "change_id": change_id or None,
         "change_label": f"{change_id} · {change_status}" if change_id else "No active change",
-        "change": dict(change_projection),
         "change_set_status": change_set_projection.get("status") or "not_planned",
         "change_set_gate": change_set_projection.get("gate"),
         "change_set_route": change_set_projection.get("route"),
@@ -2675,7 +2673,9 @@ def get_automation(
     progress = projection.get("progress") if isinstance(projection.get("progress"), Mapping) else {}
     evidence = projection.get("evidence") if isinstance(projection.get("evidence"), Mapping) else {}
     return {
-        **result,
+        "ok": bool(result.get("ok")),
+        "session_present": bool(result.get("session_present", result.get("ok"))),
+        "automation": dict(projection),
         "status": projection.get("status"),
         "phase": projection.get("phase"),
         "task_id": projection.get("task_id"),

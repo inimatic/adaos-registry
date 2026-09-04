@@ -893,6 +893,7 @@ def test_get_automation_exposes_source_prototype_metadata(monkeypatch) -> None:
         "get_state",
         lambda **kwargs: {
             "ok": True,
+            "session": {"private_history": ["x" * 20_000]},
             "automation": {
                 "status": "running",
                 "version": "0.4.0",
@@ -908,6 +909,7 @@ def test_get_automation_exposes_source_prototype_metadata(monkeypatch) -> None:
     assert all(part.isdigit() for part in result["version"].split("."))
     assert result["source_prototype_version"] == "UI 037"
     assert result["updated_at"].endswith("Z")
+    assert "session" not in result
 
 
 def test_lifecycle_exposes_bounded_automation_result_children(monkeypatch) -> None:
@@ -1117,6 +1119,8 @@ def test_project_display_preserves_runtime_semantic_preview_label(monkeypatch) -
 
     assert project["viewing_label"] == "active: 0.4.2"
     assert "task-internal-42" not in project["viewing_label"]
+    assert "workflow" not in project
+    assert "change" not in project
 
 
 def test_transport_guard_accepts_russian_unchanged_and_rejects_lossy_text(monkeypatch) -> None:
