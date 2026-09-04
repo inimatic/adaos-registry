@@ -2867,8 +2867,9 @@ def test_project_placement_navigation_uses_workflow_sdk(monkeypatch) -> None:
     assert result["preview_url"].endswith("preview_stage=trial")
     assert materializations == [
         (
-            ("desktop-dev",),
+            (),
             {
+                "webspace_id": "desktop-dev",
                 "scenario_id": "root_mgmnt_ops",
                 "revision": "0.1.1",
                 "preview_stage": "trial",

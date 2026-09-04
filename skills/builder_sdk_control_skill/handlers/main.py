@@ -2954,7 +2954,7 @@ def get_project_placement_navigation(
             raise ValueError("Active Project trial placement is incomplete")
         source_webspace_id = _preview_source_webspace_id(webspace_id, _meta)
         materialization = preview.materialize_revision(
-            target_webspace_id,
+            webspace_id=target_webspace_id,
             scenario_id=scenario_id,
             revision=revision,
             preview_stage="trial",
