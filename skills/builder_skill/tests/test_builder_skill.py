@@ -2925,6 +2925,47 @@ def test_complete_manifest_canonicalizes_unambiguous_stable_id_modal_keys() -> N
     ]
 
 
+def test_complete_manifest_initializes_resource_query_search_state() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "board",
+                        "layout": {"type": "single", "areas": [{"id": "main", "role": "main"}]},
+                        "widgets": [
+                            {
+                                "id": "board",
+                                "type": "collection.board",
+                                "area": "main",
+                                "dataSource": {
+                                    "kind": "resourceQuery",
+                                    "resourceType": "prototype.items",
+                                    "query": {"search": "$state.searchQuery"},
+                                },
+                            }
+                        ],
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_resource_query_search_defaults(payload)
+
+    page = payload["ui"]["application"]["desktop"]["pageSchema"]
+    assert page["initialState"]["searchQuery"] == ""
+    assert normalizations == [
+        {
+            "kind": "resource_query_search_initial_state",
+            "from": "",
+            "to": "empty_string",
+            "target": "searchQuery",
+        }
+    ]
+
+
 def test_complete_manifest_fills_unambiguous_modal_schema_ids() -> None:
     skill = _load_module()
     payload = {

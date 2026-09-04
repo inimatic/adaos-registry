@@ -2892,6 +2892,7 @@ def _builder_llm_system_prompt(
         "The bounded development_context is an index. Do not infer omitted details; return unable_reason when a missing detail blocks a safe prototype. "
         "The render source is ui.application.desktop.pageSchema; modal declarations belong only under ui.application.modals. "
         "Use stable ids for widgets and records. Actions must persist real state through an explicitly supported local or resource operation, not decorative controls. "
+        "Every $state key referenced by a resourceQuery must have a page initialState default; use an empty string for optional text search. "
         "Use local reversible data only for prototypes. If prototype_data_output is required, put the bounded sample records in the final complete object's prototype_records field; do not emit resource schemas or authoritative project identifiers. "
         "Images are optional and must not be invented unless the request explicitly needs them. "
         "If the request cannot be represented by selected capabilities, preserve valid UI and return unable_reason naming the missing capability. "
@@ -5704,7 +5705,7 @@ def _builder_llm_webui_transform_request(
             ),
             "query": (
                 "for text search use updateState params.searchQuery=$event.value and resourceQuery.query.search=$state.searchQuery; "
-                "do not wrap the event value in another object"
+                "declare initialState.searchQuery='' and do not wrap the event value in another object"
                 if requirements.get("resource_query")
                 else None
             ),
@@ -7817,6 +7818,47 @@ def _canonicalize_complete_manifest_modal_keys(payload: dict[str, Any]) -> list[
     return normalizations
 
 
+def _canonicalize_resource_query_search_defaults(payload: dict[str, Any]) -> list[dict[str, str]]:
+    application = (
+        payload.get("ui", {}).get("application")
+        if isinstance(payload.get("ui"), Mapping)
+        and isinstance(payload.get("ui", {}).get("application"), Mapping)
+        else {}
+    )
+    desktop = application.get("desktop") if isinstance(application.get("desktop"), Mapping) else {}
+    page = desktop.get("pageSchema") if isinstance(desktop.get("pageSchema"), Mapping) else None
+    if not isinstance(page, dict):
+        return []
+    initial_state = page.get("initialState")
+    if not isinstance(initial_state, dict):
+        initial_state = {}
+    normalizations: list[dict[str, str]] = []
+    for widget in page.get("widgets") or []:
+        if not isinstance(widget, Mapping):
+            continue
+        data_source = widget.get("dataSource") if isinstance(widget.get("dataSource"), Mapping) else {}
+        if str(data_source.get("kind") or "") != "resourceQuery":
+            continue
+        query = data_source.get("query") if isinstance(data_source.get("query"), Mapping) else {}
+        search_ref = str(query.get("search") or "").strip()
+        match = re.fullmatch(r"\$state\.([A-Za-z_][A-Za-z0-9_-]*)", search_ref)
+        if match is None or match.group(1) in initial_state:
+            continue
+        state_key = match.group(1)
+        if not isinstance(page.get("initialState"), dict):
+            page["initialState"] = initial_state
+        initial_state[state_key] = ""
+        normalizations.append(
+            {
+                "kind": "resource_query_search_initial_state",
+                "from": "",
+                "to": "empty_string",
+                "target": state_key,
+            }
+        )
+    return normalizations
+
+
 def _parse_llm_webui_transform_output(
     *,
     output_text: str,
@@ -7862,6 +7904,7 @@ def _parse_llm_webui_transform_output(
     payload_source = parsed.get("webui") if isinstance(parsed.get("webui"), Mapping) else parsed
     payload, preview = _normalise_llm_webui_payload(payload_source, previous_preview=previous_preview)
     normalizations = _canonicalize_complete_manifest_modal_keys(payload)
+    normalizations.extend(_canonicalize_resource_query_search_defaults(payload))
     validation = _validate_builder_webui_payload(payload, preview)
     if not validation.get("ok"):
         detail = str(validation.get("detail") or validation.get("error") or "LLM response did not pass Builder validation")
