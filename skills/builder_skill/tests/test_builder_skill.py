@@ -3049,6 +3049,138 @@ def test_complete_manifest_fills_missing_single_area_modal_layout() -> None:
     ]
 
 
+def test_complete_manifest_wraps_unambiguous_modal_schema_shorthand() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "modals": {
+                    "create-item": {
+                        "id": "create-item",
+                        "layout": {
+                            "type": "single",
+                            "areas": [{"id": "modal", "role": "main"}],
+                        },
+                        "widgets": [
+                            {
+                                "id": "create-form",
+                                "type": "ui.form",
+                                "area": "modal",
+                                "inputs": {},
+                            }
+                        ],
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_complete_manifest_modal_keys(payload)
+
+    modal = payload["ui"]["application"]["modals"]["create-item"]
+    assert "layout" not in modal
+    assert "widgets" not in modal
+    assert modal["schema"]["id"] == "create-item"
+    assert modal["schema"]["layout"]["areas"][0]["id"] == "modal"
+    assert modal["schema"]["widgets"][0]["area"] == "modal"
+    assert normalizations == [
+        {
+            "kind": "modal_schema_wrapper",
+            "from": "modal",
+            "to": "modal.schema",
+            "target": "create-item",
+        }
+    ]
+
+
+def test_failed_llm_result_replay_is_revision_bound_and_uses_zero_incremental_tokens(tmp_path) -> None:
+    skill = _load_module()
+    request_text = "Change the prototype title"
+    job_id = "llm_job_replay"
+    page_before = {
+        "id": "replay",
+        "title": "Before",
+        "layout": {"type": "single", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [
+            {
+                "id": "form",
+                "type": "ui.form",
+                "area": "main",
+                "inputs": {"fields": []},
+            }
+        ],
+    }
+    before_webui = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": page_before}}},
+    }
+    after_webui = copy.deepcopy(before_webui)
+    after_webui["ui"]["application"]["desktop"]["pageSchema"]["title"] = "After"
+    response = json.dumps(
+        {
+            "schema": "adaos.builder.webui_result.v1",
+            "webui": after_webui,
+            "comment": "Updated title.",
+        }
+    )
+    artifact_root = tmp_path / "replay"
+    journal_dir = artifact_root / "llm_jobs"
+    journal_dir.mkdir(parents=True)
+    (journal_dir / f"{job_id}.json").write_text(
+        json.dumps(
+            {
+                "schema": "adaos.builder.llm_job_result.v1",
+                "job_id": job_id,
+                "scenario_id": "replay",
+                "status": "failed",
+                "diagnostic": {
+                    "response": {"content": response, "truncated": False},
+                    "telemetry": {"usage": {"total_tokens": 321}},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    session = {
+        "scenario_id": "replay",
+        "artifact_root": str(artifact_root),
+        "ui_revision": "004",
+        "pending_llm_jobs": {
+            job_id: {
+                "job_id": job_id,
+                "status": "failed",
+                "request_text": request_text,
+                "model": "gpt-5",
+            }
+        },
+    }
+
+    replay = skill._replay_failed_llm_webui_result(
+        session=session,
+        job_id=job_id,
+        request_text=request_text,
+        expected_ui_revision="004",
+        previous_preview={},
+        before_webui=before_webui,
+    )
+
+    assert replay["ok"] is True
+    assert replay["payload"]["ui"]["application"]["desktop"]["pageSchema"]["title"] == "After"
+    assert replay["telemetry"]["usage"]["total_tokens"] == 0
+    assert replay["telemetry"]["original_usage"]["total_tokens"] == 321
+    assert replay["replay"]["incremental_tokens"] == 0
+
+    stale = skill._replay_failed_llm_webui_result(
+        session=session,
+        job_id=job_id,
+        request_text=request_text,
+        expected_ui_revision="003",
+        previous_preview={},
+        before_webui=before_webui,
+    )
+    assert stale["error"] == "llm_replay_stale_revision"
+
+
 def test_kanban_request_requires_bounded_prototype_records(monkeypatch) -> None:
     skill = _load_module()
     current = {

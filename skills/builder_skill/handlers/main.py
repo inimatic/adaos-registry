@@ -2631,7 +2631,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             "purpose": "Use ui.application.modals when the user asks for a modal, dialog, popup, drawer, sheet, or separate overlay surface.",
             "shape": "Add ui.application.modals.<modalId>={title,presentation:{kind:'modal'|'drawer'|'sheet'|'sideSheet'},schema:{id,layout,widgets}} alongside ui.application.desktop.pageSchema. Every modal schema must include all three required keys: id, layout, and widgets; for one-area forms use layout:{type:'single',areas:[{id:'main',role:'main'}]} and area:'main' on every widget.",
             "open_action": "Open a declared modal from a button/action with actions=[{on:'click', type:'openModal', params:{modalId:'comment_modal'}}].",
-            "rule": "Do not model an explicitly requested modal only as a hidden inline widget; use a declared modal unless the user asks for an inline panel. When replacing an inline detail with a modal, remove the old inline detail/actions and any now-unused layout area instead of retaining a second copy with visibleIf=false. Never return a root-level modals object; modal declarations live only in ui.application.modals. A modal may compose several widgets in one area, for example item.details followed by ui.actions for visible detail commands.",
+            "rule": "Do not put schema fields id/layout/widgets directly on the modal descriptor: they must be nested under its schema object. Do not model an explicitly requested modal only as a hidden inline widget; use a declared modal unless the user asks for an inline panel. When replacing an inline detail with a modal, remove the old inline detail/actions and any now-unused layout area instead of retaining a second copy with visibleIf=false. Never return a root-level modals object; modal declarations live only in ui.application.modals. A modal may compose several widgets in one area, for example item.details followed by ui.actions for visible detail commands.",
         },
         "page_schema_auto_actions": {
             "purpose": "Optional interval actions active only while a page or modal is mounted.",
@@ -7746,6 +7746,23 @@ def _canonicalize_complete_manifest_modal_keys(payload: dict[str, Any]) -> list[
         if not isinstance(modal, dict):
             continue
         schema = modal.get("schema")
+        if not isinstance(schema, Mapping) and isinstance(modal.get("widgets"), list):
+            schema = {
+                field: copy.deepcopy(modal[field])
+                for field in ("id", "layout", "widgets")
+                if field in modal
+            }
+            modal["schema"] = schema
+            modal.pop("layout", None)
+            modal.pop("widgets", None)
+            normalizations.append(
+                {
+                    "kind": "modal_schema_wrapper",
+                    "from": "modal",
+                    "to": "modal.schema",
+                    "target": str(modal.get("id") or key),
+                }
+            )
         if not isinstance(schema, dict):
             continue
         schema_id = str(schema.get("id") or "").strip()
@@ -12820,6 +12837,129 @@ def _llm_job_diagnostic(
     }
 
 
+def _replay_failed_llm_webui_result(
+    *,
+    session: Mapping[str, Any],
+    job_id: str,
+    request_text: str,
+    expected_ui_revision: str,
+    previous_preview: Mapping[str, Any],
+    before_webui: Mapping[str, Any],
+) -> dict[str, Any]:
+    token = str(job_id or "").strip()
+    expected_revision = str(expected_ui_revision or "").strip()
+    current_revision = str(session.get("ui_revision") or session.get("version") or "").strip()
+    if not token or not expected_revision:
+        return {
+            "ok": False,
+            "error": "llm_replay_precondition_required",
+            "detail": "retry_job_id and expected_ui_revision are required for a safe replay",
+        }
+    if current_revision != expected_revision:
+        return {
+            "ok": False,
+            "error": "llm_replay_stale_revision",
+            "detail": f"expected UI revision {expected_revision}, current {current_revision or 'unknown'}",
+        }
+    pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), Mapping) else {}
+    matched: dict[str, Any] = {}
+    for key, value in pending.items():
+        if not isinstance(value, Mapping) or token not in _llm_job_related_ids(str(key), value):
+            continue
+        if str(value.get("status") or "").strip().lower() != "failed":
+            continue
+        if str(value.get("request_text") or "").strip() != str(request_text or "").strip():
+            continue
+        matched.update(dict(value))
+    if not matched:
+        return {
+            "ok": False,
+            "error": "llm_replay_job_mismatch",
+            "detail": "failed LLM job does not match the current scenario and request",
+        }
+    journal_dir = _llm_job_journal_dir(session)
+    safe_job_id = re.sub(r"[^A-Za-z0-9_.-]+", "_", token).strip("._-") or _hash_suffix(token)
+    artifact_path = journal_dir / f"{safe_job_id}.json" if journal_dir is not None else None
+    try:
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8")) if artifact_path is not None else {}
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": "llm_replay_artifact_unavailable",
+            "detail": f"{type(exc).__name__}: {exc}",
+        }
+    if (
+        not isinstance(artifact, Mapping)
+        or str(artifact.get("status") or "").strip().lower() != "failed"
+        or str(artifact.get("scenario_id") or "").strip() != str(session.get("scenario_id") or "").strip()
+    ):
+        return {
+            "ok": False,
+            "error": "llm_replay_artifact_mismatch",
+            "detail": "terminal artifact does not match the failed scenario job",
+        }
+    diagnostic = artifact.get("diagnostic") if isinstance(artifact.get("diagnostic"), Mapping) else {}
+    response = diagnostic.get("response") if isinstance(diagnostic.get("response"), Mapping) else {}
+    output_text = str(response.get("content") or "")
+    if not output_text or bool(response.get("truncated")):
+        return {
+            "ok": False,
+            "error": "llm_replay_response_unavailable",
+            "detail": "terminal artifact does not contain a complete LLM response",
+        }
+    try:
+        result = _parse_llm_webui_transform_output(
+            output_text=output_text,
+            previous_preview=previous_preview,
+            before_webui=before_webui,
+            request_id=f"replay:{token}",
+            job_id=token,
+        )
+        result = _validate_llm_request_postconditions(
+            result,
+            instruction=request_text,
+            before_webui=before_webui,
+        )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": "llm_replay_validation_failed",
+            "detail": f"{type(exc).__name__}: {exc}",
+        }
+    if not result.get("ok"):
+        return {
+            **result,
+            "error": str(result.get("error") or "llm_replay_validation_failed"),
+        }
+    original_telemetry = diagnostic.get("telemetry") if isinstance(diagnostic.get("telemetry"), Mapping) else {}
+    original_usage = original_telemetry.get("usage") if isinstance(original_telemetry.get("usage"), Mapping) else {}
+    result["telemetry"] = {
+        "schema": "adaos.builder.llm_replay_telemetry.v1",
+        "source": "terminal_artifact",
+        "reused_job_id": token,
+        "usage": {
+            "input_tokens": 0,
+            "cached_input_tokens": 0,
+            "output_tokens": 0,
+            "reasoning_tokens": 0,
+            "total_tokens": 0,
+        },
+        "original_usage": copy.deepcopy(dict(original_usage)),
+    }
+    result["replay"] = {
+        "schema": "adaos.builder.llm_result_replay.v1",
+        "job_id": token,
+        "expected_ui_revision": expected_revision,
+        "artifact": str(artifact_path),
+        "incremental_tokens": 0,
+    }
+    model = str(matched.get("model") or "").strip()
+    if model:
+        result["model"] = model
+        result["profile"] = _builder_llm_prompt_profile(model)
+    return result
+
+
 def _llm_job_related_ids(key: str, value: Mapping[str, Any]) -> set[str]:
     return {
         item
@@ -13779,6 +13919,8 @@ def update_current_scenario(
     instruction: str,
     webspace_id: str | None = None,
     scenario_id: str | None = None,
+    retry_job_id: str | None = None,
+    expected_ui_revision: str | None = None,
     auto_apply: bool = True,
     conversation_context: Mapping[str, Any] | None = None,
     _meta: Mapping[str, Any] | None = None,
@@ -13965,6 +14107,68 @@ def update_current_scenario(
             from_="api",
         )
     request_emit_done_at = time.perf_counter()
+    if str(retry_job_id or "").strip():
+        replay_result = _replay_failed_llm_webui_result(
+            session=session,
+            job_id=str(retry_job_id),
+            request_text=text,
+            expected_ui_revision=str(expected_ui_revision or ""),
+            previous_preview=base_preview,
+            before_webui=before_webui,
+        )
+        if not replay_result.get("ok"):
+            return {
+                "ok": False,
+                "status": "llm_replay_failed",
+                "session_id": session.get("id"),
+                "scenario_id": session.get("scenario_id"),
+                "error": replay_result.get("error"),
+                "detail": replay_result.get("detail"),
+                "message": f"{AGENT_LABEL}: saved LLM result could not be replayed safely.",
+                "replay": replay_result.get("replay"),
+                "dialog": _dialog_state(ws, topic_ref=topic),
+            }
+        replay_patch = dict(patch)
+        replay_patch["created_by"] = "llm_agent_replay"
+        result = _finalize_llm_webui_transform_result(
+            ws=ws,
+            session=session,
+            binding=binding,
+            patch=replay_patch,
+            request_text=text,
+            before_webui=before_webui,
+            llm_result=replay_result,
+            auto_apply=auto_apply,
+            _meta=_meta,
+        )
+        result["status"] = "llm_replayed"
+        result["replay"] = copy.deepcopy(dict(replay_result["replay"]))
+        result_patch = result.get("patch") if isinstance(result.get("patch"), Mapping) else replay_patch
+        _upsert_builder_change(
+            webspace_id=ws,
+            session=session,
+            patch=result_patch,
+            request_text=text,
+            status="accepted",
+            _meta=_meta,
+            model=str(replay_result.get("model") or "replay"),
+            extra_meta={
+                "replayed_job_id": str(retry_job_id),
+                "incremental_tokens": 0,
+            },
+        )
+        _save_session(ws, session)
+        if _is_api_tool_call(_meta):
+            _safe_emit_chat(
+                str(result.get("message") or ""),
+                webspace_id=ws,
+                _meta=_meta,
+                session=session,
+                binding=binding,
+                topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else topic,
+                actions=result.get("message_actions") if isinstance(result.get("message_actions"), list) else None,
+            )
+        return result
     llm_result: dict[str, Any] | None = None
     llm_owned_content_change = _wants_llm_owned_content_change(text)
     deterministic_result = (

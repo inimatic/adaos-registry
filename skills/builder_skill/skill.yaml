@@ -140,6 +140,13 @@ tools:
         type: string
         description: Explicit target scenario for API and agent calls; must agree
           with the conversational topic when both are supplied.
+      retry_job_id:
+        type: string
+        description: Explicit failed LLM job whose complete saved response should be
+          revalidated locally instead of submitting another model request.
+      expected_ui_revision:
+        type: string
+        description: Required revision precondition when retry_job_id is supplied.
       conversation_context:
         type: object
         description: Bounded AdaOS conversation context supplied by the canonical
