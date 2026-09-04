@@ -372,8 +372,24 @@ def test_project_push_checkpoints_owned_components(monkeypatch) -> None:
     module = _module()
     project = _root_mgmnt_project()
     pushes: list[tuple[str, str, dict]] = []
+    version_advances: list[dict] = []
     transitions: list[tuple[str, str, str, dict]] = []
     monkeypatch.setattr(module.compositions, "get", lambda _project_id: dict(project))
+    monkeypatch.setattr(
+        module.compositions,
+        "advance_version",
+        lambda project_id, **kwargs: version_advances.append(
+            {"project_id": project_id, **kwargs}
+        )
+        or {
+            **project,
+            "version": "0.1.1",
+            "previous_version": "0.1.0",
+            "version_bump": kwargs["bump"],
+            "skipped_occupied_versions": [],
+            "manifest_digest": "sha256:" + "d" * 64,
+        },
+    )
     monkeypatch.setattr(
         module.workflow,
         "get_state",
@@ -419,7 +435,16 @@ def test_project_push_checkpoints_owned_components(monkeypatch) -> None:
         ("skill", "root_mgmnt"),
     ]
     assert result["package_digest"] == "sha256:" + "s" * 64
-    assert result["manifest_digest"] == project["manifest_digest"]
+    assert result["manifest_digest"] == "sha256:" + "d" * 64
+    assert result["version"] == "0.1.1"
+    assert result["previous_version"] == "0.1.0"
+    assert version_advances == [
+        {
+            "project_id": "root_mgmnt",
+            "bump": "patch",
+            "expected_manifest_digest": project["manifest_digest"],
+        }
+    ]
     assert result["source_revision"] == "root_mgmnt_ops-commit"
     assert result["verification_source_ref"] == "scenario:root_mgmnt_ops"
     assert result["change_id"] == "CP-root"

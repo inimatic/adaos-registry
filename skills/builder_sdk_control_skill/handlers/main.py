@@ -3691,6 +3691,7 @@ def push_project(
     object_id: str = DEFAULT_PROJECT_ID,
     message: str | None = None,
     checkpoint_id: str | None = None,
+    bump: str = "patch",
     confirmed: bool = False,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
@@ -3714,6 +3715,11 @@ def push_project(
     checkpoint_results: list[dict[str, Any]] = []
     if kind == "project":
         project_manifest = _composition_manifest(project_id)
+        project_manifest = compositions.advance_version(
+            project_id,
+            bump=bump,
+            expected_manifest_digest=str(project_manifest.get("manifest_digest") or ""),
+        )
         for ref in _composition_owned_refs(project_id):
             component = _split_component_ref(ref)
             if component is None:
@@ -3750,6 +3756,11 @@ def push_project(
             "kind": "project",
             "name": project_id,
             "version": str(project_manifest.get("version") or "DEV"),
+            "previous_version": project_manifest.get("previous_version"),
+            "version_bump": project_manifest.get("version_bump"),
+            "skipped_occupied_versions": list(
+                project_manifest.get("skipped_occupied_versions") or []
+            ),
             "manifest_digest": project_manifest_digest,
             "package_digest": package_digest,
             "source_revision": source_revision,
