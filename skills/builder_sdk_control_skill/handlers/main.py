@@ -3714,6 +3714,37 @@ def push_project(
         raise ValueError("Checkpoint acceptance requires explicit user confirmation")
     checkpoint_message = message or f"chore(builder): checkpoint {kind} {project_id}"
     workflow_before = workflow.get_state(workflow_kind, workflow_id)
+    workflow_description = (
+        workflow_before.get("workflow_description")
+        if isinstance(workflow_before.get("workflow_description"), Mapping)
+        else {}
+    )
+    allowed_commands = {
+        str(item.get("command") or "").strip()
+        for item in workflow_description.get("allowed_commands") or []
+        if isinstance(item, Mapping) and str(item.get("command") or "").strip()
+    }
+    if "accept_verification" not in allowed_commands:
+        blocked = next(
+            (
+                item
+                for item in workflow_description.get("blocked_commands") or []
+                if isinstance(item, Mapping)
+                and str(item.get("command") or "").strip() == "accept_verification"
+            ),
+            {},
+        )
+        governed = (
+            workflow_before.get("governed")
+            if isinstance(workflow_before.get("governed"), Mapping)
+            else {}
+        )
+        reason = str(blocked.get("reason_code") or "command_not_allowed").strip()
+        state = str(governed.get("state") or "unknown").strip()
+        raise ValueError(
+            "Project checkpoint is unavailable before source mutation: "
+            f"accept_verification is blocked in {state} ({reason})"
+        )
     canonical_change_id, context_packet_digest = _workflow_execution_identity(workflow_before)
     checkpoint_metadata: dict[str, Any] = {
         "change_id": checkpoint_change_id,

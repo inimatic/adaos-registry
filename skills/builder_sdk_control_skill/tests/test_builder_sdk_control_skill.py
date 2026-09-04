@@ -402,6 +402,10 @@ def test_project_push_checkpoints_owned_components(monkeypatch) -> None:
         module.workflow,
         "get_state",
         lambda *_args: {
+            "governed": {"state": "verification"},
+            "workflow_description": {
+                "allowed_commands": [{"command": "accept_verification"}],
+            },
             "change": {
                 "change_id": "CS-root",
                 "context_packet_digest": "sha256:" + "a" * 64,
@@ -461,6 +465,48 @@ def test_project_push_checkpoints_owned_components(monkeypatch) -> None:
     assert transitions[0][3]["metadata"]["package_digest"] == "sha256:" + "s" * 64
     assert result["execution_scope"]["context_ref"] == "project:root_mgmnt"
     assert result["execution_scope"]["execution_ref"] == "scenario:root_mgmnt_ops"
+
+
+def test_project_push_rejects_blocked_checkpoint_before_mutating_sources(monkeypatch) -> None:
+    module = _module()
+    mutations: list[tuple[str, str]] = []
+    monkeypatch.setattr(module.compositions, "get", lambda _project_id: _root_mgmnt_project())
+    monkeypatch.setattr(
+        module.workflow,
+        "get_state",
+        lambda *_args: {
+            "governed": {"state": "published"},
+            "workflow_description": {
+                "allowed_commands": [{"command": "plan_automation_change"}],
+                "blocked_commands": [
+                    {
+                        "command": "accept_verification",
+                        "reason_code": "command_not_allowed",
+                    }
+                ],
+            },
+        },
+    )
+    monkeypatch.setattr(
+        module.compositions,
+        "advance_version",
+        lambda *_args, **_kwargs: mutations.append(("advance", "project")),
+    )
+    monkeypatch.setattr(
+        module.projects,
+        "push",
+        lambda kind, project_id, **_kwargs: mutations.append((kind, project_id)),
+    )
+
+    with pytest.raises(ValueError, match="unavailable before source mutation"):
+        module.push_project(
+            "project",
+            "root_mgmnt",
+            checkpoint_id="CP-blocked",
+            confirmed=True,
+        )
+
+    assert mutations == []
 
 
 def test_project_automation_uses_primary_workflow_and_aggregate_worker_scope(monkeypatch) -> None:
@@ -2641,6 +2687,10 @@ def test_project_lifecycle_tools_stay_behind_sdk(monkeypatch) -> None:
         module.workflow,
         "get_state",
         lambda *args: {
+            "governed": {"state": "verification"},
+            "workflow_description": {
+                "allowed_commands": [{"command": "accept_verification"}],
+            },
             "capabilities": {"can_prepare_candidate": True},
             "change": {"change_id": "CH-builder", "context_packet_digest": packet_digest},
             "change_set": {
