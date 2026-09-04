@@ -3715,10 +3715,12 @@ def push_project(
     checkpoint_results: list[dict[str, Any]] = []
     if kind == "project":
         project_manifest = _composition_manifest(project_id)
+        occupied_versions = compositions.release_versions(project_id)
         project_manifest = compositions.advance_version(
             project_id,
             bump=bump,
             expected_manifest_digest=str(project_manifest.get("manifest_digest") or ""),
+            occupied_versions=tuple(occupied_versions),
         )
         for ref in _composition_owned_refs(project_id):
             component = _split_component_ref(ref)

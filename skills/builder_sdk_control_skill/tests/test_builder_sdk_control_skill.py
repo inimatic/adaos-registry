@@ -377,6 +377,14 @@ def test_project_push_checkpoints_owned_components(monkeypatch) -> None:
     monkeypatch.setattr(module.compositions, "get", lambda _project_id: dict(project))
     monkeypatch.setattr(
         module.compositions,
+        "release_versions",
+        lambda project_id: {
+            "0.1.1": "sha256:" + "1" * 64,
+            "0.1.2": "sha256:" + "2" * 64,
+        },
+    )
+    monkeypatch.setattr(
+        module.compositions,
         "advance_version",
         lambda project_id, **kwargs: version_advances.append(
             {"project_id": project_id, **kwargs}
@@ -443,6 +451,7 @@ def test_project_push_checkpoints_owned_components(monkeypatch) -> None:
             "project_id": "root_mgmnt",
             "bump": "patch",
             "expected_manifest_digest": project["manifest_digest"],
+            "occupied_versions": ("0.1.1", "0.1.2"),
         }
     ]
     assert result["source_revision"] == "root_mgmnt_ops-commit"
