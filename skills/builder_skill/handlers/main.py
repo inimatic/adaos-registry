@@ -3294,6 +3294,33 @@ def _llm_job_telemetry(job: Mapping[str, Any] | None, *, wait_elapsed_ms: int | 
     return {key: _repair_text_tree(value) for key, value in telemetry.items() if value not in (None, "", [], {})}
 
 
+def _combine_llm_job_telemetry(
+    primary: Mapping[str, Any],
+    result: Mapping[str, Any],
+) -> dict[str, Any]:
+    repair = result.get("repair") if isinstance(result.get("repair"), Mapping) else {}
+    repair_telemetry = repair.get("telemetry") if isinstance(repair.get("telemetry"), Mapping) else {}
+    if not repair_telemetry:
+        return copy.deepcopy(dict(primary))
+    combined = copy.deepcopy(dict(primary))
+    primary_usage = primary.get("usage") if isinstance(primary.get("usage"), Mapping) else {}
+    repair_usage = repair_telemetry.get("usage") if isinstance(repair_telemetry.get("usage"), Mapping) else {}
+    usage: dict[str, int | float] = {}
+    for key in set(primary_usage) | set(repair_usage):
+        values = (primary_usage.get(key), repair_usage.get(key))
+        numeric = [value for value in values if isinstance(value, (int, float)) and not isinstance(value, bool)]
+        if numeric:
+            usage[str(key)] = sum(numeric)
+    if usage:
+        combined["usage"] = usage
+    combined["usage_breakdown"] = {
+        "primary": copy.deepcopy(dict(primary_usage)),
+        "repair": copy.deepcopy(dict(repair_usage)),
+    }
+    combined["repair"] = copy.deepcopy(dict(repair_telemetry))
+    return combined
+
+
 def _compact_llm_result(result: Mapping[str, Any] | None) -> dict[str, Any] | None:
     if not isinstance(result, Mapping):
         return None
@@ -7556,6 +7583,11 @@ def _apply_llm_webui_transform(
                     last_error["request_id"] = request_id
                     continue
                 request_evaluation = developer_ui.evaluate(instruction, result["payload"])
+                request_evaluation = _accept_preexisting_capability_findings(
+                    request_evaluation,
+                    before_webui=current_payload,
+                    after_webui=result["payload"],
+                )
                 result["validation"] = {
                     **dict(validation),
                     "request_evaluation": request_evaluation,
@@ -7779,6 +7811,11 @@ def _validate_llm_request_postconditions(
             else None
         ),
     )
+    request_evaluation = _accept_preexisting_capability_findings(
+        request_evaluation,
+        before_webui=before_webui,
+        after_webui=value["payload"],
+    )
     validation = value.get("validation") if isinstance(value.get("validation"), Mapping) else {}
     value["validation"] = {
         **dict(validation),
@@ -7820,6 +7857,95 @@ def _validate_llm_request_postconditions(
                     "detail": "A new resourceQuery Prototype requires complete.prototype_records.",
                 }
             )
+    return value
+
+
+def _capability_finding_identity(
+    finding: Mapping[str, Any],
+    *,
+    webui: Mapping[str, Any],
+) -> tuple[str, str]:
+    path = str(finding.get("path") or "").strip()
+    cursor: Any = webui
+    normalized: list[str] = []
+    for segment in path.split("."):
+        match = re.fullmatch(r"([^\[]+)(?:\[(\d+)\])?", segment)
+        if match is None:
+            normalized.append(segment)
+            cursor = None
+            continue
+        key, raw_index = match.groups()
+        value = cursor.get(key) if isinstance(cursor, Mapping) else None
+        if raw_index is None:
+            normalized.append(key)
+            cursor = value
+            continue
+        index = int(raw_index)
+        item = value[index] if isinstance(value, list) and index < len(value) else None
+        identity = ""
+        if isinstance(item, Mapping):
+            identity = str(item.get("id") or "").strip()
+            if not identity:
+                identity = ":".join(
+                    str(item.get(name) or "").strip()
+                    for name in ("on", "type", "target")
+                ).strip(":")
+        normalized.append(f"{key}[{identity or '*'}]")
+        cursor = item
+    return str(finding.get("code") or "").strip(), ".".join(normalized)
+
+
+def _accept_preexisting_capability_findings(
+    evaluation: Mapping[str, Any],
+    *,
+    before_webui: Mapping[str, Any],
+    after_webui: Mapping[str, Any],
+) -> dict[str, Any]:
+    value = copy.deepcopy(dict(evaluation))
+    capability = value.get("capability_validation")
+    if not isinstance(capability, Mapping) or capability.get("ok"):
+        return value
+    baseline = developer_ui.validate(before_webui)
+    baseline_findings = [
+        dict(item)
+        for item in baseline.get("findings") or []
+        if isinstance(item, Mapping) and str(item.get("severity") or "") == "error"
+    ]
+    current_findings = [
+        dict(item)
+        for item in capability.get("findings") or []
+        if isinstance(item, Mapping) and str(item.get("severity") or "") == "error"
+    ]
+    remaining: dict[tuple[str, str], int] = {}
+    for item in baseline_findings:
+        identity = _capability_finding_identity(item, webui=before_webui)
+        remaining[identity] = remaining.get(identity, 0) + 1
+    introduced: list[dict[str, Any]] = []
+    for item in current_findings:
+        identity = _capability_finding_identity(item, webui=after_webui)
+        available = remaining.get(identity, 0)
+        if available:
+            remaining[identity] = available - 1
+        else:
+            introduced.append(item)
+    if introduced:
+        return value
+    capability_value = copy.deepcopy(dict(capability))
+    capability_value.update(
+        {
+            "validation_mode": "incremental",
+            "incremental_ok": True,
+            "preexisting_findings": current_findings,
+            "new_findings": [],
+        }
+    )
+    value["capability_validation"] = capability_value
+    postconditions_ok = all(
+        bool(item.get("ok"))
+        for item in value.get("postconditions") or []
+        if isinstance(item, Mapping)
+    )
+    value["ok"] = postconditions_ok and not value.get("capability_gaps")
     return value
 
 
@@ -7991,6 +8117,7 @@ def _repair_llm_webui_transform_output(
     )
     repair_job_id = ""
     repair_base_url = ""
+    repair_telemetry: dict[str, Any] = {}
     try:
         from adaos.sdk.llm.llm_client import submit_response_job, wait_response_job
 
@@ -8074,6 +8201,10 @@ def _repair_llm_webui_transform_output(
             if repair_status != "succeeded":
                 raise RuntimeError(f"repair job did not succeed: {response.get('error') or response}")
         repaired_output = str(response.get("output_text") or "")
+        repair_telemetry = _llm_job_telemetry(
+            response,
+            wait_elapsed_ms=int((_now() - repair_started_at) * 1000),
+        )
         _LOG.debug(
             "builder LLM repair output received scenario=%s request_id=%s original_job_id=%s repair_job_id=%s output_chars=%d",
             str(session.get("scenario_id") or ""),
@@ -8173,6 +8304,7 @@ def _repair_llm_webui_transform_output(
         "schema": "adaos.builder.llm_repair.v1",
         "request_id": repair_request_id,
         "repaired": True,
+        "telemetry": repair_telemetry,
     }
     return result
 
@@ -13159,6 +13291,7 @@ def _complete_llm_webui_job(
                 instruction=request_text,
                 before_webui=before_webui if isinstance(before_webui, Mapping) else {},
             )
+        job_telemetry = _combine_llm_job_telemetry(job_telemetry, llm_result)
         unable_detail = _llm_unable_detail(llm_result)
         if unable_detail:
             _LOG.warning(

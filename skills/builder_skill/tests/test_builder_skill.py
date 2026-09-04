@@ -1844,6 +1844,114 @@ def test_llm_terminal_journal_includes_bounded_validation_diagnostic(tmp_path) -
     assert journal["diagnostic"]["telemetry"]["usage"]["input_tokens"] == 321
 
 
+def test_local_ui_edit_accepts_unchanged_capability_debt_after_widget_move(monkeypatch) -> None:
+    skill = _load_module()
+    before = {
+        "ui": {"application": {"desktop": {"pageSchema": {"widgets": [
+            {"id": "search", "type": "input.text"},
+            {"id": "board", "type": "collection.board", "actions": [{"on": "add", "type": "resourceOperation"}]},
+        ]}}}}
+    }
+    after = copy.deepcopy(before)
+    after["ui"]["application"]["desktop"]["pageSchema"]["widgets"].reverse()
+    baseline_finding = {
+        "code": "ui.board.create_event_invalid",
+        "severity": "error",
+        "path": "ui.application.desktop.pageSchema.widgets[1].actions[0].params.payload",
+    }
+    current_finding = {**baseline_finding, "path": "ui.application.desktop.pageSchema.widgets[0].actions[0].params.payload"}
+    monkeypatch.setattr(
+        skill.developer_ui,
+        "validate",
+        lambda _webui: {"ok": False, "findings": [baseline_finding]},
+    )
+
+    result = skill._accept_preexisting_capability_findings(
+        {
+            "ok": False,
+            "capability_validation": {"ok": False, "findings": [current_finding]},
+            "postconditions": [{"id": "board", "ok": True}],
+            "capability_gaps": [],
+        },
+        before_webui=before,
+        after_webui=after,
+    )
+
+    assert result["ok"] is True
+    assert result["capability_validation"]["validation_mode"] == "incremental"
+    assert result["capability_validation"]["preexisting_findings"] == [current_finding]
+
+
+def test_local_ui_edit_rejects_new_capability_debt(monkeypatch) -> None:
+    skill = _load_module()
+    webui = {"ui": {"application": {"desktop": {"pageSchema": {"widgets": []}}}}}
+    monkeypatch.setattr(
+        skill.developer_ui,
+        "validate",
+        lambda _webui: {"ok": True, "findings": []},
+    )
+
+    result = skill._accept_preexisting_capability_findings(
+        {
+            "ok": False,
+            "capability_validation": {
+                "ok": False,
+                "findings": [{
+                    "code": "ui.resource_operation.noop_payload",
+                    "severity": "error",
+                    "path": "ui.application.desktop.pageSchema.widgets[0].actions[0].params.payload",
+                }],
+            },
+            "postconditions": [],
+            "capability_gaps": [],
+        },
+        before_webui=webui,
+        after_webui=webui,
+    )
+
+    assert result["ok"] is False
+    assert "validation_mode" not in result["capability_validation"]
+
+
+def test_llm_task_telemetry_includes_repair_usage() -> None:
+    skill = _load_module()
+
+    result = skill._combine_llm_job_telemetry(
+        {
+            "root_job_id": "primary",
+            "usage": {
+                "input_tokens": 6000,
+                "cached_input_tokens": 1000,
+                "output_tokens": 300,
+                "total_tokens": 6300,
+            },
+        },
+        {
+            "repair": {
+                "telemetry": {
+                    "root_job_id": "repair",
+                    "usage": {
+                        "input_tokens": 4000,
+                        "cached_input_tokens": 500,
+                        "output_tokens": 200,
+                        "total_tokens": 4200,
+                    },
+                }
+            }
+        },
+    )
+
+    assert result["usage"] == {
+        "input_tokens": 10000,
+        "cached_input_tokens": 1500,
+        "output_tokens": 500,
+        "total_tokens": 10500,
+    }
+    assert result["usage_breakdown"]["primary"]["total_tokens"] == 6300
+    assert result["usage_breakdown"]["repair"]["total_tokens"] == 4200
+    assert result["repair"]["root_job_id"] == "repair"
+
+
 def test_save_session_merges_pending_llm_jobs_without_downgrading_terminal_state() -> None:
     skill = _load_module()
     skill._FALLBACK_MEMORY.clear()
