@@ -4335,7 +4335,7 @@
                 }
             }
         },
-        "version": "0.2.74",
+        "version": "0.2.75",
         "user_summary": {
             "assumptions": [
                 "Lifecycle selection is navigation only; it never changes the editable process or Preview target.",

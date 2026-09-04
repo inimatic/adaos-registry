@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-03T00:25:56+00:00",
+  "updated_at": "2026-09-04T05:54:57+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -135,8 +135,8 @@
       "kind": "skill",
       "id": "builder_sdk_control_skill",
       "name": "builder_sdk_control_skill",
-      "version": "0.1.73-local.1",
-      "updated_at": "2026-08-05T21:22:48+00:00",
+      "version": "0.1.86",
+      "updated_at": "2026-09-03T16:28:53+00:00",
       "path": "skills/builder_sdk_control_skill",
       "manifest": "skills/builder_sdk_control_skill/skill.yaml",
       "source": {
@@ -151,14 +151,21 @@
       "description": "SDK-only backend for the functional Builder DEV scenario.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 57
+      "tools_count": 58,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "builder",
+        "release": "builder@0.2.59",
+        "release_digest": "sha256:5886eb7c19a3516626dfe12c21c4af9622905391122667e476a251a06d80e7de",
+        "package_digest": "sha256:c4467514540b440abea375c929b73e14c85a37e919373cb9c9c373af1b94768f"
+      }
     },
     {
       "kind": "skill",
       "id": "builder_skill",
       "name": "builder_skill",
-      "version": "0.3.41",
-      "updated_at": "2026-08-28T15:02:27+00:00",
+      "version": "0.3.56",
+      "updated_at": "2026-09-03T12:49:11+00:00",
       "path": "skills/builder_skill",
       "manifest": "skills/builder_skill/skill.yaml",
       "source": {
@@ -173,7 +180,14 @@
       "description": "Rapid prototyping Builder skill for creating and editing scenario UI drafts from voice or text dialog.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 15
+      "tools_count": 15,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "builder",
+        "release": "builder@0.2.59",
+        "release_digest": "sha256:5886eb7c19a3516626dfe12c21c4af9622905391122667e476a251a06d80e7de",
+        "package_digest": "sha256:33760809fd86da7b9800ead7676f4f94d242bee77c8d24cd3b98eefef913d587"
+      }
     },
     {
       "kind": "skill",
@@ -1226,7 +1240,14 @@
       },
       "description": "Voice chat bridge for web_desktop (text in -> materialize replies through the node conversation ledger; shared chat history is exposed as a bounded compatibility stream, with YJS kept as a compact status projection).",
       "runtime_python": "3.11",
-      "tools_count": 7
+      "tools_count": 7,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "builder",
+        "release": "builder@0.2.59",
+        "release_digest": "sha256:5886eb7c19a3516626dfe12c21c4af9622905391122667e476a251a06d80e7de",
+        "package_digest": "sha256:53310d271a7db31246955d09030c2ddef07619f37dd28dae74613848be3f207f"
+      }
     },
     {
       "kind": "skill",
@@ -1332,13 +1353,19 @@
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.63",
-      "updated_at": "2026-08-15T21:40:44+00:00",
+      "version": "0.2.75",
+      "updated_at": "2026-09-04T05:51:34+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.yaml",
       "source": {
         "path": "scenarios/builder",
-        "manifest": "scenarios/builder/scenario.yaml"
+        "manifest": "scenarios/builder/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:79b62ce43044a55ad103b0ab993dd08ddf1fadc4d99943693b68141dee0ce25d",
+        "path_scope": [
+          "projects/builder/"
+        ]
       },
       "install": {
         "kind": "scenario",
@@ -1357,6 +1384,22 @@
           "builder_sdk_control_skill",
           "voice_chat_skill"
         ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "builder",
+        "release": "builder@0.2.59",
+        "release_digest": "sha256:5886eb7c19a3516626dfe12c21c4af9622905391122667e476a251a06d80e7de",
+        "package_digest": "sha256:3fa55eb9cd1012f401d6221bf2efc5f7abd0c434249509c78860e882104a1089"
+      },
+      "channels": {
+        "stable": {
+          "release": "builder@0.2.59",
+          "release_digest": "sha256:5886eb7c19a3516626dfe12c21c4af9622905391122667e476a251a06d80e7de",
+          "source_revision": "sha256:79b62ce43044a55ad103b0ab993dd08ddf1fadc4d99943693b68141dee0ce25d",
+          "package_digest": "sha256:3fa55eb9cd1012f401d6221bf2efc5f7abd0c434249509c78860e882104a1089",
+          "version": "0.2.75"
+        }
       }
     },
     {
@@ -2041,6 +2084,60 @@
       "profiles": [
         "adaos.analysis.events.v1"
       ]
+    },
+    {
+      "kind": "project",
+      "id": "builder",
+      "name": "builder",
+      "version": "0.2.59",
+      "updated_at": "2026-09-04T05:54:57+00:00",
+      "path": "projects/builder",
+      "manifest": "projects/builder/project.yaml",
+      "source": {
+        "path": "projects/builder",
+        "manifest": "projects/builder/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "builder",
+        "id": "builder"
+      },
+      "title": "Builder",
+      "description": "AdaOS project development workbench.",
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "features": [],
+      "components": [
+        "scenario:builder",
+        "skill:builder_skill",
+        "skill:builder_sdk_control_skill"
+      ],
+      "components_count": 3,
+      "profiles": [],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "builder",
+        "release": "builder@0.2.59",
+        "release_digest": "sha256:5886eb7c19a3516626dfe12c21c4af9622905391122667e476a251a06d80e7de",
+        "primary_component": "scenario:builder",
+        "package_digest": "sha256:3fa55eb9cd1012f401d6221bf2efc5f7abd0c434249509c78860e882104a1089"
+      },
+      "channels": {
+        "stable": {
+          "release": "builder@0.2.59",
+          "release_digest": "sha256:5886eb7c19a3516626dfe12c21c4af9622905391122667e476a251a06d80e7de",
+          "source_revision": "sha256:79b62ce43044a55ad103b0ab993dd08ddf1fadc4d99943693b68141dee0ce25d",
+          "package_digest": "sha256:3fa55eb9cd1012f401d6221bf2efc5f7abd0c434249509c78860e882104a1089",
+          "version": "0.2.59"
+        }
+      }
     },
     {
       "kind": "project",
