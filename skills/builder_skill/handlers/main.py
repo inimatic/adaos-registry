@@ -4276,7 +4276,11 @@ def _save_session(webspace_id: str, session: dict[str, Any]) -> dict[str, Any]:
 
 def _load_session(webspace_id: str, session_id: str | None = None) -> dict[str, Any] | None:
     sessions = _sessions(webspace_id)
-    sid = str(session_id or "").strip() or _current_session_id(webspace_id)
+    requested_id = str(session_id or "").strip()
+    if requested_id:
+        session = sessions.get(requested_id)
+        return copy.deepcopy(session) if isinstance(session, Mapping) else None
+    sid = _current_session_id(webspace_id)
     if sid and sid in sessions:
         return copy.deepcopy(sessions[sid])
     if sessions:
@@ -13983,7 +13987,11 @@ def get_session(
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     ws = _source_webspace_id(webspace_id, _meta)
-    session = _load_session(ws, session_id)
+    requested_id = str(session_id or "").strip()
+    if requested_id:
+        session = _load_session(ws, requested_id)
+    else:
+        session, _binding = _target_session(ws)
     preview = (session or {}).get("preview_state") if isinstance(session, dict) else None
     workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False)
     binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else {}

@@ -458,6 +458,57 @@ def test_save_session_batches_sessions_and_current_pointer(monkeypatch) -> None:
     assert payload[sessions_key]["builder_session"]["scenario_id"] == "todo_scenario"
 
 
+def test_load_session_does_not_fallback_for_unknown_explicit_id(monkeypatch) -> None:
+    skill = _load_module()
+    monkeypatch.setattr(
+        skill,
+        "_sessions",
+        lambda _webspace_id: {
+            "session.current": {
+                "id": "session.current",
+                "scenario_id": "unrelated_scenario",
+                "updated_at": 2,
+            }
+        },
+    )
+    monkeypatch.setattr(skill, "_current_session_id", lambda _webspace_id: "session.current")
+
+    assert skill._load_session("desktop", "session.missing") is None
+    assert skill._load_session("desktop")["id"] == "session.current"
+
+
+def test_get_session_uses_selected_workbench_target(monkeypatch) -> None:
+    skill = _load_module()
+    selected = {
+        "id": "scenario.flowboard",
+        "scenario_id": "flowboard",
+        "preview_state": {},
+    }
+    binding = {"runtime_scenario_id": "flowboard"}
+    monkeypatch.setattr(skill, "_target_session", lambda _webspace_id: (selected, binding))
+    monkeypatch.setattr(
+        skill,
+        "_ensure_workbench",
+        lambda *_args, **_kwargs: {"binding": binding},
+    )
+    monkeypatch.setattr(skill, "_reconcile_pending_llm_jobs_from_journal", lambda _session: False)
+    monkeypatch.setattr(skill, "_reconcile_pending_llm_jobs_from_revisions", lambda _session: False)
+    monkeypatch.setattr(skill, "_sync_session_from_artifacts", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        skill,
+        "_builder_topic_ref",
+        lambda *_args, **_kwargs: {"topic_id": "prompt-project:scenario:flowboard"},
+    )
+    monkeypatch.setattr(skill, "_developer_evidence", lambda **_kwargs: {})
+    monkeypatch.setattr(skill, "_dialog_state", lambda *_args, **_kwargs: {})
+
+    result = skill.get_session(webspace_id="desktop")
+
+    assert result["ok"] is True
+    assert result["session"]["scenario_id"] == "flowboard"
+    assert result["workbench"]["binding"] == binding
+
+
 def test_target_session_recovers_selected_scenario_from_artifacts(monkeypatch, tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "prototype_app"
