@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: flowboard_lab_for_safely_prototyping_a_r_17528146
-version: 0.1.1
+version: 0.1.2
 profiles: []
 components:
   owned:
