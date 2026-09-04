@@ -3846,6 +3846,82 @@ def _recover_running_checkpoint_candidate(
     }
 
 
+def _ensure_trial_placement(
+    workflow_kind: str,
+    workflow_id: str,
+    *,
+    result: Mapping[str, Any],
+    candidate_id: str,
+    release_data: Mapping[str, Any],
+    package_digest: str,
+    trial_workflow: Mapping[str, Any],
+    webspace_id: str | None,
+    meta: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    project = (
+        trial_workflow.get("project")
+        if isinstance(trial_workflow.get("project"), Mapping)
+        else {}
+    )
+    for placement in project.get("placements") or []:
+        if not isinstance(placement, Mapping):
+            continue
+        result_ref = (
+            placement.get("result_ref")
+            if isinstance(placement.get("result_ref"), Mapping)
+            else {}
+        )
+        if (
+            str(placement.get("kind") or "") == "trial"
+            and str(placement.get("status") or "") == "active"
+            and str(result_ref.get("id") or "") == candidate_id
+        ):
+            return dict(trial_workflow)
+    trial_activation = (
+        result.get("trial_activation")
+        if isinstance(result.get("trial_activation"), Mapping)
+        else {}
+    )
+    if not trial_activation:
+        raise ValueError("Candidate trial has no signed activation placement")
+    activation_target = (
+        trial_activation.get("target")
+        if isinstance(trial_activation.get("target"), Mapping)
+        else {}
+    )
+    placed = workflow.record_project_placement(
+        workflow_kind,
+        workflow_id,
+        {
+            "kind": "trial",
+            "result_ref": {
+                "kind": "candidate",
+                "id": candidate_id,
+                "version": str(release_data.get("version") or "").strip(),
+                "digest": package_digest,
+            },
+            "target": {
+                "zone": activation_target.get("zone"),
+                "subnet_id": activation_target.get("subnet_id"),
+                "webspace_id": activation_target.get("webspace_id")
+                or _preview_dev_webspace_id(_webspace_id(webspace_id, meta)),
+                "space_kind": activation_target.get("space_kind") or "development",
+            },
+            "scenario_id": activation_target.get("scenario_id") or workflow_id,
+            "data_mode": trial_activation.get("data_mode") or "empty",
+            "runtime_binding": trial_activation.get("runtime_binding") or {},
+            "trial_activation_ref": trial_activation.get("activation_id"),
+            "safety": trial_activation.get("safety_evidence") or {},
+        },
+        expected_generation=int(trial_workflow.get("generation") or 0),
+    )
+    return (
+        dict(placed["workflow"])
+        if isinstance(placed.get("workflow"), Mapping)
+        else dict(trial_workflow)
+    )
+
+
 def _ensure_trial_waiting_before_result(
     kind: str,
     project_id: str,
@@ -3981,6 +4057,43 @@ def publish_project(
         operation = "Trial activation" if dry_run else "Publication"
         raise ValueError(f"{operation} requires explicit user confirmation")
     if dry_run:
+        if kind == "project" and str(delivery.get("status") or "").strip() == "trial":
+            candidate_id = str(delivery.get("candidate_id") or "").strip()
+            existing = projects.get_candidate(candidate_id)
+            candidate = (
+                existing.get("candidate")
+                if isinstance(existing.get("candidate"), Mapping)
+                else {}
+            )
+            release_digest = str(candidate.get("release_digest") or "").strip()
+            package_digest = str(candidate.get("package_digest") or "").strip()
+            if (
+                not candidate_id
+                or str(candidate.get("candidate_id") or "").strip() != candidate_id
+                or release_digest != str(delivery.get("release_digest") or "").strip()
+                or package_digest != str(delivery.get("package_digest") or "").strip()
+            ):
+                raise ValueError("Active Builder trial identity differs from its candidate")
+            trial_workflow = _ensure_trial_placement(
+                workflow_kind,
+                workflow_id,
+                result=existing,
+                candidate_id=candidate_id,
+                release_data={"version": candidate.get("version")},
+                package_digest=package_digest,
+                trial_workflow=workflow_before,
+                webspace_id=webspace_id,
+                meta=_meta,
+            )
+            return {
+                **dict(existing),
+                "dry_run": True,
+                "trial_ready": True,
+                "recovered": True,
+                "recovery_reason": "active_trial_projection_reconciled",
+                "workflow": trial_workflow,
+                "execution_scope": _execution_scope(kind, project_id),
+            }
         if not bool(capabilities.get("can_prepare_candidate")):
             raise ValueError(
                 "Candidate preparation requires the current completed Automation result "
@@ -4136,6 +4249,18 @@ def publish_project(
             if isinstance(workflow_result.get("workflow"), Mapping)
             else {}
         )
+        if kind == "project":
+            trial_workflow = _ensure_trial_placement(
+                workflow_kind,
+                workflow_id,
+                result=result,
+                candidate_id=candidate_id,
+                release_data=release_data,
+                package_digest=package_digest,
+                trial_workflow=trial_workflow,
+                webspace_id=webspace_id,
+                meta=_meta,
+            )
         trial_change_set = (
             trial_workflow.get("change_set")
             if isinstance(trial_workflow.get("change_set"), Mapping)

@@ -476,6 +476,7 @@ def test_project_trial_uses_composition_candidate_and_primary_checkpoint(monkeyp
     module = _module()
     project = _root_mgmnt_project()
     transitions: list[tuple[str, str, str]] = []
+    placements: list[tuple[str, str, dict, int]] = []
     candidate_calls: list[tuple[str, dict]] = []
     workflow_state = {
         "capabilities": {"can_prepare_candidate": True},
@@ -505,6 +506,20 @@ def test_project_trial_uses_composition_candidate_and_primary_checkpoint(monkeyp
         )
         or {"ok": True, "workflow": {"change_set": workflow_state["change_set"]}},
     )
+    monkeypatch.setattr(
+        module.workflow,
+        "record_project_placement",
+        lambda kind, object_id, placement, *, expected_generation: placements.append(
+            (kind, object_id, placement, expected_generation)
+        )
+        or {
+            "ok": True,
+            "workflow": {
+                "generation": expected_generation + 1,
+                "change_set": workflow_state["change_set"],
+            },
+        },
+    )
     monkeypatch.setattr(module, "_recover_running_checkpoint_candidate", lambda *_args: None)
     monkeypatch.setattr(module, "_sync_change_set_record", lambda **_kwargs: {})
     monkeypatch.setattr(
@@ -524,6 +539,17 @@ def test_project_trial_uses_composition_candidate_and_primary_checkpoint(monkeyp
                 "release_digest": "sha256:" + "r" * 64,
             },
             "trial_workspace": "trials/candidate-root/workspace",
+            "trial_activation": {
+                "activation_id": "trial-activation:candidate-root",
+                "target": {
+                    "webspace_id": "desktop-dev",
+                    "space_kind": "development",
+                    "scenario_id": "root_mgmnt_ops",
+                },
+                "data_mode": "empty",
+                "runtime_binding": {"kind": "derived_workspace_runtime"},
+                "safety_evidence": {"status": "verified"},
+            },
         },
     )
 
@@ -547,6 +573,97 @@ def test_project_trial_uses_composition_candidate_and_primary_checkpoint(monkeyp
     assert candidate_calls[0][1]["change_ids"] == ["CS-root", "CP-root"]
     assert result["trial_ready"] is True
     assert result["execution_scope"]["context_ref"] == "project:root_mgmnt"
+    assert placements[0][0:2] == ("scenario", "root_mgmnt_ops")
+    assert placements[0][2]["kind"] == "trial"
+    assert placements[0][2]["result_ref"]["id"] == "candidate-root"
+    assert placements[0][2]["target"]["webspace_id"] == "desktop-dev"
+
+
+def test_project_trial_replay_restores_missing_placement(monkeypatch) -> None:
+    module = _module()
+    project = _root_mgmnt_project()
+    placements: list[tuple[str, str, dict, int]] = []
+    workflow_state = {
+        "generation": 17,
+        "capabilities": {"can_prepare_candidate": False},
+        "delivery": {
+            "status": "trial",
+            "candidate_id": "candidate-root",
+            "release_digest": "sha256:" + "r" * 64,
+            "package_digest": "sha256:" + "p" * 64,
+        },
+        "project": {"placements": []},
+    }
+    monkeypatch.setattr(
+        module.compositions,
+        "get",
+        lambda *_args: project,
+    )
+    monkeypatch.setattr(module.workflow, "get_state", lambda *_args: workflow_state)
+    monkeypatch.setattr(
+        module.projects,
+        "get_candidate",
+        lambda candidate_id: {
+            "ok": True,
+            "candidate": {
+                "candidate_id": candidate_id,
+                "version": "0.1.1",
+                "release_digest": "sha256:" + "r" * 64,
+                "package_digest": "sha256:" + "p" * 64,
+                "status": "trial",
+            },
+            "trial_workspace": "trials/candidate-root/workspace",
+            "trial_activation": {
+                "activation_id": "trial-activation:candidate-root",
+                "target": {
+                    "webspace_id": "desktop-dev",
+                    "space_kind": "development",
+                    "scenario_id": "root_mgmnt_ops",
+                },
+                "data_mode": "empty",
+                "runtime_binding": {"kind": "derived_workspace_runtime"},
+                "safety_evidence": {"status": "verified"},
+            },
+        },
+    )
+    monkeypatch.setattr(
+        module.workflow,
+        "record_project_placement",
+        lambda kind, object_id, placement, *, expected_generation: placements.append(
+            (kind, object_id, placement, expected_generation)
+        )
+        or {
+            "ok": True,
+            "workflow": {
+                **workflow_state,
+                "generation": expected_generation + 1,
+                "project": {"placements": [placement]},
+            },
+        },
+    )
+    monkeypatch.setattr(
+        module.compositions,
+        "prepare_candidate",
+        lambda *_args, **_kwargs: pytest.fail("candidate must not be rebuilt"),
+    )
+
+    result = module.publish_project(
+        "project",
+        "root_mgmnt",
+        dry_run=True,
+        confirmed=True,
+        webspace_id="desktop",
+    )
+
+    assert result["recovered"] is True
+    assert result["recovery_reason"] == "active_trial_projection_reconciled"
+    assert result["workflow"]["generation"] == 18
+    assert len(placements) == 1
+    assert placements[0][0:2] == ("scenario", "root_mgmnt_ops")
+    assert placements[0][2]["kind"] == "trial"
+    assert placements[0][2]["result_ref"]["id"] == "candidate-root"
+    assert placements[0][2]["target"]["webspace_id"] == "desktop-dev"
+    assert placements[0][3] == 17
 
 
 def _dependency_link_setup(monkeypatch, module, *, declared: bool = True, delivery: dict | None = None):
