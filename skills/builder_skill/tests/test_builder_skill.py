@@ -3340,6 +3340,20 @@ def test_finalize_rolls_back_webui_and_session_when_prototype_materialization_fa
     assert writes[-1] == before
 
 
+def test_prototype_resource_prefers_canonical_workflow_change(monkeypatch) -> None:
+    skill = _load_module()
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *_args: {"change": {"change_id": "change-canonical"}},
+    )
+
+    assert skill._active_workflow_change_id(
+        session={"scenario_id": "kanban"},
+        patch={"change_id": "change-llm-patch"},
+    ) == "change-canonical"
+
+
 def test_unable_llm_result_is_terminal_diagnostic_not_a_revision() -> None:
     skill = _load_module()
 

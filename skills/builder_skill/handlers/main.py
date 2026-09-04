@@ -6545,6 +6545,31 @@ def _builder_change_id(
     return f"builder_change_{_hash_suffix(seed)}"
 
 
+def _active_workflow_change_id(
+    *,
+    session: Mapping[str, Any],
+    patch: Mapping[str, Any],
+) -> str:
+    scenario_id = str(session.get("scenario_id") or "").strip()
+    if scenario_id:
+        try:
+            workflow_state = sdk_builder_workflow.get_state("scenario", scenario_id)
+            change = (
+                workflow_state.get("change")
+                if isinstance(workflow_state.get("change"), Mapping)
+                else workflow_state.get("change_set")
+            )
+            if isinstance(change, Mapping):
+                change_id = str(
+                    change.get("change_id") or change.get("change_set_id") or ""
+                ).strip()
+                if change_id:
+                    return change_id
+        except Exception:
+            pass
+    return _builder_change_id(session=session, patch=patch)
+
+
 _PROTOTYPE_REQUEST_MARKERS = (
     "ui",
     "ux",
@@ -12164,12 +12189,7 @@ def _materialize_llm_prototype_resource(
     project_ref = str(session.get("project_ref") or "").strip()
     if not project_ref.startswith("project:"):
         project_ref = f"scenario:{scenario_id}"
-    change_id = str(
-        patch.get("change_id")
-        or session.get("active_change_id")
-        or session.get("change_id")
-        or ""
-    ).strip()
+    change_id = _active_workflow_change_id(session=session, patch=patch)
     if not change_id:
         raise ValueError("Prototype resource materialization requires change_id")
     spec = developer_prototypes.derive_board_resource_spec(webui, records)
@@ -12262,7 +12282,7 @@ def _finalize_scenario_update(
         session,
         revision=str(revision_info.get("revision") if revision_info else ""),
         previous_revision=previous_revision,
-        change_id=str(patch.get("change_id") or ""),
+        change_id=_active_workflow_change_id(session=session, patch=patch),
     )
     review_constraints = _evaluate_review_constraints(
         session,
