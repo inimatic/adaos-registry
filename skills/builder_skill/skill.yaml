@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.3.65
+version: 0.3.66
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -142,8 +142,8 @@ tools:
           with the conversational topic when both are supplied.
       retry_job_id:
         type: string
-        description: Explicit failed LLM job whose complete saved response should be
-          revalidated locally instead of submitting another model request.
+        description: Explicit failed LLM job whose complete saved response should
+          be revalidated locally instead of submitting another model request.
       expected_ui_revision:
         type: string
         description: Required revision precondition when retry_job_id is supplied.
@@ -418,7 +418,7 @@ conversation:
     - builder
     - buikder
     - билдер
-updated_at: '2026-09-04T08:53:37+00:00'
+updated_at: '2026-09-04T09:04:19+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.976+6068.e0b56eb0e
