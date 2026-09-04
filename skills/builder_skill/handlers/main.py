@@ -12202,6 +12202,31 @@ def _materialize_llm_prototype_resource(
     )
 
 
+def _revision_prototype_records(
+    revision_payload: Mapping[str, Any],
+) -> list[dict[str, Any]] | None:
+    llm = revision_payload.get("llm")
+    if not isinstance(llm, Mapping):
+        return None
+    raw_response = str(llm.get("raw_response") or "").strip()
+    if not raw_response:
+        return None
+    for line in reversed(raw_response.splitlines()):
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(value, Mapping) or str(value.get("type") or "") != "complete":
+            continue
+        records = value.get("prototype_records")
+        if not isinstance(records, list) or len(records) > 1000 or any(
+            not isinstance(item, Mapping) for item in records
+        ):
+            return None
+        return [copy.deepcopy(dict(item)) for item in records]
+    return None
+
+
 def _finalize_scenario_update(
     *,
     ws: str,
@@ -14883,6 +14908,22 @@ def set_ui_revision_current(
     _write_webui_payload(str(session.get("artifact_root") or ""), after_webui)
     timings_ms["write_webui_payload"] = _elapsed_ms(stage_started)
     stage_started = time.perf_counter()
+    prototype_records = _revision_prototype_records(revision_payload)
+    prototype_resource = _materialize_llm_prototype_resource(
+        session=session,
+        patch=restore_patch,
+        revision=str(session.get("ui_revision") or revision),
+        webui=after_webui,
+        llm_result=(
+            {"prototype_records": prototype_records}
+            if prototype_records is not None
+            else None
+        ),
+    )
+    if prototype_resource is not None:
+        session["prototype_resource"] = prototype_resource
+    timings_ms["materialize_prototype_resource"] = _elapsed_ms(stage_started)
+    stage_started = time.perf_counter()
     workflow_revision = _record_prototype_revision(
         session,
         revision=str(session.get("ui_revision") or revision),
@@ -14978,6 +15019,7 @@ def set_ui_revision_current(
         "workbench": workbench,
         "workflow_revision": workflow_revision,
         "review_constraints": review_constraints,
+        "prototype_resource": prototype_resource,
         "follow_active_preview": follow_active_preview,
         "dev_runtime_refresh": dev_runtime_refresh,
         "chat_emit": chat_emit,

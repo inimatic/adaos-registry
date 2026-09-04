@@ -3354,6 +3354,24 @@ def test_prototype_resource_prefers_canonical_workflow_change(monkeypatch) -> No
     ) == "change-canonical"
 
 
+def test_revision_prototype_records_reads_bounded_complete_jsonl() -> None:
+    skill = _load_module()
+    payload = {
+        "llm": {
+            "raw_response": "\n".join(
+                (
+                    '{"type":"meta","schema":"test"}',
+                    '{"type":"complete","prototype_records":[{"id":"card-1","title":"One"}]}',
+                )
+            )
+        }
+    }
+
+    assert skill._revision_prototype_records(payload) == [
+        {"id": "card-1", "title": "One"}
+    ]
+
+
 def test_unable_llm_result_is_terminal_diagnostic_not_a_revision() -> None:
     skill = _load_module()
 
