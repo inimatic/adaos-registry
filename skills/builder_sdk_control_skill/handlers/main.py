@@ -2914,6 +2914,8 @@ def get_project_placement_navigation(
     object_type: str = DEFAULT_PROJECT_KIND,
     object_id: str = DEFAULT_PROJECT_ID,
     base_url: str | None = None,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
     if kind != "project":
@@ -2928,11 +2930,53 @@ def get_project_placement_navigation(
         kind=placement_token,
         base_url=str(base_url or "").strip() or None,
     )
+    materialization: dict[str, Any] | None = None
+    if placement_token == "trial":
+        placement = (
+            result.get("placement")
+            if isinstance(result.get("placement"), Mapping)
+            else {}
+        )
+        target = (
+            placement.get("target")
+            if isinstance(placement.get("target"), Mapping)
+            else {}
+        )
+        result_ref = (
+            placement.get("result_ref")
+            if isinstance(placement.get("result_ref"), Mapping)
+            else {}
+        )
+        scenario_id = str(placement.get("scenario_id") or "").strip()
+        revision = str(result_ref.get("version") or "").strip()
+        target_webspace_id = str(target.get("webspace_id") or "").strip()
+        if not scenario_id or not revision or not target_webspace_id:
+            raise ValueError("Active Project trial placement is incomplete")
+        source_webspace_id = _preview_source_webspace_id(webspace_id, _meta)
+        materialization = preview.materialize_revision(
+            target_webspace_id,
+            scenario_id=scenario_id,
+            revision=revision,
+            preview_stage="trial",
+            preview_label=f"trial: {project_id} · {revision}",
+            source_fingerprint=str(result_ref.get("digest") or "").strip() or None,
+            event_payload={
+                "source": "builder.project.placement_navigation",
+                "source_webspace_id": source_webspace_id,
+                "preview_stage": "trial",
+                "preview_revision": revision,
+            },
+        )
+        if materialization.get("ok") is False:
+            raise ValueError(
+                str(materialization.get("error") or "Project trial materialization failed")
+            )
     return {
         **dict(result),
         "ok": True,
         "preview_url": str(result.get("url") or ""),
         "qr_text": str(result.get("url") or ""),
+        "materialization": materialization,
         "execution_scope": _execution_scope(kind, project_id),
     }
 

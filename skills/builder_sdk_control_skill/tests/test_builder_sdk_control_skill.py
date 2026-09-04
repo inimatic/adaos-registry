@@ -2830,24 +2830,60 @@ def test_project_process_exposes_active_trial_placement(monkeypatch) -> None:
 def test_project_placement_navigation_uses_workflow_sdk(monkeypatch) -> None:
     module = _module()
     calls: list[tuple] = []
+    materializations: list[tuple] = []
     monkeypatch.setattr(module.compositions, "get", lambda *_args: _root_mgmnt_project())
     monkeypatch.setattr(
         module.workflow,
         "get_project_placement_navigation",
         lambda *args, **kwargs: calls.append((args, kwargs))
-        or {"url": "https://inimatic.com/?preview_stage=trial"},
+        or {
+            "url": "https://inimatic.com/?preview_stage=trial",
+            "placement": {
+                "scenario_id": "root_mgmnt_ops",
+                "target": {"webspace_id": "desktop-dev"},
+                "result_ref": {
+                    "version": "0.1.1",
+                    "digest": "sha256:candidate",
+                },
+            },
+        },
+    )
+    monkeypatch.setattr(
+        module.preview,
+        "materialize_revision",
+        lambda *args, **kwargs: materializations.append((args, kwargs)) or {"ok": True},
     )
 
     result = module.get_project_placement_navigation(
         "trial",
         "project",
         "root_mgmnt",
+        webspace_id="desktop",
     )
 
     assert calls == [
         (("scenario", "root_mgmnt_ops"), {"kind": "trial", "base_url": None})
     ]
     assert result["preview_url"].endswith("preview_stage=trial")
+    assert materializations == [
+        (
+            ("desktop-dev",),
+            {
+                "scenario_id": "root_mgmnt_ops",
+                "revision": "0.1.1",
+                "preview_stage": "trial",
+                "preview_label": "trial: root_mgmnt · 0.1.1",
+                "source_fingerprint": "sha256:candidate",
+                "event_payload": {
+                    "source": "builder.project.placement_navigation",
+                    "source_webspace_id": "desktop",
+                    "preview_stage": "trial",
+                    "preview_revision": "0.1.1",
+                },
+            },
+        )
+    ]
+    assert result["materialization"]["ok"] is True
     assert result["execution_scope"]["context_ref"] == "project:root_mgmnt"
 
 
