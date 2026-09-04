@@ -7720,6 +7720,23 @@ def _canonicalize_complete_manifest_modal_keys(payload: dict[str, Any]) -> list[
                 "to": canonical,
             }
         )
+    for key, modal in modals.items():
+        if not isinstance(modal, dict):
+            continue
+        schema = modal.get("schema")
+        if not isinstance(schema, dict) or str(schema.get("id") or "").strip():
+            continue
+        schema_id = str(modal.get("id") or key or "").strip().removeprefix("@")
+        if not schema_id:
+            continue
+        schema["id"] = schema_id
+        normalizations.append(
+            {
+                "kind": "modal_schema_id",
+                "from": "",
+                "to": schema_id,
+            }
+        )
     return normalizations
 
 

@@ -2872,8 +2872,14 @@ def test_complete_manifest_canonicalizes_unambiguous_stable_id_modal_keys() -> N
         "ui": {
             "application": {
                 "modals": {
-                    "@create-item": {"id": "create-item", "schema": {"widgets": []}},
-                    "@mismatch": {"id": "different", "schema": {"widgets": []}},
+                    "@create-item": {
+                        "id": "create-item",
+                        "schema": {"id": "create-item", "widgets": []},
+                    },
+                    "@mismatch": {
+                        "id": "different",
+                        "schema": {"id": "different", "widgets": []},
+                    },
                 }
             }
         }
@@ -2887,6 +2893,35 @@ def test_complete_manifest_canonicalizes_unambiguous_stable_id_modal_keys() -> N
     assert "@mismatch" in modals
     assert normalizations == [
         {"kind": "stable_id_modal_key", "from": "@create-item", "to": "create-item"}
+    ]
+
+
+def test_complete_manifest_fills_unambiguous_modal_schema_ids() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "modals": {
+                    "create-item": {
+                        "id": "create-item",
+                        "schema": {"layout": {"type": "single"}, "widgets": []},
+                    },
+                    "edit-item": {
+                        "schema": {"layout": {"type": "single"}, "widgets": []},
+                    },
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_complete_manifest_modal_keys(payload)
+
+    modals = payload["ui"]["application"]["modals"]
+    assert modals["create-item"]["schema"]["id"] == "create-item"
+    assert modals["edit-item"]["schema"]["id"] == "edit-item"
+    assert normalizations == [
+        {"kind": "modal_schema_id", "from": "", "to": "create-item"},
+        {"kind": "modal_schema_id", "from": "", "to": "edit-item"},
     ]
 
 
