@@ -17,6 +17,21 @@ import pytest
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 
 
+def _find_repo_root() -> Path:
+    marker = Path("src") / "adaos" / "services"
+    candidates = [Path.cwd(), *SKILL_ROOT.parents]
+    for root in candidates:
+        if (root / marker).exists():
+            return root
+    raise FileNotFoundError(f"Cannot find AdaOS repo root containing {marker}")
+
+
+REPO_ROOT = _find_repo_root()
+SRC_ROOT = REPO_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+
 def _load_module():
     if "y_py" not in sys.modules:
         sys.modules["y_py"] = types.SimpleNamespace(YDoc=object)
@@ -58,57 +73,6 @@ def _stub_development_context(skill, monkeypatch) -> dict:
         },
     )
     return packet
-
-
-def test_codex_usage_payload_prefers_reported_provider_usage() -> None:
-    skill = _load_module()
-
-    payload = skill._codex_usage_payload_from_builder_job(
-        session={"scenario_id": "root_mgmnt_ops", "project_id": "root_mgmnt"},
-        request_text="change UI",
-        before_webui={},
-        output_text="{}",
-        job_telemetry={
-            "usage": {
-                "input_tokens": 100,
-                "cached_input_tokens": 25,
-                "output_tokens": 40,
-                "reasoning_tokens": 10,
-                "total_tokens": 150,
-            },
-            "provider": {"model": "gpt-5"},
-        },
-        status="succeeded",
-        job_id="llm_job_1",
-        request_id="req_1",
-    )
-
-    assert payload["source"] == "builder_llm_job"
-    assert payload["accuracy"] == "reported"
-    assert payload["billable_tokens"] == 150
-    assert payload["model"] == "gpt-5"
-    assert payload["scenario_id"] == "root_mgmnt_ops"
-    assert payload["idempotency_key"] == "builder:req_1:codex_usage"
-
-
-def test_codex_usage_payload_estimates_when_provider_usage_missing() -> None:
-    skill = _load_module()
-
-    payload = skill._codex_usage_payload_from_builder_job(
-        session={"scenario_id": "demo"},
-        request_text="update the page",
-        before_webui={"widgets": [{"id": "a"}]},
-        output_text='{"ok": true}',
-        job_telemetry={},
-        status="succeeded",
-        job_id="llm_job_2",
-        request_id="req_2",
-    )
-
-    assert payload["accuracy"] == "estimated"
-    assert payload["billable_tokens"] > 0
-    assert payload["input_tokens"] > 0
-    assert payload["output_tokens"] > 0
 
 
 def test_manifest_declares_builder_dialog_agent() -> None:
@@ -213,6 +177,13 @@ def test_builder_llm_request_carries_bounded_development_context() -> None:
             "messages": [{"id": "message-1", "role": "user", "text": "Keep it compact."}],
         },
         "pending_actions": [],
+        "facets": {
+            "ui_capabilities": {
+                "status": "present",
+                "schema": "adaos.ui.capability_selection.v1",
+                "payload": "x" * 100_000,
+            }
+        },
         "digest": "sha256:" + ("3" * 64),
     }
 
@@ -223,9 +194,22 @@ def test_builder_llm_request_carries_bounded_development_context() -> None:
         _meta={"builder_context_packet": packet},
     )
 
-    assert request["dynamic_request"]["development_context"] == packet
+    context_index = request["dynamic_request"]["development_context"]
+    assert context_index["schema"] == "adaos.builder.context_index.v1"
+    assert context_index["project"] == {"object_type": "scenario", "object_id": "recipes"}
+    assert context_index["change"]["change_id"] == "CH-recipes"
+    assert context_index["facet_index"] == [
+        {
+            "key": "ui_capabilities",
+            "status": "present",
+            "schema": "adaos.ui.capability_selection.v1",
+        }
+    ]
+    assert context_index["full_context_digest"] == packet["digest"]
+    assert "payload" not in json.dumps(context_index)
+    assert len(json.dumps(context_index).encode("utf-8")) < 5_000
     assert "development_context" not in json.loads(request["stable_user_prompt"])["stable_builder_context"]
-    assert "retrieved untrusted evidence" in request["system_prompt"]
+    assert "untrusted evidence" in request["system_prompt"]
 
 
 def test_chat_forwards_router_conversation_context_to_prototype(monkeypatch) -> None:
@@ -590,6 +574,7 @@ def test_sync_session_from_artifacts_refreshes_stale_current_revision(tmp_path) 
 def test_create_shopping_list_scenario_draft_writes_declarative_webui(tmp_path, monkeypatch) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "shopping_list"
+    project_calls: list[dict] = []
 
     class _Service:
         @classmethod
@@ -621,6 +606,22 @@ def test_create_shopping_list_scenario_draft_writes_declarative_webui(tmp_path, 
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
 
+    monkeypatch.setattr(
+        skill.developer_compositions,
+        "create_for_existing_component",
+        lambda project_id, **kwargs: project_calls.append(
+            {"project_id": project_id, **kwargs}
+        )
+        or {
+            "ok": True,
+            "project": {
+                "id": project_id,
+                "ref": f"project:{project_id}",
+                "manifest_digest": "sha256:" + "1" * 64,
+            },
+        },
+    )
+
     result = skill.create_scenario_draft(
         idea="\u0421\u0442\u0440\u043e\u0438\u0442\u0435\u043b\u044c, \u0441\u043e\u0437\u0434\u0430\u0434\u0438\u043c \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u0441\u043f\u0438\u0441\u043e\u043a \u043f\u043e\u043a\u0443\u043f\u043e\u043a",
         webspace_id="builder-skill-test",
@@ -632,6 +633,9 @@ def test_create_shopping_list_scenario_draft_writes_declarative_webui(tmp_path, 
     assert result["topic"]["thread_id"].startswith("prompt-project:scenario:")
     assert result["dialog"]["thread_id"] == result["topic"]["thread_id"]
     assert result["scenario_id"].startswith("shopping_list_")
+    assert result["project_ref"] == f"project:{result['scenario_id']}"
+    assert result["project_status"] == "ready"
+    assert project_calls[0]["component_id"] == result["scenario_id"]
     assert result["preview_state"]["current_ui"]["type"] == "page"
     assert result["preview_state"]["datasources"][0]["type"] == "internal_crud"
     webui = artifact_root / "webui.json"
@@ -1282,7 +1286,8 @@ def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(monkeypat
     user_prompt = captured["messages"][2]["content"]
     assert "\n" not in stable_prompt
     assert "\n" not in user_prompt
-    assert "webui_v1_schema" in stable_prompt
+    assert "webui_contract" in stable_prompt
+    assert "selected_ui_capabilities" in stable_prompt
     stable_payload = json.loads(stable_prompt)["stable_builder_context"]
     assert stable_payload["llm_prompt_profile"]["id"] == "openai-default"
     assert stable_payload["llm_prompt_profile"]["model"] == "gpt-4o-mini"
@@ -1537,9 +1542,9 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
     assert "-job-" in submit_calls[0]["kwargs"]["request_id"]
     assert submit_calls[0]["kwargs"]["temperature"] == 0.25
     system_content = submit_calls[0]["messages"][0]["content"]
-    assert "real Ionicons v7 names" in system_content
-    assert "create-outline instead of edit" in system_content
-    assert "prototyping_affordances" in submit_calls[0]["messages"][1]["content"]
+    assert "selected_ui_capabilities" in system_content
+    assert "do not invent unsupported widgets" in system_content
+    assert "selected_ui_capabilities" in submit_calls[0]["messages"][1]["content"]
     assert "current_webui_json" in submit_calls[0]["messages"][2]["content"]
 
 
@@ -1747,6 +1752,45 @@ def test_active_llm_job_reconciles_failed_worker_from_terminal_journal(tmp_path)
     journal = json.loads(path.read_text(encoding="utf-8"))
     assert journal["schema"] == "adaos.builder.llm_job_result.v1"
     assert journal["related_ids"] == ["builder_llm_submit_failed", "llm_job_failed"]
+
+
+def test_llm_terminal_journal_includes_bounded_validation_diagnostic(tmp_path) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "prototype"
+    artifact_root.mkdir(parents=True)
+    session = {
+        "id": "builder_session_diagnostic",
+        "scenario_id": "diagnostic",
+        "artifact_root": str(artifact_root),
+        "pending_llm_jobs": {"llm_job_diag": {"job_id": "llm_job_diag"}},
+    }
+    diagnostic = skill._llm_job_diagnostic(
+        result={
+            "ok": False,
+            "error": "ui_request_postconditions_failed",
+            "validation": {"request_evaluation": {"failures": ["kanban.create_form"]}},
+            "raw_response": "x" * 17000,
+        },
+        telemetry={"usage": {"input_tokens": 321}},
+        repair_attempted=True,
+    )
+
+    path = skill._write_llm_job_terminal_artifact(
+        session,
+        "llm_job_diag",
+        "failed",
+        detail="postconditions failed",
+        diagnostic=diagnostic,
+    )
+
+    journal = json.loads(path.read_text(encoding="utf-8"))
+    assert journal["diagnostic"]["repair_attempted"] is True
+    assert journal["diagnostic"]["result"]["validation"]["request_evaluation"]["failures"] == [
+        "kanban.create_form"
+    ]
+    assert journal["diagnostic"]["response"]["truncated"] is True
+    assert len(journal["diagnostic"]["response"]["content"]) == 16000
+    assert journal["diagnostic"]["telemetry"]["usage"]["input_tokens"] == 321
 
 
 def test_save_session_merges_pending_llm_jobs_without_downgrading_terminal_state() -> None:
@@ -1987,14 +2031,10 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert user_payload["llm_prompt_profile"]["variant_policy"].startswith("Prompt profiles may vary")
     assert "current_page_schema" not in user_payload["runtime_context"]
     assert user_payload["current_webui_json"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["inputs"]["previewKey"] == "status"
-    assert user_payload["runtime_component_contracts"]["ui.list"]["inputs"]["previewKey"].startswith("Single object path")
-    assert user_payload["runtime_component_contracts"]["ui.list"]["inputs"]["addButton"].startswith("Set true")
-    assert "per-item/card commands" in request["system_prompt"]
-    assert "preserve unrelated widgets" in request["system_prompt"]
-    assert "input.commandBar" in user_payload["runtime_component_contracts"]
-    assert "state_and_visibility" in user_payload["runtime_component_contracts"]
-    assert "visibleIf" in user_payload["runtime_component_contracts"]["state_and_visibility"]
-    assert "view an example" in user_payload["runtime_component_contracts"]["state_and_visibility"]["local_interaction"]
+    assert user_payload["webui_contract"]["render_root"] == "ui.application.desktop.pageSchema"
+    assert user_payload["selected_ui_capabilities"]["status"] == "present"
+    assert len(request["stable_user_prompt"].encode("utf-8")) < 20_000
+    assert "preserve unrelated ui" in request["system_prompt"].lower()
     delta = user_payload["last_revision_delta"]
     assert delta["revision"] == "002"
     assert delta["request"] == "Move request details into a right panel"
@@ -2002,81 +2042,18 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     removed_by_id = {item["id"]: item for item in delta["removed_widgets"]}
     assert removed_by_id["add-comment-action"]["owner"] == "modal:request_detail_modal"
     assert removed_by_id["add-comment-action"]["opens_modals"] == ["comment_modal"]
-    affordances = user_payload["prototyping_affordances"]
-    assert affordances["role"] == "Adaptive UI prototyping designer-programmer."
-    assert "separate requirement" in affordances["meaningful_transformation"][1]
-    assert "visible semantic change" in affordances["meaningful_transformation"][2]
-    assert "mock_data" in affordances["ui_freedom_map"]
-    form_contract = user_payload["runtime_component_contracts"]["ui.form"]["inputs"]["fields"]
-    assert "email" in form_contract["supported_field_types"]
-    assert "textarea" in form_contract["supported_field_types"]
-    assert "dateRange" in form_contract["supported_field_types"]
-    assert "multiChoice" in form_contract["supported_field_types"]
-    assert "fileUpload" in form_contract["supported_field_types"]
-    assert "ratingGrid" in form_contract["supported_field_types"]
-    assert "Choose the most semantically precise supported type" in form_contract["selection_guidance"][0]
-    assert "Refactor existing generic text fields" in form_contract["selection_guidance"][1]
-    assert "do not leave contacts" in form_contract["selection_guidance"][2]
-    assert "every requested user answer" in form_contract["selection_guidance"][-1]
-    assert form_contract["semantic_examples"]["contacts"].startswith("email plus phone")
-    assert form_contract["semantic_examples"]["convenient dates or date interval"] == "dateRange"
-    assert form_contract["semantic_examples"]["rate several factors"] == "ratingGrid or linearScale fields"
-    assert form_contract["semantic_examples"]["mark choices by days/sections/categories"] == "checkboxGrid or radioGrid"
-    assert "atomic fields" in affordances["ui_freedom_map"]["forms"]
-    assert "explicit local control" in affordances["ui_freedom_map"]["interaction"]
-    assert "input.commandBar/input.selector/ui.actions" in " ".join(affordances["self_check"])
-    assert "static mock rows alone are not enough" in " ".join(affordances["self_check"])
-    assert "internal checklist" in " ".join(affordances["self_check"])
-    assert "verify every item is covered" in " ".join(affordances["self_check"])
-    assert "n-ary add expression" in user_payload["runtime_component_contracts"]["state_and_visibility"]["computed_values"]
-    command_bar_contract = user_payload["runtime_component_contracts"]["input.commandBar"]
-    command_bar_pattern = command_bar_contract["example_pattern"]
-    assert command_bar_pattern["initialState"] == {"exampleMode": "empty"}
-    assert command_bar_pattern["widgets"][0]["actions"][0]["params"] == {"exampleMode": "$event.id"}
-    assert command_bar_pattern["widgets"][1]["visibleIf"] == "$state.exampleMode === 'sample'"
-    schema_defs = user_payload["webui_v1_abi"]["schema_contract"]["defs"]
-    assert "formInputs" in schema_defs
-    assert "formField" in schema_defs
-    assert "formInputType" in schema_defs
-    assert "formFieldType" in schema_defs
-    assert "actionButton" in schema_defs
-    assert "actionsInputs" in schema_defs
-    assert "danger" in schema_defs["actionButton"]["properties"]["kind"]["enum"]
-    assert "email" in schema_defs["formInputType"]["enum"]
-    assert "ratingGrid" in schema_defs["formInputType"]["enum"]
     assert "Always prefer conference vocabulary" in request["system_prompt"]
-    assert "adaptive UI prototyping designer-programmer" in request["system_prompt"]
-    assert "meaningful visible changes" in request["system_prompt"]
-    assert "duplicate-only" in request["system_prompt"]
-    assert "field's required 'type' property" in request["system_prompt"]
-    assert "static content or sample rows" in request["system_prompt"]
-    assert "Decompose the user's instruction into explicit requirements" in request["system_prompt"]
-    assert "visibly reacts to the local state" in request["system_prompt"]
-    assert "Do not preserve an existing generic text field" in request["system_prompt"]
-    assert "Break broad or composite user concepts into atomic fields" in request["system_prompt"]
-    assert "add an explicit local control" in request["system_prompt"]
-    assert "data-capture requirements that need ui.form fields" in request["system_prompt"]
-    assert "do not invent appearance" in request["system_prompt"]
-    assert "local development prototype until an explicit activation/release step" in request["system_prompt"]
-    assert "meaningless placeholders like Request 1" in request["system_prompt"]
-    assert "Static sample rows must match the active domain" in request["system_prompt"]
+    assert "declarative UI prototype designer" in request["system_prompt"]
+    assert "smallest visible coherent change" in request["system_prompt"]
+    assert "selected capability manifests and postconditions are authoritative" in request["system_prompt"]
+    assert "Do not preserve an existing generic text field" not in request["system_prompt"]
+    assert "Static sample rows must match the active domain" not in request["system_prompt"]
     assert (artifact_root / "builder_memory.md").exists()
     assert (artifact_root / "tz" / "base_tz.md").exists()
     assert "starting point only" in user_payload["project_memory"]["memory_text"]
     assert "not a fixed product contract" in user_payload["project_memory"]["user_summary"]["assumptions"][0]
     assert "local dev prototype" not in user_payload["project_memory"]["memory_text"]
     assert len(request["user_prompt"].encode("utf-8")) < 50_000
-
-
-def test_webui_schema_loads_from_installed_abi_without_monorepo_layout(monkeypatch, tmp_path) -> None:
-    skill = _load_module()
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(skill, "_repo_root", lambda: tmp_path)
-
-    schema = skill._load_webui_schema()
-
-    assert schema["$id"] == "adaos.webui.v1"
-    assert "formInputType" in schema["$defs"]
 
 
 def test_builder_form_component_contract_validates_choice_and_grid_fields() -> None:
@@ -2413,9 +2390,10 @@ def test_repair_uses_partially_transformed_candidate_as_current_webui(monkeypatc
 
     assert result["ok"] is True
     repair_request = json.loads(captured_messages[-1]["content"])
-    repair_current = repair_request["original_request"]["current_webui_json"]
+    repair_current = repair_request["repair_context"]["current_webui_json"]
     assert repair_current["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["title"] == "Live cart"
-    assert repair_request["original_request"]["repair_base"].startswith("partially transformed")
+    assert repair_request["repair_context"]["repair_base"].startswith("partially transformed")
+    assert "original_request" not in repair_request
     assert "remove that property instead of using an empty string" in repair_request["task"]
     assert "every click target must exist in the same widget" in repair_request["task"]
 
@@ -2526,6 +2504,195 @@ def test_repair_replaces_malformed_patch_with_complete_webui(monkeypatch) -> Non
     repair_request = json.loads(parsed["messages"][-1]["content"])
     assert "return one complete corrected adaos.webui.v1 JSON object" in repair_request["task"]
     assert "Do not return another JSON Patch stream" in repair_request["task"]
+
+
+def test_full_webui_result_preserves_prototype_records() -> None:
+    skill = _load_module()
+    webui = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "kanban",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {
+                                "id": "summary",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "inputs": {"value": {"title": "Kanban"}},
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    result = skill._parse_llm_webui_transform_output(
+        output_text=json.dumps(
+            {
+                "schema": "adaos.builder.webui_result.v1",
+                "webui": webui,
+                "prototype_records": [
+                    {"id": "card-1", "title": "Review", "status": "planned"}
+                ],
+                "comment": "Created executable board data.",
+            }
+        ),
+        previous_preview={},
+    )
+
+    assert result["ok"] is True
+    assert result["payload"]["schema"] == "adaos.webui.v1"
+    assert result["payload"]["ui"] == webui["ui"]
+    assert result["prototype_records"][0]["id"] == "card-1"
+    assert result["comment"] == "Created executable board data."
+
+
+def test_complete_manifest_canonicalizes_unambiguous_stable_id_modal_keys() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "modals": {
+                    "@create-item": {"id": "create-item", "schema": {"widgets": []}},
+                    "@mismatch": {"id": "different", "schema": {"widgets": []}},
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_complete_manifest_modal_keys(payload)
+
+    modals = payload["ui"]["application"]["modals"]
+    assert "create-item" in modals
+    assert "@create-item" not in modals
+    assert "@mismatch" in modals
+    assert normalizations == [
+        {"kind": "stable_id_modal_key", "from": "@create-item", "to": "create-item"}
+    ]
+
+
+def test_kanban_request_requires_bounded_prototype_records(monkeypatch) -> None:
+    skill = _load_module()
+    current = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "kanban",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    monkeypatch.setattr(
+        skill,
+        "_current_webui_payload",
+        lambda *_args, **_kwargs: copy.deepcopy(current),
+    )
+
+    request = skill._builder_llm_webui_transform_request(
+        session={"id": "session", "scenario_id": "kanban"},
+        instruction=(
+            "Show tasks on a three-column kanban board with sample cards, "
+            "search, editing, and drag and drop."
+        ),
+        preview_state={},
+    )
+    stable = json.loads(request["stable_user_prompt"])["stable_builder_context"]
+
+    assert stable["selected_ui_capabilities"]["status"] == "present"
+    qualification = stable["selected_ui_capabilities"]["qualification"]
+    assert qualification["requirements"]["component_type"] == "collection.board"
+    assert any(
+        item.get("id") == "collection.board"
+        for item in stable["selected_ui_capabilities"]["items"]
+    )
+    assert stable["prototype_data_output"] == {
+        "required": True,
+        "field": "complete.prototype_records",
+        "authority": "AdaOS derives schemas and revision identity; the model supplies sample records only",
+    }
+    assert len(request["stable_user_prompt"].encode("utf-8")) < 20_000
+
+
+def test_finalize_rolls_back_webui_and_session_when_prototype_materialization_fails(
+    monkeypatch, tmp_path
+) -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "kanban",
+                        "layout": {"type": "stack"},
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    after = copy.deepcopy(before)
+    after["ui"]["application"]["desktop"]["pageSchema"]["title"] = "Changed"
+    session = {
+        "id": "session",
+        "scenario_id": "kanban",
+        "artifact_root": str(tmp_path),
+        "ui_revision": "001",
+        "version": "001",
+        "patches": [],
+        "preview_state": {"title": "Before"},
+        "webui_payload": after,
+    }
+    original_session = copy.deepcopy(session)
+    writes: list[dict] = []
+    monkeypatch.setattr(skill, "_ensure_session_artifact_root", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(skill, "_draft_user_summary", lambda _session: {})
+    monkeypatch.setattr(skill, "_repair_text_tree", lambda value: value)
+    monkeypatch.setattr(
+        skill,
+        "_write_webui_payload",
+        lambda _root, payload: writes.append(copy.deepcopy(dict(payload))),
+    )
+    monkeypatch.setattr(
+        skill,
+        "_current_webui_payload",
+        lambda current, _preview: copy.deepcopy(current["webui_payload"]),
+    )
+    monkeypatch.setattr(
+        skill,
+        "_materialize_llm_prototype_resource",
+        lambda **_kwargs: (_ for _ in ()).throw(ValueError("invalid prototype seed")),
+    )
+
+    with pytest.raises(ValueError, match="invalid prototype seed"):
+        skill._finalize_scenario_update(
+            ws="desktop",
+            session=session,
+            binding={},
+            patch={"operation": "llm_webui_transform", "change_id": "change-1"},
+            request_text="Create board",
+            before_webui=before,
+            llm_result={"prototype_records": []},
+            auto_apply=False,
+            _meta={},
+        )
+
+    assert session == original_session
+    assert writes[-1] == before
 
 
 def test_unable_llm_result_is_terminal_diagnostic_not_a_revision() -> None:
@@ -2688,23 +2855,21 @@ def test_normalise_llm_payload_moves_root_modals_into_application() -> None:
     assert skill._validate_builder_webui_payload(payload, preview)["ok"] is True
 
 
-def test_builder_system_prompt_allows_replaceable_picsum_placeholders() -> None:
+def test_builder_system_prompt_does_not_send_unrequested_image_provider_rules() -> None:
     skill = _load_module()
 
     prompt = skill._builder_llm_system_prompt()
 
-    assert "https://picsum.photos/" in prompt
-    assert "replaceable placeholder image URLs" in prompt
-    assert "local seed assets or generated images" in prompt
+    assert "https://picsum.photos/" not in prompt
+    assert "Images are optional" in prompt
 
 
-def test_builder_system_prompt_omits_empty_datasource_transport_fields() -> None:
+def test_builder_system_prompt_rejects_unsupported_transport_properties() -> None:
     skill = _load_module()
 
     prompt = skill._builder_llm_system_prompt()
 
-    assert "omit method and url for static, stream, and local/mock sources" in prompt
-    assert "never emit an empty method" in prompt
+    assert "unsupported widgets, properties, actions, providers" in prompt
 
 
 def test_builder_llm_failure_chat_detail_is_compact_but_specific() -> None:
@@ -2753,10 +2918,7 @@ def test_builder_component_contract_describes_visible_form_and_detail_actions() 
     assert "click:<buttonId>" in contracts["ui.actions"]["actions"]
     assert "placeholder type='none'" in contracts["ui.actions"]["actions"]
     assert "remove the old inline detail" in contracts["application_modals"]["rule"]
-    assert "Labeled item.details actions render visible detail buttons" in prompt
-    assert "titles support the same {path} interpolation" in prompt
-    assert "do not emit placeholder actions with type:'none'" in prompt
-    assert "dotted widget keys" in prompt
+    assert "selected capability manifests and postconditions are authoritative" in prompt
 
 
 def test_builder_patch_stream_applies_to_shadow_and_preserves_unrelated_ui() -> None:
@@ -3049,6 +3211,51 @@ def test_builder_patch_stream_stable_id_path_survives_prior_array_remove() -> No
     assert result["ok"] is True
     assert [item["id"] for item in widgets] == ["recipe-details"]
     assert widgets[0]["inputs"]["fields"] == [{"label": "Title", "path": "title"}]
+
+
+def test_builder_patch_stream_stable_id_add_upserts_array_member() -> None:
+    skill = _load_module()
+    before = {
+        "widgets": [
+            {"id": "existing", "type": "ui.list", "title": "Old"},
+        ]
+    }
+
+    result = skill._apply_json_patch_operation(
+        copy.deepcopy(before),
+        {
+            "op": "add",
+            "path": "/widgets/@existing",
+            "value": {"id": "existing", "type": "collection.board", "title": "Board"},
+        },
+    )
+    result = skill._apply_json_patch_operation(
+        result,
+        {
+            "op": "add",
+            "path": "/widgets/@new",
+            "value": {"id": "new", "type": "input.text"},
+        },
+    )
+
+    assert result["widgets"] == [
+        {"id": "existing", "type": "collection.board", "title": "Board"},
+        {"id": "new", "type": "input.text"},
+    ]
+
+
+def test_builder_patch_stream_stable_id_add_rejects_mismatched_value() -> None:
+    skill = _load_module()
+
+    with pytest.raises(ValueError, match="id matches"):
+        skill._apply_json_patch_operation(
+            {"widgets": []},
+            {
+                "op": "add",
+                "path": "/widgets/@expected",
+                "value": {"id": "different", "type": "ui.list"},
+            },
+        )
 
 
 def test_builder_patch_stream_reports_missing_intermediate_parent() -> None:
@@ -5708,6 +5915,10 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
         "\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440, \u0441\u043e\u0437\u0434\u0430\u0439 \u043d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f \u0434\u043e\u043c\u0430\u0448\u043d\u0435\u0439 \u043a\u043d\u0438\u0433\u0438 \u0440\u0435\u0446\u0435\u043f\u0442\u043e\u0432",
         has_session=True,
     )
+    create_with_crud_requirements = skill._parse_builder_command(
+        "\u0421\u043e\u0437\u0434\u0430\u0439 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 Kanban-\u0434\u043e\u0441\u043a\u0430: \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438 \u043c\u043e\u0436\u043d\u043e \u0434\u043e\u0431\u0430\u0432\u043b\u044f\u0442\u044c \u0438 \u043f\u0435\u0440\u0435\u043c\u0435\u0449\u0430\u0442\u044c",
+        has_session=False,
+    )
     edit_like_without_session = skill._parse_builder_command(
         "\u0434\u043e\u0431\u0430\u0432\u044c \u043f\u043e\u043b\u0435 \u043f\u0440\u043e\u0435\u043a\u0442 \u0438 \u0441\u043e\u0437\u0434\u0430\u0439 \u043f\u0440\u0438\u043c\u0435\u0440 \u0434\u0430\u043d\u043d\u044b\u0445",
         has_session=False,
@@ -5740,6 +5951,7 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
     assert delete_field["intent"] == "none"
     assert create["intent"] == "project.create"
     assert create_new["intent"] == "project.create"
+    assert create_with_crud_requirements["intent"] == "project.create"
     assert edit_like_without_session["intent"] == "none"
     assert current["intent"] == "project.current"
     assert inspect_process["intent"] == "workflow.inspect"
@@ -6378,6 +6590,125 @@ def test_conversation_interaction_response_returns_builder_prompt_to_origin_chan
     assert presented[0]["surface_command"] == "builder.change.plan"
     assert presented[0]["_meta"]["route_id"] == "telegram"
     assert presented[0]["topic"]["thread_id"] == "prompt-project:scenario:builder"
+
+
+def test_interaction_delivery_metadata_does_not_mutate_durable_response(monkeypatch) -> None:
+    skill = _load_module()
+    captured: list[dict] = []
+    emitted: list[dict] = []
+    durable_response = {
+        "response_id": "response.prototype.approve",
+        "actor_id": "user:42",
+        "consumed_command": {"command": "builder.prototype.approve"},
+        "metadata": {
+            "io_type": "telegram",
+            "route_id": "telegram",
+            "chat_id": "42",
+        },
+    }
+    monkeypatch.setattr(skill, "_source_webspace_id", lambda webspace_id, _meta=None: webspace_id)
+    monkeypatch.setattr(
+        skill,
+        "_resolve_project_session",
+        lambda *_args, **_kwargs: {
+            "status": "found",
+            "session": {"id": "session.lab", "scenario_id": "lab", "title": "Lab"},
+        },
+    )
+    monkeypatch.setattr(skill, "_workbench_binding", lambda _webspace_id: {"runtime_scenario_id": "lab"})
+    monkeypatch.setattr(
+        skill,
+        "_builder_topic_ref",
+        lambda *_args, **_kwargs: {"thread_id": "prompt-project:scenario:lab"},
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "invoke_interaction_response",
+        lambda object_type, object_id, response, **kwargs: captured.append(
+            {
+                "object_type": object_type,
+                "object_id": object_id,
+                "response": copy.deepcopy(dict(response)),
+                "kwargs": dict(kwargs),
+            }
+        )
+        or {"workflow": {"governed": {"state": "automation_waiting"}}},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": dict(kwargs)}),
+    )
+
+    result = skill.handle_interaction_response(
+        event={
+            "interaction": {
+                "interaction_id": "interaction.prototype.approve",
+                "metadata": {
+                    "domain": "builder",
+                    "project_ref": "scenario:lab",
+                    "source_webspace_id": "dev1",
+                },
+            },
+            "response": copy.deepcopy(durable_response),
+            "duplicate": False,
+        },
+        webspace_id="dev1",
+        _meta={"route_id": "voice_chat", "delivery_attempt": 2},
+    )
+
+    assert result["status"] == "handled"
+    assert captured[0]["response"] == durable_response
+    assert "delivery_attempt" not in captured[0]["response"]["metadata"]
+    assert emitted[0]["kwargs"]["_meta"]["delivery_attempt"] == 2
+
+
+def test_telegram_user_turn_is_projected_into_builder_project_conversation(monkeypatch) -> None:
+    skill = _load_module()
+    emitted: list[dict] = []
+    session = {"id": "session.lab", "scenario_id": "lab", "title": "Lab"}
+    binding = {"runtime_scenario_id": "lab", "dev_webspace_id": "dev1-dev"}
+    topic = {"thread_id": "prompt-project:scenario:lab", "topic_id": "prompt-project:scenario:lab"}
+    monkeypatch.setattr(
+        skill,
+        "_resolve_builder_context_for_turn",
+        lambda *_args, **_kwargs: {"builder_webspace_id": "dev1"},
+    )
+    monkeypatch.setattr(skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(skill, "_target_session", lambda _webspace_id: (dict(session), dict(binding)))
+    monkeypatch.setattr(skill, "_builder_topic_ref", lambda *_args, **_kwargs: dict(topic))
+    monkeypatch.setattr(
+        skill,
+        "_parse_builder_command",
+        lambda *_args, **_kwargs: {"intent": "project.current", "source": "test"},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_handle_project_current_command",
+        lambda **_kwargs: {"ok": True, "status": "project_current"},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": dict(kwargs)}),
+    )
+
+    meta = {
+        "io_type": "telegram",
+        "request_id": "telegram:main-bot:42:100",
+        "bot_id": "main-bot",
+        "chat_id": "42",
+        "webspace_id": "default",
+    }
+    skill.chat("Строитель, что выбрано?", webspace_id="default", _meta=meta)
+    first_message_id = emitted[0]["kwargs"]["_meta"]["message_id"]
+    skill.chat("Строитель, что выбрано?", webspace_id="default", _meta=meta)
+
+    assert [item["kwargs"]["from_"] for item in emitted] == ["user", "user"]
+    assert emitted[0]["text"] == "Строитель, что выбрано?"
+    assert emitted[0]["kwargs"]["webspace_id"] == "dev1"
+    assert emitted[0]["kwargs"]["topic_ref"]["thread_id"] == "prompt-project:scenario:lab"
+    assert emitted[1]["kwargs"]["_meta"]["message_id"] == first_message_id
 
 
 def test_text_continuation_resumes_once_for_the_bound_project(monkeypatch) -> None:

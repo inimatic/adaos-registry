@@ -1,0 +1,57 @@
+schema: adaos.project.v1
+kind: project
+id: builder
+version: 0.2.58
+profiles: []
+components:
+  owned:
+  - ref: scenario:builder
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations:
+    - uses
+  - ref: skill:builder_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations:
+    - realizes
+    - uses
+  - ref: skill:builder_sdk_control_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations:
+    - realizes
+    - uses
+  dependencies:
+  - ref: skill:voice_chat_skill
+    version: null
+    lifecycle: shared
+    relations:
+    - uses
+entrypoints:
+- id: main
+  presentation: scenario:builder
+  default: true
+  bindings: {}
+catalog:
+  title: Builder
+  description: AdaOS project development workbench.
+  categories: []
+  tags: []
+publication:
+  stage: alpha
+  visibility: unlisted
+  channel: stable
+install:
+  default: false
+  features: []
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-09-03T16:20:13Z'
+created_by: adaos.dev.project.create

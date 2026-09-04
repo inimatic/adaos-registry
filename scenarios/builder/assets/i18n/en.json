@@ -83,6 +83,7 @@
   "builder.text.new.project": "new-project",
   "builder.text.create": "Create",
   "builder.text.type": "Type",
+  "builder.text.primary.component": "Primary component",
   "builder.text.scenario": "Scenario",
   "builder.text.skill": "Skill",
   "builder.text.project.id": "Project ID",
@@ -174,5 +175,8 @@
   "builder.text.prepare.trial": "Prepare trial",
   "builder.text.development.process": "Development process",
   "builder.text.development.conversation": "Development conversation",
-  "builder.text.change": "Change"
+  "builder.text.change": "Change",
+  "builder.text.development.feedback": "Development feedback",
+  "builder.text.development.feedback.filters": "Feedback filters",
+  "builder.text.development.feedback.detail": "Feedback detail"
 }

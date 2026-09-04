@@ -68,6 +68,85 @@ def test_ui_preserves_stabilized_three_panel_surface_and_modals() -> None:
     assert page["meta"]["builder"]["binding_mode"] == "skill"
 
 
+def test_builder_observes_project_scoped_development_feedback() -> None:
+    webui = _load("webui.json")
+    widgets = _by_id(webui)
+    tabs = widgets["node-views"]["inputs"]["buttons"]
+    feedback_list = widgets["development-feedback-list"]
+    feedback_detail = widgets["development-feedback-detail"]
+
+    assert any(item["id"] == "feedback" for item in tabs)
+    assert feedback_list["visibleIf"] == "$state.activeView === 'feedback'"
+    assert feedback_list["dataSource"]["name"] == (
+        "builder_sdk_control_skill.list_development_feedback"
+    )
+    assert feedback_list["dataSource"]["params"]["object_type"] == (
+        "$state.selectedProjectKind"
+    )
+    assert feedback_list["dataSource"]["params"]["object_id"] == (
+        "$state.selectedProjectId"
+    )
+    assert feedback_list["dataSource"]["maxRequestHz"] == 0.2
+    assert {item["stateKey"] for item in feedback_list["inputs"]["filters"]} == {
+        "developmentFeedbackStatus",
+        "developmentFeedbackCategory",
+        "developmentFeedbackSource",
+        "developmentFeedbackRejectionClass",
+    }
+    feedback_filters = widgets["development-feedback-filters"]
+    source_field = next(
+        item
+        for item in feedback_filters["inputs"]["fields"]
+        if item["id"] == "feedback-source"
+    )
+    assert {item["value"] for item in source_field["options"]} >= {
+        "",
+        "codex",
+        "validator",
+        "pre_codex_llm",
+        "human_review",
+    }
+    category_field = next(
+        item
+        for item in feedback_filters["inputs"]["fields"]
+        if item["id"] == "feedback-category"
+    )
+    assert "result_rejected" in {
+        item["value"] for item in category_field["options"]
+    }
+    rejection_field = next(
+        item
+        for item in feedback_filters["inputs"]["fields"]
+        if item["id"] == "feedback-rejection-class"
+    )
+    assert {item["value"] for item in rejection_field["options"]} >= {
+        "",
+        "requirement_ambiguity",
+        "builder_misread_user",
+        "sdk_doc_ambiguity",
+        "sdk_capability_gap",
+        "weak_patch",
+        "insufficient_validation",
+    }
+    assert feedback_detail["dataSource"]["name"] == (
+        "builder_sdk_control_skill.get_development_feedback"
+    )
+    assert feedback_detail["dataSource"]["params"]["feedback_id"] == (
+        "$state.selectedDevelopmentFeedbackId"
+    )
+    assert feedback_detail["dataSource"]["maxRequestHz"] == 0.2
+    assert feedback_detail["dataSource"]["preserveLastValue"] is False
+    assert {
+        "contract_ref",
+        "operation_id",
+        "input_summary",
+        "expected_behavior",
+        "observed_behavior",
+        "validation_result",
+        "user_response",
+    } <= {item["key"] for item in feedback_detail["inputs"]["fields"]}
+
+
 def test_page_state_is_initialized_from_exact_builder_selection_projection() -> None:
     page = _load("webui.json")["ui"]["application"]["desktop"]["pageSchema"]
 
@@ -84,8 +163,8 @@ def test_page_state_is_initialized_from_exact_builder_selection_projection() -> 
             "project.title": "title",
             "project.description": "description",
             "project.type": "object_type",
-            "builderTopicId": "topic_id",
-            "builderThreadId": "thread_id",
+            "builderTopicId": "conversation_topic_id",
+            "builderThreadId": "conversation_thread_id",
         },
     }
 
@@ -128,6 +207,16 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
     }
     assert picker["inputs"]["disableImplicitScenarioSelect"] is True
 
+    select_state = next(
+        action["params"]
+        for action in picker["actions"]
+        if action.get("type") == "updateState"
+    )
+    assert select_state["selectedProjectKind"] == "$event.object_type"
+    assert select_state["selectedProjectId"] == "$event.object_id"
+    assert select_state["selectedObjectKind"] == "$event.target_object_type"
+    assert select_state["selectedObjectId"] == "$event.target_object_id"
+
     state = page["initialState"]
     resolved_params = {
         key: state[value.removeprefix("$state.")] if isinstance(value, str) and value.startswith("$state.") else value
@@ -140,28 +229,36 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
         "include_archived": False,
         "_meta": {"current_scenario": "builder"},
     }
-
     handler_path = ROOT.parents[1] / "skills" / "builder_sdk_control_skill" / "handlers" / "main.py"
     spec = importlib.util.spec_from_file_location("builder_picker_contract_handler", handler_path)
     assert spec and spec.loader
     handler = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(handler)
     monkeypatch.setattr(
-        handler.projects,
+        handler.compositions,
         "list_projects",
         lambda **_kwargs: [
             {
-                "kind": "scenario",
+                "kind": "project",
                 "id": "builder",
                 "title": "Builder",
                 "description": "Workbench",
                 "version": "DEV",
+                "components": {
+                    "owned": [
+                        {
+                            "ref": "scenario:builder",
+                            "role": "primary",
+                        }
+                    ]
+                },
             }
         ],
     )
     projects = handler.list_projects(**resolved_params)
     assert projects
-    assert projects[0]["id"] == "scenario:builder"
+    assert projects[0]["id"] == "project:builder"
+    assert projects[0]["primary_ref"] == "scenario:builder"
     assert projects[0]["current"] is True
 
     calls = [item for item in picker["actions"] if item.get("type") == "callSkill"]
@@ -171,9 +268,8 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
     assert calls[0]["scope"] == "local"
     assert len(updates) == 1
     assert updates[0]["params"]["selectedProjectId"] == "$event.object_id"
-    assert updates[0]["params"]["builderTopicId"] == (
-        "prompt-project:$event.object_type:$event.object_id"
-    )
+    assert updates[0]["params"]["builderTopicId"] == "$event.conversation_topic_id"
+    assert updates[0]["params"]["builderThreadId"] == "$event.conversation_thread_id"
     assert any(item.get("type") == "closeModal" for item in picker["actions"])
     assert any(item.get("on") == "add" for item in picker["actions"])
     assert picker["inputs"]["addButtonFirst"] is True
@@ -181,6 +277,22 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
     if isinstance(toggles, dict):
         toggles = [toggles]
     assert toggles[0]["stateKey"] == "projectPickerArchived"
+
+
+def test_project_creation_selects_aggregate_and_primary_component() -> None:
+    form = _by_id(_load("webui.json"))["new-project-form"]
+    selected = next(
+        action["params"]
+        for action in form["actions"]
+        if action.get("type") == "updateState"
+        and "selectedProjectKind" in action.get("params", {})
+    )
+
+    assert selected["selectedProjectKind"] == "project"
+    assert selected["selectedProjectId"] == "$event.values.object_id"
+    assert selected["selectedProjectRef"] == "project:$event.values.object_id"
+    assert selected["selectedObjectKind"] == "$event.values.object_type"
+    assert selected["selectedObjectId"] == "$event.values.object_id"
 
 
 def test_process_inspection_is_separate_from_the_canonical_conversation() -> None:
@@ -224,7 +336,7 @@ def test_ui_revision_and_artifact_versions_have_explicit_non_stale_labels() -> N
     assert labels["proto"] == "proto:058"
     assert labels["active"] == "active:current"
     assert labels["public"] == "public:current"
-    assert "proto:045" not in json.dumps(_load("ui_revisions/047.json"), ensure_ascii=False)
+    assert "proto:045" not in json.dumps(webui, ensure_ascii=False)
 
 
 def test_prototype_declares_no_network_device_or_credential_transport() -> None:
@@ -312,7 +424,6 @@ def test_embedded_functional_parity_contract_is_satisfied() -> None:
     webui = _load("webui.json")
     contract = _load("assets/builder_functional_parity.json")
     application = webui["ui"]["application"]
-    page = application["desktop"]["pageSchema"]
     widgets = _by_id(webui)
     bindings = set()
     for node in _walk(webui):

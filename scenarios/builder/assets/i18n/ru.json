@@ -83,6 +83,7 @@
   "builder.text.new.project": "new-project",
   "builder.text.create": "Создать",
   "builder.text.type": "Тип",
+  "builder.text.primary.component": "Основной компонент",
   "builder.text.scenario": "Сценарий",
   "builder.text.skill": "Навык",
   "builder.text.project.id": "ID проекта",
@@ -174,5 +175,8 @@
   "builder.text.prepare.trial": "Подготовить апробацию",
   "builder.text.development.process": "Процесс разработки",
   "builder.text.development.conversation": "Диалог разработки",
-  "builder.text.change": "Изменение"
+  "builder.text.change": "Изменение",
+  "builder.text.development.feedback": "Сигналы разработки",
+  "builder.text.development.feedback.filters": "Фильтры сигналов",
+  "builder.text.development.feedback.detail": "Детали сигнала"
 }
