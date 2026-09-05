@@ -4,7 +4,7 @@
     "type": "desktop",
     "title": "Builder — рабочее место разработки",
     "description": "Safe local Builder prototype for the dependent Prototype, Automation, Trial, and Publication lifecycle.",
-    "version": "0.2.76",
+    "version": "0.2.78",
     "title_i18n": {
         "fallback": "Builder",
         "key": "scenario.builder.title"
@@ -4314,12 +4314,20 @@
                                     "selectedStateKey": "inspectedProcessRef",
                                     "compactIndent": true,
                                     "wrapTitles": true,
-                                    "buttons": {
-                                        "id": "show-preview",
-                                        "label": "Show in Preview",
-                                        "icon": "eye-outline",
-                                        "whenKey": "canPreview"
-                                    }
+                                    "buttons": [
+                                        {
+                                            "id": "show-preview",
+                                            "label": "Show in Preview",
+                                            "icon": "eye-outline",
+                                            "whenKey": "canPreview"
+                                        },
+                                        {
+                                            "id": "open-placement",
+                                            "label": "Open placement",
+                                            "icon": "open-outline",
+                                            "whenKey": "canOpenPlacement"
+                                        }
+                                    ]
                                 },
                                 "actions": [
                                     {
@@ -4361,6 +4369,23 @@
                                             "builder.project.preview",
                                             "builder.project.metadata"
                                         ]
+                                    },
+                                    {
+                                        "on": "click:open-placement",
+                                        "type": "callSkill",
+                                        "target": "builder_sdk_control_skill.get_project_placement_navigation",
+                                        "params": {
+                                            "placement_kind": "$event.item.placementKind",
+                                            "object_type": "$state.selectedProjectKind",
+                                            "object_id": "$state.selectedProjectId",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
+                                        },
+                                        "openResultUrl": true,
+                                        "resultUrlPath": "preview_url",
+                                        "resultPreferCurrentOrigin": true,
+                                        "invalidates": "builder.project.preview"
                                     }
                                 ]
                             }
@@ -4387,7 +4412,7 @@
                 }
             }
         },
-        "version": "0.2.76",
+        "version": "0.2.78",
         "user_summary": {
             "assumptions": [
                 "Lifecycle selection is navigation only; it never changes the editable process or Preview target.",
@@ -4410,5 +4435,5 @@
         },
         "manifest": "webui.json"
     },
-    "updated_at": "2026-09-04T06:53:39+00:00"
+    "updated_at": "2026-09-05T06:38:15+00:00"
 }

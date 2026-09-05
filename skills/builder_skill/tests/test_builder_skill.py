@@ -6640,6 +6640,7 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
     show_publication = skill._parse_builder_command("Показать публикацию", has_session=True)
     help_command = skill._parse_builder_command("Строитель, помощь", has_session=True)
     preview_link = skill._parse_builder_command("Строитель, ссылка на Preview", has_session=True)
+    show_trial = skill._parse_builder_command("show trial", has_session=True)
     design_request = skill._parse_builder_command(
         "Redesign the workspace and show the current project identity in the header.",
         has_session=True,
@@ -6672,6 +6673,7 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
         "source": "deterministic",
     }
     assert show_implementation["stage"] == "automation"
+    assert show_trial["stage"] == "trial"
     assert show_publication["stage"] == "publication"
     assert help_command["intent"] == "help"
     assert preview_link["intent"] == "preview.link"
@@ -7300,6 +7302,70 @@ def test_conversation_interaction_response_returns_builder_prompt_to_origin_chan
     assert presented[0]["surface_command"] == "builder.change.plan"
     assert presented[0]["_meta"]["route_id"] == "telegram"
     assert presented[0]["topic"]["thread_id"] == "prompt-project:scenario:builder"
+
+
+def test_trial_preview_interaction_selects_exact_candidate(monkeypatch) -> None:
+    skill = _load_module()
+    selected: list[dict] = []
+    presented: list[dict] = []
+    monkeypatch.setattr(skill, "_source_webspace_id", lambda webspace_id, _meta=None: webspace_id)
+    monkeypatch.setattr(
+        skill,
+        "_resolve_project_session",
+        lambda *_args, **_kwargs: {
+            "status": "found",
+            "session": {"id": "session.recipes", "scenario_id": "recipes"},
+        },
+    )
+    monkeypatch.setattr(skill, "_workbench_binding", lambda _webspace_id: {})
+    monkeypatch.setattr(
+        skill,
+        "_builder_topic_ref",
+        lambda *_args, **_kwargs: {"thread_id": "prompt-project:scenario:recipes"},
+    )
+
+    def _select_target(*args, **kwargs):
+        selected.append({"args": args, "kwargs": dict(kwargs)})
+        return {"target": {"label": "trial:recipes:candidate.recipes"}}
+
+    monkeypatch.setattr(skill.builder_preview, "select_target", _select_target)
+    monkeypatch.setattr(
+        skill,
+        "_present_project_workflow_interaction",
+        lambda **kwargs: presented.append(dict(kwargs)) or {"ok": True},
+    )
+
+    result = skill.handle_interaction_response(
+        event={
+            "interaction": {
+                "interaction_id": "interaction.preview.trial",
+                "metadata": {
+                    "domain": "builder",
+                    "project_ref": "scenario:recipes",
+                    "source_webspace_id": "desktop",
+                },
+            },
+            "response": {
+                "response_id": "response.preview.trial",
+                "consumed_command": {"command": "builder.preview.trial"},
+            },
+            "duplicate": False,
+        },
+        webspace_id="desktop",
+    )
+
+    assert result["status"] == "handled"
+    assert selected == [
+        {
+            "args": ("scenario", "recipes"),
+            "kwargs": {
+                "stage": "trial",
+                "source_webspace_id": "desktop",
+                "follow_active": False,
+            },
+        }
+    ]
+    assert "trial:recipes:candidate.recipes" in presented[0]["prompt"]
 
 
 def test_interaction_delivery_metadata_does_not_mutate_durable_response(monkeypatch) -> None:

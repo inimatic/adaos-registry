@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-04T20:22:49+00:00",
+  "updated_at": "2026-09-05T06:49:59+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -135,8 +135,8 @@
       "kind": "skill",
       "id": "builder_sdk_control_skill",
       "name": "builder_sdk_control_skill",
-      "version": "0.1.98",
-      "updated_at": "2026-09-04T20:22:49+00:00",
+      "version": "0.1.99",
+      "updated_at": "2026-09-05T06:41:36+00:00",
       "path": "skills/builder_sdk_control_skill",
       "manifest": "skills/builder_sdk_control_skill/skill.yaml",
       "source": {
@@ -151,14 +151,21 @@
       "description": "SDK-only backend for the functional Builder DEV scenario.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 61
+      "tools_count": 61,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "builder",
+        "release": "builder@0.2.88",
+        "release_digest": "sha256:a3a7bcdc120e0fbeefb70435bb276a9d51412431d041aa10a1c114bb5352c3af",
+        "package_digest": "sha256:afd4367b6ad7e3fdde090a9e2ebc7ae99eccf69b756435ff9669c6c3ec0b7800"
+      }
     },
     {
       "kind": "skill",
       "id": "builder_skill",
       "name": "builder_skill",
-      "version": "0.3.70",
-      "updated_at": "2026-09-04T18:03:55+00:00",
+      "version": "0.3.71",
+      "updated_at": "2026-09-05T06:39:35+00:00",
       "path": "skills/builder_skill",
       "manifest": "skills/builder_skill/skill.yaml",
       "source": {
@@ -173,7 +180,14 @@
       "description": "Rapid prototyping Builder skill for creating and editing scenario UI drafts from voice or text dialog.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 15
+      "tools_count": 15,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "builder",
+        "release": "builder@0.2.88",
+        "release_digest": "sha256:a3a7bcdc120e0fbeefb70435bb276a9d51412431d041aa10a1c114bb5352c3af",
+        "package_digest": "sha256:6661b87ae62900ef745879aea86d88196fb0c1053b8baa1da53a044d43f104ed"
+      }
     },
     {
       "kind": "skill",
@@ -314,9 +328,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.6",
-        "release_digest": "sha256:ae008a1972ccd53004f0b89d7a5bf1be4cb6daebeafd30cd2708502ed9c992b8",
-        "package_digest": "sha256:9e8917b7a5c94bcb3c37d3a9df0a60686be54a89c89d39e100c242cb1d7574da"
+        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.7",
+        "release_digest": "sha256:bd45a8329b72060154920f62e20838f805a7651fb33d5a996b6758010b9b29df",
+        "package_digest": "sha256:154e0934123fb949db42ec903daa7bd9e57661cbe3b3b2ab69ef8417ef985712"
       }
     },
     {
@@ -1259,8 +1273,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "builder",
-        "release": "builder@0.2.73",
-        "release_digest": "sha256:06f26d9bdf074ad8181ae7bbabb5ab07a91880556b45ecea48b886361a1630a7",
+        "release": "builder@0.2.88",
+        "release_digest": "sha256:a3a7bcdc120e0fbeefb70435bb276a9d51412431d041aa10a1c114bb5352c3af",
         "package_digest": "sha256:53310d271a7db31246955d09030c2ddef07619f37dd28dae74613848be3f207f"
       }
     },
@@ -1368,13 +1382,19 @@
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.77",
-      "updated_at": "2026-09-04T16:12:34+00:00",
+      "version": "0.2.78",
+      "updated_at": "2026-09-05T06:38:15+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.yaml",
       "source": {
         "path": "scenarios/builder",
-        "manifest": "scenarios/builder/scenario.yaml"
+        "manifest": "scenarios/builder/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:c3ead6f9878966a056b6c2ee51d95d4db3d675e40105e75e3be2e34a3a929349",
+        "path_scope": [
+          "projects/builder/"
+        ]
       },
       "install": {
         "kind": "scenario",
@@ -1393,6 +1413,22 @@
           "builder_sdk_control_skill",
           "voice_chat_skill"
         ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "builder",
+        "release": "builder@0.2.88",
+        "release_digest": "sha256:a3a7bcdc120e0fbeefb70435bb276a9d51412431d041aa10a1c114bb5352c3af",
+        "package_digest": "sha256:fa5d692f69e7537632df306aecdffb1e8705aa9b0d6ae4b34e3d0097bbc576f4"
+      },
+      "channels": {
+        "stable": {
+          "release": "builder@0.2.88",
+          "release_digest": "sha256:a3a7bcdc120e0fbeefb70435bb276a9d51412431d041aa10a1c114bb5352c3af",
+          "source_revision": "sha256:c3ead6f9878966a056b6c2ee51d95d4db3d675e40105e75e3be2e34a3a929349",
+          "package_digest": "sha256:fa5d692f69e7537632df306aecdffb1e8705aa9b0d6ae4b34e3d0097bbc576f4",
+          "version": "0.2.78"
+        }
       }
     },
     {
@@ -1418,8 +1454,8 @@
       "kind": "scenario",
       "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
       "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-      "version": "0.1.19",
-      "updated_at": "2026-09-04T20:03:56+00:00",
+      "version": "0.1.21",
+      "updated_at": "2026-09-04T21:20:03+00:00",
       "path": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146",
       "manifest": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146/scenario.yaml",
       "source": {
@@ -1427,7 +1463,7 @@
         "manifest": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:26bcb5259bdb90ba61262c711936e5a143ae17912572873d086969db35b37220",
+        "revision": "sha256:071b988dfffec9bc2e74aa75ccf19f9a874b88df623fc2d83aa7ec0cddcd6f82",
         "path_scope": [
           "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/"
         ]
@@ -1457,17 +1493,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.6",
-        "release_digest": "sha256:ae008a1972ccd53004f0b89d7a5bf1be4cb6daebeafd30cd2708502ed9c992b8",
-        "package_digest": "sha256:c088447f43127215a7f48b6259b37699c11597e8219416c44e3e59a9be379869"
+        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.7",
+        "release_digest": "sha256:bd45a8329b72060154920f62e20838f805a7651fb33d5a996b6758010b9b29df",
+        "package_digest": "sha256:bc5ac59554acbb12552b9e6e2f1114b3eb5483326b3a9d6d7991dc89005050ec"
       },
       "channels": {
         "stable": {
-          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.6",
-          "release_digest": "sha256:ae008a1972ccd53004f0b89d7a5bf1be4cb6daebeafd30cd2708502ed9c992b8",
-          "source_revision": "sha256:26bcb5259bdb90ba61262c711936e5a143ae17912572873d086969db35b37220",
-          "package_digest": "sha256:c088447f43127215a7f48b6259b37699c11597e8219416c44e3e59a9be379869",
-          "version": "0.1.19"
+          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.7",
+          "release_digest": "sha256:bd45a8329b72060154920f62e20838f805a7651fb33d5a996b6758010b9b29df",
+          "source_revision": "sha256:071b988dfffec9bc2e74aa75ccf19f9a874b88df623fc2d83aa7ec0cddcd6f82",
+          "package_digest": "sha256:bc5ac59554acbb12552b9e6e2f1114b3eb5483326b3a9d6d7991dc89005050ec",
+          "version": "0.1.21"
         }
       }
     },
@@ -2139,8 +2175,8 @@
       "kind": "project",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.73",
-      "updated_at": "2026-09-04T09:06:42+00:00",
+      "version": "0.2.88",
+      "updated_at": "2026-09-05T06:49:59+00:00",
       "path": "projects/builder",
       "manifest": "projects/builder/project.yaml",
       "source": {
@@ -2174,18 +2210,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "builder",
-        "release": "builder@0.2.73",
-        "release_digest": "sha256:06f26d9bdf074ad8181ae7bbabb5ab07a91880556b45ecea48b886361a1630a7",
+        "release": "builder@0.2.88",
+        "release_digest": "sha256:a3a7bcdc120e0fbeefb70435bb276a9d51412431d041aa10a1c114bb5352c3af",
         "primary_component": "scenario:builder",
-        "package_digest": "sha256:9ddf66886ad659a20f372a04c4fa259a85fb12a583db52722ae22e592d526b9a"
+        "package_digest": "sha256:fa5d692f69e7537632df306aecdffb1e8705aa9b0d6ae4b34e3d0097bbc576f4"
       },
       "channels": {
         "stable": {
-          "release": "builder@0.2.73",
-          "release_digest": "sha256:06f26d9bdf074ad8181ae7bbabb5ab07a91880556b45ecea48b886361a1630a7",
-          "source_revision": "sha256:9c9dc20ea3b69ef07723624a29810015f812e717e8b4771fc1fb26797150388d",
-          "package_digest": "sha256:9ddf66886ad659a20f372a04c4fa259a85fb12a583db52722ae22e592d526b9a",
-          "version": "0.2.73"
+          "release": "builder@0.2.88",
+          "release_digest": "sha256:a3a7bcdc120e0fbeefb70435bb276a9d51412431d041aa10a1c114bb5352c3af",
+          "source_revision": "sha256:c3ead6f9878966a056b6c2ee51d95d4db3d675e40105e75e3be2e34a3a929349",
+          "package_digest": "sha256:fa5d692f69e7537632df306aecdffb1e8705aa9b0d6ae4b34e3d0097bbc576f4",
+          "version": "0.2.88"
         }
       }
     },
@@ -2417,8 +2453,8 @@
       "kind": "project",
       "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
       "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-      "version": "0.1.6",
-      "updated_at": "2026-09-04T20:18:02+00:00",
+      "version": "0.1.7",
+      "updated_at": "2026-09-04T21:24:26+00:00",
       "path": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146",
       "manifest": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/project.yaml",
       "source": {
@@ -2451,18 +2487,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.6",
-        "release_digest": "sha256:ae008a1972ccd53004f0b89d7a5bf1be4cb6daebeafd30cd2708502ed9c992b8",
+        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.7",
+        "release_digest": "sha256:bd45a8329b72060154920f62e20838f805a7651fb33d5a996b6758010b9b29df",
         "primary_component": "scenario:flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "package_digest": "sha256:c088447f43127215a7f48b6259b37699c11597e8219416c44e3e59a9be379869"
+        "package_digest": "sha256:bc5ac59554acbb12552b9e6e2f1114b3eb5483326b3a9d6d7991dc89005050ec"
       },
       "channels": {
         "stable": {
-          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.6",
-          "release_digest": "sha256:ae008a1972ccd53004f0b89d7a5bf1be4cb6daebeafd30cd2708502ed9c992b8",
-          "source_revision": "sha256:26bcb5259bdb90ba61262c711936e5a143ae17912572873d086969db35b37220",
-          "package_digest": "sha256:c088447f43127215a7f48b6259b37699c11597e8219416c44e3e59a9be379869",
-          "version": "0.1.6"
+          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.7",
+          "release_digest": "sha256:bd45a8329b72060154920f62e20838f805a7651fb33d5a996b6758010b9b29df",
+          "source_revision": "sha256:071b988dfffec9bc2e74aa75ccf19f9a874b88df623fc2d83aa7ec0cddcd6f82",
+          "package_digest": "sha256:bc5ac59554acbb12552b9e6e2f1114b3eb5483326b3a9d6d7991dc89005050ec",
+          "version": "0.1.7"
         }
       }
     },

@@ -9360,6 +9360,9 @@ def _parse_builder_command(text: str, *, allow_create: bool = True, has_session:
         "покажи реализацию": {"intent": "preview.select", "stage": "automation"},
         "показать автоматизацию": {"intent": "preview.select", "stage": "automation"},
         "show implementation": {"intent": "preview.select", "stage": "automation"},
+        "показать апробацию": {"intent": "preview.select", "stage": "trial"},
+        "покажи апробацию": {"intent": "preview.select", "stage": "trial"},
+        "show trial": {"intent": "preview.select", "stage": "trial"},
         "показать публикацию": {"intent": "preview.select", "stage": "publication"},
         "покажи публикацию": {"intent": "preview.select", "stage": "publication"},
         "show publication": {"intent": "preview.select", "stage": "publication"},
@@ -11598,6 +11601,7 @@ def _handle_builder_conversation_interaction_response(payload: Mapping[str, Any]
     preview_stage = {
         "builder.preview.prototype": "prototype",
         "builder.preview.active": "automation",
+        "builder.preview.trial": "trial",
         "builder.preview.publication": "publication",
     }.get(command)
     if preview_stage:
