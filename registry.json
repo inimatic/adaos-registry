@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-05T06:49:59+00:00",
+  "updated_at": "2026-09-05T07:44:53+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1903,6 +1903,63 @@
     },
     {
       "kind": "scenario",
+      "id": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+      "name": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+      "version": "0.1.2",
+      "updated_at": "2026-09-05T06:51:22+00:00",
+      "path": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+      "manifest": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e/scenario.yaml",
+      "source": {
+        "path": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+        "manifest": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:166e61c04119eaa40f354aafbfec847a257c9f56c7e7ea97504bfa80fb4df86c",
+        "path_scope": [
+          "projects/trial_workspace_lifecycle_e2e_20260905_w_5decc38e/"
+        ]
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+        "id": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e"
+      },
+      "title": "Trial Workspace Lifecycle E2E 20260905 with a simple status field",
+      "title_i18n": {
+        "key": "scenario.trial_workspace_lifecycle_e2e_20260905_w_5decc38e.title",
+        "fallback": "Trial Workspace Lifecycle E2E 20260905 with a simple status field"
+      },
+      "description": "Builder-created rapid prototype scenario.",
+      "io": {
+        "input": [
+          "voice",
+          "text"
+        ],
+        "output": [
+          "voice",
+          "text",
+          "web"
+        ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+        "release": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e@0.1.1",
+        "release_digest": "sha256:9520498002fd8f40c4460e1594ba29876200a4f46d2d0c46b0692f6063b6594b",
+        "package_digest": "sha256:9f79e2fc862418746aff2be5f40fc653c6d34991934ce42190448d120afdb217"
+      },
+      "channels": {
+        "stable": {
+          "release": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e@0.1.1",
+          "release_digest": "sha256:9520498002fd8f40c4460e1594ba29876200a4f46d2d0c46b0692f6063b6594b",
+          "source_revision": "sha256:166e61c04119eaa40f354aafbfec847a257c9f56c7e7ea97504bfa80fb4df86c",
+          "package_digest": "sha256:9f79e2fc862418746aff2be5f40fc653c6d34991934ce42190448d120afdb217",
+          "version": "0.1.2"
+        }
+      }
+    },
+    {
+      "kind": "scenario",
       "id": "web_desktop",
       "name": "web_desktop",
       "version": "0.3.11",
@@ -3643,6 +3700,58 @@
       "profiles": [
         "adaos.home.recipes.eval.v1"
       ]
+    },
+    {
+      "kind": "project",
+      "id": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+      "name": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+      "version": "0.1.1",
+      "updated_at": "2026-09-05T07:44:53+00:00",
+      "path": "projects/trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+      "manifest": "projects/trial_workspace_lifecycle_e2e_20260905_w_5decc38e/project.yaml",
+      "source": {
+        "path": "projects/trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+        "manifest": "projects/trial_workspace_lifecycle_e2e_20260905_w_5decc38e/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+        "id": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e"
+      },
+      "title": "Trial Workspace Lifecycle E2E 20260905 with a simple status field",
+      "description": "Builder, create a new application named Trial Workspace Lifecycle E2E 20260905 with a simple status field.",
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "features": [],
+      "components": [
+        "scenario:trial_workspace_lifecycle_e2e_20260905_w_5decc38e"
+      ],
+      "components_count": 1,
+      "profiles": [],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+        "release": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e@0.1.1",
+        "release_digest": "sha256:9520498002fd8f40c4460e1594ba29876200a4f46d2d0c46b0692f6063b6594b",
+        "primary_component": "scenario:trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+        "package_digest": "sha256:9f79e2fc862418746aff2be5f40fc653c6d34991934ce42190448d120afdb217"
+      },
+      "channels": {
+        "stable": {
+          "release": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e@0.1.1",
+          "release_digest": "sha256:9520498002fd8f40c4460e1594ba29876200a4f46d2d0c46b0692f6063b6594b",
+          "source_revision": "sha256:166e61c04119eaa40f354aafbfec847a257c9f56c7e7ea97504bfa80fb4df86c",
+          "package_digest": "sha256:9f79e2fc862418746aff2be5f40fc653c6d34991934ce42190448d120afdb217",
+          "version": "0.1.1"
+        }
+      }
     },
     {
       "kind": "project",

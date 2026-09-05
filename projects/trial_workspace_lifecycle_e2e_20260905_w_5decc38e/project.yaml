@@ -1,0 +1,39 @@
+schema: adaos.project.v1
+kind: project
+id: trial_workspace_lifecycle_e2e_20260905_w_5decc38e
+version: 0.1.1
+profiles: []
+components:
+  owned:
+  - ref: scenario:trial_workspace_lifecycle_e2e_20260905_w_5decc38e
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations:
+    - uses
+  dependencies: []
+entrypoints:
+- id: main
+  presentation: scenario:trial_workspace_lifecycle_e2e_20260905_w_5decc38e
+  default: true
+  bindings: {}
+catalog:
+  title: Trial Workspace Lifecycle E2E 20260905 with a simple status field
+  description: Builder, create a new application named Trial Workspace Lifecycle E2E
+    20260905 with a simple status field.
+  categories: []
+  tags: []
+publication:
+  stage: alpha
+  visibility: unlisted
+  channel: stable
+install:
+  default: false
+  features: []
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-09-05T06:50:43Z'
+created_by: builder.chat
