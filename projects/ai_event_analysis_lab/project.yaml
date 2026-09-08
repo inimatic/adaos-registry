@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: ai_event_analysis_lab
-version: 0.2.24
+version: 0.2.25
 profiles:
 - adaos.analysis.events.v1
 components:
