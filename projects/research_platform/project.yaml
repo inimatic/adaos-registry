@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: research_platform
-version: 0.1.1
+version: 0.1.2
 profiles: [adaos.research.platform.v1]
 components:
   owned:

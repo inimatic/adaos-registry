@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: new_face_vision
-version: 0.2.17
+version: 0.2.18
 profiles: [adaos.vision.inspection.v1]
 components:
   owned:

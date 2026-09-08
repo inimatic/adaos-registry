@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: workflow_lab
-version: 0.1.3
+version: 0.1.4
 profiles: [adaos.workflow.lab.v1]
 components:
   owned:

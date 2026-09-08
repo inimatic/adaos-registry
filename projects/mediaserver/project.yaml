@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: mediaserver
-version: 0.1.1
+version: 0.1.4
 profiles:
 - adaos.builder.component_project.v1
 components:

@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: web_desktop
-version: 0.3.12
+version: 0.3.14
 profiles: [adaos.desktop.shell.v1, adaos.default_install.v1]
 components:
   owned:

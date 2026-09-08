@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: streaming_recipe_book_eval
-version: 0.0.4
+version: 0.0.5
 profiles: [adaos.home.recipes.eval.v1]
 components:
   owned:

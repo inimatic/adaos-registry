@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: nlu_runtime
-version: 0.1.1
+version: 0.1.2
 profiles: [adaos.nlu.runtime.v1]
 components:
   owned:

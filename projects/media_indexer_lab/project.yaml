@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: media_indexer_lab
-version: 0.1.36
+version: 0.1.37
 profiles: [adaos.media.indexer_lab.v1]
 components:
   owned:

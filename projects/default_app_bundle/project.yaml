@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: default_app_bundle
-version: 0.1.1
+version: 0.1.2
 profiles: [adaos.default_apps.v1]
 components:
   owned:
