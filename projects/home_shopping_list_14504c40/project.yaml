@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: home_shopping_list_14504c40
-version: 0.0.5
+version: 0.0.6
 profiles: [adaos.home.shopping_list.v1]
 components:
   owned:
