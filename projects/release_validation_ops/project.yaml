@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: release_validation_ops
-version: 0.1.8
+version: 0.1.9
 profiles:
 - adaos.release_validation.v1
 components:
