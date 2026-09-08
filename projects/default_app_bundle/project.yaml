@@ -1,43 +1,56 @@
 schema: adaos.project.v1
 kind: project
 id: default_app_bundle
-version: 0.1.1
-profiles: [adaos.default_apps.v1]
+version: 0.1.2
+profiles:
+- adaos.default_apps.v1
 components:
   owned:
   - ref: skill:notebook_skill
     role: primary
     exposure: application
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   - ref: skill:weather_skill
     role: supporting
     exposure: application
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   - ref: skill:conversation_companions
     role: supporting
     exposure: application
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   - ref: skill:rasa_nlu_service_skill
     role: supporting
     exposure: advanced
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   dependencies: []
 entrypoints: []
 catalog:
   title: Default Apps Bundle
   title_i18n:
-    en: "Default Apps Bundle"
-    ru: "\u041d\u0430\u0431\u043e\u0440 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0439 \u043f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e"
+    en: Default Apps Bundle
+    ru: Набор приложений по умолчанию
   description: Small default AdaOS apps and the current stable NLU service baseline.
   description_i18n:
-    en: "Small default AdaOS apps and the current stable NLU service baseline."
-    ru: "\u041d\u0435\u0431\u043e\u043b\u044c\u0448\u0438\u0435 \u0441\u0442\u0430\u043d\u0434\u0430\u0440\u0442\u043d\u044b\u0435 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f AdaOS \u0438 \u0442\u0435\u043a\u0443\u0449\u0430\u044f \u0441\u0442\u0430\u0431\u0438\u043b\u044c\u043d\u0430\u044f \u0431\u0430\u0437\u043e\u0432\u0430\u044f \u0441\u043b\u0443\u0436\u0431\u0430 NLU."
-  categories: [system, productivity]
-  tags: [default-install, notebook, weather, conversation, nlu]
+    en: Small default AdaOS apps and the current stable NLU service baseline.
+    ru: Небольшие стандартные приложения AdaOS и текущая стабильная базовая служба
+      NLU.
+  categories:
+  - system
+  - productivity
+  tags:
+  - default-install
+  - notebook
+  - weather
+  - conversation
+  - nlu
 publication:
   stage: alpha
   visibility: listed
@@ -48,29 +61,34 @@ install:
   - id: personal-tools
     title: Personal tools
     title_i18n:
-      en: "Personal tools"
-      ru: "\u041f\u0435\u0440\u0441\u043e\u043d\u0430\u043b\u044c\u043d\u044b\u0435 \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u044b"
+      en: Personal tools
+      ru: Персональные инструменты
     default: true
     optional: false
-    components: [skill:notebook_skill, skill:weather_skill]
+    components:
+    - skill:notebook_skill
+    - skill:weather_skill
   - id: conversation-companions
     title: Conversation companions
     title_i18n:
-      en: "Conversation companions"
-      ru: "\u0421\u043e\u0431\u0435\u0441\u0435\u0434\u043d\u0438\u043a\u0438"
+      en: Conversation companions
+      ru: Собеседники
     default: true
     optional: false
-    components: [skill:conversation_companions]
+    components:
+    - skill:conversation_companions
   - id: rasa-nlu
     title: Rasa NLU service
     title_i18n:
-      en: "Rasa NLU service"
-      ru: "\u0421\u043b\u0443\u0436\u0431\u0430 Rasa NLU"
+      en: Rasa NLU service
+      ru: Служба Rasa NLU
     default: true
     optional: false
-    components: [skill:rasa_nlu_service_skill]
+    components:
+    - skill:rasa_nlu_service_skill
 compatibility:
-  validation_profiles: [default_apps.local]
+  validation_profiles:
+  - default_apps.local
 lifecycle:
   uninstall:
     components: remove_if_unreferenced
