@@ -1,45 +1,54 @@
 schema: adaos.project.v1
 kind: project
 id: web_desktop
-version: 0.3.12
-profiles: [adaos.desktop.shell.v1, adaos.default_install.v1]
+version: 0.3.13
+profiles:
+- adaos.desktop.shell.v1
+- adaos.default_install.v1
 components:
   owned:
   - ref: scenario:web_desktop
     role: primary
     exposure: application
     lifecycle: bound
-    relations: [presents]
+    relations:
+    - presents
   - ref: skill:web_desktop_skill
     role: implementation
     exposure: project_only
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   - ref: skill:greet_on_boot_skill
     role: supporting
     exposure: project_only
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   - ref: skill:pair_new_device_skill
     role: supporting
     exposure: project_only
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   - ref: skill:adaos_connect
     role: supporting
     exposure: advanced
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   - ref: skill:voice_chat_skill
     role: supporting
     exposure: advanced
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   - ref: skill:browsers_skill
     role: supporting
     exposure: advanced
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   dependencies: []
 entrypoints:
 - id: desktop
@@ -50,14 +59,24 @@ entrypoints:
 catalog:
   title: Web Desktop
   title_i18n:
-    en: "Web Desktop"
-    ru: "\u0412\u0435\u0431-\u0440\u0430\u0431\u043e\u0447\u0438\u0439 \u0441\u0442\u043e\u043b"
-  description: Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.
+    en: Web Desktop
+    ru: Веб-рабочий стол
+  description: Default AdaOS desktop shell, join flow, voice bridge, and browser surface
+    support.
   description_i18n:
-    en: "Default AdaOS desktop shell, join flow, voice bridge, and browser surface support."
-    ru: "\u0421\u0442\u0430\u043d\u0434\u0430\u0440\u0442\u043d\u0430\u044f web-\u043e\u0431\u043e\u043b\u043e\u0447\u043a\u0430 AdaOS, join flow, voice bridge \u0438 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0430 browser surface."
-  categories: [system, desktop]
-  tags: [default-install, shell, browser, voice, onboarding]
+    en: Default AdaOS desktop shell, join flow, voice bridge, and browser surface
+      support.
+    ru: Стандартная web-оболочка AdaOS, join flow, voice bridge и поддержка browser
+      surface.
+  categories:
+  - system
+  - desktop
+  tags:
+  - default-install
+  - shell
+  - browser
+  - voice
+  - onboarding
 publication:
   stage: beta
   visibility: listed
@@ -68,30 +87,39 @@ install:
   - id: shell
     title: Desktop shell
     title_i18n:
-      en: "Desktop shell"
-      ru: "\u041e\u0431\u043e\u043b\u043e\u0447\u043a\u0430 \u0440\u0430\u0431\u043e\u0447\u0435\u0433\u043e \u0441\u0442\u043e\u043b\u0430"
+      en: Desktop shell
+      ru: Оболочка рабочего стола
     default: true
     optional: false
-    components: [scenario:web_desktop, skill:web_desktop_skill]
+    components:
+    - scenario:web_desktop
+    - skill:web_desktop_skill
   - id: onboarding
     title: Node onboarding
     title_i18n:
-      en: "Node onboarding"
-      ru: "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435 \u043d\u043e\u0434\u044b"
+      en: Node onboarding
+      ru: Подключение ноды
     default: true
     optional: false
-    components: [skill:greet_on_boot_skill, skill:pair_new_device_skill, skill:adaos_connect]
+    components:
+    - skill:greet_on_boot_skill
+    - skill:pair_new_device_skill
+    - skill:adaos_connect
   - id: browser-voice
     title: Browser and voice bridge
     title_i18n:
-      en: "Browser and voice bridge"
-      ru: "\u0411\u0440\u0430\u0443\u0437\u0435\u0440\u043d\u044b\u0439 \u0438 \u0433\u043e\u043b\u043e\u0441\u043e\u0432\u043e\u0439 \u043c\u043e\u0441\u0442"
+      en: Browser and voice bridge
+      ru: Браузерный и голосовой мост
     default: true
     optional: false
-    components: [skill:browsers_skill, skill:voice_chat_skill]
+    components:
+    - skill:browsers_skill
+    - skill:voice_chat_skill
 compatibility:
-  required_entrypoints: [desktop]
-  validation_profiles: [desktop.default]
+  required_entrypoints:
+  - desktop
+  validation_profiles:
+  - desktop.default
 lifecycle:
   uninstall:
     components: retain
