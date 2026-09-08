@@ -1,20 +1,23 @@
 schema: adaos.project.v1
 kind: project
 id: release_validation_ops
-version: 0.1.7
-profiles: [adaos.release_validation.v1]
+version: 0.1.8
+profiles:
+- adaos.release_validation.v1
 components:
   owned:
   - ref: scenario:release_validation_ops
     role: primary
     exposure: application
     lifecycle: bound
-    relations: [presents]
+    relations:
+    - presents
   - ref: skill:release_validation_skill
     role: implementation
     exposure: project_only
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   dependencies: []
 entrypoints:
 - id: validation
@@ -25,14 +28,19 @@ entrypoints:
 catalog:
   title: Release Validation Operations
   title_i18n:
-    en: "Release Validation Operations"
-    ru: "\u041e\u043f\u0435\u0440\u0430\u0446\u0438\u0438 \u0432\u0430\u043b\u0438\u0434\u0430\u0446\u0438\u0438 \u0440\u0435\u043b\u0438\u0437\u043e\u0432"
+    en: Release Validation Operations
+    ru: Операции валидации релизов
   description: Observe-only release validation campaign runner and evidence log.
   description_i18n:
-    en: "Observe-only release validation campaign runner and evidence log."
-    ru: "Observe-only runner \u043a\u0430\u043c\u043f\u0430\u043d\u0438\u0439 \u0432\u0430\u043b\u0438\u0434\u0430\u0446\u0438\u0438 \u0440\u0435\u043b\u0438\u0437\u043e\u0432 \u0438 \u0436\u0443\u0440\u043d\u0430\u043b evidence."
-  categories: [operations, release]
-  tags: [release-validation, campaigns, evidence]
+    en: Observe-only release validation campaign runner and evidence log.
+    ru: Observe-only runner кампаний валидации релизов и журнал evidence.
+  categories:
+  - operations
+  - release
+  tags:
+  - release-validation
+  - campaigns
+  - evidence
 publication:
   stage: alpha
   visibility: listed
@@ -43,14 +51,18 @@ install:
   - id: validation
     title: Release validation
     title_i18n:
-      en: "Release validation"
-      ru: "\u0412\u0430\u043b\u0438\u0434\u0430\u0446\u0438\u044f \u0440\u0435\u043b\u0438\u0437\u043e\u0432"
+      en: Release validation
+      ru: Валидация релизов
     default: true
     optional: false
-    components: [scenario:release_validation_ops, skill:release_validation_skill]
+    components:
+    - scenario:release_validation_ops
+    - skill:release_validation_skill
 compatibility:
-  required_entrypoints: [validation]
-  validation_profiles: [release_validation.observe]
+  required_entrypoints:
+  - validation
+  validation_profiles:
+  - release_validation.observe
 lifecycle:
   uninstall:
     components: remove_if_unreferenced
