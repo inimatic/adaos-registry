@@ -435,10 +435,16 @@
                     "title": "Source material physically held by the direction's artifact-custodian skill."
                   },
                   {
+                    "id": "inquiry",
+                    "label": "Inquiry",
+                    "icon": "search-outline",
+                    "title": "Discuss ideas while a typed scientific projection separates known work, research gaps, engineering problems, and intractable branches."
+                  },
+                  {
                     "id": "formulation",
-                    "label": "Discussion",
-                    "icon": "chatbubbles-outline",
-                    "title": "Discuss artifacts and decisions with the Researcher; accepted answers materialize typed ResearchPrototype revisions."
+                    "label": "Formulation",
+                    "icon": "flask-outline",
+                    "title": "Form bounded ResearchTasks and later ResearchPrototype revisions only from an accepted inquiry projection."
                   },
                   {
                     "id": "compilation",
@@ -658,6 +664,119 @@
               }
             },
             {
+              "id": "inquiry-projection",
+              "type": "static.markdown",
+              "area": "workspace",
+              "title": "Scientific projection",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.get_inquiry_projection",
+                "params": {
+                  "direction_id": "$state.selectedDirectionId",
+                  "task_id": "$state.selectedResearchTaskId"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.inquiry",
+                  "research.artifacts"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 2
+              },
+              "inputs": {
+                "bindField": "content"
+              }
+            },
+            {
+              "id": "inquiry-decision",
+              "type": "ui.form",
+              "area": "workspace",
+              "title": "Projection decision",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
+              "inputs": {
+                "layout": "responsiveGrid",
+                "submitLabel": "Apply exact decision",
+                "resetOnSuccess": true,
+                "fields": [
+                  {
+                    "id": "decision",
+                    "name": "decision",
+                    "type": "select",
+                    "label": "Decision",
+                    "required": true,
+                    "options": [
+                      {"label": "Form research task", "value": "accept_for_research_task"},
+                      {"label": "Form engineering task", "value": "accept_for_engineering_task"},
+                      {"label": "Reuse known solution", "value": "reuse_known_solution"},
+                      {"label": "Defer as intractable", "value": "defer_intractable"},
+                      {"label": "Stop this branch", "value": "stop"},
+                      {"label": "Request revision", "value": "request_revision"}
+                    ]
+                  },
+                  {
+                    "id": "rationale",
+                    "name": "rationale",
+                    "type": "longText",
+                    "label": "Rationale",
+                    "required": true
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.decide_inquiry_projection",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "task_id": "$state.selectedResearchTaskId",
+                    "decision": "$event.values.decision",
+                    "rationale": "$event.values.rationale"
+                  },
+                  "invalidates": [
+                    "research.inquiry",
+                    "research.activity",
+                    "research.portfolio"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "inquiry-search",
+              "type": "ui.actions",
+              "area": "workspace",
+              "title": "Source discovery",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "discover",
+                    "label": "Search typed gaps",
+                    "icon": "search-outline",
+                    "title": "Search active SearchRequests. Results remain outside the evidence boundary."
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:discover",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.discover_inquiry_sources",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "task_id": "$state.selectedResearchTaskId"
+                  },
+                  "invalidates": [
+                    "research.inquiry",
+                    "research.activity"
+                  ]
+                }
+              ]
+            },
+            {
               "id": "task-formulation-context",
               "type": "ui.actions",
               "area": "workspace",
@@ -699,7 +818,7 @@
               "type": "static.markdown",
               "area": "workspace",
               "title": "Current draft and AdaOS review",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'formulation'",
+              "visibleIf": "$state.selectedDirectionId != null && ($state.activeResearchTab === 'inquiry' || $state.activeResearchTab === 'formulation')",
               "dataSource": {
                 "kind": "skill",
                 "name": "research_orchestrator_skill.get_consensus",
@@ -724,7 +843,7 @@
               "type": "ui.chat",
               "area": "workspace",
               "title": "Research discussion",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'formulation'",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
               "dataSource": {
                 "kind": "stream",
                 "receiver": "voice_chat.messages",
@@ -742,7 +861,7 @@
                 "enterToSend": true,
                 "shiftEnterNewline": true,
                 "showTimestamps": true,
-                "placeholder": "Discuss the research question, falsifiable hypotheses, protocol, estimands, uncertainty, constraints, and unresolved decisions...",
+                "placeholder": "Discuss the idea, known work, scientific uncertainty, tractability, competing problem frames, and possible next tasks...",
                 "sendCommand": "voice.chat.user",
                 "receiver": "voice_chat.messages",
                 "scope": "shared",
@@ -1184,6 +1303,37 @@
               }
             },
             {
+              "id": "activity-accounting-actions",
+              "type": "ui.actions",
+              "area": "workspace",
+              "title": "Token accounting",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'activity'",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "reconcile",
+                    "label": "Reconcile Researcher usage",
+                    "icon": "calculator-outline",
+                    "title": "Re-read durable Root jobs; interactive Codex remains excluded."
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:reconcile",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.reconcile_inquiry_usage",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "task_id": "$state.selectedResearchTaskId"
+                  },
+                  "invalidates": ["research.activity"]
+                }
+              ]
+            },
+            {
               "id": "studies-placeholder",
               "type": "static.markdown",
               "area": "workspace",
@@ -1282,7 +1432,7 @@
               "title": "Using Research Workbench",
               "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'help'",
               "inputs": {
-                "content": "# Research Workbench\n\n1. Add exact source artifacts.\n2. Select the active task and reach a human-readable consensus with the Researcher.\n3. Inspect the typed formulation, accepted compilation, and unresolved decisions.\n4. Accept an exact digest only when the formulation is ready.\n5. Open the named Builder window for the selected implementation track.\n\nThe Workbench owns direction, task, compilation, and implementation-track metadata. A dedicated skill is the physical custodian of source artifacts. Project is created for the implementation/distribution boundary and does not own the scientific lifecycle."
+                "content": "# Research Workbench\n\n1. Discuss an idea while Inquiry maintains a typed scientific projection.\n2. Inspect ProblemDisposition before spending effort on formulation or implementation.\n3. Add exact source artifacts when a knowledge or novelty gap requires them.\n4. Record a human decision over the exact projection digest.\n5. Form ResearchTasks and later implementation tracks only through admitted transitions.\n\nThe Workbench owns the shared inquiry and research lifecycle. A direction skill is only the physical custodian of domain artifacts. Builder is not authorized by discussion or by an LLM readiness statement."
               }
             }
           ]

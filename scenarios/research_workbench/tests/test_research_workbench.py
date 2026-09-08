@@ -68,6 +68,26 @@ def test_compilation_has_full_width_facets_and_traceability_projection() -> None
     assert source["params"]["facet"] == "$state.activeCompilationFacet"
 
 
+def test_inquiry_is_a_shared_pre_formulation_surface() -> None:
+    widgets = {item["id"]: item for item in _page()["widgets"]}
+    tabs = [item["id"] for item in widgets["direction-tabs"]["inputs"]["buttons"]]
+
+    assert tabs.index("inquiry") < tabs.index("formulation")
+    assert widgets["inquiry-projection"]["dataSource"]["name"] == (
+        "research_orchestrator_skill.get_inquiry_projection"
+    )
+    assert widgets["inquiry-decision"]["actions"][0]["target"] == (
+        "research_orchestrator_skill.decide_inquiry_projection"
+    )
+    assert widgets["inquiry-search"]["actions"][0]["target"] == (
+        "research_orchestrator_skill.discover_inquiry_sources"
+    )
+    assert widgets["activity-accounting-actions"]["actions"][0]["target"] == (
+        "research_orchestrator_skill.reconcile_inquiry_usage"
+    )
+    assert "activeResearchTab === 'inquiry'" in widgets["research-chat"]["visibleIf"]
+
+
 def test_artifact_visibility_is_explicit_and_enforced_before_compilation() -> None:
     widgets = {item["id"]: item for item in _page()["widgets"]}
     upload = widgets["artifact-upload"]["actions"][0]

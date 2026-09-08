@@ -11,7 +11,9 @@ import yaml
 
 def _module():
     path = Path(__file__).resolve().parents[1] / "handlers" / "main.py"
-    spec = importlib.util.spec_from_file_location("builder_sdk_control_skill_test_handler", path)
+    spec = importlib.util.spec_from_file_location(
+        "builder_sdk_control_skill_test_handler", path
+    )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -27,10 +29,76 @@ def test_handler_has_sdk_only_adaos_imports() -> None:
             imports.append(node.module)
         elif isinstance(node, ast.Import):
             imports.extend(alias.name for alias in node.names)
-    adaos_imports = [name for name in imports if name == "adaos" or name.startswith("adaos.")]
+    adaos_imports = [
+        name for name in imports if name == "adaos" or name.startswith("adaos.")
+    ]
 
     assert adaos_imports
-    assert all(name == "adaos.sdk" or name.startswith("adaos.sdk.") for name in adaos_imports)
+    assert all(
+        name == "adaos.sdk" or name.startswith("adaos.sdk.") for name in adaos_imports
+    )
+
+
+def test_development_session_resolution_is_scoped_to_selected_project(
+    monkeypatch,
+) -> None:
+    module = _module()
+    captured = {}
+    monkeypatch.setattr(
+        module.preview,
+        "get_binding",
+        lambda _source: {
+            "selection": {"object_type": "project", "object_id": "applications"}
+        },
+    )
+    monkeypatch.setattr(
+        module.development_sessions,
+        "binding_for_selection",
+        lambda source, selected_ref: captured.update(
+            {"source": source, "selected_ref": selected_ref}
+        )
+        or None,
+    )
+
+    assert module._bound_development_session("desktop-dev") is None
+    assert captured == {
+        "source": "desktop-dev",
+        "selected_ref": "project:applications",
+    }
+
+
+def test_unrelated_project_does_not_inherit_webspace_development_session(
+    monkeypatch,
+) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        module, "_preview_source_webspace_id", lambda *_args: "desktop-dev"
+    )
+    monkeypatch.setattr(module, "_bound_development_session", lambda _source: None)
+
+    result = module.get_development_session(webspace_id="desktop-dev")
+
+    assert result["ok"] is True
+    assert result["bound"] is False
+    assert "No external Development Session" in result["content"]
+
+
+def test_development_session_mutations_fail_closed_for_unrelated_project(
+    monkeypatch,
+) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        module, "_preview_source_webspace_id", lambda *_args: "desktop-dev"
+    )
+    monkeypatch.setattr(module, "_bound_development_session", lambda _source: None)
+
+    with pytest.raises(ValueError, match="selected Builder project"):
+        module.review_development_changes(["skills/applications/skill.yaml"])
+    with pytest.raises(ValueError, match="selected Builder project"):
+        module.request_development_scope(
+            "skill:another",
+            "Need a reviewed dependency change",
+        )
 
 
 def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None:
@@ -52,7 +120,9 @@ def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None
     assert tools["select_preview_target"]["side_effects"] == "ui_navigation"
     assert tools["transition_workflow"]["side_effects"] == "local_write"
     assert tools["accept_prototype"]["side_effects"] == "local_write"
-    transition_actions = tools["transition_workflow"]["input_schema"]["properties"]["action"]["enum"]
+    transition_actions = tools["transition_workflow"]["input_schema"]["properties"][
+        "action"
+    ]["enum"]
     assert {
         "reconcile_automation",
         "reconcile_verification",
@@ -92,11 +162,28 @@ def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None
     push_schema = tools["push_project"]["input_schema"]
     assert "checkpoint_id" in push_schema["required"]
     assert push_schema["properties"]["checkpoint_id"]["minLength"] == 1
-    assert "project" in tools["list_projects"]["input_schema"]["properties"]["kind"]["enum"]
-    assert "project" in tools["get_project"]["input_schema"]["properties"]["object_type"]["enum"]
-    assert "project" in tools["push_project"]["input_schema"]["properties"]["object_type"]["enum"]
-    assert "project" in tools["start_automation"]["input_schema"]["properties"]["object_type"]["enum"]
-    assert "project" in tools["publish_project"]["input_schema"]["properties"]["object_type"]["enum"]
+    assert (
+        "project"
+        in tools["list_projects"]["input_schema"]["properties"]["kind"]["enum"]
+    )
+    assert (
+        "project"
+        in tools["get_project"]["input_schema"]["properties"]["object_type"]["enum"]
+    )
+    assert (
+        "project"
+        in tools["push_project"]["input_schema"]["properties"]["object_type"]["enum"]
+    )
+    assert (
+        "project"
+        in tools["start_automation"]["input_schema"]["properties"]["object_type"][
+            "enum"
+        ]
+    )
+    assert (
+        "project"
+        in tools["publish_project"]["input_schema"]["properties"]["object_type"]["enum"]
+    )
 
 
 def test_subscription_update_projection_exposes_review_contract(monkeypatch) -> None:
@@ -126,12 +213,19 @@ def test_subscription_update_projection_exposes_review_contract(monkeypatch) -> 
                         "retained": [],
                     },
                     "resolved_dependencies": [
-                        {"kind": "skill", "artifact_id": "builder_skill", "version": "1.1.0"}
+                        {
+                            "kind": "skill",
+                            "artifact_id": "builder_skill",
+                            "version": "1.1.0",
+                        }
                     ],
                     "permissions": {"introduced": ["network.read"], "removed": []},
                     "schemas": {"added": ["builder.v2"], "changed": [], "removed": []},
                     "migrations": {"count": 1, "rollback_ready": True},
-                    "rollback": {"available": True, "reason": "previous_workspace_lock"},
+                    "rollback": {
+                        "available": True,
+                        "reason": "previous_workspace_lock",
+                    },
                     "warnings": [],
                 },
             },
@@ -148,7 +242,9 @@ def test_subscription_update_projection_exposes_review_contract(monkeypatch) -> 
     assert result["rollback_available"] is True
 
 
-def test_subscription_update_apply_binds_digest_and_explicit_attempt(monkeypatch) -> None:
+def test_subscription_update_apply_binds_digest_and_explicit_attempt(
+    monkeypatch,
+) -> None:
     module = _module()
     calls: list[dict] = []
 
@@ -265,12 +361,16 @@ def _idle_builder_workflow() -> dict:
 def test_catalog_lists_composition_project(monkeypatch) -> None:
     module = _module()
     project = _root_mgmnt_project()
-    monkeypatch.setattr(module.compositions, "list_projects", lambda **_kwargs: [{"id": "root_mgmnt"}])
+    monkeypatch.setattr(
+        module.compositions, "list_projects", lambda **_kwargs: [{"id": "root_mgmnt"}]
+    )
     monkeypatch.setattr(module.compositions, "get", lambda _project_id: dict(project))
     monkeypatch.setattr(module.projects, "list_projects", lambda **_kwargs: [])
     monkeypatch.setattr(module, "_context", lambda *_args: {})
     monkeypatch.setattr(module, "_preview_source_webspace_id", lambda *_args: "desktop")
-    monkeypatch.setattr(module, "_preview_dev_webspace_id", lambda source: f"{source}-dev")
+    monkeypatch.setattr(
+        module, "_preview_dev_webspace_id", lambda source: f"{source}-dev"
+    )
 
     items = module.list_projects(
         query="root",
@@ -295,7 +395,9 @@ def test_project_file_paths_route_owned_components(monkeypatch, tmp_path: Path) 
     (project_root / "project.yaml").write_text("id: root_mgmnt\n", encoding="utf-8")
     project = _root_mgmnt_project()
     monkeypatch.setattr(module.compositions, "get", lambda _project_id: dict(project))
-    monkeypatch.setattr(module.compositions, "resolve_root", lambda _project_id: project_root)
+    monkeypatch.setattr(
+        module.compositions, "resolve_root", lambda _project_id: project_root
+    )
     monkeypatch.setattr(
         module.projects,
         "list_files",
@@ -353,7 +455,10 @@ def test_project_file_paths_route_owned_components(monkeypatch, tmp_path: Path) 
     monkeypatch.setattr(
         module,
         "_record_project_change",
-        lambda **kwargs: {"change_id": kwargs.get("change_id") or "change-1", "status": "accepted"},
+        lambda **kwargs: {
+            "change_id": kwargs.get("change_id") or "change-1",
+            "status": "accepted",
+        },
     )
     saved = module.save_project_file(
         "components/scenario/root_mgmnt_ops/webui/app.js",
@@ -363,7 +468,12 @@ def test_project_file_paths_route_owned_components(monkeypatch, tmp_path: Path) 
         webspace_id="desktop",
     )
 
-    assert write_calls[0][0][:4] == ("scenario", "root_mgmnt_ops", "webui/app.js", "new")
+    assert write_calls[0][0][:4] == (
+        "scenario",
+        "root_mgmnt_ops",
+        "webui/app.js",
+        "new",
+    )
     assert saved["path"] == "components/scenario/root_mgmnt_ops/webui/app.js"
     assert saved["change_id"] == "change-1"
 
@@ -434,7 +544,9 @@ def test_project_push_checkpoints_owned_components(monkeypatch) -> None:
     monkeypatch.setattr(
         module.workflow,
         "transition",
-        lambda kind, project_id, action, **kwargs: transitions.append((kind, project_id, action, kwargs))
+        lambda kind, project_id, action, **kwargs: transitions.append(
+            (kind, project_id, action, kwargs)
+        )
         or {"ok": True, "workflow": {"change_set": {"change_set_id": "CS-root"}}},
     )
 
@@ -467,10 +579,14 @@ def test_project_push_checkpoints_owned_components(monkeypatch) -> None:
     assert result["execution_scope"]["execution_ref"] == "scenario:root_mgmnt_ops"
 
 
-def test_project_push_rejects_blocked_checkpoint_before_mutating_sources(monkeypatch) -> None:
+def test_project_push_rejects_blocked_checkpoint_before_mutating_sources(
+    monkeypatch,
+) -> None:
     module = _module()
     mutations: list[tuple[str, str]] = []
-    monkeypatch.setattr(module.compositions, "get", lambda _project_id: _root_mgmnt_project())
+    monkeypatch.setattr(
+        module.compositions, "get", lambda _project_id: _root_mgmnt_project()
+    )
     monkeypatch.setattr(
         module.workflow,
         "get_state",
@@ -509,19 +625,27 @@ def test_project_push_rejects_blocked_checkpoint_before_mutating_sources(monkeyp
     assert mutations == []
 
 
-def test_project_automation_uses_primary_workflow_and_aggregate_worker_scope(monkeypatch) -> None:
+def test_project_automation_uses_primary_workflow_and_aggregate_worker_scope(
+    monkeypatch,
+) -> None:
     module = _module()
     workflow_reads: list[tuple[str, str]] = []
     automation_calls: list[dict] = []
-    monkeypatch.setattr(module.compositions, "get", lambda _project_id: _root_mgmnt_project())
+    monkeypatch.setattr(
+        module.compositions, "get", lambda _project_id: _root_mgmnt_project()
+    )
     monkeypatch.setattr(
         module.workflow,
         "get_state",
         lambda kind, object_id: workflow_reads.append((kind, object_id))
         or {"change_set": {"change_set_id": "CS-root", "status": "planned"}},
     )
-    monkeypatch.setattr(module.preview, "canonical_source_webspace_id", lambda source: source)
-    monkeypatch.setattr(module.preview, "dev_webspace_id", lambda source: f"{source}-dev")
+    monkeypatch.setattr(
+        module.preview, "canonical_source_webspace_id", lambda source: source
+    )
+    monkeypatch.setattr(
+        module.preview, "dev_webspace_id", lambda source: f"{source}-dev"
+    )
     monkeypatch.setattr(
         module.conversation,
         "ensure_builder_topic",
@@ -534,7 +658,8 @@ def test_project_automation_uses_primary_workflow_and_aggregate_worker_scope(mon
     monkeypatch.setattr(
         module.automation,
         "start",
-        lambda **kwargs: automation_calls.append(kwargs) or {"ok": True, "status": "queued"},
+        lambda **kwargs: automation_calls.append(kwargs)
+        or {"ok": True, "status": "queued"},
     )
 
     result = module.start_automation(
@@ -553,7 +678,9 @@ def test_project_automation_uses_primary_workflow_and_aggregate_worker_scope(mon
     assert result["execution_scope"]["execution_ref"] == "scenario:root_mgmnt_ops"
 
 
-def test_project_trial_uses_composition_candidate_and_primary_checkpoint(monkeypatch) -> None:
+def test_project_trial_uses_composition_candidate_and_primary_checkpoint(
+    monkeypatch,
+) -> None:
     module = _module()
     project = _root_mgmnt_project()
     transitions: list[tuple[str, str, str]] = []
@@ -578,7 +705,9 @@ def test_project_trial_uses_composition_candidate_and_primary_checkpoint(monkeyp
         },
     }
     monkeypatch.setattr(module.compositions, "get", lambda _project_id: dict(project))
-    monkeypatch.setattr(module.workflow, "get_state", lambda *_args: dict(workflow_state))
+    monkeypatch.setattr(
+        module.workflow, "get_state", lambda *_args: dict(workflow_state)
+    )
     monkeypatch.setattr(
         module.workflow,
         "transition",
@@ -601,7 +730,9 @@ def test_project_trial_uses_composition_candidate_and_primary_checkpoint(monkeyp
             },
         },
     )
-    monkeypatch.setattr(module, "_recover_running_checkpoint_candidate", lambda *_args: None)
+    monkeypatch.setattr(
+        module, "_recover_running_checkpoint_candidate", lambda *_args: None
+    )
     monkeypatch.setattr(module, "_sync_change_set_record", lambda **_kwargs: {})
     monkeypatch.setattr(
         module.compositions,
@@ -808,7 +939,9 @@ def test_project_trial_replay_restores_missing_placement(monkeypatch) -> None:
     assert placements[0][3] == 17
 
 
-def _dependency_link_setup(monkeypatch, module, *, declared: bool = True, delivery: dict | None = None):
+def _dependency_link_setup(
+    monkeypatch, module, *, declared: bool = True, delivery: dict | None = None
+):
     checkpoint_id = "dependency-checkpoint-1"
     change_set = {
         "change_set_id": "scenario-change-set-1",
@@ -816,19 +949,27 @@ def _dependency_link_setup(monkeypatch, module, *, declared: bool = True, delive
         "request": "Build candidate",
         "member_change_ids": ["scenario-change-set-1"],
     }
-    manifest = "name: recipes\ndepends:\n  - control_skill\n" if declared else "name: recipes\ndepends: []\n"
+    manifest = (
+        "name: recipes\ndepends:\n  - control_skill\n"
+        if declared
+        else "name: recipes\ndepends: []\n"
+    )
     monkeypatch.setattr(
         module.projects,
         "read_file",
         lambda *args, **kwargs: {"content": manifest},
     )
     monkeypatch.setattr(module, "_context", lambda *args: {"archived": False})
-    dependency_delivery = delivery if delivery is not None else {
-        "status": "checkpoint",
-        "checkpoint_change_id": checkpoint_id,
-        "package_digest": "sha256:" + "a" * 64,
-        "source_revision": "b" * 40,
-    }
+    dependency_delivery = (
+        delivery
+        if delivery is not None
+        else {
+            "status": "checkpoint",
+            "checkpoint_change_id": checkpoint_id,
+            "package_digest": "sha256:" + "a" * 64,
+            "source_revision": "b" * 40,
+        }
+    )
 
     def get_state(kind, project_id):
         if (kind, project_id) == ("skill", "control_skill"):
@@ -838,7 +979,9 @@ def _dependency_link_setup(monkeypatch, module, *, declared: bool = True, delive
     transitions: list[dict] = []
 
     def transition(kind, project_id, action, **kwargs):
-        transitions.append({"kind": kind, "project_id": project_id, "action": action, **kwargs})
+        transitions.append(
+            {"kind": kind, "project_id": project_id, "action": action, **kwargs}
+        )
         change_id = kwargs["metadata"]["change_id"]
         if change_id not in change_set["member_change_ids"]:
             change_set["member_change_ids"].append(change_id)
@@ -846,16 +989,27 @@ def _dependency_link_setup(monkeypatch, module, *, declared: bool = True, delive
 
     monkeypatch.setattr(module.workflow, "get_state", get_state)
     monkeypatch.setattr(module.workflow, "transition", transition)
-    monkeypatch.setattr(module, "_sync_change_set_record", lambda **kwargs: {"change_id": kwargs["change_set"]["change_set_id"]})
+    monkeypatch.setattr(
+        module,
+        "_sync_change_set_record",
+        lambda **kwargs: {"change_id": kwargs["change_set"]["change_set_id"]},
+    )
     return checkpoint_id, change_set, transitions
 
 
-def test_link_dependency_checkpoint_records_exact_immutable_receipt(monkeypatch) -> None:
+def test_link_dependency_checkpoint_records_exact_immutable_receipt(
+    monkeypatch,
+) -> None:
     module = _module()
     checkpoint_id, change_set, transitions = _dependency_link_setup(monkeypatch, module)
 
     result = module.link_dependency_checkpoint(
-        "skill", "control_skill", checkpoint_id, "scenario", "recipes", webspace_id="desktop"
+        "skill",
+        "control_skill",
+        checkpoint_id,
+        "scenario",
+        "recipes",
+        webspace_id="desktop",
     )
 
     assert result["linked"] is True
@@ -880,8 +1034,12 @@ def test_link_dependency_checkpoint_is_idempotent(monkeypatch) -> None:
     module = _module()
     checkpoint_id, change_set, _ = _dependency_link_setup(monkeypatch, module)
 
-    module.link_dependency_checkpoint("skill", "control_skill", checkpoint_id, "scenario", "recipes")
-    result = module.link_dependency_checkpoint("skill", "control_skill", checkpoint_id, "scenario", "recipes")
+    module.link_dependency_checkpoint(
+        "skill", "control_skill", checkpoint_id, "scenario", "recipes"
+    )
+    result = module.link_dependency_checkpoint(
+        "skill", "control_skill", checkpoint_id, "scenario", "recipes"
+    )
 
     assert result["linked"] is False
     assert result["idempotent"] is True
@@ -890,10 +1048,14 @@ def test_link_dependency_checkpoint_is_idempotent(monkeypatch) -> None:
 
 def test_link_dependency_checkpoint_rejects_undeclared_dependency(monkeypatch) -> None:
     module = _module()
-    checkpoint_id, _, transitions = _dependency_link_setup(monkeypatch, module, declared=False)
+    checkpoint_id, _, transitions = _dependency_link_setup(
+        monkeypatch, module, declared=False
+    )
 
     try:
-        module.link_dependency_checkpoint("skill", "control_skill", checkpoint_id, "scenario", "recipes")
+        module.link_dependency_checkpoint(
+            "skill", "control_skill", checkpoint_id, "scenario", "recipes"
+        )
     except ValueError as exc:
         assert "not declared" in str(exc)
     else:
@@ -906,7 +1068,9 @@ def test_link_dependency_checkpoint_rejects_checkpoint_mismatch(monkeypatch) -> 
     _, _, transitions = _dependency_link_setup(monkeypatch, module)
 
     try:
-        module.link_dependency_checkpoint("skill", "control_skill", "different", "scenario", "recipes")
+        module.link_dependency_checkpoint(
+            "skill", "control_skill", "different", "scenario", "recipes"
+        )
     except ValueError as exc:
         assert "does not match" in str(exc)
     else:
@@ -922,10 +1086,14 @@ def test_link_dependency_checkpoint_rejects_incomplete_receipt(monkeypatch) -> N
         "package_digest": "",
         "source_revision": "b" * 40,
     }
-    checkpoint_id, _, transitions = _dependency_link_setup(monkeypatch, module, delivery=delivery)
+    checkpoint_id, _, transitions = _dependency_link_setup(
+        monkeypatch, module, delivery=delivery
+    )
 
     try:
-        module.link_dependency_checkpoint("skill", "control_skill", checkpoint_id, "scenario", "recipes")
+        module.link_dependency_checkpoint(
+            "skill", "control_skill", checkpoint_id, "scenario", "recipes"
+        )
     except ValueError as exc:
         assert "receipt is incomplete" in str(exc)
     else:
@@ -935,15 +1103,39 @@ def test_link_dependency_checkpoint_rejects_incomplete_receipt(monkeypatch) -> N
 
 def test_get_state_keeps_capability_failures_separate(monkeypatch) -> None:
     module = _module()
-    monkeypatch.setattr(module.workflow, "get_state", lambda *_args: _idle_builder_workflow())
-    monkeypatch.setattr(module.projects, "describe", lambda *args: {"ok": True, "id": "builder"})
-    monkeypatch.setattr(module.projects, "list_files", lambda *args, **kwargs: [{"path": "scenario.json"}])
-    monkeypatch.setattr(module.preview, "dev_webspace_id", lambda source: f"{source}-dev")
-    monkeypatch.setattr(module.preview, "canonical_source_webspace_id", lambda source: source)
-    monkeypatch.setattr(module.preview, "get_binding", lambda source: {"ok": True, "source_webspace_id": source})
-    monkeypatch.setattr(module.preview, "open_workspace", lambda source: {"url": f"/?webspace={source}-dev"})
-    monkeypatch.setattr(module.automation, "get_state", lambda **kwargs: {"ok": False, "error": "idle"})
-    monkeypatch.setattr(module.conversation, "list_development_changes", lambda **kwargs: [])
+    monkeypatch.setattr(
+        module.workflow, "get_state", lambda *_args: _idle_builder_workflow()
+    )
+    monkeypatch.setattr(
+        module.projects, "describe", lambda *args: {"ok": True, "id": "builder"}
+    )
+    monkeypatch.setattr(
+        module.projects,
+        "list_files",
+        lambda *args, **kwargs: [{"path": "scenario.json"}],
+    )
+    monkeypatch.setattr(
+        module.preview, "dev_webspace_id", lambda source: f"{source}-dev"
+    )
+    monkeypatch.setattr(
+        module.preview, "canonical_source_webspace_id", lambda source: source
+    )
+    monkeypatch.setattr(
+        module.preview,
+        "get_binding",
+        lambda source: {"ok": True, "source_webspace_id": source},
+    )
+    monkeypatch.setattr(
+        module.preview,
+        "open_workspace",
+        lambda source: {"url": f"/?webspace={source}-dev"},
+    )
+    monkeypatch.setattr(
+        module.automation, "get_state", lambda **kwargs: {"ok": False, "error": "idle"}
+    )
+    monkeypatch.setattr(
+        module.conversation, "list_development_changes", lambda **kwargs: []
+    )
 
     result = module.get_state(webspace_id="desktop")
 
@@ -971,7 +1163,8 @@ def test_file_and_automation_tools_forward_stable_project_identity(monkeypatch) 
     monkeypatch.setattr(
         module.automation,
         "start",
-        lambda **kwargs: calls.append(("start", (), kwargs)) or {"ok": True, "status": "queued"},
+        lambda **kwargs: calls.append(("start", (), kwargs))
+        or {"ok": True, "status": "queued"},
     )
     monkeypatch.setattr(
         module.workflow,
@@ -984,7 +1177,9 @@ def test_file_and_automation_tools_forward_stable_project_identity(monkeypatch) 
             "change_set": {"change_set_id": "CS-builder"},
         },
     )
-    monkeypatch.setattr(module.preview, "dev_webspace_id", lambda source: f"{source}-dev")
+    monkeypatch.setattr(
+        module.preview, "dev_webspace_id", lambda source: f"{source}-dev"
+    )
     monkeypatch.setattr(
         module.conversation,
         "ensure_builder_topic",
@@ -1013,7 +1208,9 @@ def test_file_and_automation_tools_forward_stable_project_identity(monkeypatch) 
     )
 
     module.read_project_file("builder_memory.md")
-    saved = module.save_project_file("builder_memory.md", "memory", webspace_id="desktop")
+    saved = module.save_project_file(
+        "builder_memory.md", "memory", webspace_id="desktop"
+    )
     started = module.start_automation("Implement it", webspace_id="desktop")
 
     assert calls[0][1][:2] == ("scenario", "builder")
@@ -1031,7 +1228,9 @@ def test_file_and_automation_tools_forward_stable_project_identity(monkeypatch) 
     assert started["status"] == "queued"
 
 
-def test_plan_change_set_persists_workflow_and_durable_change_evidence(monkeypatch) -> None:
+def test_plan_change_set_persists_workflow_and_durable_change_evidence(
+    monkeypatch,
+) -> None:
     module = _module()
     transitions: list[dict] = []
     evidence_calls: list[dict] = []
@@ -1071,12 +1270,17 @@ def test_plan_change_set_persists_workflow_and_durable_change_evidence(monkeypat
     monkeypatch.setattr(
         module.conversation,
         "ensure_builder_topic",
-        lambda **kwargs: {"conversation_id": "conv", "topic_id": "topic", "thread_id": "thread"},
+        lambda **kwargs: {
+            "conversation_id": "conv",
+            "topic_id": "topic",
+            "thread_id": "thread",
+        },
     )
     monkeypatch.setattr(
         module.conversation,
         "upsert_development_change",
-        lambda **kwargs: evidence_calls.append(kwargs) or {"change_id": kwargs["change_id"], "status": kwargs["status"]},
+        lambda **kwargs: evidence_calls.append(kwargs)
+        or {"change_id": kwargs["change_id"], "status": kwargs["status"]},
     )
 
     result = module.plan_change_set(
@@ -1120,8 +1324,16 @@ def test_accept_prototype_forwards_exact_review_evidence(monkeypatch) -> None:
             {"id": "board.move", "status": "passed", "evidence_refs": ["trace:move-1"]}
         ],
         visual_checks=[
-            {"viewport": "compact", "status": "passed", "evidence_ref": "file:.tmp/compact.png"},
-            {"viewport": "wide", "status": "passed", "evidence_ref": "file:.tmp/wide.png"},
+            {
+                "viewport": "compact",
+                "status": "passed",
+                "evidence_ref": "file:.tmp/compact.png",
+            },
+            {
+                "viewport": "wide",
+                "status": "passed",
+                "evidence_ref": "file:.tmp/wide.png",
+            },
         ],
         object_type="project",
         object_id="kanban",
@@ -1186,10 +1398,14 @@ def test_get_automation_exposes_source_prototype_metadata(monkeypatch) -> None:
 
 def test_lifecycle_exposes_bounded_automation_result_children(monkeypatch) -> None:
     module = _module()
-    monkeypatch.setattr(module.workflow, "get_state", lambda *_args: _idle_builder_workflow())
+    monkeypatch.setattr(
+        module.workflow, "get_state", lambda *_args: _idle_builder_workflow()
+    )
     monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.2.0"})
     monkeypatch.setattr(module.projects, "list_files", lambda *args, **kwargs: [])
-    monkeypatch.setattr(module.conversation, "list_development_changes", lambda **kwargs: [])
+    monkeypatch.setattr(
+        module.conversation, "list_development_changes", lambda **kwargs: []
+    )
     monkeypatch.setattr(
         module.automation,
         "get_state",
@@ -1263,10 +1479,16 @@ def test_new_scenario_has_only_prototype_before_handoff(monkeypatch) -> None:
         "get_state",
         lambda **kwargs: {
             "ok": True,
-            "automation": {"status": "idle", "phase": "not_started", "version": "0.1.0"},
+            "automation": {
+                "status": "idle",
+                "phase": "not_started",
+                "version": "0.1.0",
+            },
         },
     )
-    monkeypatch.setattr(module.conversation, "list_development_changes", lambda **kwargs: [])
+    monkeypatch.setattr(
+        module.conversation, "list_development_changes", lambda **kwargs: []
+    )
 
     lifecycle = module.get_lifecycle("scenario", "test04_recipes")
 
@@ -1280,13 +1502,23 @@ def test_new_scenario_has_only_prototype_before_handoff(monkeypatch) -> None:
     assert lifecycle[0]["publicationUpdatedAt"] is None
 
 
-def test_return_to_prototype_adaptation_does_not_replace_automation_head(monkeypatch) -> None:
+def test_return_to_prototype_adaptation_does_not_replace_automation_head(
+    monkeypatch,
+) -> None:
     module = _module()
-    monkeypatch.setattr(module, "_project_descriptor", lambda *_args: {"version": "0.4.2", "title": "Recipes"})
+    monkeypatch.setattr(
+        module,
+        "_project_descriptor",
+        lambda *_args: {"version": "0.4.2", "title": "Recipes"},
+    )
     monkeypatch.setattr(module, "_context", lambda *_args: {})
     monkeypatch.setattr(module.projects, "list_files", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(module.projects, "read_file", lambda *_args, **_kwargs: {"content": ""})
-    monkeypatch.setattr(module.conversation, "list_development_changes", lambda **_kwargs: [])
+    monkeypatch.setattr(
+        module.projects, "read_file", lambda *_args, **_kwargs: {"content": ""}
+    )
+    monkeypatch.setattr(
+        module.conversation, "list_development_changes", lambda **_kwargs: []
+    )
     monkeypatch.setattr(
         module,
         "_workflow_projection",
@@ -1329,7 +1561,11 @@ def test_return_to_prototype_adaptation_does_not_replace_automation_head(monkeyp
 
 def test_real_automation_task_does_not_borrow_prototype_version(monkeypatch) -> None:
     module = _module()
-    projection = {"status": "running", "task_id": "task-real", "phase": "implementation"}
+    projection = {
+        "status": "running",
+        "task_id": "task-real",
+        "phase": "implementation",
+    }
 
     child = module._automation_children(projection, project_version="0.1.0")[0]
 
@@ -1352,7 +1588,9 @@ def test_preview_display_preserves_runtime_semantic_label(monkeypatch) -> None:
         },
     }
     monkeypatch.setattr(module.preview, "get_binding", lambda *_args: binding)
-    monkeypatch.setattr(module.preview, "open_workspace", lambda *_args: {"url": "/preview"})
+    monkeypatch.setattr(
+        module.preview, "open_workspace", lambda *_args: {"url": "/preview"}
+    )
 
     preview = module.get_preview(webspace_id="desktop")
 
@@ -1363,14 +1601,21 @@ def test_preview_display_preserves_runtime_semantic_label(monkeypatch) -> None:
 
 def test_project_display_preserves_runtime_semantic_preview_label(monkeypatch) -> None:
     module = _module()
-    monkeypatch.setattr(module, "_project_descriptor", lambda *_args: {"title": "Recipes", "version": "0.4.2"})
+    monkeypatch.setattr(
+        module,
+        "_project_descriptor",
+        lambda *_args: {"title": "Recipes", "version": "0.4.2"},
+    )
     monkeypatch.setattr(module, "_context", lambda *_args: {})
     monkeypatch.setattr(
         module,
         "_workflow_projection",
         lambda *_args: {
             "active_phase": "automation",
-            "automation": {"head_task_id": "task-internal-42", "result_version": "0.4.2"},
+            "automation": {
+                "head_task_id": "task-internal-42",
+                "result_version": "0.4.2",
+            },
             "capabilities": {},
         },
     )
@@ -1395,7 +1640,126 @@ def test_project_display_preserves_runtime_semantic_preview_label(monkeypatch) -
     assert "change" not in project
 
 
-def test_transport_guard_accepts_russian_unchanged_and_rejects_lossy_text(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("object_type", "error_factory", "working_label"),
+    [
+        (
+            "project",
+            lambda module: module.compositions.ProjectCompositionNotFound("missing"),
+            "Project not found",
+        ),
+        (
+            "scenario",
+            lambda module: module.projects.ProjectNotFoundError("missing"),
+            "Scenario not found",
+        ),
+        (
+            "skill",
+            lambda module: module.projects.ProjectNotFoundError("missing"),
+            "Skill not found",
+        ),
+    ],
+)
+def test_project_display_returns_terminal_not_found_projection(
+    monkeypatch,
+    object_type,
+    error_factory,
+    working_label,
+) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        module,
+        "_project_descriptor",
+        lambda *_args: (_ for _ in ()).throw(error_factory(module)),
+    )
+
+    project = module.get_project(object_type, "missing", webspace_id="desktop-dev")
+
+    assert project == {
+        "ok": True,
+        "status": "not_found",
+        "availability_state": "not_found",
+        "reason_code": f"{object_type}_not_found",
+        "object_type": object_type,
+        "object_id": "missing",
+        "project_ref": f"{object_type}:missing",
+        "source_webspace_id": "desktop-dev",
+        "working_label": working_label,
+        "change_label": f"{object_type}:missing",
+        "viewing_label": "Choose another project",
+        "viewing_read_only": True,
+        "workflow_active_phase": "unavailable",
+        "workflow_generation": 0,
+        "can_edit_prototype": False,
+        "can_edit_automation": False,
+        "can_return_to_prototype": False,
+        "can_prepare_candidate": False,
+        "can_decide_candidate": False,
+        "can_publish": False,
+        "can_start_implementation": False,
+    }
+
+
+@pytest.mark.parametrize(
+    ("object_type", "error_factory"),
+    [
+        (
+            "project",
+            lambda module: module.compositions.ProjectCompositionNotFound("missing"),
+        ),
+        ("scenario", lambda module: module.projects.ProjectNotFoundError("missing")),
+        ("skill", lambda module: module.projects.ProjectNotFoundError("missing")),
+    ],
+)
+def test_lifecycle_is_empty_when_selected_object_was_removed(
+    monkeypatch,
+    object_type,
+    error_factory,
+) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        module,
+        "_project_descriptor",
+        lambda *_args: (_ for _ in ()).throw(error_factory(module)),
+    )
+
+    assert module.get_lifecycle(object_type, "missing", webspace_id="desktop-dev") == []
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "sdk_method"),
+    [
+        ("get_interaction_frame", "get_interaction_frame"),
+        ("get_change_set", "get_state"),
+    ],
+)
+def test_initial_builder_reads_are_terminal_when_selected_object_was_removed(
+    monkeypatch,
+    tool_name,
+    sdk_method,
+) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        module.workflow,
+        sdk_method,
+        lambda *_args: (_ for _ in ()).throw(
+            FileNotFoundError("DEV scenario project not found: missing")
+        ),
+    )
+
+    result = getattr(module, tool_name)("scenario", "missing")
+
+    if tool_name == "get_interaction_frame":
+        assert result["context"]["availability_state"] == "not_found"
+        assert result["actions"] == []
+    else:
+        assert result["availability_state"] == "not_found"
+        assert result["issues"] == []
+
+
+def test_transport_guard_accepts_russian_unchanged_and_rejects_lossy_text(
+    monkeypatch,
+) -> None:
     module = _module()
     request = "Добавить поиск — быстро, точно и без потерь?"
     issue = {"issue_id": "поиск", "title": "Поиск по рецептам!"}
@@ -1404,9 +1768,8 @@ def test_transport_guard_accepts_russian_unchanged_and_rejects_lossy_text(monkey
     monkeypatch.setattr(
         module.workflow,
         "transition",
-        lambda *args, **kwargs: transitions.append(kwargs["metadata"]) or {
-            "workflow": {"change_set": kwargs["metadata"]}
-        },
+        lambda *args, **kwargs: transitions.append(kwargs["metadata"])
+        or {"workflow": {"change_set": kwargs["metadata"]}},
     )
     monkeypatch.setattr(
         module,
@@ -1422,7 +1785,9 @@ def test_transport_guard_accepts_russian_unchanged_and_rejects_lossy_text(monkey
         },
     )
 
-    result = module.plan_change_set(request, [issue], object_type="scenario", object_id="recipes")
+    result = module.plan_change_set(
+        request, [issue], object_type="scenario", object_id="recipes"
+    )
 
     assert transitions[0]["request"] == request
     assert transitions[0]["issues"] == [issue]
@@ -1430,7 +1795,9 @@ def test_transport_guard_accepts_russian_unchanged_and_rejects_lossy_text(monkey
     assert result["change_set"]["request"] == request
     for corrupt in ("Исправить \ufffd текст", "????????"):
         with pytest.raises(ValueError, match="transport integrity"):
-            module.plan_change_set(corrupt, [issue], object_type="scenario", object_id="recipes")
+            module.plan_change_set(
+                corrupt, [issue], object_type="scenario", object_id="recipes"
+            )
 
 
 def test_transport_guard_preserves_russian_launch_arguments(monkeypatch) -> None:
@@ -1442,7 +1809,9 @@ def test_transport_guard_preserves_russian_launch_arguments(monkeypatch) -> None
     monkeypatch.setattr(
         module.workflow,
         "get_state",
-        lambda *_args: {"change_set": {"change_set_id": "change-1", "status": "planned"}},
+        lambda *_args: {
+            "change_set": {"change_set_id": "change-1", "status": "planned"}
+        },
     )
     monkeypatch.setattr(
         module.automation,
@@ -1461,12 +1830,18 @@ def test_transport_guard_preserves_russian_launch_arguments(monkeypatch) -> None
     assert launched[0]["implementation_brief"] == brief
     assert followups[0][0] == submitted
     with pytest.raises(ValueError, match="transport integrity"):
-        module.start_automation("Сломано ???", object_type="scenario", object_id="recipes")
+        module.start_automation(
+            "Сломано ???", object_type="scenario", object_id="recipes"
+        )
 
 
-def test_publication_release_children_exclude_dry_runs_and_are_bounded(monkeypatch) -> None:
+def test_publication_release_children_exclude_dry_runs_and_are_bounded(
+    monkeypatch,
+) -> None:
     module = _module()
-    monkeypatch.setattr(module.workflow, "get_state", lambda *_args: _idle_builder_workflow())
+    monkeypatch.setattr(
+        module.workflow, "get_state", lambda *_args: _idle_builder_workflow()
+    )
     monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.2.0"})
     monkeypatch.setattr(module.projects, "list_files", lambda *args, **kwargs: [])
     monkeypatch.setattr(
@@ -1494,12 +1869,18 @@ def test_publication_release_children_exclude_dry_runs_and_are_bounded(monkeypat
         ],
         {"change_id": "checkpoint", "source_refs": {"action": "checkpoint"}},
     ]
-    monkeypatch.setattr(module.conversation, "list_development_changes", lambda **kwargs: changes)
+    monkeypatch.setattr(
+        module.conversation, "list_development_changes", lambda **kwargs: changes
+    )
 
     lifecycle = module.get_lifecycle("skill", "builder")
     prototype = lifecycle[0]
     automation_nodes = prototype["children"][0]["children"]
-    releases = [release for automation_node in automation_nodes for release in automation_node["children"]]
+    releases = [
+        release
+        for automation_node in automation_nodes
+        for release in automation_node["children"]
+    ]
 
     assert len(lifecycle) == 1
     assert prototype["publicationStatus"] == "published"
@@ -1508,14 +1889,20 @@ def test_publication_release_children_exclude_dry_runs_and_are_bounded(monkeypat
     assert all(child["title"].startswith("v ") for child in releases)
     assert all(child["updated_at"] == child["created_at"] for child in releases)
     assert {child["change_id"] for child in releases} == {
-        "release-0", "release-1", "release-2", "release-3", "release-4"
+        "release-0",
+        "release-1",
+        "release-2",
+        "release-3",
+        "release-4",
     }
     assert all(child["updated_at"].endswith("Z") for child in releases)
 
 
 def test_lifecycle_uses_one_stage_contract_and_timestamp_format(monkeypatch) -> None:
     module = _module()
-    monkeypatch.setattr(module.workflow, "get_state", lambda *_args: _idle_builder_workflow())
+    monkeypatch.setattr(
+        module.workflow, "get_state", lambda *_args: _idle_builder_workflow()
+    )
     monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.2.0"})
     monkeypatch.setattr(
         module.projects,
@@ -1527,9 +1914,14 @@ def test_lifecycle_uses_one_stage_contract_and_timestamp_format(monkeypatch) -> 
     monkeypatch.setattr(
         module.automation,
         "get_state",
-        lambda **kwargs: {"ok": True, "automation": {"status": "idle", "updated_at": 1784790001}},
+        lambda **kwargs: {
+            "ok": True,
+            "automation": {"status": "idle", "updated_at": 1784790001},
+        },
     )
-    monkeypatch.setattr(module.conversation, "list_development_changes", lambda **kwargs: [])
+    monkeypatch.setattr(
+        module.conversation, "list_development_changes", lambda **kwargs: []
+    )
     monkeypatch.setattr(module, "_context", lambda *args: {"updated_at": 1784790002})
 
     lifecycle = module.get_lifecycle("skill", "builder")
@@ -1543,7 +1935,9 @@ def test_lifecycle_uses_one_stage_contract_and_timestamp_format(monkeypatch) -> 
     assert lifecycle[0]["publicationUpdatedAt"] is None
 
 
-def test_lifecycle_nests_automation_and_publication_under_source_prototype(monkeypatch) -> None:
+def test_lifecycle_nests_automation_and_publication_under_source_prototype(
+    monkeypatch,
+) -> None:
     module = _module()
     monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.3.0"})
     monkeypatch.setattr(
@@ -1630,7 +2024,9 @@ def test_lifecycle_nests_automation_and_publication_under_source_prototype(monke
     assert publication_node["canPreview"] is True
 
 
-def test_lifecycle_does_not_attach_unproven_old_publication_to_current_automation(monkeypatch) -> None:
+def test_lifecycle_does_not_attach_unproven_old_publication_to_current_automation(
+    monkeypatch,
+) -> None:
     module = _module()
     monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.4.0"})
     monkeypatch.setattr(module.projects, "list_files", lambda *args, **kwargs: [])
@@ -1658,7 +2054,11 @@ def test_lifecycle_does_not_attach_unproven_old_publication_to_current_automatio
         "get_state",
         lambda **kwargs: {
             "ok": True,
-            "automation": {"status": "completed", "task_id": "task-current", "version": "0.4.1"},
+            "automation": {
+                "status": "completed",
+                "task_id": "task-current",
+                "version": "0.4.1",
+            },
         },
     )
     monkeypatch.setattr(
@@ -1683,10 +2083,14 @@ def test_lifecycle_does_not_attach_unproven_old_publication_to_current_automatio
     lifecycle = module.get_lifecycle("skill", "builder")
     automation_nodes = lifecycle[0]["children"][0]["children"]
     current = next(
-        item for item in automation_nodes if item["children"][0]["change_id"] == "publication-current"
+        item
+        for item in automation_nodes
+        if item["children"][0]["change_id"] == "publication-current"
     )
     historical = next(
-        item for item in automation_nodes if item["children"][0]["change_id"] == "publication-old"
+        item
+        for item in automation_nodes
+        if item["children"][0]["change_id"] == "publication-old"
     )
 
     assert [item["version"] for item in current["children"]] == ["0.4.0"]
@@ -1694,7 +2098,9 @@ def test_lifecycle_does_not_attach_unproven_old_publication_to_current_automatio
     assert historical["canPreview"] is False
 
 
-def test_lifecycle_treats_explicit_historical_publication_lineage_as_proven(monkeypatch) -> None:
+def test_lifecycle_treats_explicit_historical_publication_lineage_as_proven(
+    monkeypatch,
+) -> None:
     module = _module()
     monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.4.0"})
     monkeypatch.setattr(module.projects, "list_files", lambda *args, **kwargs: [])
@@ -1718,7 +2124,11 @@ def test_lifecycle_treats_explicit_historical_publication_lineage_as_proven(monk
         "get_state",
         lambda **kwargs: {
             "ok": True,
-            "automation": {"status": "completed", "task_id": "task-current", "version": "0.4.0"},
+            "automation": {
+                "status": "completed",
+                "task_id": "task-current",
+                "version": "0.4.0",
+            },
         },
     )
     monkeypatch.setattr(
@@ -1747,7 +2157,9 @@ def test_lifecycle_treats_explicit_historical_publication_lineage_as_proven(monk
 
     lifecycle = module.get_lifecycle("skill", "builder")
     automation_nodes = lifecycle[0]["children"][0]["children"]
-    proven = next(item for item in automation_nodes if item.get("task_id") == "task-historical")
+    proven = next(
+        item for item in automation_nodes if item.get("task_id") == "task-historical"
+    )
     inferred = next(
         item
         for item in automation_nodes
@@ -1806,7 +2218,8 @@ def test_publish_records_only_successful_non_dry_run_releases(monkeypatch) -> No
     monkeypatch.setattr(
         module,
         "_record_project_change",
-        lambda **kwargs: recorded.append(kwargs) or {"change_id": "publication-change", "status": "accepted"},
+        lambda **kwargs: recorded.append(kwargs)
+        or {"change_id": "publication-change", "status": "accepted"},
     )
     workflow_states = iter(
         [
@@ -1840,7 +2253,9 @@ def test_publish_records_only_successful_non_dry_run_releases(monkeypatch) -> No
             },
         ]
     )
-    monkeypatch.setattr(module.workflow, "get_state", lambda *args: next(workflow_states))
+    monkeypatch.setattr(
+        module.workflow, "get_state", lambda *args: next(workflow_states)
+    )
     transitions: list[tuple[tuple, dict]] = []
     monkeypatch.setattr(
         module.workflow,
@@ -1850,7 +2265,9 @@ def test_publish_records_only_successful_non_dry_run_releases(monkeypatch) -> No
     )
 
     dry_run = module.publish_project(dry_run=True, confirmed=True)
-    published = module.publish_project(dry_run=False, confirmed=True, webspace_id="desktop")
+    published = module.publish_project(
+        dry_run=False, confirmed=True, webspace_id="desktop"
+    )
     failed = module.publish_project(dry_run=False, confirmed=True)
 
     assert dry_run["trial_ready"] is True
@@ -1861,16 +2278,21 @@ def test_publish_records_only_successful_non_dry_run_releases(monkeypatch) -> No
     assert recorded[0]["meta"] == {
         "dry_run": False,
         "version": "0.2.1",
-            "release": "builder@0.2.1",
-            "bump": "patch",
-            "source_automation_task": "task.21",
-        }
+        "release": "builder@0.2.1",
+        "bump": "patch",
+        "source_automation_task": "task.21",
+    }
     by_action = {args[2]: kwargs for args, kwargs in transitions}
-    assert by_action["candidate_accepted"]["metadata"]["candidate_digest"] == "sha256:" + "2" * 64
+    assert (
+        by_action["candidate_accepted"]["metadata"]["candidate_digest"]
+        == "sha256:" + "2" * 64
+    )
     assert by_action["publish"]["metadata"]["candidate_digest"] == "sha256:" + "2" * 64
 
 
-def test_publish_recovers_exact_running_trial_without_repeating_activation(monkeypatch) -> None:
+def test_publish_recovers_exact_running_trial_without_repeating_activation(
+    monkeypatch,
+) -> None:
     module = _module()
     package_digest = "sha256:" + "2" * 64
     source_revision = "a" * 40
@@ -1899,7 +2321,8 @@ def test_publish_recovers_exact_running_trial_without_repeating_activation(monke
     monkeypatch.setattr(
         module.workflow,
         "transition",
-        lambda *args, **kwargs: transitions.append(args[2]) or {"ok": True, "workflow": {}},
+        lambda *args, **kwargs: transitions.append(args[2])
+        or {"ok": True, "workflow": {}},
     )
     monkeypatch.setattr(
         module.projects,
@@ -1922,7 +2345,9 @@ def test_publish_recovers_exact_running_trial_without_repeating_activation(monke
     monkeypatch.setattr(
         module.projects,
         "prepare_candidate",
-        lambda *args, **kwargs: pytest.fail("external Trial activation must not repeat"),
+        lambda *args, **kwargs: pytest.fail(
+            "external Trial activation must not repeat"
+        ),
     )
 
     result = module.publish_project("scenario", "builder", dry_run=True, confirmed=True)
@@ -1933,7 +2358,9 @@ def test_publish_recovers_exact_running_trial_without_repeating_activation(monke
     assert transitions == ["candidate_preparation_started", "candidate_prepared"]
 
 
-def test_trial_result_reconciles_lost_local_waiting_state_without_external_activation(monkeypatch) -> None:
+def test_trial_result_reconciles_lost_local_waiting_state_without_external_activation(
+    monkeypatch,
+) -> None:
     module = _module()
     monkeypatch.setattr(
         module.workflow,
@@ -1964,7 +2391,9 @@ def test_trial_result_reconciles_lost_local_waiting_state_without_external_activ
     assert calls[0][1]["metadata"]["reconciliation"] == "external_trial_result_observed"
 
 
-def test_publication_result_reconciles_lost_local_waiting_state_without_repromotion(monkeypatch) -> None:
+def test_publication_result_reconciles_lost_local_waiting_state_without_repromotion(
+    monkeypatch,
+) -> None:
     module = _module()
     monkeypatch.setattr(
         module.workflow,
@@ -1992,10 +2421,15 @@ def test_publication_result_reconciles_lost_local_waiting_state_without_repromot
     )
 
     assert [args[2] for args, _kwargs in calls] == ["publication_started"]
-    assert calls[0][1]["metadata"]["reconciliation"] == "external_publication_result_observed"
+    assert (
+        calls[0][1]["metadata"]["reconciliation"]
+        == "external_publication_result_observed"
+    )
 
 
-def test_publication_attempt_identity_advances_after_reconciliation(monkeypatch) -> None:
+def test_publication_attempt_identity_advances_after_reconciliation(
+    monkeypatch,
+) -> None:
     module = _module()
     monkeypatch.setattr(
         module.workflow,
@@ -2187,7 +2621,11 @@ def test_project_catalog_and_component_files_are_browser_ready(monkeypatch) -> N
         lambda *args, **kwargs: [
             {"path": "scenario.yaml", "editable": True, "size_bytes": 100},
             {"path": "ui_revisions/001.json", "editable": False, "size_bytes": 200},
-            {"path": "tests/__pycache__/test_builder.pyc", "editable": False, "size_bytes": 300},
+            {
+                "path": "tests/__pycache__/test_builder.pyc",
+                "editable": False,
+                "size_bytes": 300,
+            },
         ],
     )
     monkeypatch.setattr(
@@ -2302,7 +2740,9 @@ def test_project_collection_hides_archived_projects_by_default(monkeypatch) -> N
     )
 
     assert [item["object_id"] for item in module.list_projects()] == ["active"]
-    assert [item["object_id"] for item in module.list_projects(include_archived=True)] == [
+    assert [
+        item["object_id"] for item in module.list_projects(include_archived=True)
+    ] == [
         "active",
         "archived",
     ]
@@ -2330,7 +2770,9 @@ def test_project_catalog_uses_lightweight_state(monkeypatch) -> None:
     monkeypatch.setattr(
         module,
         "_context",
-        lambda *_args: (_ for _ in ()).throw(AssertionError("catalog should not read prompt context")),
+        lambda *_args: (_ for _ in ()).throw(
+            AssertionError("catalog should not read prompt context")
+        ),
     )
 
     assert module.list_projects()[0]["object_id"] == "builder"
@@ -2390,13 +2832,13 @@ def test_preview_selection_waits_until_materialized(monkeypatch) -> None:
     monkeypatch.setattr(
         module.workflow,
         "update_interaction_context",
-        lambda *args, **kwargs: context_updates.append(
-            {"args": args, "kwargs": kwargs}
-        )
+        lambda *args, **kwargs: context_updates.append({"args": args, "kwargs": kwargs})
         or {"workflow": {"interaction": args[2]}},
     )
 
-    result = module.select_preview("scenario", "builder", webspace_id="builder-smoke-dev")
+    result = module.select_preview(
+        "scenario", "builder", webspace_id="builder-smoke-dev"
+    )
 
     assert result["selected"] is True
     assert captured["args"] == ("scenario", "builder")
@@ -2404,12 +2846,16 @@ def test_preview_selection_waits_until_materialized(monkeypatch) -> None:
     assert captured["stage"] == "prototype"
     assert captured["follow_active"] is True
     assert result["interaction_updated"] is True
-    assert context_updates[0]["args"][2] == {"preview_target": "prototype:builder:current"}
+    assert context_updates[0]["args"][2] == {
+        "preview_target": "prototype:builder:current"
+    }
     assert context_updates[0]["kwargs"]["expected_generation"] == 4
 
 
 @pytest.mark.parametrize("tool_name", ["select_preview", "select_preview_target"])
-def test_scenario_preview_selection_preserves_atomic_sdk_event_contract(monkeypatch, tool_name: str) -> None:
+def test_scenario_preview_selection_preserves_atomic_sdk_event_contract(
+    monkeypatch, tool_name: str
+) -> None:
     module = _module()
     events: list[tuple[str, dict]] = []
     expected = {
@@ -2444,10 +2890,16 @@ def test_scenario_preview_selection_preserves_atomic_sdk_event_contract(monkeypa
         return expected
 
     monkeypatch.setattr(module.preview, "select_target", _select_target)
-    monkeypatch.setattr(module.preview, "canonical_source_webspace_id", lambda source: source.removesuffix("-dev"))
+    monkeypatch.setattr(
+        module.preview,
+        "canonical_source_webspace_id",
+        lambda source: source.removesuffix("-dev"),
+    )
 
     if tool_name == "select_preview":
-        result = module.select_preview("scenario", "recipes", webspace_id="builder-host-dev")
+        result = module.select_preview(
+            "scenario", "recipes", webspace_id="builder-host-dev"
+        )
     else:
         result = module.select_preview_target(
             "automation",
@@ -2471,7 +2923,9 @@ def test_scenario_preview_selection_preserves_atomic_sdk_event_contract(monkeypa
     assert all(topic != "builder.preview.desired" for topic, _payload in events)
 
 
-def test_create_project_selects_preview_and_returns_durable_conversation(monkeypatch) -> None:
+def test_create_project_selects_preview_and_returns_durable_conversation(
+    monkeypatch,
+) -> None:
     module = _module()
     selections: list[dict] = []
     monkeypatch.setattr(
@@ -2492,10 +2946,15 @@ def test_create_project_selects_preview_and_returns_durable_conversation(monkeyp
     monkeypatch.setattr(
         module.preview,
         "select_project",
-        lambda *args, **kwargs: selections.append({"args": args, **kwargs}) or {"ok": True},
+        lambda *args, **kwargs: selections.append({"args": args, **kwargs})
+        or {"ok": True},
     )
-    monkeypatch.setattr(module.preview, "canonical_source_webspace_id", lambda source: "dev1")
-    monkeypatch.setattr(module.preview, "dev_webspace_id", lambda source: f"{source}-dev")
+    monkeypatch.setattr(
+        module.preview, "canonical_source_webspace_id", lambda source: "dev1"
+    )
+    monkeypatch.setattr(
+        module.preview, "dev_webspace_id", lambda source: f"{source}-dev"
+    )
     monkeypatch.setattr(
         module.conversation,
         "ensure_builder_topic",
@@ -2529,7 +2988,9 @@ def test_create_project_selects_preview_and_returns_durable_conversation(monkeyp
     ]
 
 
-def test_create_project_from_builder_preview_keeps_current_webspace_as_host(monkeypatch) -> None:
+def test_create_project_from_builder_preview_keeps_current_webspace_as_host(
+    monkeypatch,
+) -> None:
     module = _module()
     selections: list[dict] = []
     source_calls: list[tuple[str, str | None]] = []
@@ -2556,7 +3017,9 @@ def test_create_project_from_builder_preview_keeps_current_webspace_as_host(monk
         lambda *args, **kwargs: selections.append({"args": args, **kwargs})
         or {"ok": True},
     )
-    monkeypatch.setattr(module.preview, "dev_webspace_id", lambda source: f"{source}-dev")
+    monkeypatch.setattr(
+        module.preview, "dev_webspace_id", lambda source: f"{source}-dev"
+    )
     monkeypatch.setattr(
         module.conversation,
         "ensure_builder_topic",
@@ -2592,13 +3055,21 @@ def test_create_project_from_builder_preview_keeps_current_webspace_as_host(monk
 
 def test_preview_state_exposes_open_and_qr_targets(monkeypatch) -> None:
     module = _module()
-    monkeypatch.setattr(module.preview, "canonical_source_webspace_id", lambda source: "dev1")
+    monkeypatch.setattr(
+        module.preview, "canonical_source_webspace_id", lambda source: "dev1"
+    )
     monkeypatch.setattr(
         module.preview,
         "get_binding",
-        lambda source: {"ok": True, "runtime_scenario_id": "builder", "dev_webspace_id": "dev1-dev"},
+        lambda source: {
+            "ok": True,
+            "runtime_scenario_id": "builder",
+            "dev_webspace_id": "dev1-dev",
+        },
     )
-    monkeypatch.setattr(module.preview, "open_workspace", lambda source: {"url": "/?webspace=dev1-dev"})
+    monkeypatch.setattr(
+        module.preview, "open_workspace", lambda source: {"url": "/?webspace=dev1-dev"}
+    )
 
     result = module.get_preview(webspace_id="dev1-dev")
 
@@ -2654,7 +3125,9 @@ def test_project_lifecycle_tools_stay_behind_sdk(monkeypatch) -> None:
             "trial_workspace": "trials/candidate-1/workspace",
         },
     )
-    monkeypatch.setattr(module.preview, "dev_webspace_id", lambda source: f"{source}-dev")
+    monkeypatch.setattr(
+        module.preview, "dev_webspace_id", lambda source: f"{source}-dev"
+    )
     monkeypatch.setattr(
         module.conversation,
         "ensure_builder_topic",
@@ -2666,7 +3139,9 @@ def test_project_lifecycle_tools_stay_behind_sdk(monkeypatch) -> None:
         captured_change.update(kwargs)
         return {"change_id": kwargs["change_id"], "status": kwargs["status"]}
 
-    monkeypatch.setattr(module.conversation, "upsert_development_change", _upsert_change)
+    monkeypatch.setattr(
+        module.conversation, "upsert_development_change", _upsert_change
+    )
     monkeypatch.setattr(
         module.conversation,
         "get_development_change",
@@ -2675,7 +3150,8 @@ def test_project_lifecycle_tools_stay_behind_sdk(monkeypatch) -> None:
     monkeypatch.setattr(
         module.conversation,
         "upsert_development_run",
-        lambda **kwargs: run_calls.append(kwargs) or {"run_id": kwargs["run_id"], "change_id": kwargs["change_id"]},
+        lambda **kwargs: run_calls.append(kwargs)
+        or {"run_id": kwargs["run_id"], "change_id": kwargs["change_id"]},
     )
     monkeypatch.setattr(
         module.workflow,
@@ -2692,7 +3168,10 @@ def test_project_lifecycle_tools_stay_behind_sdk(monkeypatch) -> None:
                 "allowed_commands": [{"command": "accept_verification"}],
             },
             "capabilities": {"can_prepare_candidate": True},
-            "change": {"change_id": "CH-builder", "context_packet_digest": packet_digest},
+            "change": {
+                "change_id": "CH-builder",
+                "context_packet_digest": packet_digest,
+            },
             "change_set": {
                 "change_set_id": "CH-builder",
                 "member_change_ids": ["CH-builder", captured_change.get("change_id")],
@@ -2760,7 +3239,9 @@ def test_project_lifecycle_tools_stay_behind_sdk(monkeypatch) -> None:
 
 def test_prompt_ide_compatibility_projections_are_browser_ready(monkeypatch) -> None:
     module = _module()
-    monkeypatch.setattr(module.workflow, "get_state", lambda *_args: _idle_builder_workflow())
+    monkeypatch.setattr(
+        module.workflow, "get_state", lambda *_args: _idle_builder_workflow()
+    )
 
     def _describe(kind, object_id):
         return {
@@ -2803,7 +3284,10 @@ def test_prompt_ide_compatibility_projections_are_browser_ready(monkeypatch) -> 
     tree = module.list_project_file_tree("scenario", "builder")
     lifecycle = module.get_lifecycle("scenario", "builder", webspace_id="desktop")
 
-    assert [item["id"] for item in objects] == ["scenario:builder", "skill:builder_skill"]
+    assert [item["id"] for item in objects] == [
+        "scenario:builder",
+        "skill:builder_skill",
+    ]
     assert [item["id"] for item in tree] == ["builder_memory.md", "ui_revisions"]
     assert lifecycle[0]["children"][0]["revision"] == "030"
     assert lifecycle[0]["children"][0]["canMakeCurrent"] is False
@@ -2892,13 +3376,18 @@ def test_process_nests_implementation_under_its_source_prototype(monkeypatch) ->
         "get_state",
         lambda *args: {
             "generation": 7,
-            "interaction": {"inspected_ref": None, "preview_target": "prototype:recipes:002"},
+            "interaction": {
+                "inspected_ref": None,
+                "preview_target": "prototype:recipes:002",
+            },
             "change": {
                 "change_id": "CH-recipes",
                 "request": "Add recipe search",
                 "status": "trial",
                 "issues": [],
-                "runs": [{"run_id": "RUN-implementation", "activity": "automation_completed"}],
+                "runs": [
+                    {"run_id": "RUN-implementation", "activity": "automation_completed"}
+                ],
             },
             "prototype": {"head_revision": "003", "status": "frozen"},
             "automation": {
@@ -2932,13 +3421,19 @@ def test_process_nests_implementation_under_its_source_prototype(monkeypatch) ->
 
 def test_project_process_exposes_active_trial_placement(monkeypatch) -> None:
     module = _module()
-    monkeypatch.setattr(module.compositions, "get", lambda *_args: _root_mgmnt_project())
+    monkeypatch.setattr(
+        module.compositions, "get", lambda *_args: _root_mgmnt_project()
+    )
     monkeypatch.setattr(
         module.workflow,
         "get_state",
         lambda *_args: {
             "generation": 18,
-            "change": {"change_id": "CH-root", "request": "Update root UI", "issues": []},
+            "change": {
+                "change_id": "CH-root",
+                "request": "Update root UI",
+                "issues": [],
+            },
             "prototype": {"head_revision": "003", "status": "frozen"},
             "automation": {
                 "status": "completed",
@@ -2976,7 +3471,9 @@ def test_project_placement_navigation_uses_workflow_sdk(monkeypatch) -> None:
     module = _module()
     calls: list[tuple] = []
     materializations: list[tuple] = []
-    monkeypatch.setattr(module.compositions, "get", lambda *_args: _root_mgmnt_project())
+    monkeypatch.setattr(
+        module.compositions, "get", lambda *_args: _root_mgmnt_project()
+    )
     monkeypatch.setattr(
         module.workflow,
         "get_project_placement_navigation",
@@ -3053,7 +3550,9 @@ def test_project_stable_navigation_recovers_published_placement(monkeypatch) -> 
         },
         "project": {"placements": []},
     }
-    monkeypatch.setattr(module.compositions, "get", lambda *_args: _root_mgmnt_project())
+    monkeypatch.setattr(
+        module.compositions, "get", lambda *_args: _root_mgmnt_project()
+    )
     monkeypatch.setattr(module, "_preview_source_webspace_id", lambda *_args: "desktop")
 
     def navigation(*args, **kwargs):
@@ -3070,7 +3569,8 @@ def test_project_stable_navigation_recovers_published_placement(monkeypatch) -> 
     monkeypatch.setattr(
         module.preview,
         "materialize_revision",
-        lambda **kwargs: materializations.append(kwargs) or {"ok": True, "accepted": True},
+        lambda **kwargs: materializations.append(kwargs)
+        or {"ok": True, "accepted": True},
     )
     monkeypatch.setattr(
         module.workflow,
@@ -3125,13 +3625,16 @@ def test_project_stable_navigation_recovers_published_placement(monkeypatch) -> 
     assert result["preview_url"].endswith("preview_stage=publication")
 
 
-def test_semantic_ui_tool_forwards_typed_local_reversible_operation(monkeypatch) -> None:
+def test_semantic_ui_tool_forwards_typed_local_reversible_operation(
+    monkeypatch,
+) -> None:
     module = _module()
     operations: list[dict] = []
     monkeypatch.setattr(
         module.semantic_ui,
         "apply",
-        lambda operation: operations.append(operation) or {"ok": True, "revision": "055"},
+        lambda operation: operations.append(operation)
+        or {"ok": True, "revision": "055"},
     )
 
     result = module.apply_semantic_ui_change(
@@ -3150,7 +3653,9 @@ def test_semantic_ui_tool_forwards_typed_local_reversible_operation(monkeypatch)
     assert operations[0]["operation"] == "rename"
 
 
-def test_review_constraint_tools_forward_structured_review_and_revision(monkeypatch) -> None:
+def test_review_constraint_tools_forward_structured_review_and_revision(
+    monkeypatch,
+) -> None:
     module = _module()
     registered: list[dict] = []
     evaluated: list[dict] = []
@@ -3205,7 +3710,8 @@ def test_project_context_and_metadata_mutations_stay_behind_sdk(monkeypatch) -> 
     monkeypatch.setattr(
         module.prompt_context,
         "save_base",
-        lambda *args, **kwargs: calls.append(("save_base", args, kwargs)) or {"ok": True},
+        lambda *args, **kwargs: calls.append(("save_base", args, kwargs))
+        or {"ok": True},
     )
     monkeypatch.setattr(
         module.prompt_context,
@@ -3215,12 +3721,14 @@ def test_project_context_and_metadata_mutations_stay_behind_sdk(monkeypatch) -> 
     monkeypatch.setattr(
         module.prompt_context,
         "set_preferences",
-        lambda *args, **kwargs: calls.append(("preferences", args, kwargs)) or {"ok": True},
+        lambda *args, **kwargs: calls.append(("preferences", args, kwargs))
+        or {"ok": True},
     )
     monkeypatch.setattr(
         module.projects,
         "update_metadata",
-        lambda *args, **kwargs: calls.append(("metadata", args, kwargs)) or {"ok": True},
+        lambda *args, **kwargs: calls.append(("metadata", args, kwargs))
+        or {"ok": True},
     )
     monkeypatch.setattr(
         module,
@@ -3229,7 +3737,9 @@ def test_project_context_and_metadata_mutations_stay_behind_sdk(monkeypatch) -> 
     )
 
     saved = module.save_prompt_context("Base", webspace_id="desktop")
-    appended = module.append_prompt_addendum("Delta", iteration_ref="030", webspace_id="desktop")
+    appended = module.append_prompt_addendum(
+        "Delta", iteration_ref="030", webspace_id="desktop"
+    )
     module.archive_project(True)
     module.update_project_metadata(title="Builder 2")
 
@@ -3241,7 +3751,9 @@ def test_project_context_and_metadata_mutations_stay_behind_sdk(monkeypatch) -> 
     assert appended["change_id"] == "chg"
 
 
-def test_development_feedback_reads_project_scoped_context_inspector(monkeypatch) -> None:
+def test_development_feedback_reads_project_scoped_context_inspector(
+    monkeypatch,
+) -> None:
     module = _module()
     calls: list[tuple[str, int]] = []
     monkeypatch.setattr(module, "_preview_source_webspace_id", lambda *_args: "desktop")

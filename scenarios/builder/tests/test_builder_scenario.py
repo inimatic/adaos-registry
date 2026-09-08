@@ -64,8 +64,46 @@ def test_ui_preserves_stabilized_three_panel_surface_and_modals() -> None:
     assert [area["id"] for area in page["layout"]["areas"]] == ["left", "center", "right"]
     assert {"llm-profile", "llmModel", "provider", "voice-input"} <= ids
     assert "confirm-subscription-update" in webui["ui"]["application"]["modals"]
+    assert "prototype-review" in webui["ui"]["application"]["modals"]
     assert page["meta"]["builder"]["functional"] is True
     assert page["meta"]["builder"]["binding_mode"] == "skill"
+
+
+def test_prototype_approval_collects_evidence_and_uses_canonical_acceptance() -> None:
+    webui = _load("webui.json")
+    widgets = _by_id(webui)
+    modals = webui["ui"]["application"]["modals"]
+    review = modals["prototype-review"]["schema"]["widgets"][0]
+
+    approval_actions = [
+        action
+        for widget_id, event in (
+            ("context-actions", "click:approve-prototype"),
+            ("project-tree", "click:stabilize"),
+        )
+        for action in widgets[widget_id]["actions"]
+        if action.get("on") == event
+    ]
+    assert len(approval_actions) == 2
+    assert all(action["type"] == "openModal" for action in approval_actions)
+    assert all(action["params"]["modalId"] == "prototype-review" for action in approval_actions)
+
+    fields = {item["id"] for item in review["inputs"]["fields"]}
+    assert fields == {
+        "behavior_evidence_ref",
+        "compact_screenshot_ref",
+        "wide_screenshot_ref",
+    }
+    accept = next(action for action in review["actions"] if action["type"] == "callSkill")
+    assert accept["target"] == "builder_sdk_control_skill.accept_prototype"
+    assert accept["params"]["expected_generation"] == "$state.workflowGeneration"
+    assert {item["breakpoint"] for item in accept["params"]["visual_checks"]} == {
+        "compact",
+        "wide",
+    }
+    assert "builder_sdk_control_skill.push_project" not in {
+        action.get("target") for action in approval_actions
+    }
 
 
 def test_builder_observes_project_scoped_development_feedback() -> None:
@@ -343,11 +381,11 @@ def test_ui_revision_and_artifact_versions_have_explicit_non_stale_labels() -> N
     webui = _load("webui.json")
     labels = webui["ui"]["application"]["desktop"]["pageSchema"]["meta"]["builder"]
 
-    assert labels["ui_revision"] == "058"
-    assert labels["proto"] == "proto:058"
+    assert labels["ui_revision"] == "059"
+    assert labels["proto"] == "proto:059"
     assert labels["active"] == "active:current"
     assert labels["public"] == "public:current"
-    assert "proto:045" not in json.dumps(webui, ensure_ascii=False)
+    assert "proto:058" not in json.dumps(webui, ensure_ascii=False)
 
 
 def test_prototype_declares_no_network_device_or_credential_transport() -> None:

@@ -4,7 +4,7 @@
     "type": "desktop",
     "title": "Builder — рабочее место разработки",
     "description": "Safe local Builder prototype for the dependent Prototype, Automation, Trial, and Publication lifecycle.",
-    "version": "0.2.78",
+    "version": "0.2.81",
     "title_i18n": {
         "fallback": "Builder",
         "key": "scenario.builder.title"
@@ -104,6 +104,7 @@
                         "selectedLifecycleStage": "prototype",
                         "lifecycleConversationLabel": "Prototype conversation",
                         "workflowActivePhase": "prototype",
+                        "projectAvailabilityState": "available",
                         "workflowWorkingLabel": "WORKING: Prototype",
                         "previewViewingLabel": "Preview: not selected",
                         "previewViewingReadOnly": false,
@@ -287,41 +288,10 @@
                                 },
                                 {
                                     "on": "click:approve-prototype",
-                                    "type": "callSkill",
-                                    "target": "builder_sdk_control_skill.push_project",
+                                    "type": "openModal",
                                     "params": {
-                                        "checkpoint_id": "chat-first-prototype-approval",
-                                        "confirmed": true,
-                                        "message": "Builder prototype approval",
-                                        "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId",
-                                        "_meta": {
-                                            "current_scenario": "builder"
-                                        }
-                                    },
-                                    "invalidates": [
-                                        "builder.project.change",
-                                        "builder.project.lifecycle"
-                                    ]
-                                },
-                                {
-                                    "on": "click:approve-prototype",
-                                    "type": "callSkill",
-                                    "target": "builder_sdk_control_skill.transition_workflow",
-                                    "params": {
-                                        "action": "stabilize_prototype",
-                                        "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId",
-                                        "expected_generation": "$state.workflowGeneration",
-                                        "_meta": {
-                                            "current_scenario": "builder"
-                                        }
-                                    },
-                                    "invalidates": [
-                                        "builder.project.change",
-                                        "builder.project.metadata",
-                                        "builder.project.lifecycle"
-                                    ]
+                                        "modalId": "prototype-review"
+                                    }
                                 },
                                 {
                                     "on": "click:start-implementation",
@@ -399,8 +369,49 @@
                                     "canPublish": "can_publish",
                                     "workflowGeneration": "workflow_generation",
                                     "changeLabel": "change_label",
-                                    "canStartImplementation": "can_start_implementation"
+                                    "canStartImplementation": "can_start_implementation",
+                                    "projectAvailabilityState": "availability_state"
                                 }
+                            }
+                        },
+                        {
+                            "area": "center",
+                            "id": "missing-project-actions",
+                            "type": "ui.actions",
+                            "title": "Selected project, skill, or scenario was not found",
+                            "visibleIf": "$state.projectAvailabilityState === 'not_found'",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "size": "small",
+                                "buttons": [
+                                    {
+                                        "id": "choose-project",
+                                        "label": "Choose project",
+                                        "icon": "folder-open-outline",
+                                        "label_i18n": {
+                                            "key": "builder.text.choose.project"
+                                        }
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:choose-project",
+                                    "type": "updateState",
+                                    "params": {
+                                        "projectPickerArchived": false
+                                    }
+                                },
+                                {
+                                    "on": "click:choose-project",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "project-picker"
+                                    }
+                                }
+                            ],
+                            "title_i18n": {
+                                "key": "builder.text.selected.object.not.found"
                             }
                         },
                         {
@@ -1676,39 +1687,10 @@
                                 },
                                 {
                                     "on": "click:stabilize",
-                                    "type": "callSkill",
-                                    "target": "builder_sdk_control_skill.push_project",
+                                    "type": "openModal",
                                     "params": {
-                                        "checkpoint_id": "$event.id",
-                                        "confirmed": true,
-                                        "message": "Builder prototype stabilization",
-                                        "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId",
-                                        "_meta": {
-                                            "current_scenario": "builder"
-                                        }
-                                    },
-                                    "invalidates": [
-                                        "builder.project.publication",
-                                        "builder.project.lifecycle"
-                                    ]
-                                },
-                                {
-                                    "on": "click:stabilize",
-                                    "type": "callSkill",
-                                    "target": "builder_sdk_control_skill.transition_workflow",
-                                    "params": {
-                                        "action": "stabilize_prototype",
-                                        "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId",
-                                        "_meta": {
-                                            "current_scenario": "builder"
-                                        }
-                                    },
-                                    "invalidates": [
-                                        "builder.project.metadata",
-                                        "builder.project.lifecycle"
-                                    ]
+                                        "modalId": "prototype-review"
+                                    }
                                 },
                                 {
                                     "on": "click:go-automation",
@@ -2630,9 +2612,9 @@
                     "meta": {
                         "builder": {
                             "scenario_id": "builder",
-                            "ui_revision": "058",
+                            "ui_revision": "059",
                             "prototype_base_revision": "029",
-                            "previous_revision": "057",
+                            "previous_revision": "058",
                             "functional": true,
                             "workflow_contract": "adaos.builder.workflow.v1",
                             "functional_base_revision": "042",
@@ -2649,7 +2631,7 @@
                                 "automation": "builder_sdk_control_skill.get_automation",
                                 "publication": "builder_sdk_control_skill.publish_project"
                             },
-                            "proto": "proto:058",
+                            "proto": "proto:059",
                             "active": "active:current",
                             "public": "public:current",
                             "lifecycle": [
@@ -3448,6 +3430,130 @@
                     },
                     "title_i18n": {
                         "key": "builder.text.specification.addendum"
+                    }
+                },
+                "prototype-review": {
+                    "title": "Prototype review",
+                    "presentation": {
+                        "kind": "modal"
+                    },
+                    "schema": {
+                        "id": "prototype-review",
+                        "title": "Prototype review",
+                        "layout": {
+                            "type": "stack",
+                            "areas": {
+                                "id": "main",
+                                "role": "main"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "area": "main",
+                                "id": "prototype-review-form",
+                                "type": "ui.form",
+                                "title": "Acceptance evidence",
+                                "inputs": {
+                                    "submitLabel": "Approve prototype",
+                                    "fields": [
+                                        {
+                                            "id": "behavior_evidence_ref",
+                                            "type": "shortText",
+                                            "label": "Behavior check reference",
+                                            "required": true,
+                                            "label_i18n": {
+                                                "key": "builder.text.prototype.behavior.evidence"
+                                            }
+                                        },
+                                        {
+                                            "id": "compact_screenshot_ref",
+                                            "type": "shortText",
+                                            "label": "Compact screenshot reference",
+                                            "required": true,
+                                            "label_i18n": {
+                                                "key": "builder.text.prototype.compact.evidence"
+                                            }
+                                        },
+                                        {
+                                            "id": "wide_screenshot_ref",
+                                            "type": "shortText",
+                                            "label": "Wide screenshot reference",
+                                            "required": true,
+                                            "label_i18n": {
+                                                "key": "builder.text.prototype.wide.evidence"
+                                            }
+                                        }
+                                    ],
+                                    "submitLabel_i18n": {
+                                        "key": "builder.text.approve.prototype"
+                                    }
+                                },
+                                "actions": [
+                                    {
+                                        "on": "submit",
+                                        "type": "callSkill",
+                                        "target": "builder_sdk_control_skill.accept_prototype",
+                                        "params": {
+                                            "reviewer_id": "user:local",
+                                            "reviewer_kind": "human",
+                                            "behavior_checks": [
+                                                {
+                                                    "id": "render.ready",
+                                                    "status": "passed",
+                                                    "evidence_refs": [
+                                                        "$event.values.behavior_evidence_ref"
+                                                    ]
+                                                }
+                                            ],
+                                            "visual_checks": [
+                                                {
+                                                    "breakpoint": "compact",
+                                                    "viewport": {
+                                                        "width": 390,
+                                                        "height": 844
+                                                    },
+                                                    "status": "passed",
+                                                    "evidence_ref": "$event.values.compact_screenshot_ref"
+                                                },
+                                                {
+                                                    "breakpoint": "wide",
+                                                    "viewport": {
+                                                        "width": 1440,
+                                                        "height": 1000
+                                                    },
+                                                    "status": "passed",
+                                                    "evidence_ref": "$event.values.wide_screenshot_ref"
+                                                }
+                                            ],
+                                            "object_type": "$state.selectedProjectKind",
+                                            "object_id": "$state.selectedProjectId",
+                                            "expected_generation": "$state.workflowGeneration",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
+                                        },
+                                        "invalidates": [
+                                            "builder.project.change",
+                                            "builder.project.metadata",
+                                            "builder.project.lifecycle"
+                                        ]
+                                    },
+                                    {
+                                        "on": "submit",
+                                        "type": "closeModal"
+                                    }
+                                ],
+                                "title_i18n": {
+                                    "key": "builder.text.prototype.acceptance.evidence"
+                                }
+                            }
+                        ],
+                        "title_i18n": {
+                            "key": "builder.text.prototype.review"
+                        }
+                    },
+                    "title_i18n": {
+                        "key": "builder.text.prototype.review"
                     }
                 },
                 "automation": {
@@ -4412,7 +4518,7 @@
                 }
             }
         },
-        "version": "0.2.78",
+        "version": "0.2.81",
         "user_summary": {
             "assumptions": [
                 "Lifecycle selection is navigation only; it never changes the editable process or Preview target.",
@@ -4435,5 +4541,5 @@
         },
         "manifest": "webui.json"
     },
-    "updated_at": "2026-09-05T06:38:15+00:00"
+    "updated_at": "2026-09-08T19:45:02+00:00"
 }

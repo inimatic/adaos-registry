@@ -1,12 +1,12 @@
 name: research_orchestrator_skill
-version: 0.75.0
+version: 0.79.4
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
 - en
 - ru
 entry: handlers/main.py
-default_tool: chat
+default_tool: inquiry_chat
 runtime:
   python: '3.11'
 data_migration:
@@ -47,6 +47,12 @@ exports:
   - list_artifacts
   - preview_artifact
   - get_consensus
+  - get_inquiry_projection
+  - inquiry_chat
+  - discover_inquiry_sources
+  - reconcile_inquiry_usage
+  - record_inquiry_turn
+  - decide_inquiry_projection
   - record_prototype
   - chat
   - accept_prototype
@@ -500,6 +506,165 @@ tools:
       prototype:
         type: object
       actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: get_inquiry_projection
+  description: Read the current typed scientific projection, ProblemDisposition, semantic measures, and exact human decision.
+  entry: handlers.main:get_inquiry_projection
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: inquiry_chat
+  description: Update the typed scientific inquiry projection through a high-reasoning Researcher LLM call without writing a paper or ResearchPrototype.
+  entry: handlers.main:inquiry_chat
+  side_effects: local_write
+  timeout_seconds: 1800
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - text
+    properties:
+      direction_id:
+        type: string
+      text:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      model:
+        type:
+        - string
+        - 'null'
+      actor:
+        type:
+        - string
+        - 'null'
+      invocation_origin:
+        type:
+        - string
+        - 'null'
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: discover_inquiry_sources
+  description: Use Researcher web search for active typed SearchRequests and persist non-admitted source candidate receipts with provider token usage.
+  entry: handlers.main:discover_inquiry_sources
+  side_effects: external_read
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      model:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: reconcile_inquiry_usage
+  description: Re-read durable Root LLM jobs to backfill missing Researcher token usage without changing scientific state.
+  entry: handlers.main:reconcile_inquiry_usage
+  side_effects: external_read
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: record_inquiry_turn
+  description: Persist one reviewed event and typed projection patch through deterministic semantic gates.
+  entry: handlers.main:record_inquiry_turn
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - text
+    - patch
+    properties:
+      direction_id:
+        type: string
+      text:
+        type: string
+      patch:
+        type: object
+      task_id:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
+      patch_actor_kind:
+        enum:
+        - human
+        - llm
+        - deterministic_tool
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: decide_inquiry_projection
+  description: Record a human decision over the exact current inquiry projection digest.
+  entry: handlers.main:decide_inquiry_projection
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - decision
+    - rationale
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      decision:
+        enum:
+        - accept_for_research_task
+        - accept_for_engineering_task
+        - reuse_known_solution
+        - defer_intractable
+        - stop
+        - request_revision
+      rationale:
+        type: string
+      accepted_by:
         type: string
     additionalProperties: true
   output_schema:
@@ -1101,7 +1266,7 @@ conversation:
     id: research_orchestrator
     label: Исследователь
     owner: skill:research_orchestrator_skill
-    default_tool: research_orchestrator_skill.chat
+    default_tool: research_orchestrator_skill.inquiry_chat
     route_id: voice_chat
     history:
       store: node
@@ -1141,7 +1306,7 @@ conversation:
     kind: skill_agent
     channel_id: research_orchestrator
     skill: research_orchestrator_skill
-    talk_tool: chat
+    talk_tool: inquiry_chat
     gender: neutral
     voice: default
     icon: flask-outline
@@ -1303,6 +1468,28 @@ data_routes:
     invalidation_tags:
     - research.formulation
     - research.automation_brief
+- surface: widget:inquiry-projection
+  route: tool/details
+  tool: get_inquiry_projection
+  owner: skill:research_orchestrator_skill
+  first_paint: empty typed scientific inquiry projection
+  recovery: preserve the last projection and retry after inquiry invalidation
+  guard_visibility: compact typed semantics, provenance refs, measures, and semantic diff; raw source bytes excluded
+  budget:
+    max_payload_bytes: 1048576
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - research.inquiry
+    - research.artifacts
 - surface: widget:research-activity
   route: tool/details
   tool: get_activity
@@ -1432,13 +1619,13 @@ llm_hints:
   - research orchestrator
   - исследователь
   primary_actions:
-  - id: research_orchestrator_skill.chat
-    intent: research_orchestrator_skill.chat
-    tool: chat
+  - id: research_orchestrator_skill.inquiry_chat
+    intent: research_orchestrator_skill.inquiry_chat
+    tool: inquiry_chat
     side_effect_class: local_write
     examples:
-    - Обсуди постановку исследования
-    - Уточни гипотезы и план эксперимента
+    - Обсуди идею и обнови научную проекцию
+    - Определи, известна ли проблема, исследуема ли она или является инженерной
   - id: research_orchestrator_skill.next_steps
     intent: research_orchestrator_skill.next_steps
     tool: next_steps
@@ -1464,4 +1651,3 @@ compatibility:
     min_commit: 70d7d20b24b646d8d84f404c5685a8e14418da8d
     min_short_commit: 70d7d20b
     build_date: '2026-08-21T07:36:48+00:00'
-

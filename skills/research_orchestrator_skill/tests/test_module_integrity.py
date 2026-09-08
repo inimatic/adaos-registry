@@ -21,7 +21,11 @@ def test_skill_manifest_and_entrypoint_are_valid() -> None:
     }
     assert "accept_prototype" in manifest["exports"]["tools"]
     assert "get_formulation_run" in manifest["exports"]["tools"]
-    assert manifest["conversation"]["dialog_channel"]["default_tool"] == "research_orchestrator_skill.chat"
+    assert "get_inquiry_projection" in manifest["exports"]["tools"]
+    assert "inquiry_chat" in manifest["exports"]["tools"]
+    assert "discover_inquiry_sources" in manifest["exports"]["tools"]
+    assert "reconcile_inquiry_usage" in manifest["exports"]["tools"]
+    assert manifest["conversation"]["dialog_channel"]["default_tool"] == "research_orchestrator_skill.inquiry_chat"
 
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
@@ -29,6 +33,9 @@ def test_skill_manifest_and_entrypoint_are_valid() -> None:
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    assert callable(module.inquiry_chat)
+    assert callable(module.discover_inquiry_sources)
+    assert callable(module.reconcile_inquiry_usage)
     assert callable(module.chat)
     assert callable(module.get_formulation_run)
 

@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.3.71
+version: 0.3.145
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -8,6 +8,9 @@ workflow:
 runtime:
   python: '3.11'
   sdk_only: true
+capabilities:
+- applications.develop
+- applications.publish
 default_tool: chat
 dependencies: []
 events:
@@ -15,12 +18,24 @@ events:
   publish:
   - io.out.chat.append
   - builder.workbench.ensure_requested
+  - builder.ui_revision.materialize
+  - desktop.webspace.reload
 exports:
   tools:
   - start
   - chat
   - handle_interaction_response
   - create_scenario_draft
+  - create_application_draft
+  - resume_application_registration
+  - get_application_development_state
+  - update_application_metadata
+  - materialize_application
+  - create_application_trial
+  - decide_application_trial
+  - publish_application_trial
+  - promote_application_stable
+  - publish_application_stable_source
   - update_current_scenario
   - get_session
   - get_preview_state
@@ -35,6 +50,7 @@ exports:
 tools:
 - name: start
   description: Start or resume the Builder rapid prototyping dialog.
+  side_effects: local_write
   entry: handlers.main:start
   input_schema:
     type: object
@@ -45,8 +61,13 @@ tools:
         type: string
       conversation_context:
         type: object
-        description: Bounded AdaOS conversation context supplied by the canonical
-          Router.
+        description: When supplied for prototype generation, this must be a canonical
+          adaos.context.packet.v1 packet. Routing metadata belongs in _meta.
+        properties:
+          schema:
+            type: string
+            const: adaos.context.packet.v1
+        additionalProperties: true
     additionalProperties: true
   output_schema:
     type: object
@@ -56,6 +77,7 @@ tools:
     - dialog
 - name: chat
   description: Handle a Builder dialog turn and create or patch a scenario prototype.
+  side_effects: local_write
   entry: handlers.main:chat
   timeout_seconds: 120
   input_schema:
@@ -67,10 +89,22 @@ tools:
         type: string
       auto_apply:
         type: boolean
+      retry_job_id:
+        type: string
+        description: Replay one failed LLM result for the exact same request without
+          another model call.
+      expected_ui_revision:
+        type: string
+        description: Current UI revision required for a safe failed-result replay.
       conversation_context:
         type: object
-        description: Bounded AdaOS conversation context supplied by the canonical
-          Router.
+        description: When supplied for prototype generation, this must be a canonical
+          adaos.context.packet.v1 packet. Routing metadata belongs in _meta.
+        properties:
+          schema:
+            type: string
+            const: adaos.context.packet.v1
+        additionalProperties: true
     additionalProperties: true
   output_schema:
     type: object
@@ -81,6 +115,7 @@ tools:
 - name: handle_interaction_response
   description: Handle one validated semantic Builder interaction response routed by
     AdaOS core.
+  side_effects: local_write
   entry: handlers.main:handle_interaction_response
   timeout_seconds: 30
   input_schema:
@@ -100,6 +135,7 @@ tools:
     - status
 - name: create_scenario_draft
   description: Create a new dev-space scenario draft with a declarative web UI prototype.
+  side_effects: local_write
   entry: handlers.main:create_scenario_draft
   input_schema:
     type: object
@@ -123,8 +159,274 @@ tools:
       pending_action:
         type: object
         description: Reserved for destructive or release-stage Builder actions.
+- name: create_application_draft
+  description: Create an exact Application aggregate and its primary scenario prototype.
+  side_effects: local_write
+  entry: handlers.main:create_application_draft
+  input_schema:
+    type: object
+    required:
+    - idea
+    properties:
+      idea:
+        type: string
+      application_id:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - application_id
+    - application_status
+- name: resume_application_registration
+  description: Resume aggregate registration for an existing recoverable Application
+    draft.
+  side_effects: local_write
+  entry: handlers.main:resume_application_registration
+  input_schema:
+    type: object
+    properties:
+      session_id:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - status
+- name: get_application_development_state
+  description: Return the selected Application aggregate, Builder workflow, candidate
+    identity, channels, and development operations.
+  side_effects: none
+  entry: handlers.main:get_application_development_state
+  input_schema:
+    type: object
+    properties:
+      session_id:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - application_id
+    - application_revision
+- name: update_application_metadata
+  description: Replace bounded catalog metadata for the selected publisher-owned Application.
+  side_effects: local_write
+  entry: handlers.main:update_application_metadata
+  input_schema:
+    type: object
+    required:
+    - title
+    - summary
+    - categories
+    - idempotency_key
+    properties:
+      title:
+        type: string
+        minLength: 1
+        maxLength: 160
+      summary:
+        type: string
+        minLength: 1
+        maxLength: 500
+      categories:
+        type: array
+        maxItems: 12
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+          maxLength: 64
+      idempotency_key:
+        type: string
+      session_id:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - status
+    - operation
+- name: materialize_application
+  description: Materialize the selected accepted Application UI revision in its isolated
+    DEV Preview.
+  side_effects: local_write
+  entry: handlers.main:materialize_application
+  input_schema:
+    type: object
+    required:
+    - idempotency_key
+    properties:
+      idempotency_key:
+        type: string
+      revision:
+        type: string
+      session_id:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - status
+    - operation
+- name: create_application_trial
+  description: Prepare one immutable Trial candidate from the selected Application
+    and activate it in isolated Trial storage.
+  side_effects: local_write
+  entry: handlers.main:create_application_trial
+  input_schema:
+    type: object
+    required:
+    - idempotency_key
+    properties:
+      idempotency_key:
+        type: string
+      session_id:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - status
+    - candidate_id
+    - operation
+- name: decide_application_trial
+  description: Record the publisher's explicit acceptance or rejection of the selected
+    immutable Trial candidate.
+  side_effects: local_write
+  entry: handlers.main:decide_application_trial
+  input_schema:
+    type: object
+    required:
+    - accepted
+    - idempotency_key
+    properties:
+      accepted:
+        type: boolean
+      idempotency_key:
+        type: string
+      session_id:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - status
+    - candidate_id
+    - operation
+- name: publish_application_trial
+  description: Publish the selected accepted Trial as a private link or move the public
+    prerelease channel after the first stable.
+  side_effects: local_write
+  entry: handlers.main:publish_application_trial
+  input_schema:
+    type: object
+    required:
+    - mode
+    - idempotency_key
+    properties:
+      mode:
+        type: string
+        enum:
+        - link_only
+        - prerelease
+      idempotency_key:
+        type: string
+      addresses_report_ids:
+        type: array
+        maxItems: 200
+        items:
+          type: string
+      session_id:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - status
+    - mode
+    - candidate_id
+    - operation
+- name: promote_application_stable
+  description: Promote the selected accepted Trial candidate to the stable Application
+    channel with a CAS precondition.
+  side_effects: local_write
+  entry: handlers.main:promote_application_stable
+  input_schema:
+    type: object
+    required:
+    - idempotency_key
+    properties:
+      idempotency_key:
+        type: string
+      session_id:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - status
+    - candidate_id
+    - operation
+- name: publish_application_stable_source
+  description: Publish the stable source projection after stable promotion using the
+    exact release digest.
+  side_effects: local_write
+  entry: handlers.main:publish_application_stable_source
+  input_schema:
+    type: object
+    required:
+    - idempotency_key
+    properties:
+      idempotency_key:
+        type: string
+      release_notes:
+        type: string
+        maxLength: 20000
+      release_digest:
+        type: string
+      session_id:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - status
+    - release_digest
+    - operation
 - name: update_current_scenario
   description: Apply a safe declarative UI patch to the current Builder scenario session.
+  side_effects: local_write
   entry: handlers.main:update_current_scenario
   timeout_seconds: 120
   input_schema:
@@ -149,8 +451,13 @@ tools:
         description: Required revision precondition when retry_job_id is supplied.
       conversation_context:
         type: object
-        description: Bounded AdaOS conversation context supplied by the canonical
-          Router.
+        description: When supplied for prototype generation, this must be a canonical
+          adaos.context.packet.v1 packet. Routing metadata belongs in _meta.
+        properties:
+          schema:
+            type: string
+            const: adaos.context.packet.v1
+        additionalProperties: true
     additionalProperties: true
   output_schema:
     type: object
@@ -163,6 +470,7 @@ tools:
         description: Reserved for destructive or release-stage Builder actions.
 - name: get_session
   description: Return the current Builder rapid prototyping session.
+  side_effects: none
   entry: handlers.main:get_session
   input_schema:
     type: object
@@ -179,6 +487,7 @@ tools:
 - name: get_preview_state
   description: Return the render-ready declarative preview state for the current Builder
     session.
+  side_effects: none
   entry: handlers.main:get_preview_state
   input_schema:
     type: object
@@ -195,6 +504,7 @@ tools:
     - preview_state
 - name: set_ui_revision_current
   description: Restore a stored Builder UI revision as the current scenario web UI.
+  side_effects: local_write
   entry: handlers.main:set_ui_revision_current
   input_schema:
     type: object
@@ -216,6 +526,7 @@ tools:
 - name: ensure_dev_webspace
   description: Create or reuse the paired Prompt IDE dev webspace for the current
     source webspace.
+  side_effects: local_write
   entry: handlers.main:ensure_dev_webspace
   input_schema:
     type: object
@@ -231,6 +542,7 @@ tools:
     - ok
 - name: get_workspace_binding
   description: Return the Builder source/dev webspace binding and active draft.
+  side_effects: none
   entry: handlers.main:get_workspace_binding
   input_schema:
     type: object
@@ -245,6 +557,7 @@ tools:
     - binding
 - name: open_dev_webspace
   description: Return the browser URL for the paired Prompt IDE dev webspace.
+  side_effects: local_write
   entry: handlers.main:open_dev_webspace
   input_schema:
     type: object
@@ -262,6 +575,7 @@ tools:
     - webspace_id
 - name: attach_dialog_widget
   description: Return embedded Voice Chat widget config for Builder Prompt IDE.
+  side_effects: none
   entry: handlers.main:attach_dialog_widget
   input_schema:
     type: object
@@ -277,6 +591,7 @@ tools:
 - name: set_active_draft
   description: Switch the active Builder development draft in the paired Prompt IDE
     dev webspace.
+  side_effects: local_write
   entry: handlers.main:set_active_draft
   input_schema:
     type: object
@@ -293,6 +608,7 @@ tools:
     - binding
 - name: list_development_skills
   description: List Builder drafts and skills/scenarios currently in development.
+  side_effects: none
   entry: handlers.main:list_development_skills
   input_schema:
     type: object
@@ -308,6 +624,7 @@ tools:
 - name: delete_development_skill
   description: Delete a Builder development draft and clear it from the active workbench
     if selected.
+  side_effects: local_write
   entry: handlers.main:delete_development_skill
   input_schema:
     type: object
@@ -418,7 +735,7 @@ conversation:
     - builder
     - buikder
     - билдер
-updated_at: '2026-09-05T06:39:35+00:00'
+updated_at: '2026-09-08T19:45:17+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.1001+6134.0c3bea8cd

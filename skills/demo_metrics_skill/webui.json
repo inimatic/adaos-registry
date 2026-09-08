@@ -502,7 +502,7 @@
               "id": "demo-metric-notes",
               "type": "ui.table",
               "area": "main",
-              "title": "Metric annotations",
+              "title": "Notes for metrics",
               "dataSource": {
                 "kind": "skill",
                 "name": "demo_metrics_skill.query_resource_workbench",
@@ -940,7 +940,7 @@
                 "id": "metrics_notes",
                 "kind": "collection_grid",
                 "area": "main",
-                "title": "Metric annotations",
+                "title": "Notes for metrics",
                 "source": {
                   "kind": "skill",
                   "ref": "demo_metrics_skill.query_resource_workbench",

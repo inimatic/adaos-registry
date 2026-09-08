@@ -26,6 +26,7 @@
   "builder.text.stage": "Этап",
   "builder.text.dev.workspace": "Dev‑пространство",
   "builder.text.choose.project": "Выбрать проект",
+  "builder.text.selected.object.not.found": "Выбранный проект, навык или сценарий не найден",
   "builder.text.lifecycle": "Жизненный цикл",
   "builder.text.make.current": "Сделать текущей",
   "builder.text.stabilize": "Стабилизировать",
@@ -178,5 +179,10 @@
   "builder.text.change": "Изменение",
   "builder.text.development.feedback": "Сигналы разработки",
   "builder.text.development.feedback.filters": "Фильтры сигналов",
-  "builder.text.development.feedback.detail": "Детали сигнала"
+  "builder.text.development.feedback.detail": "Детали сигнала",
+  "builder.text.prototype.review": "Проверка прототипа",
+  "builder.text.prototype.acceptance.evidence": "Свидетельства приемки",
+  "builder.text.prototype.behavior.evidence": "Ссылка на функциональную проверку",
+  "builder.text.prototype.compact.evidence": "Ссылка на компактный скриншот",
+  "builder.text.prototype.wide.evidence": "Ссылка на широкий скриншот"
 }

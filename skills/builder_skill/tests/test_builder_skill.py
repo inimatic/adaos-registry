@@ -39,7 +39,9 @@ def _load_module():
         ystore_mod = types.SimpleNamespace(BaseYStore=object, YDocNotFound=RuntimeError)
         sys.modules["ypy_websocket"] = types.SimpleNamespace(ystore=ystore_mod)
         sys.modules["ypy_websocket.ystore"] = ystore_mod
-    spec = importlib.util.spec_from_file_location("builder_skill_under_test", SKILL_ROOT / "handlers" / "main.py")
+    spec = importlib.util.spec_from_file_location(
+        "builder_skill_under_test", SKILL_ROOT / "handlers" / "main.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -47,9 +49,15 @@ def _load_module():
     # Runtime self-tests receive the active skill memory path. Keep every
     # freshly loaded test module isolated instead of reading or mutating the
     # user's persisted Builder sessions.
-    module._mem_get = lambda key, default=None: copy.deepcopy(module._FALLBACK_MEMORY.get(key, default))
-    module._mem_set = lambda key, value: module._FALLBACK_MEMORY.__setitem__(key, copy.deepcopy(value))
-    module._mem_set_many = lambda values: module._FALLBACK_MEMORY.update(copy.deepcopy(dict(values)))
+    module._mem_get = lambda key, default=None: copy.deepcopy(
+        module._FALLBACK_MEMORY.get(key, default)
+    )
+    module._mem_set = lambda key, value: module._FALLBACK_MEMORY.__setitem__(
+        key, copy.deepcopy(value)
+    )
+    module._mem_set_many = lambda values: module._FALLBACK_MEMORY.update(
+        copy.deepcopy(dict(values))
+    )
     return module
 
 
@@ -77,21 +85,65 @@ def _stub_development_context(skill, monkeypatch) -> dict:
 
 def test_manifest_declares_builder_dialog_agent() -> None:
     manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    conversational_manifest = yaml.safe_load(
+        (SKILL_ROOT / "conversational" / "manifest.yaml").read_text(encoding="utf-8")
+    )
 
     tools = {item["name"] for item in manifest["tools"]}
     tools_by_name = {item["name"]: item for item in manifest["tools"]}
-    assert {"start", "chat", "create_scenario_draft", "update_current_scenario", "get_preview_state"}.issubset(tools)
+    assert {
+        "start",
+        "chat",
+        "create_scenario_draft",
+        "create_application_draft",
+        "resume_application_registration",
+        "get_application_development_state",
+        "update_application_metadata",
+        "materialize_application",
+        "create_application_trial",
+        "decide_application_trial",
+        "publish_application_trial",
+        "promote_application_stable",
+        "publish_application_stable_source",
+        "update_current_scenario",
+        "get_preview_state",
+    }.issubset(tools)
     assert tools_by_name["chat"]["timeout_seconds"] >= 120
     assert tools_by_name["update_current_scenario"]["timeout_seconds"] >= 120
     for tool_name in ("start", "chat", "update_current_scenario"):
-        assert tools_by_name[tool_name]["input_schema"]["properties"]["conversation_context"]["type"] == "object"
-    assert "conversation_context" not in tools_by_name["create_scenario_draft"]["input_schema"]["properties"]
+        context_schema = tools_by_name[tool_name]["input_schema"]["properties"][
+            "conversation_context"
+        ]
+        assert context_schema["type"] == "object"
+        assert (
+            context_schema["properties"]["schema"]["const"] == "adaos.context.packet.v1"
+        )
+    assert (
+        "conversation_context"
+        not in tools_by_name["create_scenario_draft"]["input_schema"]["properties"]
+    )
     assert manifest["default_tool"] == "chat"
+    assert "applications.develop" in manifest["capabilities"]
+    assert "applications.publish" in manifest["capabilities"]
+    assert {
+        "builder.ui_revision.materialize",
+        "desktop.webspace.reload",
+    }.issubset(set(manifest["events"]["publish"]))
+    assert all(item.get("side_effects") for item in manifest["tools"])
+    assert tools_by_name["get_session"]["side_effects"] == "none"
+    assert tools_by_name["create_application_draft"]["side_effects"] == "local_write"
+    assert (
+        tools_by_name["resume_application_registration"]["side_effects"]
+        == "local_write"
+    )
     assert manifest["conversation"]["dialog_channel"]["id"] == "builder"
     assert manifest["conversation"]["agents"][0]["id"] == "agent:builder_skill:builder"
+    assert conversational_manifest["version"] == manifest["version"]
 
 
-def test_builder_development_context_uses_project_pending_refs_and_conversation(monkeypatch) -> None:
+def test_builder_development_context_uses_project_pending_refs_and_conversation(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     calls: list[dict] = []
     conversation_context = {
@@ -132,7 +184,9 @@ def test_builder_development_context_uses_project_pending_refs_and_conversation(
             "digest": "sha256:" + ("2" * 64),
         }
 
-    monkeypatch.setattr(skill.sdk_builder_workflow, "build_context_packet", _build_context_packet)
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow, "build_context_packet", _build_context_packet
+    )
 
     result = skill._builder_development_context_packet(
         webspace_id="desktop-dev",
@@ -160,6 +214,38 @@ def test_builder_development_context_uses_project_pending_refs_and_conversation(
     ]
 
 
+def test_application_development_context_uses_primary_scenario_source(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    calls: list[tuple] = []
+    monkeypatch.setattr(skill, "_builder_pending_action_refs", lambda **_kwargs: [])
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "build_context_packet",
+        lambda *args, **_kwargs: calls.append(args)
+        or {
+            "schema": "adaos.builder.context_packet.v1",
+            "change": {"change_id": "CH-applications"},
+            "digest": "sha256:" + ("3" * 64),
+        },
+    )
+
+    result = skill._builder_development_context_packet(
+        webspace_id="desktop",
+        session={
+            "artifact_kind": "application",
+            "application_id": "applications",
+            "scenario_id": "applications",
+        },
+        conversation_context=None,
+        _meta=None,
+    )
+
+    assert result["ok"] is True
+    assert calls == [("scenario", "applications")]
+
+
 def test_builder_llm_request_carries_bounded_development_context() -> None:
     skill = _load_module()
     session = {
@@ -174,7 +260,9 @@ def test_builder_llm_request_carries_bounded_development_context() -> None:
         "change": {"change_id": "CH-recipes"},
         "conversation": {
             "schema": "adaos.context.packet.v1",
-            "messages": [{"id": "message-1", "role": "user", "text": "Keep it compact."}],
+            "messages": [
+                {"id": "message-1", "role": "user", "text": "Keep it compact."}
+            ],
         },
         "pending_actions": [],
         "facets": {
@@ -196,7 +284,10 @@ def test_builder_llm_request_carries_bounded_development_context() -> None:
 
     context_index = request["dynamic_request"]["development_context"]
     assert context_index["schema"] == "adaos.builder.context_index.v1"
-    assert context_index["project"] == {"object_type": "scenario", "object_id": "recipes"}
+    assert context_index["project"] == {
+        "object_type": "scenario",
+        "object_id": "recipes",
+    }
     assert context_index["change"]["change_id"] == "CH-recipes"
     assert context_index["facet_index"] == [
         {
@@ -208,7 +299,10 @@ def test_builder_llm_request_carries_bounded_development_context() -> None:
     assert context_index["full_context_digest"] == packet["digest"]
     assert "payload" not in json.dumps(context_index)
     assert len(json.dumps(context_index).encode("utf-8")) < 5_000
-    assert "development_context" not in json.loads(request["stable_user_prompt"])["stable_builder_context"]
+    assert (
+        "development_context"
+        not in json.loads(request["stable_user_prompt"])["stable_builder_context"]
+    )
     assert "untrusted evidence" in request["system_prompt"]
 
 
@@ -216,15 +310,25 @@ def test_chat_forwards_router_conversation_context_to_prototype(monkeypatch) -> 
     skill = _load_module()
     calls: list[dict] = []
     conversation_context = {"schema": "adaos.context.packet.v1", "messages": []}
-    session = {"id": "session-recipes", "scenario_id": "recipes", "artifact_kind": "scenario"}
+    session = {
+        "id": "session-recipes",
+        "scenario_id": "recipes",
+        "artifact_kind": "scenario",
+    }
     binding = {"dev_webspace_id": "desktop-dev", "runtime_scenario_id": "recipes"}
     topic = {"thread_id": "prompt-project:scenario:recipes"}
-    monkeypatch.setattr(skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
     monkeypatch.setattr(skill, "_builder_topic_ref", lambda *_args, **_kwargs: topic)
     monkeypatch.setattr(skill, "_route_automation_chat", lambda **_kwargs: None)
     monkeypatch.setattr(skill, "_safe_emit_chat", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(skill, "_dialog_state", lambda *_args, **_kwargs: {"thread_id": topic["thread_id"]})
+    monkeypatch.setattr(
+        skill,
+        "_dialog_state",
+        lambda *_args, **_kwargs: {"thread_id": topic["thread_id"]},
+    )
     monkeypatch.setattr(
         skill,
         "update_current_scenario",
@@ -240,6 +344,78 @@ def test_chat_forwards_router_conversation_context_to_prototype(monkeypatch) -> 
 
     assert result["ok"] is True
     assert calls[0]["conversation_context"] is conversation_context
+
+
+def test_chat_forwards_safe_llm_replay_controls(monkeypatch) -> None:
+    skill = _load_module()
+    calls: list[dict] = []
+    session = {
+        "id": "session-recipes",
+        "scenario_id": "recipes",
+        "artifact_kind": "scenario",
+    }
+    binding = {"dev_webspace_id": "desktop-dev", "runtime_scenario_id": "recipes"}
+    topic = {"thread_id": "prompt-project:scenario:recipes"}
+    monkeypatch.setattr(
+        skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
+    monkeypatch.setattr(skill, "_builder_topic_ref", lambda *_args, **_kwargs: topic)
+    monkeypatch.setattr(skill, "_route_automation_chat", lambda **_kwargs: None)
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(skill, "_dialog_state", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        skill,
+        "update_current_scenario",
+        lambda **kwargs: calls.append(kwargs)
+        or {"ok": True, "status": "updated", "message": "Updated.", "topic": topic},
+    )
+
+    result = skill.chat(
+        "Keep the current recipe.",
+        webspace_id="desktop",
+        retry_job_id="llm_job_failed",
+        expected_ui_revision="006",
+    )
+
+    assert result["ok"] is True
+    assert calls[0]["retry_job_id"] == "llm_job_failed"
+    assert calls[0]["expected_ui_revision"] == "006"
+
+
+def test_chat_does_not_forward_ad_hoc_conversation_metadata(monkeypatch) -> None:
+    skill = _load_module()
+    calls: list[dict] = []
+    session = {
+        "id": "session-recipes",
+        "scenario_id": "recipes",
+        "artifact_kind": "scenario",
+    }
+    binding = {"dev_webspace_id": "desktop-dev", "runtime_scenario_id": "recipes"}
+    topic = {"thread_id": "prompt-project:scenario:recipes"}
+    monkeypatch.setattr(
+        skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
+    monkeypatch.setattr(skill, "_builder_topic_ref", lambda *_args, **_kwargs: topic)
+    monkeypatch.setattr(skill, "_route_automation_chat", lambda **_kwargs: None)
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(skill, "_dialog_state", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        skill,
+        "update_current_scenario",
+        lambda **kwargs: calls.append(kwargs)
+        or {"ok": True, "status": "updated", "message": "Updated.", "topic": topic},
+    )
+
+    skill.chat(
+        "Move the search field.",
+        webspace_id="desktop",
+        conversation_context={"language": "en"},
+    )
+
+    assert calls[0]["conversation_context"] is None
+    assert calls[0]["_meta"]["language"] == "en"
 
 
 def test_prototype_revision_evaluates_durable_review_constraints(monkeypatch) -> None:
@@ -358,24 +534,35 @@ def test_change_intake_does_not_duplicate_retried_request(monkeypatch) -> None:
 def test_explicit_app_title_wins_over_incidental_shopping_list_mention() -> None:
     skill = _load_module()
     idea = (
-        'Конструктор, создай мобильное приложение «Книга рецептов». '
-        'В карточке рецепта добавь действие «Добавить ингредиенты в список покупок».'
+        "Конструктор, создай мобильное приложение «Книга рецептов». "
+        "В карточке рецепта добавь действие «Добавить ингредиенты в список покупок»."
     )
 
     assert skill._explicit_prototype_title(idea) == "Книга рецептов"
     assert skill._scenario_id_from_idea(idea).startswith("prototype_app_")
-    assert [field["id"] for field in skill._build_fields(idea)] == ["title", "notes", "status"]
+    assert [field["id"] for field in skill._build_fields(idea)] == [
+        "title",
+        "notes",
+        "status",
+    ]
 
 
 def test_explicit_shopping_list_title_keeps_shopping_scaffold() -> None:
     skill = _load_module()
-    idea = 'Конструктор, создай приложение «Список покупок».'
+    idea = "Конструктор, создай приложение «Список покупок»."
 
     assert skill._scenario_id_from_idea(idea).startswith("shopping_list_")
-    assert [field["id"] for field in skill._build_fields(idea)] == ["item", "quantity", "category", "done"]
+    assert [field["id"] for field in skill._build_fields(idea)] == [
+        "item",
+        "quantity",
+        "category",
+        "done",
+    ]
 
 
-def test_builder_topic_ref_normalizes_old_session_topic_without_store(monkeypatch) -> None:
+def test_builder_topic_ref_normalizes_old_session_topic_without_store(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     calls: list[dict] = []
 
@@ -385,7 +572,9 @@ def test_builder_topic_ref_normalizes_old_session_topic_without_store(monkeypatc
         calls.append({"args": args, "kwargs": kwargs})
         return {"thread_id": "unexpected", "topic_id": "unexpected"}
 
-    monkeypatch.setattr(conversation_links, "ensure_builder_topic", _ensure_builder_topic)
+    monkeypatch.setattr(
+        conversation_links, "ensure_builder_topic", _ensure_builder_topic
+    )
 
     topic = skill._builder_topic_ref(
         "desktop",
@@ -419,7 +608,9 @@ def test_builder_topic_ref_replaces_stale_prompt_project_topic(monkeypatch) -> N
     monkeypatch.setattr(
         conversation_links,
         "ensure_builder_topic",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("should not touch store")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("should not touch store")
+        ),
     )
 
     topic = skill._builder_topic_ref(
@@ -436,7 +627,10 @@ def test_builder_topic_ref_replaces_stale_prompt_project_topic(monkeypatch) -> N
                 "project_id": "todo_list_5b9319fa",
             },
         },
-        binding={"runtime_scenario_id": "prototype_app_4d5758e5", "dev_webspace_id": "desktop-dev"},
+        binding={
+            "runtime_scenario_id": "prototype_app_4d5758e5",
+            "dev_webspace_id": "desktop-dev",
+        },
     )
 
     assert topic["thread_id"] == "prompt-project:scenario:prototype_app_4d5758e5"
@@ -445,14 +639,21 @@ def test_builder_topic_ref_replaces_stale_prompt_project_topic(monkeypatch) -> N
     assert topic["project_id"] == "prototype_app_4d5758e5"
 
 
-def test_builder_aligns_stale_workbench_binding_to_incoming_prompt_topic(monkeypatch) -> None:
+def test_builder_aligns_stale_workbench_binding_to_incoming_prompt_topic(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     calls: list[dict] = []
 
     class _Svc:
         def get_workspace_binding(self, webspace_id):
-            calls.append({"method": "get_workspace_binding", "webspace_id": webspace_id})
-            return {"runtime_scenario_id": "codex_eval_survey2", "dev_webspace_id": "desktop-dev"}
+            calls.append(
+                {"method": "get_workspace_binding", "webspace_id": webspace_id}
+            )
+            return {
+                "runtime_scenario_id": "codex_eval_survey2",
+                "dev_webspace_id": "desktop-dev",
+            }
 
         def set_active_draft(self, **kwargs):
             calls.append({"method": "set_active_draft", **kwargs})
@@ -478,7 +679,9 @@ def test_builder_aligns_stale_workbench_binding_to_incoming_prompt_topic(monkeyp
 def test_builder_explicit_scenario_routing_is_structured_and_fail_closed() -> None:
     skill = _load_module()
 
-    routed = skill._routing_meta_for_explicit_scenario("flowboard", {"request_id": "req-1"})
+    routed = skill._routing_meta_for_explicit_scenario(
+        "flowboard", {"request_id": "req-1"}
+    )
 
     assert routed["request_id"] == "req-1"
     assert routed["builder_topic"] == {
@@ -497,7 +700,9 @@ def test_save_session_batches_sessions_and_current_pointer(monkeypatch) -> None:
     calls: list[dict] = []
 
     monkeypatch.setattr(skill, "_sessions", lambda webspace_id: {})
-    monkeypatch.setattr(skill, "_mem_set_many", lambda values: calls.append(dict(values)))
+    monkeypatch.setattr(
+        skill, "_mem_set_many", lambda values: calls.append(dict(values))
+    )
 
     session = {"id": "builder_session", "scenario_id": "todo_scenario"}
     result = skill._save_session("desktop", session)
@@ -525,7 +730,9 @@ def test_load_session_does_not_fallback_for_unknown_explicit_id(monkeypatch) -> 
             }
         },
     )
-    monkeypatch.setattr(skill, "_current_session_id", lambda _webspace_id: "session.current")
+    monkeypatch.setattr(
+        skill, "_current_session_id", lambda _webspace_id: "session.current"
+    )
 
     assert skill._load_session("desktop", "session.missing") is None
     assert skill._load_session("desktop")["id"] == "session.current"
@@ -539,15 +746,23 @@ def test_get_session_uses_selected_workbench_target(monkeypatch) -> None:
         "preview_state": {},
     }
     binding = {"runtime_scenario_id": "flowboard"}
-    monkeypatch.setattr(skill, "_target_session", lambda _webspace_id: (selected, binding))
+    monkeypatch.setattr(
+        skill, "_target_session", lambda _webspace_id: (selected, binding)
+    )
     monkeypatch.setattr(
         skill,
         "_ensure_workbench",
         lambda *_args, **_kwargs: {"binding": binding},
     )
-    monkeypatch.setattr(skill, "_reconcile_pending_llm_jobs_from_journal", lambda _session: False)
-    monkeypatch.setattr(skill, "_reconcile_pending_llm_jobs_from_revisions", lambda _session: False)
-    monkeypatch.setattr(skill, "_sync_session_from_artifacts", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        skill, "_reconcile_pending_llm_jobs_from_journal", lambda _session: False
+    )
+    monkeypatch.setattr(
+        skill, "_reconcile_pending_llm_jobs_from_revisions", lambda _session: False
+    )
+    monkeypatch.setattr(
+        skill, "_sync_session_from_artifacts", lambda *_args, **_kwargs: False
+    )
     monkeypatch.setattr(
         skill,
         "_builder_topic_ref",
@@ -563,7 +778,9 @@ def test_get_session_uses_selected_workbench_target(monkeypatch) -> None:
     assert result["workbench"]["binding"] == binding
 
 
-def test_target_session_recovers_selected_scenario_from_artifacts(monkeypatch, tmp_path) -> None:
+def test_target_session_recovers_selected_scenario_from_artifacts(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "prototype_app"
     revision_dir = artifact_root / "ui_revisions"
@@ -575,7 +792,10 @@ def test_target_session_recovers_selected_scenario_from_artifacts(monkeypatch, t
             {
                 "draft_id": "draft.prototype",
                 "source": {"utterance": "Создай форму опроса"},
-                "artifact": {"id": "prototype_app_4d5758e5", "draft_root": str(artifact_root)},
+                "artifact": {
+                    "id": "prototype_app_4d5758e5",
+                    "draft_root": str(artifact_root),
+                },
             },
             ensure_ascii=False,
         ),
@@ -603,13 +823,23 @@ def test_target_session_recovers_selected_scenario_from_artifacts(monkeypatch, t
         encoding="utf-8",
     )
     saved: list[dict] = []
-    monkeypatch.setattr(skill, "_workbench_binding", lambda _ws: {
-        "active_draft_id": "draft.prototype",
-        "runtime_scenario_id": "prototype_app_4d5758e5",
-    })
+    monkeypatch.setattr(
+        skill,
+        "_workbench_binding",
+        lambda _ws: {
+            "active_draft_id": "draft.prototype",
+            "runtime_scenario_id": "prototype_app_4d5758e5",
+        },
+    )
     monkeypatch.setattr(skill, "_sessions", lambda _ws: {})
-    monkeypatch.setattr(skill, "_scenario_artifact_root_from_id", lambda _scenario_id: str(artifact_root))
-    monkeypatch.setattr(skill, "_mem_set_many", lambda values: saved.append(dict(values)))
+    monkeypatch.setattr(
+        skill,
+        "_scenario_artifact_root_from_id",
+        lambda _scenario_id: str(artifact_root),
+    )
+    monkeypatch.setattr(
+        skill, "_mem_set_many", lambda values: saved.append(dict(values))
+    )
 
     session, binding = skill._target_session("desktop")
 
@@ -676,10 +906,13 @@ def test_sync_session_from_artifacts_refreshes_stale_current_revision(tmp_path) 
     assert session["ui_revisions"][-1]["revision"] == "024"
 
 
-def test_create_shopping_list_scenario_draft_writes_declarative_webui(tmp_path, monkeypatch) -> None:
+def test_create_shopping_list_scenario_draft_writes_declarative_webui(
+    tmp_path, monkeypatch
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "shopping_list"
     project_calls: list[dict] = []
+    registered_changes: list[dict] = []
 
     class _Service:
         @classmethod
@@ -702,14 +935,34 @@ def test_create_shopping_list_scenario_draft_writes_declarative_webui(tmp_path, 
     import adaos.services.builder.workspace as workspace
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
+
     class _Workbench:
         def set_active_draft(self, **kwargs):
-            return {"dev_webspace_id": "builder-skill-test-dev", "active_draft_id": kwargs.get("active_draft_id")}
+            return {
+                "dev_webspace_id": "builder-skill-test-dev",
+                "active_draft_id": kwargs.get("active_draft_id"),
+            }
 
         def snapshot(self, *args, **kwargs):
             return {"preview_state": kwargs.get("preview_state") or {}}
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
+    monkeypatch.setattr(
+        skill,
+        "_register_builder_change_set",
+        lambda **kwargs: registered_changes.append(kwargs)
+        or {
+            "ok": True,
+            "action": "planned",
+            "workflow": {
+                "generation": 1,
+                "change_set": {
+                    "change_set_id": "builder_change_test",
+                    "status": "planned",
+                },
+            },
+        },
+    )
 
     monkeypatch.setattr(
         skill.developer_compositions,
@@ -740,7 +993,17 @@ def test_create_shopping_list_scenario_draft_writes_declarative_webui(tmp_path, 
     assert result["scenario_id"].startswith("shopping_list_")
     assert result["project_ref"] == f"project:{result['scenario_id']}"
     assert result["project_status"] == "ready"
+    assert result["change_set"] == {
+        "ok": True,
+        "action": "planned",
+        "change_set_id": "builder_change_test",
+        "status": "planned",
+        "generation": 1,
+    }
+    assert registered_changes[0]["request_text"].startswith("Строитель")
+    assert registered_changes[0]["patch"]["change_id"]
     assert project_calls[0]["component_id"] == result["scenario_id"]
+    assert result["preview_state"]["scenario_id"] == result["scenario_id"]
     assert result["preview_state"]["current_ui"]["type"] == "page"
     assert result["preview_state"]["datasources"][0]["type"] == "internal_crud"
     webui = artifact_root / "webui.json"
@@ -749,13 +1012,20 @@ def test_create_shopping_list_scenario_draft_writes_declarative_webui(tmp_path, 
     assert webui_payload["schema"] == "adaos.webui.v1"
     assert "preview_state" not in webui_payload
     assert webui_payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
-    scenario = yaml.safe_load((artifact_root / "scenario.json").read_text(encoding="utf-8"))
+    scenario = yaml.safe_load(
+        (artifact_root / "scenario.json").read_text(encoding="utf-8")
+    )
     page_schema = scenario["ui"]["application"]["desktop"]["pageSchema"]
-    assert page_schema["title"] == "\u0421\u043f\u0438\u0441\u043e\u043a \u043f\u043e\u043a\u0443\u043f\u043e\u043a"
+    assert (
+        page_schema["title"]
+        == "\u0421\u043f\u0438\u0441\u043e\u043a \u043f\u043e\u043a\u0443\u043f\u043e\u043a"
+    )
     assert {item["type"] for item in page_schema["widgets"]} >= {"ui.form", "ui.table"}
 
 
-def test_create_draft_does_not_publish_pending_action_for_reversible_local_revision(monkeypatch, tmp_path) -> None:
+def test_create_draft_does_not_publish_pending_action_for_reversible_local_revision(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "shopping_list"
     published: list[dict] = []
@@ -767,7 +1037,11 @@ def test_create_draft_does_not_publish_pending_action_for_reversible_local_revis
 
         def create_draft(self, **_kwargs):
             artifact_root.mkdir(parents=True, exist_ok=True)
-            return {"ok": True, "draft": {"draft_id": "draft.shopping"}, "artifact_root": str(artifact_root)}
+            return {
+                "ok": True,
+                "draft": {"draft_id": "draft.shopping"},
+                "artifact_root": str(artifact_root),
+            }
 
     import adaos.services.builder.workspace as workspace
     import adaos.sdk.data.pending_actions as pending_actions
@@ -783,7 +1057,9 @@ def test_create_draft_does_not_publish_pending_action_for_reversible_local_revis
             "metadata": kwargs["metadata"],
         }
 
-    monkeypatch.setattr(pending_actions, "publish_pending_action", _publish_pending_action)
+    monkeypatch.setattr(
+        pending_actions, "publish_pending_action", _publish_pending_action
+    )
 
     result = skill.create_scenario_draft(
         idea="Builder, create a shopping list app",
@@ -814,18 +1090,31 @@ def test_update_current_scenario_adds_card_view(monkeypatch, tmp_path) -> None:
 
         def create_draft(self, **_kwargs):
             artifact_root.mkdir(parents=True, exist_ok=True)
-            return {"ok": True, "draft": {"draft_id": "draft.shopping"}, "artifact_root": str(artifact_root)}
+            return {
+                "ok": True,
+                "draft": {"draft_id": "draft.shopping"},
+                "artifact_root": str(artifact_root),
+            }
 
     import adaos.services.builder.workspace as workspace
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
-    skill.create_scenario_draft("\u0441\u043e\u0437\u0434\u0430\u0439 \u0441\u043f\u0438\u0441\u043e\u043a \u043f\u043e\u043a\u0443\u043f\u043e\u043a", webspace_id="builder-skill-cards")
+    skill.create_scenario_draft(
+        "\u0441\u043e\u0437\u0434\u0430\u0439 \u0441\u043f\u0438\u0441\u043e\u043a \u043f\u043e\u043a\u0443\u043f\u043e\u043a",
+        webspace_id="builder-skill-cards",
+    )
 
-    result = skill.update_current_scenario("\u043f\u043e\u043a\u0430\u0436\u0438 \u043e\u0442\u0432\u0435\u0442\u044b \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0430\u043c\u0438", webspace_id="builder-skill-cards")
+    result = skill.update_current_scenario(
+        "\u043f\u043e\u043a\u0430\u0436\u0438 \u043e\u0442\u0432\u0435\u0442\u044b \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0430\u043c\u0438",
+        webspace_id="builder-skill-cards",
+    )
 
     assert result["ok"] is True
     assert result["patch"]["operation"] == "change_view_representation"
-    assert any(item["type"] == "card_list" for item in result["preview_state"]["current_ui"]["children"])
+    assert any(
+        item["type"] == "card_list"
+        for item in result["preview_state"]["current_ui"]["children"]
+    )
 
 
 def test_functional_request_is_planned_for_automation_without_mutating_prototype(
@@ -851,9 +1140,13 @@ def test_functional_request_is_planned_for_automation_without_mutating_prototype
     import adaos.services.builder.workspace as workspace
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
-    skill.create_scenario_draft("создай список покупок", webspace_id="builder-functional")
+    skill.create_scenario_draft(
+        "создай список покупок", webspace_id="builder-functional"
+    )
     before = (artifact_root / "webui.json").read_bytes()
-    monkeypatch.setattr(skill.sdk_builder_workflow, "get_state", lambda *args: {"change_set": None})
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow, "get_state", lambda *args: {"change_set": None}
+    )
 
     def _transition(*args, **kwargs):
         metadata = kwargs["metadata"]
@@ -931,11 +1224,18 @@ def test_card_view_hides_table_in_generated_page_schema(monkeypatch, tmp_path) -
                 '{"id":"todo_cards","version":"0.1.0","name":"todo_cards","steps":[]}',
                 encoding="utf-8",
             )
-            return {"ok": True, "draft": {"draft_id": "draft.todo.cards"}, "artifact_root": str(artifact_root)}
+            return {
+                "ok": True,
+                "draft": {"draft_id": "draft.todo.cards"},
+                "artifact_root": str(artifact_root),
+            }
 
     class _Workbench:
         def set_active_draft(self, **kwargs):
-            return {"dev_webspace_id": "builder-cards-dev", "active_draft_id": kwargs.get("active_draft_id")}
+            return {
+                "dev_webspace_id": "builder-cards-dev",
+                "active_draft_id": kwargs.get("active_draft_id"),
+            }
 
         def snapshot(self, *args, **kwargs):
             return {"preview_state": kwargs.get("preview_state") or {}}
@@ -944,10 +1244,17 @@ def test_card_view_hides_table_in_generated_page_schema(monkeypatch, tmp_path) -
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
 
     skill.create_scenario_draft("create todo list", webspace_id="builder-cards")
-    result = skill.update_current_scenario("\u041f\u043e\u043a\u0430\u0436\u0438 \u0441\u043f\u0438\u0441\u043e\u043a \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0430\u043c\u0438", webspace_id="builder-cards")
+    result = skill.update_current_scenario(
+        "\u041f\u043e\u043a\u0430\u0436\u0438 \u0441\u043f\u0438\u0441\u043e\u043a \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0430\u043c\u0438",
+        webspace_id="builder-cards",
+    )
 
     assert result["patch"]["diff"]["hide_table"] is True
     page = json.loads((artifact_root / "scenario.json").read_text(encoding="utf-8"))
@@ -973,11 +1280,18 @@ def test_update_current_scenario_swaps_input_and_cards(monkeypatch, tmp_path) ->
                 '{"id":"todo_swap","version":"0.1.0","name":"todo_swap","steps":[]}',
                 encoding="utf-8",
             )
-            return {"ok": True, "draft": {"draft_id": "draft.todo.swap"}, "artifact_root": str(artifact_root)}
+            return {
+                "ok": True,
+                "draft": {"draft_id": "draft.todo.swap"},
+                "artifact_root": str(artifact_root),
+            }
 
     class _Workbench:
         def set_active_draft(self, **kwargs):
-            return {"dev_webspace_id": "builder-swap-dev", "active_draft_id": kwargs.get("active_draft_id")}
+            return {
+                "dev_webspace_id": "builder-swap-dev",
+                "active_draft_id": kwargs.get("active_draft_id"),
+            }
 
         def snapshot(self, *args, **kwargs):
             return {"preview_state": kwargs.get("preview_state") or {}}
@@ -986,10 +1300,17 @@ def test_update_current_scenario_swaps_input_and_cards(monkeypatch, tmp_path) ->
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
 
     skill.create_scenario_draft("create todo list", webspace_id="builder-swap")
-    result = skill.update_current_scenario("\u041f\u0435\u0440\u0435\u0441\u0442\u0430\u0432\u044c \u043c\u0435\u0441\u0442\u0430\u043c\u0438 \u043e\u0431\u043b\u0430\u0441\u0442\u044c Input \u0438 Cards", webspace_id="builder-swap")
+    result = skill.update_current_scenario(
+        "\u041f\u0435\u0440\u0435\u0441\u0442\u0430\u0432\u044c \u043c\u0435\u0441\u0442\u0430\u043c\u0438 \u043e\u0431\u043b\u0430\u0441\u0442\u044c Input \u0438 Cards",
+        webspace_id="builder-swap",
+    )
 
     assert result["patch"]["operation"] == "swap_layout_areas"
     assert result["preview_state"]["layout_order"] == "cards_first"
@@ -1003,7 +1324,9 @@ def test_update_current_scenario_swaps_input_and_cards(monkeypatch, tmp_path) ->
     assert not any(item["id"] == "prototype-table" for item in widgets)
 
 
-def test_update_current_scenario_swaps_input_and_cards_with_lost_cyrillic(monkeypatch, tmp_path) -> None:
+def test_update_current_scenario_swaps_input_and_cards_with_lost_cyrillic(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "todo_swap_lost_cyrillic"
 
@@ -1018,11 +1341,18 @@ def test_update_current_scenario_swaps_input_and_cards_with_lost_cyrillic(monkey
                 '{"id":"todo_swap_lost_cyrillic","version":"0.1.0","name":"todo_swap_lost_cyrillic","steps":[]}',
                 encoding="utf-8",
             )
-            return {"ok": True, "draft": {"draft_id": "draft.todo.swap.lost"}, "artifact_root": str(artifact_root)}
+            return {
+                "ok": True,
+                "draft": {"draft_id": "draft.todo.swap.lost"},
+                "artifact_root": str(artifact_root),
+            }
 
     class _Workbench:
         def set_active_draft(self, **kwargs):
-            return {"dev_webspace_id": "builder-swap-lost-dev", "active_draft_id": kwargs.get("active_draft_id")}
+            return {
+                "dev_webspace_id": "builder-swap-lost-dev",
+                "active_draft_id": kwargs.get("active_draft_id"),
+            }
 
         def snapshot(self, *args, **kwargs):
             return {"preview_state": kwargs.get("preview_state") or {}}
@@ -1031,18 +1361,32 @@ def test_update_current_scenario_swaps_input_and_cards_with_lost_cyrillic(monkey
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
 
     skill.create_scenario_draft("create todo list", webspace_id="builder-swap-lost")
-    result = skill.update_current_scenario("\u041f\u0435\u0440\u0435\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u043e\u0431\u043b\u0430\u0441\u0442\u0438 Input \u0438 Cards", webspace_id="builder-swap-lost")
+    result = skill.update_current_scenario(
+        "\u041f\u0435\u0440\u0435\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u043e\u0431\u043b\u0430\u0441\u0442\u0438 Input \u0438 Cards",
+        webspace_id="builder-swap-lost",
+    )
 
     assert result["patch"]["operation"] == "swap_layout_areas"
     assert result["preview_state"]["layout_order"] == "cards_first"
-    revision = json.loads((artifact_root / "ui_revisions" / "002.json").read_text(encoding="utf-8"))
-    assert revision["request"]["text"] == "\u041f\u0435\u0440\u0435\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u043e\u0431\u043b\u0430\u0441\u0442\u0438 Input \u0438 Cards"
+    revision = json.loads(
+        (artifact_root / "ui_revisions" / "002.json").read_text(encoding="utf-8")
+    )
+    assert (
+        revision["request"]["text"]
+        == "\u041f\u0435\u0440\u0435\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u043e\u0431\u043b\u0430\u0441\u0442\u0438 Input \u0438 Cards"
+    )
 
 
-def test_update_current_scenario_prefers_llm_for_ui_changes_when_enabled(monkeypatch, tmp_path) -> None:
+def test_update_current_scenario_prefers_llm_for_ui_changes_when_enabled(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     _stub_development_context(skill, monkeypatch)
     artifact_root = tmp_path / "todo_swap_no_llm"
@@ -1056,11 +1400,18 @@ def test_update_current_scenario_prefers_llm_for_ui_changes_when_enabled(monkeyp
 
         def create_draft(self, **_kwargs):
             artifact_root.mkdir(parents=True, exist_ok=True)
-            return {"ok": True, "draft": {"draft_id": "draft.todo.swap.no.llm"}, "artifact_root": str(artifact_root)}
+            return {
+                "ok": True,
+                "draft": {"draft_id": "draft.todo.swap.no.llm"},
+                "artifact_root": str(artifact_root),
+            }
 
     class _Workbench:
         def set_active_draft(self, **kwargs):
-            return {"dev_webspace_id": "builder-swap-no-llm-dev", "active_draft_id": kwargs.get("active_draft_id")}
+            return {
+                "dev_webspace_id": "builder-swap-no-llm-dev",
+                "active_draft_id": kwargs.get("active_draft_id"),
+            }
 
         def snapshot(self, *args, **kwargs):
             return {"preview_state": kwargs.get("preview_state") or {}}
@@ -1069,16 +1420,27 @@ def test_update_current_scenario_prefers_llm_for_ui_changes_when_enabled(monkeyp
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
-    created = skill.create_scenario_draft("create todo list", webspace_id="builder-swap-no-llm")
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
+    created = skill.create_scenario_draft(
+        "create todo list", webspace_id="builder-swap-no-llm"
+    )
     preview = dict(created["preview_state"])
     preview["layout_order"] = "cards_first"
     page_schema = skill._page_schema_from_preview(preview)
-    payload = {"schema": "adaos.webui.v1", "generated_by": "builder_skill", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}
+    payload = {
+        "schema": "adaos.webui.v1",
+        "generated_by": "builder_skill",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+    }
     monkeypatch.setattr(
         skill,
         "_apply_llm_webui_transform",
-        lambda **kwargs: llm_calls.append(dict(kwargs)) or {
+        lambda **kwargs: llm_calls.append(dict(kwargs))
+        or {
             "ok": True,
             "preview_state": preview,
             "payload": payload,
@@ -1087,14 +1449,20 @@ def test_update_current_scenario_prefers_llm_for_ui_changes_when_enabled(monkeyp
         },
     )
 
-    result = skill.update_current_scenario("swap input and cards", webspace_id="builder-swap-no-llm")
+    result = skill.update_current_scenario(
+        "swap input and cards", webspace_id="builder-swap-no-llm"
+    )
 
     assert result["patch"]["operation"] == "llm_webui_transform"
     assert result["preview_state"]["layout_order"] == "cards_first"
     assert result["ui_revision"]["revision"] == "002"
     assert len(llm_calls) == 1
-    written_webui = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
-    builder_meta = written_webui["ui"]["application"]["desktop"]["pageSchema"]["meta"]["builder"]
+    written_webui = json.loads(
+        (artifact_root / "webui.json").read_text(encoding="utf-8")
+    )
+    builder_meta = written_webui["ui"]["application"]["desktop"]["pageSchema"]["meta"][
+        "builder"
+    ]
     assert builder_meta["ui_revision"] == "002"
     assert builder_meta["proto"] == "002"
     assert builder_meta["scenario_id"] == created["scenario_id"]
@@ -1116,7 +1484,10 @@ def test_update_current_scenario_prefers_llm_for_ui_changes_when_enabled(monkeyp
     assert result["patch"]["operation"] == "llm_webui_transform"
     assert len(llm_calls) == 2
     assert "apply review comments" in llm_calls[-1]["instruction"]
-    assert "Prototype review notes from the current dev preview" in llm_calls[-1]["instruction"]
+    assert (
+        "Prototype review notes from the current dev preview"
+        in llm_calls[-1]["instruction"]
+    )
     assert "Move this field to the top" in llm_calls[-1]["instruction"]
 
 
@@ -1140,18 +1511,25 @@ def test_api_request_chat_meta_uses_semantic_request_origin() -> None:
     assert generic["active_agent_label"] == "API"
 
 
-def test_review_packet_is_promoted_to_durable_revision_aware_context(monkeypatch) -> None:
+def test_review_packet_is_promoted_to_durable_revision_aware_context(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     submitted: list[dict] = []
     monkeypatch.setattr(
         skill.sdk_builder_review,
         "submit",
-        lambda review: submitted.append(dict(review)) or {"ok": True, "review": dict(review)},
+        lambda review: submitted.append(dict(review))
+        or {"ok": True, "review": dict(review)},
     )
     monkeypatch.setattr(
         skill.sdk_builder_review,
         "context_for_next_request",
-        lambda object_type, object_id: {"ok": True, "object_type": object_type, "object_id": object_id},
+        lambda object_type, object_id: {
+            "ok": True,
+            "object_type": object_type,
+            "object_id": object_id,
+        },
     )
 
     result = skill._persist_prototype_review_notes(
@@ -1188,7 +1566,9 @@ def test_review_packet_is_promoted_to_durable_revision_aware_context(monkeypatch
     assert submitted[0]["author_ref"] == "user:owner"
 
 
-def test_update_current_scenario_recovers_artifact_root_for_ui_revisions(monkeypatch, tmp_path) -> None:
+def test_update_current_scenario_recovers_artifact_root_for_ui_revisions(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "todo_recover_artifact"
     state_dir = tmp_path / "state"
@@ -1205,14 +1585,21 @@ def test_update_current_scenario_recovers_artifact_root_for_ui_revisions(monkeyp
                 '{"id":"todo_recover","version":"0.1.0","name":"todo_recover","steps":[]}',
                 encoding="utf-8",
             )
-            return {"ok": True, "draft": {"draft_id": draft_id}, "artifact_root": str(artifact_root)}
+            return {
+                "ok": True,
+                "draft": {"draft_id": draft_id},
+                "artifact_root": str(artifact_root),
+            }
 
     class _Workbench:
         def get_workspace_binding(self, _webspace_id):
             return {"active_draft_id": draft_id, "runtime_scenario_id": "todo_recover"}
 
         def set_active_draft(self, **kwargs):
-            return {"dev_webspace_id": "builder-recover-dev", "active_draft_id": kwargs.get("active_draft_id")}
+            return {
+                "dev_webspace_id": "builder-recover-dev",
+                "active_draft_id": kwargs.get("active_draft_id"),
+            }
 
         def snapshot(self, *args, **kwargs):
             return {"preview_state": kwargs.get("preview_state") or {}}
@@ -1223,12 +1610,20 @@ def test_update_current_scenario_recovers_artifact_root_for_ui_revisions(monkeyp
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     monkeypatch.setattr(runtime_paths, "current_state_dir", lambda: state_dir)
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
 
     skill.create_scenario_draft("create todo list", webspace_id="builder-recover")
     draft_payload = {
         "draft_id": draft_id,
-        "artifact": {"kind": "scenario", "id": "todo_recover", "draft_root": str(artifact_root)},
+        "artifact": {
+            "kind": "scenario",
+            "id": "todo_recover",
+            "draft_root": str(artifact_root),
+        },
     }
     draft_path = state_dir / "builder" / "drafts" / draft_id / "builder.draft.json"
     draft_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1258,11 +1653,18 @@ def test_update_current_scenario_adds_execution_checkbox(monkeypatch, tmp_path) 
 
         def create_draft(self, **_kwargs):
             artifact_root.mkdir(parents=True, exist_ok=True)
-            return {"ok": True, "draft": {"draft_id": "draft.todo.checkbox"}, "artifact_root": str(artifact_root)}
+            return {
+                "ok": True,
+                "draft": {"draft_id": "draft.todo.checkbox"},
+                "artifact_root": str(artifact_root),
+            }
 
     class _Workbench:
         def set_active_draft(self, **kwargs):
-            return {"dev_webspace_id": "builder-checkbox-dev", "active_draft_id": kwargs.get("active_draft_id")}
+            return {
+                "dev_webspace_id": "builder-checkbox-dev",
+                "active_draft_id": kwargs.get("active_draft_id"),
+            }
 
         def snapshot(self, *args, **kwargs):
             return {"preview_state": kwargs.get("preview_state") or {}}
@@ -1271,13 +1673,24 @@ def test_update_current_scenario_adds_execution_checkbox(monkeypatch, tmp_path) 
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
 
     skill.create_scenario_draft("create todo list", webspace_id="builder-checkbox")
-    result = skill.update_current_scenario("\u0414\u043e\u0431\u0430\u0432\u044c \u0447\u0435\u043a\u0431\u043e\u043a\u0441 \u0438\u0441\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f", webspace_id="builder-checkbox")
+    result = skill.update_current_scenario(
+        "\u0414\u043e\u0431\u0430\u0432\u044c \u0447\u0435\u043a\u0431\u043e\u043a\u0441 \u0438\u0441\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f",
+        webspace_id="builder-checkbox",
+    )
 
     assert result["patch"]["operation"] == "add_field"
-    field = next(item for item in result["preview_state"]["datasources"][0]["fields"] if item["id"] == "done")
+    field = next(
+        item
+        for item in result["preview_state"]["datasources"][0]["fields"]
+        if item["id"] == "done"
+    )
     assert field["type"] == "boolean"
     assert field["label"] == "\u0418\u0441\u043f\u043e\u043b\u043d\u0435\u043d\u043e"
 
@@ -1299,11 +1712,18 @@ def test_update_current_scenario_uses_llm_webui_fallback(monkeypatch, tmp_path) 
                 '{"id":"llm_fallback","version":"0.1.0","name":"llm_fallback","steps":[]}',
                 encoding="utf-8",
             )
-            return {"ok": True, "draft": {"draft_id": "draft.llm"}, "artifact_root": str(artifact_root)}
+            return {
+                "ok": True,
+                "draft": {"draft_id": "draft.llm"},
+                "artifact_root": str(artifact_root),
+            }
 
     class _Workbench:
         def set_active_draft(self, **kwargs):
-            return {"dev_webspace_id": "builder-llm-dev", "active_draft_id": kwargs.get("active_draft_id")}
+            return {
+                "dev_webspace_id": "builder-llm-dev",
+                "active_draft_id": kwargs.get("active_draft_id"),
+            }
 
         def snapshot(self, *args, **kwargs):
             return {"preview_state": kwargs.get("preview_state") or {}}
@@ -1312,36 +1732,59 @@ def test_update_current_scenario_uses_llm_webui_fallback(monkeypatch, tmp_path) 
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
 
     created = skill.create_scenario_draft("create todo list", webspace_id="builder-llm")
     preview = dict(created["preview_state"])
     preview["title"] = "English Todo"
     page_schema = skill._page_schema_from_preview(preview)
     page_schema["title"] = "English Todo"
-    payload = {"schema": "adaos.webui.v1", "generated_by": "builder_skill", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}
+    payload = {
+        "schema": "adaos.webui.v1",
+        "generated_by": "builder_skill",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+    }
     monkeypatch.setattr(
         skill,
         "_apply_llm_webui_transform",
-        lambda **_kwargs: {"ok": True, "payload": payload, "preview_state": preview, "validation": {"ok": True}},
+        lambda **_kwargs: {
+            "ok": True,
+            "payload": payload,
+            "preview_state": preview,
+            "validation": {"ok": True},
+        },
     )
 
-    result = skill.update_current_scenario("\u041d\u0430\u043f\u0438\u0448\u0438 \u0442\u0435\u043a\u0441\u0442 \u043d\u0430 \u0430\u043d\u0433\u043b\u0438\u0439\u0441\u043a\u043e\u043c \u044f\u0437\u044b\u043a\u0435", webspace_id="builder-llm")
+    result = skill.update_current_scenario(
+        "\u041d\u0430\u043f\u0438\u0448\u0438 \u0442\u0435\u043a\u0441\u0442 \u043d\u0430 \u0430\u043d\u0433\u043b\u0438\u0439\u0441\u043a\u043e\u043c \u044f\u0437\u044b\u043a\u0435",
+        webspace_id="builder-llm",
+    )
 
     assert result["patch"]["operation"] == "llm_webui_transform"
     assert result["ui_revision"]["revision"] == "002"
 
-    result = skill.update_current_scenario("\u0421\u0434\u0435\u043b\u0430\u0439 \u0431\u043e\u043b\u0435\u0435 \u043a\u043e\u043c\u043f\u0430\u043a\u0442\u043d\u044b\u0439 \u0432\u0432\u043e\u0434", webspace_id="builder-llm")
+    result = skill.update_current_scenario(
+        "\u0421\u0434\u0435\u043b\u0430\u0439 \u0431\u043e\u043b\u0435\u0435 \u043a\u043e\u043c\u043f\u0430\u043a\u0442\u043d\u044b\u0439 \u0432\u0432\u043e\u0434",
+        webspace_id="builder-llm",
+    )
 
     assert result["patch"]["operation"] == "llm_webui_transform"
     assert result["preview_state"]["title"] == "English Todo"
     assert result["ui_revision"]["revision"] == "003"
     saved = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
     assert saved["schema"] == "adaos.webui.v1"
-    assert saved["ui"]["application"]["desktop"]["pageSchema"]["title"] == "English Todo"
+    assert (
+        saved["ui"]["application"]["desktop"]["pageSchema"]["title"] == "English Todo"
+    )
 
 
-def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(monkeypatch) -> None:
+def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     import adaos.sdk.llm.llm_client as llm_client
 
@@ -1354,7 +1797,14 @@ def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(monkeypat
         "id": "todo_list",
         "title": "Todo List",
         "layout": {"type": "split", "areas": [{"id": "main"}]},
-        "widgets": [{"id": "prototype-form", "type": "ui.form", "area": "main", "inputs": {"fields": []}}],
+        "widgets": [
+            {
+                "id": "prototype-form",
+                "type": "ui.form",
+                "area": "main",
+                "inputs": {"fields": []},
+            }
+        ],
     }
     preview = {
         "title": "Todo List",
@@ -1362,20 +1812,43 @@ def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(monkeypat
         "datasources": [{"id": "prototype_items", "type": "array"}],
         "mock_data": {"prototype_items": [{"title": "Buy tickets"}]},
     }
-    payload = {"schema": "adaos.webui.v1", "generated_by": "builder_skill", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}
+    payload = {
+        "schema": "adaos.webui.v1",
+        "generated_by": "builder_skill",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+    }
     captured: dict[str, object] = {}
 
     def _send_response(messages, **kwargs):
         captured["messages"] = list(messages)
         captured["kwargs"] = dict(kwargs)
-        return {"output_text": json.dumps({**payload, "comment": "Updated."}, ensure_ascii=False)}
+        return {
+            "output_text": json.dumps(
+                {**payload, "comment": "Updated."}, ensure_ascii=False
+            )
+        }
 
     monkeypatch.setattr(llm_client, "send_response", _send_response)
-    monkeypatch.setattr(skill, "_normalise_llm_webui_payload", lambda parsed, previous_preview: (parsed, {"title": "Todo List", "page_schema": page_schema}))
-    monkeypatch.setattr(skill, "_validate_builder_webui_payload", lambda payload_arg, preview_arg: {"ok": True})
+    monkeypatch.setattr(
+        skill,
+        "_normalise_llm_webui_payload",
+        lambda parsed, previous_preview: (
+            parsed,
+            {"title": "Todo List", "page_schema": page_schema},
+        ),
+    )
+    monkeypatch.setattr(
+        skill,
+        "_validate_builder_webui_payload",
+        lambda payload_arg, preview_arg: {"ok": True},
+    )
 
     result = skill._apply_llm_webui_transform(
-        session={"id": "builder_session_todo", "scenario_id": "todo_list", "version": "001"},
+        session={
+            "id": "builder_session_todo",
+            "scenario_id": "todo_list",
+            "version": "001",
+        },
         instruction="Adapt sample data for conference preparation",
         preview_state=preview,
     )
@@ -1396,8 +1869,52 @@ def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(monkeypat
     stable_payload = json.loads(stable_prompt)["stable_builder_context"]
     assert stable_payload["llm_prompt_profile"]["id"] == "openai-default"
     assert stable_payload["llm_prompt_profile"]["model"] == "gpt-4o-mini"
-    assert json.loads(user_prompt)["builder_request"]["instruction"] == "Adapt sample data for conference preparation"
+    assert (
+        json.loads(user_prompt)["builder_request"]["instruction"]
+        == "Adapt sample data for conference preparation"
+    )
     assert "Prompt profile: openai-default" in captured["messages"][0]["content"]
+    assert (
+        "every callMcp action requires target, complete tool params, and idempotencyKey='auto'"
+        in captured["messages"][0]["content"]
+    )
+    assert (
+        "Never invent event.item or event.buttonId wrappers"
+        in captured["messages"][0]["content"]
+    )
+    assert (
+        "put on, callMcp, updateState, and action-level enabledIf on matching widget.actions"
+        in captured["messages"][0]["content"]
+    )
+
+
+def test_builder_llm_repair_request_id_includes_repair_context() -> None:
+    skill = _load_module()
+    common = {
+        "session": {
+            "id": "builder_session_applications",
+            "scenario_id": "applications",
+        },
+        "instruction": "Localize Applications.",
+        "current_payload": {"schema": "adaos.webui.v1"},
+        "attempt": 2,
+    }
+
+    first = skill._builder_llm_request_id(
+        **common,
+        request_context=[{"role": "user", "content": "repair missing title"}],
+    )
+    repeated = skill._builder_llm_request_id(
+        **common,
+        request_context=[{"role": "user", "content": "repair missing title"}],
+    )
+    changed = skill._builder_llm_request_id(
+        **common,
+        request_context=[{"role": "user", "content": "repair missing dictionary"}],
+    )
+
+    assert first == repeated
+    assert first != changed
 
 
 def test_builder_llm_temperature_defaults_to_mild_prototyping(monkeypatch) -> None:
@@ -1452,7 +1969,9 @@ def test_builder_llm_prompt_profile_tracks_provider_and_model(monkeypatch) -> No
     assert profile["strategy"] == "compact_abi_plus_affordance_map"
 
 
-def test_builder_llm_job_submit_timeout_default_allows_root_fallback(monkeypatch) -> None:
+def test_builder_llm_job_submit_timeout_default_allows_root_fallback(
+    monkeypatch,
+) -> None:
     skill = _load_module()
 
     monkeypatch.delenv("ADAOS_BUILDER_LLM_JOB_SUBMIT_TIMEOUT_S", raising=False)
@@ -1468,6 +1987,94 @@ def test_one_shot_dev_tool_disables_async_builder_llm(monkeypatch) -> None:
     monkeypatch.setenv("ADAOS_BUILDER_LLM_ASYNC_IN_TESTS", "1")
 
     assert skill._builder_llm_async_enabled() is False
+
+
+def test_one_shot_sync_transform_uses_durable_llm_job(monkeypatch) -> None:
+    skill = _load_module()
+    import adaos.sdk.llm.llm_client as llm_client
+
+    monkeypatch.setenv("ADAOS_DEV_TOOL_EXECUTION_MODE", "oneshot")
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_SYNC_USE_JOBS", "1")
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_OUTPUT_MODE", "jsonl_patch_v1")
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    monkeypatch.setattr(
+        skill,
+        "_builder_llm_webui_transform_request",
+        lambda **_kwargs: {
+            "current_payload": before,
+            "system_prompt": "system",
+            "stable_user_prompt": "contract",
+            "user_prompt": "request",
+            "dynamic_request": {},
+        },
+    )
+    monkeypatch.setattr(
+        skill,
+        "_parse_llm_webui_transform_output",
+        lambda **_kwargs: {"ok": True, "payload": before, "validation": {"ok": True}},
+    )
+    monkeypatch.setattr(
+        skill, "_validate_llm_request_postconditions", lambda result, **_kwargs: result
+    )
+    submit_calls = []
+    wait_calls = []
+
+    def _submit(messages, **kwargs):
+        submit_calls.append({"messages": list(messages), "kwargs": dict(kwargs)})
+        return {
+            "job_id": "llm_job_oneshot",
+            "status": "queued",
+            "_client": {"base_url": "https://ru.api.inimatic.com"},
+        }
+
+    def _wait(job_id, **kwargs):
+        wait_calls.append({"job_id": job_id, "kwargs": dict(kwargs)})
+        return {"job_id": job_id, "status": "succeeded", "output_text": "{}"}
+
+    monkeypatch.setattr(
+        llm_client,
+        "send_response",
+        lambda *_args, **_kwargs: pytest.fail("sync response used"),
+    )
+    monkeypatch.setattr(llm_client, "submit_response_job", _submit)
+    monkeypatch.setattr(llm_client, "wait_response_job", _wait)
+
+    result = skill._apply_llm_webui_transform(
+        session={"scenario_id": "applications", "artifact_root": ""},
+        instruction="Localize Applications.",
+        preview_state={},
+    )
+
+    assert result["ok"] is True
+    assert submit_calls[0]["kwargs"]["stream_protocol"] == "jsonl"
+    assert submit_calls[0]["kwargs"]["timeout"] == 15.0
+    assert wait_calls == [
+        {
+            "job_id": "llm_job_oneshot",
+            "kwargs": {
+                "base_url": "https://ru.api.inimatic.com",
+                "timeout_s": 150.0,
+                "poll_interval_s": 1.0,
+                "request_timeout": 6.0,
+            },
+        }
+    ]
 
 
 def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> None:
@@ -1501,14 +2108,26 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
             return {"preview_state": kwargs.get("preview_state") or {}}
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
-    monkeypatch.setattr(skill, "_publish_prompt_project_changed", lambda *args, **kwargs: {"ok": True})
-    monkeypatch.setattr(skill, "_publish_prompt_project_selection", lambda *args, **kwargs: {"ok": True})
-    monkeypatch.setattr(skill, "_publish_review_pending_action", lambda **kwargs: {"id": "pa.async"})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
+    monkeypatch.setattr(
+        skill, "_publish_prompt_project_changed", lambda *args, **kwargs: {"ok": True}
+    )
+    monkeypatch.setattr(
+        skill, "_publish_prompt_project_selection", lambda *args, **kwargs: {"ok": True}
+    )
+    monkeypatch.setattr(
+        skill, "_publish_review_pending_action", lambda **kwargs: {"id": "pa.async"}
+    )
     monkeypatch.setattr(
         skill,
         "_schedule_dev_runtime_reload_after_revision",
-        lambda webspace_id, **kwargs: refresh_calls.append({"webspace_id": webspace_id, **kwargs})
+        lambda webspace_id, **kwargs: refresh_calls.append(
+            {"webspace_id": webspace_id, **kwargs}
+        )
         or {"ok": True, "scheduled": True, "webspace_id": "builder-async-dev"},
     )
 
@@ -1543,7 +2162,11 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
         ]
     }
     page_schema = skill._page_schema_from_preview(preview)
-    payload = {"schema": "adaos.webui.v1", "generated_by": "builder_skill", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}
+    payload = {
+        "schema": "adaos.webui.v1",
+        "generated_by": "builder_skill",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+    }
     skill._save_session("builder-async", session)
 
     submit_calls: list[dict] = []
@@ -1568,7 +2191,10 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
             "job_id": job_id,
             "request_id": "builder-ui-telemetry-test",
             "status": "succeeded",
-            "output_text": json.dumps({**payload, "comment": "Adapted conference sample data."}, ensure_ascii=False),
+            "output_text": json.dumps(
+                {**payload, "comment": "Adapted conference sample data."},
+                ensure_ascii=False,
+            ),
             "response": {
                 "id": "resp_builder_telemetry_test",
                 "status": "completed",
@@ -1596,7 +2222,11 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
                     "service_tier": "default",
                     "upstream_request_id": "req_builder_telemetry_test",
                 },
-                "tools": {"requested_count": 0, "used_count": 0, "output_type_counts": {"message": 1}},
+                "tools": {
+                    "requested_count": 0,
+                    "used_count": 0,
+                    "output_type_counts": {"message": 1},
+                },
                 "mcp": {"used_mcp": False, "item_count": 0, "items": []},
             },
         }
@@ -1651,6 +2281,17 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
     assert "do not invent unsupported widgets" in system_content
     assert "selected_ui_capabilities" in submit_calls[0]["messages"][1]["content"]
     assert "current_webui_json" in submit_calls[0]["messages"][2]["content"]
+    input_journal = json.loads(
+        (artifact_root / "llm_jobs" / "llm_job_async_test.request.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert input_journal["schema"] == "adaos.builder.llm_job_input.v1"
+    assert input_journal["messages"] == submit_calls[0]["messages"]
+    assert (
+        input_journal["generation"]["options"]["request_id"]
+        == submit_calls[0]["kwargs"]["request_id"]
+    )
 
 
 def test_update_current_scenario_blocks_parallel_llm_jobs(monkeypatch) -> None:
@@ -1695,7 +2336,9 @@ def test_update_current_scenario_blocks_parallel_llm_jobs(monkeypatch) -> None:
     }
 
     monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
-    monkeypatch.setattr(skill, "_dialog_state", lambda *args, **kwargs: {"messages": []})
+    monkeypatch.setattr(
+        skill, "_dialog_state", lambda *args, **kwargs: {"messages": []}
+    )
 
     def _unexpected_start_worker(**_kwargs):
         raise AssertionError("parallel LLM worker must not start")
@@ -1709,7 +2352,9 @@ def test_update_current_scenario_blocks_parallel_llm_jobs(monkeypatch) -> None:
 
     skill._update_llm_job_status(session, "llm_job_busy", "succeeded")
     assert skill._active_llm_job(session) is None
-    assert session["pending_llm_jobs"]["builder_llm_submit_busy"]["status"] == "succeeded"
+    assert (
+        session["pending_llm_jobs"]["builder_llm_submit_busy"]["status"] == "succeeded"
+    )
     assert session["pending_llm_jobs"]["llm_job_busy"]["status"] == "succeeded"
 
 
@@ -1725,8 +2370,12 @@ def test_development_profile_kwargs_supports_new_and_legacy_sdk_signatures() -> 
     def legacy_sdk(messages, *, model=None):
         return messages, model
 
-    assert skill._development_profile_kwargs(new_sdk) == {"profile_scope": "development"}
-    assert skill._development_profile_kwargs(compatibility_sdk) == {"profile_scope": "development"}
+    assert skill._development_profile_kwargs(new_sdk) == {
+        "profile_scope": "development"
+    }
+    assert skill._development_profile_kwargs(compatibility_sdk) == {
+        "profile_scope": "development"
+    }
     assert skill._development_profile_kwargs(legacy_sdk) == {}
 
 
@@ -1758,10 +2407,18 @@ def test_llm_job_link_normalises_terminal_status_after_stale_session_load() -> N
     skill._update_llm_job_status(session, "llm_job_race", "succeeded")
 
     assert skill._active_llm_job(session) is None
-    assert session["pending_llm_jobs"]["builder_llm_submit_race"]["status"] == "succeeded"
+    assert (
+        session["pending_llm_jobs"]["builder_llm_submit_race"]["status"] == "succeeded"
+    )
     assert session["pending_llm_jobs"]["llm_job_race"]["status"] == "succeeded"
-    assert session["pending_llm_jobs"]["builder_llm_submit_race"]["root_job_id"] == "llm_job_race"
-    assert session["pending_llm_jobs"]["llm_job_race"]["local_job_id"] == "builder_llm_submit_race"
+    assert (
+        session["pending_llm_jobs"]["builder_llm_submit_race"]["root_job_id"]
+        == "llm_job_race"
+    )
+    assert (
+        session["pending_llm_jobs"]["llm_job_race"]["local_job_id"]
+        == "builder_llm_submit_race"
+    )
 
 
 def test_active_llm_job_reconciles_orphan_local_job_from_ui_revision(tmp_path) -> None:
@@ -1810,11 +2467,15 @@ def test_active_llm_job_reconciles_orphan_local_job_from_ui_revision(tmp_path) -
     }
 
     assert skill._active_llm_job(session) is None
-    assert session["pending_llm_jobs"]["builder_llm_submit_race"]["status"] == "succeeded"
+    assert (
+        session["pending_llm_jobs"]["builder_llm_submit_race"]["status"] == "succeeded"
+    )
     assert session["pending_llm_jobs"]["llm_job_race"]["status"] == "succeeded"
 
 
-def test_active_llm_job_reconciles_failed_worker_from_terminal_journal(tmp_path) -> None:
+def test_active_llm_job_reconciles_failed_worker_from_terminal_journal(
+    tmp_path,
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "prototype"
     artifact_root.mkdir(parents=True)
@@ -1851,9 +2512,14 @@ def test_active_llm_job_reconciles_failed_worker_from_terminal_journal(tmp_path)
 
     assert path is not None and path.exists()
     assert skill._active_llm_job(session) is None
-    assert session["pending_llm_jobs"]["builder_llm_submit_failed"]["status"] == "failed"
+    assert (
+        session["pending_llm_jobs"]["builder_llm_submit_failed"]["status"] == "failed"
+    )
     assert session["pending_llm_jobs"]["llm_job_failed"]["status"] == "failed"
-    assert "invalid modal contract" in session["pending_llm_jobs"]["llm_job_failed"]["detail"]
+    assert (
+        "invalid modal contract"
+        in session["pending_llm_jobs"]["llm_job_failed"]["detail"]
+    )
     journal = json.loads(path.read_text(encoding="utf-8"))
     assert journal["schema"] == "adaos.builder.llm_job_result.v1"
     assert journal["related_ids"] == ["builder_llm_submit_failed", "llm_job_failed"]
@@ -1873,11 +2539,31 @@ def test_llm_terminal_journal_includes_bounded_validation_diagnostic(tmp_path) -
         result={
             "ok": False,
             "error": "ui_request_postconditions_failed",
-            "validation": {"request_evaluation": {"failures": ["kanban.create_form"]}},
-            "raw_response": "x" * 17000,
+            "validation": {
+                "request_evaluation": {
+                    "failures": ["kanban.create_form"],
+                    "postconditions": [
+                        {
+                            "id": "applications.prototype_fixtures",
+                            "ok": False,
+                            "expected": {"profiles": ["applications"]},
+                            "actual": {"profiles": []},
+                        }
+                    ],
+                }
+            },
+            "raw_response": "x" * 270000,
         },
         telemetry={"usage": {"input_tokens": 321}},
         repair_attempted=True,
+    )
+    input_artifact = skill._write_llm_job_request_artifact(
+        session=session,
+        job_id="llm_job_diag",
+        request_id="request-diag",
+        model="gpt-5",
+        messages=[{"role": "user", "content": "Build the requested prototype."}],
+        generation_options={"temperature": 0.0},
     )
 
     path = skill._write_llm_job_terminal_artifact(
@@ -1889,22 +2575,109 @@ def test_llm_terminal_journal_includes_bounded_validation_diagnostic(tmp_path) -
     )
 
     journal = json.loads(path.read_text(encoding="utf-8"))
+    assert input_artifact is not None
+    assert journal["input_artifact"]["path"] == input_artifact["path"]
+    assert journal["input_artifact"]["sha256"] == input_artifact["sha256"]
     assert journal["diagnostic"]["repair_attempted"] is True
-    assert journal["diagnostic"]["result"]["validation"]["request_evaluation"]["failures"] == [
-        "kanban.create_form"
-    ]
+    assert journal["diagnostic"]["result"]["validation"]["request_evaluation"][
+        "failures"
+    ] == ["kanban.create_form"]
+    postcondition = journal["diagnostic"]["result"]["validation"]["request_evaluation"][
+        "postconditions"
+    ][0]
+    assert postcondition == {
+        "id": "applications.prototype_fixtures",
+        "ok": False,
+        "expected": {"profiles": ["applications"]},
+        "actual": {"profiles": []},
+    }
     assert journal["diagnostic"]["response"]["truncated"] is True
-    assert len(journal["diagnostic"]["response"]["content"]) == 16000
+    assert len(journal["diagnostic"]["response"]["content"]) == 256000
     assert journal["diagnostic"]["telemetry"]["usage"]["input_tokens"] == 321
 
 
-def test_local_ui_edit_accepts_unchanged_capability_debt_after_widget_move(monkeypatch) -> None:
+def test_llm_candidate_journal_preserves_normalized_result(tmp_path) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "prototype"
+    artifact_root.mkdir(parents=True)
+    session = {
+        "id": "builder_session_candidate",
+        "scenario_id": "candidate",
+        "artifact_root": str(artifact_root),
+        "ui_revision": "007",
+    }
+    webui = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "candidate",
+                        "layout": {
+                            "type": "single",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {
+                                "id": "content",
+                                "type": "item.details",
+                                "area": "main",
+                                "inputs": {"fields": []},
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+
+    link = skill._write_llm_job_candidate_artifact(
+        session=session,
+        job_id="llm_job_candidate",
+        request_id="request-candidate",
+        stage="primary",
+        result={
+            "ok": False,
+            "payload": webui,
+            "locale_dictionaries": {"en": {"title": "Title"}},
+            "prototype_records": [{"id": "record-1"}],
+            "validation": {"request_evaluation": {"ok": False}},
+        },
+    )
+
+    assert link is not None
+    artifact = json.loads(
+        (artifact_root / link["path"]).read_text(encoding="utf-8")
+    )
+    assert artifact["schema"] == "adaos.builder.llm_candidate.v1"
+    assert artifact["source_ui_revision"] == "007"
+    assert artifact["result"]["payload"] == webui
+    assert artifact["result"]["locale_dictionaries"]["en"]["title"] == "Title"
+    assert artifact["result"]["prototype_records"] == [{"id": "record-1"}]
+    assert artifact["webui_digest"] == link["webui_digest"]
+
+
+def test_local_ui_edit_accepts_unchanged_capability_debt_after_widget_move(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     before = {
-        "ui": {"application": {"desktop": {"pageSchema": {"widgets": [
-            {"id": "search", "type": "input.text"},
-            {"id": "board", "type": "collection.board", "actions": [{"on": "add", "type": "resourceOperation"}]},
-        ]}}}}
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "widgets": [
+                            {"id": "search", "type": "input.text"},
+                            {
+                                "id": "board",
+                                "type": "collection.board",
+                                "actions": [{"on": "add", "type": "resourceOperation"}],
+                            },
+                        ]
+                    }
+                }
+            }
+        }
     }
     after = copy.deepcopy(before)
     after["ui"]["application"]["desktop"]["pageSchema"]["widgets"].reverse()
@@ -1913,7 +2686,10 @@ def test_local_ui_edit_accepts_unchanged_capability_debt_after_widget_move(monke
         "severity": "error",
         "path": "ui.application.desktop.pageSchema.widgets[1].actions[0].params.payload",
     }
-    current_finding = {**baseline_finding, "path": "ui.application.desktop.pageSchema.widgets[0].actions[0].params.payload"}
+    current_finding = {
+        **baseline_finding,
+        "path": "ui.application.desktop.pageSchema.widgets[0].actions[0].params.payload",
+    }
     monkeypatch.setattr(
         skill.developer_ui,
         "validate",
@@ -1950,11 +2726,13 @@ def test_local_ui_edit_rejects_new_capability_debt(monkeypatch) -> None:
             "ok": False,
             "capability_validation": {
                 "ok": False,
-                "findings": [{
-                    "code": "ui.resource_operation.noop_payload",
-                    "severity": "error",
-                    "path": "ui.application.desktop.pageSchema.widgets[0].actions[0].params.payload",
-                }],
+                "findings": [
+                    {
+                        "code": "ui.resource_operation.noop_payload",
+                        "severity": "error",
+                        "path": "ui.application.desktop.pageSchema.widgets[0].actions[0].params.payload",
+                    }
+                ],
             },
             "postconditions": [],
             "capability_gaps": [],
@@ -2006,6 +2784,60 @@ def test_llm_task_telemetry_includes_repair_usage() -> None:
     assert result["repair"]["root_job_id"] == "repair"
 
 
+def test_new_scenario_title_identity_replaces_template_identity(tmp_path) -> None:
+    skill = _load_module()
+    root = tmp_path / "applications_experiment"
+    root.mkdir()
+    (root / "scenario.yaml").write_text(
+        "id: applications_experiment\n"
+        "title: Applications\n"
+        "title_i18n:\n"
+        "  key: scenario.applications.title\n"
+        "  fallback: Applications\n",
+        encoding="utf-8",
+    )
+    (root / "scenario.json").write_text(
+        json.dumps(
+            {
+                "id": "applications_experiment",
+                "title": "Applications",
+                "title_i18n": {"key": "scenario.applications.title"},
+                "ui": {
+                    "application": {
+                        "desktop": {
+                            "pageSchema": {
+                                "id": "applications_experiment",
+                                "title": "Applications",
+                                "title_i18n": {"key": "scenario.applications.title"},
+                            }
+                        }
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    skill._bind_new_scenario_title_identity(
+        str(root),
+        scenario_id="applications_experiment",
+        title="Applications Experiment",
+    )
+
+    manifest = yaml.safe_load((root / "scenario.yaml").read_text(encoding="utf-8"))
+    projection = json.loads((root / "scenario.json").read_text(encoding="utf-8"))
+    expected = {
+        "key": "scenario.applications_experiment.title",
+        "fallback": "Applications Experiment",
+    }
+    assert manifest["title_i18n"] == expected
+    assert projection["title_i18n"] == expected
+    assert (
+        projection["ui"]["application"]["desktop"]["pageSchema"]["title_i18n"]
+        == expected
+    )
+
+
 def test_deterministic_local_edit_moves_and_renames_only_search(monkeypatch) -> None:
     skill = _load_module()
     before = {
@@ -2017,10 +2849,23 @@ def test_deterministic_local_edit_moves_and_renames_only_search(monkeypatch) -> 
                     "pageSchema": {
                         "id": "flowboard",
                         "title": "Flowboard",
-                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
                         "widgets": [
-                            {"id": "form", "type": "ui.form", "area": "main", "inputs": {"fields": []}},
-                            {"id": "table", "type": "ui.table", "area": "main", "inputs": {"columns": []}},
+                            {
+                                "id": "form",
+                                "type": "ui.form",
+                                "area": "main",
+                                "inputs": {"fields": []},
+                            },
+                            {
+                                "id": "table",
+                                "type": "ui.table",
+                                "area": "main",
+                                "inputs": {"columns": []},
+                            },
                             {
                                 "id": "board",
                                 "type": "collection.board",
@@ -2033,9 +2878,20 @@ def test_deterministic_local_edit_moves_and_renames_only_search(monkeypatch) -> 
                                 "type": "input.text",
                                 "area": "main",
                                 "title": "Search",
-                                "actions": [{"on": "change", "type": "updateState", "params": {"query": "$event.value"}}],
+                                "actions": [
+                                    {
+                                        "on": "change",
+                                        "type": "updateState",
+                                        "params": {"query": "$event.value"},
+                                    }
+                                ],
                             },
-                            {"id": "details", "type": "item.details", "area": "main", "title": "Details"},
+                            {
+                                "id": "details",
+                                "type": "item.details",
+                                "area": "main",
+                                "title": "Details",
+                            },
                         ],
                     }
                 }
@@ -2050,13 +2906,22 @@ def test_deterministic_local_edit_moves_and_renames_only_search(monkeypatch) -> 
 
     def _capability_validation(payload):
         widgets = payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
-        board_index = next(index for index, item in enumerate(widgets) if item["id"] == "board")
+        board_index = next(
+            index for index, item in enumerate(widgets) if item["id"] == "board"
+        )
         return {
             "ok": False,
-            "findings": [{**baseline_finding, "path": f"ui.application.desktop.pageSchema.widgets[{board_index}].actions[0].params.payload"}],
+            "findings": [
+                {
+                    **baseline_finding,
+                    "path": f"ui.application.desktop.pageSchema.widgets[{board_index}].actions[0].params.payload",
+                }
+            ],
         }
 
-    monkeypatch.setattr(skill, "_validate_builder_webui_payload", lambda *_args, **_kwargs: {"ok": True})
+    monkeypatch.setattr(
+        skill, "_validate_builder_webui_payload", lambda *_args, **_kwargs: {"ok": True}
+    )
     monkeypatch.setattr(skill.developer_ui, "validate", _capability_validation)
 
     result = skill._deterministic_local_webui_transform(
@@ -2070,8 +2935,17 @@ def test_deterministic_local_edit_moves_and_renames_only_search(monkeypatch) -> 
 
     assert result is not None
     widgets = result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
-    assert [item["id"] for item in widgets] == ["form", "table", "search", "board", "details"]
-    assert widgets[2]["title"] == "\u041f\u043e\u0438\u0441\u043a \u0437\u0430\u0434\u0430\u0447"
+    assert [item["id"] for item in widgets] == [
+        "form",
+        "table",
+        "search",
+        "board",
+        "details",
+    ]
+    assert (
+        widgets[2]["title"]
+        == "\u041f\u043e\u0438\u0441\u043a \u0437\u0430\u0434\u0430\u0447"
+    )
     expected = copy.deepcopy(before)
     expected_widgets = expected["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
     moved = expected_widgets.pop(3)
@@ -2079,17 +2953,38 @@ def test_deterministic_local_edit_moves_and_renames_only_search(monkeypatch) -> 
     expected_widgets.insert(2, moved)
     assert result["payload"] == expected
     assert result["execution"]["usage"]["total_tokens"] == 0
-    assert result["validation"]["request_evaluation"]["capability_validation"]["validation_mode"] == "incremental"
+    assert (
+        result["validation"]["request_evaluation"]["capability_validation"][
+            "validation_mode"
+        ]
+        == "incremental"
+    )
 
 
 def test_deterministic_local_edit_falls_back_when_target_is_ambiguous() -> None:
     skill = _load_module()
     before = {
-        "ui": {"application": {"desktop": {"pageSchema": {"widgets": [
-            {"id": "search-a", "type": "input.text", "title": "Search"},
-            {"id": "search-b", "type": "input.text", "title": "Search backlog"},
-            {"id": "board", "type": "collection.board", "title": "Board"},
-        ]}}}}
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "widgets": [
+                            {"id": "search-a", "type": "input.text", "title": "Search"},
+                            {
+                                "id": "search-b",
+                                "type": "input.text",
+                                "title": "Search backlog",
+                            },
+                            {
+                                "id": "board",
+                                "type": "collection.board",
+                                "title": "Board",
+                            },
+                        ]
+                    }
+                }
+            }
+        }
     }
 
     result = skill._deterministic_local_webui_transform(
@@ -2101,14 +2996,177 @@ def test_deterministic_local_edit_falls_back_when_target_is_ambiguous() -> None:
     assert result is None
 
 
+def test_structured_prototype_review_moves_widgets_without_model(monkeypatch) -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {
+                                "id": "details-section",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "dataSource": {"kind": "static", "value": {}},
+                            },
+                            {
+                                "id": "reviewed-plan",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "dataSource": {"kind": "static", "value": {}},
+                            },
+                            {
+                                "id": "review-actions",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "dataSource": {"kind": "static", "value": {}},
+                            },
+                            {
+                                "id": "installation-section",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "dataSource": {"kind": "static", "value": {}},
+                            },
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    monkeypatch.setattr(
+        skill, "_validate_builder_webui_payload", lambda *_args, **_kwargs: {"ok": True}
+    )
+    monkeypatch.setattr(
+        skill.developer_ui, "validate", lambda _payload: {"ok": True, "findings": []}
+    )
+
+    result = skill._deterministic_prototype_review_transform(
+        instruction="Apply the structured review notes.",
+        before_webui=before,
+        previous_preview={},
+        current_revision="011",
+        _meta={
+            "prototype_review_notes": {
+                "revision_key": "applications:011",
+                "comments": [
+                    {
+                        "operation": {
+                            "kind": "move_before",
+                            "source_ref": "widget:review-actions",
+                            "target_ref": "widget:reviewed-plan",
+                        }
+                    },
+                    {
+                        "operation": {
+                            "kind": "move_before",
+                            "source_ref": "widget:reviewed-plan",
+                            "target_ref": "widget:details-section",
+                        }
+                    },
+                ],
+            }
+        },
+    )
+
+    assert result is not None and result["ok"] is True
+    widgets = result["payload"]["ui"]["application"]["desktop"]["pageSchema"][
+        "widgets"
+    ]
+    assert [item["id"] for item in widgets] == [
+        "review-actions",
+        "reviewed-plan",
+        "details-section",
+        "installation-section",
+    ]
+    assert result["execution"]["model_calls"] == 0
+    assert result["execution"]["usage"]["total_tokens"] == 0
+
+
+def test_structured_prototype_review_skips_llm_context_composition() -> None:
+    skill = _load_module()
+
+    assert skill._has_deterministic_prototype_review_operations(
+        {
+            "prototype_review_notes": {
+                "comments": [
+                    {
+                        "operation": {
+                            "kind": "move_before",
+                            "source_ref": "widget:review-actions",
+                            "target_ref": "widget:reviewed-plan",
+                        }
+                    }
+                ]
+            }
+        }
+    )
+    assert not skill._has_deterministic_prototype_review_operations(
+        {
+            "prototype_review_notes": {
+                "comments": [
+                    {
+                        "operation": {
+                            "kind": "rename",
+                            "source_ref": "widget:review-actions",
+                            "target_ref": "widget:reviewed-plan",
+                        }
+                    }
+                ]
+            }
+        }
+    )
+
+
+def test_structured_prototype_review_rejects_stale_revision() -> None:
+    skill = _load_module()
+
+    result = skill._deterministic_prototype_review_transform(
+        instruction="Apply the structured review notes.",
+        before_webui={},
+        previous_preview={},
+        current_revision="012",
+        _meta={
+            "prototype_review_notes": {
+                "revision_key": "applications:011",
+                "comments": [
+                    {
+                        "operation": {
+                            "kind": "move_before",
+                            "source_ref": "widget:review-actions",
+                            "target_ref": "widget:reviewed-plan",
+                        }
+                    }
+                ],
+            }
+        },
+    )
+
+    assert result is not None and result["ok"] is False
+    assert result["error"] == "prototype_review_revision_stale"
+
+
 def test_deterministic_ui_revision_has_no_inference_metadata(tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "deterministic_revision"
     artifact_root.mkdir()
-    webui = {"schema": "adaos.webui.v1", "ui": {"application": {"desktop": {"pageSchema": {"widgets": []}}}}}
+    webui = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": {"widgets": []}}}},
+    }
 
     result = skill._write_ui_revision(
-        session={"id": "session", "scenario_id": "scenario", "artifact_root": str(artifact_root)},
+        session={
+            "id": "session",
+            "scenario_id": "scenario",
+            "artifact_root": str(artifact_root),
+        },
         request_text="move search",
         patch={"operation": "deterministic_webui_transform"},
         before_webui=webui,
@@ -2123,7 +3181,9 @@ def test_deterministic_ui_revision_has_no_inference_metadata(tmp_path) -> None:
     assert revision["llm"] is None
 
 
-def test_save_session_merges_pending_llm_jobs_without_downgrading_terminal_state() -> None:
+def test_save_session_merges_pending_llm_jobs_without_downgrading_terminal_state() -> (
+    None
+):
     skill = _load_module()
     skill._FALLBACK_MEMORY.clear()
     webspace_id = "builder-merge-jobs"
@@ -2181,7 +3241,9 @@ def test_save_session_merges_pending_llm_jobs_without_downgrading_terminal_state
     assert pending["llm_job_merge"]["local_job_id"] == "builder_llm_submit_merge"
 
 
-def test_submit_llm_webui_transform_job_does_not_retry_request_id_conflict(monkeypatch, tmp_path) -> None:
+def test_submit_llm_webui_transform_job_does_not_retry_request_id_conflict(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     import adaos.sdk.llm.llm_client as llm_client
     from adaos.services.root.client import RootHttpError
@@ -2244,7 +3306,9 @@ def test_new_transport_corrupted_text_is_rejected_before_writes(monkeypatch) -> 
     assert writes == []
 
 
-def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_path) -> None:
+def test_builder_llm_request_includes_runtime_context_and_project_prompt(
+    tmp_path,
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "llm_context"
     artifact_root.mkdir(parents=True)
@@ -2257,25 +3321,51 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
                 "id": "prototype-cards",
                 "type": "ui.list",
                 "area": "main",
-                "inputs": {"variant": "cards", "titleKey": "title", "subtitleKey": "notes", "previewKey": "status"},
+                "inputs": {
+                    "variant": "cards",
+                    "titleKey": "title",
+                    "subtitleKey": "notes",
+                    "previewKey": "status",
+                },
             }
         ],
     }
     (artifact_root / "scenario.json").write_text(
-        json.dumps({"id": "llm_context", "name": "llm_context", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}),
+        json.dumps(
+            {
+                "id": "llm_context",
+                "name": "llm_context",
+                "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+            }
+        ),
         encoding="utf-8",
     )
-    (artifact_root / "builder_system_prompt.md").write_text("Always prefer conference vocabulary.\n", encoding="utf-8")
+    (artifact_root / "builder_system_prompt.md").write_text(
+        "Always prefer conference vocabulary.\n", encoding="utf-8"
+    )
     before_page_schema = copy.deepcopy(page_schema)
     before_page_schema["widgets"] = [
         {
             "id": "prototype-cards",
             "type": "ui.list",
             "area": "main",
-            "inputs": {"variant": "cards", "titleKey": "title", "subtitleKey": "notes", "previewKey": "status"},
+            "inputs": {
+                "variant": "cards",
+                "titleKey": "title",
+                "subtitleKey": "notes",
+                "previewKey": "status",
+            },
             "actions": [
-                {"on": "select", "type": "updateState", "params": {"selectedId": "$event.id"}},
-                {"on": "select", "type": "openModal", "params": {"modalId": "request_detail_modal"}},
+                {
+                    "on": "select",
+                    "type": "updateState",
+                    "params": {"selectedId": "$event.id"},
+                },
+                {
+                    "on": "select",
+                    "type": "openModal",
+                    "params": {"modalId": "request_detail_modal"},
+                },
             ],
         }
     ]
@@ -2289,7 +3379,10 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
                         "title": "Request details",
                         "schema": {
                             "id": "request_detail_modal_schema",
-                            "layout": {"type": "single", "areas": [{"id": "modal-main"}]},
+                            "layout": {
+                                "type": "single",
+                                "areas": [{"id": "modal-main"}],
+                            },
                             "widgets": [
                                 {
                                     "id": "add-comment-action",
@@ -2297,7 +3390,11 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
                                     "area": "modal-main",
                                     "title": "Add comment",
                                     "actions": [
-                                        {"on": "click", "type": "openModal", "params": {"modalId": "comment_modal"}}
+                                        {
+                                            "on": "click",
+                                            "type": "openModal",
+                                            "params": {"modalId": "comment_modal"},
+                                        }
                                     ],
                                 }
                             ],
@@ -2308,14 +3405,23 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
                         "schema": {
                             "id": "comment_modal_schema",
                             "layout": {"type": "single", "areas": [{"id": "form"}]},
-                            "widgets": [{"id": "comment-form", "type": "ui.form", "area": "form"}],
+                            "widgets": [
+                                {
+                                    "id": "comment-form",
+                                    "type": "ui.form",
+                                    "area": "form",
+                                }
+                            ],
                         },
                     },
                 },
             }
         },
     }
-    after_webui = {"schema": "adaos.webui.v1", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}
+    after_webui = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+    }
     revision_dir = artifact_root / "ui_revisions"
     revision_dir.mkdir()
     (revision_dir / "current.txt").write_text("002\n", encoding="utf-8")
@@ -2339,7 +3445,9 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
         "ui_revision": "002",
         "datasource_id": "prototype_items",
         "fields": [{"id": "title", "type": "string", "label": "Title"}],
-        "user_summary": {"assumptions": ["The first data model uses fields: Title, Notes, Status"]},
+        "user_summary": {
+            "assumptions": ["The first data model uses fields: Title, Notes, Status"]
+        },
     }
     preview = skill._preview_state(session=session)
 
@@ -2355,33 +3463,60 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     current = user_payload["current_webui_json"]
     assert current["schema"] == "adaos.webui.v1"
     assert "preview_state" not in current
-    assert current["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["id"] == "prototype-cards"
-    assert user_payload["llm_prompt_profile"]["schema"] == "adaos.builder.llm_prompt_profile.v1"
+    assert (
+        current["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["id"]
+        == "prototype-cards"
+    )
+    assert (
+        user_payload["llm_prompt_profile"]["schema"]
+        == "adaos.builder.llm_prompt_profile.v1"
+    )
     assert user_payload["llm_prompt_profile"]["id"] == "default"
-    assert user_payload["llm_prompt_profile"]["variant_policy"].startswith("Prompt profiles may vary")
+    assert user_payload["llm_prompt_profile"]["variant_policy"].startswith(
+        "Prompt profiles may vary"
+    )
     assert "current_page_schema" not in user_payload["runtime_context"]
-    assert user_payload["current_webui_json"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["inputs"]["previewKey"] == "status"
-    assert user_payload["webui_contract"]["render_root"] == "ui.application.desktop.pageSchema"
+    assert (
+        user_payload["current_webui_json"]["ui"]["application"]["desktop"][
+            "pageSchema"
+        ]["widgets"][0]["inputs"]["previewKey"]
+        == "status"
+    )
+    assert (
+        user_payload["webui_contract"]["render_root"]
+        == "ui.application.desktop.pageSchema"
+    )
     assert user_payload["selected_ui_capabilities"]["status"] == "present"
     assert len(request["stable_user_prompt"].encode("utf-8")) < 20_000
     assert "preserve unrelated ui" in request["system_prompt"].lower()
     delta = user_payload["last_revision_delta"]
     assert delta["revision"] == "002"
     assert delta["request"] == "Move request details into a right panel"
-    assert {"id": "comment_modal", "title": "Add comment", "presentation": ""} in delta["removed_modals"]
+    assert {"id": "comment_modal", "title": "Add comment", "presentation": ""} in delta[
+        "removed_modals"
+    ]
     removed_by_id = {item["id"]: item for item in delta["removed_widgets"]}
     assert removed_by_id["add-comment-action"]["owner"] == "modal:request_detail_modal"
     assert removed_by_id["add-comment-action"]["opens_modals"] == ["comment_modal"]
     assert "Always prefer conference vocabulary" in request["system_prompt"]
     assert "declarative UI prototype designer" in request["system_prompt"]
     assert "smallest visible coherent change" in request["system_prompt"]
-    assert "selected capability manifests and postconditions are authoritative" in request["system_prompt"]
-    assert "Do not preserve an existing generic text field" not in request["system_prompt"]
-    assert "Static sample rows must match the active domain" not in request["system_prompt"]
+    assert (
+        "selected capability manifests and postconditions are authoritative"
+        in request["system_prompt"]
+    )
+    assert (
+        "Do not preserve an existing generic text field" not in request["system_prompt"]
+    )
+    assert (
+        "Static sample rows must match the active domain"
+        not in request["system_prompt"]
+    )
     assert (artifact_root / "builder_memory.md").exists()
     assert (artifact_root / "tz" / "base_tz.md").exists()
     assert "starting point only" in user_payload["project_memory"]["memory_text"]
-    assert "not a fixed product contract" in user_payload["project_memory"]["user_summary"]["assumptions"][0]
+    assert "user_summary" not in user_payload["project_memory"]
+    assert "first data model" not in user_payload["project_memory"]["memory_text"]
     assert "local dev prototype" not in user_payload["project_memory"]["memory_text"]
     assert len(request["user_prompt"].encode("utf-8")) < 50_000
 
@@ -2395,11 +3530,17 @@ def test_builder_form_component_contract_validates_choice_and_grid_fields() -> N
             {
                 "id": "form",
                 "type": "ui.form",
-                "inputs": {"fields": [{"id": "topics", "type": "multiChoice", "label": "Topics"}]},
+                "inputs": {
+                    "fields": [
+                        {"id": "topics", "type": "multiChoice", "label": "Topics"}
+                    ]
+                },
             }
         ],
     }
-    assert skill._validate_page_schema_component_contracts(missing_options)["ok"] is False
+    assert (
+        skill._validate_page_schema_component_contracts(missing_options)["ok"] is False
+    )
 
     missing_grid_columns = {
         "id": "form_contract",
@@ -2425,7 +3566,9 @@ def test_builder_form_component_contract_validates_choice_and_grid_fields() -> N
     assert "rows and columns" in grid_result["detail"]
 
     valid = copy.deepcopy(missing_grid_columns)
-    valid["widgets"][0]["inputs"]["fields"][0]["columns"] = [{"label": "Urban planning", "value": "urban"}]
+    valid["widgets"][0]["inputs"]["fields"][0]["columns"] = [
+        {"label": "Urban planning", "value": "urban"}
+    ]
     valid["widgets"][0]["inputs"]["fields"].append(
         {
             "id": "format",
@@ -2437,7 +3580,9 @@ def test_builder_form_component_contract_validates_choice_and_grid_fields() -> N
     assert skill._validate_page_schema_component_contracts(valid)["ok"] is True
 
 
-def test_builder_project_memory_repairs_mojibake_and_legacy_constraints(tmp_path) -> None:
+def test_builder_project_memory_repairs_mojibake_and_legacy_constraints(
+    tmp_path,
+) -> None:
     skill = _load_module()
 
     artifact_root = tmp_path / "prototype"
@@ -2452,36 +3597,41 @@ def test_builder_project_memory_repairs_mojibake_and_legacy_constraints(tmp_path
         encoding="utf-8",
     )
     (artifact_root / "prompt_state.json").write_text(
-        json.dumps({"base_tz": f"The first data model uses fields: {mojibake_fields}"}, ensure_ascii=False),
+        json.dumps(
+            {"base_tz": f"The first data model uses fields: {mojibake_fields}"},
+            ensure_ascii=False,
+        ),
         encoding="utf-8",
     )
 
     memory = skill._project_memory(
         {
             "artifact_root": str(artifact_root),
-            "user_summary": {"assumptions": [f"The first data model uses fields: {mojibake_fields}"]},
+            "user_summary": {
+                "assumptions": [f"The first data model uses fields: {mojibake_fields}"]
+            },
         }
     )
 
     assert "Рќ" not in memory["memory_text"]
-    assert "Название, Заметки, Статус" in memory["memory_text"]
-    assert "not a fixed product contract" in memory["memory_text"]
+    assert "first data model" not in memory["memory_text"].lower()
     assert "local dev prototype" not in memory["memory_text"]
     assert "Рќ" not in memory["technical_spec_text"]
-    assert "Название, Заметки, Статус" in memory["technical_spec_text"]
-    assert "not a fixed product contract" in memory["user_summary"]["assumptions"][0]
+    assert "first data model" not in memory["technical_spec_text"].lower()
 
     skill._ensure_builder_project_files(artifact_root, {"title": "Prototype"})
 
     memory_file_text = (artifact_root / "builder_memory.md").read_text(encoding="utf-8")
     tz_file_text = (artifact_root / "tz" / "base_tz.md").read_text(encoding="utf-8")
-    state = json.loads((artifact_root / "prompt_state.json").read_text(encoding="utf-8"))
+    state = json.loads(
+        (artifact_root / "prompt_state.json").read_text(encoding="utf-8")
+    )
     assert "Рќ" not in memory_file_text
-    assert "Название, Заметки, Статус" in memory_file_text
-    assert "not a fixed product contract" in tz_file_text
+    assert "first data model" not in memory_file_text.lower()
+    assert "first data model" not in tz_file_text.lower()
     assert "local dev prototype" not in memory_file_text
     assert "Рќ" not in state["base_tz"]
-    assert "not a fixed product contract" in state["base_tz"]
+    assert "first data model" not in state["base_tz"].lower()
 
 
 def test_builder_webui_title_uses_scenario_yaml_as_canonical_metadata(tmp_path) -> None:
@@ -2512,7 +3662,14 @@ def test_builder_webui_title_uses_scenario_yaml_as_canonical_metadata(tmp_path) 
         "id": "prototype_app_4d5758e5",
         "title": "Latency Probe C 2df367",
         "layout": {"type": "stack", "areas": [{"id": "main"}]},
-        "widgets": [{"id": "prototype-form", "type": "ui.form", "area": "main", "inputs": {"fields": []}}],
+        "widgets": [
+            {
+                "id": "prototype-form",
+                "type": "ui.form",
+                "area": "main",
+                "inputs": {"fields": []},
+            }
+        ],
     }
     (artifact_root / "scenario.json").write_text(
         json.dumps(
@@ -2550,7 +3707,10 @@ def test_builder_webui_title_uses_scenario_yaml_as_canonical_metadata(tmp_path) 
 
     current_page_schema = current["ui"]["application"]["desktop"]["pageSchema"]
     assert current_page_schema["title"] == "Prototype App E5"
-    assert current_page_schema["title_i18n"]["key"] == "scenario.prototype_app_4d5758e5.title"
+    assert (
+        current_page_schema["title_i18n"]["key"]
+        == "scenario.prototype_app_4d5758e5.title"
+    )
 
     updated_page_schema = copy.deepcopy(current_page_schema)
     updated_page_schema["title"] = "City Growth Survey"
@@ -2561,22 +3721,116 @@ def test_builder_webui_title_uses_scenario_yaml_as_canonical_metadata(tmp_path) 
     skill._write_webui_payload(str(artifact_root), payload)
 
     saved_webui = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
-    saved_scenario_json = json.loads((artifact_root / "scenario.json").read_text(encoding="utf-8"))
-    saved_yaml = yaml.safe_load((artifact_root / "scenario.yaml").read_text(encoding="utf-8"))
-    assert saved_webui["ui"]["application"]["desktop"]["pageSchema"]["title"] == "City Growth Survey"
+    saved_scenario_json = json.loads(
+        (artifact_root / "scenario.json").read_text(encoding="utf-8")
+    )
+    saved_yaml = yaml.safe_load(
+        (artifact_root / "scenario.yaml").read_text(encoding="utf-8")
+    )
+    assert (
+        saved_webui["ui"]["application"]["desktop"]["pageSchema"]["title"]
+        == "City Growth Survey"
+    )
     assert saved_scenario_json["title"] == "City Growth Survey"
-    assert saved_scenario_json["ui"]["application"]["desktop"]["pageSchema"]["title"] == "City Growth Survey"
+    assert (
+        saved_scenario_json["ui"]["application"]["desktop"]["pageSchema"]["title"]
+        == "City Growth Survey"
+    )
     assert saved_yaml["title"] == "City Growth Survey"
 
 
-def test_async_llm_completion_repairs_missing_page_schema(monkeypatch, tmp_path) -> None:
+def test_builder_canonical_title_does_not_reintroduce_inline_locale_assets(
+    tmp_path,
+) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "applications"
+    artifact_root.mkdir(parents=True)
+    (artifact_root / "scenario.yaml").write_text(
+        "\n".join(
+            [
+                "id: applications",
+                "name: applications",
+                "type: desktop",
+                "title: Applications",
+                "title_i18n:",
+                "  key: scenario.applications.title",
+                "  fallback: Applications",
+                "  translations:",
+                "    en: Applications",
+                "    ru: Приложения",
+                "version: 0.1.0",
+                "depends: []",
+                "runtime:",
+                "  skills:",
+                "    required: []",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    skill._write_scenario_locale_dictionaries(
+        str(artifact_root),
+        {
+            "en": {"scenario.applications.title": "Applications"},
+            "ru": {"scenario.applications.title": "Приложения"},
+        },
+    )
+    page_schema = {
+        "id": "applications",
+        "title": "Applications",
+        "title_i18n": {
+            "key": "scenario.applications.title",
+            "fallback": "Applications",
+            "translations": {"en": "Applications", "ru": "Приложения"},
+        },
+        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "widgets": [],
+    }
+    (artifact_root / "webui.json").write_text(
+        json.dumps(
+            {
+                "schema": "adaos.webui.v1",
+                "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    current = skill._current_webui_payload(
+        {"artifact_root": str(artifact_root)},
+        {"scenario_id": "applications", "title": "Applications"},
+    )
+
+    assert current["ui"]["application"]["desktop"]["pageSchema"]["title_i18n"] == {
+        "key": "scenario.applications.title",
+        "fallback": "Applications",
+    }
+    saved_yaml = yaml.safe_load(
+        (artifact_root / "scenario.yaml").read_text(encoding="utf-8")
+    )
+    assert saved_yaml["title_i18n"] == {
+        "key": "scenario.applications.title",
+        "fallback": "Applications",
+    }
+
+
+def test_async_llm_completion_repairs_missing_page_schema(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     import adaos.sdk.llm.llm_client as llm_client
 
     artifact_root = tmp_path / "repair_missing_page_schema"
     artifact_root.mkdir(parents=True)
     (artifact_root / "scenario.json").write_text(
-        json.dumps({"id": "repair_missing_page_schema", "name": "repair_missing_page_schema", "version": "0.1.0"}),
+        json.dumps(
+            {
+                "id": "repair_missing_page_schema",
+                "name": "repair_missing_page_schema",
+                "version": "0.1.0",
+            }
+        ),
         encoding="utf-8",
     )
     session = {
@@ -2595,20 +3849,53 @@ def test_async_llm_completion_repairs_missing_page_schema(monkeypatch, tmp_path)
     }
     preview = skill._preview_state(session=session)
     page_schema = skill._page_schema_from_preview(preview)
-    payload = {"schema": "adaos.webui.v1", "generated_by": "builder_skill", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}
+    payload = {
+        "schema": "adaos.webui.v1",
+        "generated_by": "builder_skill",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+    }
     skill._save_session("builder-repair", session)
     emitted: list[str] = []
 
-    monkeypatch.setattr(skill, "_workbench_service", lambda: type("_Workbench", (), {
-        "set_active_draft": lambda self, **kwargs: {"dev_webspace_id": "builder-repair-dev", "active_draft_id": kwargs.get("active_draft_id")},
-        "snapshot": lambda self, *args, **kwargs: {"preview_state": kwargs.get("preview_state") or {}},
-    })())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
-    monkeypatch.setattr(skill, "_publish_prompt_project_changed", lambda *args, **kwargs: {"ok": True})
-    monkeypatch.setattr(skill, "_publish_prompt_project_selection", lambda *args, **kwargs: {"ok": True})
-    monkeypatch.setattr(skill, "_publish_review_pending_action", lambda **kwargs: {"id": "pa.repair"})
-    monkeypatch.setattr(skill, "_schedule_dev_runtime_reload_after_revision", lambda *args, **kwargs: {"ok": True, "scheduled": True})
-    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **_kwargs: emitted.append(str(text)))
+    monkeypatch.setattr(
+        skill,
+        "_workbench_service",
+        lambda: type(
+            "_Workbench",
+            (),
+            {
+                "set_active_draft": lambda self, **kwargs: {
+                    "dev_webspace_id": "builder-repair-dev",
+                    "active_draft_id": kwargs.get("active_draft_id"),
+                },
+                "snapshot": lambda self, *args, **kwargs: {
+                    "preview_state": kwargs.get("preview_state") or {}
+                },
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
+    monkeypatch.setattr(
+        skill, "_publish_prompt_project_changed", lambda *args, **kwargs: {"ok": True}
+    )
+    monkeypatch.setattr(
+        skill, "_publish_prompt_project_selection", lambda *args, **kwargs: {"ok": True}
+    )
+    monkeypatch.setattr(
+        skill, "_publish_review_pending_action", lambda **kwargs: {"id": "pa.repair"}
+    )
+    monkeypatch.setattr(
+        skill,
+        "_schedule_dev_runtime_reload_after_revision",
+        lambda *args, **kwargs: {"ok": True, "scheduled": True},
+    )
+    monkeypatch.setattr(
+        skill, "_safe_emit_chat", lambda text, **_kwargs: emitted.append(str(text))
+    )
 
     wait_calls = []
 
@@ -2619,13 +3906,17 @@ def test_async_llm_completion_repairs_missing_page_schema(monkeypatch, tmp_path)
                 "ok": True,
                 "job_id": "llm_job_repair_fix",
                 "status": "succeeded",
-                "output_text": json.dumps({**payload, "comment": "Repaired."}, ensure_ascii=False),
+                "output_text": json.dumps(
+                    {**payload, "comment": "Repaired."}, ensure_ascii=False
+                ),
             }
         return {
             "ok": True,
             "job_id": "llm_job_repair",
             "status": "succeeded",
-            "output_text": json.dumps({"comment": "Missing page schema."}, ensure_ascii=False),
+            "output_text": json.dumps(
+                {"comment": "Missing page schema."}, ensure_ascii=False
+            ),
         }
 
     monkeypatch.setattr(llm_client, "wait_response_job", fake_wait_response_job)
@@ -2670,25 +3961,50 @@ def test_async_llm_completion_repairs_missing_page_schema(monkeypatch, tmp_path)
     assert submit_calls
     assert submit_calls[0]["kwargs"]["stream_protocol"] is None
     assert "Return only one JSON object" in submit_calls[0]["args"][0][0]["content"]
-    assert not any("LLM payload must contain ui.application.desktop.pageSchema" in item for item in emitted)
+    assert not any(
+        "LLM payload must contain ui.application.desktop.pageSchema" in item
+        for item in emitted
+    )
     saved = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
-    assert saved["ui"]["application"]["desktop"]["pageSchema"]["id"] == page_schema["id"]
+    assert (
+        saved["ui"]["application"]["desktop"]["pageSchema"]["id"] == page_schema["id"]
+    )
 
 
-def test_repair_uses_partially_transformed_candidate_as_current_webui(monkeypatch) -> None:
+def test_repair_uses_partially_transformed_candidate_as_current_webui(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     import adaos.sdk.llm.llm_client as llm_client
 
     original = {
         "schema": "adaos.webui.v1",
-        "ui": {"application": {"desktop": {"pageSchema": {
-            "id": "store",
-            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
-            "widgets": [{"id": "cart", "type": "ui.list", "area": "main", "title": "Old cart"}],
-        }}}},
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "store",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {
+                                "id": "cart",
+                                "type": "ui.list",
+                                "area": "main",
+                                "title": "Old cart",
+                            }
+                        ],
+                    }
+                }
+            }
+        },
     }
     candidate = copy.deepcopy(original)
-    candidate["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["title"] = "Live cart"
+    candidate["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["title"] = (
+        "Live cart"
+    )
     captured_messages: list[dict] = []
 
     monkeypatch.setattr(
@@ -2698,70 +4014,234 @@ def test_repair_uses_partially_transformed_candidate_as_current_webui(monkeypatc
             "current_payload": copy.deepcopy(original),
             "system_prompt": "system",
             "stable_user_prompt": "stable",
-            "dynamic_request": {"current_webui_json": copy.deepcopy(original), "instruction": "fix cart"},
+            "dynamic_request": {
+                "current_webui_json": copy.deepcopy(original),
+                "instruction": "fix cart",
+            },
         },
     )
 
     def fake_submit(messages, **_kwargs):
         captured_messages.extend(messages)
-        return {"job_id": "repair-job", "status": "succeeded", "output_text": json.dumps(candidate)}
+        return {
+            "job_id": "repair-job",
+            "status": "succeeded",
+            "output_text": json.dumps(candidate),
+        }
 
     monkeypatch.setattr(llm_client, "submit_response_job", fake_submit)
-    monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", lambda **_kwargs: {"ok": True, "attempts": []})
+    monkeypatch.setattr(
+        skill,
+        "_parse_llm_webui_transform_output",
+        lambda **_kwargs: {"ok": True, "attempts": []},
+    )
 
     result = skill._repair_llm_webui_transform_output(
         session={"id": "session", "scenario_id": "store"},
         instruction="fix cart",
         previous_preview={},
         output_text="invalid candidate",
-        validation_error={"detail": "one computed field is invalid"},
+        validation_error={
+            "detail": "qualified UI is incomplete",
+            "request_evaluation": {
+                "postconditions": [
+                    {
+                        "id": "store.lifecycle_defaults",
+                        "ok": False,
+                        "expected": {"automaticUpdates": True},
+                        "actual": {"automaticUpdates": False},
+                    },
+                    {"id": "store.valid", "ok": True},
+                ]
+            },
+        },
         candidate_payload=candidate,
     )
 
     assert result["ok"] is True
     repair_request = json.loads(captured_messages[-1]["content"])
     repair_current = repair_request["repair_context"]["current_webui_json"]
-    assert repair_current["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["title"] == "Live cart"
-    assert repair_request["repair_context"]["repair_base"].startswith("partially transformed")
+    assert (
+        repair_current["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0][
+            "title"
+        ]
+        == "Live cart"
+    )
+    assert repair_request["repair_context"]["repair_base"].startswith(
+        "partially transformed"
+    )
+    assert repair_request["repair_context"]["failed_postconditions"] == [
+        {
+            "id": "store.lifecycle_defaults",
+            "expected": {"automaticUpdates": True},
+            "actual": {"automaticUpdates": False},
+        }
+    ]
     assert "original_request" not in repair_request
-    assert "remove that property instead of using an empty string" in repair_request["task"]
+    assert (
+        "remove that property instead of using an empty string"
+        in repair_request["task"]
+    )
     assert "every click target must exist in the same widget" in repair_request["task"]
+    assert "Never replace initialState with a partial object" in repair_request["task"]
 
 
-def test_transform_request_reports_existing_component_contract_violations(monkeypatch) -> None:
+def test_localization_repair_uses_candidate_dictionary_delta(monkeypatch) -> None:
+    skill = _load_module()
+    import adaos.sdk.llm.llm_client as llm_client
+
+    candidate = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {"type": "stack"},
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    captured_messages: list[dict] = []
+    monkeypatch.setattr(
+        skill,
+        "_builder_llm_webui_transform_request",
+        lambda **_kwargs: {
+            "current_payload": copy.deepcopy(candidate),
+            "system_prompt": "system",
+            "stable_user_prompt": "stable",
+            "dynamic_request": {"current_webui_json": copy.deepcopy(candidate)},
+            "base_request": {
+                "scenario_locale_output": {"required": True},
+                "selected_ui_capabilities": {},
+            },
+        },
+    )
+
+    def fake_submit(messages, **_kwargs):
+        captured_messages.extend(messages)
+        return {
+            "job_id": "repair-locales",
+            "status": "succeeded",
+            "output_text": "{}",
+        }
+
+    monkeypatch.setattr(llm_client, "submit_response_job", fake_submit)
+    monkeypatch.setattr(
+        skill,
+        "_parse_llm_webui_transform_output",
+        lambda **_kwargs: {"ok": True, "attempts": []},
+    )
+
+    result = skill._repair_llm_webui_transform_output(
+        session={"id": "session", "scenario_id": "applications"},
+        instruction="Complete Applications localization.",
+        previous_preview={},
+        output_text='{"schema":"adaos.builder.webui_patch_stream.v1"}',
+        validation_error={
+            "request_evaluation": {
+                "postconditions": [
+                    {
+                        "id": "applications.localization",
+                        "ok": False,
+                        "required": True,
+                        "actual": {
+                            "missing": ["pages.0.widgets.5.inputs.emptyText"],
+                            "invalid": [
+                                {
+                                    "path": "pages.0.widgets.5.title",
+                                    "key": "applications.section.categories",
+                                    "missingLocales": ["en", "ru"],
+                                }
+                            ],
+                        },
+                    }
+                ]
+            }
+        },
+        candidate_payload=candidate,
+        candidate_locale_dictionaries={
+            "en": {"applications.title": "Applications"},
+            "ru": {"applications.title": "Приложения"},
+        },
+    )
+
+    assert result["ok"] is True
+    repair_request = json.loads(captured_messages[-1]["content"])
+    assert "Only applications.localization failed" in repair_request["task"]
+    assert "locale_dictionary deltas" in repair_request["task"]
+    assert repair_request["repair_context"]["candidate_locale_dictionary_index"][
+        "locales"
+    ]["en"] == ["applications.title"]
+    assert "delta" in repair_request["required_output_shape"]["complete"][
+        "locale_dictionaries"
+    ]["en"]
+
+
+def test_transform_request_reports_existing_component_contract_violations(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     current = {
         "schema": "adaos.webui.v1",
-        "ui": {"application": {"desktop": {"pageSchema": {
-            "id": "artifact-editor",
-            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
-            "initialState": {"selectedFileId": "memory", "files": {}},
-            "widgets": [{
-                "id": "editor",
-                "type": "item.textEditor",
-                "area": "main",
-                "dataSource": {
-                    "kind": "static",
-                    "value": {
-                        "id": "$state.selectedFileId",
-                        "path": "$state.files[$state.selectedFileId].path",
-                        "content": "$state.files[$state.selectedFileId].content",
-                    },
-                },
-            }, {
-                "id": "archive-actions",
-                "type": "ui.actions",
-                "area": "main",
-                "inputs": {"buttons": [{"id": "archive", "label": "Archive", "whenKey": "archived"}]},
-            }],
-        }}}},
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "artifact-editor",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "initialState": {"selectedFileId": "memory", "files": {}},
+                        "widgets": [
+                            {
+                                "id": "editor",
+                                "type": "item.textEditor",
+                                "area": "main",
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": {
+                                        "id": "$state.selectedFileId",
+                                        "path": "$state.files[$state.selectedFileId].path",
+                                        "content": "$state.files[$state.selectedFileId].content",
+                                    },
+                                },
+                            },
+                            {
+                                "id": "archive-actions",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "archive",
+                                            "label": "Archive",
+                                            "whenKey": "archived",
+                                        }
+                                    ]
+                                },
+                            },
+                        ],
+                    }
+                }
+            }
+        },
     }
-    monkeypatch.setattr(skill, "_current_webui_payload", lambda *_args, **_kwargs: copy.deepcopy(current))
+    monkeypatch.setattr(
+        skill,
+        "_current_webui_payload",
+        lambda *_args, **_kwargs: copy.deepcopy(current),
+    )
 
     request = skill._builder_llm_webui_transform_request(
         session={"id": "session", "scenario_id": "artifact-editor"},
         instruction="Improve the artifact workspace",
-        preview_state={"page_schema": current["ui"]["application"]["desktop"]["pageSchema"]},
+        preview_state={
+            "page_schema": current["ui"]["application"]["desktop"]["pageSchema"]
+        },
     )
 
     diagnostic = request["dynamic_request"]["current_webui_validation"]
@@ -2779,11 +4259,20 @@ def test_repair_replaces_malformed_patch_with_complete_webui(monkeypatch) -> Non
 
     original = {
         "schema": "adaos.webui.v1",
-        "ui": {"application": {"desktop": {"pageSchema": {
-            "id": "store",
-            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
-            "widgets": [],
-        }}}},
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "store",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [],
+                    }
+                }
+            }
+        },
     }
     request_modes: list[str] = []
     parsed: dict = {}
@@ -2794,7 +4283,10 @@ def test_repair_replaces_malformed_patch_with_complete_webui(monkeypatch) -> Non
             "current_payload": copy.deepcopy(original),
             "system_prompt": "patch system",
             "stable_user_prompt": "stable",
-            "dynamic_request": {"current_webui_json": copy.deepcopy(original), "patch_base": {"base_hash": "hash"}},
+            "dynamic_request": {
+                "current_webui_json": copy.deepcopy(original),
+                "patch_base": {"base_hash": "hash"},
+            },
         }
 
     repaired_document = copy.deepcopy(original)
@@ -2804,7 +4296,11 @@ def test_repair_replaces_malformed_patch_with_complete_webui(monkeypatch) -> Non
         parsed["messages"] = messages
         parsed["stream_protocol"] = kwargs.get("stream_protocol")
         parsed["text"] = kwargs.get("text")
-        return {"job_id": "repair-patch-job", "status": "succeeded", "output_text": json.dumps(repaired_document)}
+        return {
+            "job_id": "repair-patch-job",
+            "status": "succeeded",
+            "output_text": json.dumps(repaired_document),
+        }
 
     def fake_parse(**kwargs):
         parsed["before_webui"] = kwargs.get("before_webui")
@@ -2827,13 +4323,145 @@ def test_repair_replaces_malformed_patch_with_complete_webui(monkeypatch) -> Non
     )
 
     assert result["ok"] is True
-    assert request_modes == ["full_webui"]
-    assert parsed["stream_protocol"] is None
-    assert parsed["text"] == {"format": {"type": "json_object"}}
-    assert parsed["before_webui"] is None
+    assert request_modes == ["jsonl_patch_v1"]
+    assert parsed["stream_protocol"] == "jsonl"
+    assert parsed["text"] is None
+    assert parsed["before_webui"] == original
     repair_request = json.loads(parsed["messages"][-1]["content"])
-    assert "return one complete corrected adaos.webui.v1 JSON object" in repair_request["task"]
-    assert "Do not return another JSON Patch stream" in repair_request["task"]
+    assert (
+        "fresh adaos.builder.webui_patch_stream.v1 JSONL stream"
+        in repair_request["task"]
+    )
+    assert (
+        "construct the repaired stream from the supplied valid base"
+        in repair_request["task"]
+    )
+
+
+def test_repair_retries_one_malformed_repair_patch(monkeypatch) -> None:
+    skill = _load_module()
+    import adaos.sdk.llm.llm_client as llm_client
+
+    original = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "store",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    submit_calls: list[dict] = []
+    parse_calls: list[str] = []
+
+    monkeypatch.setattr(
+        skill,
+        "_builder_llm_webui_transform_request",
+        lambda **_kwargs: {
+            "current_payload": copy.deepcopy(original),
+            "system_prompt": "patch system",
+            "stable_user_prompt": "stable",
+            "dynamic_request": {"current_webui_json": copy.deepcopy(original)},
+        },
+    )
+
+    def fake_submit(messages, **kwargs):
+        submit_calls.append({"messages": messages, "kwargs": kwargs})
+        return {
+            "job_id": f"repair-{len(submit_calls)}",
+            "status": "succeeded",
+            "output_text": '{"schema":"adaos.builder.webui_patch_stream.v1","type":"meta"}',
+        }
+
+    def fake_parse(**kwargs):
+        parse_calls.append(str(kwargs.get("job_id") or ""))
+        if len(parse_calls) == 1:
+            raise KeyError("JSON Pointer stable id not found: borrowed")
+        return {"ok": True, "attempts": [], "payload": copy.deepcopy(original)}
+
+    monkeypatch.setattr(llm_client, "submit_response_job", fake_submit)
+    monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", fake_parse)
+
+    result = skill._repair_llm_webui_transform_output(
+        session={"id": "session", "scenario_id": "store"},
+        instruction="fix all qualified findings",
+        previous_preview={},
+        output_text=(
+            '{"schema":"adaos.builder.webui_patch_stream.v1","type":"meta"}\n'
+            '{"type":"complete","comment":"repair"}'
+        ),
+        validation_error={
+            "request_evaluation": {
+                "postconditions": [
+                    {
+                        "id": "store.complete",
+                        "ok": False,
+                        "expected": True,
+                        "actual": False,
+                    }
+                ]
+            }
+        },
+        candidate_payload=original,
+    )
+
+    assert result["ok"] is True
+    assert len(submit_calls) == 2
+    second_request = json.loads(submit_calls[1]["messages"][-1]["content"])
+    assert second_request["repair_context"]["failed_postconditions"] == [
+        {"id": "store.complete", "expected": True, "actual": False}
+    ]
+    assert "never borrow ids from another array" in second_request["task"]
+
+
+def test_builder_system_prompt_requires_local_i18n_descriptors() -> None:
+    skill = _load_module()
+
+    prompt = skill._builder_llm_system_prompt(output_mode="jsonl_patch_v1")
+
+    assert "same object under the sibling <field>_i18n key" in prompt
+    assert "stable key and translations object are required" in prompt
+    assert "a direct {en,ru} map" in prompt
+
+
+def test_bounded_repair_diagnostic_keeps_qualification_findings() -> None:
+    skill = _load_module()
+    findings = [f"missing.{index}" for index in range(69)]
+
+    diagnostic = skill._bounded_repair_diagnostic(
+        {
+            "attempts": [
+                {
+                    "validation": {
+                        "request_evaluation": {
+                            "postconditions": [
+                                {
+                                    "actual": {
+                                        "missing": findings,
+                                        "casDefaults": False,
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    )
+
+    actual = diagnostic["attempts"][0]["validation"]["request_evaluation"][
+        "postconditions"
+    ][0]["actual"]
+    assert actual["missing"] == findings
+    assert actual["casDefaults"] is False
 
 
 def test_full_webui_result_preserves_prototype_records() -> None:
@@ -2933,7 +4561,10 @@ def test_complete_manifest_initializes_resource_query_search_state() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "board",
-                        "layout": {"type": "single", "areas": [{"id": "main", "role": "main"}]},
+                        "layout": {
+                            "type": "single",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
                         "widgets": [
                             {
                                 "id": "board",
@@ -2963,6 +4594,195 @@ def test_complete_manifest_initializes_resource_query_search_state() -> None:
             "to": "empty_string",
             "target": "searchQuery",
         }
+    ]
+
+
+def test_complete_manifest_canonicalizes_action_button_style_alias() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "widgets": [
+                            {
+                                "id": "commands",
+                                "type": "ui.actions",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "plan",
+                                            "label": "Plan",
+                                            "style": "primary",
+                                        },
+                                        {
+                                            "id": "apply",
+                                            "label": "Apply",
+                                            "kind": "secondary",
+                                        },
+                                        {
+                                            "id": "custom",
+                                            "label": "Custom",
+                                            "style": "quiet",
+                                        },
+                                    ]
+                                },
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_action_button_aliases(payload)
+
+    buttons = payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0][
+        "inputs"
+    ]["buttons"]
+    assert buttons[0] == {"id": "plan", "label": "Plan", "kind": "primary"}
+    assert buttons[1] == {"id": "apply", "label": "Apply", "kind": "secondary"}
+    assert buttons[2] == {"id": "custom", "label": "Custom", "style": "quiet"}
+    assert normalizations == [
+        {
+            "kind": "action_button_style_alias",
+            "from": "style",
+            "to": "kind",
+            "target": "plan",
+        }
+    ]
+
+
+def test_complete_manifest_canonicalizes_call_mcp_data_source_aliases() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "widgets": [
+                            {
+                                "id": "commands",
+                                "type": "ui.actions",
+                                "actions": [
+                                    {
+                                        "type": "callMcp",
+                                        "toolId": "applications.plan",
+                                        "arguments": {
+                                            "application_id": "$state.selectedApplicationId"
+                                        },
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_call_mcp_action_aliases(payload)
+
+    action = payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0][
+        "actions"
+    ][0]
+    assert action == {
+        "type": "callMcp",
+        "target": "applications.plan",
+        "params": {"application_id": "$state.selectedApplicationId"},
+    }
+    assert [item["kind"] for item in normalizations] == [
+        "call_mcp_target_alias",
+        "call_mcp_params_alias",
+    ]
+
+
+def test_complete_manifest_canonicalizes_widget_runtime_aliases() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "widgets": [
+                            {
+                                "id": "catalog",
+                                "type": "ui.list",
+                                "catalog": {
+                                    "search": True,
+                                    "titleKey": "application.display.title",
+                                },
+                                "variant": "list",
+                                "filters": [{"key": "installed", "value": True}],
+                                "actions": [
+                                    {
+                                        "type": "updateState",
+                                        "on": "select",
+                                        "params": {
+                                            "selected": "$event.item.application.application_id"
+                                        },
+                                    }
+                                ],
+                            },
+                            {
+                                "id": "tabs",
+                                "type": "input.commandBar",
+                                "actions": [
+                                    {
+                                        "type": "updateState",
+                                        "on": "click",
+                                        "params": {"activeTab": "$event.buttonId"},
+                                    }
+                                ],
+                            },
+                            {
+                                "id": "details",
+                                "type": "item.details",
+                                "detailStateBindings": {
+                                    "revision": "application.revision"
+                                },
+                            },
+                            {
+                                "id": "track",
+                                "type": "input.selector",
+                                "actions": [
+                                    {
+                                        "type": "updateState",
+                                        "on": "select",
+                                        "params": {"track": "$event.value"},
+                                    }
+                                ],
+                            },
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_widget_runtime_aliases(payload)
+
+    widgets = payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
+    assert widgets[0]["inputs"] == {
+        "search": True,
+        "titleKey": "application.display.title",
+        "variant": "list",
+    }
+    assert widgets[0]["filters"] == [{"key": "installed", "value": True}]
+    assert (
+        widgets[0]["actions"][0]["params"]["selected"]
+        == "$event.application.application_id"
+    )
+    assert widgets[1]["actions"][0]["params"]["activeTab"] == "$event.id"
+    assert widgets[2]["inputs"]["stateBindings"] == {"revision": "application.revision"}
+    assert widgets[3]["actions"][0]["on"] == "change"
+    assert [item["kind"] for item in normalizations] == [
+        "list_catalog_alias",
+        "list_input_alias",
+        "widget_event_path_alias",
+        "widget_event_path_alias",
+        "details_state_bindings_alias",
+        "selector_event_alias",
     ]
 
 
@@ -3021,7 +4841,9 @@ def test_complete_manifest_fills_unambiguous_modal_widget_areas() -> None:
                                 "type": "split",
                                 "areas": [{"id": "main"}, {"id": "aside"}],
                             },
-                            "widgets": [{"id": "form", "type": "ui.form", "inputs": {}}],
+                            "widgets": [
+                                {"id": "form", "type": "ui.form", "inputs": {}}
+                            ],
                         }
                     },
                 }
@@ -3134,8 +4956,12 @@ def test_complete_manifest_wraps_unambiguous_modal_schema_shorthand() -> None:
     ]
 
 
-def test_failed_llm_result_replay_is_revision_bound_and_uses_zero_incremental_tokens(tmp_path) -> None:
+def test_failed_llm_result_replay_recovers_after_session_projection_loss(
+    tmp_path, monkeypatch
+) -> None:
     skill = _load_module()
+    from adaos.sdk.llm import llm_client
+
     request_text = "Change the prototype title"
     job_id = "llm_job_replay"
     page_before = {
@@ -3164,6 +4990,17 @@ def test_failed_llm_result_replay_is_revision_bound_and_uses_zero_incremental_to
             "comment": "Updated title.",
         }
     )
+    artifact_webui = copy.deepcopy(before_webui)
+    artifact_webui["ui"]["application"]["desktop"]["pageSchema"]["title"] = (
+        "Artifact repair"
+    )
+    artifact_response = json.dumps(
+        {
+            "schema": "adaos.builder.webui_result.v1",
+            "webui": artifact_webui,
+            "comment": "A later repair response.",
+        }
+    )
     artifact_root = tmp_path / "replay"
     journal_dir = artifact_root / "llm_jobs"
     journal_dir.mkdir(parents=True)
@@ -3175,8 +5012,19 @@ def test_failed_llm_result_replay_is_revision_bound_and_uses_zero_incremental_to
                 "scenario_id": "replay",
                 "status": "failed",
                 "diagnostic": {
-                    "response": {"content": response, "truncated": False},
+                    "response": {"content": artifact_response, "truncated": False},
                     "telemetry": {"usage": {"total_tokens": 321}},
+                    "result": {
+                        "validation": {
+                            "request_evaluation": {
+                                "qualification": {
+                                    "request_digest": skill.developer_ui.qualify(
+                                        request_text
+                                    )["request_digest"]
+                                }
+                            }
+                        }
+                    },
                 },
             }
         ),
@@ -3186,15 +5034,17 @@ def test_failed_llm_result_replay_is_revision_bound_and_uses_zero_incremental_to
         "scenario_id": "replay",
         "artifact_root": str(artifact_root),
         "ui_revision": "004",
-        "pending_llm_jobs": {
-            job_id: {
-                "job_id": job_id,
-                "status": "failed",
-                "request_text": request_text,
-                "model": "gpt-5",
-            }
-        },
+        "pending_llm_jobs": {},
     }
+    monkeypatch.setattr(
+        llm_client,
+        "get_response_job",
+        lambda root_job_id, **kwargs: {
+            "status": "succeeded",
+            "output_text": response,
+            "job_id": root_job_id,
+        },
+    )
 
     replay = skill._replay_failed_llm_webui_result(
         session=session,
@@ -3206,7 +5056,10 @@ def test_failed_llm_result_replay_is_revision_bound_and_uses_zero_incremental_to
     )
 
     assert replay["ok"] is True
-    assert replay["payload"]["ui"]["application"]["desktop"]["pageSchema"]["title"] == "After"
+    assert (
+        replay["payload"]["ui"]["application"]["desktop"]["pageSchema"]["title"]
+        == "After"
+    )
     assert replay["telemetry"]["usage"]["total_tokens"] == 0
     assert replay["telemetry"]["original_usage"]["total_tokens"] == 321
     assert replay["replay"]["incremental_tokens"] == 0
@@ -3220,6 +5073,116 @@ def test_failed_llm_result_replay_is_revision_bound_and_uses_zero_incremental_to
         before_webui=before_webui,
     )
     assert stale["error"] == "llm_replay_stale_revision"
+
+
+def test_failed_llm_result_replay_uses_normalized_candidate_without_root(
+    tmp_path, monkeypatch
+) -> None:
+    skill = _load_module()
+    from adaos.sdk.llm import llm_client
+
+    request_text = "Change the prototype title"
+    job_id = "llm_job_candidate_replay"
+    artifact_root = tmp_path / "candidate-replay"
+    artifact_root.mkdir(parents=True)
+    before_webui = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "candidate-replay",
+                        "title": "Before",
+                        "layout": {
+                            "type": "single",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {
+                                "id": "content",
+                                "type": "item.details",
+                                "area": "main",
+                                "inputs": {"fields": []},
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    after_webui = copy.deepcopy(before_webui)
+    after_webui["ui"]["application"]["desktop"]["pageSchema"]["title"] = "After"
+    session = {
+        "id": "builder_session_candidate_replay",
+        "scenario_id": "candidate-replay",
+        "artifact_root": str(artifact_root),
+        "ui_revision": "004",
+        "pending_llm_jobs": {
+            job_id: {
+                "job_id": job_id,
+                "root_job_id": job_id,
+                "status": "failed",
+                "request_text": request_text,
+            }
+        },
+    }
+    candidate_link = skill._write_llm_job_candidate_artifact(
+        session=session,
+        job_id=job_id,
+        request_id="request-candidate-replay",
+        stage="primary",
+        result={"ok": False, "payload": after_webui, "comment": "Updated title."},
+    )
+    diagnostic = skill._llm_job_diagnostic(
+        result={
+            "ok": False,
+            "error": "ui_request_postconditions_failed",
+            "candidate_artifacts": [candidate_link],
+            "validation": {
+                "request_evaluation": {
+                    "qualification": {
+                        "request_digest": skill.developer_ui.qualify(request_text)[
+                            "request_digest"
+                        ]
+                    }
+                }
+            },
+            "last_response": "not reusable",
+        },
+        telemetry={"usage": {"total_tokens": 321}},
+    )
+    skill._write_llm_job_terminal_artifact(
+        session,
+        job_id,
+        "failed",
+        detail="postconditions failed",
+        diagnostic=diagnostic,
+    )
+    root_calls = []
+
+    def fail_root_call(*args, **kwargs):
+        root_calls.append((args, kwargs))
+        raise AssertionError("a valid local candidate must not query Root")
+
+    monkeypatch.setattr(llm_client, "get_response_job", fail_root_call)
+
+    replay = skill._replay_failed_llm_webui_result(
+        session=session,
+        job_id=job_id,
+        request_text=request_text,
+        expected_ui_revision="004",
+        previous_preview={},
+        before_webui=before_webui,
+    )
+
+    assert replay["ok"] is True, replay
+    assert replay["payload"] == after_webui
+    assert replay["telemetry"]["source"] == "normalized_candidate"
+    assert replay["telemetry"]["usage"]["total_tokens"] == 0
+    assert replay["replay"]["candidate_artifact"].endswith(
+        ".candidate.primary.json"
+    )
+    assert root_calls == []
 
 
 def test_kanban_request_requires_bounded_prototype_records(monkeypatch) -> None:
@@ -3272,6 +5235,250 @@ def test_kanban_request_requires_bounded_prototype_records(monkeypatch) -> None:
     assert len(request["stable_user_prompt"].encode("utf-8")) < 20_000
 
 
+def test_application_manager_request_requires_scenario_locale_dictionaries(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    current = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    monkeypatch.setattr(
+        skill,
+        "_current_webui_payload",
+        lambda *_args, **_kwargs: copy.deepcopy(current),
+    )
+
+    request = skill._builder_llm_webui_transform_request(
+        session={"id": "session", "scenario_id": "applications"},
+        instruction=(
+            "Build an Applications lifecycle manager with an Extensions-style catalog, "
+            "installed applications, Marketplace, and MCP operations."
+        ),
+        preview_state={},
+    )
+    stable = json.loads(request["stable_user_prompt"])["stable_builder_context"]
+
+    assert (
+        stable["selected_ui_capabilities"]["qualification"]["requirements"][
+            "application_manager"
+        ]
+        is True
+    )
+    assert stable["scenario_locale_output"] == {
+        "required": True,
+        "field": "complete.locale_dictionaries",
+        "authority": (
+            "AdaOS stores dictionaries under the scenario package and derives WebUI "
+            "resource descriptors"
+        ),
+    }
+    complete = stable["requested_output_contract"]["line_shapes"]["complete"]
+    assert set(complete["locale_dictionaries"]) == {"en", "ru"}
+    assert (
+        "assets/i18n/<locale>.json" in stable["enforced_acceptance"]["scenario_locales"]
+    )
+
+
+def test_application_manager_layout_request_reuses_existing_scenario_locales(
+    monkeypatch, tmp_path
+) -> None:
+    skill = _load_module()
+    locale_root = tmp_path / "assets" / "i18n"
+    locale_root.mkdir(parents=True)
+    (locale_root / "en.json").write_text(
+        json.dumps({"scenario.applications.title": "Applications"}), encoding="utf-8"
+    )
+    (locale_root / "ru.json").write_text(
+        json.dumps({"scenario.applications.title": "Applications RU"}), encoding="utf-8"
+    )
+    current = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    monkeypatch.setattr(
+        skill,
+        "_current_webui_payload",
+        lambda *_args, **_kwargs: copy.deepcopy(current),
+    )
+
+    request = skill._builder_llm_webui_transform_request(
+        session={
+            "id": "session",
+            "scenario_id": "applications",
+            "artifact_root": str(tmp_path),
+        },
+        instruction=(
+            "Move the review actions before the reviewed plan in the Applications "
+            "lifecycle manager. Preserve all text."
+        ),
+        preview_state={},
+    )
+    stable = json.loads(request["stable_user_prompt"])["stable_builder_context"]
+
+    assert stable["selected_ui_capabilities"]["qualification"]["requirements"][
+        "application_manager"
+    ] is True
+    assert stable["scenario_locale_output"]["required"] is False
+    assert (
+        "locale_dictionaries"
+        not in stable["requested_output_contract"]["line_shapes"]["complete"]
+    )
+
+
+def test_application_manager_request_exposes_a_bounded_cumulative_phase(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    current = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    monkeypatch.setattr(
+        skill,
+        "_current_webui_payload",
+        lambda *_args, **_kwargs: copy.deepcopy(current),
+    )
+
+    request = skill._builder_llm_webui_transform_request(
+        session={"id": "session", "scenario_id": "applications"},
+        instruction=(
+            "Prototype phase 1/6: build Applications as an Extensions-style "
+            "lifecycle manager backed by MCP. Implement the catalog shell."
+        ),
+        preview_state={},
+    )
+    stable = json.loads(request["stable_user_prompt"])["stable_builder_context"]
+    recipe = next(
+        item
+        for item in stable["selected_ui_capabilities"]["items"]
+        if item["id"] == "recipe.application_manager"
+    )
+
+    assert stable["scenario_locale_output"]["required"] is False
+    assert (
+        "locale_dictionaries"
+        not in stable["requested_output_contract"]["line_shapes"]["complete"]
+    )
+    assert stable["prototype_workflow"]["current"]["id"] == "catalog_shell"
+    assert stable["prototype_workflow"]["phase_index"] == 1
+    assert stable["prototype_workflow"]["total_phases"] == 6
+    assert "applications.sidebar_layout" in stable["prototype_workflow"]["required_now"]
+    assert "applications.mcp_reads" not in stable["prototype_workflow"]["required_now"]
+    assert {
+        item["id"] for item in stable["prototype_workflow"]["failed_now"]
+    } == {
+        "applications.sidebar_layout",
+        "applications.catalog_sections",
+        "applications.master_selection",
+    }
+    assert set(recipe["composition"]) == {
+        "page",
+        "navigation",
+        "catalog_widget",
+        "development_catalog_widget",
+        "catalog_sections",
+        "installed_filter",
+            "reads",
+            "initial_state",
+            "initial_state_target",
+        }
+    assert len(request["stable_user_prompt"].encode("utf-8")) < 30_000
+
+
+def test_repair_ignores_outstanding_later_phase_postconditions() -> None:
+    skill = _load_module()
+    failures = skill._failed_repair_postconditions(
+        {
+            "postconditions": [
+                {
+                    "id": "applications.sidebar_layout",
+                    "ok": False,
+                    "required": True,
+                    "expected": "split",
+                    "actual": "stack",
+                },
+                {
+                    "id": "applications.localization",
+                    "ok": False,
+                    "required": False,
+                    "expected": ["en", "ru"],
+                    "actual": [],
+                },
+            ]
+        }
+    )
+
+    assert [item["id"] for item in failures] == ["applications.sidebar_layout"]
+
+
+def test_compact_validation_ignores_outstanding_later_phase_postconditions() -> None:
+    skill = _load_module()
+
+    compact = skill._compact_llm_validation(
+        {
+            "request_evaluation": {
+                "ok": False,
+                "postconditions": [
+                    {
+                        "id": "applications.detail_state_binding",
+                        "ok": False,
+                        "required": True,
+                    },
+                    {
+                        "id": "applications.localization",
+                        "ok": False,
+                        "required": False,
+                    },
+                ],
+            }
+        }
+    )
+
+    assert compact["request_evaluation"]["failed_postconditions"] == [
+        "applications.detail_state_binding"
+    ]
+
+
 def test_finalize_rolls_back_webui_and_session_when_prototype_materialization_fails(
     monkeypatch, tmp_path
 ) -> None:
@@ -3304,7 +5511,9 @@ def test_finalize_rolls_back_webui_and_session_when_prototype_materialization_fa
     }
     original_session = copy.deepcopy(session)
     writes: list[dict] = []
-    monkeypatch.setattr(skill, "_ensure_session_artifact_root", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        skill, "_ensure_session_artifact_root", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(skill, "_draft_user_summary", lambda _session: {})
     monkeypatch.setattr(skill, "_repair_text_tree", lambda value: value)
     monkeypatch.setattr(
@@ -3348,10 +5557,13 @@ def test_prototype_resource_prefers_canonical_workflow_change(monkeypatch) -> No
         lambda *_args: {"change": {"change_id": "change-canonical"}},
     )
 
-    assert skill._active_workflow_change_id(
-        session={"scenario_id": "kanban"},
-        patch={"change_id": "change-llm-patch"},
-    ) == "change-canonical"
+    assert (
+        skill._active_workflow_change_id(
+            session={"scenario_id": "kanban"},
+            patch={"change_id": "change-llm-patch"},
+        )
+        == "change-canonical"
+    )
 
 
 def test_revision_prototype_records_reads_bounded_complete_jsonl() -> None:
@@ -3375,9 +5587,9 @@ def test_revision_prototype_records_reads_bounded_complete_jsonl() -> None:
 def test_unable_llm_result_is_terminal_diagnostic_not_a_revision() -> None:
     skill = _load_module()
 
-    assert skill._llm_unable_detail({"ok": True, "comment": "Need a clearer request.", "unable_reason": "ambiguous"}) == (
-        "Need a clearer request. (ambiguous)"
-    )
+    assert skill._llm_unable_detail(
+        {"ok": True, "comment": "Need a clearer request.", "unable_reason": "ambiguous"}
+    ) == ("Need a clearer request. (ambiguous)")
     assert skill._llm_unable_detail({"ok": True, "comment": "Applied."}) == ""
 
 
@@ -3387,12 +5599,22 @@ def test_normalise_llm_payload_uses_webui_page_schema_as_source_of_truth() -> No
         "id": "todo",
         "layout": {"type": "split", "areas": [{"id": "main"}, {"id": "right"}]},
         "widgets": [
-            {"id": "prototype-form", "type": "ui.form", "area": "main", "inputs": {"fields": []}},
+            {
+                "id": "prototype-form",
+                "type": "ui.form",
+                "area": "main",
+                "inputs": {"fields": []},
+            },
             {
                 "id": "prototype-cards",
                 "type": "ui.list",
                 "area": "right",
-                "inputs": {"variant": "cards", "titleKey": "title", "subtitleKey": "notes", "previewKey": "status"},
+                "inputs": {
+                    "variant": "cards",
+                    "titleKey": "title",
+                    "subtitleKey": "notes",
+                    "previewKey": "status",
+                },
             },
         ],
     }
@@ -3404,7 +5626,13 @@ def test_normalise_llm_payload_uses_webui_page_schema_as_source_of_truth() -> No
             "type": "page",
             "children": [
                 {"id": "editor", "type": "section", "children": []},
-                {"id": "items_cards", "type": "card_list", "title": "{{title}}", "subtitle": "{{notes}}", "preview": "{{date}}"},
+                {
+                    "id": "items_cards",
+                    "type": "card_list",
+                    "title": "{{title}}",
+                    "subtitle": "{{notes}}",
+                    "preview": "{{date}}",
+                },
             ],
         },
         "datasources": [
@@ -3417,7 +5645,9 @@ def test_normalise_llm_payload_uses_webui_page_schema_as_source_of_truth() -> No
                 ],
             }
         ],
-        "mock_data": {"prototype_items": [{"title": "Talk", "notes": "CFP", "date": "2026-07-02"}]},
+        "mock_data": {
+            "prototype_items": [{"title": "Talk", "notes": "CFP", "date": "2026-07-02"}]
+        },
         "layout_order": "input_first",
     }
     next_page_schema = {
@@ -3429,9 +5659,19 @@ def test_normalise_llm_payload_uses_webui_page_schema_as_source_of_truth() -> No
                 "id": "prototype-cards",
                 "type": "ui.list",
                 "area": "main",
-                "inputs": {"variant": "cards", "titleKey": "title", "subtitleKey": "notes", "previewKey": "date"},
+                "inputs": {
+                    "variant": "cards",
+                    "titleKey": "title",
+                    "subtitleKey": "notes",
+                    "previewKey": "date",
+                },
             },
-            {"id": "prototype-form", "type": "ui.form", "area": "right", "inputs": {"fields": []}},
+            {
+                "id": "prototype-form",
+                "type": "ui.form",
+                "area": "right",
+                "inputs": {"fields": []},
+            },
         ],
     }
     parsed = {
@@ -3440,13 +5680,23 @@ def test_normalise_llm_payload_uses_webui_page_schema_as_source_of_truth() -> No
         "ui": {"application": {"desktop": {"pageSchema": next_page_schema}}},
     }
 
-    _payload, preview = skill._normalise_llm_webui_payload(parsed, previous_preview=previous_preview)
+    _payload, preview = skill._normalise_llm_webui_payload(
+        parsed, previous_preview=previous_preview
+    )
     assert _payload["schema"] == "adaos.webui.v1"
     assert "preview_state" not in _payload
     assert "current_ui" not in preview
     assert preview["page_schema"] == next_page_schema
-    form = next(item for item in preview["page_schema"]["widgets"] if item["id"] == "prototype-form")
-    cards = next(item for item in preview["page_schema"]["widgets"] if item["id"] == "prototype-cards")
+    form = next(
+        item
+        for item in preview["page_schema"]["widgets"]
+        if item["id"] == "prototype-form"
+    )
+    cards = next(
+        item
+        for item in preview["page_schema"]["widgets"]
+        if item["id"] == "prototype-cards"
+    )
     assert form["area"] == "right"
     assert cards["area"] == "main"
     assert cards["inputs"]["previewKey"] == "date"
@@ -3486,13 +5736,162 @@ def test_normalise_llm_payload_accepts_webui_schema_wrapper() -> None:
         }
     }
 
-    payload, preview = skill._normalise_llm_webui_payload(parsed, previous_preview={"title": "Survey"})
+    payload, preview = skill._normalise_llm_webui_payload(
+        parsed, previous_preview={"title": "Survey"}
+    )
 
     assert payload["schema"] == "adaos.webui.v1"
     fields = preview["page_schema"]["widgets"][0]["inputs"]["fields"]
     assert fields[0]["id"] == "fio"
     assert fields[1]["id"] == "gender"
     assert fields[1]["options"][0]["value"] == "male"
+
+
+def test_normalise_llm_payload_lifts_wrapped_widget_action_examples() -> None:
+    skill = _load_module()
+    wrapped = {
+        "action": {
+            "on": "click:open-builder",
+            "type": "openWorkspace",
+            "params": {"ensureBuilderWorkbench": True},
+        },
+        "id": "open-builder",
+        "label": "Open in Builder",
+        "visibleIf": "$state.localDevelopmentAvailable == true",
+    }
+    parsed = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                        "widgets": [
+                            {
+                                "id": "actions",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "actions": [wrapped],
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+
+    payload, preview = skill._normalise_llm_webui_payload(
+        parsed, previous_preview={"title": "Applications"}
+    )
+
+    expected = wrapped["action"]
+    assert preview["page_schema"]["widgets"][0]["actions"] == [expected]
+    assert payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0][
+        "actions"
+    ] == [expected]
+
+
+def test_normalise_llm_payload_materializes_segmented_control_default() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "applications",
+        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "widgets": [
+            {
+                "id": "catalog-sections",
+                "type": "input.commandBar",
+                "area": "main",
+                "inputs": {
+                    "variant": "segmented",
+                    "selectedStateKey": "catalogSection",
+                    "defaultValue": "marketplace",
+                    "buttons": [
+                        {"id": "marketplace", "label": "Marketplace"},
+                        {"id": "installed", "label": "Installed"},
+                    ],
+                },
+            }
+        ],
+    }
+    parsed = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+    }
+
+    payload, preview = skill._normalise_llm_webui_payload(
+        parsed, previous_preview={"title": "Applications"}
+    )
+
+    assert preview["page_schema"]["initialState"]["catalogSection"] == "marketplace"
+    assert (
+        payload["ui"]["application"]["desktop"]["pageSchema"]["initialState"][
+            "catalogSection"
+        ]
+        == "marketplace"
+    )
+
+
+def test_normalise_llm_payload_bounds_empty_configured_details() -> None:
+    skill = _load_module()
+    payload = {
+        "schema": "adaos.webui.v1",
+        "resources": {
+            "misplaced.root.en": {
+                "kind": "data",
+                "role": "i18n",
+                "locale": "en",
+                "path": "assets/i18n/en.json",
+            }
+        },
+        "ui": {
+            "resources": {
+                "misplaced.ui.ru": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "ru",
+                    "path": "assets/i18n/ru.json",
+                }
+            },
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "details",
+                        "layout": {
+                            "type": "single",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {
+                                "id": "installation",
+                                "type": "item.details",
+                                "area": "main",
+                                "inputs": {
+                                    "fields": [
+                                        {
+                                            "label": "Version",
+                                            "path": "installed.version",
+                                        }
+                                    ]
+                                },
+                            }
+                        ],
+                    }
+                }
+            },
+        },
+    }
+
+    normalized, preview = skill._normalise_llm_webui_payload(
+        payload, previous_preview={}
+    )
+    widget = normalized["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]
+
+    assert widget["inputs"]["emptyText"] == "No details available."
+    assert (
+        preview["page_schema"]["widgets"][0]["inputs"]["emptyText"]
+        == "No details available."
+    )
 
 
 def test_normalise_llm_payload_moves_root_modals_into_application() -> None:
@@ -3505,7 +5904,13 @@ def test_normalise_llm_payload_moves_root_modals_into_application() -> None:
                 "id": "open-comment",
                 "type": "ui.actions",
                 "area": "main",
-                "actions": [{"on": "click", "type": "openModal", "params": {"modalId": "comment_modal"}}],
+                "actions": [
+                    {
+                        "on": "click",
+                        "type": "openModal",
+                        "params": {"modalId": "comment_modal"},
+                    }
+                ],
             }
         ],
     }
@@ -3518,16 +5923,28 @@ def test_normalise_llm_payload_moves_root_modals_into_application() -> None:
                 "schema": {
                     "id": "comment_modal_schema",
                     "layout": {"type": "stack", "areas": [{"id": "modal"}]},
-                    "widgets": [{"id": "comment", "type": "ui.form", "area": "modal", "inputs": {"fields": [{"id": "text", "type": "longText"}]}}],
+                    "widgets": [
+                        {
+                            "id": "comment",
+                            "type": "ui.form",
+                            "area": "modal",
+                            "inputs": {"fields": [{"id": "text", "type": "longText"}]},
+                        }
+                    ],
                 },
             }
         },
     }
 
-    payload, preview = skill._normalise_llm_webui_payload(parsed, previous_preview={"title": "Requests"})
+    payload, preview = skill._normalise_llm_webui_payload(
+        parsed, previous_preview={"title": "Requests"}
+    )
 
     assert "modals" not in payload
-    assert payload["ui"]["application"]["modals"]["comment_modal"]["title"] == "Add comment"
+    assert (
+        payload["ui"]["application"]["modals"]["comment_modal"]["title"]
+        == "Add comment"
+    )
     assert preview["page_schema"] == page_schema
     assert skill._validate_builder_webui_payload(payload, preview)["ok"] is True
 
@@ -3556,7 +5973,10 @@ def test_builder_llm_failure_chat_detail_is_compact_but_specific() -> None:
 
     visible = skill._llm_job_failure_chat_detail(detail)
 
-    assert visible == "\u041e\u0442\u0432\u0435\u0442 \u043d\u0435 \u043f\u0440\u043e\u0448\u0451\u043b ABI-\u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443: '' is not one of ['GET', 'POST']"
+    assert (
+        visible
+        == "\u041e\u0442\u0432\u0435\u0442 \u043d\u0435 \u043f\u0440\u043e\u0448\u0451\u043b ABI-\u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443: '' is not one of ['GET', 'POST']"
+    )
     assert "Failed validating" not in visible
 
 
@@ -3595,7 +6015,9 @@ def test_builder_component_contract_describes_visible_form_and_detail_actions() 
     assert "click:<buttonId>" in contracts["ui.actions"]["actions"]
     assert "placeholder type='none'" in contracts["ui.actions"]["actions"]
     assert "remove the old inline detail" in contracts["application_modals"]["rule"]
-    assert "selected capability manifests and postconditions are authoritative" in prompt
+    assert (
+        "selected capability manifests and postconditions are authoritative" in prompt
+    )
 
 
 def test_builder_patch_stream_applies_to_shadow_and_preserves_unrelated_ui() -> None:
@@ -3608,7 +6030,10 @@ def test_builder_patch_stream_applies_to_shadow_and_preserves_unrelated_ui() -> 
                     "pageSchema": {
                         "id": "recipes",
                         "title": "Recipe draft",
-                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
                         "widgets": [
                             {
                                 "id": "recipe-title",
@@ -3625,7 +6050,13 @@ def test_builder_patch_stream_applies_to_shadow_and_preserves_unrelated_ui() -> 
     base_hash = skill._webui_source_fingerprint(before)
     output = "\n".join(
         [
-            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": base_hash}),
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": base_hash,
+                }
+            ),
             json.dumps(
                 {
                     "type": "patch",
@@ -3648,11 +6079,1058 @@ def test_builder_patch_stream_applies_to_shadow_and_preserves_unrelated_ui() -> 
     )
 
     assert result["ok"] is True
-    assert before["ui"]["application"]["desktop"]["pageSchema"]["title"] == "Recipe draft"
-    assert result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["title"] == "Recipe book"
-    assert result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["id"] == "recipe-title"
+    assert (
+        before["ui"]["application"]["desktop"]["pageSchema"]["title"] == "Recipe draft"
+    )
+    assert (
+        result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["title"]
+        == "Recipe book"
+    )
+    assert (
+        result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0][
+            "id"
+        ]
+        == "recipe-title"
+    )
     assert result["semantic_patch_stream"]["operation_count"] == 1
     assert result["attempts"][0]["output_mode"] == "jsonl_patch_v1"
+
+
+def test_empty_locale_dictionary_pair_is_treated_as_no_delta() -> None:
+    skill = _load_module()
+
+    assert skill._normalise_locale_dictionaries({"en": {}, "ru": {}}) is None
+
+
+def test_builder_patch_stream_returns_bounded_scenario_locale_dictionaries() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "title": "Applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    output = "\n".join(
+        [
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": skill._webui_source_fingerprint(before),
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "add",
+                    "path": "/ui/application/desktop/pageSchema/title_i18n",
+                    "value": "scenario.applications.title",
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "complete",
+                    "comment": "Localized the scenario.",
+                    "locale_dictionaries": {
+                        "en": {
+                            "scenario.applications.title": "Applications",
+                            "unused.only.en": "Unused",
+                            "": "",
+                        },
+                        "ru": {
+                            "scenario.applications.title": "Приложения",
+                            "": "",
+                        },
+                    },
+                },
+                ensure_ascii=False,
+            ),
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert (
+        result["locale_dictionaries"]["ru"]["scenario.applications.title"]
+        == "Приложения"
+    )
+    assert set(result["locale_dictionaries"]["en"]) == {"scenario.applications.title"}
+    compact = skill._compact_llm_result(result, include_artifacts=True)
+    assert compact["locale_dictionaries"] == result["locale_dictionaries"]
+    assert (
+        skill._revision_locale_dictionaries({"llm": compact})
+        == result["locale_dictionaries"]
+    )
+
+
+def test_public_llm_result_is_bounded_and_keeps_failure_summary() -> None:
+    skill = _load_module()
+    result = {
+        "ok": True,
+        "comment": "Localized.",
+        "raw_response": "x" * 100_000,
+        "locale_dictionaries": {
+            "en": {f"key.{index}": "English" for index in range(200)},
+            "ru": {f"key.{index}": "Русский" for index in range(200)},
+        },
+        "validation": {
+            "ok": True,
+            "schema": "adaos.webui.v1",
+            "request_evaluation": {
+                "ok": False,
+                "qualification": {"surface_kind": "application_manager"},
+                "postconditions": [
+                    {
+                        "id": "applications.localization",
+                        "ok": False,
+                        "actual": {"missing": ["x"] * 500},
+                    }
+                ],
+                "capability_validation": {"findings": [{"code": "fixture"}] * 500},
+            },
+        },
+        "attempts": [
+            {
+                "attempt": 1,
+                "ok": False,
+                "request_id": "request-1",
+                "validation": {
+                    "request_evaluation": {
+                        "ok": False,
+                        "postconditions": [
+                            {"id": "applications.localization", "ok": False}
+                        ],
+                    }
+                },
+            }
+        ],
+        "semantic_patch_stream": {
+            "operation_count": 100,
+            "patches": [{"value": "x" * 1000}] * 100,
+        },
+    }
+
+    compact = skill._compact_llm_result(result)
+
+    assert "raw_response" not in compact
+    assert "locale_dictionaries" not in compact
+    assert "patches" not in compact["semantic_patch_stream"]
+    assert compact["validation"]["request_evaluation"]["failed_postconditions"] == [
+        "applications.localization"
+    ]
+    assert (
+        compact["validation"]["request_evaluation"]["capability_finding_count"] == 500
+    )
+    assert len(json.dumps(compact, ensure_ascii=False)) < 5000
+
+
+def test_builder_patch_stream_extracts_locale_dictionaries_patched_under_complete() -> (
+    None
+):
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "title": "Applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    dictionaries = {
+        "en": {"scenario.applications.title": "Applications"},
+        "ru": {"scenario.applications.title": "Приложения"},
+    }
+    output = "\n".join(
+        [
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": skill._webui_source_fingerprint(before),
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "add",
+                    "path": "/complete/locale_dictionaries",
+                    "value": dictionaries,
+                },
+                ensure_ascii=False,
+            ),
+            json.dumps({"type": "complete", "comment": "Localized."}),
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert result["locale_dictionaries"] == dictionaries
+    assert "complete" not in result["payload"]
+    assert result["semantic_patch_stream"]["locale_normalization_pending"] is True
+
+
+def test_builder_patch_stream_removes_action_for_a_removed_button() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {
+                                "id": "lifecycle",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "install",
+                                            "label": "Install",
+                                            "kind": "primary",
+                                        },
+                                        {
+                                            "id": "apply",
+                                            "label": "Apply",
+                                            "kind": "secondary",
+                                        },
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:install",
+                                        "type": "updateState",
+                                        "params": {"intent": "install"},
+                                    },
+                                    {
+                                        "on": "click:apply",
+                                        "type": "updateState",
+                                        "params": {"intent": "apply"},
+                                    },
+                                ],
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    output = "\n".join(
+        [
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": skill._webui_source_fingerprint(before),
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "remove",
+                    "path": (
+                        "/ui/application/desktop/pageSchema/widgets/@lifecycle/"
+                        "inputs/buttons/1"
+                    ),
+                }
+            ),
+            json.dumps({"type": "complete", "comment": "Moved apply to review."}),
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert result["ok"] is True
+    widget = result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"][
+        0
+    ]
+    assert [item["id"] for item in widget["inputs"]["buttons"]] == ["install"]
+    assert [item["on"] for item in widget["actions"]] == ["click:install"]
+    assert any(
+        item.get("kind") == "orphan_widget_action" for item in result["normalizations"]
+    )
+
+
+def test_builder_writes_scenario_locale_assets_and_derives_resource_paths(
+    tmp_path,
+) -> None:
+    skill = _load_module()
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "resources": {
+                    "legacy.inline.ru": {
+                        "kind": "data",
+                        "role": "i18n",
+                        "locale": "ru",
+                        "dictionary": {"legacy": "Устарело"},
+                    },
+                    "applications.fixture": {
+                        "kind": "data",
+                        "role": "prototype-fixture",
+                        "path": "assets/fixtures/applications.json",
+                    },
+                },
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "title": "Applications",
+                        "title_i18n": {
+                            "key": "scenario.applications.title",
+                            "fallback": "Applications",
+                            "translations": {
+                                "en": "Applications",
+                                "ru": "Приложения",
+                            },
+                        },
+                        "layout": {"type": "stack", "areas": []},
+                        "widgets": [],
+                    }
+                },
+            }
+        },
+    }
+    dictionaries = {
+        "en": {"scenario.applications.title": "Applications"},
+        "ru": {"scenario.applications.title": "Приложения"},
+    }
+
+    collected = skill._collect_inline_locale_dictionaries(payload)
+    resolved = skill._with_scenario_locale_resources(payload, dictionaries)
+    skill._write_scenario_locale_dictionaries(str(tmp_path), dictionaries)
+
+    assert collected == dictionaries
+    resources = resolved["ui"]["application"]["resources"]
+    assert "resources" not in resolved
+    assert "resources" not in resolved["ui"]
+    assert resources["applications.i18n.en"]["path"] == "assets/i18n/en.json"
+    assert "dictionary" not in resources["applications.i18n.en"]
+    assert "legacy.inline.ru" not in resources
+    assert "applications.fixture" in resources
+    assert resolved["ui"]["application"]["desktop"]["pageSchema"]["title_i18n"] == (
+        "scenario.applications.title"
+    )
+    assert (
+        json.loads(
+            (tmp_path / "assets" / "i18n" / "ru.json").read_text(encoding="utf-8")
+        )
+        == dictionaries["ru"]
+    )
+
+
+def test_builder_extracts_misplaced_complete_locale_dictionaries() -> None:
+    skill = _load_module()
+    dictionaries = {
+        "en": {"scenario.applications.title": "Applications"},
+        "ru": {"scenario.applications.title": "Приложения"},
+    }
+    payload = {
+        "schema": "adaos.webui.v1",
+        "complete.locale_dictionaries": dictionaries,
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "title": "Applications",
+                        "title_i18n": {
+                            "key": "scenario.applications.title",
+                            "translations": {
+                                "en": "Applications",
+                                "ru": "Приложения",
+                            },
+                        },
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {
+                                "id": "summary",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "dataSource": {"kind": "static", "value": {}},
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+
+    result = skill._validate_llm_request_postconditions(
+        {"ok": True, "payload": payload, "validation": {"ok": True}},
+        instruction="Localize only the selected scenario.",
+        before_webui=payload,
+    )
+
+    assert result["ok"] is True
+    assert "complete.locale_dictionaries" not in result["payload"]
+    assert result["locale_dictionaries"] == dictionaries
+    page = result["payload"]["ui"]["application"]["desktop"]["pageSchema"]
+    assert page["title_i18n"] == "scenario.applications.title"
+
+
+def test_builder_oneshot_transform_uses_shared_request_postconditions(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "demo",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {
+                                "id": "summary",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "dataSource": {"kind": "static", "value": {}},
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    monkeypatch.setattr(
+        skill,
+        "_builder_llm_webui_transform_request",
+        lambda **_kwargs: {
+            "current_payload": before,
+            "system_prompt": "system",
+            "stable_user_prompt": "contract",
+            "user_prompt": "request",
+            "dynamic_request": {},
+        },
+    )
+    monkeypatch.setattr(
+        skill,
+        "_parse_llm_webui_transform_output",
+        lambda **_kwargs: {
+            "ok": True,
+            "payload": before,
+            "validation": {"ok": True},
+        },
+    )
+    calls = []
+
+    def _postconditions(result, **kwargs):
+        calls.append(kwargs)
+        return {
+            **result,
+            "shared_postconditions": True,
+            "validation": {"ok": True, "request_evaluation": {"ok": True}},
+        }
+
+    monkeypatch.setattr(skill, "_validate_llm_request_postconditions", _postconditions)
+    import adaos.sdk.llm.llm_client as llm_client
+
+    monkeypatch.setattr(
+        llm_client, "send_response", lambda *_args, **_kwargs: {"output_text": "{}"}
+    )
+
+    result = skill._apply_llm_webui_transform(
+        session={"scenario_id": "demo", "artifact_root": ""},
+        instruction="Localize the selected scenario.",
+        preview_state={},
+    )
+
+    assert result["ok"] is True
+    assert result["shared_postconditions"] is True
+    assert calls == [
+        {
+            "instruction": "Localize the selected scenario.",
+            "before_webui": before,
+            "existing_locale_dictionaries": None,
+        }
+    ]
+
+
+def test_llm_transform_allows_syntax_and_postcondition_repairs(monkeypatch) -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    monkeypatch.setattr(
+        skill,
+        "_builder_llm_webui_transform_request",
+        lambda **_kwargs: {
+            "current_payload": before,
+            "system_prompt": "system",
+            "stable_user_prompt": "contract",
+            "user_prompt": "request",
+            "dynamic_request": {"instruction": "localize"},
+        },
+    )
+    parsed_results = iter(
+        [
+            TypeError("invalid scalar parent"),
+            {
+                "ok": True,
+                "payload": before,
+                "validation": {"ok": True},
+            },
+            {
+                "ok": True,
+                "payload": before,
+                "validation": {"ok": True},
+            },
+        ]
+    )
+
+    def _parse(**_kwargs):
+        value = next(parsed_results)
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", _parse)
+    postcondition_calls = 0
+
+    def _postconditions(result, **_kwargs):
+        nonlocal postcondition_calls
+        postcondition_calls += 1
+        if postcondition_calls == 1:
+            return {
+                **result,
+                "ok": False,
+                "validation": {
+                    "ok": True,
+                    "request_evaluation": {
+                        "ok": False,
+                        "postconditions": [
+                            {"id": "applications.localization", "ok": False}
+                        ],
+                    },
+                },
+            }
+        return {
+            **result,
+            "ok": True,
+            "validation": {
+                "ok": True,
+                "request_evaluation": {"ok": True},
+            },
+        }
+
+    monkeypatch.setattr(skill, "_validate_llm_request_postconditions", _postconditions)
+    import adaos.sdk.llm.llm_client as llm_client
+
+    messages_by_attempt = []
+
+    long_response = "x" * 41000
+
+    def _send_response(messages, **_kwargs):
+        messages_by_attempt.append(messages)
+        return {"output_text": long_response}
+
+    monkeypatch.setattr(llm_client, "send_response", _send_response)
+
+    result = skill._apply_llm_webui_transform(
+        session={"scenario_id": "applications", "artifact_root": ""},
+        instruction="Localize Applications.",
+        preview_state={},
+    )
+
+    assert result["ok"] is True
+    assert [item["ok"] for item in result["attempts"]] == [False, False, True]
+    assert len(messages_by_attempt) == 3
+    first_repair = json.loads(messages_by_attempt[1][2]["content"])
+    assert first_repair["previous_response"] == long_response
+    final_repair = json.loads(messages_by_attempt[2][2]["content"])
+    assert final_repair["validation_error"]["request_evaluation"]["ok"] is False
+    assert final_repair["previous_response"] == long_response
+
+
+def test_request_postconditions_apply_deterministic_localization_repairs(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {
+                                "id": "install",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "title": "Review",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "install",
+                                            "label": "Install",
+                                            "label_i18n": "widgets.install.label",
+                                        }
+                                    ],
+                                    "meta": [
+                                        {
+                                            "field": "installation.status",
+                                            "label": "Status",
+                                        }
+                                    ],
+                                },
+                            },
+                            {
+                                "id": "reviewed-plan",
+                                "type": "item.details",
+                                "area": "main",
+                                "inputs": {"emptyText": "No details available."},
+                            },
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    evaluations = []
+
+    def _evaluate(_instruction, candidate, **_kwargs):
+        evaluations.append(copy.deepcopy(candidate))
+        if len(evaluations) == 1:
+            return {
+                "ok": False,
+                "qualification": {"requirements": {"application_manager": True}},
+                "postconditions": [
+                    {
+                        "id": "applications.localization",
+                        "ok": False,
+                        "actual": {
+                            "missing": [
+                                "pages.0.widgets.0.title",
+                                "pages.0.widgets.1.inputs.emptyText",
+                            ],
+                            "invalidLocaleEntries": [
+                                {
+                                    "key": "applications.unused.placeholder",
+                                    "locales": ["en", "ru"],
+                                }
+                            ],
+                            "invalid": [
+                                {
+                                    "path": "pages.0.widgets.0.inputs.buttons.0.label",
+                                    "key": "widgets.install.label",
+                                    "missingLocales": [],
+                                    "englishMatchesFallback": False,
+                                }
+                            ],
+                            "missingValuePrefixes": [
+                                {
+                                    "path": "pages.0.widgets.0.inputs.meta.0.valueI18nPrefix",
+                                    "expected": "applications.installation.status.",
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "id": "applications.review_composition",
+                        "ok": False,
+                        "actual": {
+                            "localeValueMismatches": [
+                                {
+                                    "path": "pages.0.widgets.0.inputs.buttons.0.label",
+                                    "key": "widgets.install.label",
+                                    "locale": "ru",
+                                    "expected": "Установить",
+                                    "actual": "Спланировать установку",
+                                }
+                            ]
+                        },
+                    },
+                ],
+            }
+        return {
+            "ok": True,
+            "qualification": {"requirements": {"application_manager": True}},
+            "postconditions": [{"id": "applications.localization", "ok": True}],
+        }
+
+    monkeypatch.setattr(skill.developer_ui, "evaluate", _evaluate)
+    result = skill._validate_llm_request_postconditions(
+        {
+            "ok": True,
+            "payload": payload,
+            "validation": {"ok": True},
+            "locale_dictionaries": {
+                "en": {
+                    "widgets.install.label": "Plan install",
+                    "widgets.install.title": "Review",
+                    "applications.details.empty": "No details available.",
+                    "applications.unused.placeholder": "placeholder",
+                },
+                "ru": {
+                    "widgets.install.label": "Спланировать установку",
+                    "widgets.install.title": "Проверка",
+                    "applications.details.empty": "Нет доступных сведений.",
+                    "applications.unused.placeholder": "placeholder",
+                },
+            },
+        },
+        instruction="Build Applications lifecycle manager.",
+        before_webui=payload,
+    )
+
+    assert result["ok"] is True
+    assert result["locale_dictionaries"]["en"]["widgets.install.label"] == "Install"
+    assert result["locale_dictionaries"]["ru"]["widgets.install.label"] == "Установить"
+    assert "applications.unused.placeholder" not in result["locale_dictionaries"]["en"]
+    assert "applications.unused.placeholder" not in result["locale_dictionaries"]["ru"]
+    repaired_page = skill._extract_webui_page_schema(result["payload"])
+    assert repaired_page["widgets"][0]["title_i18n"] == "widgets.install.title"
+    assert repaired_page["widgets"][1]["inputs"]["emptyText_i18n"] == (
+        "applications.details.empty"
+    )
+    assert repaired_page["widgets"][0]["inputs"]["meta"][0]["valueI18nPrefix"] == (
+        "applications.installation.status."
+    )
+    repair_kinds = {item["repair"] for item in result["normalizations"]}
+    assert repair_kinds == {
+        "synchronize_english_i18n_fallback",
+        "apply_stable_i18n_descriptor",
+        "apply_canonical_value_i18n_prefix",
+        "apply_canonical_locale_value",
+        "remove_placeholder_locale_entry",
+    }
+    assert len(evaluations) == 2
+
+
+def test_builder_patch_stream_normalizes_prototype_fixture_alias_path() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "initialState": {
+                            "prototypeFixtures": {
+                                "samples": {"marketplace": {"title": "Marketplace"}}
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "summary",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "dataSource": {"kind": "static", "value": {}},
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    output = "\n".join(
+        [
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": skill._webui_source_fingerprint(before),
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "replace",
+                    "path": (
+                        "/ui/application/desktop/pageSchema/initialState/"
+                        "samples/marketplace/title"
+                    ),
+                    "value": "Applications",
+                }
+            ),
+            json.dumps({"type": "complete", "comment": "Updated fixtures."}),
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    page = result["payload"]["ui"]["application"]["desktop"]["pageSchema"]
+    assert (
+        page["initialState"]["prototypeFixtures"]["samples"]["marketplace"]["title"]
+        == "Applications"
+    )
+    patch = result["semantic_patch_stream"]["patches"][0]
+    assert patch["normalized_path_from"].endswith(
+        "/initialState/samples/marketplace/title"
+    )
+
+
+def test_builder_patch_stream_normalizes_replace_for_missing_object_member() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "initialState": {},
+                        "widgets": [
+                            {
+                                "id": "summary",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": {"title": "Applications"},
+                                },
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    output = "\n".join(
+        [
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": skill._webui_source_fingerprint(before),
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "replace",
+                    "path": "/ui/application/desktop/pageSchema/initialState/automaticUpdates",
+                    "value": True,
+                }
+            ),
+            json.dumps({"type": "complete", "comment": "Added the default."}),
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert result["ok"] is True
+    assert (
+        result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["initialState"][
+            "automaticUpdates"
+        ]
+        is True
+    )
+    assert result["semantic_patch_stream"]["patches"][0]["op"] == "add"
+    assert result["semantic_patch_stream"]["patches"][0]["normalized_from"] == "replace"
+
+
+def test_builder_patch_stream_allows_a_zero_delta_for_qualification() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "demo",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "initialState": {},
+                        "widgets": [
+                            {
+                                "id": "summary",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": {"title": "Ready"},
+                                },
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    output = "\n".join(
+        [
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": skill._webui_source_fingerprint(before),
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "complete",
+                    "comment": "The current revision already satisfies the request.",
+                }
+            ),
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert result["ok"] is True
+    assert result["payload"]["ui"] == before["ui"]
+    assert result["payload"]["generated_by"] == "builder_skill"
+    assert result["semantic_patch_stream"]["operation_count"] == 0
+    assert result["semantic_patch_stream"]["meaningful_operation_count"] == 0
+
+
+def test_builder_patch_stream_allows_one_noop_to_reach_qualification() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "demo",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "initialState": {},
+                        "widgets": [
+                            {
+                                "id": "summary",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": {"title": "Ready"},
+                                },
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    output = "\n".join(
+        [
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": skill._webui_source_fingerprint(before),
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "add",
+                    "path": "/ui/application/desktop/pageSchema/widgets/@summary/dataSource/value/title",
+                    "value": "Ready",
+                }
+            ),
+            json.dumps({"type": "complete", "comment": "Rechecked the UI."}),
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert result["ok"] is True
+    assert result["semantic_patch_stream"]["operation_count"] == 1
+    assert result["semantic_patch_stream"]["meaningful_operation_count"] == 0
+    assert result["semantic_patch_stream"]["no_op_count"] == 1
 
 
 def test_builder_patch_stream_rejects_a_mostly_noop_delta() -> None:
@@ -3664,9 +7142,17 @@ def test_builder_patch_stream_rejects_a_mostly_noop_delta() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "demo",
-                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
                         "widgets": [
-                            {"id": "summary", "type": "item.details", "area": "main", "title": "Summary"}
+                            {
+                                "id": "summary",
+                                "type": "item.details",
+                                "area": "main",
+                                "title": "Summary",
+                            }
                         ],
                     }
                 }
@@ -3676,11 +7162,49 @@ def test_builder_patch_stream_rejects_a_mostly_noop_delta() -> None:
     base_hash = skill._webui_source_fingerprint(before)
     output = "\n".join(
         [
-            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": base_hash}),
-            json.dumps({"type": "patch", "seq": 1, "op": "replace", "path": "/ui/application/desktop/pageSchema/id", "value": "demo"}),
-            json.dumps({"type": "patch", "seq": 2, "op": "replace", "path": "/ui/application/desktop/pageSchema/layout/type", "value": "stack"}),
-            json.dumps({"type": "patch", "seq": 3, "op": "replace", "path": "/ui/application/desktop/pageSchema/widgets/@summary/title", "value": "Updated summary"}),
-            json.dumps({"type": "patch", "seq": 4, "op": "replace", "path": "/ui/application/desktop/pageSchema/widgets/@summary/type", "value": "item.details"}),
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": base_hash,
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "replace",
+                    "path": "/ui/application/desktop/pageSchema/id",
+                    "value": "demo",
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 2,
+                    "op": "replace",
+                    "path": "/ui/application/desktop/pageSchema/layout/type",
+                    "value": "stack",
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 3,
+                    "op": "replace",
+                    "path": "/ui/application/desktop/pageSchema/widgets/@summary/title",
+                    "value": "Updated summary",
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 4,
+                    "op": "replace",
+                    "path": "/ui/application/desktop/pageSchema/widgets/@summary/type",
+                    "value": "item.details",
+                }
+            ),
             json.dumps({"type": "complete", "comment": "Everything was changed."}),
         ]
     )
@@ -3693,6 +7217,88 @@ def test_builder_patch_stream_rejects_a_mostly_noop_delta() -> None:
         )
 
 
+def test_builder_patch_stream_allows_locale_normalization_only_delta() -> None:
+    skill = _load_module()
+    dictionaries = {
+        "en": {"scenario.demo.title": "Demo"},
+        "ru": {"scenario.demo.title": "Демо"},
+    }
+    before = {
+        "schema": "adaos.webui.v1",
+        "complete.locale_dictionaries": dictionaries,
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "demo",
+                        "title": "Demo",
+                        "title_i18n": {
+                            "key": "scenario.demo.title",
+                            "translations": {
+                                "en": "Demo",
+                                "ru": "Демо",
+                            },
+                        },
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {
+                                "id": "summary",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "dataSource": {"kind": "static", "value": {}},
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    output = "\n".join(
+        [
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": skill._webui_source_fingerprint(before),
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "replace",
+                    "path": "/complete.locale_dictionaries/ru/scenario.demo.title",
+                    "value": "Демо",
+                },
+                ensure_ascii=False,
+            ),
+            json.dumps({"type": "complete", "comment": "Normalize locales."}),
+        ]
+    )
+
+    parsed = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+    result = skill._validate_llm_request_postconditions(
+        parsed,
+        instruction="Normalize localization metadata.",
+        before_webui=before,
+    )
+
+    assert result["ok"] is True
+    assert result["semantic_patch_stream"]["meaningful_operation_count"] == 0
+    assert result["semantic_patch_stream"]["locale_normalization_pending"] is True
+    assert result["locale_dictionaries"] == dictionaries
+    assert "complete.locale_dictionaries" not in result["payload"]
+    page = result["payload"]["ui"]["application"]["desktop"]["pageSchema"]
+    assert page["title_i18n"] == "scenario.demo.title"
+
+
 def test_builder_patch_stream_rejects_wrong_base_hash() -> None:
     skill = _load_module()
     before = {
@@ -3703,7 +7309,13 @@ def test_builder_patch_stream_rejects_wrong_base_hash() -> None:
                     "pageSchema": {
                         "id": "recipes",
                         "layout": {"type": "stack"},
-                        "widgets": [{"id": "title", "type": "ui.jsonViewer", "inputs": {"value": {"title": "Recipes"}}}],
+                        "widgets": [
+                            {
+                                "id": "title",
+                                "type": "ui.jsonViewer",
+                                "inputs": {"value": {"title": "Recipes"}},
+                            }
+                        ],
                     }
                 }
             }
@@ -3711,8 +7323,22 @@ def test_builder_patch_stream_rejects_wrong_base_hash() -> None:
     }
     output = "\n".join(
         [
-            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": "wrong"}),
-            json.dumps({"type": "patch", "seq": 1, "op": "replace", "path": "/schema", "value": "adaos.webui.v1"}),
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": "wrong",
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "replace",
+                    "path": "/schema",
+                    "value": "adaos.webui.v1",
+                }
+            ),
             json.dumps({"type": "complete", "comment": "No-op"}),
         ]
     )
@@ -3729,6 +7355,90 @@ def test_builder_patch_stream_rejects_wrong_base_hash() -> None:
         raise AssertionError("wrong patch base hash must be rejected")
 
 
+def test_builder_patch_stream_repairs_truncated_hash_and_list_container_add() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {
+                                "id": "summary",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "inputs": {"value": {}},
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    expected_hash = skill._webui_source_fingerprint(before)
+    output = "\n".join(
+        [
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": expected_hash[:-1],
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "add",
+                    "path": "/ui/application/desktop/pageSchema/widgets",
+                    "value": {
+                        "id": "review",
+                        "type": "ui.jsonViewer",
+                        "area": "main",
+                        "inputs": {},
+                    },
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 2,
+                    "op": "add",
+                    "path": "/ui/application/desktop/pageSchema/widgets/@review/inputs/value",
+                    "value": {"status": "ready"},
+                }
+            ),
+            json.dumps({"type": "complete", "comment": "Added review."}),
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert result["ok"] is True
+    widgets = result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
+    assert [item["id"] for item in widgets] == ["summary", "review"]
+    assert widgets[-1]["inputs"]["value"] == {"status": "ready"}
+    stream = result["semantic_patch_stream"]
+    assert stream["patches"][0]["normalized_list_path_from"].endswith("/widgets")
+    assert stream["syntax_repairs"] == [
+        {
+            "kind": "truncated_base_hash",
+            "from": expected_hash[:-1],
+            "to": expected_hash,
+        }
+    ]
+
+
 def test_builder_patch_stream_repairs_only_missing_outer_line_closer() -> None:
     skill = _load_module()
     before = {
@@ -3738,8 +7448,13 @@ def test_builder_patch_stream_repairs_only_missing_outer_line_closer() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "recipes",
-                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
-                        "widgets": [{"id": "title", "type": "ui.jsonViewer", "area": "main"}],
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {"id": "title", "type": "ui.jsonViewer", "area": "main"}
+                        ],
                     }
                 }
             }
@@ -3752,12 +7467,23 @@ def test_builder_patch_stream_repairs_only_missing_outer_line_closer() -> None:
             "seq": 1,
             "op": "add",
             "path": "/ui/application/desktop/pageSchema/widgets/-",
-            "value": {"id": "cards", "type": "ui.list", "area": "main", "inputs": {"variant": "cards"}},
+            "value": {
+                "id": "cards",
+                "type": "ui.list",
+                "area": "main",
+                "inputs": {"variant": "cards"},
+            },
         }
     )[:-1]
     output = "\n".join(
         [
-            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": base_hash}),
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": base_hash,
+                }
+            ),
             malformed_patch,
             json.dumps({"type": "complete", "comment": "Added cards."}),
         ]
@@ -3770,7 +7496,12 @@ def test_builder_patch_stream_repairs_only_missing_outer_line_closer() -> None:
     )
 
     assert result["ok"] is True
-    assert result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"][-1]["id"] == "cards"
+    assert (
+        result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"][-1][
+            "id"
+        ]
+        == "cards"
+    )
     assert result["semantic_patch_stream"]["syntax_repairs"] == [
         {"line": 2, "repair": "append_missing_container_closers", "added_closers": 1}
     ]
@@ -3786,8 +7517,13 @@ def test_builder_patch_stream_drops_only_truncated_complete_marker() -> None:
                     "pageSchema": {
                         "id": "recipes",
                         "title": "Old title",
-                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
-                        "widgets": [{"id": "title", "type": "ui.jsonViewer", "area": "main"}],
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {"id": "title", "type": "ui.jsonViewer", "area": "main"}
+                        ],
                     }
                 }
             }
@@ -3796,7 +7532,13 @@ def test_builder_patch_stream_drops_only_truncated_complete_marker() -> None:
     base_hash = skill._webui_source_fingerprint(before)
     output = "\n".join(
         [
-            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": base_hash}),
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": base_hash,
+                }
+            ),
             json.dumps(
                 {
                     "type": "patch",
@@ -3817,9 +7559,135 @@ def test_builder_patch_stream_drops_only_truncated_complete_marker() -> None:
     )
 
     assert result["ok"] is True
-    assert result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["title"] == "New title"
+    assert (
+        result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["title"]
+        == "New title"
+    )
     assert result["semantic_patch_stream"]["syntax_repairs"] == [
         {"repair": "drop_incomplete_complete_marker", "truncated_chars": 37}
+    ]
+
+
+def test_builder_patch_stream_drops_complete_marker_with_missing_quote() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "recipes",
+                        "title": "Old title",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [
+                            {"id": "title", "type": "ui.jsonViewer", "area": "main"}
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    base_hash = skill._webui_source_fingerprint(before)
+    output = "\n".join(
+        [
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": base_hash,
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "replace",
+                    "path": "/ui/application/desktop/pageSchema/title",
+                    "value": "New title",
+                }
+            ),
+            '{"type":"complete,"comment":"Applied."}',
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert result["ok"] is True
+    assert (
+        result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["title"]
+        == "New title"
+    )
+    assert result["semantic_patch_stream"]["syntax_repairs"] == [
+        {
+            "repair": "drop_incomplete_complete_marker",
+            "truncated_chars": len('{"type":"complete,"comment":"Applied."}'),
+        }
+    ]
+
+
+def test_builder_patch_stream_inserts_single_missing_object_closer() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "applications",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    base_hash = skill._webui_source_fingerprint(before)
+    malformed_patch = (
+        '{"type":"patch","seq":1,"op":"add",'
+        '"path":"/ui/application/desktop/pageSchema/widgets/-",'
+        '"value":{"id":"review-actions","type":"ui.actions","area":"main",'
+        '"inputs":{"buttons":[{"id":"cancel","label":"Cancel"],"variant":"toolbar"}}}'
+    )
+    output = "\n".join(
+        [
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": base_hash,
+                }
+            ),
+            malformed_patch,
+            json.dumps({"type": "complete", "comment": "Added review actions."}),
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    widgets = result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
+    assert result["ok"] is True
+    assert widgets[0]["inputs"]["buttons"][0]["id"] == "cancel"
+    assert result["semantic_patch_stream"]["syntax_repairs"] == [
+        {
+            "line": 2,
+            "repair": "insert_missing_container_closer",
+            "closer": "}",
+            "offset": malformed_patch.index('],"variant"'),
+        }
     ]
 
 
@@ -3827,7 +7695,9 @@ def test_builder_patch_stream_rejects_truncated_patch_object() -> None:
     skill = _load_module()
     output = "\n".join(
         [
-            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1"}),
+            json.dumps(
+                {"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1"}
+            ),
             '{"type":"patch","seq":1,"op":"replace","path":"/schema","value":"adaos.webui.v1',
         ]
     )
@@ -3845,9 +7715,16 @@ def test_builder_patch_stream_stable_id_path_survives_prior_array_remove() -> No
                 "desktop": {
                     "pageSchema": {
                         "id": "recipes",
-                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
                         "widgets": [
-                            {"id": "remove-me", "type": "input.selector", "area": "main"},
+                            {
+                                "id": "remove-me",
+                                "type": "input.selector",
+                                "area": "main",
+                            },
                             {
                                 "id": "recipe-details",
                                 "type": "item.details",
@@ -3863,8 +7740,21 @@ def test_builder_patch_stream_stable_id_path_survives_prior_array_remove() -> No
     base_hash = skill._webui_source_fingerprint(before)
     output = "\n".join(
         [
-            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": base_hash}),
-            json.dumps({"type": "patch", "seq": 1, "op": "remove", "path": "/ui/application/desktop/pageSchema/widgets/@remove-me"}),
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": base_hash,
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "remove",
+                    "path": "/ui/application/desktop/pageSchema/widgets/@remove-me",
+                }
+            ),
             json.dumps(
                 {
                     "type": "patch",
@@ -3944,7 +7834,10 @@ def test_builder_patch_stream_reports_missing_intermediate_parent() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "recipes",
-                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+                        "layout": {
+                            "type": "stack",
+                            "areas": [{"id": "main", "role": "main"}],
+                        },
                         "widgets": [],
                     }
                 }
@@ -3954,14 +7847,27 @@ def test_builder_patch_stream_reports_missing_intermediate_parent() -> None:
     base_hash = skill._webui_source_fingerprint(before)
     output = "\n".join(
         [
-            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": base_hash}),
+            json.dumps(
+                {
+                    "type": "meta",
+                    "schema": "adaos.builder.webui_patch_stream.v1",
+                    "base_hash": base_hash,
+                }
+            ),
             json.dumps(
                 {
                     "type": "patch",
                     "seq": 1,
                     "op": "add",
                     "path": "/ui/application/modals/detail",
-                    "value": {"title": "Details", "schema": {"id": "detail", "layout": {"type": "stack"}, "widgets": []}},
+                    "value": {
+                        "title": "Details",
+                        "schema": {
+                            "id": "detail",
+                            "layout": {"type": "stack"},
+                            "widgets": [],
+                        },
+                    },
                 }
             ),
             json.dumps({"type": "complete", "comment": "Added details."}),
@@ -4017,7 +7923,15 @@ def test_builder_component_contract_rejects_unrendered_details_fields() -> None:
                 "type": "item.details",
                 "area": "main",
                 "dataSource": {"kind": "static", "value": {"title": "Soup"}},
-                "inputs": {"fields": [{"id": "title", "type": "staticContent", "content": "$item.title"}]},
+                "inputs": {
+                    "fields": [
+                        {
+                            "id": "title",
+                            "type": "staticContent",
+                            "content": "$item.title",
+                        }
+                    ]
+                },
             }
         ],
     }
@@ -4028,7 +7942,9 @@ def test_builder_component_contract_rejects_unrendered_details_fields() -> None:
     assert "item.details ignores" in validation["detail"]
 
 
-def test_builder_component_contract_accepts_visible_detail_and_form_actions_but_rejects_dotted_keys() -> None:
+def test_builder_component_contract_accepts_visible_detail_and_form_actions_but_rejects_dotted_keys() -> (
+    None
+):
     skill = _load_module()
     payload = {
         "schema": "adaos.webui.v1",
@@ -4038,7 +7954,9 @@ def test_builder_component_contract_accepts_visible_detail_and_form_actions_but_
                     "pageSchema": {
                         "id": "recipes",
                         "layout": {"type": "stack", "areas": [{"id": "main"}]},
-                        "widgets": [{"id": "catalog", "type": "ui.list", "area": "main"}],
+                        "widgets": [
+                            {"id": "catalog", "type": "ui.list", "area": "main"}
+                        ],
                     }
                 },
                 "modals": {
@@ -4073,8 +7991,12 @@ def test_builder_component_contract_accepts_visible_detail_and_form_actions_but_
                                     "type": "ui.form",
                                     "area": "modal",
                                     "inputs": {
-                                        "fields": [{"id": "title", "type": "shortText"}],
-                                        "secondaryActions": [{"id": "cancel", "label": "Cancel"}],
+                                        "fields": [
+                                            {"id": "title", "type": "shortText"}
+                                        ],
+                                        "secondaryActions": [
+                                            {"id": "cancel", "label": "Cancel"}
+                                        ],
                                     },
                                     "actions": [
                                         {"on": "click:cancel", "type": "closeModal"}
@@ -4092,8 +8014,12 @@ def test_builder_component_contract_accepts_visible_detail_and_form_actions_but_
                                     "id": "edit_form",
                                     "type": "ui.form",
                                     "area": "modal",
-                                    "inputs": {"fields": [{"id": "title", "type": "shortText"}]},
-                                    "inputs.secondaryActions": [{"id": "cancel", "label": "Cancel"}],
+                                    "inputs": {
+                                        "fields": [{"id": "title", "type": "shortText"}]
+                                    },
+                                    "inputs.secondaryActions": [
+                                        {"id": "cancel", "label": "Cancel"}
+                                    ],
                                 }
                             ],
                         }
@@ -4136,7 +8062,9 @@ def test_builder_canonical_payload_migrates_legacy_dotted_widget_properties() ->
                                     "id": "edit_form",
                                     "type": "ui.form",
                                     "area": "modal",
-                                    "inputs": {"fields": [{"id": "title", "type": "shortText"}]},
+                                    "inputs": {
+                                        "fields": [{"id": "title", "type": "shortText"}]
+                                    },
                                     "inputs.secondaryActions": [
                                         {"id": "cancel", "label": "Cancel"}
                                     ],
@@ -4156,7 +8084,9 @@ def test_builder_canonical_payload_migrates_legacy_dotted_widget_properties() ->
         payload,
         payload["ui"]["application"]["desktop"]["pageSchema"],
     )
-    form = canonical["ui"]["application"]["modals"]["edit_modal"]["schema"]["widgets"][0]
+    form = canonical["ui"]["application"]["modals"]["edit_modal"]["schema"]["widgets"][
+        0
+    ]
 
     assert "inputs.secondaryActions" not in form
     assert form["inputs"]["secondaryActions"] == [{"id": "cancel", "label": "Cancel"}]
@@ -4197,7 +8127,9 @@ def test_builder_modal_contract_reports_component_and_action_issues_together() -
                     "pageSchema": {
                         "id": "recipes",
                         "layout": {"type": "stack", "areas": [{"id": "main"}]},
-                        "widgets": [{"id": "catalog", "type": "ui.list", "area": "main"}],
+                        "widgets": [
+                            {"id": "catalog", "type": "ui.list", "area": "main"}
+                        ],
                     }
                 },
                 "modals": {
@@ -4210,10 +8142,18 @@ def test_builder_modal_contract_reports_component_and_action_issues_together() -
                                     "id": "form",
                                     "type": "ui.form",
                                     "area": "main",
-                                    "inputs": {"fields": [{"id": "title", "type": "shortText"}]},
-                                    "inputs_secondaryActions": [{"id": "cancel", "label": "Cancel"}],
+                                    "inputs": {
+                                        "fields": [{"id": "title", "type": "shortText"}]
+                                    },
+                                    "inputs_secondaryActions": [
+                                        {"id": "cancel", "label": "Cancel"}
+                                    ],
                                     "actions": [
-                                        {"on": "click:cancel", "type": "openModal", "params": {"modalId": ""}}
+                                        {
+                                            "on": "click:cancel",
+                                            "type": "openModal",
+                                            "params": {"modalId": ""},
+                                        }
                                     ],
                                 }
                             ],
@@ -4241,7 +8181,9 @@ def test_builder_modal_contract_recommends_close_modal_for_pseudo_close_id() -> 
                     "pageSchema": {
                         "id": "recipes",
                         "layout": {"type": "stack", "areas": [{"id": "main"}]},
-                        "widgets": [{"id": "catalog", "type": "ui.list", "area": "main"}],
+                        "widgets": [
+                            {"id": "catalog", "type": "ui.list", "area": "main"}
+                        ],
                     }
                 },
                 "modals": {
@@ -4276,7 +8218,9 @@ def test_builder_modal_contract_recommends_close_modal_for_pseudo_close_id() -> 
     assert "use action type closeModal" in validation["detail"]
 
 
-def test_builder_component_contract_accepts_composed_detail_actions_and_form_cancel() -> None:
+def test_builder_component_contract_accepts_composed_detail_actions_and_form_cancel() -> (
+    None
+):
     skill = _load_module()
     detail_schema = {
         "id": "detail_modal",
@@ -4315,7 +8259,9 @@ def test_builder_component_contract_accepts_composed_detail_actions_and_form_can
     assert skill._validate_page_schema_component_contracts(detail_schema)["ok"] is True
 
 
-def test_builder_component_contract_rejects_secondary_form_action_without_behavior() -> None:
+def test_builder_component_contract_rejects_secondary_form_action_without_behavior() -> (
+    None
+):
     skill = _load_module()
     page_schema = {
         "id": "form_modal",
@@ -4353,7 +8299,9 @@ def test_builder_component_contract_rejects_invented_update_state_operators() ->
                     {
                         "on": "click",
                         "type": "updateState",
-                        "params": {"favorites": {"$merge": True, "$value": {"$toggle": True}}},
+                        "params": {
+                            "favorites": {"$merge": True, "$value": {"$toggle": True}}
+                        },
                     }
                 ],
             }
@@ -4364,10 +8312,14 @@ def test_builder_component_contract_rejects_invented_update_state_operators() ->
 
     assert validation["ok"] is False
     assert "unsupported updateState operator" in validation["detail"]
-    assert skill._unsupported_action_param_operator({"favorite": {"$set": True}}) == "$set"
+    assert (
+        skill._unsupported_action_param_operator({"favorite": {"$set": True}}) == "$set"
+    )
 
 
-def test_builder_component_contract_rejects_javascript_like_update_state_values() -> None:
+def test_builder_component_contract_rejects_javascript_like_update_state_values() -> (
+    None
+):
     skill = _load_module()
     page_schema = {
         "id": "actions",
@@ -4381,7 +8333,9 @@ def test_builder_component_contract_rejects_javascript_like_update_state_values(
                     {
                         "on": "click",
                         "type": "updateState",
-                        "params": {"favorites": "$state.favorites.includes($event.id) ? [] : [$event.id]"},
+                        "params": {
+                            "favorites": "$state.favorites.includes($event.id) ? [] : [$event.id]"
+                        },
                     }
                 ],
             }
@@ -4394,7 +8348,9 @@ def test_builder_component_contract_rejects_javascript_like_update_state_values(
     assert "JavaScript-like updateState expression" in validation["detail"]
 
 
-def test_builder_component_contract_rejects_unknown_expression_and_wrong_membership_direction() -> None:
+def test_builder_component_contract_rejects_unknown_expression_and_wrong_membership_direction() -> (
+    None
+):
     skill = _load_module()
     page_schema = {
         "id": "catalog",
@@ -4406,7 +8362,9 @@ def test_builder_component_contract_rejects_unknown_expression_and_wrong_members
                 "type": "ui.list",
                 "area": "main",
                 "inputs": {
-                    "filters": [{"key": "id", "stateKey": "favorites", "operator": "includes"}],
+                    "filters": [
+                        {"key": "id", "stateKey": "favorites", "operator": "includes"}
+                    ],
                 },
                 "actions": [
                     {
@@ -4414,7 +8372,15 @@ def test_builder_component_contract_rejects_unknown_expression_and_wrong_members
                         "type": "mutateState",
                         "params": {
                             "operations": [
-                                {"op": "set", "path": "x", "value": {"kind": "expression", "op": "includes", "args": [[], "a"]}}
+                                {
+                                    "op": "set",
+                                    "path": "x",
+                                    "value": {
+                                        "kind": "expression",
+                                        "op": "includes",
+                                        "args": [[], "a"],
+                                    },
+                                }
                             ]
                         },
                     }
@@ -4443,7 +8409,10 @@ def test_builder_component_contract_rejects_unrendered_state_templates() -> None
                 "id": "rows",
                 "type": "ui.list",
                 "area": "main",
-                "dataSource": {"kind": "static", "value": [{"quantity": "Count: {$state.qty.p1}"}]},
+                "dataSource": {
+                    "kind": "static",
+                    "value": [{"quantity": "Count: {$state.qty.p1}"}],
+                },
             }
         ],
     }
@@ -4456,7 +8425,15 @@ def test_builder_component_contract_rejects_unrendered_state_templates() -> None
             "id": "form",
             "type": "ui.form",
             "area": "main",
-            "inputs": {"fields": [{"id": "summary", "type": "staticContent", "content": "Total: {total}"}]},
+            "inputs": {
+                "fields": [
+                    {
+                        "id": "summary",
+                        "type": "staticContent",
+                        "content": "Total: {total}",
+                    }
+                ]
+            },
         }
     ]
     validation = skill._validate_page_schema_component_contracts(page_schema)
@@ -4464,7 +8441,9 @@ def test_builder_component_contract_rejects_unrendered_state_templates() -> None
     assert "staticContent is literal" in validation["detail"]
 
 
-def test_builder_component_contract_rejects_dynamic_state_index_in_static_data() -> None:
+def test_builder_component_contract_rejects_dynamic_state_index_in_static_data() -> (
+    None
+):
     skill = _load_module()
     page_schema = {
         "id": "artifact-editor",
@@ -4489,22 +8468,39 @@ def test_builder_component_contract_rejects_dynamic_state_index_in_static_data()
     assert "dynamic state indexing" in validation["detail"]
 
 
-def test_builder_component_contract_rejects_chained_state_reference_and_dynamic_mutation_path() -> None:
+def test_builder_component_contract_rejects_chained_state_reference_and_dynamic_mutation_path() -> (
+    None
+):
     skill = _load_module()
     page_schema = {
         "id": "editor",
         "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
-        "widgets": [{
-            "id": "file-editor",
-            "type": "item.textEditor",
-            "area": "main",
-            "dataSource": {"kind": "static", "value": {"content": "$state.files.$state.selectedId.content"}},
-            "actions": [{
-                "on": "save",
-                "type": "mutateState",
-                "params": {"operations": [{"op": "set", "path": "files.$state.selectedId.content", "value": "$event.content"}]},
-            }],
-        }],
+        "widgets": [
+            {
+                "id": "file-editor",
+                "type": "item.textEditor",
+                "area": "main",
+                "dataSource": {
+                    "kind": "static",
+                    "value": {"content": "$state.files.$state.selectedId.content"},
+                },
+                "actions": [
+                    {
+                        "on": "save",
+                        "type": "mutateState",
+                        "params": {
+                            "operations": [
+                                {
+                                    "op": "set",
+                                    "path": "files.$state.selectedId.content",
+                                    "value": "$event.content",
+                                }
+                            ]
+                        },
+                    }
+                ],
+            }
+        ],
     }
 
     validation = skill._validate_page_schema_component_contracts(page_schema)
@@ -4518,13 +8514,24 @@ def test_builder_component_contract_rejects_missing_tree_event_fields() -> None:
     page_schema = {
         "id": "files",
         "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
-        "widgets": [{
-            "id": "file-tree",
-            "type": "collection.tree",
-            "area": "main",
-            "dataSource": {"kind": "static", "value": [{"id": "memory", "title": "memory.md", "kind": "file"}]},
-            "actions": [{"on": "select", "type": "updateState", "params": {"selectedPath": "$event.path"}}],
-        }],
+        "widgets": [
+            {
+                "id": "file-tree",
+                "type": "collection.tree",
+                "area": "main",
+                "dataSource": {
+                    "kind": "static",
+                    "value": [{"id": "memory", "title": "memory.md", "kind": "file"}],
+                },
+                "actions": [
+                    {
+                        "on": "select",
+                        "type": "updateState",
+                        "params": {"selectedPath": "$event.path"},
+                    }
+                ],
+            }
+        ],
     }
 
     validation = skill._validate_page_schema_component_contracts(page_schema)
@@ -4546,7 +8553,13 @@ def test_builder_component_contract_rejects_synthetic_root_in_rootless_tree() ->
                 "inputs": {"hideRoot": True},
                 "dataSource": {
                     "kind": "static",
-                    "value": [{"id": "root", "title": "Project", "children": [{"id": "readme"}]}],
+                    "value": [
+                        {
+                            "id": "root",
+                            "title": "Project",
+                            "children": [{"id": "readme"}],
+                        }
+                    ],
                 },
             }
         ],
@@ -4569,7 +8582,14 @@ def test_builder_component_contract_rejects_conditional_ui_action_buttons() -> N
                 "type": "ui.actions",
                 "area": "main",
                 "inputs": {
-                    "buttons": [{"id": "archive", "label": "Archive", "whenKey": "$state.archived", "whenEquals": False}]
+                    "buttons": [
+                        {
+                            "id": "archive",
+                            "label": "Archive",
+                            "whenKey": "$state.archived",
+                            "whenEquals": False,
+                        }
+                    ]
                 },
             }
         ],
@@ -4581,7 +8601,9 @@ def test_builder_component_contract_rejects_conditional_ui_action_buttons() -> N
     assert "do not conditionally render individual buttons" in validation["detail"]
 
 
-def test_builder_component_contract_distinguishes_state_from_sibling_computed_data() -> None:
+def test_builder_component_contract_distinguishes_state_from_sibling_computed_data() -> (
+    None
+):
     skill = _load_module()
     page_schema = {
         "id": "cart",
@@ -4595,8 +8617,16 @@ def test_builder_component_contract_distinguishes_state_from_sibling_computed_da
                 "dataSource": {
                     "kind": "static",
                     "value": {
-                        "subtotal": {"kind": "expression", "op": "multiply", "args": ["$state.quantity", 100]},
-                        "discount": {"kind": "expression", "op": "multiply", "args": ["$state.subtotal", 0.1]},
+                        "subtotal": {
+                            "kind": "expression",
+                            "op": "multiply",
+                            "args": ["$state.quantity", 100],
+                        },
+                        "discount": {
+                            "kind": "expression",
+                            "op": "multiply",
+                            "args": ["$state.subtotal", 0.1],
+                        },
                     },
                 },
                 "inputs": {"fields": [{"key": "subtotal"}, {"key": "discount"}]},
@@ -4608,7 +8638,9 @@ def test_builder_component_contract_distinguishes_state_from_sibling_computed_da
     assert validation["ok"] is False
     assert "$data.subtotal" in validation["detail"]
 
-    page_schema["widgets"][0]["dataSource"]["value"]["discount"]["args"][0] = "$data.subtotal"
+    page_schema["widgets"][0]["dataSource"]["value"]["discount"]["args"][0] = (
+        "$data.subtotal"
+    )
     assert skill._validate_page_schema_component_contracts(page_schema)["ok"] is True
 
 
@@ -4623,10 +8655,18 @@ def test_builder_component_contract_rejects_computed_data_as_filter_state() -> N
                 "id": "cart-list",
                 "type": "ui.list",
                 "area": "main",
-                "dataSource": {"kind": "static", "value": [{"id": "p1", "quantity": "$state.cart.p1"}]},
+                "dataSource": {
+                    "kind": "static",
+                    "value": [{"id": "p1", "quantity": "$state.cart.p1"}],
+                },
                 "inputs": {
                     "filters": [
-                        {"key": "id", "operator": "in", "stateKey": "cartItemIds", "enabledIf": "$state.hasCartItems === true"}
+                        {
+                            "key": "id",
+                            "operator": "in",
+                            "stateKey": "cartItemIds",
+                            "enabledIf": "$state.hasCartItems === true",
+                        }
                     ]
                 },
             },
@@ -4634,7 +8674,10 @@ def test_builder_component_contract_rejects_computed_data_as_filter_state() -> N
                 "id": "cart-summary",
                 "type": "item.details",
                 "area": "main",
-                "dataSource": {"kind": "static", "value": {"cartItemIds": ["p1"], "hasCartItems": True}},
+                "dataSource": {
+                    "kind": "static",
+                    "value": {"cartItemIds": ["p1"], "hasCartItems": True},
+                },
             },
         ],
     }
@@ -4643,11 +8686,15 @@ def test_builder_component_contract_rejects_computed_data_as_filter_state() -> N
     assert validation["ok"] is False
     assert "data sources do not write page state" in validation["detail"]
 
-    page_schema["widgets"][0]["inputs"]["filters"] = [{"key": "quantity", "operator": "gt", "value": 0}]
+    page_schema["widgets"][0]["inputs"]["filters"] = [
+        {"key": "quantity", "operator": "gt", "value": 0}
+    ]
     assert skill._validate_page_schema_component_contracts(page_schema)["ok"] is True
 
 
-def test_builder_component_contract_accepts_legacy_duplicates_but_rejects_unknown_command_actions() -> None:
+def test_builder_component_contract_accepts_legacy_duplicates_but_rejects_unknown_command_actions() -> (
+    None
+):
     skill = _load_module()
     duplicate_action = {
         "id": "close",
@@ -4671,7 +8718,12 @@ def test_builder_component_contract_accepts_legacy_duplicates_but_rejects_unknow
     assert skill._validate_page_schema_component_contracts(page_schema)["ok"] is True
 
     page_schema["widgets"][0]["actions"] = [
-        {"id": "edit", "on": "click", "type": "openModal", "params": {"modalId": "edit-modal"}}
+        {
+            "id": "edit",
+            "on": "click",
+            "type": "openModal",
+            "params": {"modalId": "edit-modal"},
+        }
     ]
     validation = skill._validate_page_schema_component_contracts(page_schema)
 
@@ -4679,7 +8731,57 @@ def test_builder_component_contract_accepts_legacy_duplicates_but_rejects_unknow
     assert "has no matching inputs.buttons id" in validation["detail"]
 
 
-def test_builder_component_contract_accepts_field_change_and_rejects_unknown_field_target() -> None:
+def test_builder_normalization_removes_only_exact_and_subsumed_actions() -> None:
+    skill = _load_module()
+    payload = {
+        "actions": [
+            {"id": "close", "on": "click", "type": "closeModal"},
+            {"id": "close", "on": "click", "type": "closeModal"},
+            {
+                "on": "change",
+                "type": "updateState",
+                "params": {"selected": "$event.value"},
+            },
+            {
+                "on": "change",
+                "type": "updateState",
+                "params": {
+                    "selected": "$event.value",
+                    "reviewedPlan": {},
+                },
+            },
+            {
+                "on": "change",
+                "type": "updateState",
+                "params": {"audit": "$event.value"},
+            },
+        ]
+    }
+
+    repairs = skill._normalise_redundant_widget_actions(payload)
+
+    assert repairs == 2
+    assert payload["actions"] == [
+        {"id": "close", "on": "click", "type": "closeModal"},
+        {
+            "on": "change",
+            "type": "updateState",
+            "params": {
+                "selected": "$event.value",
+                "reviewedPlan": {},
+            },
+        },
+        {
+            "on": "change",
+            "type": "updateState",
+            "params": {"audit": "$event.value"},
+        },
+    ]
+
+
+def test_builder_component_contract_accepts_field_change_and_rejects_unknown_field_target() -> (
+    None
+):
     skill = _load_module()
     page_schema = {
         "id": "catalog",
@@ -4728,7 +8830,9 @@ def test_builder_component_contract_rejects_unrendered_table_image_cells() -> No
                 "id": "catalog-table",
                 "type": "ui.table",
                 "area": "main",
-                "inputs": {"columns": [{"key": "image", "label": "Image", "kind": "image"}]},
+                "inputs": {
+                    "columns": [{"key": "image", "label": "Image", "kind": "image"}]
+                },
             }
         ],
     }
@@ -4763,9 +8867,14 @@ def test_builder_webui_validation_rejects_select_without_options() -> None:
             }
         ],
     }
-    payload = {"schema": "adaos.webui.v1", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+    }
 
-    validation = skill._validate_builder_webui_payload(payload, {"page_schema": page_schema})
+    validation = skill._validate_builder_webui_payload(
+        payload, {"page_schema": page_schema}
+    )
 
     assert validation["ok"] is False
     assert validation["error"] == "component_contract_invalid"
@@ -4776,9 +8885,17 @@ def test_builder_webui_validation_rejects_select_without_options() -> None:
         {"label": "Economic", "value": "economic"},
         {"label": "Social", "value": "social"},
     ]
-    fixed_payload = {"schema": "adaos.webui.v1", "ui": {"application": {"desktop": {"pageSchema": fixed_page_schema}}}}
+    fixed_payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": fixed_page_schema}}},
+    }
 
-    assert skill._validate_builder_webui_payload(fixed_payload, {"page_schema": fixed_page_schema})["ok"] is True
+    assert (
+        skill._validate_builder_webui_payload(
+            fixed_payload, {"page_schema": fixed_page_schema}
+        )["ok"]
+        is True
+    )
 
 
 def test_builder_webui_validation_rejects_undeclared_modal_action() -> None:
@@ -4792,13 +8909,24 @@ def test_builder_webui_validation_rejects_undeclared_modal_action() -> None:
                 "id": "open-detail",
                 "type": "ui.actions",
                 "area": "main",
-                "actions": [{"on": "click", "type": "openModal", "params": {"modalId": "request_detail_modal"}}],
+                "actions": [
+                    {
+                        "on": "click",
+                        "type": "openModal",
+                        "params": {"modalId": "request_detail_modal"},
+                    }
+                ],
             }
         ],
     }
-    payload = {"schema": "adaos.webui.v1", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+    }
 
-    validation = skill._validate_builder_webui_payload(payload, {"page_schema": page_schema})
+    validation = skill._validate_builder_webui_payload(
+        payload, {"page_schema": page_schema}
+    )
 
     assert validation["ok"] is False
     assert validation["error"] == "component_contract_invalid"
@@ -4816,7 +8944,12 @@ def test_builder_webui_validation_rejects_undeclared_modal_action() -> None:
         }
     }
 
-    assert skill._validate_builder_webui_payload(fixed_payload, {"page_schema": page_schema})["ok"] is True
+    assert (
+        skill._validate_builder_webui_payload(
+            fixed_payload, {"page_schema": page_schema}
+        )["ok"]
+        is True
+    )
 
 
 def test_builder_webui_validation_rejects_root_level_modals() -> None:
@@ -4833,12 +8966,18 @@ def test_builder_webui_validation_rejects_root_level_modals() -> None:
         "modals": {
             "request_detail_modal": {
                 "title": "Request detail",
-                "schema": {"id": "request_detail_modal_schema", "layout": {"type": "stack"}, "widgets": []},
+                "schema": {
+                    "id": "request_detail_modal_schema",
+                    "layout": {"type": "stack"},
+                    "widgets": [],
+                },
             }
         },
     }
 
-    validation = skill._validate_builder_webui_payload(payload, {"page_schema": page_schema})
+    validation = skill._validate_builder_webui_payload(
+        payload, {"page_schema": page_schema}
+    )
 
     assert validation["ok"] is False
     assert validation["error"] == "component_contract_invalid"
@@ -4856,25 +8995,36 @@ def test_builder_webui_validation_rejects_question_mark_encoding_loss() -> None:
                 "id": "open-detail",
                 "type": "ui.actions",
                 "area": "main",
-                "inputs": {"buttons": [{"id": "open", "label": "??????? ?????? ??????"}]},
+                "inputs": {
+                    "buttons": [{"id": "open", "label": "??????? ?????? ??????"}]
+                },
             }
         ],
     }
-    payload = {"schema": "adaos.webui.v1", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+    }
 
-    validation = skill._validate_builder_webui_payload(payload, {"page_schema": page_schema})
+    validation = skill._validate_builder_webui_payload(
+        payload, {"page_schema": page_schema}
+    )
 
     assert validation["ok"] is False
     assert validation["error"] == "text_encoding_suspect"
     assert "question marks" in validation["detail"]
 
 
-def test_write_webui_payload_projects_canonical_page_schema_to_scenario(tmp_path) -> None:
+def test_write_webui_payload_projects_canonical_page_schema_to_scenario(
+    tmp_path,
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "canonical_webui"
     artifact_root.mkdir(parents=True)
     (artifact_root / "scenario.json").write_text(
-        json.dumps({"id": "canonical_webui", "name": "canonical_webui", "type": "desktop"}),
+        json.dumps(
+            {"id": "canonical_webui", "name": "canonical_webui", "type": "desktop"}
+        ),
         encoding="utf-8",
     )
     page_schema = {
@@ -4924,15 +9074,24 @@ def test_write_webui_payload_projects_canonical_page_schema_to_scenario(tmp_path
     skill._write_webui_payload(str(artifact_root), payload)
 
     saved_webui = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
-    saved_scenario = json.loads((artifact_root / "scenario.json").read_text(encoding="utf-8"))
-    saved_field = saved_scenario["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["inputs"]["fields"][0]
+    saved_scenario = json.loads(
+        (artifact_root / "scenario.json").read_text(encoding="utf-8")
+    )
+    saved_field = saved_scenario["ui"]["application"]["desktop"]["pageSchema"][
+        "widgets"
+    ][0]["inputs"]["fields"][0]
     assert saved_webui["schema"] == "adaos.webui.v1"
     assert "preview_state" not in saved_webui
     assert saved_field["options"][0]["value"] == "economic"
-    assert saved_scenario["ui"]["application"]["modals"]["comment_modal"]["title"] == "Comment"
+    assert (
+        saved_scenario["ui"]["application"]["modals"]["comment_modal"]["title"]
+        == "Comment"
+    )
 
 
-def test_legacy_page_schema_from_preview_preserves_select_options_from_current_ui() -> None:
+def test_legacy_page_schema_from_preview_preserves_select_options_from_current_ui() -> (
+    None
+):
     skill = _load_module()
     preview = {
         "title": "City survey",
@@ -5023,7 +9182,12 @@ def test_page_schema_from_preview_derives_composite_card_preview() -> None:
         ],
         "mock_data": {
             "prototype_items": [
-                {"title": "Talk", "notes": "CFP", "status": "Pending", "date": "2026-07-02"}
+                {
+                    "title": "Talk",
+                    "notes": "CFP",
+                    "status": "Pending",
+                    "date": "2026-07-02",
+                }
             ]
         },
         "layout_order": "cards_first",
@@ -5037,22 +9201,33 @@ def test_page_schema_from_preview_derives_composite_card_preview() -> None:
     assert cards["dataSource"]["value"][0]["status"] == "Pending"
 
 
-def test_repair_mojibake_text_handles_common_cyrillic_and_keeps_other_languages() -> None:
+def test_repair_mojibake_text_handles_common_cyrillic_and_keeps_other_languages() -> (
+    None
+):
     skill = _load_module()
 
     assert (
-        skill._repair_mojibake_text("Р”РѕР±Р°РІСЊ РІ РєР°СЂС‚РѕС‡РєРё РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РґР°С‚Рµ")
+        skill._repair_mojibake_text(
+            "Р”РѕР±Р°РІСЊ РІ РєР°СЂС‚РѕС‡РєРё РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РґР°С‚Рµ"
+        )
         == "Добавь в карточки информацию о дате"
     )
     assert (
-        skill._repair_mojibake_text("РїРѕРјРµРЅСЏР№ РјРµСЃС‚Р°РјРё СЃРµРєС†РёСЋ Input Рё Cards")
+        skill._repair_mojibake_text(
+            "РїРѕРјРµРЅСЏР№ РјРµСЃС‚Р°РјРё СЃРµРєС†РёСЋ Input Рё Cards"
+        )
         == "поменяй местами секцию Input и Cards"
     )
-    assert skill._repair_mojibake_text("Переведи данные на китайский язык") == "Переведи данные на китайский язык"
+    assert (
+        skill._repair_mojibake_text("Переведи данные на китайский язык")
+        == "Переведи данные на китайский язык"
+    )
     assert skill._repair_mojibake_text("翻译成中文") == "翻译成中文"
 
 
-def test_update_current_scenario_sample_data_uses_llm_payload_and_refreshes_files(monkeypatch, tmp_path) -> None:
+def test_update_current_scenario_sample_data_uses_llm_payload_and_refreshes_files(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     _stub_development_context(skill, monkeypatch)
     artifact_root = tmp_path / "llm_sample_data"
@@ -5081,29 +9256,57 @@ def test_update_current_scenario_sample_data_uses_llm_payload_and_refreshes_file
     import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
-    monkeypatch.setattr(pending_actions, "publish_pending_action", lambda **kwargs: {"id": "pa.builder.llm.sample"})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
+    monkeypatch.setattr(
+        pending_actions,
+        "publish_pending_action",
+        lambda **kwargs: {"id": "pa.builder.llm.sample"},
+    )
     refresh_calls: list[dict] = []
     monkeypatch.setattr(
         skill,
         "_schedule_dev_runtime_reload_after_revision",
-        lambda webspace_id, **kwargs: refresh_calls.append({"webspace_id": webspace_id, **kwargs})
+        lambda webspace_id, **kwargs: refresh_calls.append(
+            {"webspace_id": webspace_id, **kwargs}
+        )
         or {"ok": True, "scheduled": True, "webspace_id": "builder-llm-sample-dev"},
     )
-    monkeypatch.setattr(events, "publish", lambda topic, payload, source=None: published.append((topic, dict(payload))))
+    monkeypatch.setattr(
+        events,
+        "publish",
+        lambda topic, payload, source=None: published.append((topic, dict(payload))),
+    )
 
     def _llm_transform(**kwargs):
         preview = json.loads(json.dumps(kwargs["preview_state"]))
         preview["mock_data"] = {
             "prototype_items": [
-                {"title": "Book venue", "notes": "Confirm room capacity and AV equipment", "status": "In progress", "date": "2026-07-01"},
-                {"title": "Confirm speakers", "notes": "Collect talk titles and short bios", "status": "Planned", "date": "2026-07-02"},
+                {
+                    "title": "Book venue",
+                    "notes": "Confirm room capacity and AV equipment",
+                    "status": "In progress",
+                    "date": "2026-07-01",
+                },
+                {
+                    "title": "Confirm speakers",
+                    "notes": "Collect talk titles and short bios",
+                    "status": "Planned",
+                    "date": "2026-07-02",
+                },
             ]
         }
         page_schema = skill._page_schema_from_preview(preview)
         return {
             "ok": True,
-            "payload": {"schema": "adaos.webui.v1", "generated_by": "builder_skill", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}},
+            "payload": {
+                "schema": "adaos.webui.v1",
+                "generated_by": "builder_skill",
+                "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+            },
             "preview_state": preview,
             "comment": "Updated mock data for conference preparation.",
             "validation": {"ok": True},
@@ -5124,7 +9327,12 @@ def test_update_current_scenario_sample_data_uses_llm_payload_and_refreshes_file
             "fields": [
                 {"id": "title", "type": "string", "label": "Title", "required": True},
                 {"id": "notes", "type": "string", "label": "Notes", "required": False},
-                {"id": "status", "type": "string", "label": "Status", "required": False},
+                {
+                    "id": "status",
+                    "type": "string",
+                    "label": "Status",
+                    "required": False,
+                },
                 {"id": "date", "type": "date", "label": "Date", "required": False},
             ],
             "patches": [],
@@ -5153,16 +9361,27 @@ def test_update_current_scenario_sample_data_uses_llm_payload_and_refreshes_file
         and payload.get("reason") == "builder_ui_revision_written"
         for topic, payload in published
     )
-    revision = json.loads((artifact_root / "ui_revisions" / "001.json").read_text(encoding="utf-8"))
+    revision = json.loads(
+        (artifact_root / "ui_revisions" / "001.json").read_text(encoding="utf-8")
+    )
     assert revision["llm"]["ok"] is True
     assert revision["inference"]["model"] == "gpt-test-builder"
     assert revision["inference"]["provider"] == "openai"
-    assert revision["preview_state"]["mock_data"]["prototype_items"][0]["title"] == "Book venue"
+    assert (
+        revision["preview_state"]["mock_data"]["prototype_items"][0]["title"]
+        == "Book venue"
+    )
 
 
-def test_schedule_dev_runtime_reload_publishes_materialization_event_without_running_loop(monkeypatch) -> None:
+def test_schedule_dev_runtime_reload_publishes_materialization_event_without_running_loop(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     monkeypatch.setenv("ADAOS_BUILDER_DEV_RUNTIME_REFRESH_IN_TESTS", "1")
+    monkeypatch.setenv(
+        "ADAOS_SERVICE_EVENT_BRIDGE_URL",
+        "http://127.0.0.1:8777/api/node/internal/service-events",
+    )
     published: list[dict] = []
     reload_calls: list[dict] = []
 
@@ -5172,12 +9391,21 @@ def test_schedule_dev_runtime_reload_publishes_materialization_event_without_run
     monkeypatch.setattr(
         events,
         "publish",
-        lambda topic, payload, source=None: published.append(
-            {"topic": topic, "payload": dict(payload), "source": source}
+        lambda topic, payload, source=None: (
+            published.append(
+                {"topic": topic, "payload": dict(payload), "source": source}
+            )
+            or {
+                "ok": True,
+                "schema": "adaos.service_event_bridge.ack.v1",
+                "topic": topic,
+            }
         ),
     )
 
-    async def _reload(webspace_id, *, scenario_id=None, action="reload", event_payload=None):
+    async def _reload(
+        webspace_id, *, scenario_id=None, action="reload", event_payload=None
+    ):
         reload_calls.append(
             {
                 "webspace_id": webspace_id,
@@ -5192,14 +9420,19 @@ def test_schedule_dev_runtime_reload_publishes_materialization_event_without_run
 
     result = skill._schedule_dev_runtime_reload_after_revision(
         "desktop",
-        session={"scenario_id": "todo_list", "draft_id": "draft.todo", "ui_revision": "016"},
+        session={
+            "scenario_id": "todo_list",
+            "draft_id": "draft.todo",
+            "ui_revision": "016",
+        },
         binding={"dev_webspace_id": "desktop-dev"},
         revision="016",
     )
 
     assert result["ok"] is True
     assert result["scheduled"] is True
-    assert result["mode"] == "materialization_event_bus"
+    assert result["mode"] == "materialization_service_event_bridge"
+    assert result["delivery_ack"]["ok"] is True
     assert result["webspace_id"] == "desktop-dev"
     assert reload_calls == []
     assert published[-1]["topic"] == "builder.ui_revision.materialize"
@@ -5212,7 +9445,9 @@ def test_schedule_dev_runtime_reload_publishes_materialization_event_without_run
     assert result["delay_s"] == 0.0
 
 
-def test_schedule_dev_runtime_materialization_uses_running_event_loop(monkeypatch) -> None:
+def test_schedule_dev_runtime_materialization_uses_running_event_loop(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     monkeypatch.setenv("ADAOS_BUILDER_DEV_RUNTIME_REFRESH_IN_TESTS", "1")
     monkeypatch.setenv("ADAOS_BUILDER_REVISION_MATERIALIZATION_DELAY_S", "0")
@@ -5224,12 +9459,18 @@ def test_schedule_dev_runtime_materialization_uses_running_event_loop(monkeypatc
         calls.append({"webspace_id": webspace_id, **kwargs})
         return {"ok": True}
 
-    monkeypatch.setattr(webspace_runtime, "apply_builder_revision_materialization", _apply)
+    monkeypatch.setattr(
+        webspace_runtime, "apply_builder_revision_materialization", _apply
+    )
 
     async def _run() -> dict:
         result = skill._schedule_dev_runtime_reload_after_revision(
             "desktop",
-            session={"scenario_id": "todo_list", "draft_id": "draft.todo", "ui_revision": "019"},
+            session={
+                "scenario_id": "todo_list",
+                "draft_id": "draft.todo",
+                "ui_revision": "019",
+            },
             binding={"dev_webspace_id": "desktop-dev"},
             revision="019",
             source_fingerprint="fp-019",
@@ -5253,7 +9494,107 @@ def test_schedule_dev_runtime_materialization_uses_running_event_loop(monkeypatc
     assert calls[-1]["user_id"] == "guest"
 
 
-def test_update_current_scenario_does_not_generate_domain_mock_data_without_llm(monkeypatch, tmp_path) -> None:
+def test_schedule_dev_runtime_materialization_uses_owner_api_for_oneshot(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    monkeypatch.setenv("ADAOS_BUILDER_DEV_RUNTIME_REFRESH_IN_TESTS", "1")
+    monkeypatch.setenv("ADAOS_DEV_TOOL_EXECUTION_MODE", "oneshot")
+    calls: list[dict] = []
+
+    def _ensure(scenario_id, **kwargs):
+        calls.append({"ensure_scenario_id": scenario_id, **kwargs})
+        return {
+            "ok": True,
+            "accepted": True,
+            "created": True,
+            "webspace_id": kwargs["requested_id"],
+            "source_mode": "dev",
+        }
+
+    def _materialize(webspace_id, **kwargs):
+        calls.append({"webspace_id": webspace_id, **kwargs})
+        return {
+            "ok": True,
+            "accepted": True,
+            "delivery": "owner_control_api",
+            "materialization_identity": {"revision": "027"},
+            "live_room_refresh": {"materialized_payload": "large-runtime-payload"},
+        }
+
+    monkeypatch.setattr(skill.builder_preview, "ensure_dev_webspace_via_owner", _ensure)
+    monkeypatch.setattr(
+        skill.builder_preview, "materialize_revision_via_owner", _materialize
+    )
+
+    result = skill._schedule_dev_runtime_reload_after_revision(
+        "desktop",
+        session={
+            "scenario_id": "applications",
+            "draft_id": "draft.applications",
+            "ui_revision": "027",
+        },
+        binding={"dev_webspace_id": "desktop-dev"},
+        revision="027",
+        source_fingerprint="fp-027",
+        user_id="guest",
+        roles=[],
+    )
+
+    assert result["ok"] is True
+    assert result["scheduled"] is False
+    assert result["completed"] is True
+    assert result["mode"] == "materialization_owner_control_api"
+    assert result["delivery_ack"]["materialization_identity"]["revision"] == "027"
+    assert result["dev_webspace_ack"] == {
+        "ok": True,
+        "accepted": True,
+        "webspace_id": "desktop-dev",
+        "source_mode": "dev",
+        "created": True,
+    }
+    assert "live_room_refresh" not in result["delivery_ack"]
+    assert calls[0]["ensure_scenario_id"] == "applications"
+    assert calls[0]["requested_id"] == "desktop-dev"
+    assert calls[1]["webspace_id"] == "desktop-dev"
+    assert calls[1]["scenario_id"] == "applications"
+    assert calls[1]["revision"] == "027"
+    assert calls[1]["event_payload"]["source_webspace_id"] == "desktop"
+
+
+def test_compact_workflow_result_keeps_status_without_full_workflow() -> None:
+    skill = _load_module()
+
+    result = skill._compact_workflow_result(
+        {
+            "ok": True,
+            "workflow": {
+                "schema": "adaos.builder.workflow.v1",
+                "generation": 43,
+                "active_phase": "prototype",
+                "prototype": {"head_revision": "027", "status": "working"},
+                "change": {
+                    "change_id": "builder_change_1",
+                    "status": "in_progress",
+                    "issues": [{"id": "issue.1", "description": "large" * 1000}],
+                },
+                "history": [{"payload": "large" * 1000}],
+                "context_packet": {"conversation": "large" * 1000},
+            },
+        }
+    )
+
+    assert result["ok"] is True
+    assert result["workflow"]["active_phase"] == "prototype"
+    assert result["workflow"]["prototype"]["head_revision"] == "027"
+    assert result["workflow"]["change"]["issue_count"] == 1
+    assert result["workflow"]["history_count"] == 1
+    assert "context_packet" not in result["workflow"]
+
+
+def test_update_current_scenario_does_not_generate_domain_mock_data_without_llm(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "sample_without_llm"
     artifact_root.mkdir(parents=True)
@@ -5265,7 +9606,10 @@ def test_update_current_scenario_does_not_generate_domain_mock_data_without_llm(
 
     class _Workbench:
         def set_active_draft(self, **kwargs):
-            return {"dev_webspace_id": "builder-sample-no-llm-dev", "active_draft_id": kwargs.get("active_draft_id")}
+            return {
+                "dev_webspace_id": "builder-sample-no-llm-dev",
+                "active_draft_id": kwargs.get("active_draft_id"),
+            }
 
         def snapshot(self, *args, **kwargs):
             return {"preview_state": kwargs.get("preview_state") or {}}
@@ -5274,9 +9618,17 @@ def test_update_current_scenario_does_not_generate_domain_mock_data_without_llm(
     import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
     monkeypatch.setattr(events, "publish", lambda *args, **kwargs: None)
-    monkeypatch.setattr(pending_actions, "publish_pending_action", lambda **kwargs: {"id": "pa.builder.sample.no.llm"})
+    monkeypatch.setattr(
+        pending_actions,
+        "publish_pending_action",
+        lambda **kwargs: {"id": "pa.builder.sample.no.llm"},
+    )
     skill._save_session(
         "builder-sample-no-llm",
         {
@@ -5294,7 +9646,11 @@ def test_update_current_scenario_does_not_generate_domain_mock_data_without_llm(
                 {"id": "date", "type": "date", "label": "Date", "required": False},
             ],
             "mock_rows": [
-                {"title": "Existing task", "notes": "Existing note", "date": "2026-07-01"},
+                {
+                    "title": "Existing task",
+                    "notes": "Existing note",
+                    "date": "2026-07-01",
+                },
             ],
             "patches": [],
             "version": "001",
@@ -5309,11 +9665,15 @@ def test_update_current_scenario_does_not_generate_domain_mock_data_without_llm(
     assert result["status"] == "noop"
     assert result["patch"]["operation"] == "noop"
     rows = result["preview_state"]["mock_data"]["prototype_items"]
-    assert rows == [{"title": "Existing task", "notes": "Existing note", "date": "2026-07-01"}]
+    assert rows == [
+        {"title": "Existing task", "notes": "Existing note", "date": "2026-07-01"}
+    ]
     assert not (artifact_root / "ui_revisions").exists()
 
 
-def test_update_current_scenario_translate_data_timeout_does_not_apply_ui_only_fallback(monkeypatch, tmp_path) -> None:
+def test_update_current_scenario_translate_data_timeout_does_not_apply_ui_only_fallback(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     _stub_development_context(skill, monkeypatch)
     artifact_root = tmp_path / "translate_data_timeout"
@@ -5326,7 +9686,10 @@ def test_update_current_scenario_translate_data_timeout_does_not_apply_ui_only_f
 
     class _Workbench:
         def set_active_draft(self, **kwargs):
-            return {"dev_webspace_id": "builder-translate-timeout-dev", "active_draft_id": kwargs.get("active_draft_id")}
+            return {
+                "dev_webspace_id": "builder-translate-timeout-dev",
+                "active_draft_id": kwargs.get("active_draft_id"),
+            }
 
         def snapshot(self, *args, **kwargs):
             return {"preview_state": kwargs.get("preview_state") or {}}
@@ -5342,7 +9705,11 @@ def test_update_current_scenario_translate_data_timeout_does_not_apply_ui_only_f
         }
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
     monkeypatch.setattr(skill, "_apply_llm_webui_transform", _llm_timeout)
     skill._save_session(
         "builder-translate-timeout",
@@ -5360,7 +9727,10 @@ def test_update_current_scenario_translate_data_timeout_does_not_apply_ui_only_f
                 {"id": "notes", "type": "string", "label": "Notes", "required": False},
             ],
             "mock_rows": [
-                {"title": "\u041a\u0443\u043f\u0438\u0442\u044c \u0431\u0438\u043b\u0435\u0442\u044b", "notes": "\u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u0434\u0430\u0442\u044b"},
+                {
+                    "title": "\u041a\u0443\u043f\u0438\u0442\u044c \u0431\u0438\u043b\u0435\u0442\u044b",
+                    "notes": "\u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u0434\u0430\u0442\u044b",
+                },
             ],
             "patches": [],
             "version": "001",
@@ -5368,7 +9738,7 @@ def test_update_current_scenario_translate_data_timeout_does_not_apply_ui_only_f
     )
 
     result = skill.update_current_scenario(
-        "\u041f\u0435\u0440\u0435\u0432\u0435\u0434\u0438 \u0434\u0430\u043d\u043d\u044b\u0435 \u043d\u0430 \u0430\u043d\u0433\u043b\u0438\u0439\u0441\u043a\u0438\u0439 \u044f\u0437\u044b\u043a",
+        "\u041f\u0435\u0440\u0435\u0432\u0435\u0434\u0438 \u0434\u0430\u043d\u043d\u044b\u0435 \u043d\u0430 \u0430\u043d\u0433\u043b\u0438\u0439\u0441\u043a\u0438\u0439 \u044f\u0437\u044b\u043a \u0438 \u0434\u043e\u0431\u0430\u0432\u044c \u0444\u0438\u043b\u044c\u0442\u0440 \u043f\u043e category",
         webspace_id="builder-translate-timeout",
     )
 
@@ -5378,7 +9748,12 @@ def test_update_current_scenario_translate_data_timeout_does_not_apply_ui_only_f
     assert result["patch"]["diff"]["llm_required"] is True
     assert "timed out" in result["message"]
     rows = result["preview_state"]["mock_data"]["prototype_items"]
-    assert rows == [{"title": "\u041a\u0443\u043f\u0438\u0442\u044c \u0431\u0438\u043b\u0435\u0442\u044b", "notes": "\u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u0434\u0430\u0442\u044b"}]
+    assert rows == [
+        {
+            "title": "\u041a\u0443\u043f\u0438\u0442\u044c \u0431\u0438\u043b\u0435\u0442\u044b",
+            "notes": "\u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u0434\u0430\u0442\u044b",
+        }
+    ]
     assert not (artifact_root / "ui_revisions").exists()
 
 
@@ -5398,7 +9773,11 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
                 '{"id":"revision_restore","version":"0.1.0","name":"revision_restore","steps":[]}',
                 encoding="utf-8",
             )
-            return {"ok": True, "draft": {"draft_id": "draft.revision"}, "artifact_root": str(artifact_root)}
+            return {
+                "ok": True,
+                "draft": {"draft_id": "draft.revision"},
+                "artifact_root": str(artifact_root),
+            }
 
         def checkpoint_artifact(self, **kwargs):
             checkpoints.append(dict(kwargs))
@@ -5406,7 +9785,10 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
 
     class _Workbench:
         def set_active_draft(self, **kwargs):
-            return {"dev_webspace_id": "builder-revision-dev", "active_draft_id": kwargs.get("active_draft_id")}
+            return {
+                "dev_webspace_id": "builder-revision-dev",
+                "active_draft_id": kwargs.get("active_draft_id"),
+            }
 
         def snapshot(self, *args, **kwargs):
             return {"preview_state": kwargs.get("preview_state") or {}}
@@ -5416,42 +9798,85 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
-    monkeypatch.setattr(pending_actions, "publish_pending_action", lambda **kwargs: {"id": "pa.builder.revision"})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
+    monkeypatch.setattr(
+        pending_actions,
+        "publish_pending_action",
+        lambda **kwargs: {"id": "pa.builder.revision"},
+    )
     refresh_calls: list[dict] = []
     monkeypatch.setattr(
         skill,
         "_schedule_dev_runtime_reload_after_revision",
-        lambda webspace_id, **kwargs: refresh_calls.append({"webspace_id": webspace_id, **kwargs})
+        lambda webspace_id, **kwargs: refresh_calls.append(
+            {"webspace_id": webspace_id, **kwargs}
+        )
         or {"ok": True, "scheduled": True, "webspace_id": "builder-revision-dev"},
     )
 
-    created = skill.create_scenario_draft("create todo list", webspace_id="builder-revision")
+    created = skill.create_scenario_draft(
+        "create todo list", webspace_id="builder-revision"
+    )
     assert created["ui_revision"]["revision"] == "001"
-    created_revision = json.loads((artifact_root / "ui_revisions" / "001.json").read_text(encoding="utf-8"))
-    assert created_revision["preview_state"]["version"] == created["ui_revision"]["revision"]
+    created_revision = json.loads(
+        (artifact_root / "ui_revisions" / "001.json").read_text(encoding="utf-8")
+    )
+    assert (
+        created_revision["preview_state"]["version"]
+        == created["ui_revision"]["revision"]
+    )
     assert "preview_state" not in created_revision["after_webui"]
     assert created_revision["prompt_files"]["tz/base_tz.md"]["exists"] is True
     first_tz = created_revision["prompt_files"]["tz/base_tz.md"]["content"]
-    (artifact_root / "tz" / "base_tz.md").write_text("spec revision 002", encoding="utf-8")
+    (artifact_root / "tz" / "base_tz.md").write_text(
+        "spec revision 002", encoding="utf-8"
+    )
     (artifact_root / "prompt_state.json").write_text(
-        json.dumps({"base_tz": "spec revision 002", "prepare": {}, "generate": {}}, ensure_ascii=False),
+        json.dumps(
+            {"base_tz": "spec revision 002", "prepare": {}, "generate": {}},
+            ensure_ascii=False,
+        ),
         encoding="utf-8",
     )
-    updated = skill.update_current_scenario("show cards", webspace_id="builder-revision")
+    updated = skill.update_current_scenario(
+        "show cards", webspace_id="builder-revision"
+    )
     assert updated["ui_revision"]["revision"] == "002"
-    updated_revision = json.loads((artifact_root / "ui_revisions" / "002.json").read_text(encoding="utf-8"))
-    assert updated_revision["preview_state"]["version"] == updated["ui_revision"]["revision"]
+    updated_revision = json.loads(
+        (artifact_root / "ui_revisions" / "002.json").read_text(encoding="utf-8")
+    )
+    assert (
+        updated_revision["preview_state"]["version"]
+        == updated["ui_revision"]["revision"]
+    )
     assert "preview_state" not in updated_revision["after_webui"]
-    assert updated_revision["prompt_files"]["tz/base_tz.md"]["content"] == "spec revision 002"
-    assert any(item["type"] == "card_list" for item in updated["preview_state"]["current_ui"]["children"])
+    assert (
+        updated_revision["prompt_files"]["tz/base_tz.md"]["content"]
+        == "spec revision 002"
+    )
+    assert any(
+        item["type"] == "card_list"
+        for item in updated["preview_state"]["current_ui"]["children"]
+    )
+    locale_dir = artifact_root / "assets" / "i18n"
+    locale_dir.mkdir(parents=True)
+    (locale_dir / "en.json").write_text('{"stale":"Stale"}', encoding="utf-8")
+    (locale_dir / "ru.json").write_text('{"stale":"Устарело"}', encoding="utf-8")
     emitted: list[dict[str, object]] = []
 
     def _unexpected_revision_chat_emit(*args, **kwargs):
         emitted.append({"args": args, "kwargs": kwargs})
-        raise AssertionError("successful Set current must not append a persistent chat message")
+        raise AssertionError(
+            "successful Set current must not append a persistent chat message"
+        )
 
-    monkeypatch.setattr(skill, "_schedule_safe_emit_chat", _unexpected_revision_chat_emit)
+    monkeypatch.setattr(
+        skill, "_schedule_safe_emit_chat", _unexpected_revision_chat_emit
+    )
     review_calls: list[dict[str, object]] = []
     monkeypatch.setattr(
         skill,
@@ -5466,7 +9891,11 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
 
     assert restored["ok"] is True
     assert restored["revision"] == "001"
-    assert restored["review_constraints"] == {"ok": True, "status": "satisfied", "revision": "001"}
+    assert restored["review_constraints"] == {
+        "ok": True,
+        "status": "satisfied",
+        "revision": "001",
+    }
     assert review_calls == [{"scenario_id": created["scenario_id"], "revision": "001"}]
     assert emitted == []
     assert restored["chat_emit"]["mode"] == "receipt_only"
@@ -5475,17 +9904,29 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
     assert restored["vcs_checkpoint"]["ok"] is True
     assert checkpoints[-1]["message"] == "Restore UI revision 001"
     assert checkpoints[-1]["metadata"]["revision"] == "001"
-    assert checkpoints[-1]["metadata"]["change_id"] == restored["message_meta"]["change_id"]
+    assert (
+        checkpoints[-1]["metadata"]["change_id"]
+        == restored["message_meta"]["change_id"]
+    )
     assert restored["dev_runtime_refresh"]["scheduled"] is True
     assert refresh_calls[-1]["webspace_id"] == "builder-revision"
     assert refresh_calls[-1]["revision"] == "001"
-    assert (artifact_root / "ui_revisions" / "current.txt").read_text(encoding="utf-8").strip() == "001"
-    assert not any(item["type"] == "card_list" for item in restored["preview_state"]["current_ui"]["children"])
+    assert (artifact_root / "ui_revisions" / "current.txt").read_text(
+        encoding="utf-8"
+    ).strip() == "001"
+    assert not any(
+        item["type"] == "card_list"
+        for item in restored["preview_state"]["current_ui"]["children"]
+    )
     saved = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
     widgets = saved["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
     assert not any(item.get("id") == "prototype-cards" for item in widgets)
+    assert not (artifact_root / "assets" / "i18n" / "en.json").exists()
+    assert not (artifact_root / "assets" / "i18n" / "ru.json").exists()
     assert (artifact_root / "tz" / "base_tz.md").read_text(encoding="utf-8") == first_tz
-    state = json.loads((artifact_root / "prompt_state.json").read_text(encoding="utf-8"))
+    state = json.loads(
+        (artifact_root / "prompt_state.json").read_text(encoding="utf-8")
+    )
     assert state["base_tz"] == first_tz
 
 
@@ -5507,12 +9948,17 @@ def test_follow_active_preview_moves_to_the_new_prototype_revision(monkeypatch) 
             },
             "binding": {
                 "selection": {"object_id": object_id, "title": "Кулинарные рецепты"},
-                "preview_target": {"revision": kwargs["revision"], "follow_active": True},
+                "preview_target": {
+                    "revision": kwargs["revision"],
+                    "follow_active": True,
+                },
             },
             "materialization": {"ok": True, "revision": kwargs["revision"]},
         }
 
-    monkeypatch.setattr(skill.builder_preview, "refresh_follow_active_target", _refresh_target)
+    monkeypatch.setattr(
+        skill.builder_preview, "refresh_follow_active_target", _refresh_target
+    )
 
     result = skill._refresh_follow_active_preview(
         "desktop",
@@ -5544,12 +9990,16 @@ def test_follow_active_preview_moves_to_the_new_prototype_revision(monkeypatch) 
     ]
 
 
-def test_follow_active_preview_does_not_override_an_explicit_snapshot(monkeypatch) -> None:
+def test_follow_active_preview_does_not_override_an_explicit_snapshot(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     monkeypatch.setattr(
         skill.builder_preview,
         "refresh_follow_active_target",
-        lambda *_args, **_kwargs: pytest.fail("explicit preview snapshots must not move"),
+        lambda *_args, **_kwargs: pytest.fail(
+            "explicit preview snapshots must not move"
+        ),
     )
 
     result = skill._refresh_follow_active_preview(
@@ -5569,7 +10019,9 @@ def test_follow_active_preview_does_not_override_an_explicit_snapshot(monkeypatc
     assert result == {"ok": True, "skipped": "preview_target_not_following_active"}
 
 
-def test_set_ui_revision_current_migrates_legacy_root_modals(monkeypatch, tmp_path) -> None:
+def test_set_ui_revision_current_migrates_legacy_root_modals(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "legacy_modal_revision"
     revision_dir = artifact_root / "ui_revisions"
@@ -5587,16 +10039,33 @@ def test_set_ui_revision_current_migrates_legacy_root_modals(monkeypatch, tmp_pa
                 "type": "ui.actions",
                 "area": "main",
                 "title": "Open details",
-                "actions": [{"on": "click", "type": "openModal", "params": {"modalId": "details_modal"}}],
+                "actions": [
+                    {
+                        "on": "click",
+                        "type": "openModal",
+                        "params": {"modalId": "details_modal"},
+                    }
+                ],
             }
         ],
     }
     modal_schema = {
         "id": "details_modal",
         "layout": {"type": "single", "areas": [{"id": "main", "role": "main"}]},
-        "widgets": [{"id": "details", "type": "item.details", "area": "main", "title": "Details"}],
+        "widgets": [
+            {
+                "id": "details",
+                "type": "item.details",
+                "area": "main",
+                "title": "Details",
+            }
+        ],
     }
-    preview = {"title": "Legacy Modal Revision", "page_schema": page_schema, "version": "004"}
+    preview = {
+        "title": "Legacy Modal Revision",
+        "page_schema": page_schema,
+        "version": "004",
+    }
     (revision_dir / "004.json").write_text(
         json.dumps(
             {
@@ -5605,7 +10074,9 @@ def test_set_ui_revision_current_migrates_legacy_root_modals(monkeypatch, tmp_pa
                 "after_webui": {
                     "schema": "adaos.webui.v1",
                     "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
-                    "modals": {"details_modal": {"title": "Details", "schema": modal_schema}},
+                    "modals": {
+                        "details_modal": {"title": "Details", "schema": modal_schema}
+                    },
                 },
                 "preview_state": preview,
             },
@@ -5634,13 +10105,20 @@ def test_set_ui_revision_current_migrates_legacy_root_modals(monkeypatch, tmp_pa
         "_ensure_workbench",
         lambda *args, **kwargs: {
             "ok": True,
-            "binding": {"runtime_scenario_id": "legacy_modal_revision", "active_draft_id": "draft.legacy.modal"},
+            "binding": {
+                "runtime_scenario_id": "legacy_modal_revision",
+                "active_draft_id": "draft.legacy.modal",
+            },
         },
     )
     monkeypatch.setattr(
         skill,
         "_schedule_dev_runtime_reload_after_revision",
-        lambda *args, **kwargs: {"ok": True, "scheduled": True, "revision": kwargs.get("revision")},
+        lambda *args, **kwargs: {
+            "ok": True,
+            "scheduled": True,
+            "revision": kwargs.get("revision"),
+        },
     )
 
     restored = skill.set_ui_revision_current("004", webspace_id="builder-legacy-modal")
@@ -5648,8 +10126,16 @@ def test_set_ui_revision_current_migrates_legacy_root_modals(monkeypatch, tmp_pa
     assert restored["ok"] is True
     saved = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
     assert "modals" not in saved
-    assert saved["ui"]["application"]["modals"]["details_modal"]["schema"]["id"] == "details_modal"
-    assert saved["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["actions"][0]["params"]["modalId"] == "details_modal"
+    assert (
+        saved["ui"]["application"]["modals"]["details_modal"]["schema"]["id"]
+        == "details_modal"
+    )
+    assert (
+        saved["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["actions"][0][
+            "params"
+        ]["modalId"]
+        == "details_modal"
+    )
 
 
 def test_write_ui_revision_does_not_overwrite_existing_revision(tmp_path) -> None:
@@ -5688,13 +10174,17 @@ def test_write_ui_revision_does_not_overwrite_existing_revision(tmp_path) -> Non
     assert session["ui_revision"] == "005"
 
 
-def test_builder_vcs_checkpoint_uses_llm_comment_and_persists_commit(monkeypatch, tmp_path) -> None:
+def test_builder_vcs_checkpoint_uses_llm_comment_and_persists_commit(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "vcs_scenario"
     revision_dir = artifact_root / "ui_revisions"
     revision_dir.mkdir(parents=True)
     revision_path = revision_dir / "003.json"
-    revision_path.write_text('{"schema":"adaos.builder.ui_revision.v1","revision":"003"}', encoding="utf-8")
+    revision_path.write_text(
+        '{"schema":"adaos.builder.ui_revision.v1","revision":"003"}', encoding="utf-8"
+    )
     calls: list[dict] = []
 
     class _Service:
@@ -5717,6 +10207,7 @@ def test_builder_vcs_checkpoint_uses_llm_comment_and_persists_commit(monkeypatch
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     session = {
         "scenario_id": "vcs_scenario",
+        "artifact_kind": "application",
         "artifact_root": str(artifact_root),
         "ui_revision": "003",
     }
@@ -5741,7 +10232,58 @@ def test_builder_vcs_checkpoint_uses_llm_comment_and_persists_commit(monkeypatch
     assert session["vcs_checkpoint"]["message"] == "Added a modal form."
 
 
-def test_set_ui_revision_current_failure_keeps_project_topic(monkeypatch, tmp_path) -> None:
+def test_builder_vcs_checkpoint_can_stay_local(monkeypatch, tmp_path) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "local_scenario"
+    revision_dir = artifact_root / "ui_revisions"
+    revision_dir.mkdir(parents=True)
+    revision_path = revision_dir / "003.json"
+    revision_path.write_text(
+        '{"schema":"adaos.builder.ui_revision.v1","revision":"003"}',
+        encoding="utf-8",
+    )
+    calls: list[dict] = []
+    monkeypatch.setattr(
+        skill.builder_artifacts,
+        "local_checkpoint",
+        lambda **kwargs: calls.append(dict(kwargs))
+        or {
+            "ok": True,
+            "scope": "local",
+            "kind": kwargs["kind"],
+            "name": kwargs["artifact_id"],
+            "bytes_uploaded": 0,
+            "package_digest": "sha256:local",
+        },
+    )
+    monkeypatch.setattr(
+        skill.builder_artifacts,
+        "checkpoint",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("remote checkpoint")),
+    )
+    session = {
+        "scenario_id": "local_scenario",
+        "artifact_kind": "application",
+        "artifact_root": str(artifact_root),
+        "ui_revision": "003",
+    }
+
+    result = skill._checkpoint_builder_artifact(
+        session=session,
+        revision_info={"revision": "003", "path": str(revision_path)},
+        request_text="Local prototype revision",
+        llm_result=None,
+        local_only=True,
+    )
+
+    assert len(calls) == 1
+    assert result["scope"] == "local"
+    assert result["bytes_uploaded"] == 0
+
+
+def test_set_ui_revision_current_failure_keeps_project_topic(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "revision_failure_topic"
     artifact_root.mkdir(parents=True)
@@ -5769,7 +10311,9 @@ def test_set_ui_revision_current_failure_keeps_project_topic(monkeypatch, tmp_pa
         lambda *args, **kwargs: emitted.append({"args": args, "kwargs": kwargs}),
     )
 
-    result = skill.set_ui_revision_current("999", webspace_id="builder-revision-failure")
+    result = skill.set_ui_revision_current(
+        "999", webspace_id="builder-revision-failure"
+    )
 
     expected_topic = "prompt-project:scenario:revision_failure_topic"
     assert result["ok"] is False
@@ -5789,7 +10333,9 @@ def test_write_webui_keeps_builder_skill_out_of_runtime_dependencies(tmp_path) -
                 "id": "prototype",
                 "name": "prototype",
                 "depends": ["builder_skill", "voice_chat_skill"],
-                "runtime": {"skills": {"required": ["builder_skill", "voice_chat_skill"]}},
+                "runtime": {
+                    "skills": {"required": ["builder_skill", "voice_chat_skill"]}
+                },
             }
         ),
         encoding="utf-8",
@@ -5819,7 +10365,58 @@ def test_write_webui_keeps_builder_skill_out_of_runtime_dependencies(tmp_path) -
     assert "builder_skill" not in manifest
 
 
-def test_safe_prototype_write_uses_yaml_truth_and_drops_stale_automation_dependencies(tmp_path) -> None:
+def test_write_webui_preserves_universal_scenario_locale_resources(tmp_path) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "localized_prototype"
+    locale_root = artifact_root / "assets" / "i18n"
+    locale_root.mkdir(parents=True)
+    dictionaries = {
+        "en": {"scenario.localized_prototype.title": "Localized Prototype"},
+        "ru": {"scenario.localized_prototype.title": "Локализованный прототип"},
+    }
+    for locale, dictionary in dictionaries.items():
+        (locale_root / f"{locale}.json").write_text(
+            json.dumps(dictionary, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    (artifact_root / "scenario.yaml").write_text(
+        "id: localized_prototype\n"
+        "name: localized_prototype\n"
+        "version: 0.1.0\n"
+        "title: Localized Prototype\n"
+        "title_i18n:\n"
+        "  key: scenario.localized_prototype.title\n"
+        "  fallback: Localized Prototype\n",
+        encoding="utf-8",
+    )
+
+    skill._write_webui(
+        str(artifact_root),
+        {
+            "scenario_id": "localized_prototype",
+            "title": "Localized Prototype",
+            "current_ui": {
+                "id": "localized_prototype",
+                "type": "page",
+                "children": [],
+            },
+        },
+    )
+
+    payload = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
+    application = payload["ui"]["application"]
+    assert application["desktop"]["pageSchema"]["title_i18n"] == (
+        "scenario.localized_prototype.title"
+    )
+    assert {item["locale"] for item in application["resources"].values()} == {
+        "en",
+        "ru",
+    }
+
+
+def test_safe_prototype_write_uses_yaml_truth_and_drops_stale_automation_dependencies(
+    tmp_path,
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "safe_prototype"
     artifact_root.mkdir(parents=True)
@@ -5877,7 +10474,11 @@ def test_safe_prototype_write_uses_yaml_truth_and_drops_stale_automation_depende
     skill._write_scenario_application_value(
         artifact_root,
         {"desktop": {"pageSchema": page_schema}},
-        {"scenario_id": "safe_prototype", "title": "Безопасный прототип", "version": "001"},
+        {
+            "scenario_id": "safe_prototype",
+            "title": "Безопасный прототип",
+            "version": "001",
+        },
     )
 
     scenario = json.loads((artifact_root / "scenario.json").read_text(encoding="utf-8"))
@@ -5925,15 +10526,26 @@ def test_chat_meta_replaces_stale_client_topic_with_selected_scenario() -> None:
         topic_ref=stale_topic,
     )
 
-    assert meta["conversation_topic_id"] == "prompt-project:scenario:prototype_app_4d5758e5"
-    assert meta["conversation_thread_id"] == "prompt-project:scenario:prototype_app_4d5758e5"
+    assert (
+        meta["conversation_topic_id"]
+        == "prompt-project:scenario:prototype_app_4d5758e5"
+    )
+    assert (
+        meta["conversation_thread_id"]
+        == "prompt-project:scenario:prototype_app_4d5758e5"
+    )
     assert meta["thread_id"] == "prompt-project:scenario:prototype_app_4d5758e5"
     assert meta["topic_id"] == "prompt-project:scenario:prototype_app_4d5758e5"
-    assert meta["builder_topic"]["thread_id"] == "prompt-project:scenario:prototype_app_4d5758e5"
+    assert (
+        meta["builder_topic"]["thread_id"]
+        == "prompt-project:scenario:prototype_app_4d5758e5"
+    )
     assert meta["builder_topic"]["scenario_id"] == "prototype_app_4d5758e5"
 
 
-def test_chat_first_idea_creates_preview_and_accepts_correction(monkeypatch, tmp_path) -> None:
+def test_chat_first_idea_creates_preview_and_accepts_correction(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "first_idea"
     emitted: list[dict] = []
@@ -5958,7 +10570,14 @@ def test_chat_first_idea_creates_preview_and_accepts_correction(monkeypatch, tmp
             }
 
     class _Workbench:
-        def set_active_draft(self, *, source_webspace_id=None, active_draft_id=None, runtime_scenario_id=None, persist_projection=True):
+        def set_active_draft(
+            self,
+            *,
+            source_webspace_id=None,
+            active_draft_id=None,
+            runtime_scenario_id=None,
+            persist_projection=True,
+        ):
             return {
                 "source_webspace_id": source_webspace_id,
                 "dev_webspace_id": f"{source_webspace_id}-dev",
@@ -5968,22 +10587,36 @@ def test_chat_first_idea_creates_preview_and_accepts_correction(monkeypatch, tmp
             }
 
         def snapshot(self, webspace_id, *, preview_state=None):
-            return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
+            return {
+                "source_webspace_id": webspace_id,
+                "preview_state": preview_state or {},
+            }
 
     import adaos.services.builder.workspace as workspace
     import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
-    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}))
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}),
+    )
     monkeypatch.setattr(
         pending_actions,
         "publish_pending_action",
-        lambda **kwargs: published.append(dict(kwargs)) or {"id": f"pa.builder.{len(published)}", "kind": kwargs["kind"]},
+        lambda **kwargs: published.append(dict(kwargs))
+        or {"id": f"pa.builder.{len(published)}", "kind": kwargs["kind"]},
     )
 
-    created = skill.chat("I have an idea. Let's build it.", webspace_id="builder-first-idea")
+    created = skill.chat(
+        "I have an idea. Let's build it.", webspace_id="builder-first-idea"
+    )
 
     assert created["ok"] is True
     assert created["scenario_id"].startswith("i_have_an_idea_let_s_build_it")
@@ -5993,14 +10626,19 @@ def test_chat_first_idea_creates_preview_and_accepts_correction(monkeypatch, tmp
     assert "Assumptions:" in created["message"]
     assert (artifact_root / "webui.json").exists()
     assert published == []
-    assert emitted[0]["kwargs"]["topic_ref"]["thread_id"] == created["topic"]["thread_id"]
+    assert (
+        emitted[0]["kwargs"]["topic_ref"]["thread_id"] == created["topic"]["thread_id"]
+    )
 
     updated = skill.chat("show the result as cards", webspace_id="builder-first-idea")
 
     assert updated["ok"] is True
     assert updated["patch"]["operation"] == "change_view_representation"
     assert updated["topic"]["thread_id"] == created["topic"]["thread_id"]
-    assert any(item["type"] == "card_list" for item in updated["preview_state"]["current_ui"]["children"])
+    assert any(
+        item["type"] == "card_list"
+        for item in updated["preview_state"]["current_ui"]["children"]
+    )
     webui = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
     widgets = webui["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
     cards = next(item for item in widgets if item["id"] == "prototype-cards")
@@ -6022,7 +10660,11 @@ def test_chat_guides_underspecified_first_idea(monkeypatch) -> None:
             }
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}))
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}),
+    )
 
     result = skill.chat("I have an idea", webspace_id="builder-clarify")
 
@@ -6037,12 +10679,19 @@ def test_chat_guides_underspecified_first_idea(monkeypatch) -> None:
         "primary_objects",
         "first_action",
     ]
-    assert result["clarification"]["next_turn_policy"]["creates_draft_when_answered"] is True
+    assert (
+        result["clarification"]["next_turn_policy"]["creates_draft_when_answered"]
+        is True
+    )
     assert "scenario_id" not in result
-    assert emitted[0]["kwargs"]["topic_ref"]["thread_id"] == result["topic"]["thread_id"]
+    assert (
+        emitted[0]["kwargs"]["topic_ref"]["thread_id"] == result["topic"]["thread_id"]
+    )
 
 
-def test_chat_routes_followup_to_automation_sdk_at_automation_stage(monkeypatch) -> None:
+def test_chat_routes_followup_to_automation_sdk_at_automation_stage(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     emitted: list[dict] = []
     submitted: list[dict] = []
@@ -6053,24 +10702,43 @@ def test_chat_routes_followup_to_automation_sdk_at_automation_stage(monkeypatch)
     monkeypatch.setattr(
         skill.developer_prompt_context,
         "get",
-        lambda kind, project_id: {"workflow_state": "automation", "object_type": kind, "object_id": project_id},
+        lambda kind, project_id: {
+            "workflow_state": "automation",
+            "object_type": kind,
+            "object_id": project_id,
+        },
     )
     monkeypatch.setattr(
         skill.sdk_builder_automation,
         "get_state",
-        lambda **_kwargs: {"ok": True, "session_present": True, "automation": {"status": "completed"}},
+        lambda **_kwargs: {
+            "ok": True,
+            "session_present": True,
+            "automation": {"status": "completed"},
+        },
     )
 
     def _submit(text, **kwargs):
         submitted.append({"text": text, **kwargs})
-        return {"ok": True, "handled": True, "status": "automation_queued", "message": "Iteration queued."}
+        return {
+            "ok": True,
+            "handled": True,
+            "status": "automation_queued",
+            "message": "Iteration queued.",
+        }
 
     monkeypatch.setattr(skill.sdk_builder_automation, "submit", _submit)
-    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append({"text": text, **kwargs}))
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda text, **kwargs: emitted.append({"text": text, **kwargs}),
+    )
     monkeypatch.setattr(
         skill,
         "update_current_scenario",
-        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("prototype route must not run")),
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("prototype route must not run")
+        ),
     )
 
     result = skill.chat("Add a lint gate before push.", webspace_id="desktop")
@@ -6096,7 +10764,11 @@ def test_chat_starts_new_prototype_change_after_publication(monkeypatch) -> None
     updates: list[dict] = []
 
     monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
-    monkeypatch.setattr(skill.developer_prompt_context, "get", lambda *_args: {"workflow_state": "automation"})
+    monkeypatch.setattr(
+        skill.developer_prompt_context,
+        "get",
+        lambda *_args: {"workflow_state": "automation"},
+    )
     monkeypatch.setattr(
         skill.sdk_builder_workflow,
         "get_state",
@@ -6105,41 +10777,104 @@ def test_chat_starts_new_prototype_change_after_publication(monkeypatch) -> None
     monkeypatch.setattr(
         skill.sdk_builder_automation,
         "get_state",
-        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("terminal Change must not reuse Automation")),
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("terminal Change must not reuse Automation")
+        ),
     )
 
     def _update(**kwargs):
         updates.append(dict(kwargs))
-        return {"ok": True, "status": "llm_pending", "message": "Prototype update queued."}
+        return {
+            "ok": True,
+            "status": "llm_pending",
+            "message": "Prototype update queued.",
+        }
 
     monkeypatch.setattr(skill, "update_current_scenario", _update)
-    monkeypatch.setattr(skill, "_schedule_safe_emit_chat", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        skill, "_schedule_safe_emit_chat", lambda *_args, **_kwargs: None
+    )
 
     result = skill.chat("Rename Planned to Backlog.", webspace_id="desktop")
 
     assert result["status"] == "llm_pending"
     assert updates[0]["instruction"] == "Rename Planned to Backlog."
     assert updates[0]["webspace_id"] == "desktop"
+    assert updates[0]["_meta"]["builder_chat_owns_result_emit"] is True
 
 
-def test_chat_does_not_mutate_prototype_when_automation_session_is_not_started(monkeypatch) -> None:
+def test_chat_owns_single_sync_update_result_emit(monkeypatch) -> None:
+    skill = _load_module()
+    session = {"scenario_id": "builder", "artifact_root": "/dev/scenarios/builder"}
+    binding = {"runtime_scenario_id": "builder", "dev_webspace_id": "desktop-dev"}
+    emitted: list[str] = []
+
+    monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
+    monkeypatch.setattr(
+        skill.developer_prompt_context,
+        "get",
+        lambda *_args: {"workflow_state": "automation"},
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *_args: {"governed": {"state": "published"}},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda text, **_kwargs: emitted.append(str(text)),
+    )
+
+    def _update(**kwargs):
+        if skill._should_emit_api_tool_chat(kwargs["_meta"]):
+            skill._safe_emit_chat("Updated once.")
+        return {"ok": True, "status": "llm_repaired", "message": "Updated once."}
+
+    monkeypatch.setattr(skill, "update_current_scenario", _update)
+
+    result = skill.chat(
+        "Repair the saved candidate.",
+        webspace_id="desktop",
+        _meta={"action_source": "api_tool_call"},
+    )
+
+    assert result["status"] == "llm_repaired"
+    assert emitted == ["Updated once."]
+
+
+def test_chat_does_not_mutate_prototype_when_automation_session_is_not_started(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     emitted: list[str] = []
     session = {"scenario_id": "builder", "artifact_root": "/dev/scenarios/builder"}
     binding = {"runtime_scenario_id": "builder", "dev_webspace_id": "desktop-dev"}
 
     monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
-    monkeypatch.setattr(skill.developer_prompt_context, "get", lambda *_args: {"workflow_state": "automation"})
+    monkeypatch.setattr(
+        skill.developer_prompt_context,
+        "get",
+        lambda *_args: {"workflow_state": "automation"},
+    )
     monkeypatch.setattr(
         skill.sdk_builder_automation,
         "get_state",
-        lambda **_kwargs: {"ok": True, "session_present": False, "automation": {"status": "idle"}},
+        lambda **_kwargs: {
+            "ok": True,
+            "session_present": False,
+            "automation": {"status": "idle"},
+        },
     )
-    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **_kwargs: emitted.append(text))
+    monkeypatch.setattr(
+        skill, "_safe_emit_chat", lambda text, **_kwargs: emitted.append(text)
+    )
     monkeypatch.setattr(
         skill,
         "update_current_scenario",
-        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("prototype route must not run")),
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("prototype route must not run")
+        ),
     )
 
     result = skill.chat("Implement the approved brief.", webspace_id="desktop")
@@ -6149,7 +10884,9 @@ def test_chat_does_not_mutate_prototype_when_automation_session_is_not_started(m
     assert "ещё не запущена" in emitted[0]
 
 
-def test_update_current_scenario_handles_layout_column_and_date_requests(monkeypatch, tmp_path) -> None:
+def test_update_current_scenario_handles_layout_column_and_date_requests(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "shopping_list"
     artifact_root.mkdir(parents=True, exist_ok=True)
@@ -6176,13 +10913,24 @@ def test_update_current_scenario_handles_layout_column_and_date_requests(monkeyp
             }
 
         def snapshot(self, webspace_id, *, preview_state=None):
-            return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
+            return {
+                "source_webspace_id": webspace_id,
+                "preview_state": preview_state or {},
+            }
 
     import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
-    monkeypatch.setattr(pending_actions, "publish_pending_action", lambda **kwargs: {"id": "pa.builder.layout"})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
+    monkeypatch.setattr(
+        pending_actions,
+        "publish_pending_action",
+        lambda **kwargs: {"id": "pa.builder.layout"},
+    )
     skill._save_session(
         "builder-layout",
         {
@@ -6195,51 +10943,104 @@ def test_update_current_scenario_handles_layout_column_and_date_requests(monkeyp
             "artifact_root": str(artifact_root),
             "datasource_id": "shopping_items",
             "fields": [
-                {"id": "item", "type": "string", "label": "\u0422\u043e\u0432\u0430\u0440", "required": True},
-                {"id": "quantity", "type": "number", "label": "\u041a\u043e\u043b-\u0432\u043e", "required": False},
-                {"id": "category", "type": "string", "label": "\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f", "required": False},
-                {"id": "done", "type": "boolean", "label": "\u041a\u0443\u043f\u043b\u0435\u043d\u043e", "required": False},
+                {
+                    "id": "item",
+                    "type": "string",
+                    "label": "\u0422\u043e\u0432\u0430\u0440",
+                    "required": True,
+                },
+                {
+                    "id": "quantity",
+                    "type": "number",
+                    "label": "\u041a\u043e\u043b-\u0432\u043e",
+                    "required": False,
+                },
+                {
+                    "id": "category",
+                    "type": "string",
+                    "label": "\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f",
+                    "required": False,
+                },
+                {
+                    "id": "done",
+                    "type": "boolean",
+                    "label": "\u041a\u0443\u043f\u043b\u0435\u043d\u043e",
+                    "required": False,
+                },
             ],
             "patches": [],
             "version": "v1",
         },
     )
 
-    moved = skill.update_current_scenario("\u041f\u0435\u0440\u0435\u043c\u0435\u0441\u0442\u0438\u043c \u043a\u043d\u043e\u043f\u043a\u0443 Add \u043d\u0430\u0434 \u0444\u043e\u0440\u043c\u043e\u0439", webspace_id="builder-layout")
+    moved = skill.update_current_scenario(
+        "\u041f\u0435\u0440\u0435\u043c\u0435\u0441\u0442\u0438\u043c \u043a\u043d\u043e\u043f\u043a\u0443 Add \u043d\u0430\u0434 \u0444\u043e\u0440\u043c\u043e\u0439",
+        webspace_id="builder-layout",
+    )
     assert moved["patch"]["operation"] == "move_form_action"
-    form = next(item for item in moved["preview_state"]["current_ui"]["children"] if item["id"] == "editor")
+    form = next(
+        item
+        for item in moved["preview_state"]["current_ui"]["children"]
+        if item["id"] == "editor"
+    )
     assert form["action_position"] == "top"
-    scenario = yaml.safe_load((artifact_root / "scenario.json").read_text(encoding="utf-8"))
+    scenario = yaml.safe_load(
+        (artifact_root / "scenario.json").read_text(encoding="utf-8")
+    )
     page_schema = scenario["ui"]["application"]["desktop"]["pageSchema"]
-    page_form = next(item for item in page_schema["widgets"] if item["id"] == "prototype-form")
+    page_form = next(
+        item for item in page_schema["widgets"] if item["id"] == "prototype-form"
+    )
     assert page_form["inputs"]["submitPlacement"] == "top"
 
-    checkbox = skill.update_current_scenario("\u0421\u0434\u0435\u043b\u0430\u0435\u043c \u043f\u0435\u0440\u0432\u043e\u0439 \u043a\u043e\u043b\u043e\u043d\u043a\u043e\u0439 \u0442\u0430\u0431\u043b\u0438\u0446\u044b \u0447\u0435\u043a\u0431\u043e\u043a\u0441 (\u043a\u0443\u043f\u043b\u0435\u043d\u043e)", webspace_id="builder-layout")
+    checkbox = skill.update_current_scenario(
+        "\u0421\u0434\u0435\u043b\u0430\u0435\u043c \u043f\u0435\u0440\u0432\u043e\u0439 \u043a\u043e\u043b\u043e\u043d\u043a\u043e\u0439 \u0442\u0430\u0431\u043b\u0438\u0446\u044b \u0447\u0435\u043a\u0431\u043e\u043a\u0441 (\u043a\u0443\u043f\u043b\u0435\u043d\u043e)",
+        webspace_id="builder-layout",
+    )
     assert checkbox["patch"]["operation"] == "set_checkbox_column"
     assert checkbox["preview_state"]["datasources"][0]["fields"][0]["id"] == "done"
-    page_schema = yaml.safe_load((artifact_root / "scenario.json").read_text(encoding="utf-8"))["ui"]["application"]["desktop"]["pageSchema"]
-    page_table = next(item for item in page_schema["widgets"] if item["id"] == "prototype-table")
-    assert page_table["inputs"]["columns"][0] == {"key": "done", "label": "\u041a\u0443\u043f\u043b\u0435\u043d\u043e", "kind": "boolean", "width": "72px"}
+    page_schema = yaml.safe_load(
+        (artifact_root / "scenario.json").read_text(encoding="utf-8")
+    )["ui"]["application"]["desktop"]["pageSchema"]
+    page_table = next(
+        item for item in page_schema["widgets"] if item["id"] == "prototype-table"
+    )
+    assert page_table["inputs"]["columns"][0] == {
+        "key": "done",
+        "label": "\u041a\u0443\u043f\u043b\u0435\u043d\u043e",
+        "kind": "boolean",
+        "width": "72px",
+    }
 
-    date_result = skill.update_current_scenario("\u0414\u043e\u0431\u0430\u0432\u044c \u0434\u0430\u043d\u043d\u044b\u0435 \u0432 \u043f\u043e\u043b\u0435 \u0434\u0430\u0442\u0430 \u0432 \u0442\u0430\u0431\u043b\u0438\u0446\u0443", webspace_id="builder-layout")
+    date_result = skill.update_current_scenario(
+        "\u0414\u043e\u0431\u0430\u0432\u044c \u0434\u0430\u043d\u043d\u044b\u0435 \u0432 \u043f\u043e\u043b\u0435 \u0434\u0430\u0442\u0430 \u0432 \u0442\u0430\u0431\u043b\u0438\u0446\u0443",
+        webspace_id="builder-layout",
+    )
     assert date_result["patch"]["operation"] == "add_field"
-    assert any(item["id"] == "date" and item["type"] == "date" for item in date_result["preview_state"]["datasources"][0]["fields"])
+    assert any(
+        item["id"] == "date" and item["type"] == "date"
+        for item in date_result["preview_state"]["datasources"][0]["fields"]
+    )
     rows = date_result["preview_state"]["mock_data"]["shopping_items"]
     assert [row["date"] for row in rows] == ["2026-07-01", "2026-07-02", "2026-07-03"]
 
     filled = skill.update_current_scenario(
-        "\u0417\u0430\u043f\u043e\u043b\u043d\u0438 \u043a\u043e\u043b\u043e\u043d\u043a\u0443 \u0434\u0430\u0442\u0430 \u043d\u0435 \u0441\u043b\u043e\u0432\u043e\u043c \"\u0434\u0430\u0442\u0430\", \u0430 \u043f\u0440\u043e\u0438\u0437\u0432\u043e\u043b\u044c\u043d\u044b\u043c\u0438 \u0437\u043d\u0430\u0447\u0435\u043d\u0438\u044f\u043c\u0438 \u0442\u0438\u043f\u0430 \u0434\u0430\u0442\u0430",
+        '\u0417\u0430\u043f\u043e\u043b\u043d\u0438 \u043a\u043e\u043b\u043e\u043d\u043a\u0443 \u0434\u0430\u0442\u0430 \u043d\u0435 \u0441\u043b\u043e\u0432\u043e\u043c "\u0434\u0430\u0442\u0430", \u0430 \u043f\u0440\u043e\u0438\u0437\u0432\u043e\u043b\u044c\u043d\u044b\u043c\u0438 \u0437\u043d\u0430\u0447\u0435\u043d\u0438\u044f\u043c\u0438 \u0442\u0438\u043f\u0430 \u0434\u0430\u0442\u0430',
         webspace_id="builder-layout",
     )
     assert filled["patch"]["operation"] == "update_mock_data"
-    assert [row["date"] for row in filled["preview_state"]["mock_data"]["shopping_items"]] == [
+    assert [
+        row["date"] for row in filled["preview_state"]["mock_data"]["shopping_items"]
+    ] == [
         "2026-07-01",
         "2026-07-02",
         "2026-07-03",
     ]
 
 
-def test_update_current_scenario_does_not_publish_pending_action_for_reversible_revision(monkeypatch, tmp_path) -> None:
+def test_update_current_scenario_does_not_publish_pending_action_for_reversible_revision(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "shopping_list"
     published: list[dict] = []
@@ -6251,7 +11052,11 @@ def test_update_current_scenario_does_not_publish_pending_action_for_reversible_
 
         def create_draft(self, **_kwargs):
             artifact_root.mkdir(parents=True, exist_ok=True)
-            return {"ok": True, "draft": {"draft_id": "draft.shopping"}, "artifact_root": str(artifact_root)}
+            return {
+                "ok": True,
+                "draft": {"draft_id": "draft.shopping"},
+                "artifact_root": str(artifact_root),
+            }
 
     import adaos.services.builder.workspace as workspace
     import adaos.sdk.data.pending_actions as pending_actions
@@ -6260,14 +11065,18 @@ def test_update_current_scenario_does_not_publish_pending_action_for_reversible_
     monkeypatch.setattr(
         pending_actions,
         "publish_pending_action",
-        lambda **kwargs: published.append(dict(kwargs)) or {"id": f"pa.builder.{len(published)}"},
+        lambda **kwargs: published.append(dict(kwargs))
+        or {"id": f"pa.builder.{len(published)}"},
     )
 
     skill.create_scenario_draft("create shopping list", webspace_id="builder-pa-patch")
     result = skill.update_current_scenario(
         "show cards",
         webspace_id="builder-pa-patch",
-        _meta={"turn_trace_id": "trace.patch.1", "conversation_id": "conv.skill.builder_skill.default.builder-pa-patch"},
+        _meta={
+            "turn_trace_id": "trace.patch.1",
+            "conversation_id": "conv.skill.builder_skill.default.builder-pa-patch",
+        },
     )
 
     assert published == []
@@ -6275,7 +11084,9 @@ def test_update_current_scenario_does_not_publish_pending_action_for_reversible_
     assert "pending_action_id" not in result["patch"]
 
 
-def test_update_current_scenario_does_not_call_pending_action_service_for_local_revision(monkeypatch, tmp_path) -> None:
+def test_update_current_scenario_does_not_call_pending_action_service_for_local_revision(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "pending_timeout"
 
@@ -6290,11 +11101,18 @@ def test_update_current_scenario_does_not_call_pending_action_service_for_local_
                 '{"id":"pending_timeout","version":"0.1.0","name":"pending_timeout","steps":[]}',
                 encoding="utf-8",
             )
-            return {"ok": True, "draft": {"draft_id": "draft.pending.timeout"}, "artifact_root": str(artifact_root)}
+            return {
+                "ok": True,
+                "draft": {"draft_id": "draft.pending.timeout"},
+                "artifact_root": str(artifact_root),
+            }
 
     class _Workbench:
         def set_active_draft(self, **kwargs):
-            return {"dev_webspace_id": "builder-pending-timeout-dev", "active_draft_id": kwargs.get("active_draft_id")}
+            return {
+                "dev_webspace_id": "builder-pending-timeout-dev",
+                "active_draft_id": kwargs.get("active_draft_id"),
+            }
 
         def snapshot(self, *args, **kwargs):
             return {"preview_state": kwargs.get("preview_state") or {}}
@@ -6308,12 +11126,20 @@ def test_update_current_scenario_does_not_call_pending_action_service_for_local_
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
     monkeypatch.setattr(skill, "PENDING_ACTION_TIMEOUT_S", 0.02)
     monkeypatch.setattr(pending_actions, "publish_pending_action", _slow_publish)
 
-    skill.create_scenario_draft("create todo list", webspace_id="builder-pending-timeout")
-    result = skill.update_current_scenario("show cards", webspace_id="builder-pending-timeout")
+    skill.create_scenario_draft(
+        "create todo list", webspace_id="builder-pending-timeout"
+    )
+    result = skill.update_current_scenario(
+        "show cards", webspace_id="builder-pending-timeout"
+    )
 
     assert result["ui_revision"]["revision"] == "002"
     assert result["pending_action"] is None
@@ -6321,7 +11147,9 @@ def test_update_current_scenario_does_not_call_pending_action_service_for_local_
     assert "\u0420\u0435\u0432\u0438\u0437\u0438\u044f UI: 002" in result["message"]
 
 
-def test_update_current_scenario_adds_product_units_and_filters(monkeypatch, tmp_path) -> None:
+def test_update_current_scenario_adds_product_units_and_filters(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "shopping_list"
     artifact_root.mkdir(parents=True)
@@ -6338,13 +11166,24 @@ def test_update_current_scenario_adds_product_units_and_filters(monkeypatch, tmp
             return dict(kwargs)
 
         def snapshot(self, webspace_id, *, preview_state=None):
-            return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
+            return {
+                "source_webspace_id": webspace_id,
+                "preview_state": preview_state or {},
+            }
 
     import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
-    monkeypatch.setattr(pending_actions, "publish_pending_action", lambda **kwargs: {"id": "pa.builder.filters"})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
+    monkeypatch.setattr(
+        pending_actions,
+        "publish_pending_action",
+        lambda **kwargs: {"id": "pa.builder.filters"},
+    )
     skill._save_session(
         "builder-filters",
         {
@@ -6357,33 +11196,71 @@ def test_update_current_scenario_adds_product_units_and_filters(monkeypatch, tmp
             "artifact_root": str(artifact_root),
             "datasource_id": "shopping_items",
             "fields": [
-                {"id": "item", "type": "string", "label": "\u0422\u043e\u0432\u0430\u0440", "required": True},
-                {"id": "quantity", "type": "number", "label": "\u041a\u043e\u043b-\u0432\u043e", "required": False},
-                {"id": "done", "type": "boolean", "label": "\u041a\u0443\u043f\u043b\u0435\u043d\u043e", "required": False},
+                {
+                    "id": "item",
+                    "type": "string",
+                    "label": "\u0422\u043e\u0432\u0430\u0440",
+                    "required": True,
+                },
+                {
+                    "id": "quantity",
+                    "type": "number",
+                    "label": "\u041a\u043e\u043b-\u0432\u043e",
+                    "required": False,
+                },
+                {
+                    "id": "done",
+                    "type": "boolean",
+                    "label": "\u041a\u0443\u043f\u043b\u0435\u043d\u043e",
+                    "required": False,
+                },
             ],
             "patches": [],
             "version": "v1",
         },
     )
 
-    unit_result = skill.update_current_scenario("\u0414\u043e\u0431\u0430\u0432\u044c \u043c\u0435\u0440\u0443 \u043f\u043e \u0442\u043e\u0432\u0430\u0440\u0430\u043c. \u0422\u0438\u043f\u0430. \u0448\u0442., \u043a\u0433, \u0433., \u043b.", webspace_id="builder-filters")
+    unit_result = skill.update_current_scenario(
+        "\u0414\u043e\u0431\u0430\u0432\u044c \u043c\u0435\u0440\u0443 \u043f\u043e \u0442\u043e\u0432\u0430\u0440\u0430\u043c. \u0422\u0438\u043f\u0430. \u0448\u0442., \u043a\u0433, \u0433., \u043b.",
+        webspace_id="builder-filters",
+    )
     assert unit_result["patch"]["operation"] == "add_field"
-    assert any(item["id"] == "unit" and item["options"] == ["\u0448\u0442", "\u043a\u0433", "\u0433", "\u043b"] for item in unit_result["preview_state"]["datasources"][0]["fields"])
+    assert any(
+        item["id"] == "unit"
+        and item["options"] == ["\u0448\u0442", "\u043a\u0433", "\u0433", "\u043b"]
+        for item in unit_result["preview_state"]["datasources"][0]["fields"]
+    )
 
-    filter_result = skill.update_current_scenario("\u0414\u043e\u0431\u0430\u0432\u044c \u043f\u043e\u043b\u0435 \u041d\u0430\u043b\u0438\u0447\u0438\u0435. \u0414\u043e\u0431\u0430\u0432\u044c \u0444\u0438\u043b\u044c\u0442\u0440 \u043f\u043e \u041a\u0443\u043f\u043b\u0435\u043d\u043e \u0438 \u041d\u0430\u043b\u0438\u0447\u0438\u0435.", webspace_id="builder-filters")
+    filter_result = skill.update_current_scenario(
+        "\u0414\u043e\u0431\u0430\u0432\u044c \u043f\u043e\u043b\u0435 \u041d\u0430\u043b\u0438\u0447\u0438\u0435. \u0414\u043e\u0431\u0430\u0432\u044c \u0444\u0438\u043b\u044c\u0442\u0440 \u043f\u043e \u041a\u0443\u043f\u043b\u0435\u043d\u043e \u0438 \u041d\u0430\u043b\u0438\u0447\u0438\u0435.",
+        webspace_id="builder-filters",
+    )
     assert filter_result["patch"]["operation"] == "multi_update"
     assert filter_result["patch"]["diff"]["not_implemented"] == []
     filters = filter_result["preview_state"]["filters"]
     assert {item["field_id"] for item in filters} == {"done", "availability"}
 
-    page_schema = yaml.safe_load((artifact_root / "scenario.json").read_text(encoding="utf-8"))["ui"]["application"]["desktop"]["pageSchema"]
+    page_schema = yaml.safe_load(
+        (artifact_root / "scenario.json").read_text(encoding="utf-8")
+    )["ui"]["application"]["desktop"]["pageSchema"]
     widget_ids = {widget["id"] for widget in page_schema["widgets"]}
-    assert {"prototype-filter-done", "prototype-filter-availability", "prototype-table"}.issubset(widget_ids)
-    table = next(widget for widget in page_schema["widgets"] if widget["id"] == "prototype-table")
-    assert {item["key"] for item in table["inputs"]["filters"]} == {"done", "availability"}
+    assert {
+        "prototype-filter-done",
+        "prototype-filter-availability",
+        "prototype-table",
+    }.issubset(widget_ids)
+    table = next(
+        widget for widget in page_schema["widgets"] if widget["id"] == "prototype-table"
+    )
+    assert {item["key"] for item in table["inputs"]["filters"]} == {
+        "done",
+        "availability",
+    }
 
 
-def test_builder_pending_action_approve_marks_patch_and_emits_chat(monkeypatch, tmp_path) -> None:
+def test_builder_pending_action_approve_marks_patch_and_emits_chat(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "shopping_list"
     artifact_root.mkdir(parents=True)
@@ -6401,13 +11278,22 @@ def test_builder_pending_action_approve_marks_patch_and_emits_chat(monkeypatch, 
             return dict(kwargs)
 
         def snapshot(self, webspace_id, *, preview_state=None):
-            return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
+            return {
+                "source_webspace_id": webspace_id,
+                "preview_state": preview_state or {},
+            }
 
     import adaos.sdk.io.out as io_out
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
-    monkeypatch.setattr(io_out, "chat_append", lambda text, **_kwargs: emitted.append(text))
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
+    monkeypatch.setattr(
+        io_out, "chat_append", lambda text, **_kwargs: emitted.append(text)
+    )
     skill._save_session(
         "builder-approve",
         {
@@ -6419,8 +11305,22 @@ def test_builder_pending_action_approve_marks_patch_and_emits_chat(monkeypatch, 
             "draft_id": "draft.shopping",
             "artifact_root": str(artifact_root),
             "datasource_id": "shopping_items",
-            "fields": [{"id": "item", "type": "string", "label": "\u0422\u043e\u0432\u0430\u0440", "required": True}],
-            "patches": [{"id": "patch_1", "operation": "add_field", "status": "applied", "pending_action_id": "pa.builder.1"}],
+            "fields": [
+                {
+                    "id": "item",
+                    "type": "string",
+                    "label": "\u0422\u043e\u0432\u0430\u0440",
+                    "required": True,
+                }
+            ],
+            "patches": [
+                {
+                    "id": "patch_1",
+                    "operation": "add_field",
+                    "status": "applied",
+                    "pending_action_id": "pa.builder.1",
+                }
+            ],
             "pending_action_id": "pa.builder.1",
             "version": "v2",
         },
@@ -6437,7 +11337,10 @@ def test_builder_pending_action_approve_marks_patch_and_emits_chat(monkeypatch, 
                     "scenario_id": "shopping_list",
                     "patch_id": "patch_1",
                 },
-                "pending_action": {"id": "pa.builder.1", "webspace_id": "builder-approve"},
+                "pending_action": {
+                    "id": "pa.builder.1",
+                    "webspace_id": "builder-approve",
+                },
                 "response": {"response_action_id": "approve"},
             }
         )
@@ -6446,10 +11349,15 @@ def test_builder_pending_action_approve_marks_patch_and_emits_chat(monkeypatch, 
     session = skill._load_session("builder-approve", "builder_session_approve")
     assert session["patches"][0]["review_status"] == "approved"
     assert "pending_action_id" not in session
-    assert any("\u0443\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u044b" in text for text in emitted)
+    assert any(
+        "\u0443\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u044b" in text
+        for text in emitted
+    )
 
 
-def test_chat_from_dev_webspace_updates_source_session_and_mirrors_response(monkeypatch, tmp_path) -> None:
+def test_chat_from_dev_webspace_updates_source_session_and_mirrors_response(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     monkeypatch.setattr(
         skill,
@@ -6490,32 +11398,60 @@ def test_chat_from_dev_webspace_updates_source_session_and_mirrors_response(monk
             }
 
         def snapshot(self, webspace_id, *, preview_state=None):
-            return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
+            return {
+                "source_webspace_id": webspace_id,
+                "preview_state": preview_state or {},
+            }
 
     import adaos.sdk.io.out as io_out
     import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
-    monkeypatch.setattr(pending_actions, "publish_pending_action", lambda **kwargs: {"id": "pa.sample"})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
+    monkeypatch.setattr(
+        pending_actions, "publish_pending_action", lambda **kwargs: {"id": "pa.sample"}
+    )
     monkeypatch.setattr(
         io_out,
         "chat_append",
-        lambda text, *, from_="hub", msg_id=None, ts=None, _meta=None: emitted.append({"text": text, "meta": dict(_meta or {})}) or {"ok": True},
+        lambda text, *, from_="hub", msg_id=None, ts=None, _meta=None: emitted.append(
+            {"text": text, "meta": dict(_meta or {})}
+        )
+        or {"ok": True},
     )
 
     def _llm_transform(**kwargs):
         preview = json.loads(json.dumps(kwargs["preview_state"]))
         preview["mock_data"] = {
             "shopping_items": [
-                {"item": "Milk", "quantity": 2, "category": "Dairy", "done": False, "price": 89.9},
-                {"item": "Bread", "quantity": 1, "category": "Bakery", "done": True, "price": 54.0},
+                {
+                    "item": "Milk",
+                    "quantity": 2,
+                    "category": "Dairy",
+                    "done": False,
+                    "price": 89.9,
+                },
+                {
+                    "item": "Bread",
+                    "quantity": 1,
+                    "category": "Bakery",
+                    "done": True,
+                    "price": 54.0,
+                },
             ]
         }
         page_schema = skill._page_schema_from_preview(preview)
         return {
             "ok": True,
-            "payload": {"schema": "adaos.webui.v1", "generated_by": "builder_skill", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}},
+            "payload": {
+                "schema": "adaos.webui.v1",
+                "generated_by": "builder_skill",
+                "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+            },
             "preview_state": preview,
             "comment": "Updated sample data.",
             "validation": {"ok": True},
@@ -6534,18 +11470,46 @@ def test_chat_from_dev_webspace_updates_source_session_and_mirrors_response(monk
             "artifact_root": str(artifact_root),
             "datasource_id": "shopping_items",
             "fields": [
-                {"id": "item", "type": "string", "label": "\u0422\u043e\u0432\u0430\u0440", "required": True},
-                {"id": "quantity", "type": "number", "label": "\u041a\u043e\u043b-\u0432\u043e", "required": False},
-                {"id": "category", "type": "string", "label": "\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f", "required": False},
-                {"id": "done", "type": "boolean", "label": "\u041a\u0443\u043f\u043b\u0435\u043d\u043e", "required": False},
-                {"id": "price", "type": "number", "label": "\u0426\u0435\u043d\u0430", "required": False},
+                {
+                    "id": "item",
+                    "type": "string",
+                    "label": "\u0422\u043e\u0432\u0430\u0440",
+                    "required": True,
+                },
+                {
+                    "id": "quantity",
+                    "type": "number",
+                    "label": "\u041a\u043e\u043b-\u0432\u043e",
+                    "required": False,
+                },
+                {
+                    "id": "category",
+                    "type": "string",
+                    "label": "\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f",
+                    "required": False,
+                },
+                {
+                    "id": "done",
+                    "type": "boolean",
+                    "label": "\u041a\u0443\u043f\u043b\u0435\u043d\u043e",
+                    "required": False,
+                },
+                {
+                    "id": "price",
+                    "type": "number",
+                    "label": "\u0426\u0435\u043d\u0430",
+                    "required": False,
+                },
             ],
             "patches": [],
             "version": "v1",
         },
     )
 
-    result = skill.chat("\u0421\u0434\u0435\u043b\u0430\u0439 \u043f\u0440\u0438\u043c\u0435\u0440 \u0434\u0430\u043d\u043d\u044b\u0445 \u043d\u0430 \u043e\u0441\u043d\u043e\u0432\u0435 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u043e\u0432 \u043f\u0438\u0442\u0430\u043d\u0438\u044f", webspace_id="desktop-dev")
+    result = skill.chat(
+        "\u0421\u0434\u0435\u043b\u0430\u0439 \u043f\u0440\u0438\u043c\u0435\u0440 \u0434\u0430\u043d\u043d\u044b\u0445 \u043d\u0430 \u043e\u0441\u043d\u043e\u0432\u0435 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u043e\u0432 \u043f\u0438\u0442\u0430\u043d\u0438\u044f",
+        webspace_id="desktop-dev",
+    )
 
     assert result["ok"] is True
     assert result["patch"]["operation"] == "llm_webui_transform"
@@ -6572,15 +11536,23 @@ def test_chat_requires_selected_builder_target(monkeypatch) -> None:
     monkeypatch.setattr(skill, "_load_session", lambda _webspace_id: None)
     monkeypatch.setattr(skill, "_safe_emit_chat", lambda *args, **kwargs: None)
 
-    result = skill.chat("\u0434\u043e\u0431\u0430\u0432\u044c \u043f\u043e\u043b\u0435 \u0446\u0435\u043d\u0430", webspace_id="desktop")
+    result = skill.chat(
+        "\u0434\u043e\u0431\u0430\u0432\u044c \u043f\u043e\u043b\u0435 \u0446\u0435\u043d\u0430",
+        webspace_id="desktop",
+    )
 
     assert result["ok"] is True
     assert result["status"] == "target_required"
     assert result["needs_selection"] is True
-    assert "target" in result["message"].lower() or "\u0432\u044b\u0431\u0435\u0440" in result["message"].lower()
+    assert (
+        "target" in result["message"].lower()
+        or "\u0432\u044b\u0431\u0435\u0440" in result["message"].lower()
+    )
 
 
-def test_chat_does_not_create_project_for_edit_like_request_without_target(monkeypatch) -> None:
+def test_chat_does_not_create_project_for_edit_like_request_without_target(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     created: list[dict] = []
 
@@ -6618,9 +11590,18 @@ def test_chat_does_not_create_project_for_edit_like_request_without_target(monke
 def test_builder_command_parser_prioritises_project_commands() -> None:
     skill = _load_module()
 
-    switch = skill._parse_builder_command("\u0421\u0442\u0440\u043e\u0438\u0442\u0435\u043b\u044c, \u043f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0441\u044c \u043d\u0430 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439 demo_scenario", has_session=True)
-    delete_field = skill._parse_builder_command("\u0443\u0434\u0430\u043b\u0438 \u043f\u043e\u043b\u0435 \u0446\u0435\u043d\u0430", has_session=True)
-    create = skill._parse_builder_command("\u0441\u043e\u0437\u0434\u0430\u0439 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u0441\u043f\u0438\u0441\u043e\u043a \u043f\u043e\u043a\u0443\u043f\u043e\u043a", has_session=True)
+    switch = skill._parse_builder_command(
+        "\u0421\u0442\u0440\u043e\u0438\u0442\u0435\u043b\u044c, \u043f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0441\u044c \u043d\u0430 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439 demo_scenario",
+        has_session=True,
+    )
+    delete_field = skill._parse_builder_command(
+        "\u0443\u0434\u0430\u043b\u0438 \u043f\u043e\u043b\u0435 \u0446\u0435\u043d\u0430",
+        has_session=True,
+    )
+    create = skill._parse_builder_command(
+        "\u0441\u043e\u0437\u0434\u0430\u0439 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u0441\u043f\u0438\u0441\u043e\u043a \u043f\u043e\u043a\u0443\u043f\u043e\u043a",
+        has_session=True,
+    )
     create_new = skill._parse_builder_command(
         "\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440, \u0441\u043e\u0437\u0434\u0430\u0439 \u043d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f \u0434\u043e\u043c\u0430\u0448\u043d\u0435\u0439 \u043a\u043d\u0438\u0433\u0438 \u0440\u0435\u0446\u0435\u043f\u0442\u043e\u0432",
         has_session=True,
@@ -6629,24 +11610,41 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
         "\u0421\u043e\u0437\u0434\u0430\u0439 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 Kanban-\u0434\u043e\u0441\u043a\u0430: \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438 \u043c\u043e\u0436\u043d\u043e \u0434\u043e\u0431\u0430\u0432\u043b\u044f\u0442\u044c \u0438 \u043f\u0435\u0440\u0435\u043c\u0435\u0449\u0430\u0442\u044c",
         has_session=False,
     )
+    create_protected_application = skill._parse_builder_command(
+        'Create a new full-screen protected system application named "Applications".',
+        has_session=True,
+    )
     edit_like_without_session = skill._parse_builder_command(
         "\u0434\u043e\u0431\u0430\u0432\u044c \u043f\u043e\u043b\u0435 \u043f\u0440\u043e\u0435\u043a\u0442 \u0438 \u0441\u043e\u0437\u0434\u0430\u0439 \u043f\u0440\u0438\u043c\u0435\u0440 \u0434\u0430\u043d\u043d\u044b\u0445",
         has_session=False,
     )
-    current = skill._parse_builder_command("What is the current project?", has_session=True)
+    current = skill._parse_builder_command(
+        "What is the current project?", has_session=True
+    )
     inspect_process = skill._parse_builder_command("Показать процесс", has_session=True)
     show_prototype = skill._parse_builder_command("Показать прототип", has_session=True)
-    show_implementation = skill._parse_builder_command("Показать реализацию", has_session=True)
-    show_publication = skill._parse_builder_command("Показать публикацию", has_session=True)
+    show_implementation = skill._parse_builder_command(
+        "Показать реализацию", has_session=True
+    )
+    show_publication = skill._parse_builder_command(
+        "Показать публикацию", has_session=True
+    )
     help_command = skill._parse_builder_command("Строитель, помощь", has_session=True)
-    preview_link = skill._parse_builder_command("Строитель, ссылка на Preview", has_session=True)
+    preview_link = skill._parse_builder_command(
+        "Строитель, ссылка на Preview", has_session=True
+    )
     show_trial = skill._parse_builder_command("show trial", has_session=True)
     design_request = skill._parse_builder_command(
         "Redesign the workspace and show the current project identity in the header.",
         has_session=True,
     )
-    delete_current = skill._parse_builder_command("\u0443\u0434\u0430\u043b\u0438 \u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u0440\u043e\u0435\u043a\u0442", has_session=True)
-    delete_named = skill._parse_builder_command("delete project demo_scenario", has_session=True)
+    delete_current = skill._parse_builder_command(
+        "\u0443\u0434\u0430\u043b\u0438 \u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u0440\u043e\u0435\u043a\u0442",
+        has_session=True,
+    )
+    delete_named = skill._parse_builder_command(
+        "delete project demo_scenario", has_session=True
+    )
     cart_delete = skill._parse_builder_command(
         "\u0422\u0435\u043a\u0443\u0449\u0430\u044f \u0432\u0435\u0440\u0441\u0438\u044f \u0441\u043b\u0438\u0448\u043a\u043e\u043c \u0443\u043f\u0440\u043e\u0449\u0435\u043d\u0430. \u0412 \u043a\u043e\u0440\u0437\u0438\u043d\u0435 \u043d\u0443\u0436\u043d\u044b \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u0435 \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u0430 \u0438 \u0443\u0434\u0430\u043b\u0435\u043d\u0438\u0435 \u043f\u043e\u0437\u0438\u0446\u0438\u0438.",
         has_session=True,
@@ -6663,6 +11661,11 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
     assert create["intent"] == "project.create"
     assert create_new["intent"] == "project.create"
     assert create_with_crud_requirements["intent"] == "project.create"
+    assert create_protected_application["intent"] == "project.create"
+    assert (
+        skill._is_application_create_request(create_protected_application["idea"])
+        is True
+    )
     assert edit_like_without_session["intent"] == "none"
     assert current["intent"] == "project.current"
     assert inspect_process["intent"] == "workflow.inspect"
@@ -6690,6 +11693,348 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
     assert delete_named["target"] == "ref"
     assert cart_delete["intent"] == "none"
     assert ui_request_with_new_project_copy["intent"] == "none"
+
+
+def test_create_application_draft_uses_exact_named_identity_and_system_protection(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    calls: list[dict] = []
+    session = {"id": "builder_session_applications", "scenario_id": "applications"}
+    monkeypatch.setattr(
+        skill,
+        "create_scenario_draft",
+        lambda **kwargs: {
+            "ok": True,
+            "session_id": session["id"],
+            "scenario_id": kwargs["scenario_id"],
+            "message": "Created.",
+            "preview_state": {
+                "scenario_id": kwargs["scenario_id"],
+                "title": "Applications",
+                "version": "001",
+                "datasources": [{"id": "applications"}],
+                "current_ui": {"large_payload": "x" * 100_000},
+            },
+            "workbench": {
+                "ok": True,
+                "binding": {
+                    "source_webspace_id": "desktop",
+                    "dev_webspace_id": "desktop-dev",
+                },
+                "projection": {"snapshot": {"large_payload": "x" * 100_000}},
+            },
+        },
+    )
+    monkeypatch.setattr(skill, "_load_session", lambda *_args, **_kwargs: session)
+    monkeypatch.setattr(skill, "_save_session", lambda *_args, **_kwargs: session)
+    monkeypatch.setattr(
+        skill.sdk_builder_applications,
+        "publisher_context",
+        lambda: {"publisher_ref": "subnet:home"},
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_applications,
+        "create_application",
+        lambda application_id, **kwargs: calls.append(
+            {"application_id": application_id, **kwargs}
+        )
+        or {"status": "succeeded", "operation_id": "appdevop.create.applications"},
+    )
+
+    result = skill.create_application_draft(
+        'Create a new full-screen protected system application named "Applications".',
+        webspace_id="desktop",
+    )
+
+    assert result["application_id"] == "applications"
+    assert result["scenario_id"] == "applications"
+    assert result["application_status"] == "succeeded"
+    assert "preview_state" not in result
+    assert result["prototype"] == {
+        "scenario_id": "applications",
+        "title": "Applications",
+        "version": "001",
+        "datasource_count": 1,
+        "locales": [],
+        "detail": "available_via_get_preview_state",
+    }
+    assert len(json.dumps(result)) < 10_000
+    assert result["application_operation"] == {
+        "operation_id": "appdevop.create.applications",
+        "status": "succeeded",
+        "detail": "full_operation_available_via_applications_read_tools",
+    }
+    assert calls[0]["application_id"] == "applications"
+    assert calls[0]["protection"] == {
+        "system_application": True,
+        "bootstrap_capable": True,
+        "active_installation_removable": False,
+        "recovery_surfaces": ["cli", "mcp"],
+    }
+    assert session["artifact_kind"] == "application"
+
+
+def test_create_application_draft_preflights_publisher_before_writing_scenario(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    monkeypatch.setattr(
+        skill.sdk_builder_applications,
+        "publisher_context",
+        lambda: (_ for _ in ()).throw(RuntimeError("release key missing")),
+    )
+    monkeypatch.setattr(
+        skill,
+        "create_scenario_draft",
+        lambda **_kwargs: pytest.fail(
+            "publisher preflight must run before scenario creation"
+        ),
+    )
+
+    result = skill.create_application_draft(
+        'Create a protected system application named "Applications".',
+        webspace_id="desktop",
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "publisher_identity_required"
+    assert result["application_status"] == "creation_blocked"
+    assert "No scenario was created" in result["message"]
+
+
+def test_resume_application_registration_reuses_recoverable_session(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    calls: list[dict] = []
+    session = {
+        "id": "builder_session_applications",
+        "artifact_kind": "application",
+        "application_id": "applications",
+        "scenario_id": "applications",
+        "source_idea": 'Create a protected system application named "Applications".',
+        "application_status": "creation_failed",
+    }
+    monkeypatch.setattr(skill, "_load_session", lambda *_args, **_kwargs: session)
+    monkeypatch.setattr(skill, "_save_session", lambda *_args, **_kwargs: session)
+    monkeypatch.setattr(
+        skill.sdk_builder_applications,
+        "publisher_context",
+        lambda: {"publisher_ref": "subnet:home"},
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_applications,
+        "create_application",
+        lambda application_id, **kwargs: calls.append(
+            {"application_id": application_id, **kwargs}
+        )
+        or {"status": "succeeded", "operation_id": "appdevop.create.applications"},
+    )
+
+    result = skill.resume_application_registration(
+        session_id=session["id"],
+        webspace_id="desktop",
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "application_registered"
+    assert calls[0]["application_id"] == "applications"
+    assert calls[0]["expected_revision"] == 0
+    assert calls[0]["protection"]["active_installation_removable"] is False
+    assert session["application_error"] is None
+
+
+def test_application_lifecycle_tools_derive_publisher_revision_and_candidate(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    calls: list[tuple[str, str, dict]] = []
+    session = {
+        "id": "builder_session_applications",
+        "artifact_kind": "application",
+        "application_id": "applications",
+        "scenario_id": "applications",
+        "ui_revision": "005",
+    }
+    model = {
+        "application": {
+            "application_id": "applications",
+            "publisher_ref": "subnet:home",
+            "revision": 7,
+        },
+        "channels": {
+            "stable": "sha256:" + ("a" * 64),
+            "prerelease": "sha256:" + ("b" * 64),
+        },
+    }
+    candidate_id = "candidate.applications.1"
+    candidate_digest = "sha256:" + ("c" * 64)
+    release_digest = "sha256:" + ("d" * 64)
+
+    monkeypatch.setattr(skill, "_load_session", lambda *_args, **_kwargs: session)
+    monkeypatch.setattr(skill, "_save_session", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        skill.sdk_applications, "get_application", lambda _app_id: copy.deepcopy(model)
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_applications,
+        "publisher_context",
+        lambda: {"publisher_ref": "subnet:home"},
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *_args, **_kwargs: {
+            "delivery": {
+                "candidate_id": candidate_id,
+                "package_digest": candidate_digest,
+            }
+        },
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_applications,
+        "list_development_operations",
+        lambda application_id: [{"application_id": application_id}],
+    )
+
+    def operation(name: str, **result):
+        return {
+            "status": "succeeded",
+            "operation_id": f"appdevop.{name}",
+            "result": result,
+        }
+
+    def record(name):
+        def invoke(application_id, *args, **kwargs):
+            calls.append((name, application_id, dict(kwargs)))
+            if name == "create_trial":
+                return operation(
+                    name,
+                    workflow={
+                        "delivery": {
+                            "candidate_id": candidate_id,
+                            "package_digest": candidate_digest,
+                        }
+                    },
+                )
+            if name == "promote_stable":
+                return operation(name, release={"release_digest": release_digest})
+            return operation(name)
+
+        return invoke
+
+    for name in (
+        "update_application_metadata",
+        "materialize_application",
+        "create_trial",
+        "decide_trial",
+        "publish_link_trial",
+        "publish_prerelease",
+        "promote_stable",
+        "publish_stable_source",
+    ):
+        monkeypatch.setattr(skill.sdk_builder_applications, name, record(name))
+
+    metadata = skill.update_application_metadata(
+        title="Applications",
+        summary="Manage installed applications and available releases.",
+        categories=["System", "Management"],
+        idempotency_key="metadata-005",
+        session_id=session["id"],
+        webspace_id="desktop",
+    )
+    materialized = skill.materialize_application(
+        idempotency_key="materialize-005",
+        session_id=session["id"],
+        webspace_id="desktop",
+    )
+    trial = skill.create_application_trial(
+        idempotency_key="trial-005",
+        session_id=session["id"],
+        webspace_id="desktop",
+    )
+    decision = skill.decide_application_trial(
+        True,
+        idempotency_key="accept-005",
+        session_id=session["id"],
+        webspace_id="desktop",
+    )
+    linked = skill.publish_application_trial(
+        "link_only",
+        idempotency_key="link-005",
+        session_id=session["id"],
+        webspace_id="desktop",
+    )
+    prerelease = skill.publish_application_trial(
+        "prerelease",
+        idempotency_key="prerelease-005",
+        session_id=session["id"],
+        webspace_id="desktop",
+    )
+    stable = skill.promote_application_stable(
+        idempotency_key="stable-005",
+        session_id=session["id"],
+        webspace_id="desktop",
+    )
+    source = skill.publish_application_stable_source(
+        idempotency_key="stable-source-005",
+        release_notes="First Applications release.",
+        session_id=session["id"],
+        webspace_id="desktop",
+    )
+    state = skill.get_application_development_state(
+        session_id=session["id"],
+        webspace_id="desktop",
+    )
+
+    assert all(
+        item["ok"]
+        for item in (
+            metadata,
+            materialized,
+            trial,
+            decision,
+            linked,
+            prerelease,
+            stable,
+            source,
+            state,
+        )
+    )
+    assert trial["candidate_id"] == candidate_id
+    assert session["application_candidate_id"] == candidate_id
+    assert stable["release_digest"] == release_digest
+    assert source["release_digest"] == release_digest
+    assert state["application_revision"] == 7
+    assert calls[0][2] == {
+        "title": "Applications",
+        "summary": "Manage installed applications and available releases.",
+        "categories": ("System", "Management"),
+        "actor_ref": "builder.lifecycle",
+        "subnet_ref": "subnet:home",
+        "capability": "applications.develop",
+        "expected_revision": 7,
+        "idempotency_key": "metadata-005",
+    }
+    assert calls[1][2] == {
+        "revision": "005",
+        "source_webspace_id": "desktop",
+        "actor_ref": "builder.lifecycle",
+        "subnet_ref": "subnet:home",
+        "capability": "applications.develop",
+        "expected_revision": 7,
+        "idempotency_key": "materialize-005",
+    }
+    prerelease_call = next(item for item in calls if item[0] == "publish_prerelease")
+    assert (
+        prerelease_call[2]["expected_prerelease_digest"]
+        == model["channels"]["prerelease"]
+    )
+    stable_call = next(item for item in calls if item[0] == "promote_stable")
+    assert stable_call[2]["expected_stable_digest"] == model["channels"]["stable"]
+    assert all(item[2]["expected_revision"] == 7 for item in calls)
+    assert all(item[2]["subnet_ref"] == "subnet:home" for item in calls)
 
 
 def test_builder_command_parser_does_not_capture_ui_copy_about_project_lists() -> None:
@@ -6752,7 +12097,14 @@ def test_chat_handles_builder_project_commands(monkeypatch, tmp_path) -> None:
         def get_workspace_binding(self, webspace_id):
             return dict(binding)
 
-        def set_active_draft(self, *, source_webspace_id=None, active_draft_id=None, runtime_scenario_id=None, persist_projection=True):
+        def set_active_draft(
+            self,
+            *,
+            source_webspace_id=None,
+            active_draft_id=None,
+            runtime_scenario_id=None,
+            persist_projection=True,
+        ):
             binding.update(
                 {
                     "source_webspace_id": source_webspace_id,
@@ -6771,27 +12123,68 @@ def test_chat_handles_builder_project_commands(monkeypatch, tmp_path) -> None:
             )
             return dict(binding)
 
+        def set_selected_project(
+            self,
+            *,
+            source_webspace_id=None,
+            object_type=None,
+            object_id=None,
+            title=None,
+            description=None,
+            persist_projection=True,
+        ):
+            binding["selection"] = {
+                "object_type": object_type,
+                "object_id": object_id,
+                "title": title,
+                "description": description,
+            }
+            calls.append(
+                {
+                    "method": "set_selected_project",
+                    "source_webspace_id": source_webspace_id,
+                    "object_type": object_type,
+                    "object_id": object_id,
+                    "persist_projection": persist_projection,
+                }
+            )
+            return dict(binding)
+
         def snapshot(self, webspace_id, *, preview_state=None):
             calls.append({"method": "snapshot", "webspace_id": webspace_id})
-            return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
+            return {
+                "source_webspace_id": webspace_id,
+                "preview_state": preview_state or {},
+            }
 
     import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
     monkeypatch.setattr(skill.developer_projects, "list_projects", lambda **kwargs: [])
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
-    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}))
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}),
+    )
     monkeypatch.setattr(
         pending_actions,
         "publish_pending_action",
-        lambda **kwargs: published.append(dict(kwargs)) or {"id": f"pa.builder.{len(published)}", "kind": kwargs["kind"]},
+        lambda **kwargs: published.append(dict(kwargs))
+        or {"id": f"pa.builder.{len(published)}", "kind": kwargs["kind"]},
     )
 
     base_session = {
         "webspace_id": "desktop",
         "status": "drafting",
         "datasource_id": "items",
-        "fields": [{"id": "title", "type": "string", "label": "Title", "required": True}],
+        "fields": [
+            {"id": "title", "type": "string", "label": "Title", "required": True}
+        ],
         "patches": [],
         "version": "v1",
         "artifact_root": str(tmp_path),
@@ -6819,26 +12212,54 @@ def test_chat_handles_builder_project_commands(monkeypatch, tmp_path) -> None:
         },
     )
 
-    listed = skill.chat("\u043f\u043e\u043a\u0430\u0436\u0438 \u043f\u0440\u043e\u0435\u043a\u0442\u044b", webspace_id="desktop")
-    current = skill.chat("\u0447\u0442\u043e \u0432\u044b\u0431\u0440\u0430\u043d\u043e", webspace_id="desktop")
-    switched = skill.chat("\u043f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0441\u044c \u043d\u0430 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439 alpha_scenario", webspace_id="desktop")
-    delete = skill.chat("\u0443\u0434\u0430\u043b\u0438 \u0442\u0435\u043a\u0443\u0449\u0438\u0439", webspace_id="desktop")
+    listed = skill.chat(
+        "\u043f\u043e\u043a\u0430\u0436\u0438 \u043f\u0440\u043e\u0435\u043a\u0442\u044b",
+        webspace_id="desktop",
+    )
+    current = skill.chat(
+        "\u0447\u0442\u043e \u0432\u044b\u0431\u0440\u0430\u043d\u043e",
+        webspace_id="desktop",
+    )
+    switched = skill.chat(
+        "\u043f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0441\u044c \u043d\u0430 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439 alpha_scenario",
+        webspace_id="desktop",
+    )
+    delete = skill.chat(
+        "\u0443\u0434\u0430\u043b\u0438 \u0442\u0435\u043a\u0443\u0449\u0438\u0439",
+        webspace_id="desktop",
+    )
 
     assert listed["status"] == "project_list"
-    assert {item["scenario_id"] for item in listed["items"]} == {"alpha_scenario", "beta_scenario"}
+    assert {item["scenario_id"] for item in listed["items"]} == {
+        "alpha_scenario",
+        "beta_scenario",
+    }
     assert current["status"] == "project_current"
     assert current["scenario_id"] == "beta_scenario"
     assert switched["status"] == "project_switched"
     assert switched["scenario_id"] == "alpha_scenario"
     assert binding["active_draft_id"] == "draft.alpha"
     assert binding["runtime_scenario_id"] == "alpha_scenario"
+    assert binding["selection"]["object_type"] == "scenario"
+    assert binding["selection"]["object_id"] == "alpha_scenario"
     assert delete["status"] == "delete_review_required"
     assert delete["pending_action"]["id"] == "pa.builder.1"
     assert published[0]["kind"] == "builder.scenario_delete.review"
     assert published[0]["domain_ref"]["operation"] == "delete_draft"
     assert published[0]["domain_ref"]["draft_id"] == "draft.alpha"
-    assert emitted[-1]["kwargs"]["topic_ref"]["thread_id"] == delete["topic"]["thread_id"]
-    assert any(item["method"] == "set_active_draft" and item["active_draft_id"] == "draft.alpha" for item in calls)
+    assert (
+        emitted[-1]["kwargs"]["topic_ref"]["thread_id"] == delete["topic"]["thread_id"]
+    )
+    assert any(
+        item["method"] == "set_active_draft"
+        and item["active_draft_id"] == "draft.alpha"
+        for item in calls
+    )
+    assert any(
+        item["method"] == "set_selected_project"
+        and item["object_id"] == "alpha_scenario"
+        for item in calls
+    )
 
 
 def test_current_project_presents_contextual_workflow_controls(monkeypatch) -> None:
@@ -6852,13 +12273,19 @@ def test_current_project_presents_contextual_workflow_controls(monkeypatch) -> N
         "title": "Builder",
     }
     binding = {"runtime_scenario_id": "builder", "active_draft_id": "draft.builder"}
-    topic = {"thread_id": "prompt-project:scenario:builder", "topic_id": "prompt-project:scenario:builder"}
+    topic = {
+        "thread_id": "prompt-project:scenario:builder",
+        "topic_id": "prompt-project:scenario:builder",
+    }
 
-    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append(text))
+    monkeypatch.setattr(
+        skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append(text)
+    )
     monkeypatch.setattr(
         skill,
         "_present_project_workflow_interaction",
-        lambda **kwargs: presented.append(dict(kwargs)) or {
+        lambda **kwargs: presented.append(dict(kwargs))
+        or {
             "handle": {"interaction_id": "interaction.builder.current"},
             "presentation": {
                 "mode": "buttons",
@@ -6893,18 +12320,31 @@ def test_current_project_presents_contextual_workflow_controls(monkeypatch) -> N
     assert emitted == []
 
 
-def test_project_list_has_one_explicit_dialog_current_and_selection_buttons(monkeypatch) -> None:
+def test_project_list_has_one_explicit_dialog_current_and_selection_buttons(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     captured: dict = {}
     items = [
-        {"session_id": "shared", "scenario_id": "test04_recipes", "title": "Список покупок"},
-        {"session_id": "shared", "scenario_id": "test05_recipes", "title": "Home Recipe Book"},
+        {
+            "session_id": "shared",
+            "scenario_id": "test04_recipes",
+            "title": "Список покупок",
+        },
+        {
+            "session_id": "shared",
+            "scenario_id": "test05_recipes",
+            "title": "Home Recipe Book",
+        },
     ]
 
     def _request(specification, **kwargs):
         captured["specification"] = dict(specification)
         captured["kwargs"] = dict(kwargs)
-        return {"handle": {"interaction_id": "interaction.projects"}, "presentation": {"mode": "buttons"}}
+        return {
+            "handle": {"interaction_id": "interaction.projects"},
+            "presentation": {"mode": "buttons"},
+        }
 
     monkeypatch.setattr(skill.sdk_chat, "request", _request)
     message = skill._format_project_list(items, "test04_recipes")
@@ -6912,7 +12352,11 @@ def test_project_list_has_one_explicit_dialog_current_and_selection_buttons(monk
         webspace_id="dev1",
         items=items,
         prompt=message,
-        session={"id": "shared", "scenario_id": "test04_recipes", "title": "Список покупок"},
+        session={
+            "id": "shared",
+            "scenario_id": "test04_recipes",
+            "title": "Список покупок",
+        },
         binding={"runtime_scenario_id": "test04_recipes"},
         topic={"thread_id": "prompt-project:scenario:test04_recipes"},
         _meta={"io_type": "telegram", "route_id": "telegram", "chat_id": "42"},
@@ -6922,7 +12366,9 @@ def test_project_list_has_one_explicit_dialog_current_and_selection_buttons(monk
     assert message.count("· рабочий проект") == 1
     assert "id: test04_recipes · рабочий проект" in message
     assert "id: test05_recipes · доступен в DEV" in message
-    assert [item["target_ref"]["id"] for item in captured["specification"]["actions"]] == [
+    assert [
+        item["target_ref"]["id"] for item in captured["specification"]["actions"]
+    ] == [
         "test04_recipes",
         "test05_recipes",
     ]
@@ -6942,12 +12388,18 @@ def test_telegram_webspace_context_reports_selected_builder_host() -> None:
     fallback = skill._webspace_context(
         "default",
         binding,
-        {"io_type": "telegram", "transport_route": {"via": "session", "alias": "hub-8"}},
+        {
+            "io_type": "telegram",
+            "transport_route": {"via": "session", "alias": "hub-8"},
+        },
     )
     explicit = skill._webspace_context(
         "dev1",
         {"preview_webspace_id": "dev1-dev"},
-        {"io_type": "telegram", "transport_route": {"via": "session", "webspace_id": "dev1"}},
+        {
+            "io_type": "telegram",
+            "transport_route": {"via": "session", "webspace_id": "dev1"},
+        },
     )
 
     assert fallback == {
@@ -6981,8 +12433,12 @@ def test_help_and_preview_link_never_route_to_automation(monkeypatch) -> None:
     session = {"id": "session.recipes", "scenario_id": "recipes", "title": "Recipes"}
     binding = {"runtime_scenario_id": "recipes", "dev_webspace_id": "dev1-dev"}
     emitted: list[dict] = []
-    monkeypatch.setattr(skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(skill, "_target_session", lambda _ws: (dict(session), dict(binding)))
+    monkeypatch.setattr(
+        skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        skill, "_target_session", lambda _ws: (dict(session), dict(binding))
+    )
     monkeypatch.setattr(
         skill,
         "_builder_topic_ref",
@@ -6991,7 +12447,10 @@ def test_help_and_preview_link_never_route_to_automation(monkeypatch) -> None:
     monkeypatch.setattr(
         skill,
         "_present_project_workflow_interaction",
-        lambda **_kwargs: {"handle": {"interaction_id": "interaction.help"}, "presentation": {"mode": "buttons"}},
+        lambda **_kwargs: {
+            "handle": {"interaction_id": "interaction.help"},
+            "presentation": {"mode": "buttons"},
+        },
     )
     monkeypatch.setattr(
         skill,
@@ -7012,7 +12471,9 @@ def test_help_and_preview_link_never_route_to_automation(monkeypatch) -> None:
     monkeypatch.setattr(
         skill,
         "_route_automation_chat",
-        lambda **_kwargs: pytest.fail("read-only Builder command must not route to Automation"),
+        lambda **_kwargs: pytest.fail(
+            "read-only Builder command must not route to Automation"
+        ),
     )
 
     help_result = skill.chat("Строитель, помощь", webspace_id="dev1")
@@ -7036,8 +12497,12 @@ def test_workflow_text_commands_bypass_automation_and_llm_routing(monkeypatch) -
     binding = {"runtime_scenario_id": "recipes", "active_draft_id": "draft.recipes"}
     captured: list[dict] = []
 
-    monkeypatch.setattr(skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(skill, "_target_session", lambda _ws: (dict(session), dict(binding)))
+    monkeypatch.setattr(
+        skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        skill, "_target_session", lambda _ws: (dict(session), dict(binding))
+    )
     monkeypatch.setattr(
         skill,
         "_builder_topic_ref",
@@ -7074,7 +12539,9 @@ def test_workflow_text_commands_bypass_automation_and_llm_routing(monkeypatch) -
 def test_workflow_inspection_uses_localized_process_projection(monkeypatch) -> None:
     skill = _load_module()
     calls: list[tuple[str, str | None]] = []
-    monkeypatch.setattr(skill, "_session_summary", lambda _session: {"scenario_id": "recipes"})
+    monkeypatch.setattr(
+        skill, "_session_summary", lambda _session: {"scenario_id": "recipes"}
+    )
     monkeypatch.setattr(
         skill.sdk_builder_workflow,
         "get_interaction_frame",
@@ -7090,7 +12557,10 @@ def test_workflow_inspection_uses_localized_process_projection(monkeypatch) -> N
     monkeypatch.setattr(
         skill,
         "_present_project_workflow_interaction",
-        lambda **_kwargs: {"handle": {"interaction_id": "interaction.process"}, "presentation": {}},
+        lambda **_kwargs: {
+            "handle": {"interaction_id": "interaction.process"},
+            "presentation": {},
+        },
     )
     monkeypatch.setattr(skill, "_builder_command_response", lambda **kwargs: kwargs)
 
@@ -7108,10 +12578,14 @@ def test_workflow_inspection_uses_localized_process_projection(monkeypatch) -> N
     assert result["extra"]["process_explanation"]["text"].startswith("Проект: Recipes")
 
 
-def test_current_project_router_fallback_is_materialized_once_by_router(monkeypatch) -> None:
+def test_current_project_router_fallback_is_materialized_once_by_router(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     emitted: list[str] = []
-    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append(text))
+    monkeypatch.setattr(
+        skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append(text)
+    )
     monkeypatch.setattr(
         skill,
         "_present_project_workflow_interaction",
@@ -7166,9 +12640,12 @@ def test_builder_topic_keeps_matching_project_thread_stable() -> None:
     assert preserved["thread_id"] == "prompt-project:scenario:recipes"
 
 
-def test_project_workflow_interaction_uses_shared_localized_registry(monkeypatch) -> None:
+def test_project_workflow_interaction_uses_shared_localized_registry(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     captured: dict = {}
+
     def _create(*args, **kwargs):
         captured["create_args"] = args
         captured["create_kwargs"] = dict(kwargs)
@@ -7181,9 +12658,14 @@ def test_project_workflow_interaction_uses_shared_localized_registry(monkeypatch
     def _present(interaction, **kwargs):
         captured["interaction"] = dict(interaction)
         captured["kwargs"] = dict(kwargs)
-        return {"handle": {"interaction_id": "interaction.builder"}, "presentation": {"mode": "buttons"}}
+        return {
+            "handle": {"interaction_id": "interaction.builder"},
+            "presentation": {"mode": "buttons"},
+        }
 
-    monkeypatch.setattr(skill.sdk_builder_workflow, "create_conversation_interaction", _create)
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow, "create_conversation_interaction", _create
+    )
     monkeypatch.setattr(skill.sdk_chat, "present", _present)
 
     result = skill._present_project_workflow_interaction(
@@ -7194,19 +12676,28 @@ def test_project_workflow_interaction_uses_shared_localized_registry(monkeypatch
         session={"id": "session.builder", "scenario_id": "builder", "title": "Builder"},
         binding={"runtime_scenario_id": "builder"},
         topic={"thread_id": "prompt-project:scenario:builder"},
-        _meta={"io_type": "telegram", "route_id": "telegram", "chat_id": "42", "bot_id": "main-bot"},
+        _meta={
+            "io_type": "telegram",
+            "route_id": "telegram",
+            "chat_id": "42",
+            "bot_id": "main-bot",
+        },
     )
 
     assert result["presentation"]["mode"] == "buttons"
     assert captured["create_args"] == ("scenario", "builder")
     assert captured["create_kwargs"]["locale"] == "ru"
-    assert captured["create_kwargs"]["command_context_id"] == "prompt-project:scenario:builder"
+    assert (
+        captured["create_kwargs"]["command_context_id"]
+        == "prompt-project:scenario:builder"
+    )
     assert captured["kwargs"]["route_id"] == "telegram"
 
 
 def test_project_workflow_interaction_returns_to_exact_dev_surface(monkeypatch) -> None:
     skill = _load_module()
     captured: dict = {}
+
     def _create(*args, **kwargs):
         captured["create_args"] = args
         captured["create_kwargs"] = dict(kwargs)
@@ -7224,7 +12715,9 @@ def test_project_workflow_interaction_returns_to_exact_dev_surface(monkeypatch) 
             "presentation": {"mode": "buttons", "actions": []},
         }
 
-    monkeypatch.setattr(skill.sdk_builder_workflow, "create_conversation_interaction", _create)
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow, "create_conversation_interaction", _create
+    )
     monkeypatch.setattr(skill.sdk_chat, "present", _present)
 
     skill._present_project_workflow_interaction(
@@ -7249,17 +12742,25 @@ def test_project_workflow_interaction_returns_to_exact_dev_surface(monkeypatch) 
     assert captured["create_kwargs"]["metadata"]["reply_webspace_id"] == "dev1-dev"
 
 
-def test_conversation_interaction_response_returns_builder_prompt_to_origin_channel(monkeypatch) -> None:
+def test_conversation_interaction_response_returns_builder_prompt_to_origin_channel(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     presented: list[dict] = []
     session = {"id": "session.builder", "scenario_id": "builder", "title": "Builder"}
-    monkeypatch.setattr(skill, "_source_webspace_id", lambda webspace_id, _meta=None: webspace_id)
+    monkeypatch.setattr(
+        skill, "_source_webspace_id", lambda webspace_id, _meta=None: webspace_id
+    )
     monkeypatch.setattr(
         skill,
         "_resolve_project_session",
         lambda *_args, **_kwargs: {"status": "found", "session": dict(session)},
     )
-    monkeypatch.setattr(skill, "_workbench_binding", lambda _webspace_id: {"runtime_scenario_id": "builder"})
+    monkeypatch.setattr(
+        skill,
+        "_workbench_binding",
+        lambda _webspace_id: {"runtime_scenario_id": "builder"},
+    )
     monkeypatch.setattr(
         skill,
         "_builder_topic_ref",
@@ -7273,27 +12774,27 @@ def test_conversation_interaction_response_returns_builder_prompt_to_origin_chan
 
     result = skill.handle_interaction_response(
         event={
-                    "interaction": {
-                        "interaction_id": "interaction.builder",
-                        "metadata": {
-                            "domain": "builder",
-                            "project_ref": "scenario:builder",
-                            "source_webspace_id": "dev1-dev",
-                            "topic_ref": {"thread_id": "prompt-project:scenario:builder"},
-                        },
-                    },
-                    "response": {
-                        "response_id": "response.builder.plan",
-                        "consumed_command": {"command": "builder.change.plan"},
-                        "metadata": {
-                            "io_type": "telegram",
-                            "route_id": "telegram",
-                            "bot_id": "main-bot",
-                            "chat_id": "42",
-                        },
-                    },
-                    "duplicate": False,
+            "interaction": {
+                "interaction_id": "interaction.builder",
+                "metadata": {
+                    "domain": "builder",
+                    "project_ref": "scenario:builder",
+                    "source_webspace_id": "dev1-dev",
+                    "topic_ref": {"thread_id": "prompt-project:scenario:builder"},
                 },
+            },
+            "response": {
+                "response_id": "response.builder.plan",
+                "consumed_command": {"command": "builder.change.plan"},
+                "metadata": {
+                    "io_type": "telegram",
+                    "route_id": "telegram",
+                    "bot_id": "main-bot",
+                    "chat_id": "42",
+                },
+            },
+            "duplicate": False,
+        },
         webspace_id="dev1-dev",
     )
 
@@ -7308,7 +12809,9 @@ def test_trial_preview_interaction_selects_exact_candidate(monkeypatch) -> None:
     skill = _load_module()
     selected: list[dict] = []
     presented: list[dict] = []
-    monkeypatch.setattr(skill, "_source_webspace_id", lambda webspace_id, _meta=None: webspace_id)
+    monkeypatch.setattr(
+        skill, "_source_webspace_id", lambda webspace_id, _meta=None: webspace_id
+    )
     monkeypatch.setattr(
         skill,
         "_resolve_project_session",
@@ -7368,7 +12871,9 @@ def test_trial_preview_interaction_selects_exact_candidate(monkeypatch) -> None:
     assert "trial:recipes:candidate.recipes" in presented[0]["prompt"]
 
 
-def test_interaction_delivery_metadata_does_not_mutate_durable_response(monkeypatch) -> None:
+def test_interaction_delivery_metadata_does_not_mutate_durable_response(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     captured: list[dict] = []
     emitted: list[dict] = []
@@ -7382,7 +12887,9 @@ def test_interaction_delivery_metadata_does_not_mutate_durable_response(monkeypa
             "chat_id": "42",
         },
     }
-    monkeypatch.setattr(skill, "_source_webspace_id", lambda webspace_id, _meta=None: webspace_id)
+    monkeypatch.setattr(
+        skill, "_source_webspace_id", lambda webspace_id, _meta=None: webspace_id
+    )
     monkeypatch.setattr(
         skill,
         "_resolve_project_session",
@@ -7391,7 +12898,9 @@ def test_interaction_delivery_metadata_does_not_mutate_durable_response(monkeypa
             "session": {"id": "session.lab", "scenario_id": "lab", "title": "Lab"},
         },
     )
-    monkeypatch.setattr(skill, "_workbench_binding", lambda _webspace_id: {"runtime_scenario_id": "lab"})
+    monkeypatch.setattr(
+        skill, "_workbench_binding", lambda _webspace_id: {"runtime_scenario_id": "lab"}
+    )
     monkeypatch.setattr(
         skill,
         "_builder_topic_ref",
@@ -7439,20 +12948,31 @@ def test_interaction_delivery_metadata_does_not_mutate_durable_response(monkeypa
     assert emitted[0]["kwargs"]["_meta"]["delivery_attempt"] == 2
 
 
-def test_telegram_user_turn_is_projected_into_builder_project_conversation(monkeypatch) -> None:
+def test_telegram_user_turn_is_projected_into_builder_project_conversation(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     emitted: list[dict] = []
     session = {"id": "session.lab", "scenario_id": "lab", "title": "Lab"}
     binding = {"runtime_scenario_id": "lab", "dev_webspace_id": "dev1-dev"}
-    topic = {"thread_id": "prompt-project:scenario:lab", "topic_id": "prompt-project:scenario:lab"}
+    topic = {
+        "thread_id": "prompt-project:scenario:lab",
+        "topic_id": "prompt-project:scenario:lab",
+    }
     monkeypatch.setattr(
         skill,
         "_resolve_builder_context_for_turn",
         lambda *_args, **_kwargs: {"builder_webspace_id": "dev1"},
     )
-    monkeypatch.setattr(skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(skill, "_target_session", lambda _webspace_id: (dict(session), dict(binding)))
-    monkeypatch.setattr(skill, "_builder_topic_ref", lambda *_args, **_kwargs: dict(topic))
+    monkeypatch.setattr(
+        skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        skill, "_target_session", lambda _webspace_id: (dict(session), dict(binding))
+    )
+    monkeypatch.setattr(
+        skill, "_builder_topic_ref", lambda *_args, **_kwargs: dict(topic)
+    )
     monkeypatch.setattr(
         skill,
         "_parse_builder_command",
@@ -7483,7 +13003,9 @@ def test_telegram_user_turn_is_projected_into_builder_project_conversation(monke
     assert [item["kwargs"]["from_"] for item in emitted] == ["user", "user"]
     assert emitted[0]["text"] == "Строитель, что выбрано?"
     assert emitted[0]["kwargs"]["webspace_id"] == "dev1"
-    assert emitted[0]["kwargs"]["topic_ref"]["thread_id"] == "prompt-project:scenario:lab"
+    assert (
+        emitted[0]["kwargs"]["topic_ref"]["thread_id"] == "prompt-project:scenario:lab"
+    )
     assert emitted[1]["kwargs"]["_meta"]["message_id"] == first_message_id
 
 
@@ -7492,17 +13014,40 @@ def test_text_continuation_resumes_once_for_the_bound_project(monkeypatch) -> No
     updates: list[dict] = []
     emitted: list[dict] = []
     session = {"id": "session.builder", "scenario_id": "builder", "title": "Builder"}
-    monkeypatch.setattr(skill, "_source_webspace_id", lambda webspace_id, _meta=None: webspace_id)
-    monkeypatch.setattr(skill, "_resolve_project_session", lambda *_args, **_kwargs: {"status": "found", "session": dict(session)})
-    monkeypatch.setattr(skill, "_workbench_binding", lambda _webspace_id: {"runtime_scenario_id": "builder"})
-    monkeypatch.setattr(skill, "_builder_topic_ref", lambda *_args, **_kwargs: {"thread_id": "prompt-project:scenario:builder"})
-    monkeypatch.setattr(skill.sdk_builder_workflow, "get_state", lambda *_args, **_kwargs: {"generation": 7})
+    monkeypatch.setattr(
+        skill, "_source_webspace_id", lambda webspace_id, _meta=None: webspace_id
+    )
+    monkeypatch.setattr(
+        skill,
+        "_resolve_project_session",
+        lambda *_args, **_kwargs: {"status": "found", "session": dict(session)},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_workbench_binding",
+        lambda _webspace_id: {"runtime_scenario_id": "builder"},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_builder_topic_ref",
+        lambda *_args, **_kwargs: {"thread_id": "prompt-project:scenario:builder"},
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *_args, **_kwargs: {"generation": 7},
+    )
     monkeypatch.setattr(
         skill,
         "update_current_scenario",
-        lambda **kwargs: updates.append(dict(kwargs)) or {"ok": True, "message": "accepted"},
+        lambda **kwargs: updates.append(dict(kwargs))
+        or {"ok": True, "message": "accepted"},
     )
-    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append({"text": text, "kwargs": dict(kwargs)}))
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": dict(kwargs)}),
+    )
 
     result = skill.handle_interaction_response(
         event={
@@ -7533,17 +13078,23 @@ def test_text_continuation_resumes_once_for_the_bound_project(monkeypatch) -> No
     assert result["status"] == "handled"
     assert len(updates) == 1
     assert updates[0]["instruction"] == "Move the controls to the left."
-    assert updates[0]["conversation_context"]["continuation_command"] == "builder.change.plan"
+    assert (
+        updates[0]["conversation_context"]["continuation_command"]
+        == "builder.change.plan"
+    )
     assert emitted[0]["text"] == "accepted"
 
 
-def test_project_selection_interaction_switches_by_stable_target_id(monkeypatch) -> None:
+def test_project_selection_interaction_switches_by_stable_target_id(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     switched: list[dict] = []
     monkeypatch.setattr(
         skill,
         "_handle_project_switch_command",
-        lambda **kwargs: switched.append(dict(kwargs)) or {"ok": True, "status": "project_switched"},
+        lambda **kwargs: switched.append(dict(kwargs))
+        or {"ok": True, "status": "project_switched"},
     )
 
     result = skill.handle_interaction_response(
@@ -7580,7 +13131,9 @@ def test_project_selection_interaction_switches_by_stable_target_id(monkeypatch)
     assert switched[0]["_meta"]["route_id"] == "telegram"
 
 
-def test_limited_channel_can_select_existing_dev_scenario_without_local_session(monkeypatch, tmp_path) -> None:
+def test_limited_channel_can_select_existing_dev_scenario_without_local_session(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     emitted: list[dict] = []
     binding = {
@@ -7618,17 +13171,23 @@ def test_limited_channel_can_select_existing_dev_scenario_without_local_session(
             }
         ],
     )
-    monkeypatch.setattr(skill.developer_projects, "find_scenario_root", lambda project_id: tmp_path)
+    monkeypatch.setattr(
+        skill.developer_projects, "find_scenario_root", lambda project_id: tmp_path
+    )
 
     monkeypatch.setattr(
         skill,
         "_ensure_workbench",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("limited channel must not materialize Preview")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("limited channel must not materialize Preview")
+        ),
     )
     monkeypatch.setattr(
         skill,
         "_publish_prompt_project_selection",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("limited channel must not publish Preview selection")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("limited channel must not publish Preview selection")
+        ),
     )
     monkeypatch.setattr(
         skill,
@@ -7652,7 +13211,9 @@ def test_limited_channel_can_select_existing_dev_scenario_without_local_session(
     assert emitted[-1]["kwargs"]["_meta"]["io_type"] == "telegram"
 
 
-def test_telegram_requires_explicit_builder_context_before_project_focus(monkeypatch) -> None:
+def test_telegram_requires_explicit_builder_context_before_project_focus(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     captured: dict = {}
     contexts = [
@@ -7678,19 +13239,28 @@ def test_telegram_requires_explicit_builder_context_before_project_focus(monkeyp
         },
     ]
     monkeypatch.setattr(skill, "_builder_context_candidates", lambda: list(contexts))
-    monkeypatch.setattr(skill, "_resolve_builder_context_for_turn", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        skill, "_resolve_builder_context_for_turn", lambda *_args, **_kwargs: None
+    )
 
     def _request(specification, **kwargs):
         captured["specification"] = specification
         captured["kwargs"] = kwargs
-        return {"handle": {"interaction_id": "interaction.builder.context"}, "presentation": {"mode": "buttons"}}
+        return {
+            "handle": {"interaction_id": "interaction.builder.context"},
+            "presentation": {"mode": "buttons"},
+        }
 
     monkeypatch.setattr(skill.sdk_chat, "request", _request)
 
     result = skill.chat(
         "Строитель, покажи проекты",
         webspace_id="default",
-        _meta={"io_type": "telegram", "chat_id": "42", "conversation_id": "conv.telegram.42"},
+        _meta={
+            "io_type": "telegram",
+            "chat_id": "42",
+            "conversation_id": "conv.telegram.42",
+        },
     )
 
     assert result["status"] == "builder_context_required"
@@ -7698,12 +13268,20 @@ def test_telegram_requires_explicit_builder_context_before_project_focus(monkeyp
         "builder.context.select",
         "builder.context.select",
     ]
-    assert [item["value"] for item in captured["specification"]["actions"]] == ["dev1", "dev1-dev"]
+    assert [item["value"] for item in captured["specification"]["actions"]] == [
+        "dev1",
+        "dev1-dev",
+    ]
     assert captured["kwargs"]["webspace_id"] == "default"
-    assert captured["specification"]["metadata"]["builder_context_scope"] == "telegram:chat:42:thread:-"
+    assert (
+        captured["specification"]["metadata"]["builder_context_scope"]
+        == "telegram:chat:42:thread:-"
+    )
 
 
-def test_builder_context_discovery_failure_is_not_reported_as_no_builder(monkeypatch) -> None:
+def test_builder_context_discovery_failure_is_not_reported_as_no_builder(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     emitted: list[str] = []
 
@@ -7711,7 +13289,9 @@ def test_builder_context_discovery_failure_is_not_reported_as_no_builder(monkeyp
         raise AttributeError("list_builder_hosts")
 
     monkeypatch.setattr(skill.builder_preview, "list_builder_hosts", _fail_discovery)
-    monkeypatch.setattr(skill, "_resolve_builder_context_for_turn", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        skill, "_resolve_builder_context_for_turn", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(
         skill,
         "_safe_emit_chat",
@@ -7736,7 +13316,9 @@ def test_builder_context_empty_inventory_is_reported_as_not_found(monkeypatch) -
     skill = _load_module()
     emitted: list[str] = []
     monkeypatch.setattr(skill, "_builder_context_candidates", lambda: [])
-    monkeypatch.setattr(skill, "_resolve_builder_context_for_turn", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        skill, "_resolve_builder_context_for_turn", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(
         skill,
         "_safe_emit_chat",
@@ -7756,7 +13338,9 @@ def test_builder_context_empty_inventory_is_reported_as_not_found(monkeypatch) -
     assert emitted == [result["message"]]
 
 
-def test_builder_context_interaction_selects_host_before_listing_projects(monkeypatch) -> None:
+def test_builder_context_interaction_selects_host_before_listing_projects(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     stored: list[tuple[str, dict]] = []
     listed: list[dict] = []
@@ -7769,11 +13353,29 @@ def test_builder_context_interaction_selects_host_before_listing_projects(monkey
         "status": "ready",
         "selectable": True,
     }
-    monkeypatch.setattr(skill.builder_preview, "resolve_builder_context", lambda _value: dict(context))
-    monkeypatch.setattr(skill, "_remember_builder_context", lambda scope, value: stored.append((scope, dict(value))))
-    monkeypatch.setattr(skill, "_target_session", lambda _webspace_id: (None, {"runtime_scenario_id": None}))
-    monkeypatch.setattr(skill, "_builder_topic_ref", lambda *_args, **_kwargs: {"thread_id": "builder:dev1-dev"})
-    monkeypatch.setattr(skill, "_handle_project_list_command", lambda **kwargs: listed.append(dict(kwargs)) or {})
+    monkeypatch.setattr(
+        skill.builder_preview, "resolve_builder_context", lambda _value: dict(context)
+    )
+    monkeypatch.setattr(
+        skill,
+        "_remember_builder_context",
+        lambda scope, value: stored.append((scope, dict(value))),
+    )
+    monkeypatch.setattr(
+        skill,
+        "_target_session",
+        lambda _webspace_id: (None, {"runtime_scenario_id": None}),
+    )
+    monkeypatch.setattr(
+        skill,
+        "_builder_topic_ref",
+        lambda *_args, **_kwargs: {"thread_id": "builder:dev1-dev"},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_handle_project_list_command",
+        lambda **kwargs: listed.append(dict(kwargs)) or {},
+    )
 
     result = skill.handle_interaction_response(
         event={
@@ -7805,7 +13407,9 @@ def test_builder_context_interaction_selects_host_before_listing_projects(monkey
     assert listed[0]["_meta"]["builder_source_webspace_id"] == "dev1-dev"
 
 
-def test_builder_delete_pending_action_approve_deletes_draft(monkeypatch, tmp_path) -> None:
+def test_builder_delete_pending_action_approve_deletes_draft(
+    monkeypatch, tmp_path
+) -> None:
     skill = _load_module()
     calls: list[dict] = []
     emitted: list[dict] = []
@@ -7820,11 +13424,22 @@ def test_builder_delete_pending_action_approve_deletes_draft(monkeypatch, tmp_pa
             }
 
         def delete_development_skill(self, draft_id, webspace_id):
-            calls.append({"method": "delete", "draft_id": draft_id, "webspace_id": webspace_id})
+            calls.append(
+                {"method": "delete", "draft_id": draft_id, "webspace_id": webspace_id}
+            )
             return {"ok": True, "draft_id": draft_id}
 
-        def set_active_draft(self, *, source_webspace_id=None, active_draft_id=None, runtime_scenario_id=None, persist_projection=True):
-            calls.append({"method": "set_active_draft", "active_draft_id": active_draft_id})
+        def set_active_draft(
+            self,
+            *,
+            source_webspace_id=None,
+            active_draft_id=None,
+            runtime_scenario_id=None,
+            persist_projection=True,
+        ):
+            calls.append(
+                {"method": "set_active_draft", "active_draft_id": active_draft_id}
+            )
             return {
                 "source_webspace_id": source_webspace_id,
                 "dev_webspace_id": f"{source_webspace_id}-dev",
@@ -7833,7 +13448,11 @@ def test_builder_delete_pending_action_approve_deletes_draft(monkeypatch, tmp_pa
             }
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}))
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}),
+    )
     skill._save_session(
         "desktop",
         {
@@ -7867,7 +13486,11 @@ def test_builder_delete_pending_action_approve_deletes_draft(monkeypatch, tmp_pa
         )
     )
 
-    assert calls[0] == {"method": "delete", "draft_id": "draft.to_delete", "webspace_id": "desktop"}
+    assert calls[0] == {
+        "method": "delete",
+        "draft_id": "draft.to_delete",
+        "webspace_id": "desktop",
+    }
     assert skill._load_session("desktop", "session_delete") is None
     assert "draft.to_delete" in emitted[0]["text"]
 
@@ -7894,7 +13517,9 @@ def test_get_session_exposes_developer_evidence(monkeypatch, tmp_path) -> None:
     artifact_root = tmp_path / "shopping_list"
     artifact_root.mkdir(parents=True)
     (artifact_root / "webui.json").write_text('{"preview_state":{}}', encoding="utf-8")
-    (artifact_root / "scenario.json").write_text('{"id":"shopping_list"}', encoding="utf-8")
+    (artifact_root / "scenario.json").write_text(
+        '{"id":"shopping_list"}', encoding="utf-8"
+    )
 
     class _Workbench:
         def set_active_draft(self, **kwargs):
@@ -7906,10 +13531,17 @@ def test_get_session_exposes_developer_evidence(monkeypatch, tmp_path) -> None:
             }
 
         def snapshot(self, webspace_id, *, preview_state=None):
-            return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
+            return {
+                "source_webspace_id": webspace_id,
+                "preview_state": preview_state or {},
+            }
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
+    monkeypatch.setattr(
+        skill,
+        "_request_workbench_refresh",
+        lambda payload: {"ok": True, "payload": dict(payload)},
+    )
     monkeypatch.setattr(
         skill,
         "_builder_topic_ref",
@@ -7933,7 +13565,9 @@ def test_get_session_exposes_developer_evidence(monkeypatch, tmp_path) -> None:
             "draft_id": "draft.shopping",
             "artifact_root": str(artifact_root),
             "datasource_id": "shopping_items",
-            "fields": [{"id": "item", "type": "string", "label": "Item", "required": True}],
+            "fields": [
+                {"id": "item", "type": "string", "label": "Item", "required": True}
+            ],
             "preview_state": {
                 "current_ui": {"type": "page"},
                 "datasources": [{"id": "shopping_items", "type": "internal_crud"}],
@@ -7958,7 +13592,10 @@ def test_get_session_exposes_developer_evidence(monkeypatch, tmp_path) -> None:
 
     assert session_result["ok"] is True
     assert evidence["schema"] == "adaos.builder.developer_evidence.v1"
-    assert evidence["route_plan"]["thread_id"] == "thread.builder.builder-evidence.shopping_list"
+    assert (
+        evidence["route_plan"]["thread_id"]
+        == "thread.builder.builder-evidence.shopping_list"
+    )
     assert evidence["route_plan"]["default_tool"] == "builder_skill.chat"
     assert evidence["preview_refs"]["current_ui_type"] == "page"
     assert evidence["preview_refs"]["datasource_ids"] == ["shopping_items"]
@@ -7969,7 +13606,9 @@ def test_get_session_exposes_developer_evidence(monkeypatch, tmp_path) -> None:
     assert files["scenario_manifest_json"]["exists"] is True
 
     preview_result = skill.get_preview_state(webspace_id="builder-evidence")
-    assert preview_result["developer_evidence"]["preview_refs"]["pending_patch_count"] == 1
+    assert (
+        preview_result["developer_evidence"]["preview_refs"]["pending_patch_count"] == 1
+    )
 
 
 def test_create_scenario_draft_updates_builder_workbench(monkeypatch, tmp_path) -> None:
@@ -7984,17 +13623,31 @@ def test_create_scenario_draft_updates_builder_workbench(monkeypatch, tmp_path) 
 
         def create_draft(self, **kwargs):
             artifact_root.mkdir(parents=True, exist_ok=True)
-            return {"ok": True, "draft": {"draft_id": "draft.shopping"}, "artifact_root": str(artifact_root), "kwargs": kwargs}
+            return {
+                "ok": True,
+                "draft": {"draft_id": "draft.shopping"},
+                "artifact_root": str(artifact_root),
+                "kwargs": kwargs,
+            }
 
     class _Workbench:
-        def set_active_draft(self, *, source_webspace_id=None, active_draft_id=None, runtime_scenario_id=None, persist_projection=True):
-            calls.append({
-                "method": "set_active_draft",
-                "webspace_id": source_webspace_id,
-                "active_draft_id": active_draft_id,
-                "runtime_scenario_id": runtime_scenario_id,
-                "persist_projection": persist_projection,
-            })
+        def set_active_draft(
+            self,
+            *,
+            source_webspace_id=None,
+            active_draft_id=None,
+            runtime_scenario_id=None,
+            persist_projection=True,
+        ):
+            calls.append(
+                {
+                    "method": "set_active_draft",
+                    "webspace_id": source_webspace_id,
+                    "active_draft_id": active_draft_id,
+                    "runtime_scenario_id": runtime_scenario_id,
+                    "persist_projection": persist_projection,
+                }
+            )
             return {
                 "source_webspace_id": source_webspace_id,
                 "dev_webspace_id": f"{source_webspace_id}-dev",
@@ -8005,8 +13658,17 @@ def test_create_scenario_draft_updates_builder_workbench(monkeypatch, tmp_path) 
             }
 
         def snapshot(self, webspace_id, *, preview_state=None):
-            calls.append({"method": "snapshot", "webspace_id": webspace_id, "preview_state": preview_state})
-            return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
+            calls.append(
+                {
+                    "method": "snapshot",
+                    "webspace_id": webspace_id,
+                    "preview_state": preview_state,
+                }
+            )
+            return {
+                "source_webspace_id": webspace_id,
+                "preview_state": preview_state or {},
+            }
 
     import adaos.services.builder.workspace as workspace
 
@@ -8015,17 +13677,22 @@ def test_create_scenario_draft_updates_builder_workbench(monkeypatch, tmp_path) 
     monkeypatch.setattr(
         skill,
         "_request_workbench_refresh",
-        lambda payload: calls.append({"method": "event", "payload": dict(payload)}) or {"ok": True},
+        lambda payload: calls.append({"method": "event", "payload": dict(payload)})
+        or {"ok": True},
     )
     refresh_calls: list[dict] = []
     monkeypatch.setattr(
         skill,
         "_schedule_dev_runtime_reload_after_revision",
-        lambda webspace_id, **kwargs: refresh_calls.append({"webspace_id": webspace_id, **kwargs})
+        lambda webspace_id, **kwargs: refresh_calls.append(
+            {"webspace_id": webspace_id, **kwargs}
+        )
         or {"ok": True, "scheduled": True, "webspace_id": "desktop-dev"},
     )
 
-    result = skill.create_scenario_draft("Builder, create a shopping list app", webspace_id="desktop")
+    result = skill.create_scenario_draft(
+        "Builder, create a shopping list app", webspace_id="desktop"
+    )
 
     assert result["ok"] is True
     assert result["workbench"]["binding"]["dev_webspace_id"] == "desktop-dev"
@@ -8038,7 +13705,9 @@ def test_create_scenario_draft_updates_builder_workbench(monkeypatch, tmp_path) 
         "persist_projection": False,
     }
     assert [item["method"] for item in calls[:1]] == ["set_active_draft"]
-    assert {item["method"] for item in calls}.issubset({"set_active_draft", "ensure_dev_webspace"})
+    assert {item["method"] for item in calls}.issubset(
+        {"set_active_draft", "ensure_dev_webspace"}
+    )
     assert result["dev_runtime_refresh"]["scheduled"] is True
     assert refresh_calls[-1]["webspace_id"] == "desktop"
     assert refresh_calls[-1]["revision"] == "001"
@@ -8050,14 +13719,23 @@ def test_ensure_workbench_prefers_direct_dev_runtime_switch(monkeypatch) -> None
     calls: list[dict] = []
 
     class _Workbench:
-        def set_active_draft(self, *, source_webspace_id=None, active_draft_id=None, runtime_scenario_id=None, persist_projection=True):
-            calls.append({
-                "method": "set_active_draft",
-                "source_webspace_id": source_webspace_id,
-                "active_draft_id": active_draft_id,
-                "runtime_scenario_id": runtime_scenario_id,
-                "persist_projection": persist_projection,
-            })
+        def set_active_draft(
+            self,
+            *,
+            source_webspace_id=None,
+            active_draft_id=None,
+            runtime_scenario_id=None,
+            persist_projection=True,
+        ):
+            calls.append(
+                {
+                    "method": "set_active_draft",
+                    "source_webspace_id": source_webspace_id,
+                    "active_draft_id": active_draft_id,
+                    "runtime_scenario_id": runtime_scenario_id,
+                    "persist_projection": persist_projection,
+                }
+            )
             return {
                 "source_webspace_id": source_webspace_id,
                 "dev_webspace_id": f"{source_webspace_id}-dev",
@@ -8066,18 +13744,37 @@ def test_ensure_workbench_prefers_direct_dev_runtime_switch(monkeypatch) -> None
             }
 
         def snapshot(self, webspace_id, *, preview_state=None):
-            calls.append({"method": "snapshot", "webspace_id": webspace_id, "preview_state": preview_state})
-            return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
+            calls.append(
+                {
+                    "method": "snapshot",
+                    "webspace_id": webspace_id,
+                    "preview_state": preview_state,
+                }
+            )
+            return {
+                "source_webspace_id": webspace_id,
+                "preview_state": preview_state or {},
+            }
 
-        def ensure_dev_webspace(self, source_webspace_id, *, active_draft_id=None, runtime_scenario_id=None, preview_state=None, wait_for_rebuild=None):
-            calls.append({
-                "method": "ensure_dev_webspace",
-                "source_webspace_id": source_webspace_id,
-                "active_draft_id": active_draft_id,
-                "runtime_scenario_id": runtime_scenario_id,
-                "preview_state": preview_state,
-                "wait_for_rebuild": wait_for_rebuild,
-            })
+        def ensure_dev_webspace(
+            self,
+            source_webspace_id,
+            *,
+            active_draft_id=None,
+            runtime_scenario_id=None,
+            preview_state=None,
+            wait_for_rebuild=None,
+        ):
+            calls.append(
+                {
+                    "method": "ensure_dev_webspace",
+                    "source_webspace_id": source_webspace_id,
+                    "active_draft_id": active_draft_id,
+                    "runtime_scenario_id": runtime_scenario_id,
+                    "preview_state": preview_state,
+                    "wait_for_rebuild": wait_for_rebuild,
+                }
+            )
             return {
                 "source_webspace_id": source_webspace_id,
                 "dev_webspace_id": f"{source_webspace_id}-dev",
@@ -8090,7 +13787,8 @@ def test_ensure_workbench_prefers_direct_dev_runtime_switch(monkeypatch) -> None
     monkeypatch.setattr(
         skill,
         "_request_workbench_refresh",
-        lambda payload: calls.append({"method": "event", "payload": dict(payload)}) or {"ok": True},
+        lambda payload: calls.append({"method": "event", "payload": dict(payload)})
+        or {"ok": True},
     )
 
     result = skill._ensure_workbench(
@@ -8104,24 +13802,39 @@ def test_ensure_workbench_prefers_direct_dev_runtime_switch(monkeypatch) -> None
     assert result["binding"]["runtime_scenario_id"] == "todo_scenario"
     assert result["projection"]["event"]["skipped"] == "direct_workbench_ensure"
     assert result["projection"]["direct"]["result"]["runtime"]["ok"] is True
-    assert [item["method"] for item in calls] == ["set_active_draft", "snapshot", "ensure_dev_webspace"]
+    assert [item["method"] for item in calls] == [
+        "set_active_draft",
+        "snapshot",
+        "ensure_dev_webspace",
+    ]
     assert calls[2]["runtime_scenario_id"] == "todo_scenario"
     assert calls[2]["wait_for_rebuild"] is False
 
 
-def test_ensure_workbench_can_defer_runtime_switch_for_ui_revision_updates(monkeypatch) -> None:
+def test_ensure_workbench_can_defer_runtime_switch_for_ui_revision_updates(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     calls: list[dict] = []
 
     class _Workbench:
-        def set_active_draft(self, *, source_webspace_id=None, active_draft_id=None, runtime_scenario_id=None, persist_projection=True):
-            calls.append({
-                "method": "set_active_draft",
-                "source_webspace_id": source_webspace_id,
-                "active_draft_id": active_draft_id,
-                "runtime_scenario_id": runtime_scenario_id,
-                "persist_projection": persist_projection,
-            })
+        def set_active_draft(
+            self,
+            *,
+            source_webspace_id=None,
+            active_draft_id=None,
+            runtime_scenario_id=None,
+            persist_projection=True,
+        ):
+            calls.append(
+                {
+                    "method": "set_active_draft",
+                    "source_webspace_id": source_webspace_id,
+                    "active_draft_id": active_draft_id,
+                    "runtime_scenario_id": runtime_scenario_id,
+                    "persist_projection": persist_projection,
+                }
+            )
             return {
                 "source_webspace_id": source_webspace_id,
                 "dev_webspace_id": f"{source_webspace_id}-dev",
@@ -8130,18 +13843,30 @@ def test_ensure_workbench_can_defer_runtime_switch_for_ui_revision_updates(monke
             }
 
         def snapshot(self, webspace_id, *, preview_state=None):
-            calls.append({"method": "snapshot", "webspace_id": webspace_id, "preview_state": preview_state})
-            return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
+            calls.append(
+                {
+                    "method": "snapshot",
+                    "webspace_id": webspace_id,
+                    "preview_state": preview_state,
+                }
+            )
+            return {
+                "source_webspace_id": webspace_id,
+                "preview_state": preview_state or {},
+            }
 
         def ensure_dev_webspace(self, *args, **kwargs):
-            calls.append({"method": "ensure_dev_webspace", "args": args, "kwargs": kwargs})
+            calls.append(
+                {"method": "ensure_dev_webspace", "args": args, "kwargs": kwargs}
+            )
             return {"source_webspace_id": "unexpected", "runtime": {"ok": True}}
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
     monkeypatch.setattr(
         skill,
         "_request_workbench_refresh",
-        lambda payload: calls.append({"method": "event", "payload": dict(payload)}) or {"ok": True},
+        lambda payload: calls.append({"method": "event", "payload": dict(payload)})
+        or {"ok": True},
     )
 
     result = skill._ensure_workbench(
@@ -8154,26 +13879,45 @@ def test_ensure_workbench_can_defer_runtime_switch_for_ui_revision_updates(monke
 
     assert result["ok"] is True
     assert result["binding"]["runtime_scenario_id"] == "todo_scenario"
-    assert result["projection"]["direct"]["skipped"] == "runtime_refresh_deferred_to_dev_reload"
-    assert result["projection"]["event"]["skipped"] == "runtime_refresh_deferred_to_dev_reload"
+    assert (
+        result["projection"]["direct"]["skipped"]
+        == "runtime_refresh_deferred_to_dev_reload"
+    )
+    assert (
+        result["projection"]["event"]["skipped"]
+        == "runtime_refresh_deferred_to_dev_reload"
+    )
     methods = [item["method"] for item in calls]
     assert methods[:2] == ["set_active_draft", "snapshot"]
-    assert set(methods).issubset({"set_active_draft", "snapshot", "ensure_dev_webspace"})
+    assert set(methods).issubset(
+        {"set_active_draft", "snapshot", "ensure_dev_webspace"}
+    )
 
 
-def test_ensure_workbench_can_defer_snapshot_projection_for_pointer_switches(monkeypatch) -> None:
+def test_ensure_workbench_can_defer_snapshot_projection_for_pointer_switches(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     calls: list[dict] = []
 
     class _Workbench:
-        def set_active_draft(self, *, source_webspace_id=None, active_draft_id=None, runtime_scenario_id=None, persist_projection=True):
-            calls.append({
-                "method": "set_active_draft",
-                "source_webspace_id": source_webspace_id,
-                "active_draft_id": active_draft_id,
-                "runtime_scenario_id": runtime_scenario_id,
-                "persist_projection": persist_projection,
-            })
+        def set_active_draft(
+            self,
+            *,
+            source_webspace_id=None,
+            active_draft_id=None,
+            runtime_scenario_id=None,
+            persist_projection=True,
+        ):
+            calls.append(
+                {
+                    "method": "set_active_draft",
+                    "source_webspace_id": source_webspace_id,
+                    "active_draft_id": active_draft_id,
+                    "runtime_scenario_id": runtime_scenario_id,
+                    "persist_projection": persist_projection,
+                }
+            )
             return {
                 "source_webspace_id": source_webspace_id,
                 "dev_webspace_id": f"{source_webspace_id}-dev",
@@ -8182,8 +13926,17 @@ def test_ensure_workbench_can_defer_snapshot_projection_for_pointer_switches(mon
             }
 
         def snapshot(self, webspace_id, *, preview_state=None):
-            calls.append({"method": "snapshot", "webspace_id": webspace_id, "preview_state": preview_state})
-            return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
+            calls.append(
+                {
+                    "method": "snapshot",
+                    "webspace_id": webspace_id,
+                    "preview_state": preview_state,
+                }
+            )
+            return {
+                "source_webspace_id": webspace_id,
+                "preview_state": preview_state or {},
+            }
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
 
@@ -8207,8 +13960,20 @@ def test_ensure_workbench_schedules_async_direct_runtime_switch(monkeypatch) -> 
     calls: list[dict] = []
 
     class _Workbench:
-        def set_active_draft(self, *, source_webspace_id=None, active_draft_id=None, runtime_scenario_id=None, persist_projection=True):
-            calls.append({"method": "set_active_draft", "runtime_scenario_id": runtime_scenario_id})
+        def set_active_draft(
+            self,
+            *,
+            source_webspace_id=None,
+            active_draft_id=None,
+            runtime_scenario_id=None,
+            persist_projection=True,
+        ):
+            calls.append(
+                {
+                    "method": "set_active_draft",
+                    "runtime_scenario_id": runtime_scenario_id,
+                }
+            )
             return {
                 "source_webspace_id": source_webspace_id,
                 "dev_webspace_id": f"{source_webspace_id}-dev",
@@ -8218,18 +13983,38 @@ def test_ensure_workbench_schedules_async_direct_runtime_switch(monkeypatch) -> 
 
         def snapshot(self, webspace_id, *, preview_state=None):
             calls.append({"method": "snapshot", "webspace_id": webspace_id})
-            return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
+            return {
+                "source_webspace_id": webspace_id,
+                "preview_state": preview_state or {},
+            }
 
-        async def ensure_dev_webspace(self, source_webspace_id, *, active_draft_id=None, runtime_scenario_id=None, preview_state=None, wait_for_rebuild=None):
-            calls.append({"method": "ensure_dev_webspace", "runtime_scenario_id": runtime_scenario_id})
+        async def ensure_dev_webspace(
+            self,
+            source_webspace_id,
+            *,
+            active_draft_id=None,
+            runtime_scenario_id=None,
+            preview_state=None,
+            wait_for_rebuild=None,
+        ):
+            calls.append(
+                {
+                    "method": "ensure_dev_webspace",
+                    "runtime_scenario_id": runtime_scenario_id,
+                }
+            )
             await asyncio.sleep(1.0)
-            return {"source_webspace_id": source_webspace_id, "runtime_scenario_id": runtime_scenario_id}
+            return {
+                "source_webspace_id": source_webspace_id,
+                "runtime_scenario_id": runtime_scenario_id,
+            }
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
     monkeypatch.setattr(
         skill,
         "_request_workbench_refresh",
-        lambda payload: calls.append({"method": "event", "payload": dict(payload)}) or {"ok": True, "payload": dict(payload)},
+        lambda payload: calls.append({"method": "event", "payload": dict(payload)})
+        or {"ok": True, "payload": dict(payload)},
     )
 
     started = time.perf_counter()
@@ -8273,14 +14058,17 @@ def test_safe_emit_chat_does_not_wait_for_stuck_append(monkeypatch) -> None:
     assert calls
 
 
-def test_chat_aligns_incoming_project_before_target_session_resolution(monkeypatch) -> None:
+def test_chat_aligns_incoming_project_before_target_session_resolution(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     order: list[str] = []
 
     monkeypatch.setattr(
         skill,
         "_align_workbench_binding_to_meta",
-        lambda webspace_id, meta: order.append("align") or {"runtime_scenario_id": "test04_recipes"},
+        lambda webspace_id, meta: order.append("align")
+        or {"runtime_scenario_id": "test04_recipes"},
     )
 
     def _target(_webspace_id):
@@ -8306,22 +14094,40 @@ def test_natural_russian_selected_project_question_is_deterministic() -> None:
     skill = _load_module()
 
     assert skill._is_current_project_command("Какой проект выбран?") is True
-    assert skill._parse_builder_command("Какой проект выбран?", has_session=True)["intent"] == "project.current"
+    assert (
+        skill._parse_builder_command("Какой проект выбран?", has_session=True)["intent"]
+        == "project.current"
+    )
     assert skill._is_current_project_command("Какой проект сейчас выбран?") is True
-    assert skill._parse_builder_command("Какой проект сейчас выбран?", has_session=True)["intent"] == "project.current"
+    assert (
+        skill._parse_builder_command("Какой проект сейчас выбран?", has_session=True)[
+            "intent"
+        ]
+        == "project.current"
+    )
 
 
-def test_mutating_builder_text_guard_preserves_russian_and_rejects_loss(monkeypatch) -> None:
+def test_mutating_builder_text_guard_preserves_russian_and_rejects_loss(
+    monkeypatch,
+) -> None:
     skill = _load_module()
     russian = "Добавь поле «Название блюда»"
     assert skill._reject_transport_corrupted_text(russian, field="text") is None
 
-    monkeypatch.setattr(skill, "_target_session", lambda _ws: pytest.fail("corrupt text must fail before target or LLM resolution"))
+    monkeypatch.setattr(
+        skill,
+        "_target_session",
+        lambda _ws: pytest.fail(
+            "corrupt text must fail before target or LLM resolution"
+        ),
+    )
     with pytest.raises(ValueError, match="transport-corrupted"):
         skill.chat("Добавь ??? поле", webspace_id="desktop")
 
 
-def test_repeated_checkpoint_preserves_complete_yaml_manifest_and_cyrillic(tmp_path) -> None:
+def test_repeated_checkpoint_preserves_complete_yaml_manifest_and_cyrillic(
+    tmp_path,
+) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "test04_recipes"
     artifact_root.mkdir()
@@ -8349,7 +14155,12 @@ def test_repeated_checkpoint_preserves_complete_yaml_manifest_and_cyrillic(tmp_p
     (artifact_root / "scenario.json").write_text(
         json.dumps(original, ensure_ascii=False), encoding="utf-8"
     )
-    page = {"id": "test04_recipes", "title": title, "layout": {"type": "stack"}, "widgets": []}
+    page = {
+        "id": "test04_recipes",
+        "title": title,
+        "layout": {"type": "stack"},
+        "widgets": [],
+    }
 
     for _ in range(2):
         skill._write_scenario_application_value(
@@ -8360,7 +14171,14 @@ def test_repeated_checkpoint_preserves_complete_yaml_manifest_and_cyrillic(tmp_p
 
     saved_bytes = (artifact_root / "scenario.yaml").read_bytes()
     saved = yaml.safe_load(saved_bytes.decode("utf-8"))
-    for key in ("triggers", "nlu", "slots", "params", "extensions", "future_valid_field"):
+    for key in (
+        "triggers",
+        "nlu",
+        "slots",
+        "params",
+        "extensions",
+        "future_valid_field",
+    ):
         assert saved[key] == original[key]
     assert saved["runtime"]["custom"] == {"keep": True}
     assert saved["ui"] == {"manifest": "webui.json", "theme": "family"}
@@ -8375,50 +14193,117 @@ def test_workbench_tool_wrappers_use_voice_widget_and_active_draft(monkeypatch) 
     calls: list[dict] = []
 
     class _Workbench:
-        def set_active_draft(self, *, source_webspace_id=None, active_draft_id=None, runtime_scenario_id=None, persist_projection=True):
-            calls.append({
-                "method": "set_active_draft",
-                "webspace_id": source_webspace_id,
+        def set_active_draft(
+            self,
+            *,
+            source_webspace_id=None,
+            active_draft_id=None,
+            runtime_scenario_id=None,
+            persist_projection=True,
+        ):
+            calls.append(
+                {
+                    "method": "set_active_draft",
+                    "webspace_id": source_webspace_id,
+                    "active_draft_id": active_draft_id,
+                    "runtime_scenario_id": runtime_scenario_id,
+                    "persist_projection": persist_projection,
+                }
+            )
+            return {
+                "source_webspace_id": source_webspace_id,
+                "dev_webspace_id": f"{source_webspace_id}-dev",
                 "active_draft_id": active_draft_id,
-                "runtime_scenario_id": runtime_scenario_id,
-                "persist_projection": persist_projection,
-            })
-            return {"source_webspace_id": source_webspace_id, "dev_webspace_id": f"{source_webspace_id}-dev", "active_draft_id": active_draft_id}
+            }
 
         def get_workspace_binding(self, webspace_id):
-            return {"source_webspace_id": webspace_id, "dev_webspace_id": f"{webspace_id}-dev", "active_draft_id": "draft.one"}
+            return {
+                "source_webspace_id": webspace_id,
+                "dev_webspace_id": f"{webspace_id}-dev",
+                "active_draft_id": "draft.one",
+            }
 
         def open_dev_webspace(self, webspace_id, *, base_url=None):
-            return {"ok": True, "url": f"{base_url}/?webspace={webspace_id}-dev", "webspace_id": f"{webspace_id}-dev"}
+            return {
+                "ok": True,
+                "url": f"{base_url}/?webspace={webspace_id}-dev",
+                "webspace_id": f"{webspace_id}-dev",
+            }
 
         def snapshot(self, webspace_id, *, preview_state=None):
-            calls.append({"method": "snapshot", "webspace_id": webspace_id, "preview_state": preview_state})
-            return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
+            calls.append(
+                {
+                    "method": "snapshot",
+                    "webspace_id": webspace_id,
+                    "preview_state": preview_state,
+                }
+            )
+            return {
+                "source_webspace_id": webspace_id,
+                "preview_state": preview_state or {},
+            }
 
         def dialog_widget_config(self, webspace_id):
-            return {"widget": "voice_chat", "dialog_channel_id": "builder", "source_webspace_id": webspace_id}
+            return {
+                "widget": "voice_chat",
+                "dialog_channel_id": "builder",
+                "source_webspace_id": webspace_id,
+            }
 
         def list_development_skills(self, webspace_id):
-            return {"ok": True, "items": [{"draft_id": "draft.one", "active": True}], "active_draft_id": "draft.one"}
+            return {
+                "ok": True,
+                "items": [{"draft_id": "draft.one", "active": True}],
+                "active_draft_id": "draft.one",
+            }
 
         def delete_development_skill(self, draft_id, webspace_id):
-            calls.append({"method": "delete", "webspace_id": webspace_id, "draft_id": draft_id})
+            calls.append(
+                {"method": "delete", "webspace_id": webspace_id, "draft_id": draft_id}
+            )
             return {"ok": True, "draft_id": draft_id}
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
     monkeypatch.setattr(
         skill,
         "_request_workbench_refresh",
-        lambda payload: calls.append({"method": "event", "payload": dict(payload)}) or {"ok": True},
+        lambda payload: calls.append({"method": "event", "payload": dict(payload)})
+        or {"ok": True},
     )
 
-    assert skill.ensure_dev_webspace(webspace_id="desktop", active_draft_id="draft.one")["binding"]["dev_webspace_id"] == "desktop-dev"
-    assert skill.get_workspace_binding(webspace_id="desktop")["binding"]["active_draft_id"] == "draft.one"
-    assert skill.open_dev_webspace(webspace_id="desktop", base_url="http://localhost:8100")["url"] == "http://localhost:8100/?webspace=desktop-dev"
-    assert skill.attach_dialog_widget(webspace_id="desktop")["widget"]["widget"] == "voice_chat"
-    assert skill.set_active_draft("draft.two", webspace_id="desktop")["binding"]["active_draft_id"] == "draft.two"
-    assert skill.list_development_skills(webspace_id="desktop")["items"][0]["draft_id"] == "draft.one"
-    assert skill.delete_development_skill("draft.one", webspace_id="desktop")["ok"] is True
+    assert (
+        skill.ensure_dev_webspace(webspace_id="desktop", active_draft_id="draft.one")[
+            "binding"
+        ]["dev_webspace_id"]
+        == "desktop-dev"
+    )
+    assert (
+        skill.get_workspace_binding(webspace_id="desktop")["binding"]["active_draft_id"]
+        == "draft.one"
+    )
+    assert (
+        skill.open_dev_webspace(
+            webspace_id="desktop", base_url="http://localhost:8100"
+        )["url"]
+        == "http://localhost:8100/?webspace=desktop-dev"
+    )
+    assert (
+        skill.attach_dialog_widget(webspace_id="desktop")["widget"]["widget"]
+        == "voice_chat"
+    )
+    assert (
+        skill.set_active_draft("draft.two", webspace_id="desktop")["binding"][
+            "active_draft_id"
+        ]
+        == "draft.two"
+    )
+    assert (
+        skill.list_development_skills(webspace_id="desktop")["items"][0]["draft_id"]
+        == "draft.one"
+    )
+    assert (
+        skill.delete_development_skill("draft.one", webspace_id="desktop")["ok"] is True
+    )
     assert calls[0] == {
         "method": "set_active_draft",
         "webspace_id": "desktop",
@@ -8426,4 +14311,8 @@ def test_workbench_tool_wrappers_use_voice_widget_and_active_draft(monkeypatch) 
         "runtime_scenario_id": None,
         "persist_projection": False,
     }
-    assert calls[-1] == {"method": "delete", "webspace_id": "desktop", "draft_id": "draft.one"}
+    assert calls[-1] == {
+        "method": "delete",
+        "webspace_id": "desktop",
+        "draft_id": "draft.one",
+    }

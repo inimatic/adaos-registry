@@ -1,5 +1,5 @@
 name: flowboard_lab_for_safely_prototyping_a_r_17528146_skill
-version: 0.1.1
+version: 0.1.6
 description: Project-owned typed resource provider for the accepted prototype. Implement
   accepted Flowboard prototype revision 007 exactly. Preserve the accepted three-lane
   text Kanban, six current accepted records, search, typed create/edit/delete, drag
@@ -211,7 +211,7 @@ nlu_hints:
   slot_schemas: {}
   entities: []
 prototype: skill_default
-updated_at: '2026-09-04T15:07:16+00:00'
+updated_at: '2026-09-04T20:04:02+00:00'
 resource_runtime:
   declarations:
   - resources/work_items.resource.json

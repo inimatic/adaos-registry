@@ -6,7 +6,7 @@ import pytest
 
 from handlers import main as handlers
 from research import orchestrator as orchestrator_module
-from research.orchestrator import ResearchOrchestrator
+from research.orchestrator import ResearchOrchestrator, _unprojected_inquiry_events
 
 
 def _uninitialized_orchestrator(monkeypatch: pytest.MonkeyPatch) -> ResearchOrchestrator:
@@ -81,6 +81,64 @@ def test_uninitialized_direction_read_tools_return_empty_data_not_errors(monkeyp
     assert automation["ok"] is True
     assert automation["available"] is False
     assert automation["initialized"] is False
+
+
+def test_usage_summary_separates_researcher_builder_and_deduplicates_jobs() -> None:
+    events = [
+        {
+            "detail": {
+                "provider_job_id": "llm-job-1",
+                "usage": {
+                    "total_tokens": 120,
+                    "input_tokens": 80,
+                    "output_tokens": 40,
+                    "accuracy": "provider_reported",
+                },
+            }
+        },
+        {
+            "detail": {
+                "provider_job_id": "llm-job-1",
+                "usage": {"total_tokens": 120, "accuracy": "provider_reported"},
+            }
+        },
+        {
+            "detail": {
+                "automation": {"task_id": "builder-task-1"},
+                "codex_usage_accounting": {
+                    "task_id": "builder-task-1",
+                    "status": "reported",
+                    "accuracy": "provider_reported",
+                    "input_tokens": 200,
+                    "output_tokens": 60,
+                    "total_tokens": 260,
+                },
+            }
+        },
+    ]
+
+    summary = handlers._research_usage_summary(events, [])
+
+    assert summary["researcher_llm"]["total_tokens"] == 120
+    assert summary["researcher_llm"]["provider_reported_jobs"] == 1
+    assert summary["builder_codex"]["total_tokens"] == 260
+    assert summary["builder_codex"]["provider_reported_runs"] == 1
+    assert summary["interactive_codex_included"] is False
+
+
+def test_only_durable_events_missing_from_projection_are_replayed() -> None:
+    projection = {
+        "provenance": {"event_refs": ["discussion-event:evt-projected"]}
+    }
+    events = [
+        {"event_id": "evt-projected", "text": "already represented"},
+        {"event_id": "evt-failed", "text": "stored before a failed LLM call"},
+        {"event_id": "evt-current", "text": "current trigger"},
+    ]
+
+    pending = _unprojected_inquiry_events(projection, events, events[-1])
+
+    assert pending == [events[1]]
 
 
 def test_staged_discussion_rejects_accepted_task_before_source_or_llm_work(monkeypatch) -> None:

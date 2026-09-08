@@ -47,12 +47,14 @@
     "file-picker",
     "new-project",
     "preview-qr",
+    "prototype-review",
     "project-picker",
     "publication",
     "technical-addendum",
     "process"
   ],
   "required_bindings": [
+    "builder_sdk_control_skill.accept_prototype",
     "builder_sdk_control_skill.append_prompt_addendum",
     "builder_sdk_control_skill.apply_subscription_update",
     "builder_sdk_control_skill.archive_project",
@@ -80,7 +82,6 @@
     "builder_sdk_control_skill.set_llm_profile",
     "builder_sdk_control_skill.start_automation",
     "builder_sdk_control_skill.submit_automation",
-    "builder_sdk_control_skill.transition_workflow",
     "builder_sdk_control_skill.update_project_metadata",
     "builder_skill.set_ui_revision_current",
     "stream:voice_chat.messages"

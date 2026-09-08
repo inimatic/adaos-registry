@@ -21,6 +21,18 @@ from adaos.sdk.builder import development_sessions
 from adaos.sdk.builder import preview as builder_preview
 from adaos.sdk.developer import artifact_context, compositions, projects
 from adaos.sdk.llm import llm_client
+from adaos.sdk.research import (
+    accept_inquiry_projection,
+    apply_projection_patch,
+    build_discussion_event,
+    build_projection_patch,
+    build_projection_patch_messages,
+    build_source_discovery_messages,
+    build_source_discovery_receipt,
+    canonicalize_projection_patch_payload,
+    new_inquiry_projection,
+    normalize_llm_usage,
+)
 from adaos.sdk.skills import invoke as invoke_skill
 from adaos.services.agent_context import get_ctx
 from adaos.services.skill.artifacts import skill_upload_dir
@@ -32,6 +44,7 @@ from research.contracts import (
     prototype_admission_issues,
     prototype_candidate_schema,
     prototype_quality_issues,
+    now,
 )
 from research.compiler import build_compilation
 from research.formulation import (
@@ -90,6 +103,22 @@ def _bounded_text(value: Any, limit: int) -> str:
     if len(text) <= limit:
         return text
     return text[: max(0, limit - 1)].rstrip() + "…"
+
+
+def _unprojected_inquiry_events(
+    projection: Mapping[str, Any],
+    events: list[Mapping[str, Any]],
+    current_event: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    represented = set(projection.get("provenance", {}).get("event_refs") or ())
+    current_ref = f"discussion-event:{current_event['event_id']}"
+    pending: list[dict[str, Any]] = []
+    for event in events:
+        event_ref = f"discussion-event:{event['event_id']}"
+        if event_ref == current_ref or event_ref in represented:
+            continue
+        pending.append(dict(event))
+    return pending
 
 
 class StudyExecutionAdmissionError(ValueError):
@@ -1467,6 +1496,645 @@ class ResearchOrchestrator:
             "development_session": development_session,
             "builder_url": builder_url,
             "next_steps": self._next_steps(state, bundle, prototype, track=selected_track),
+        }
+
+    def get_inquiry_projection(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Read the current formal projection that precedes task formulation."""
+
+        token = _direction_id(direction_id)
+        state = self.repository.get_direction(token)
+        if not state:
+            raise ValueError("research direction is not initialized")
+        task = self.repository.get_task(task_id or state.get("active_task_id"))
+        if not task or task.get("direction_id") != token:
+            raise ValueError("inquiry requires a ResearchTask owned by the direction")
+        inquiry_id = f"inquiry.{task['task_id']}"
+        projection = self.repository.latest_inquiry_projection(token, str(task["task_id"]))
+        if projection is None:
+            projection = new_inquiry_projection(
+                inquiry_id=inquiry_id,
+                direction_ref=f"research-direction:{token}",
+                task_ref=str(task["ref"]),
+                created_at=str(task["created_at"]),
+            )
+        return {
+            "ok": True,
+            "direction_id": token,
+            "task_id": str(task["task_id"]),
+            "inquiry_id": inquiry_id,
+            "projection": projection,
+            "acceptance": self.repository.get_inquiry_acceptance(
+                token, str(task["task_id"])
+            ),
+            "events": self.repository.inquiry_events(token, str(task["task_id"])),
+            "patches": self.repository.inquiry_patches(token, str(task["task_id"])),
+            "source_discoveries": self.repository.source_discoveries(
+                token, str(task["task_id"])
+            ),
+        }
+
+    def _prepare_inquiry_event(
+        self,
+        direction_id: str,
+        text: str,
+        *,
+        actor: str | None,
+        actor_kind: str,
+        dialog_payload: Mapping[str, Any] | None,
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], list[dict[str, Any]]]:
+        token = _direction_id(direction_id)
+        state = self.repository.get_direction(token)
+        if not state:
+            raise ValueError("research direction is not initialized")
+        requested_task_id = str((dialog_payload or {}).get("task_id") or "").strip()
+        active_task_id = str(state.get("active_task_id") or "")
+        if requested_task_id and requested_task_id != active_task_id:
+            raise ValueError("selected ResearchTask is read-only until explicitly activated")
+        task = self.repository.get_task(active_task_id)
+        if not task:
+            raise ValueError("research direction has no active ResearchTask")
+        accepted = self.repository.get_inquiry_acceptance(token, active_task_id)
+        if accepted and accepted.get("decision") != "request_revision":
+            raise ValueError(
+                "the exact inquiry projection is already accepted; create a branch ResearchTask"
+            )
+        inquiry = self.get_inquiry_projection(token, task_id=active_task_id)
+        projection = dict(inquiry["projection"])
+        dialog = self._dialog({"direction_id": token, **dict(dialog_payload or {})})
+        request_identity = str(dialog.get("request_id") or uuid.uuid4().hex)
+        suffix = re.sub(r"[^A-Za-z0-9_.-]+", "-", request_identity).strip("-._")[:32]
+        ordinal = len(inquiry["events"]) + 1
+        event_id = f"evt.{token[:48]}.{ordinal}.{suffix or uuid.uuid4().hex[:12]}"
+        bundle = artifact_context.source_bundle(
+            self._artifact_owner_id(token), audience=_FORMULATION_AUDIENCE
+        )
+        source_context = self._source_context(bundle, query=text) if bundle.get("sources") else {
+            "sources": [],
+            "coverage": {
+                "sources_total": 0,
+                "sources_represented": 0,
+                "selected_characters": 0,
+                "truncated_sources": [],
+                "unreadable_sources": [],
+                "items": [],
+            },
+        }
+        admitted_sources = [
+            {
+                "ref": str(item.get("artifact_ref") or ""),
+                "digest": item.get("digest"),
+                "title": item.get("name"),
+                "authority": "supporting_context",
+                "actual_reading_status": "fragment_read" if item.get("excerpt") else "metadata_only",
+                "content": item.get("excerpt"),
+            }
+            for item in source_context["sources"]
+            if item.get("artifact_ref")
+        ]
+        event = build_discussion_event(
+            event_id=event_id,
+            inquiry_id=str(projection["inquiry_id"]),
+            direction_ref=f"research-direction:{token}",
+            task_ref=str(task["ref"]),
+            ordinal=ordinal,
+            actor_kind=actor_kind,
+            actor_id=str(actor or "user:conversation"),
+            text=text,
+            source_refs=[str(item["ref"]) for item in admitted_sources],
+            prior_projection_digest=str(projection["digest"]),
+            created_at=now(),
+        )
+        event = self.repository.put_inquiry_event(
+            direction_id=token,
+            task_id=str(task["task_id"]),
+            base_projection=projection,
+            event=event,
+        )
+        return projection, event, task, admitted_sources
+
+    def record_inquiry_turn(
+        self,
+        direction_id: str,
+        text: str,
+        patch_payload: Mapping[str, Any],
+        *,
+        actor: str = "user:local",
+        patch_actor_kind: str = "human",
+        model: str | None = None,
+        provider_job_id: str | None = None,
+        usage: Mapping[str, Any] | None = None,
+        dialog_payload: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Persist one externally produced patch through the same deterministic gate."""
+
+        base, event, task, _ = self._prepare_inquiry_event(
+            direction_id,
+            text,
+            actor=actor,
+            actor_kind="human" if patch_actor_kind != "deterministic_tool" else "deterministic_tool",
+            dialog_payload=dialog_payload,
+        )
+        patch = build_projection_patch(
+            patch_payload,
+            patch_id=f"patch.{event['event_id']}",
+            inquiry_id=str(base["inquiry_id"]),
+            base_projection_digest=str(base["digest"]),
+            trigger_event_ref=f"discussion-event:{event['event_id']}",
+            actor_kind=patch_actor_kind,
+            actor_id=actor,
+            model=model,
+            provider_job_id=provider_job_id,
+            usage=usage,
+            created_at=now(),
+        )
+        applied = apply_projection_patch(base, patch, event, created_at=now())
+        projection = self.repository.put_inquiry_turn(
+            direction_id=_direction_id(direction_id),
+            task_id=str(task["task_id"]),
+            base_projection=base,
+            event=event,
+            patch=patch,
+            projection=applied["projection"],
+        )
+        self.repository.activity(
+            _direction_id(direction_id),
+            "inquiry",
+            "projection_revised",
+            f"Scientific inquiry projection revision {projection['revision']} recorded.",
+            {
+                "task_ref": task["ref"],
+                "projection_digest": projection["digest"],
+                "patch_digest": patch["digest"],
+                "readiness": projection["readiness"],
+                "semantic_diff": applied["semantic_diff"],
+                "usage": patch.get("usage") or {},
+            },
+            actor=actor,
+            subject_ref=str(task["ref"]),
+        )
+        return {
+            "ok": True,
+            "projection": projection,
+            "patch": patch,
+            "event": event,
+            "semantic_diff": applied["semantic_diff"],
+        }
+
+    def discuss_inquiry(
+        self,
+        direction_id: str,
+        text: str,
+        *,
+        model: str | None = None,
+        actor: str | None = None,
+        dialog_payload: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Ask the Researcher LLM for one patch, never a full paper or prototype."""
+
+        base, event, task, admitted_sources = self._prepare_inquiry_event(
+            direction_id,
+            text,
+            actor=actor,
+            actor_kind="human",
+            dialog_payload=dialog_payload,
+        )
+        resolved_model = str(
+            model or os.getenv("ADAOS_RESEARCH_INQUIRY_MODEL") or "gpt-5.6"
+        ).strip()
+        unprojected_events = _unprojected_inquiry_events(
+            base,
+            self.repository.inquiry_events(
+                _direction_id(direction_id), str(task["task_id"])
+            ),
+            event,
+        )
+        messages = build_projection_patch_messages(
+            base,
+            event,
+            admitted_sources=admitted_sources,
+            unprojected_events=unprojected_events,
+        )
+        request_id = f"adaos-inquiry-{event['event_id']}"
+        submitted = llm_client.submit_response_job(
+            messages,
+            model=resolved_model,
+            max_tokens=9000,
+            reasoning={"effort": "high"},
+            request_id=request_id,
+            profile_scope="research.inquiry.projection",
+            text={"verbosity": "low"},
+            stream=True,
+            timeout=30,
+        )
+        job_id = str(submitted.get("job_id") or "")
+        if not job_id:
+            raise RuntimeError("Root LLM did not return a job_id for inquiry projection")
+        base_url = str((submitted.get("_client") or {}).get("base_url") or "") or None
+        completed = llm_client.wait_response_job(
+            job_id,
+            base_url=base_url,
+            timeout_s=480,
+            poll_interval_s=1.5,
+        )
+        if str(completed.get("status") or "").lower() != "succeeded":
+            self.repository.activity(
+                _direction_id(direction_id),
+                "inquiry",
+                "llm_projection_failed",
+                "Researcher LLM did not produce an admissible inquiry patch.",
+                {
+                    "task_ref": task["ref"],
+                    "provider_job_id": job_id,
+                    "model": resolved_model,
+                    "projection_digest": base["digest"],
+                    "provider_status": completed.get("status"),
+                    "provider_error": completed.get("error"),
+                    "usage": normalize_llm_usage(completed),
+                },
+                actor=f"llm:{resolved_model}",
+                subject_ref=str(task["ref"]),
+                source_event_id=f"inquiry-llm-job:{job_id}",
+            )
+            raise _llm_failure(completed, operation="inquiry_projection")
+        repair_attempt = 0
+        current_request_id = request_id
+        while True:
+            raw_output = str(completed.get("output_text") or "")
+            try:
+                payload, structural_normalizations = canonicalize_projection_patch_payload(
+                    _json_object(raw_output)
+                )
+                patch = build_projection_patch(
+                    payload,
+                    patch_id=f"patch.{event['event_id']}",
+                    inquiry_id=str(base["inquiry_id"]),
+                    base_projection_digest=str(base["digest"]),
+                    trigger_event_ref=f"discussion-event:{event['event_id']}",
+                    actor_kind="llm",
+                    actor_id=f"llm:{resolved_model}",
+                    model=resolved_model,
+                    provider_job_id=job_id,
+                    usage=normalize_llm_usage(completed),
+                    created_at=now(),
+                )
+                applied = apply_projection_patch(
+                    base,
+                    patch,
+                    event,
+                    context_events=unprojected_events,
+                    created_at=now(),
+                )
+                break
+            except Exception as exc:
+                self.repository.activity(
+                    _direction_id(direction_id),
+                    "inquiry",
+                    "llm_projection_validation_failed",
+                    "Researcher output failed the deterministic projection contract.",
+                    {
+                        "task_ref": task["ref"],
+                        "discussion_event_ref": f"discussion-event:{event['event_id']}",
+                        "provider_job_id": job_id,
+                        "model": resolved_model,
+                        "projection_digest": base["digest"],
+                        "validation_error": f"{type(exc).__name__}: {exc}"[:4000],
+                        "repair_attempt": repair_attempt,
+                        "usage": normalize_llm_usage(completed),
+                    },
+                    actor=f"llm:{resolved_model}",
+                    subject_ref=str(task["ref"]),
+                    source_event_id=f"inquiry-validation:{job_id}",
+                )
+                if repair_attempt >= 1:
+                    raise RuntimeError(
+                        "Researcher inquiry patch failed its typed contract after one repair: "
+                        f"{type(exc).__name__}: {exc}"
+                    ) from exc
+                repair_attempt += 1
+                current_request_id = f"{request_id}-repair-{repair_attempt}"
+                repair_messages = [
+                    *messages,
+                    {"role": "assistant", "content": raw_output},
+                    {
+                        "role": "user",
+                        "content": (
+                            "The prior json object was rejected by the deterministic contract: "
+                            f"{type(exc).__name__}: {exc}. Return a corrected json object only. "
+                            "For every upsert operation, nest id, statement, status, derivation, "
+                            "basis_refs, confidence, uncertainty, and attributes inside record. "
+                            "Keep action, target_type, target_id, basis_refs, and record at the "
+                            "operation level; do not add any other operation fields. The only "
+                            "permitted_next_steps values are continue_discussion, clarify, search, "
+                            "split_problem, reformulate, reuse_known_solution, formulate_research_task, "
+                            "formulate_engineering_task, defer, and stop."
+                        ),
+                    },
+                ]
+                repaired = llm_client.submit_response_job(
+                    repair_messages,
+                    model=resolved_model,
+                    max_tokens=9000,
+                    reasoning={"effort": "high"},
+                    request_id=current_request_id,
+                    profile_scope="research.inquiry.projection.repair",
+                    text={"verbosity": "low"},
+                    stream=True,
+                    timeout=30,
+                )
+                job_id = str(repaired.get("job_id") or "")
+                if not job_id:
+                    raise RuntimeError("Root LLM did not return a job_id for inquiry repair")
+                base_url = str((repaired.get("_client") or {}).get("base_url") or "") or None
+                completed = llm_client.wait_response_job(
+                    job_id,
+                    base_url=base_url,
+                    timeout_s=480,
+                    poll_interval_s=1.5,
+                )
+                if str(completed.get("status") or "").lower() != "succeeded":
+                    self.repository.activity(
+                        _direction_id(direction_id),
+                        "inquiry",
+                        "llm_projection_repair_failed",
+                        "Researcher LLM repair job did not complete.",
+                        {
+                            "task_ref": task["ref"],
+                            "provider_job_id": job_id,
+                            "model": resolved_model,
+                            "projection_digest": base["digest"],
+                            "provider_status": completed.get("status"),
+                            "provider_error": completed.get("error"),
+                            "repair_attempt": repair_attempt,
+                            "usage": normalize_llm_usage(completed),
+                        },
+                        actor=f"llm:{resolved_model}",
+                        subject_ref=str(task["ref"]),
+                        source_event_id=f"inquiry-repair-job:{job_id}",
+                    )
+                    raise _llm_failure(completed, operation="inquiry_projection_repair")
+        projection = self.repository.put_inquiry_turn(
+            direction_id=_direction_id(direction_id),
+            task_id=str(task["task_id"]),
+            base_projection=base,
+            event=event,
+            patch=patch,
+            projection=applied["projection"],
+        )
+        decision = str(projection["readiness"]["decision"])
+        message = (
+            f"Scientific projection revision {projection['revision']} recorded. "
+            f"Disposition gate: {decision}."
+        )
+        self.repository.activity(
+            _direction_id(direction_id),
+            "inquiry",
+            "llm_projection_revised",
+            message,
+            {
+                "task_ref": task["ref"],
+                "provider_job_id": job_id,
+                "model": resolved_model,
+                "projection_digest": projection["digest"],
+                "patch_digest": patch["digest"],
+                "readiness": projection["readiness"],
+                "semantic_diff": applied["semantic_diff"],
+                "usage": patch.get("usage") or {},
+                "repair_attempts": repair_attempt,
+                "structural_normalizations": structural_normalizations,
+            },
+            actor=f"llm:{resolved_model}",
+            subject_ref=str(task["ref"]),
+        )
+        return {
+            "ok": True,
+            "message": message,
+            "projection": projection,
+            "patch": patch,
+            "event": event,
+            "semantic_diff": applied["semantic_diff"],
+            "structural_normalizations": structural_normalizations,
+            "llm_job": {
+                "job_id": job_id,
+                "request_id": current_request_id,
+                "model": resolved_model,
+                "status": "succeeded",
+                "usage": patch.get("usage") or {},
+                "repair_attempts": repair_attempt,
+            },
+        }
+
+    def accept_inquiry(
+        self,
+        direction_id: str,
+        *,
+        decision: str,
+        rationale: str,
+        accepted_by: str,
+        task_id: str | None = None,
+    ) -> dict[str, Any]:
+        token = _direction_id(direction_id)
+        inquiry = self.get_inquiry_projection(token, task_id=task_id)
+        projection = inquiry["projection"]
+        acceptance = accept_inquiry_projection(
+            projection,
+            acceptance_id=f"acceptance.{projection['inquiry_id']}.{projection['revision']}",
+            decision=decision,
+            accepted_by=accepted_by,
+            accepted_at=now(),
+            rationale=rationale,
+        )
+        self.repository.put_inquiry_acceptance(
+            direction_id=token,
+            task_id=str(inquiry["task_id"]),
+            acceptance=acceptance,
+        )
+        self.repository.activity(
+            token,
+            "inquiry",
+            "projection_decided",
+            f"Human inquiry decision {decision} recorded over revision {projection['revision']}.",
+            {
+                "task_ref": f"research-task:{inquiry['task_id']}",
+                "projection_digest": projection["digest"],
+                "acceptance_digest": acceptance["digest"],
+                "decision": decision,
+            },
+            actor=accepted_by,
+            subject_ref=f"research-task:{inquiry['task_id']}",
+        )
+        return {"ok": True, "projection": projection, "acceptance": acceptance}
+
+    def discover_inquiry_sources(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        model: str | None = None,
+        actor: str = "user:local",
+    ) -> dict[str, Any]:
+        """Run web search without admitting any result as scientific evidence."""
+
+        token = _direction_id(direction_id)
+        inquiry = self.get_inquiry_projection(token, task_id=task_id)
+        projection = dict(inquiry["projection"])
+        messages = build_source_discovery_messages(projection)
+        resolved_model = str(
+            model or os.getenv("ADAOS_RESEARCH_DISCOVERY_MODEL")
+            or os.getenv("ADAOS_RESEARCH_INQUIRY_MODEL") or "gpt-5.6"
+        ).strip()
+        discovery_id = (
+            f"discovery.{projection['inquiry_id']}.{len(inquiry['source_discoveries']) + 1}."
+            f"{uuid.uuid4().hex[:12]}"
+        )
+        request_id = f"adaos-{discovery_id}"
+        submitted = llm_client.submit_response_job(
+            messages,
+            model=resolved_model,
+            max_tokens=7000,
+            reasoning={"effort": "high"},
+            tools=[{"type": "web_search"}],
+            tool_choice="auto",
+            max_tool_calls=6,
+            request_id=request_id,
+            profile_scope="research.inquiry.source_discovery",
+            text={"verbosity": "low"},
+            stream=True,
+            timeout=30,
+        )
+        job_id = str(submitted.get("job_id") or "")
+        if not job_id:
+            raise RuntimeError("Root LLM did not return a job_id for source discovery")
+        base_url = str((submitted.get("_client") or {}).get("base_url") or "") or None
+        completed = llm_client.wait_response_job(
+            job_id,
+            base_url=base_url,
+            timeout_s=600,
+            poll_interval_s=1.5,
+        )
+        if str(completed.get("status") or "").lower() != "succeeded":
+            self.repository.activity(
+                token,
+                "inquiry",
+                "source_discovery_failed",
+                "Researcher web source discovery did not complete.",
+                {
+                    "task_ref": f"research-task:{inquiry['task_id']}",
+                    "projection_digest": projection["digest"],
+                    "provider_job_id": job_id,
+                    "model": resolved_model,
+                    "provider_status": completed.get("status"),
+                    "provider_error": completed.get("error"),
+                    "usage": normalize_llm_usage(completed),
+                },
+                actor=f"llm:{resolved_model}",
+                subject_ref=f"research-task:{inquiry['task_id']}",
+                source_event_id=f"inquiry-source-job:{job_id}",
+            )
+            raise _llm_failure(completed, operation="inquiry_source_discovery")
+        receipt = build_source_discovery_receipt(
+            _json_object(str(completed.get("output_text") or "")),
+            discovery_id=discovery_id,
+            projection=projection,
+            model=resolved_model,
+            provider_job_id=job_id,
+            usage=normalize_llm_usage(completed),
+            created_at=now(),
+        )
+        receipt = self.repository.put_source_discovery(
+            direction_id=token,
+            task_id=str(inquiry["task_id"]),
+            receipt=receipt,
+        )
+        self.repository.activity(
+            token,
+            "inquiry",
+            "source_candidates_discovered",
+            f"Researcher found {len(receipt['candidates'])} source candidates; none were admitted.",
+            {
+                "task_ref": f"research-task:{inquiry['task_id']}",
+                "projection_digest": projection["digest"],
+                "source_discovery_digest": receipt["digest"],
+                "provider_job_id": job_id,
+                "model": resolved_model,
+                "candidate_count": len(receipt["candidates"]),
+                "usage": receipt["usage"],
+            },
+            actor=actor,
+            subject_ref=f"research-task:{inquiry['task_id']}",
+        )
+        return {
+            "ok": True,
+            "receipt": receipt,
+            "message": (
+                f"Found {len(receipt['candidates'])} candidates. "
+                "They remain outside the evidence boundary."
+            ),
+        }
+
+    def reconcile_inquiry_usage(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        actor: str = "system:research_orchestrator",
+    ) -> dict[str, Any]:
+        """Backfill missing async Root usage without changing scientific state."""
+
+        token = _direction_id(direction_id)
+        inquiry = self.get_inquiry_projection(token, task_id=task_id)
+        task_ref = f"research-task:{inquiry['task_id']}"
+        jobs: dict[str, dict[str, Any]] = {}
+        for event in self.repository.activities(token, limit=500):
+            detail = event.get("detail") if isinstance(event.get("detail"), Mapping) else {}
+            job_id = str(detail.get("provider_job_id") or "").strip()
+            if not job_id:
+                continue
+            usage = detail.get("usage") if isinstance(detail.get("usage"), Mapping) else {}
+            jobs[job_id] = {"usage": dict(usage), "event": event}
+        reconciled: list[dict[str, Any]] = []
+        unresolved: list[dict[str, Any]] = []
+        for job_id, current in jobs.items():
+            usage = current["usage"]
+            if usage.get("accuracy") == "provider_reported" and int(
+                usage.get("total_tokens") or 0
+            ) > 0:
+                continue
+            try:
+                observed = llm_client.get_response_job(job_id, timeout=30)
+                normalized = normalize_llm_usage(observed)
+            except Exception as exc:
+                unresolved.append({"provider_job_id": job_id, "error": f"{type(exc).__name__}: {exc}"})
+                continue
+            if normalized["accuracy"] != "provider_reported":
+                unresolved.append({"provider_job_id": job_id, "error": "provider usage unavailable"})
+                continue
+            self.repository.activity(
+                token,
+                "accounting",
+                "researcher_usage_reconciled",
+                f"Researcher usage reconciled for provider job {job_id}.",
+                {
+                    "task_ref": task_ref,
+                    "provider_job_id": job_id,
+                    "usage": normalized,
+                    "reconciles_activity_event_id": current["event"].get("event_id"),
+                },
+                actor=actor,
+                subject_ref=task_ref,
+                source_event_id=f"researcher-usage-reconciled:{job_id}",
+            )
+            reconciled.append({"provider_job_id": job_id, "usage": normalized})
+        return {
+            "ok": True,
+            "direction_id": token,
+            "task_id": inquiry["task_id"],
+            "reconciled": reconciled,
+            "unresolved": unresolved,
         }
 
     def outline(self, direction_id: str) -> dict[str, Any]:
@@ -4916,6 +5584,20 @@ class ResearchOrchestrator:
         )
         projection = response.get("automation") if isinstance(response.get("automation"), Mapping) else response
         status = str(projection.get("status") or response.get("status") or "unknown").lower()
+        budget_usage = (
+            projection.get("budget_usage")
+            if isinstance(projection.get("budget_usage"), Mapping)
+            else response.get("budget_usage")
+            if isinstance(response.get("budget_usage"), Mapping)
+            else None
+        )
+        codex_usage_accounting = (
+            projection.get("codex_usage_accounting")
+            if isinstance(projection.get("codex_usage_accounting"), Mapping)
+            else response.get("codex_usage_accounting")
+            if isinstance(response.get("codex_usage_accounting"), Mapping)
+            else None
+        )
         normalized = {
             "completed": "implementation_complete",
             "succeeded": "implementation_complete",
@@ -4938,6 +5620,8 @@ class ResearchOrchestrator:
                 "failure_message": projection.get("error") or response.get("failure_message"),
                 "progress_message": response.get("progress_message"),
             },
+            "budget_usage": copy.deepcopy(budget_usage),
+            "codex_usage_accounting": copy.deepcopy(codex_usage_accounting),
         }
         updated_track = self.repository.record_track_evaluation(
             str(track["track_id"]),
@@ -4967,6 +5651,8 @@ class ResearchOrchestrator:
                 "implementation_track_ref": track["ref"],
                 "development_session_id": session["session_id"],
                 "automation": metadata["automation"],
+                "budget_usage": budget_usage,
+                "codex_usage_accounting": codex_usage_accounting,
             },
             actor=actor,
             origin="skill:builder_sdk_control_skill",

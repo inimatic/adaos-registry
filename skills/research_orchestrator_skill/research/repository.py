@@ -89,6 +89,30 @@ MIGRATIONS = (
             "CREATE UNIQUE INDEX research_prototypes_task_revision ON research_prototypes(task_id, revision)",
         ),
     ),
+    RelationalMigration(
+        version=6,
+        name="typed scientific inquiry projection ledger",
+        idempotent=True,
+        statements=(
+            "CREATE TABLE research_inquiries (inquiry_id TEXT PRIMARY KEY, direction_id TEXT NOT NULL, task_id TEXT NOT NULL UNIQUE, current_projection_digest TEXT, accepted_decision_digest TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+            "CREATE INDEX research_inquiries_direction ON research_inquiries(direction_id, updated_at)",
+            "CREATE TABLE research_discussion_events (digest TEXT PRIMARY KEY, event_id TEXT NOT NULL UNIQUE, inquiry_id TEXT NOT NULL, direction_id TEXT NOT NULL, task_id TEXT NOT NULL, ordinal INTEGER NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)",
+            "CREATE UNIQUE INDEX research_discussion_events_ordinal ON research_discussion_events(inquiry_id, ordinal)",
+            "CREATE TABLE research_projection_patches (digest TEXT PRIMARY KEY, patch_id TEXT NOT NULL UNIQUE, inquiry_id TEXT NOT NULL, direction_id TEXT NOT NULL, task_id TEXT NOT NULL, base_projection_digest TEXT NOT NULL, trigger_event_ref TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)",
+            "CREATE TABLE research_inquiry_projections (digest TEXT PRIMARY KEY, inquiry_id TEXT NOT NULL, direction_id TEXT NOT NULL, task_id TEXT NOT NULL, revision INTEGER NOT NULL, parent_digest TEXT, applied_patch_digest TEXT, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)",
+            "CREATE UNIQUE INDEX research_inquiry_projection_revision ON research_inquiry_projections(inquiry_id, revision)",
+            "CREATE TABLE research_inquiry_acceptances (digest TEXT PRIMARY KEY, acceptance_id TEXT NOT NULL UNIQUE, inquiry_id TEXT NOT NULL, direction_id TEXT NOT NULL, task_id TEXT NOT NULL, projection_digest TEXT NOT NULL, decision TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)",
+        ),
+    ),
+    RelationalMigration(
+        version=7,
+        name="typed source discovery receipts",
+        idempotent=True,
+        statements=(
+            "CREATE TABLE research_source_discoveries (digest TEXT PRIMARY KEY, discovery_id TEXT NOT NULL UNIQUE, inquiry_id TEXT NOT NULL, direction_id TEXT NOT NULL, task_id TEXT NOT NULL, projection_digest TEXT NOT NULL, provider_job_id TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)",
+            "CREATE INDEX research_source_discoveries_inquiry ON research_source_discoveries(inquiry_id, created_at)",
+        ),
+    ),
 )
 
 
@@ -905,6 +929,298 @@ class OrchestratorRepository:
             {"direction_id": direction_id},
         )[: max(1, min(int(limit), 500))]
         return [{**dict(row), "detail": json.loads(str(row["detail_json"]))} for row in reversed(rows)]
+
+    def latest_inquiry_projection(
+        self,
+        direction_id: str,
+        task_id: str,
+    ) -> dict[str, Any] | None:
+        inquiry = self._db.fetch_one(
+            "SELECT * FROM research_inquiries WHERE direction_id=:direction_id AND task_id=:task_id",
+            {"direction_id": direction_id, "task_id": task_id},
+        )
+        if not inquiry or not inquiry.get("current_projection_digest"):
+            return None
+        row = self._db.fetch_one(
+            "SELECT payload_json FROM research_inquiry_projections WHERE digest=:digest",
+            {"digest": inquiry["current_projection_digest"]},
+        )
+        return json.loads(str(row["payload_json"])) if row else None
+
+    def inquiry_state(self, direction_id: str, task_id: str) -> dict[str, Any] | None:
+        row = self._db.fetch_one(
+            "SELECT * FROM research_inquiries WHERE direction_id=:direction_id AND task_id=:task_id",
+            {"direction_id": direction_id, "task_id": task_id},
+        )
+        return dict(row) if row else None
+
+    def put_inquiry_event(
+        self,
+        *,
+        direction_id: str,
+        task_id: str,
+        base_projection: Mapping[str, Any],
+        event: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Persist raw discussion before interpretation or model execution."""
+
+        base_value = dict(base_projection)
+        event_value = dict(event)
+        inquiry_id = str(base_value["inquiry_id"])
+        with self._db.transaction() as tx:
+            existing_event = tx.fetch_one(
+                "SELECT payload_json FROM research_discussion_events WHERE digest=:digest",
+                {"digest": event_value["digest"]},
+            )
+            if existing_event:
+                return json.loads(str(existing_event["payload_json"]))
+            state = tx.fetch_one(
+                "SELECT * FROM research_inquiries WHERE task_id=:task_id",
+                {"task_id": task_id},
+            )
+            if state and (
+                str(state["direction_id"]) != direction_id
+                or str(state["inquiry_id"]) != inquiry_id
+            ):
+                raise ValueError("ResearchTask is already bound to another inquiry")
+            if state and str(state.get("current_projection_digest") or "") != str(
+                base_value["digest"]
+            ):
+                raise ValueError("discussion event does not bind the current inquiry revision")
+            if not state:
+                tx.execute(
+                    "INSERT INTO research_inquiries(inquiry_id, direction_id, task_id, current_projection_digest, accepted_decision_digest, created_at, updated_at) VALUES (:inquiry_id, :direction_id, :task_id, :base_digest, NULL, :created_at, :updated_at)",
+                    {
+                        "inquiry_id": inquiry_id,
+                        "direction_id": direction_id,
+                        "task_id": task_id,
+                        "base_digest": base_value["digest"],
+                        "created_at": event_value["created_at"],
+                        "updated_at": event_value["created_at"],
+                    },
+                )
+                tx.execute(
+                    "INSERT INTO research_inquiry_projections(digest, inquiry_id, direction_id, task_id, revision, parent_digest, applied_patch_digest, payload_json, created_at) VALUES (:digest, :inquiry_id, :direction_id, :task_id, :revision, :parent_digest, :applied_patch_digest, :payload_json, :created_at)",
+                    {
+                        "digest": base_value["digest"],
+                        "inquiry_id": inquiry_id,
+                        "direction_id": direction_id,
+                        "task_id": task_id,
+                        "revision": base_value["revision"],
+                        "parent_digest": base_value.get("parent_digest"),
+                        "applied_patch_digest": base_value.get("applied_patch_digest"),
+                        "payload_json": canonical_json(base_value),
+                        "created_at": base_value["created_at"],
+                    },
+                )
+            tx.execute(
+                "INSERT INTO research_discussion_events(digest, event_id, inquiry_id, direction_id, task_id, ordinal, payload_json, created_at) VALUES (:digest, :event_id, :inquiry_id, :direction_id, :task_id, :ordinal, :payload_json, :created_at)",
+                {
+                    "digest": event_value["digest"],
+                    "event_id": event_value["event_id"],
+                    "inquiry_id": inquiry_id,
+                    "direction_id": direction_id,
+                    "task_id": task_id,
+                    "ordinal": event_value["ordinal"],
+                    "payload_json": canonical_json(event_value),
+                    "created_at": event_value["created_at"],
+                },
+            )
+        return event_value
+
+    def put_inquiry_turn(
+        self,
+        *,
+        direction_id: str,
+        task_id: str,
+        base_projection: Mapping[str, Any],
+        event: Mapping[str, Any],
+        patch: Mapping[str, Any],
+        projection: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        event_value = dict(event)
+        patch_value = dict(patch)
+        projection_value = dict(projection)
+        inquiry_id = str(projection_value["inquiry_id"])
+        with self._db.transaction() as tx:
+            existing = tx.fetch_one(
+                "SELECT payload_json FROM research_inquiry_projections WHERE digest=:digest",
+                {"digest": projection_value["digest"]},
+            )
+            if existing:
+                return json.loads(str(existing["payload_json"]))
+            state = tx.fetch_one(
+                "SELECT * FROM research_inquiries WHERE task_id=:task_id",
+                {"task_id": task_id},
+            )
+            if state and (
+                str(state["direction_id"]) != direction_id
+                or str(state["inquiry_id"]) != inquiry_id
+            ):
+                raise ValueError("ResearchTask is already bound to another inquiry")
+            if state and str(state.get("current_projection_digest") or "") != str(
+                projection_value.get("parent_digest") or ""
+            ):
+                raise ValueError("inquiry projection parent is not the current durable revision")
+            if not state:
+                raise ValueError("discussion event must be persisted before its projection patch")
+            durable_event = tx.fetch_one(
+                "SELECT digest FROM research_discussion_events WHERE event_id=:event_id",
+                {"event_id": event_value["event_id"]},
+            )
+            if not durable_event or str(durable_event["digest"]) != str(event_value["digest"]):
+                raise ValueError("projection patch trigger event is not durable")
+            tx.execute(
+                "INSERT INTO research_projection_patches(digest, patch_id, inquiry_id, direction_id, task_id, base_projection_digest, trigger_event_ref, payload_json, created_at) VALUES (:digest, :patch_id, :inquiry_id, :direction_id, :task_id, :base_projection_digest, :trigger_event_ref, :payload_json, :created_at)",
+                {
+                    "digest": patch_value["digest"],
+                    "patch_id": patch_value["patch_id"],
+                    "inquiry_id": inquiry_id,
+                    "direction_id": direction_id,
+                    "task_id": task_id,
+                    "base_projection_digest": patch_value["base_projection_digest"],
+                    "trigger_event_ref": patch_value["trigger_event_ref"],
+                    "payload_json": canonical_json(patch_value),
+                    "created_at": patch_value["created_at"],
+                },
+            )
+            tx.execute(
+                "INSERT INTO research_inquiry_projections(digest, inquiry_id, direction_id, task_id, revision, parent_digest, applied_patch_digest, payload_json, created_at) VALUES (:digest, :inquiry_id, :direction_id, :task_id, :revision, :parent_digest, :applied_patch_digest, :payload_json, :created_at)",
+                {
+                    "digest": projection_value["digest"],
+                    "inquiry_id": inquiry_id,
+                    "direction_id": direction_id,
+                    "task_id": task_id,
+                    "revision": projection_value["revision"],
+                    "parent_digest": projection_value.get("parent_digest"),
+                    "applied_patch_digest": projection_value.get("applied_patch_digest"),
+                    "payload_json": canonical_json(projection_value),
+                    "created_at": projection_value["created_at"],
+                },
+            )
+            tx.execute(
+                "UPDATE research_inquiries SET current_projection_digest=:digest, updated_at=:updated_at WHERE inquiry_id=:inquiry_id",
+                {
+                    "digest": projection_value["digest"],
+                    "updated_at": projection_value["created_at"],
+                    "inquiry_id": inquiry_id,
+                },
+            )
+        return projection_value
+
+    def inquiry_events(self, direction_id: str, task_id: str) -> list[dict[str, Any]]:
+        rows = self._db.fetch_all(
+            "SELECT payload_json FROM research_discussion_events WHERE direction_id=:direction_id AND task_id=:task_id ORDER BY ordinal",
+            {"direction_id": direction_id, "task_id": task_id},
+        )
+        return [json.loads(str(row["payload_json"])) for row in rows]
+
+    def inquiry_patches(self, direction_id: str, task_id: str) -> list[dict[str, Any]]:
+        rows = self._db.fetch_all(
+            "SELECT payload_json FROM research_projection_patches WHERE direction_id=:direction_id AND task_id=:task_id ORDER BY created_at, patch_id",
+            {"direction_id": direction_id, "task_id": task_id},
+        )
+        return [json.loads(str(row["payload_json"])) for row in rows]
+
+    def put_inquiry_acceptance(
+        self,
+        *,
+        direction_id: str,
+        task_id: str,
+        acceptance: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        value = dict(acceptance)
+        with self._db.transaction() as tx:
+            state = tx.fetch_one(
+                "SELECT * FROM research_inquiries WHERE direction_id=:direction_id AND task_id=:task_id",
+                {"direction_id": direction_id, "task_id": task_id},
+            )
+            if not state or str(state.get("current_projection_digest") or "") != str(
+                value["projection_digest"]
+            ):
+                raise ValueError("only the current durable inquiry projection can be accepted")
+            existing = tx.fetch_one(
+                "SELECT payload_json FROM research_inquiry_acceptances WHERE digest=:digest",
+                {"digest": value["digest"]},
+            )
+            if existing:
+                return json.loads(str(existing["payload_json"]))
+            tx.execute(
+                "INSERT INTO research_inquiry_acceptances(digest, acceptance_id, inquiry_id, direction_id, task_id, projection_digest, decision, payload_json, created_at) VALUES (:digest, :acceptance_id, :inquiry_id, :direction_id, :task_id, :projection_digest, :decision, :payload_json, :created_at)",
+                {
+                    "digest": value["digest"],
+                    "acceptance_id": value["acceptance_id"],
+                    "inquiry_id": value["inquiry_id"],
+                    "direction_id": direction_id,
+                    "task_id": task_id,
+                    "projection_digest": value["projection_digest"],
+                    "decision": value["decision"],
+                    "payload_json": canonical_json(value),
+                    "created_at": value["accepted_at"],
+                },
+            )
+            tx.execute(
+                "UPDATE research_inquiries SET accepted_decision_digest=:digest, updated_at=:updated_at WHERE inquiry_id=:inquiry_id",
+                {
+                    "digest": value["digest"],
+                    "updated_at": value["accepted_at"],
+                    "inquiry_id": value["inquiry_id"],
+                },
+            )
+        return value
+
+    def get_inquiry_acceptance(self, direction_id: str, task_id: str) -> dict[str, Any] | None:
+        state = self.inquiry_state(direction_id, task_id)
+        digest_value = str((state or {}).get("accepted_decision_digest") or "")
+        if not digest_value:
+            return None
+        row = self._db.fetch_one(
+            "SELECT payload_json FROM research_inquiry_acceptances WHERE digest=:digest",
+            {"digest": digest_value},
+        )
+        return json.loads(str(row["payload_json"])) if row else None
+
+    def put_source_discovery(
+        self,
+        *,
+        direction_id: str,
+        task_id: str,
+        receipt: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        value = dict(receipt)
+        state = self.inquiry_state(direction_id, task_id)
+        if not state or str(state.get("inquiry_id") or "") != str(value["inquiry_id"]):
+            raise ValueError("source discovery does not belong to the active inquiry")
+        if str(state.get("current_projection_digest") or "") != str(value["projection_digest"]):
+            raise ValueError("source discovery must bind the current durable projection")
+        existing = self._db.fetch_one(
+            "SELECT payload_json FROM research_source_discoveries WHERE digest=:digest",
+            {"digest": value["digest"]},
+        )
+        if existing:
+            return json.loads(str(existing["payload_json"]))
+        self._db.execute(
+            "INSERT INTO research_source_discoveries(digest, discovery_id, inquiry_id, direction_id, task_id, projection_digest, provider_job_id, payload_json, created_at) VALUES (:digest, :discovery_id, :inquiry_id, :direction_id, :task_id, :projection_digest, :provider_job_id, :payload_json, :created_at)",
+            {
+                "digest": value["digest"],
+                "discovery_id": value["discovery_id"],
+                "inquiry_id": value["inquiry_id"],
+                "direction_id": direction_id,
+                "task_id": task_id,
+                "projection_digest": value["projection_digest"],
+                "provider_job_id": value["producer"]["provider_job_id"],
+                "payload_json": canonical_json(value),
+                "created_at": value["created_at"],
+            },
+        )
+        return value
+
+    def source_discoveries(self, direction_id: str, task_id: str) -> list[dict[str, Any]]:
+        rows = self._db.fetch_all(
+            "SELECT payload_json FROM research_source_discoveries WHERE direction_id=:direction_id AND task_id=:task_id ORDER BY created_at, discovery_id",
+            {"direction_id": direction_id, "task_id": task_id},
+        )
+        return [json.loads(str(row["payload_json"])) for row in rows]
 
     def put_formulation_stage(
         self,

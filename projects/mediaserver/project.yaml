@@ -1,0 +1,46 @@
+schema: adaos.project.v1
+kind: project
+id: mediaserver
+version: 0.1.1
+profiles:
+- adaos.builder.component_project.v1
+components:
+  owned:
+  - ref: skill:mediaserver
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations:
+    - uses
+  dependencies: []
+entrypoints: []
+catalog:
+  title: mediaserver
+  description: Local MVP media debugging skill for upload/playback diagnostics and
+    media-channel readiness checks.
+  categories:
+  - development
+  tags:
+  - builder-managed
+  - legacy-component
+publication:
+  stage: alpha
+  visibility: unlisted
+  channel: stable
+install:
+  default: false
+  features:
+  - id: default
+    title: mediaserver
+    default: true
+    optional: false
+    components:
+    - skill:mediaserver
+compatibility: {}
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-09-02T19:20:20.253057Z'
+created_by: codex:e2e

@@ -409,6 +409,107 @@ def _markdown_lines(items: Any, *, empty: str = "—") -> str:
     return "\n".join(f"- {item}" for item in values) or empty
 
 
+@tool(summary="Read the live typed scientific inquiry projection and disposition gate.", side_effects="none")
+def get_inquiry_projection(
+    direction_id: str,
+    task_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    result = _orchestrator().get_inquiry_projection(direction_id, task_id=task_id)
+    projection = result["projection"]
+    records = projection["records"]
+    readiness = projection["readiness"]
+    measures = projection["measures"]
+
+    def active(collection: str) -> list[Mapping[str, Any]]:
+        return [
+            item
+            for item in records[collection]
+            if item.get("status") in {"proposed", "contested"}
+        ]
+
+    frames = [
+        f"**{item['id']}** — {item['statement']}  \n"
+        f"Scope: `{item['attributes'].get('scope', '—')}` · derivation: `{item['derivation']}`"
+        for item in active("problem_frames")
+    ]
+    dispositions = [
+        f"**{item['id']}** → `{item['attributes'].get('disposition', 'unresolved')}` "
+        f"(`{item['attributes'].get('assessment_status', 'provisional')}`)  \n"
+        f"{item['attributes'].get('rationale') or item['statement']}  \n"
+        f"Reconsider when: `{item['attributes'].get('reconsideration_conditions') or []}`"
+        for item in active("problem_dispositions")
+    ]
+    claims = [
+        f"**{item['id']}** `{item['attributes'].get('epistemic_status', item['derivation'])}` — "
+        f"{item['statement']}"
+        for item in active("knowledge_claims")
+    ]
+    questions = [
+        f"**{item['id']}** — {item['statement']}"
+        for item in [*active("research_questions"), *active("hypotheses")]
+    ]
+    tasks = [
+        f"**{item['id']}** `{item['attributes'].get('task_kind', 'unknown')}` — "
+        f"{item['attributes'].get('objective') or item['statement']}"
+        for item in active("task_candidates")
+    ]
+    searches = [
+        f"**{item['id']}** - `{item['attributes'].get('query', '')}`  \n"
+        f"Stop: {item['attributes'].get('stop_rule', '-')}"
+        for item in active("search_requests")
+    ]
+    discoveries = list(result.get("source_discoveries") or [])
+    latest_discovery = discoveries[-1] if discoveries else {}
+    candidates = [
+        f"**{item.get('title') or item.get('candidate_id')}** "
+        f"`{item.get('discovery_status')}`  \n"
+        f"{item.get('url')}  \n"
+        f"DOI: `{(item.get('identifiers') or {}).get('doi') or '-'}` - "
+        f"OA: `{(item.get('open_access') or {}).get('status') or 'unknown'}` - "
+        f"{item.get('relevance') or ''}"
+        for item in latest_discovery.get("candidates") or []
+    ]
+    latest_diff = None
+    for activity in reversed(OrchestratorRepository().activities(direction_id, limit=100)):
+        detail = activity.get("detail") if isinstance(activity.get("detail"), Mapping) else {}
+        if detail.get("semantic_diff"):
+            latest_diff = detail["semantic_diff"]
+            break
+    changes = [
+        f"`{item.get('action')}` {item.get('target_type')} **{item.get('target_id')}**"
+        for item in (latest_diff or {}).get("changes") or []
+    ]
+    content = (
+        f"## Scientific projection · revision {projection['revision']}\n\n"
+        f"**Disposition gate:** `{readiness['decision']}`  \n"
+        f"Allowed: `{readiness['admitted_transitions']}`  \n"
+        f"Digest: `{projection['digest']}`\n\n"
+        f"### Problem frames\n\n{_markdown_lines(frames)}\n\n"
+        f"### Problem disposition\n\n{_markdown_lines(dispositions)}\n\n"
+        f"### Known, inferred, and proposed claims\n\n{_markdown_lines(claims)}\n\n"
+        f"### Questions and hypotheses\n\n{_markdown_lines(questions)}\n\n"
+        f"### Candidate next tasks\n\n{_markdown_lines(tasks)}\n\n"
+        f"### Search requests\n\n{_markdown_lines(searches)}\n\n"
+        f"### Latest source candidates (not evidence)\n\n{_markdown_lines(candidates)}\n\n"
+        f"### Blockers\n\n{_markdown_lines(readiness['blockers'])}\n\n"
+        f"### Scientific measures\n\n"
+        f"Unclassified frames: `{measures['unclassified_problem_count']}` · "
+        f"untraceable: `{measures['untraceable_record_count']}` · "
+        f"unsupported source claims: `{measures['unsupported_source_claim_count']}` · "
+        f"incompatible tasks: `{measures['incompatible_task_count']}`\n\n"
+        f"### Latest semantic diff\n\n{_markdown_lines(changes)}"
+    )
+    return {
+        **result,
+        "readiness_decision": readiness["decision"],
+        "admitted_transitions": readiness["admitted_transitions"],
+        "blockers": readiness["blockers"],
+        "latest_semantic_diff": latest_diff,
+        "content": content,
+    }
+
+
 @tool(summary="Read the evolving human-readable research consensus.", side_effects="none")
 def get_consensus(direction_id: str, task_id: str | None = None, **_: Any) -> dict[str, Any]:
     state = _orchestrator().get(direction_id, task_id=task_id)
@@ -569,6 +670,101 @@ def get_automation_brief(
         "language": "json",
         "codex_started": False,
     }
+
+
+@tool(summary="Discuss an idea and update only its typed scientific projection.", side_effects="local_write")
+def inquiry_chat(
+    direction_id: str,
+    text: str,
+    task_id: str | None = None,
+    model: str | None = None,
+    actor: str | None = None,
+    invocation_origin: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+    **payload: Any,
+) -> dict[str, Any]:
+    dialog_payload = dict(payload)
+    if task_id:
+        dialog_payload["task_id"] = task_id
+    if invocation_origin:
+        dialog_payload["invocation_origin"] = invocation_origin
+    if _meta:
+        dialog_payload["_meta"] = dict(_meta)
+    return _orchestrator().discuss_inquiry(
+        direction_id,
+        text,
+        model=model,
+        actor=actor,
+        dialog_payload=dialog_payload,
+    )
+
+
+@tool(summary="Discover source candidates for active typed SearchRequests.", side_effects="external_read")
+def discover_inquiry_sources(
+    direction_id: str,
+    task_id: str | None = None,
+    model: str | None = None,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().discover_inquiry_sources(
+        direction_id,
+        task_id=task_id,
+        model=model,
+        actor=actor,
+    )
+
+
+@tool(summary="Reconcile missing Researcher LLM usage from durable Root jobs.", side_effects="external_read")
+def reconcile_inquiry_usage(
+    direction_id: str,
+    task_id: str | None = None,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().reconcile_inquiry_usage(
+        direction_id,
+        task_id=task_id,
+        actor=actor,
+    )
+
+
+@tool(summary="Record one externally reviewed inquiry projection patch.", side_effects="local_write")
+def record_inquiry_turn(
+    direction_id: str,
+    text: str,
+    patch: Mapping[str, Any],
+    task_id: str | None = None,
+    actor: str = "user:local",
+    patch_actor_kind: str = "human",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().record_inquiry_turn(
+        direction_id,
+        text,
+        patch,
+        actor=actor,
+        patch_actor_kind=patch_actor_kind,
+        dialog_payload={"task_id": task_id} if task_id else None,
+    )
+
+
+@tool(summary="Record a human decision over one exact inquiry projection.", side_effects="local_write")
+def decide_inquiry_projection(
+    direction_id: str,
+    decision: str,
+    rationale: str,
+    accepted_by: str = "user:local",
+    task_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().accept_inquiry(
+        direction_id,
+        decision=decision,
+        rationale=rationale,
+        accepted_by=accepted_by,
+        task_id=task_id,
+    )
 
 
 @tool(summary="Bind and open the exact pre-Codex Development Session in Builder.", side_effects="local_write")
@@ -831,6 +1027,7 @@ def get_activity(
             "output_digest": item.get("output_digest"),
             "resolved_model": item["telemetry"].get("resolved_model"),
             "resolved_provider": item["telemetry"].get("resolved_provider"),
+            "provider_job_id": item["telemetry"].get("provider_job_id"),
             "structured_output": item["telemetry"].get("structured_output"),
             "repair_attempts": item["telemetry"].get("repair_attempts", 0),
             "aggregate_usage": item["telemetry"].get("aggregate_usage") or item["telemetry"].get("usage") or {},
@@ -838,6 +1035,9 @@ def get_activity(
         }
         for item in stages
     ]
+    usage_summary = _research_usage_summary(events, stage_summaries)
+    researcher = usage_summary["researcher_llm"]
+    builder = usage_summary["builder_codex"]
     stage_lines = "\n".join(
         f"- `{item['run_id']}` · **{item['stage_index']}/4 {item['stage_name']}** · `{item['status']}` · "
         f"model `{item.get('resolved_model') or 'unknown'}` · structured `{item.get('structured_output')}` · repairs `{item.get('repair_attempts', 0)}`"
@@ -846,10 +1046,102 @@ def get_activity(
     )
     event_lines = "\n".join(f"- `{item['seq']:03d}` **{item['stage']} / {item['status']}** — {item['message']}" for item in events)
     content = (
+        f"## Token accounting\n\n"
+        f"- Researcher LLM: `{researcher['total_tokens']}` known tokens across "
+        f"`{researcher['provider_reported_jobs']}` provider-reported jobs; "
+        f"unknown jobs `{researcher['unknown_usage_jobs']}`.\n"
+        f"- Builder Codex: `{builder['total_tokens']}` known tokens across "
+        f"`{builder['provider_reported_runs']}` Builder runs; "
+        f"unknown runs `{builder['unknown_usage_runs']}`.\n"
+        f"- Interactive Codex session tokens are excluded.\n\n"
         f"## Formulation stages\n\n{stage_lines or 'No staged formulation runs yet.'}\n\n"
         f"## Activity events\n\n{event_lines or 'No activity events yet.'}"
     )
-    return {"ok": True, "direction_id": direction_id, "events": events, "formulation_stages": stage_summaries, "content": content}
+    return {
+        "ok": True,
+        "direction_id": direction_id,
+        "events": events,
+        "formulation_stages": stage_summaries,
+        "usage_summary": usage_summary,
+        "content": content,
+    }
+
+
+def _research_usage_summary(
+    events: list[Mapping[str, Any]],
+    stages: list[Mapping[str, Any]],
+) -> dict[str, Any]:
+    researcher_jobs: dict[str, Mapping[str, Any]] = {}
+    builder_runs: dict[str, Mapping[str, Any]] = {}
+
+    for item in stages:
+        usage = item.get("aggregate_usage") if isinstance(item.get("aggregate_usage"), Mapping) else {}
+        if not usage or str(item.get("resolved_model") or "") == "not_invoked":
+            continue
+        key = str(item.get("provider_job_id") or f"stage:{item.get('run_id')}:{item.get('stage_name')}")
+        researcher_jobs[key] = usage
+    for event in events:
+        detail = event.get("detail") if isinstance(event.get("detail"), Mapping) else {}
+        usage = detail.get("usage") if isinstance(detail.get("usage"), Mapping) else None
+        provider_job_id = str(detail.get("provider_job_id") or "").strip()
+        if usage is not None and provider_job_id:
+            researcher_jobs[provider_job_id] = usage
+        accounting = (
+            detail.get("codex_usage_accounting")
+            if isinstance(detail.get("codex_usage_accounting"), Mapping)
+            else None
+        )
+        budget = detail.get("budget_usage") if isinstance(detail.get("budget_usage"), Mapping) else {}
+        observed = budget.get("observed") if isinstance(budget.get("observed"), Mapping) else {}
+        automation = detail.get("automation") if isinstance(detail.get("automation"), Mapping) else {}
+        run_id = str(
+            (accounting or {}).get("task_id")
+            or automation.get("task_id")
+            or ""
+        ).strip()
+        if run_id:
+            builder_runs[run_id] = accounting or (
+                {**observed, "accuracy": "provider_reported"}
+                if int(observed.get("model_tokens") or 0) > 0
+                else {"total_tokens": None, "accuracy": "unavailable"}
+            )
+
+    def aggregate(values: Mapping[str, Mapping[str, Any]], *, run_label: str) -> dict[str, Any]:
+        known = 0
+        unknown = 0
+        totals = {
+            "input_tokens": 0,
+            "cached_input_tokens": 0,
+            "output_tokens": 0,
+            "reasoning_tokens": 0,
+            "total_tokens": 0,
+        }
+        for usage in values.values():
+            total = usage.get("total_tokens")
+            if total is None and "model_tokens" in usage:
+                total = usage.get("model_tokens")
+            accuracy = str(usage.get("accuracy") or "")
+            if total is None or accuracy == "unavailable":
+                unknown += 1
+                continue
+            known += 1
+            totals["input_tokens"] += int(usage.get("input_tokens") or 0)
+            totals["cached_input_tokens"] += int(usage.get("cached_input_tokens") or 0)
+            totals["output_tokens"] += int(usage.get("output_tokens") or 0)
+            totals["reasoning_tokens"] += int(usage.get("reasoning_tokens") or 0)
+            totals["total_tokens"] += int(total or 0)
+        return {
+            **totals,
+            f"provider_reported_{run_label}": known,
+            f"unknown_usage_{run_label}": unknown,
+            "exact_total_available": unknown == 0,
+        }
+
+    return {
+        "researcher_llm": aggregate(researcher_jobs, run_label="jobs"),
+        "builder_codex": aggregate(builder_runs, run_label="runs"),
+        "interactive_codex_included": False,
+    }
 
 
 @tool(summary="Read the exact persisted artifacts and telemetry for one formulation run.", side_effects="none")

@@ -26,6 +26,7 @@
   "builder.text.stage": "Stage",
   "builder.text.dev.workspace": "DEV workspace",
   "builder.text.choose.project": "Choose project",
+  "builder.text.selected.object.not.found": "Selected project, skill, or scenario was not found",
   "builder.text.lifecycle": "Lifecycle",
   "builder.text.make.current": "Make current",
   "builder.text.stabilize": "Stabilize",
@@ -178,5 +179,10 @@
   "builder.text.change": "Change",
   "builder.text.development.feedback": "Development feedback",
   "builder.text.development.feedback.filters": "Feedback filters",
-  "builder.text.development.feedback.detail": "Feedback detail"
+  "builder.text.development.feedback.detail": "Feedback detail",
+  "builder.text.prototype.review": "Prototype review",
+  "builder.text.prototype.acceptance.evidence": "Acceptance evidence",
+  "builder.text.prototype.behavior.evidence": "Behavior check reference",
+  "builder.text.prototype.compact.evidence": "Compact screenshot reference",
+  "builder.text.prototype.wide.evidence": "Wide screenshot reference"
 }
