@@ -1,20 +1,23 @@
 schema: adaos.project.v1
 kind: project
 id: new_face_vision
-version: 0.2.17
-profiles: [adaos.vision.inspection.v1]
+version: 0.2.18
+profiles:
+- adaos.vision.inspection.v1
 components:
   owned:
   - ref: scenario:new_face_vision_scenario
     role: primary
     exposure: application
     lifecycle: bound
-    relations: [presents]
+    relations:
+    - presents
   - ref: skill:new_face_vision_skill
     role: implementation
     exposure: project_only
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   dependencies: []
 entrypoints:
 - id: inspection
@@ -25,14 +28,19 @@ entrypoints:
 catalog:
   title: New Face Vision
   title_i18n:
-    en: "New Face Vision"
-    ru: "\u0418\u043d\u0441\u043f\u0435\u043a\u0446\u0438\u044f New Face Vision"
+    en: New Face Vision
+    ru: Инспекция New Face Vision
   description: Desktop video frame analysis for stone defect inspection.
   description_i18n:
-    en: "Desktop video frame analysis for stone defect inspection."
-    ru: "\u0410\u043d\u0430\u043b\u0438\u0437 \u0432\u0438\u0434\u0435\u043e\u043a\u0430\u0434\u0440\u043e\u0432 \u043d\u0430 \u0440\u0430\u0431\u043e\u0447\u0435\u043c \u0441\u0442\u043e\u043b\u0435 \u0434\u043b\u044f \u0438\u043d\u0441\u043f\u0435\u043a\u0446\u0438\u0438 \u0434\u0435\u0444\u0435\u043a\u0442\u043e\u0432 \u043a\u0430\u043c\u043d\u044f."
-  categories: [vision]
-  tags: [inspection, video, deeplabv3, alpha]
+    en: Desktop video frame analysis for stone defect inspection.
+    ru: Анализ видеокадров на рабочем столе для инспекции дефектов камня.
+  categories:
+  - vision
+  tags:
+  - inspection
+  - video
+  - deeplabv3
+  - alpha
 publication:
   stage: alpha
   visibility: listed
@@ -43,14 +51,18 @@ install:
   - id: inspection
     title: Vision inspection
     title_i18n:
-      en: "Vision inspection"
-      ru: "\u0412\u0438\u0437\u0443\u0430\u043b\u044c\u043d\u0430\u044f \u0438\u043d\u0441\u043f\u0435\u043a\u0446\u0438\u044f"
+      en: Vision inspection
+      ru: Визуальная инспекция
     default: true
     optional: false
-    components: [scenario:new_face_vision_scenario, skill:new_face_vision_skill]
+    components:
+    - scenario:new_face_vision_scenario
+    - skill:new_face_vision_skill
 compatibility:
-  required_entrypoints: [inspection]
-  validation_profiles: [vision.inspection.local]
+  required_entrypoints:
+  - inspection
+  validation_profiles:
+  - vision.inspection.local
 lifecycle:
   uninstall:
     components: remove_if_unreferenced
