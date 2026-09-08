@@ -1,28 +1,35 @@
 schema: adaos.project.v1
 kind: project
 id: ai_event_analysis_lab
-version: 0.2.22
-profiles: [adaos.analysis.events.v1]
+version: 0.2.23
+profiles:
+- adaos.analysis.events.v1
 components:
   owned:
   - ref: skill:ai_event_analysis_skill
     role: primary
     exposure: advanced
     lifecycle: bound
-    relations: [evaluates]
+    relations:
+    - evaluates
   dependencies: []
 entrypoints: []
 catalog:
   title: AI Event Analysis Lab
   title_i18n:
-    en: "AI Event Analysis Lab"
-    ru: "\u041b\u0430\u0431\u043e\u0440\u0430\u0442\u043e\u0440\u0438\u044f \u0430\u043d\u0430\u043b\u0438\u0437\u0430 AI-\u0441\u043e\u0431\u044b\u0442\u0438\u0439"
+    en: AI Event Analysis Lab
+    ru: Лаборатория анализа AI-событий
   description: Measurable AI/ML analysis of AdaOS operational event windows.
   description_i18n:
-    en: "Measurable AI/ML analysis of AdaOS operational event windows."
-    ru: "\u0418\u0437\u043c\u0435\u0440\u0438\u043c\u044b\u0439 AI/ML-\u0430\u043d\u0430\u043b\u0438\u0437 \u043e\u043a\u043e\u043d \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u043e\u043d\u043d\u044b\u0445 \u0441\u043e\u0431\u044b\u0442\u0438\u0439 AdaOS."
-  categories: [operations, research]
-  tags: [event-analysis, lab, alpha]
+    en: Measurable AI/ML analysis of AdaOS operational event windows.
+    ru: Измеримый AI/ML-анализ окон операционных событий AdaOS.
+  categories:
+  - operations
+  - research
+  tags:
+  - event-analysis
+  - lab
+  - alpha
 publication:
   stage: alpha
   visibility: unlisted
@@ -30,7 +37,8 @@ publication:
 install:
   default: false
 compatibility:
-  validation_profiles: [analysis.events.local]
+  validation_profiles:
+  - analysis.events.local
 lifecycle:
   uninstall:
     components: remove_if_unreferenced
