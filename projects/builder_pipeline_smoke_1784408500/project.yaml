@@ -1,20 +1,23 @@
 schema: adaos.project.v1
 kind: project
 id: builder_pipeline_smoke_1784408500
-version: 0.0.3
-profiles: [adaos.builder.fixture.v1]
+version: 0.0.4
+profiles:
+- adaos.builder.fixture.v1
 components:
   owned:
   - ref: scenario:builder_pipeline_smoke_1784408500
     role: primary
     exposure: advanced
     lifecycle: bound
-    relations: [presents]
+    relations:
+    - presents
   - ref: skill:builder_pipeline_smoke_1784408500_skill
     role: implementation
     exposure: project_only
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   dependencies: []
 entrypoints:
 - id: smoke
@@ -25,14 +28,18 @@ entrypoints:
 catalog:
   title: Builder Pipeline Smoke
   title_i18n:
-    en: "Builder Pipeline Smoke"
-    ru: "Smoke-\u0442\u0435\u0441\u0442 Builder Pipeline"
+    en: Builder Pipeline Smoke
+    ru: Smoke-тест Builder Pipeline
   description: Internal SDK-only fixture for Builder pipeline proof.
   description_i18n:
-    en: "Internal SDK-only fixture for Builder pipeline proof."
-    ru: "\u0412\u043d\u0443\u0442\u0440\u0435\u043d\u043d\u0438\u0439 SDK-only \u0441\u0442\u0435\u043d\u0434 \u0434\u043b\u044f \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438 pipeline Builder."
-  categories: [development]
-  tags: [internal, smoke, fixture]
+    en: Internal SDK-only fixture for Builder pipeline proof.
+    ru: Внутренний SDK-only стенд для проверки pipeline Builder.
+  categories:
+  - development
+  tags:
+  - internal
+  - smoke
+  - fixture
 publication:
   stage: internal
   visibility: hidden
@@ -40,8 +47,10 @@ publication:
 install:
   default: false
 compatibility:
-  required_entrypoints: [smoke]
-  validation_profiles: [builder.fixture]
+  required_entrypoints:
+  - smoke
+  validation_profiles:
+  - builder.fixture
 lifecycle:
   uninstall:
     components: remove_if_unreferenced
