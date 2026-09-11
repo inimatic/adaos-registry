@@ -4,7 +4,7 @@
     "type": "desktop",
     "title": "Builder — рабочее место разработки",
     "description": "Safe local Builder prototype for the dependent Prototype, Automation, Trial, and Publication lifecycle.",
-    "version": "0.2.81",
+    "version": "0.2.83",
     "title_i18n": {
         "fallback": "Builder",
         "key": "scenario.builder.title"
@@ -4518,7 +4518,7 @@
                 }
             }
         },
-        "version": "0.2.81",
+        "version": "0.2.83",
         "user_summary": {
             "assumptions": [
                 "Lifecycle selection is navigation only; it never changes the editable process or Preview target.",
@@ -4541,5 +4541,5 @@
         },
         "manifest": "webui.json"
     },
-    "updated_at": "2026-09-08T19:45:02+00:00"
+    "updated_at": "2026-09-11T05:55:29+00:00"
 }

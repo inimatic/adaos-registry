@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.105
+version: 0.1.107
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -2328,7 +2328,7 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-09-08T19:45:40+00:00'
+updated_at: '2026-09-11T05:56:02+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.1002+6139.cdc1a0cfc

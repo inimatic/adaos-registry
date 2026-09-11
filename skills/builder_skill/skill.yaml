@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.3.145
+version: 0.3.163
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -11,6 +11,7 @@ runtime:
 capabilities:
 - applications.develop
 - applications.publish
+- storage.relational
 default_tool: chat
 dependencies: []
 events:
@@ -643,11 +644,11 @@ tools:
 data_routes:
 - surface: builder rapid prototype preview
   route: skill-local
-  path: skill_memory:builder_skill.sessions
+  path: relational:builder_state
   owner: skill:builder_skill
   first_paint: empty Builder session with a prompt to describe the application
-  recovery: get_preview_state rebuilds preview from skill-local session and dev scenario
-    files
+  recovery: lazily migrate legacy skill_env keys; get_preview_state rebuilds preview
+    from owner-scoped relational state and dev scenario files
   guard_visibility: Builder reports degraded preview state in tool response
   budget:
     max_items: 25
@@ -735,7 +736,7 @@ conversation:
     - builder
     - buikder
     - билдер
-updated_at: '2026-09-08T19:45:17+00:00'
+updated_at: '2026-09-11T05:55:42+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.1001+6134.0c3bea8cd
