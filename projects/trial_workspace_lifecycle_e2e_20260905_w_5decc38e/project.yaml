@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: trial_workspace_lifecycle_e2e_20260905_w_5decc38e
-version: 0.1.5
+version: 0.1.6
 profiles: []
 components:
   owned:
