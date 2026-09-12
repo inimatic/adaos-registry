@@ -1,20 +1,23 @@
 schema: adaos.project.v1
 kind: project
 id: home_shopping_list_14504c40
-version: 0.0.6
-profiles: [adaos.home.shopping_list.v1]
+version: 0.0.9
+profiles:
+- adaos.home.shopping_list.v1
 components:
   owned:
   - ref: scenario:shopping_list_14504c40
     role: primary
     exposure: application
     lifecycle: bound
-    relations: [presents]
+    relations:
+    - presents
   - ref: skill:shopping_list_14504c40_skill
     role: implementation
     exposure: project_only
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   dependencies: []
 entrypoints:
 - id: shopping-list
@@ -25,14 +28,19 @@ entrypoints:
 catalog:
   title: Home Shopping List 14504c40
   title_i18n:
-    en: "Home Shopping List 14504c40"
-    ru: "\u0414\u043e\u043c\u0430\u0448\u043d\u0438\u0439 \u0441\u043f\u0438\u0441\u043e\u043a \u043f\u043e\u043a\u0443\u043f\u043e\u043a 14504c40"
+    en: Home Shopping List 14504c40
+    ru: Домашний список покупок 14504c40
   description: Published alpha recipe book and shopping-list instance.
   description_i18n:
-    en: "Published alpha recipe book and shopping-list instance."
-    ru: "\u041e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u043d\u044b\u0439 alpha-\u044d\u043a\u0437\u0435\u043c\u043f\u043b\u044f\u0440 \u043a\u043d\u0438\u0433\u0438 \u0440\u0435\u0446\u0435\u043f\u0442\u043e\u0432 \u0438 \u0441\u043f\u0438\u0441\u043a\u0430 \u043f\u043e\u043a\u0443\u043f\u043e\u043a."
-  categories: [home]
-  tags: [recipes, shopping-list, alpha, instance]
+    en: Published alpha recipe book and shopping-list instance.
+    ru: Опубликованный alpha-экземпляр книги рецептов и списка покупок.
+  categories:
+  - home
+  tags:
+  - recipes
+  - shopping-list
+  - alpha
+  - instance
 publication:
   stage: alpha
   visibility: listed
@@ -43,14 +51,18 @@ install:
   - id: shopping-list
     title: Shopping list
     title_i18n:
-      en: "Shopping list"
-      ru: "\u0421\u043f\u0438\u0441\u043e\u043a \u043f\u043e\u043a\u0443\u043f\u043e\u043a"
+      en: Shopping list
+      ru: Список покупок
     default: true
     optional: false
-    components: [scenario:shopping_list_14504c40, skill:shopping_list_14504c40_skill]
+    components:
+    - scenario:shopping_list_14504c40
+    - skill:shopping_list_14504c40_skill
 compatibility:
-  required_entrypoints: [shopping-list]
-  validation_profiles: [home.shopping_list.alpha]
+  required_entrypoints:
+  - shopping-list
+  validation_profiles:
+  - home.shopping_list.alpha
 lifecycle:
   uninstall:
     components: remove_if_unreferenced
