@@ -1,40 +1,47 @@
 schema: adaos.project.v1
 kind: project
 id: ops_infrascope
-version: 0.10.21
-profiles: [adaos.operations.infrascope.v1]
+version: 0.10.22
+profiles:
+- adaos.operations.infrascope.v1
 components:
   owned:
   - ref: scenario:infrascope
     role: primary
     exposure: application
     lifecycle: bound
-    relations: [presents]
+    relations:
+    - presents
   - ref: skill:infrascope_skill
     role: implementation
     exposure: project_only
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   - ref: skill:infrastate_skill
     role: supporting
     exposure: application
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   - ref: skill:infra_access_skill
     role: supporting
     exposure: advanced
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   - ref: skill:subnet_env
     role: supporting
     exposure: advanced
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   - ref: skill:service_doctor_skill
     role: supporting
     exposure: advanced
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   dependencies: []
 entrypoints:
 - id: infrascope
@@ -45,14 +52,23 @@ entrypoints:
 catalog:
   title: Infrascope Operations
   title_i18n:
-    en: "Infrascope Operations"
-    ru: "\u041e\u043f\u0435\u0440\u0430\u0446\u0438\u0438 Infrascope"
-  description: Operator inventory, infrastructure state, access, subnet, and service diagnostics.
+    en: Infrascope Operations
+    ru: Операции Infrascope
+  description: Operator inventory, infrastructure state, access, subnet, and service
+    diagnostics.
   description_i18n:
-    en: "Operator inventory, infrastructure state, access, subnet, and service diagnostics."
-    ru: "\u0418\u043d\u0432\u0435\u043d\u0442\u0430\u0440\u0438\u0437\u0430\u0446\u0438\u044f \u043e\u043f\u0435\u0440\u0430\u0442\u043e\u0440\u0430, \u0441\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u0435 \u0438\u043d\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043a\u0442\u0443\u0440\u044b, \u0434\u043e\u0441\u0442\u0443\u043f, \u043f\u043e\u0434\u0441\u0435\u0442\u044c \u0438 \u0434\u0438\u0430\u0433\u043d\u043e\u0441\u0442\u0438\u043a\u0430 \u0441\u0435\u0440\u0432\u0438\u0441\u043e\u0432."
-  categories: [operations, system]
-  tags: [infrascope, inventory, marketplace, infra, subnet]
+    en: Operator inventory, infrastructure state, access, subnet, and service diagnostics.
+    ru: Инвентаризация оператора, состояние инфраструктуры, доступ, подсеть и диагностика
+      сервисов.
+  categories:
+  - operations
+  - system
+  tags:
+  - infrascope
+  - inventory
+  - marketplace
+  - infra
+  - subnet
 publication:
   stage: alpha
   visibility: listed
@@ -63,22 +79,30 @@ install:
   - id: inventory
     title: Inventory and marketplace
     title_i18n:
-      en: "Inventory and marketplace"
-      ru: "Inventory \u0438 Marketplace"
+      en: Inventory and marketplace
+      ru: Inventory и Marketplace
     default: true
     optional: false
-    components: [scenario:infrascope, skill:infrascope_skill, skill:infrastate_skill]
+    components:
+    - scenario:infrascope
+    - skill:infrascope_skill
+    - skill:infrastate_skill
   - id: infra-access
     title: Managed infra access
     title_i18n:
-      en: "Managed infra access"
-      ru: "\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u043c\u044b\u0439 infra access"
+      en: Managed infra access
+      ru: Управляемый infra access
     default: false
     optional: true
-    components: [skill:infra_access_skill, skill:subnet_env, skill:service_doctor_skill]
+    components:
+    - skill:infra_access_skill
+    - skill:subnet_env
+    - skill:service_doctor_skill
 compatibility:
-  required_entrypoints: [infrascope]
-  validation_profiles: [ops.infrascope.local]
+  required_entrypoints:
+  - infrascope
+  validation_profiles:
+  - ops.infrascope.local
 lifecycle:
   uninstall:
     components: remove_if_unreferenced
