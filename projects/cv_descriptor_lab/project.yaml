@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: cv_descriptor_lab
-version: 0.1.10
+version: 0.1.13
 profiles:
 - adaos.cv.descriptor_lab.v1
 components:
