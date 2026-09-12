@@ -2864,6 +2864,33 @@ def test_project_catalog_resolves_dev_space_once(monkeypatch) -> None:
     assert calls == ["desktop"]
 
 
+@pytest.mark.parametrize("existing", [None, "different", "wanted"])
+def test_open_preview_targets_selected_application_and_preserves_pinned_revision(monkeypatch, existing) -> None:
+    module = _module()
+    calls = []
+    monkeypatch.setattr(module, "_preview_source_webspace_id", lambda *args: "host")
+    monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "wanted"))
+    target = {"object_type": "scenario", "object_id": existing, "stage": "automation", "revision": "fixed"} if existing else {}
+    monkeypatch.setattr(module.preview, "get_binding", lambda source: {"preview_target": target})
+    monkeypatch.setattr(module.preview, "select_project", lambda *args, **kwargs: calls.append((args, kwargs)) or {"ok": True})
+    monkeypatch.setattr(module.preview, "navigation_link", lambda source: {"url": "/?expected_scenario_id=wanted"})
+    result = module.open_preview("project", "app")
+    assert result["preview_url"] == "/?expected_scenario_id=wanted"
+    assert len(calls) == (0 if existing == "wanted" else 1)
+    if calls:
+        assert calls[0] == (("project", "app"), {"source_webspace_id": "host", "ensure_ready": True, "wait_for_rebuild": True, "publish_event": False})
+
+
+def test_open_preview_does_not_return_a_fallback_link_after_selection_failure(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "_preview_source_webspace_id", lambda *args: "host")
+    monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "wanted"))
+    monkeypatch.setattr(module.preview, "get_binding", lambda source: {})
+    monkeypatch.setattr(module.preview, "select_project", lambda *args, **kwargs: {"ok": False, "error": "not_ready"})
+    monkeypatch.setattr(module.preview, "navigation_link", lambda source: pytest.fail("No fallback navigation on failure"))
+    assert module.open_preview("project", "app") == {"ok": False, "error": "not_ready"}
+
+
 def test_preview_selection_waits_until_materialized(monkeypatch) -> None:
     module = _module()
     captured: dict = {}

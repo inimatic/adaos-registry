@@ -3358,6 +3358,34 @@ def get_preview(
     }
 
 
+@tool("open_preview", summary="Open the selected application's preview, retaining its chosen revision.", side_effects="ui_navigation")
+def open_preview(
+    object_type: str,
+    object_id: str,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    execution_kind, execution_id = _execution_identity(kind, project_id)
+    source = _preview_source_webspace_id(webspace_id, _meta)
+    binding = preview.get_binding(source)
+    target = binding.get("preview_target") or {}
+    selected = (target.get("object_type"), target.get("object_id"))
+    if selected not in {(kind, project_id), (execution_kind, execution_id)}:
+        if kind == "scenario":
+            selection = select_preview(kind, project_id, webspace_id=webspace_id, _meta=_meta)
+        else:
+            # A navigation URL must name the materialized preview, not its pending host.
+            selection = preview.select_project(
+                kind, project_id, source_webspace_id=source,
+                ensure_ready=True, wait_for_rebuild=True, publish_event=False,
+            )
+        if selection.get("ok") is False:
+            return selection
+    navigation = preview.navigation_link(source)
+    return {"ok": True, "preview_url": navigation["url"], "navigation": navigation}
+
+
 @tool(
     "list_changes",
     summary="List Builder Change evidence for the selected project.",

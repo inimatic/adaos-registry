@@ -4,7 +4,7 @@
     "type": "desktop",
     "title": "Builder — рабочее место разработки",
     "description": "Safe local Builder prototype for the dependent Prototype, Automation, Trial, and Publication lifecycle.",
-    "version": "0.2.88",
+    "version": "0.2.89",
     "title_i18n": {
         "fallback": "Builder",
         "key": "scenario.builder.title"
@@ -1995,8 +1995,10 @@
                                 {
                                     "on": "click:open-dev-link",
                                     "type": "callSkill",
-                                    "target": "builder_sdk_control_skill.get_preview",
+                                    "target": "builder_sdk_control_skill.open_preview",
                                     "params": {
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId",
                                         "_meta": {
                                             "current_scenario": "builder"
                                         }
@@ -4627,7 +4629,7 @@
                 }
             }
         },
-        "version": "0.2.88",
+        "version": "0.2.89",
         "user_summary": {
             "assumptions": [
                 "Lifecycle selection is navigation only; it never changes the editable process or Preview target.",
@@ -4650,5 +4652,5 @@
         },
         "manifest": "webui.json"
     },
-    "updated_at": "2026-09-12T12:57:26+00:00"
+    "updated_at": "2026-09-12T13:22:57+00:00"
 }

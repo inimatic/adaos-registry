@@ -515,3 +515,12 @@ def test_all_localized_payloads_are_valid_utf8_without_replacement_characters() 
         text = path.read_bytes().decode("utf-8")
         assert "\ufffd" not in text
     assert {path.stem for path in (ROOT / "assets/i18n").glob("*.json")} == {"en", "ru"}
+
+
+def test_open_preview_uses_selected_application_not_unselected_global_binding() -> None:
+    for name in ("webui.json", "scenario.json"):
+        action = next(item for item in _walk(_load(name)) if item.get("on") == "click:open-dev-link")
+        assert action["target"] == "builder_sdk_control_skill.open_preview"
+        assert action["params"]["object_type"] == "$state.selectedProjectKind"
+        assert action["params"]["object_id"] == "$state.selectedProjectId"
+        assert action["openResultUrl"] is True

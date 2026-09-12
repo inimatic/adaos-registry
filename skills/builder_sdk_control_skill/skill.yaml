@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.113
+version: 0.1.114
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -1101,6 +1101,30 @@ tools:
   timeout_seconds: 120
   input_schema:
     type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: open_preview
+  description: Open the selected application preview, retaining its chosen revision.
+  entry: handlers.main:open_preview
+  side_effects: ui_navigation
+  timeout_seconds: 120
+  input_schema:
+    type: object
+    required:
+    - object_type
+    - object_id
     properties:
       object_type:
         type: string
@@ -2328,7 +2352,7 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-09-12T12:57:59+00:00'
+updated_at: '2026-09-12T13:23:29+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.1002+6139.cdc1a0cfc

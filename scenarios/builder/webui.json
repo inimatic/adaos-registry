@@ -1947,8 +1947,10 @@
                                 {
                                     "on": "click:open-dev-link",
                                     "type": "callSkill",
-                                    "target": "builder_sdk_control_skill.get_preview",
+                                    "target": "builder_sdk_control_skill.open_preview",
                                     "params": {
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId",
                                         "_meta": {
                                             "current_scenario": "builder"
                                         }
@@ -4579,7 +4581,7 @@
                 }
             }
         },
-        "version": "0.2.88",
+        "version": "0.2.89",
         "user_summary": {
             "assumptions": [
                 "Lifecycle selection is navigation only; it never changes the editable process or Preview target.",
