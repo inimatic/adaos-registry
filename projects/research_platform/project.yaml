@@ -1,40 +1,47 @@
 schema: adaos.project.v1
 kind: project
 id: research_platform
-version: 0.1.7
-profiles: [adaos.research.platform.v1]
+version: 0.1.8
+profiles:
+- adaos.research.platform.v1
 components:
   owned:
   - ref: scenario:research_workbench
     role: primary
     exposure: application
     lifecycle: bound
-    relations: [presents]
+    relations:
+    - presents
   - ref: skill:research_orchestrator_skill
     role: implementation
     exposure: project_only
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   - ref: skill:research_manager_skill
     role: implementation
     exposure: project_only
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   - ref: skill:research_evaluator_skill
     role: supporting
     exposure: project_only
     lifecycle: bound
-    relations: [evaluates]
+    relations:
+    - evaluates
   - ref: skill:research_calibration_runner_skill
     role: supporting
     exposure: project_only
     lifecycle: bound
-    relations: [evaluates]
+    relations:
+    - evaluates
   - ref: skill:mlflow_tracker_skill
     role: supporting
     exposure: advanced
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   dependencies: []
 entrypoints:
 - id: workbench
@@ -45,14 +52,23 @@ entrypoints:
 catalog:
   title: Research Platform
   title_i18n:
-    en: "Research Platform"
-    ru: "\u0418\u0441\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u0441\u043a\u0430\u044f \u043f\u043b\u0430\u0442\u0444\u043e\u0440\u043c\u0430"
-  description: Reusable governed research workbench, orchestration, experiment management, evaluation, and tracking.
+    en: Research Platform
+    ru: Исследовательская платформа
+  description: Reusable governed research workbench, orchestration, experiment management,
+    evaluation, and tracking.
   description_i18n:
-    en: "Reusable governed research workbench, orchestration, experiment management, evaluation, and tracking."
-    ru: "\u041f\u0435\u0440\u0435\u0438\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0435\u043c\u0430\u044f \u0443\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u043c\u0430\u044f \u0438\u0441\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u0441\u043a\u0430\u044f \u0440\u0430\u0431\u043e\u0447\u0430\u044f \u0441\u0440\u0435\u0434\u0430, \u043e\u0440\u043a\u0435\u0441\u0442\u0440\u0430\u0446\u0438\u044f, \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u044d\u043a\u0441\u043f\u0435\u0440\u0438\u043c\u0435\u043d\u0442\u0430\u043c\u0438, \u043e\u0446\u0435\u043d\u043a\u0430 \u0438 \u0442\u0440\u0435\u043a\u0438\u043d\u0433."
-  categories: [research]
-  tags: [workbench, orchestration, experiments, evaluator, mlflow]
+    en: Reusable governed research workbench, orchestration, experiment management,
+      evaluation, and tracking.
+    ru: Переиспользуемая управляемая исследовательская рабочая среда, оркестрация,
+      управление экспериментами, оценка и трекинг.
+  categories:
+  - research
+  tags:
+  - workbench
+  - orchestration
+  - experiments
+  - evaluator
+  - mlflow
 publication:
   stage: alpha
   visibility: listed
@@ -63,31 +79,41 @@ install:
   - id: workbench
     title: Research workbench
     title_i18n:
-      en: "Research workbench"
-      ru: "\u0418\u0441\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u0441\u043a\u0430\u044f \u0440\u0430\u0431\u043e\u0447\u0430\u044f \u0441\u0440\u0435\u0434\u0430"
+      en: Research workbench
+      ru: Исследовательская рабочая среда
     default: true
     optional: false
-    components: [scenario:research_workbench, skill:research_orchestrator_skill, skill:research_manager_skill]
+    components:
+    - scenario:research_workbench
+    - skill:research_orchestrator_skill
+    - skill:research_manager_skill
   - id: evaluation
     title: Evaluation and calibration
     title_i18n:
-      en: "Evaluation and calibration"
-      ru: "\u041e\u0446\u0435\u043d\u043a\u0430 \u0438 \u043a\u0430\u043b\u0438\u0431\u0440\u043e\u0432\u043a\u0430"
+      en: Evaluation and calibration
+      ru: Оценка и калибровка
     default: true
     optional: false
-    components: [skill:research_evaluator_skill, skill:research_calibration_runner_skill]
+    components:
+    - skill:research_evaluator_skill
+    - skill:research_calibration_runner_skill
   - id: tracker
     title: MLflow tracker
     title_i18n:
-      en: "MLflow tracker"
-      ru: "\u0422\u0440\u0435\u043a\u0435\u0440 MLflow"
+      en: MLflow tracker
+      ru: Трекер MLflow
     default: false
     optional: true
-    components: [skill:mlflow_tracker_skill]
+    components:
+    - skill:mlflow_tracker_skill
 compatibility:
-  required_entrypoints: [workbench]
-  required_contracts: [adaos.research.direction.v1, adaos.research.experiment.v1]
-  validation_profiles: [research.platform.local]
+  required_entrypoints:
+  - workbench
+  required_contracts:
+  - adaos.research.direction.v1
+  - adaos.research.experiment.v1
+  validation_profiles:
+  - research.platform.local
 lifecycle:
   uninstall:
     components: remove_if_unreferenced
