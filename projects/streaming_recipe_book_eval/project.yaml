@@ -1,20 +1,23 @@
 schema: adaos.project.v1
 kind: project
 id: streaming_recipe_book_eval
-version: 0.0.6
-profiles: [adaos.home.recipes.eval.v1]
+version: 0.0.7
+profiles:
+- adaos.home.recipes.eval.v1
 components:
   owned:
   - ref: scenario:streaming_recipe_book_eval
     role: primary
     exposure: advanced
     lifecycle: bound
-    relations: [presents]
+    relations:
+    - presents
   - ref: skill:streaming_recipe_book_eval_skill
     role: implementation
     exposure: project_only
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   dependencies: []
 entrypoints:
 - id: recipes
@@ -25,14 +28,18 @@ entrypoints:
 catalog:
   title: Streaming Recipe Book Eval
   title_i18n:
-    en: "Streaming Recipe Book Eval"
-    ru: "\u041e\u0446\u0435\u043d\u043a\u0430 \u043f\u043e\u0442\u043e\u043a\u043e\u0432\u043e\u0439 \u043a\u043d\u0438\u0433\u0438 \u0440\u0435\u0446\u0435\u043f\u0442\u043e\u0432"
+    en: Streaming Recipe Book Eval
+    ru: Оценка потоковой книги рецептов
   description: Deprecated recipe catalog evaluation instance retained for comparison.
   description_i18n:
-    en: "Deprecated recipe catalog evaluation instance retained for comparison."
-    ru: "Deprecated-\u044d\u043a\u0437\u0435\u043c\u043f\u043b\u044f\u0440 \u043e\u0446\u0435\u043d\u043a\u0438 \u043a\u0430\u0442\u0430\u043b\u043e\u0433\u0430 \u0440\u0435\u0446\u0435\u043f\u0442\u043e\u0432, \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0439 \u0434\u043b\u044f \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f."
-  categories: [home]
-  tags: [recipes, eval, deprecated]
+    en: Deprecated recipe catalog evaluation instance retained for comparison.
+    ru: Deprecated-экземпляр оценки каталога рецептов, сохранённый для сравнения.
+  categories:
+  - home
+  tags:
+  - recipes
+  - eval
+  - deprecated
 publication:
   stage: deprecated
   visibility: hidden
@@ -40,8 +47,10 @@ publication:
 install:
   default: false
 compatibility:
-  required_entrypoints: [recipes]
-  validation_profiles: [home.recipes.eval]
+  required_entrypoints:
+  - recipes
+  validation_profiles:
+  - home.recipes.eval
 lifecycle:
   uninstall:
     components: remove_if_unreferenced
