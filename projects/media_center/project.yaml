@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: media_center
-version: 0.6.101
+version: 0.6.102
 profiles:
 - adaos.media_center.v1
 - adaos.media_center.tv.v1
@@ -14,22 +14,26 @@ components:
     role: primary
     exposure: application
     lifecycle: bound
-    relations: [presents]
+    relations:
+    - presents
   - ref: skill:media_center_skill
     role: implementation
     exposure: project_only
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   - ref: skill:media_library_agent
     role: supporting
     exposure: project_only
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   - ref: skill:media_control_skill
     role: supporting
     exposure: advanced
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   dependencies: []
 entrypoints:
 - id: library
@@ -60,14 +64,23 @@ entrypoints:
 catalog:
   title: Media Center
   title_i18n:
-    en: "Media Center"
-    ru: "\u041c\u0435\u0434\u0438\u0430\u0446\u0435\u043d\u0442\u0440"
-  description: Distributed in-place household media library, playback, and remote control.
+    en: Media Center
+    ru: Медиацентр
+  description: Distributed in-place household media library, playback, and remote
+    control.
   description_i18n:
-    en: "Distributed in-place household media library, playback, and remote control."
-    ru: "\u0420\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0451\u043d\u043d\u0430\u044f \u0434\u043e\u043c\u0430\u0448\u043d\u044f\u044f \u043c\u0435\u0434\u0438\u0430\u0442\u0435\u043a\u0430, \u0432\u043e\u0441\u043f\u0440\u043e\u0438\u0437\u0432\u0435\u0434\u0435\u043d\u0438\u0435 \u0438 \u0434\u0438\u0441\u0442\u0430\u043d\u0446\u0438\u043e\u043d\u043d\u043e\u0435 \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u043d\u0430 \u043c\u0435\u0441\u0442\u0435."
-  categories: [media, home]
-  tags: [audio, video, tv, remote-control, distributed]
+    en: Distributed in-place household media library, playback, and remote control.
+    ru: Распределённая домашняя медиатека, воспроизведение и дистанционное управление
+      на месте.
+  categories:
+  - media
+  - home
+  tags:
+  - audio
+  - video
+  - tv
+  - remote-control
+  - distributed
 publication:
   stage: beta
   visibility: listed
@@ -78,21 +91,28 @@ install:
   - id: library
     title: Media library
     title_i18n:
-      en: "Media library"
-      ru: "\u041c\u0435\u0434\u0438\u0430\u0442\u0435\u043a\u0430"
+      en: Media library
+      ru: Медиатека
     default: true
     optional: false
-    components: [scenario:media_center, skill:media_center_skill, skill:media_library_agent]
+    components:
+    - scenario:media_center
+    - skill:media_center_skill
+    - skill:media_library_agent
   - id: playback-control
     title: Playback control
     title_i18n:
-      en: "Playback control"
-      ru: "\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0432\u043e\u0441\u043f\u0440\u043e\u0438\u0437\u0432\u0435\u0434\u0435\u043d\u0438\u0435\u043c"
+      en: Playback control
+      ru: Управление воспроизведением
     default: true
     optional: false
-    components: [skill:media_control_skill]
+    components:
+    - skill:media_control_skill
 compatibility:
-  required_entrypoints: [library, tv, remote]
+  required_entrypoints:
+  - library
+  - tv
+  - remote
   required_contracts:
   - adaos.project.deployment.v1
   - adaos.distributed.service.v1
