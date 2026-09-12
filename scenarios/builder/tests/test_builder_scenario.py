@@ -226,14 +226,15 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
     webui = _load("webui.json")
     page = webui["ui"]["application"]["desktop"]["pageSchema"]
     widgets = _by_id(webui)
-    picker = widgets["project-picker-list"]
+    picker = widgets["project-picker-table"]
 
     assert picker["dataSource"] == {
         "kind": "skill",
         "name": "builder_sdk_control_skill.list_projects",
         "scope": "local",
         "params": {
-            "limit": 50,
+            "limit": 5000,
+            "query": "$state.projectPickerQuery",
             "selected_object_type": "$state.selectedProjectKind",
             "selected_object_id": "$state.selectedProjectId",
             "include_archived": "$state.projectPickerArchived",
@@ -243,7 +244,11 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
         "invalidationTags": ["builder.project.catalog"],
         "preserveLastValue": True,
     }
-    assert picker["inputs"]["disableImplicitScenarioSelect"] is True
+    assert picker["type"] == "ui.table"
+    assert picker["inputs"]["refresh"] is True
+    assert picker["inputs"]["preferences"]["filterStateKeys"] == ["projectPickerArchived"]
+    assert widgets["project-picker-sample"]["inputs"]["value"] == "$state.projectPickerSample"
+    assert widgets["project-picker-archived"]["inputs"]["value"] == "$state.projectPickerArchived"
 
     select_state = next(
         action["params"]
@@ -255,13 +260,14 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
     assert select_state["selectedObjectKind"] == "$event.target_object_type"
     assert select_state["selectedObjectId"] == "$event.target_object_id"
 
-    state = page["initialState"]
+    state = {**page["initialState"], **webui["ui"]["application"]["modals"]["project-picker"]["schema"]["initialState"]}
     resolved_params = {
         key: state[value.removeprefix("$state.")] if isinstance(value, str) and value.startswith("$state.") else value
         for key, value in picker["dataSource"]["params"].items()
     }
     assert resolved_params == {
-        "limit": 50,
+        "limit": 5000,
+        "query": "",
         "selected_object_type": "scenario",
         "selected_object_id": "builder",
         "include_archived": False,
@@ -309,12 +315,9 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
     assert updates[0]["params"]["builderTopicId"] == "$event.conversation_topic_id"
     assert updates[0]["params"]["builderThreadId"] == "$event.conversation_thread_id"
     assert any(item.get("type") == "closeModal" for item in picker["actions"])
-    assert any(item.get("on") == "add" for item in picker["actions"])
-    assert picker["inputs"]["addButtonFirst"] is True
-    toggles = picker["inputs"]["toolbarToggles"]
-    if isinstance(toggles, dict):
-        toggles = [toggles]
-    assert toggles[0]["stateKey"] == "projectPickerArchived"
+    assert widgets["project-picker-create"]["actions"][0]["params"]["modalId"] == "new-project"
+    metadata_action = next(node for node in _walk(webui) if node.get("target") == "builder_sdk_control_skill.update_project_metadata")
+    assert "builder.project.catalog" in metadata_action["invalidates"]
 
 
 def test_project_creation_selects_aggregate_and_primary_component() -> None:

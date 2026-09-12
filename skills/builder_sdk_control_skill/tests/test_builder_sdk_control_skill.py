@@ -2778,6 +2778,57 @@ def test_project_catalog_uses_lightweight_state(monkeypatch) -> None:
     assert module.list_projects()[0]["object_id"] == "builder"
 
 
+def test_catalog_updated_uses_owned_component_state_not_preview_or_dependencies(monkeypatch) -> None:
+    module = _module()
+    calls = []
+    def state(kind, identifier):
+        calls.append((kind, identifier))
+        return {"updated_at": "2026-09-11T12:30:00+03:00" if identifier == "primary" else "invalid"}
+    monkeypatch.setattr(module, "_catalog_state", state)
+    item = {"created_at": "2026-09-10T00:00:00Z", "component_refs": ["scenario:primary", "skill:helper"], "dependency_refs": ["skill:external"]}
+    assert module._catalog_updated(item, {"updated_at": "2026-09-10T23:00:00Z"}) == "2026-09-11T09:30:00Z"
+    assert calls == [("scenario", "primary"), ("skill", "helper")]
+    assert module._catalog_updated({}, {"updated_at": "DEV"}) is None
+
+
+def test_catalog_orders_by_update_before_limit(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "_catalog_state", lambda *_args: {})
+    monkeypatch.setattr(module.compositions, "list_projects", lambda **_kwargs: [
+        {"id": "old", "created_at": "2026-09-10T00:00:00Z", "components": {"owned": []}},
+        {"id": "new", "created_at": "2026-09-11T00:00:00Z", "components": {"owned": []}},
+    ])
+    assert module.list_projects(limit=1)[0]["object_id"] == "new"
+
+
+def test_project_catalog_propagates_sdk_failure(monkeypatch) -> None:
+    module = _module()
+
+    def unavailable(**kwargs):
+        raise RuntimeError("catalog unavailable")
+
+    monkeypatch.setattr(module.compositions, "list_projects", unavailable)
+    with pytest.raises(RuntimeError, match="catalog unavailable"):
+        module.list_projects(query="test")
+
+
+def test_project_catalog_search_precedes_limit_and_marks_test_samples(monkeypatch) -> None:
+    module = _module()
+    calls = []
+
+    def catalog(**kwargs):
+        calls.append(kwargs)
+        return [{"id": "z_test", "title": "Sample [TEST]-20260911-e2eabc",
+                 "components": {"owned": [], "dependencies": []}}]
+
+    monkeypatch.setattr(module.compositions, "list_projects", catalog)
+    monkeypatch.setattr(module, "_catalog_state", lambda *_args: {"archived": False})
+    rows = module.list_projects(query="E2EABC", limit=1)
+    assert calls == [{"query": "e2eabc", "limit": 5000}]
+    assert rows[0]["test_sample"] == "test"
+    assert rows[0]["object_id"] == "z_test"
+
+
 def test_project_catalog_resolves_dev_space_once(monkeypatch) -> None:
     module = _module()
     calls: list[str] = []

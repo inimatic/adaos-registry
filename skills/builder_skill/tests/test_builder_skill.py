@@ -79,6 +79,26 @@ def test_background_thread_propagates_runtime_context() -> None:
     assert observed == ["skill:builder_skill"]
 
 
+@pytest.mark.parametrize("source,expected", [("api", True), ("e2e", True), ("chat", False), ("unknown", False)])
+def test_sdk_turns_are_projected_once_without_duplicating_browser_ingress(monkeypatch, source, expected):
+    skill = _load_module()
+    emitted = []
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append((text, kwargs)))
+    session = {"scenario_id": "local-example"}
+    topic = {"thread_id": "prompt-project:scenario:local-example"}
+    metadata = {"prototype_request_source": source, "message_id": "request-one"}
+    for _ in range(2):
+        skill._project_external_user_turn("Full original instruction", webspace_id="desktop-dev", _meta=metadata,
+                                         session=session, binding={}, topic_ref=topic)
+    assert bool(emitted) is expected
+    if expected:
+        assert emitted[0][1]["_meta"]["message_id"] == emitted[1][1]["_meta"]["message_id"]
+        assert emitted[0][1]["topic_ref"] == topic
+        assert emitted[0][1]["session"] == session
+        assert emitted[0][1]["from_"] == "user"
+        assert emitted[0][0] == "Full original instruction"
+
+
 def _stub_development_context(skill, monkeypatch) -> dict:
     packet = {
         "schema": "adaos.builder.context_packet.v1",
@@ -2096,15 +2116,27 @@ def test_builder_configures_fast_complete_json_for_gpt5(monkeypatch) -> None:
     skill = _load_module()
 
     monkeypatch.delenv("ADAOS_BUILDER_LLM_MAX_TOKENS", raising=False)
-    assert skill._builder_llm_reasoning_for_model("gpt-5") == {"effort": "minimal"}
+    assert skill._builder_llm_reasoning_for_model("gpt-5") == {"effort": "low"}
     assert skill._builder_llm_max_tokens_for_model("gpt-5") == 5000
     assert (
         skill._builder_llm_max_tokens_for_model("gpt-5", output_mode="semantic_v2")
-        == 8000
+        == 128000
     )
     assert skill._builder_llm_reasoning_for_model("gpt-5-pro") is None
     assert skill._builder_llm_reasoning_for_model("gpt-4.1") is None
     assert skill._builder_llm_max_tokens_for_model("gpt-4.1") == 5000
+
+
+def test_builder_llm_prompt_profile_tracks_reasoning_override() -> None:
+    skill = _load_module()
+    profile = skill._builder_llm_prompt_profile("gpt-5", {"builder_llm_reasoning_effort": "low"})
+    assert profile["reasoning"] == {"effort": "low"}
+    assert skill._builder_llm_prompt_profile("gpt-5")["reasoning"] == {"effort": "low"}
+    assert skill._builder_llm_max_tokens_for_model("gpt-5", output_mode="semantic_v2", _meta={"builder_llm_max_output_tokens": 12000}) == 12000
+    assert skill._builder_llm_max_tokens_for_model("gpt-5", _meta={"builder_llm_max_output_tokens": 128000}) == 128000
+    for invalid in (True, "12000", 0, 128001):
+        with pytest.raises(ValueError):
+            skill._builder_llm_max_tokens_for_model("gpt-5", _meta={"builder_llm_max_output_tokens": invalid})
 
 
 def test_builder_llm_prompt_profile_tracks_provider_and_model(monkeypatch) -> None:
@@ -3084,6 +3116,9 @@ def test_new_scenario_title_identity_replaces_template_identity(tmp_path) -> Non
     skill = _load_module()
     root = tmp_path / "applications_experiment"
     root.mkdir()
+    locale = root / "assets" / "i18n" / "ru.json"
+    locale.parent.mkdir(parents=True)
+    locale.write_text(json.dumps({"scenario.applications_experiment.title": "New scenario", "authored": "Keep"}), encoding="utf-8")
     (root / "scenario.yaml").write_text(
         "id: applications_experiment\n"
         "title: Applications\n"
@@ -3127,6 +3162,7 @@ def test_new_scenario_title_identity_replaces_template_identity(tmp_path) -> Non
         "fallback": "Applications Experiment",
     }
     assert manifest["title_i18n"] == expected
+    assert json.loads(locale.read_text(encoding="utf-8")) == {"scenario.applications_experiment.title": "Applications Experiment", "authored": "Keep"}
     assert projection["title_i18n"] == expected
     assert (
         projection["ui"]["application"]["desktop"]["pageSchema"]["title_i18n"]
@@ -3918,6 +3954,18 @@ def test_builder_form_component_contract_validates_choice_and_grid_fields() -> N
         }
     )
     assert skill._validate_page_schema_component_contracts(valid)["ok"] is True
+
+
+def test_builder_component_contract_accepts_live_dropdown_not_an_empty_static_choice() -> None:
+    skill = _load_module()
+    field = {"id": "target", "type": "dropdown", "optionValuePath": "id",
+             "optionLabelPaths": ["label"], "optionsDataSource": {
+                 "kind": "resourceQuery", "resourceType": "prototype.targets", "query": {"limit": 100}}}
+    page = {"id": "lookup", "widgets": [{"id": "form", "type": "ui.form", "inputs": {"fields": [field]}}]}
+    assert skill._validate_page_schema_component_contracts(page)["ok"] is True
+    for source in ({}, {"kind": "resourceQuery"}, {"kind": "static", "resourceType": "prototype.targets"}):
+        field["optionsDataSource"] = source
+        assert skill._validate_page_schema_component_contracts(page)["ok"] is False
 
 
 def test_builder_project_memory_repairs_mojibake_and_legacy_constraints(
@@ -4881,8 +4929,24 @@ def test_semantic_v2_prompt_distinguishes_read_only_reveal_from_mutation() -> No
 
     prompt = skill._builder_llm_system_prompt(output_mode="semantic_v2")
 
-    assert "fields present only in a details view" in prompt
-    assert "do not invent an update command" in prompt
+    guidance = skill.sdk_builder_prototype.semantic_generation_guidance()
+    assert "smallest useful interactive Prototype" in prompt
+    assert "Details-only fields provide on-demand disclosure" in guidance["interactions"]
+    assert guidance["stage"]["acceptance"] == "interactive_preview_not_production_readiness"
+    assert "deferring supported UI interactions" in guidance["stage"]["automation_requirements"]["not_allowed"]
+    assert "may omit views" in guidance["modeling"]
+
+
+def test_single_locale_merge_does_not_discard_untranslated_authored_messages(tmp_path) -> None:
+    skill = _load_module()
+    existing = {"en": {"template.title": "New scenario"}, "ru": {"template.title": "Новый сценарий"}}
+    authored = {"ru": {"prototype.title": "Проверка", "status.pending": "Ожидает проверки"}}
+    merged = skill._merge_scenario_locale_dictionaries(existing, authored)
+    assert merged["ru"] == {**existing["ru"], **authored["ru"]}
+    assert merged["en"] == existing["en"]
+    skill._write_scenario_locale_dictionaries(str(tmp_path), merged)
+    assert skill._read_scenario_locale_dictionaries(str(tmp_path)) == merged
+    assert skill._normalise_locale_dictionaries(authored) == authored
 
 
 def test_bounded_repair_diagnostic_keeps_qualification_findings() -> None:
@@ -6010,16 +6074,17 @@ def test_semantic_request_keeps_renderer_context_out_of_model_input(
         "title",
         "prototype_brief",
         "instruction",
+        "output_locales",
     }
     assert dynamic["prototype_brief"]["schema"] == (
-        "adaos.builder.prototype_model_context.v1"
+        "adaos.builder.prototype_model_context.v2"
     )
     assert "legacy-renderer-state" not in model_input
     assert "legacy-domain-operation" not in model_input
     assert "selected_ui_capabilities" not in model_input
     assert '"type":"ui.form"' not in model_input
     assert "query_control" in model_input
-    assert "strict output schema is authoritative" in model_input
+    assert "strict output schema" in model_input
     assert "current_webui_json" not in model_input
 
 
@@ -6175,6 +6240,91 @@ def test_semantic_output_compiles_against_exact_prototype_brief() -> None:
     assert result["requirement_runtime_map"]["job:01"]
 
 
+def test_reasoning_profile_override_preserves_default_and_other_models():
+    skill = _load_module()
+    assert skill._builder_llm_reasoning_for_model("gpt-5") == {"effort": "low"}
+    assert skill._builder_llm_reasoning_for_model("gpt-5", {"builder_llm_reasoning_effort": "minimal"}) == {"effort": "minimal"}
+    assert skill._builder_llm_reasoning_for_model("gpt-5", {"builder_llm_reasoning_effort": "low"}) == {"effort": "low"}
+    assert skill._builder_llm_reasoning_for_model("gpt-4.1", {"builder_llm_reasoning_effort": "low"}) is None
+    with pytest.raises(ValueError, match="reasoning effort"):
+        skill._builder_llm_reasoning_for_model("gpt-5", {"builder_llm_reasoning_effort": "invalid"})
+
+
+def test_semantic_gpt5_budget_honors_explicit_limits_without_legacy_clamping(monkeypatch):
+    skill = _load_module()
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_MAX_TOKENS", "32000")
+    assert skill._builder_llm_max_tokens_for_model("gpt-5", output_mode="semantic_v2") == 32000
+    assert skill._builder_llm_max_tokens_for_model("gpt-4.1", output_mode="semantic_v2") == 12000
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_MAX_TOKENS", "128001")
+    with pytest.raises(ValueError, match="ADAOS_BUILDER_LLM_MAX_TOKENS"):
+        skill._builder_llm_max_tokens_for_model("gpt-5", output_mode="semantic_v2")
+
+
+def test_semantic_repair_does_not_send_compiler_defects_to_the_model(tmp_path, monkeypatch):
+    skill = _load_module()
+    import adaos.sdk.llm.llm_client as llm_client
+
+    def unexpected(*args, **kwargs):
+        raise AssertionError("Compiler defects must not consume a model repair")
+
+    monkeypatch.setattr(llm_client, "submit_response_job", unexpected)
+    result = skill._repair_llm_semantic_transform_output(
+        session={"artifact_root": str(tmp_path)}, instruction="Show records", previous_preview={},
+        output_text="{}", validation_error={"findings": [{"code": "semantic.compiler_contract_invalid"}]},
+        prototype_brief={}, project_ref=None, request_id="test", job_id="test", output_mode="semantic_v2", _meta={},
+    )
+    assert result["repair_skipped"] is True
+    assert result["ok"] is False
+
+
+@pytest.mark.parametrize("version", [1, 2, 3])
+def test_state_repair_context_and_transport_use_patch_contract(tmp_path, monkeypatch, version):
+    skill = _load_module()
+    import adaos.sdk.llm.llm_client as llm_client
+
+    candidate = {"schema": "adaos.builder.semantic_prototype_candidate.v2", "resources": [{"id": "unchanged"}]}
+    replacement = {"schema": f"adaos.builder.state_repair.v{version}", "states": [], "views": []}
+    merged = {**candidate, "representative_states": []}
+    plan = {"task": "Repair only reported states", "output_schema": {"type": "object", "properties": {"schema": {"enum": [replacement["schema"]]}}}, "allowed_state_ids": ["empty"]}
+    submitted = {}
+    parsed = {}
+    brief = skill.developer_ui.select("Show records.", limit=8)["qualification"]["prototype_brief"]
+
+    def submit(messages, **kwargs):
+        submitted.update(messages=messages, kwargs=kwargs)
+        return {"status": "succeeded", "job_id": "patch-job", "output_text": json.dumps(replacement)}
+
+    def apply(original, patch, findings):
+        assert original == candidate
+        assert patch == replacement
+        return merged
+
+    def parse(**kwargs):
+        parsed.update(kwargs)
+        return {"ok": True, "attempts": []}
+
+    monkeypatch.setattr(llm_client, "submit_response_job", submit)
+    monkeypatch.setattr(skill.sdk_builder_prototype, "prepare_state_repair", lambda *_: plan)
+    monkeypatch.setattr(skill.sdk_builder_prototype, "apply_state_repair", apply)
+    monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", parse)
+    result = skill._repair_llm_semantic_transform_output(
+        session={"id": "patch", "scenario_id": "records", "artifact_root": str(tmp_path)},
+        instruction="Show records", previous_preview={}, output_text=json.dumps(candidate),
+        validation_error={"findings": [{"code": "semantic.state_fixture_mismatch"}]},
+        prototype_brief=brief, project_ref="project:records", request_id="patch", job_id="original",
+        output_mode="semantic_v2", _meta={},
+    )
+    assert result["ok"] is True
+    assert result["repair"]["kind"] == "semantic_state_repair"
+    assert json.loads(parsed["output_text"]) == merged
+    assert json.loads(submitted["messages"][1]["content"])["stable_builder_context"]["output_contract"]["schema"] == replacement["schema"]
+    assert submitted["kwargs"]["text"]["format"]["schema"] == plan["output_schema"]
+    assert result["raw_response"] == json.dumps(replacement)
+    assert replacement["schema"] in submitted["messages"][0]["content"]
+    for other in {1, 2, 3} - {version}:
+        assert f"adaos.builder.state_repair.v{other}" not in submitted["messages"][0]["content"]
+
+
 def test_semantic_repair_receives_full_candidate_brief_and_finding(
     tmp_path, monkeypatch
 ) -> None:
@@ -6272,6 +6422,7 @@ def test_semantic_repair_receives_full_candidate_brief_and_finding(
     dynamic = json.loads(submitted["messages"][-1]["content"])["semantic_repair"]
     assert dynamic["candidate"] == candidate
     assert dynamic["prototype_brief"]["brief_ref"] == brief["brief_id"]
+    assert dynamic["prototype_brief"]["stage_contract"]["stage"] == "prototype"
     assert [item["code"] for item in dynamic["validation_findings"]] == [
         "requirement.binding_and_gap",
         "requirement.reference_unknown",
@@ -7359,7 +7510,7 @@ def test_builder_patch_stream_returns_bounded_scenario_locale_dictionaries() -> 
         result["locale_dictionaries"]["ru"]["scenario.applications.title"]
         == "Приложения"
     )
-    assert set(result["locale_dictionaries"]["en"]) == {"scenario.applications.title"}
+    assert set(result["locale_dictionaries"]["en"]) == {"scenario.applications.title", "unused.only.en"}
     compact = skill._compact_llm_result(result, include_artifacts=True)
     assert compact["locale_dictionaries"] == result["locale_dictionaries"]
     assert (
@@ -15395,6 +15546,21 @@ def test_ensure_workbench_schedules_async_direct_runtime_switch(monkeypatch) -> 
     methods = [item["method"] for item in calls]
     assert methods[:2] == ["set_active_draft", "snapshot"]
     assert methods[2:] in ([], ["ensure_dev_webspace"])
+
+
+def test_safe_emit_chat_preserves_context_and_requests_durable_storage(monkeypatch) -> None:
+    from contextvars import ContextVar
+    import adaos.sdk.io.out as io_out
+
+    skill = _load_module()
+    ambient = ContextVar('test_chat_context', default='missing')
+    ambient.set('caller')
+    calls = []
+    monkeypatch.setattr(io_out, 'chat_append', lambda text, **kwargs: calls.append((ambient.get(), kwargs)) or {'ok': True, 'persisted': True})
+    skill._safe_emit_chat('Request', webspace_id='desktop', session={'scenario_id': 'one'})
+    assert calls[0][0] == 'caller'
+    assert calls[0][1]['persist'] is True
+    assert calls[0][1]['_meta']['thread_id'] == 'prompt-project:scenario:one'
 
 
 def test_safe_emit_chat_does_not_wait_for_stuck_append(monkeypatch) -> None:

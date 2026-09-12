@@ -4,7 +4,7 @@
     "type": "desktop",
     "title": "Builder — рабочее место разработки",
     "description": "Safe local Builder prototype for the dependent Prototype, Automation, Trial, and Publication lifecycle.",
-    "version": "0.2.83",
+    "version": "0.2.88",
     "title_i18n": {
         "fallback": "Builder",
         "key": "scenario.builder.title"
@@ -1149,6 +1149,7 @@
                                 },
                                 "invalidates": [
                                     "builder.project.metadata",
+                                    "builder.project.catalog",
                                     "builder.project.lifecycle"
                                 ]
                             },
@@ -2981,7 +2982,7 @@
                 "project-picker": {
                     "title": "Выбор проекта",
                     "presentation": {
-                        "kind": "modal"
+                        "kind": "fullscreen"
                     },
                     "schema": {
                         "id": "project-picker",
@@ -2995,16 +2996,113 @@
                         },
                         "widgets": [
                             {
+                                "id": "project-picker-sample",
                                 "area": "main",
-                                "id": "project-picker-list",
-                                "type": "ui.list",
+                                "type": "input.selector",
+                                "title": "Applications",
+                                "title_i18n": {
+                                    "key": "builder.text.applications"
+                                },
+                                "inputs": {
+                                    "searchable": false,
+                                    "value": "$state.projectPickerSample",
+                                    "options": [
+                                        {
+                                            "id": "all",
+                                            "label": "All applications",
+                                            "label_i18n": {
+                                                "key": "builder.text.all.applications"
+                                            }
+                                        },
+                                        {
+                                            "id": "test",
+                                            "label": "Test applications",
+                                            "label_i18n": {
+                                                "key": "builder.text.test.applications"
+                                            }
+                                        },
+                                        {
+                                            "id": "regular",
+                                            "label": "Non-test applications",
+                                            "label_i18n": {
+                                                "key": "builder.text.non.test.applications"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "change",
+                                        "type": "updateState",
+                                        "params": {
+                                            "projectPickerSample": "$event.value"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "project-picker-archived",
+                                "area": "main",
+                                "type": "input.toggle",
+                                "title": "Include archived",
+                                "title_i18n": {
+                                    "key": "builder.text.include.archived"
+                                },
+                                "inputs": {
+                                    "value": "$state.projectPickerArchived"
+                                },
+                                "actions": [
+                                    {
+                                        "on": "change",
+                                        "type": "updateState",
+                                        "params": {
+                                            "projectPickerArchived": "$event.value"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "project-picker-create",
+                                "area": "main",
+                                "type": "ui.actions",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "create",
+                                            "icon": "add-outline",
+                                            "title": "New application",
+                                            "label": "New",
+                                            "label_i18n": {
+                                                "key": "builder.text.new"
+                                            },
+                                            "title_i18n": {
+                                                "key": "builder.text.new.application"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:create",
+                                        "type": "openModal",
+                                        "params": {
+                                            "modalId": "new-project"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "area": "main",
+                                "id": "project-picker-table",
+                                "type": "ui.table",
                                 "title": "Проекты",
                                 "dataSource": {
                                     "kind": "skill",
                                     "name": "builder_sdk_control_skill.list_projects",
                                     "scope": "local",
                                     "params": {
-                                        "limit": 50,
+                                        "limit": 5000,
+                                        "query": "$state.projectPickerQuery",
                                         "selected_object_type": "$state.selectedProjectKind",
                                         "selected_object_id": "$state.selectedProjectId",
                                         "include_archived": "$state.projectPickerArchived",
@@ -3019,67 +3117,82 @@
                                     "preserveLastValue": true
                                 },
                                 "inputs": {
-                                    "variant": "list",
-                                    "groupBy": "type",
-                                    "groupDisplay": "sections",
-                                    "previewKey": "updated",
+                                    "pagination": true,
+                                    "pageSize": 10,
+                                    "refresh": true,
+                                    "preferences": {
+                                        "filterStateKeys": [
+                                            "projectPickerArchived"
+                                        ]
+                                    },
+                                    "pageSizeOptions": [
+                                        10,
+                                        25,
+                                        50
+                                    ],
                                     "search": true,
-                                    "searchPlaceholder": "Поиск проектов...",
-                                    "titleKey": "title",
-                                    "subtitleKey": "description",
-                                    "meta": [
+                                    "searchStateKey": "projectPickerQuery",
+                                    "sort": {
+                                        "key": "updated",
+                                        "direction": "desc"
+                                    },
+                                    "searchKeys": [
+                                        "title",
+                                        "object_id",
+                                        "description"
+                                    ],
+                                    "searchPlaceholder": "Search projects",
+                                    "searchPlaceholder_i18n": {
+                                        "key": "builder.text.search.projects"
+                                    },
+                                    "emptyText": "No matching projects",
+                                    "emptyText_i18n": {
+                                        "key": "builder.text.no.matching.projects"
+                                    },
+                                    "filters": [
                                         {
-                                            "key": "stage",
-                                            "label": "Этап",
-                                            "label_i18n": {
-                                                "key": "builder.text.stage"
-                                            }
-                                        },
+                                            "key": "test_sample",
+                                            "stateKey": "projectPickerSample",
+                                            "any": "all"
+                                        }
+                                    ],
+                                    "columns": [
                                         {
-                                            "key": "version",
-                                            "label": "Версия",
+                                            "key": "title",
+                                            "label": "Application",
+                                            "sortable": true,
                                             "label_i18n": {
-                                                "key": "builder.text.version"
-                                            }
-                                        },
-                                        {
-                                            "key": "sync",
-                                            "label": "Синхронизация",
-                                            "label_i18n": {
-                                                "key": "builder.text.synchronization"
-                                            }
-                                        },
-                                        {
-                                            "key": "space",
-                                            "label": "Dev‑пространство",
-                                            "label_i18n": {
-                                                "key": "builder.text.dev.workspace"
+                                                "key": "builder.text.application"
                                             }
                                         },
                                         {
                                             "key": "updated",
-                                            "label": "Обновлено",
+                                            "label": "Updated",
                                             "label_i18n": {
                                                 "key": "builder.text.updated"
-                                            }
+                                            },
+                                            "kind": "datetime",
+                                            "sortable": true,
+                                            "width": "190px"
+                                        },
+                                        {
+                                            "key": "version",
+                                            "label": "Version",
+                                            "label_i18n": {
+                                                "key": "builder.text.version"
+                                            },
+                                            "mono": true,
+                                            "width": "90px"
+                                        },
+                                        {
+                                            "key": "sync",
+                                            "label": "Status",
+                                            "label_i18n": {
+                                                "key": "builder.text.status"
+                                            },
+                                            "width": "160px"
                                         }
-                                    ],
-                                    "groupTitleKey": "type",
-                                    "buttons": {
-                                        "icon": "radio-button-on-outline",
-                                        "id": "current",
-                                        "whenKey": "current",
-                                        "whenEquals": true
-                                    },
-                                    "disableImplicitScenarioSelect": true,
-                                    "addButton": true,
-                                    "addButtonFirst": true,
-                                    "addButtonLabel": "Создать проект",
-                                    "toolbarToggles": {
-                                        "id": "archived",
-                                        "label": "Архивные",
-                                        "stateKey": "projectPickerArchived"
-                                    }
+                                    ]
                                 },
                                 "actions": [
                                     {
@@ -3120,19 +3233,13 @@
                                             "projectArchived": "$event.archived",
                                             "selectedNodeId": "stage-proto",
                                             "selectedLifecycleStage": "prototype",
-                                            "lifecycleConversationLabel": "Prototype conversation"
+                                            "lifecycleConversationLabel": "Prototype conversation",
+                                            "activeView": "overview"
                                         }
                                     },
                                     {
                                         "on": "select",
                                         "type": "closeModal"
-                                    },
-                                    {
-                                        "on": "add",
-                                        "type": "openModal",
-                                        "params": {
-                                            "modalId": "new-project"
-                                        }
                                     }
                                 ],
                                 "title_i18n": {
@@ -3144,10 +3251,12 @@
                             "key": "builder.text.select.project"
                         },
                         "initialState": {
-                            "projectPickerArchived": false
+                            "projectPickerArchived": false,
+                            "projectPickerQuery": "",
+                            "projectPickerSample": "all"
                         },
                         "interaction": {
-                            "initialFocus": "widget:project-picker-list"
+                            "initialFocus": "widget:project-picker-table"
                         }
                     },
                     "title_i18n": {
@@ -4518,7 +4627,7 @@
                 }
             }
         },
-        "version": "0.2.83",
+        "version": "0.2.88",
         "user_summary": {
             "assumptions": [
                 "Lifecycle selection is navigation only; it never changes the editable process or Preview target.",
@@ -4541,5 +4650,5 @@
         },
         "manifest": "webui.json"
     },
-    "updated_at": "2026-09-11T05:55:29+00:00"
+    "updated_at": "2026-09-12T12:57:26+00:00"
 }

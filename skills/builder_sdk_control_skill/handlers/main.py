@@ -571,6 +571,26 @@ def _catalog_state(kind: str, project_id: str) -> dict[str, Any]:
     return state
 
 
+def _catalog_updated(item: Mapping[str, Any], state: Mapping[str, Any]) -> str | None:
+    candidates = [item.get("created_at"), state.get("updated_at")]
+    for ref in item.get("component_refs") or []:
+        identity = _split_component_ref(str(ref))
+        if identity:
+            candidates.append(_catalog_state(*identity).get("updated_at"))
+    timestamps: list[datetime] = []
+    for value in candidates:
+        if not value:
+            continue
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        timestamps.append(parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed)
+    if not timestamps:
+        return None
+    return max(timestamps).astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
 def _workflow_projection(
     kind: str, project_id: str, state: Mapping[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -1328,10 +1348,7 @@ def list_projects(
     dev_space = _preview_dev_webspace_id(source)
     items: list[dict[str, Any]] = []
     if requested_kind in {"", "project"}:
-        try:
-            project_items = compositions.list_projects(limit=bounded_limit)
-        except Exception:
-            project_items = []
+        project_items = compositions.list_projects(query=needle or None, limit=5000)
         for project_item in project_items:
             object_id = str(
                 project_item.get("id") or project_item.get("name") or ""
@@ -1403,15 +1420,16 @@ def list_projects(
                         if current
                         else "builder.project_sync.available_dev"
                     },
-                    "updated": str(state.get("updated_at") or "DEV"),
+                    "updated": _catalog_updated(item, state),
                     "current": current,
+                    "test_sample": "test" if "[TEST]" in title else "regular",
                     "archived": bool(state.get("archived")),
                     "builder_llm_model": state.get("builder_llm_model"),
                 }
             )
-            if len(items) >= bounded_limit:
-                return items
-        return items
+        items.sort(key=lambda row: (str(row["title"]).casefold(), row["id"]))
+        items.sort(key=lambda row: row["updated"] or "", reverse=True)
+        return items[:bounded_limit]
 
 
 @tool("get_project", summary="Describe the selected DEV project.", side_effects="none")
