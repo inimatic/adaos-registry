@@ -3382,6 +3382,8 @@ def open_preview(
             )
         if selection.get("ok") is False:
             return selection
+    else:
+        preview.ensure_selected_target(source)
     navigation = preview.navigation_link(source)
     return {"ok": True, "preview_url": navigation["url"], "navigation": navigation}
 

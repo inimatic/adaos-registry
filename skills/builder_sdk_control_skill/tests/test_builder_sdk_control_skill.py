@@ -2874,9 +2874,12 @@ def test_open_preview_targets_selected_application_and_preserves_pinned_revision
     monkeypatch.setattr(module.preview, "get_binding", lambda source: {"preview_target": target})
     monkeypatch.setattr(module.preview, "select_project", lambda *args, **kwargs: calls.append((args, kwargs)) or {"ok": True})
     monkeypatch.setattr(module.preview, "navigation_link", lambda source: {"url": "/?expected_scenario_id=wanted"})
+    restored = []
+    monkeypatch.setattr(module.preview, "ensure_selected_target", lambda source: restored.append(source) or {"ok": True})
     result = module.open_preview("project", "app")
     assert result["preview_url"] == "/?expected_scenario_id=wanted"
     assert len(calls) == (0 if existing == "wanted" else 1)
+    assert restored == (["host"] if existing == "wanted" else [])
     if calls:
         assert calls[0] == (("project", "app"), {"source_webspace_id": "host", "ensure_ready": True, "wait_for_rebuild": True, "publish_event": False})
 
