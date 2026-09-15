@@ -1048,7 +1048,7 @@ def test_infrastate_project_inventory_infers_projects_from_installed_components(
     )
     monkeypatch.setattr(
         mod,
-        "list_workspace_projects",
+        "list_workspace_project_definitions",
         lambda workspace_root, include_hidden=False: [
             {
                 "id": "web_desktop",
@@ -1141,7 +1141,7 @@ def test_infrastate_project_inventory_keeps_explicit_project_record(monkeypatch)
     )
     monkeypatch.setattr(
         mod,
-        "list_workspace_projects",
+        "list_workspace_project_definitions",
         lambda workspace_root, include_hidden=False: [
             {
                 "id": "web_desktop",
@@ -1221,7 +1221,7 @@ def test_infrastate_project_detail_streams_show_components_and_local_nodes(monke
     ctx = SimpleNamespace(paths=SimpleNamespace(workspace_dir=lambda: Path("workspace")))
     monkeypatch.setattr(mod, "get_ctx", lambda: ctx)
     monkeypatch.setattr(mod, "load_installed_projects", lambda ctx: [])
-    monkeypatch.setattr(mod, "list_workspace_projects", lambda workspace_root, include_hidden=False: [definition])
+    monkeypatch.setattr(mod, "list_workspace_project_definitions", lambda workspace_root, include_hidden=False: [definition])
     monkeypatch.setattr(
         mod,
         "_installed_project_component_refs",
@@ -1400,7 +1400,7 @@ def test_infrastate_project_detail_streams_include_deployment_activations(monkey
     }
     monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace(paths=SimpleNamespace(workspace_dir=lambda: Path("workspace"))))
     monkeypatch.setattr(mod, "load_installed_projects", lambda ctx: [])
-    monkeypatch.setattr(mod, "list_workspace_projects", lambda workspace_root, include_hidden=False: [definition])
+    monkeypatch.setattr(mod, "list_workspace_project_definitions", lambda workspace_root, include_hidden=False: [definition])
     monkeypatch.setattr(
         mod,
         "_installed_project_component_refs",
@@ -1563,7 +1563,7 @@ def test_infrastate_project_reconcile_records_explicit_install(monkeypatch):
     ctx = SimpleNamespace(paths=SimpleNamespace(workspace_dir=lambda: Path("workspace")))
     recorded: list[dict[str, object]] = []
     monkeypatch.setattr(mod, "get_ctx", lambda: ctx)
-    monkeypatch.setattr(mod, "list_workspace_projects", lambda workspace_root, include_hidden=False: [definition])
+    monkeypatch.setattr(mod, "list_workspace_project_definitions", lambda workspace_root, include_hidden=False: [definition])
     monkeypatch.setattr(
         mod,
         "_installed_project_component_refs",

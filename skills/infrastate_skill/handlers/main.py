@@ -51,7 +51,7 @@ from adaos.services.scenario.webspace_runtime import WebspaceService
 from adaos.services.operations import get_operation_manager, submit_install_operation, submit_update_operation
 from adaos.services.project_install import (
     install_workspace_project,
-    list_workspace_projects,
+    list_workspace_project_definitions,
     load_installed_projects,
     record_project_install,
     selected_project_component_refs,
@@ -3365,7 +3365,7 @@ def _allow_marketplace_git_ref_lookup() -> bool:
 
 def _workspace_project_catalog_entries(workspace_root: Path) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
-    for definition in list_workspace_projects(workspace_root, include_hidden=False):
+    for definition in list_workspace_project_definitions(workspace_root, include_hidden=False):
         project_id = str(definition.get("id") or "").strip()
         if not project_id:
             continue
@@ -3903,7 +3903,7 @@ def _workspace_project_definitions_by_id(ctx: Any) -> dict[str, dict[str, Any]]:
     except Exception:
         return {}
     try:
-        definitions = list_workspace_projects(workspace_root, include_hidden=True)
+        definitions = list_workspace_project_definitions(workspace_root, include_hidden=True)
     except Exception:
         return {}
     return {
@@ -4090,7 +4090,7 @@ def _project_definition_by_id(project_id: str) -> dict[str, Any]:
     except Exception:
         return {}
     try:
-        definitions = list_workspace_projects(workspace_root, include_hidden=True)
+        definitions = list_workspace_project_definitions(workspace_root, include_hidden=True)
     except Exception:
         definitions = []
     for definition in definitions:
