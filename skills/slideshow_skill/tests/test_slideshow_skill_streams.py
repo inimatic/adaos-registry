@@ -127,6 +127,82 @@ def test_folder_items_survive_process_cache_reset_without_sqlite_query(monkeypat
     assert second == first
 
 
+def test_folder_items_rebuilds_stale_persistent_snapshot_when_index_signature_changes(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+    root = tmp_path / "photos"
+    root.mkdir()
+    monkeypatch.setenv("SLIDESHOW_DATA_DIR", str(tmp_path / "state"))
+    signature = {"index_file_size": 1024, "index_file_mtime_ns": 1}
+    monkeypatch.setattr(mod, "_index_file_signature", lambda: dict(signature))
+    monkeypatch.setattr(
+        mod,
+        "_ensure_index",
+        lambda _root: {
+            "ok": True,
+            "root_dir": str(root),
+            "indexed_at": float(signature["index_file_mtime_ns"]),
+            "photo_count": 1,
+        },
+    )
+
+    with mod._index_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO photos (
+                content_ref, source_path, root_dir, rel_path, top_folder,
+                source_name, ext, size, mtime, favorite, hidden, indexed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "content:old",
+                str(root / "Old" / "one.jpg"),
+                str(root),
+                "Old/one.jpg",
+                "Old",
+                "one.jpg",
+                ".jpg",
+                10,
+                1,
+                0,
+                0,
+                1.0,
+            ),
+        )
+
+    state = {"source_dir": str(root), "selected_folder": ""}
+    assert [item["id"] for item in mod._folder_items(state)] == ["", "Old"]
+    mod._invalidate_folder_cache(persistent=False)
+
+    with mod._index_connection() as conn:
+        conn.execute("DELETE FROM photos WHERE root_dir = ?", (str(root),))
+        conn.execute(
+            """
+            INSERT INTO photos (
+                content_ref, source_path, root_dir, rel_path, top_folder,
+                source_name, ext, size, mtime, favorite, hidden, indexed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "content:new",
+                str(root / "New" / "two.jpg"),
+                str(root),
+                "New/two.jpg",
+                "New",
+                "two.jpg",
+                ".jpg",
+                20,
+                2,
+                0,
+                0,
+                2.0,
+            ),
+        )
+    signature["index_file_mtime_ns"] = 2
+
+    rebuilt = mod._folder_items(state)
+    assert [item["id"] for item in rebuilt] == ["", "New"]
+
+
 def test_index_connection_closes_sqlite_handle(monkeypatch, tmp_path):
     mod = _load_slideshow_module()
     monkeypatch.setenv("SLIDESHOW_DATA_DIR", str(tmp_path / "state"))
@@ -576,6 +652,42 @@ def test_index_status_marks_stale_running_status_interrupted(monkeypatch, tmp_pa
 
     assert status["status"] == "interrupted"
     assert writes[-1]["status"] == "interrupted"
+
+
+def test_index_status_heals_interrupted_status_when_committed_meta_covers_attempt(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    memory = {
+        mod._INDEX_STATUS_KEY: {
+            "ok": True,
+            "status": "interrupted",
+            "source_dir": str(tmp_path),
+            "visited_files": 0,
+            "indexed_count": 0,
+            "photo_count": 107313,
+            "display_count": 107313,
+            "folder_count": 0,
+            "started_at": "2000-01-01T00:00:00+00:00",
+            "worker_pid": 12345,
+            "message": "Indexing was interrupted. Press Refresh index to resume.",
+        }
+    }
+    writes: list[dict[str, object]] = []
+
+    monkeypatch.setattr(mod, "_index_meta", lambda _root: {"indexed_at": time.time(), "photo_count": 56811})
+    monkeypatch.setattr(mod, "_indexed_folder_count", lambda _root: 218)
+    monkeypatch.setattr(mod, "_memory_get", lambda key, default=None: memory.get(key, default))
+    monkeypatch.setattr(mod, "_memory_set", lambda _key, value: writes.append(dict(value)))
+
+    status = mod._index_status(tmp_path)
+
+    assert status["status"] == "completed"
+    assert status["color"] == "success"
+    assert status["value"] == "56 811"
+    assert status["folder_count"] == 218
+    assert status["description"] == f"Index ready for {tmp_path}: 56 811 photos, 218 folders."
+    assert writes[-1]["status"] == "completed"
+    assert "worker_pid" not in writes[-1]
 
 
 def test_refresh_index_does_not_build_preview_surfaces(monkeypatch, tmp_path):

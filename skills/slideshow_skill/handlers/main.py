@@ -174,6 +174,19 @@ def _iso_age_s(value: Any) -> float | None:
         return None
 
 
+def _iso_timestamp_s(value: Any) -> float | None:
+    token = _text(value)
+    if not token:
+        return None
+    try:
+        item = datetime.fromisoformat(token)
+        if item.tzinfo is None:
+            item = item.replace(tzinfo=timezone.utc)
+        return float(item.timestamp())
+    except Exception:
+        return None
+
+
 def _text(value: Any) -> str:
     return str(value or "").strip()
 
@@ -306,6 +319,14 @@ def _folder_snapshot_path() -> Path:
     return _internal_data_dir() / "folders.v1.json"
 
 
+def _index_file_signature() -> dict[str, int]:
+    try:
+        stat = _index_path().stat()
+        return {"index_file_size": int(stat.st_size), "index_file_mtime_ns": int(stat.st_mtime_ns)}
+    except Exception:
+        return {}
+
+
 def _with_folder_selection(items: list[dict[str, Any]], selected: str) -> list[dict[str, Any]]:
     return [
         {**dict(item), "selected": _text(item.get("id")) == selected}
@@ -314,15 +335,27 @@ def _with_folder_selection(items: list[dict[str, Any]], selected: str) -> list[d
     ]
 
 
-def _load_folder_snapshot(root: Path, selected: str) -> list[dict[str, Any]] | None:
+def _load_folder_snapshot(
+    root: Path,
+    selected: str,
+    *,
+    index_signature: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]] | None:
     path = _folder_snapshot_path()
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
-    if not isinstance(payload, Mapping) or int(payload.get("schema") or 0) != 1:
+    if not isinstance(payload, Mapping) or int(payload.get("schema") or 0) != 2:
         return None
     if _text(payload.get("source_dir")).casefold() != str(root).casefold():
+        return None
+    signature = dict(index_signature or _index_file_signature())
+    if not signature:
+        return None
+    if _count_int(payload.get("index_file_size")) != _count_int(signature.get("index_file_size")):
+        return None
+    if _count_int(payload.get("index_file_mtime_ns")) != _count_int(signature.get("index_file_mtime_ns")):
         return None
     raw_items = payload.get("items")
     if not isinstance(raw_items, list) or len(raw_items) > _MAX_FOLDER_STREAM_ITEMS + 1:
@@ -331,13 +364,25 @@ def _load_folder_snapshot(root: Path, selected: str) -> list[dict[str, Any]] | N
     return _with_folder_selection(items, selected) if items else None
 
 
-def _store_folder_snapshot(root: Path, items: list[dict[str, Any]]) -> None:
+def _store_folder_snapshot(
+    root: Path,
+    items: list[dict[str, Any]],
+    *,
+    index_signature: Mapping[str, Any] | None = None,
+    index_meta: Mapping[str, Any] | None = None,
+) -> None:
     path = _folder_snapshot_path()
     temp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    signature = dict(index_signature or _index_file_signature())
+    meta = dict(index_meta or {})
     payload = {
-        "schema": 1,
+        "schema": 2,
         "source_dir": str(root),
         "updated_at": _now(),
+        "index_file_size": _count_int(signature.get("index_file_size")),
+        "index_file_mtime_ns": _count_int(signature.get("index_file_mtime_ns")),
+        "indexed_at": meta.get("indexed_at"),
+        "photo_count": _count_int(meta.get("photo_count")),
         "items": [{**dict(item), "selected": False} for item in items],
     }
     try:
@@ -670,6 +715,24 @@ def _index_meta(root: Path) -> dict[str, Any]:
     return {"root_dir": str(root), "indexed_at": float(row["indexed_at"]), "photo_count": int(row["photo_count"])}
 
 
+def _indexed_folder_count(root: Path) -> int:
+    try:
+        with _index_connection(read_only=True) as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) AS count FROM (
+                    SELECT top_folder FROM photos
+                    WHERE root_dir = ? AND hidden = 0 AND top_folder != ''
+                    GROUP BY top_folder
+                )
+                """,
+                (str(root),),
+            ).fetchone()
+        return int(row["count"] or 0) if row is not None else 0
+    except Exception:
+        return 0
+
+
 def _index_status(root: Path | None = None, *, verify_liveness: bool = True) -> dict[str, Any]:
     data = _memory_get(_INDEX_STATUS_KEY, {})
     status = dict(data) if isinstance(data, Mapping) else {}
@@ -709,13 +772,35 @@ def _index_status(root: Path | None = None, *, verify_liveness: bool = True) -> 
             status["message"] = "Indexing was interrupted. Press Refresh index to resume."
             _memory_set(_INDEX_STATUS_KEY, status)
     if meta and _text(status.get("status")) not in {"running", "canceling"}:
+        state = _text(status.get("status"))
+        meta_indexed_at = float(meta.get("indexed_at") or 0.0)
+        attempt_started_at = _iso_timestamp_s(status.get("started_at")) or 0.0
+        meta_covers_attempt = bool(meta_indexed_at and attempt_started_at and meta_indexed_at >= attempt_started_at - 1.0)
+        healed_status = False
+        if state in {"interrupted", "failed"} and meta_covers_attempt:
+            status["ok"] = True
+            status["status"] = "completed"
+            status["message"] = ""
+            status["completed_at"] = status.get("completed_at") or _now()
+            status["folder_count"] = _count_int(status.get("folder_count")) or _indexed_folder_count(_source_dir(source_dir))
+            status.pop("error", None)
+            status.pop("worker_pid", None)
+            healed_status = True
         status["photo_count"] = meta_photo_count or _count_int(status.get("photo_count"))
         status["indexed_count"] = meta_photo_count or _count_int(status.get("indexed_count"))
-    display_count = max(
-        _count_int(status.get("display_count")),
-        _count_int(status.get("photo_count")),
-        _count_int(status.get("indexed_count")),
-    )
+        if healed_status:
+            _memory_set(_INDEX_STATUS_KEY, status)
+    if meta and _text(status.get("status")) not in {"running", "canceling"}:
+        display_count = meta_photo_count or max(
+            _count_int(status.get("photo_count")),
+            _count_int(status.get("indexed_count")),
+        )
+    else:
+        display_count = max(
+            _count_int(status.get("display_count")),
+            _count_int(status.get("photo_count")),
+            _count_int(status.get("indexed_count")),
+        )
     status["display_count"] = display_count
     status["value"] = _count_label(display_count)
     status["label"] = _text(status.get("status")) or "idle"
@@ -1270,18 +1355,22 @@ def _is_favorite(root: Path, content_ref: str) -> bool:
 
 def _folder_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
     root = _source_dir(_text(state.get("source_dir")))
-    _ensure_index(root)
+    index_meta = _ensure_index(root)
     selected = _text(state.get("selected_folder"))
-    try:
-        stat = _index_path().stat()
-        cache_key = (str(root), selected, int(stat.st_mtime_ns), int(stat.st_size))
+    index_signature = _index_file_signature()
+    cache_key = None
+    if index_signature:
+        cache_key = (
+            str(root),
+            selected,
+            _count_int(index_signature.get("index_file_mtime_ns")),
+            _count_int(index_signature.get("index_file_size")),
+        )
         with _folder_cache_lock:
             cached = _folder_cache.get(cache_key)
             if cached is not None:
                 return [dict(item) for item in cached]
-    except Exception:
-        cache_key = None
-    persisted = _load_folder_snapshot(root, selected)
+    persisted = _load_folder_snapshot(root, selected, index_signature=index_signature)
     if persisted is not None:
         if cache_key is not None:
             with _folder_cache_lock:
@@ -1348,7 +1437,7 @@ def _folder_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
         with _folder_cache_lock:
             _folder_cache.clear()
             _folder_cache[cache_key] = [dict(item) for item in items]
-    _store_folder_snapshot(root, items)
+    _store_folder_snapshot(root, items, index_signature=index_signature, index_meta=index_meta)
     return items
 
 
