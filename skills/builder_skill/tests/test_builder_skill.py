@@ -6277,13 +6277,13 @@ def test_semantic_repair_does_not_send_compiler_defects_to_the_model(tmp_path, m
     assert result["ok"] is False
 
 
-@pytest.mark.parametrize("version", [1, 2, 3])
-def test_state_repair_context_and_transport_use_patch_contract(tmp_path, monkeypatch, version):
+@pytest.mark.parametrize("kind,version", [("state", 1), ("state", 2), ("state", 3), ("binding", 1), ("reference", 1)])
+def test_state_repair_context_and_transport_use_patch_contract(tmp_path, monkeypatch, kind, version):
     skill = _load_module()
     import adaos.sdk.llm.llm_client as llm_client
 
     candidate = {"schema": "adaos.builder.semantic_prototype_candidate.v2", "resources": [{"id": "unchanged"}]}
-    replacement = {"schema": f"adaos.builder.state_repair.v{version}", "states": [], "views": []}
+    replacement = {"schema": f"adaos.builder.{kind}_repair.v{version}", "states": [], "views": []}
     merged = {**candidate, "representative_states": []}
     plan = {"task": "Repair only reported states", "output_schema": {"type": "object", "properties": {"schema": {"enum": [replacement["schema"]]}}}, "allowed_state_ids": ["empty"]}
     submitted = {}
@@ -6304,8 +6304,10 @@ def test_state_repair_context_and_transport_use_patch_contract(tmp_path, monkeyp
         return {"ok": True, "attempts": []}
 
     monkeypatch.setattr(llm_client, "submit_response_job", submit)
-    monkeypatch.setattr(skill.sdk_builder_prototype, "prepare_state_repair", lambda *_: plan)
-    monkeypatch.setattr(skill.sdk_builder_prototype, "apply_state_repair", apply)
+    monkeypatch.setattr(skill.sdk_builder_prototype, "prepare_state_repair", lambda *_: plan if kind == "state" else None)
+    monkeypatch.setattr(skill.sdk_builder_prototype, "prepare_binding_repair", lambda *_: plan if kind == "binding" else None)
+    monkeypatch.setattr(skill.sdk_builder_prototype, "prepare_reference_repair", lambda *_: plan if kind == "reference" else None)
+    monkeypatch.setattr(skill.sdk_builder_prototype, f"apply_{kind}_repair", apply)
     monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", parse)
     result = skill._repair_llm_semantic_transform_output(
         session={"id": "patch", "scenario_id": "records", "artifact_root": str(tmp_path)},
@@ -6315,14 +6317,52 @@ def test_state_repair_context_and_transport_use_patch_contract(tmp_path, monkeyp
         output_mode="semantic_v2", _meta={},
     )
     assert result["ok"] is True
-    assert result["repair"]["kind"] == "semantic_state_repair"
+    assert result["repair"]["kind"] == f"semantic_{kind}_repair"
     assert json.loads(parsed["output_text"]) == merged
     assert json.loads(submitted["messages"][1]["content"])["stable_builder_context"]["output_contract"]["schema"] == replacement["schema"]
     assert submitted["kwargs"]["text"]["format"]["schema"] == plan["output_schema"]
     assert result["raw_response"] == json.dumps(replacement)
     assert replacement["schema"] in submitted["messages"][0]["content"]
+    assert "requirement bindings and unreported states unchanged" not in submitted["messages"][0]["content"]
     for other in {1, 2, 3} - {version}:
         assert f"adaos.builder.state_repair.v{other}" not in submitted["messages"][0]["content"]
+
+
+@pytest.mark.parametrize("second_passes", [False, True])
+def test_semantic_repair_chains_distinct_scopes_and_preserves_candidate(monkeypatch, second_passes):
+    skill = _load_module()
+    original = {"resources": [{"records": [["row", "keep"]]}], "reference": ""}
+    calls = []
+
+    def once(**kwargs):
+        candidate = json.loads(kwargs["output_text"])
+        assert candidate["resources"] == original["resources"]
+        calls.append(kwargs)
+        if len(calls) == 1:
+            merged, kind, ok = {**candidate, "reference": "id"}, "reference", False
+        else:
+            assert candidate["reference"] == "id"
+            merged, kind, ok = {**candidate, "bindings": ["required"]}, "binding", second_passes
+        return {"ok": ok, "repair_candidate": merged,
+                "validation": {"findings": [{"code": "missing_binding"}]},
+                "repair": {"kind": f"semantic_{kind}_repair", "request_id": f"req{len(calls)}",
+                           "job_id": f"job{len(calls)}", "telemetry": {"usage": {"total_tokens": 10}}},
+                "candidate_artifacts": [{"job_id": f"job{len(calls)}"}],
+                "attempts": [{"ok": False}, {"ok": ok}]}
+
+    monkeypatch.setattr(skill, "_repair_llm_semantic_transform_once", once)
+    monkeypatch.setattr(skill, "_semantic_scoped_repair", lambda *args: ("semantic_binding_repair", {"task": "bind"}))
+    result = skill._repair_llm_semantic_transform_output(output_text=json.dumps(original))
+    assert len(calls) == 2
+    assert [item["attempt_number"] for item in calls] == [2, 3]
+    assert result["ok"] is second_passes
+    assert result["repair"]["telemetry"]["usage"]["total_tokens"] == 20
+    assert len(result["repair"]["history"]) == 2
+    assert [item["attempt"] for item in result["attempts"]] == [1, 2, 3]
+    assert len(result["candidate_artifacts"]) == 2
+    assert "repair_candidate" not in result
+    if not second_passes:
+        assert result["repair"]["stop_reason"] == "no_new_bounded_scope_or_no_progress"
 
 
 def test_semantic_repair_receives_full_candidate_brief_and_finding(
@@ -10328,7 +10368,8 @@ def test_builder_component_contract_accepts_field_change_and_rejects_unknown_fie
     assert "targets unknown form field 'missing'" in validation["detail"]
 
 
-def test_builder_component_contract_rejects_unrendered_table_image_cells() -> None:
+@pytest.mark.parametrize("kind", ["text", "icon", "boolean", "buttons", "status", "date", "datetime", "number", "image", "video"])
+def test_builder_table_kinds_follow_the_shared_capability_contract(kind) -> None:
     skill = _load_module()
     page_schema = {
         "id": "catalog",
@@ -10339,7 +10380,7 @@ def test_builder_component_contract_rejects_unrendered_table_image_cells() -> No
                 "type": "ui.table",
                 "area": "main",
                 "inputs": {
-                    "columns": [{"key": "image", "label": "Image", "kind": "image"}]
+                    "columns": [{"key": "value", "label": "Value", "kind": kind}]
                 },
             }
         ],
@@ -10347,9 +10388,18 @@ def test_builder_component_contract_rejects_unrendered_table_image_cells() -> No
 
     result = skill._validate_page_schema_component_contracts(page_schema)
 
-    assert result["ok"] is False
-    assert result["error"] == "component_contract_invalid"
-    assert "ui.list cards" in result["detail"]
+    assert result["ok"] is (kind != "video")
+    if kind == "video":
+        assert result["error"] == "component_contract_invalid"
+        assert "declared column kind" in result["detail"]
+
+
+def test_builder_table_contract_does_not_crash_on_older_catalog_metadata(monkeypatch) -> None:
+    skill = _load_module()
+    monkeypatch.setattr(skill.developer_ui, "get", lambda *args, **kwargs: {"manifest": {}})
+    page = {"id": "records", "widgets": [{"id": "records", "type": "ui.table",
+             "inputs": {"columns": [{"key": "title", "kind": "text"}]}}]}
+    assert skill._validate_page_schema_component_contracts(page)["ok"] is True
 
 
 def test_builder_webui_validation_rejects_select_without_options() -> None:
@@ -13672,7 +13722,9 @@ def test_chat_handles_builder_project_commands(monkeypatch, tmp_path) -> None:
     import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(skill.developer_projects, "list_projects", lambda **kwargs: [])
+    monkeypatch.setattr(
+        skill.sdk_builder_project_catalog, "list_projects", lambda **kwargs: []
+    )
     monkeypatch.setattr(
         skill,
         "_request_workbench_refresh",
@@ -14672,7 +14724,7 @@ def test_limited_channel_can_select_existing_dev_scenario_without_local_session(
         },
     )
     monkeypatch.setattr(
-        skill.developer_projects,
+        skill.sdk_builder_project_catalog,
         "list_projects",
         lambda **kwargs: [
             {

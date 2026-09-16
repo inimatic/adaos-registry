@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-16T05:07:15+00:00",
+  "updated_at": "2026-09-16T05:07:32+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -157,8 +157,8 @@
       "kind": "skill",
       "id": "builder_skill",
       "name": "builder_skill",
-      "version": "0.3.170",
-      "updated_at": "2026-09-12T13:23:08+00:00",
+      "version": "0.3.171",
+      "updated_at": "2026-09-16T05:07:32+00:00",
       "path": "skills/builder_skill",
       "manifest": "skills/builder_skill/skill.yaml",
       "source": {
@@ -173,14 +173,7 @@
       "description": "Rapid prototyping Builder skill for creating and editing scenario UI drafts from voice or text dialog.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 25,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "builder",
-        "release": "builder@0.2.127",
-        "release_digest": "sha256:691625a36b034a995402165b68b95746cf7f93d857e39f8e6e7b3a399b8ca20f",
-        "package_digest": "sha256:6921ad6eb75a8f49cd94db4f117cfc9f25eda63e614c29d57b6819b3d10dbff9"
-      }
+      "tools_count": 25
     },
     {
       "kind": "skill",
