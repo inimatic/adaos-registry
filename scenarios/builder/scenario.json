@@ -56,30 +56,73 @@
                     "id": "builder",
                     "title": "Builder",
                     "layout": {
-                        "type": "split",
-                        "areas": [
+                        "version": 2,
+                        "pattern": "collection",
+                        "density": "compact",
+                        "contentWidth": "bounded",
+                        "scroll": "regions",
+                        "regions": [
                             {
                                 "id": "main",
-                                "role": "main"
+                                "role": "collection",
+                                "priority": 100,
+                                "scroll": "page",
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "stack"
+                                }
                             },
                             {
                                 "id": "conversation",
-                                "role": "aux",
-                                "width": 360
+                                "role": "inspector",
+                                "priority": 60,
+                                "scroll": "region",
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "sheet"
+                                },
+                                "size": {
+                                    "minPx": 220,
+                                    "preferredPx": 360,
+                                    "maxPx": 600
+                                }
                             }
                         ],
-                        "auxWidth": 360,
+                        "interaction": {
+                            "selection": "single",
+                            "rowActivation": "open-detail",
+                            "filters": "inline",
+                            "actions": "adaptive",
+                            "detail": "inline"
+                        },
+                        "maxContentWidthPx": 1600,
                         "variants": [
                             {
-                                "id": "conversation-focus",
-                                "when": "$state.workbenchView === 'conversation'",
-                                "type": "single",
-                                "areas": [
+                                "pattern": "collection",
+                                "density": "compact",
+                                "contentWidth": "bounded",
+                                "scroll": "regions",
+                                "regions": [
                                     {
                                         "id": "main",
-                                        "role": "main"
+                                        "role": "collection",
+                                        "priority": 100,
+                                        "scroll": "page",
+                                        "presentation": {
+                                            "wide": "pane",
+                                            "compact": "stack"
+                                        }
                                     }
-                                ]
+                                ],
+                                "interaction": {
+                                    "selection": "single",
+                                    "rowActivation": "select",
+                                    "filters": "inline",
+                                    "actions": "adaptive"
+                                },
+                                "maxContentWidthPx": 1600,
+                                "id": "conversation-focus",
+                                "when": "$state.workbenchView === 'conversation'"
                             }
                         ]
                     },
@@ -3068,13 +3111,29 @@
                         "id": "confirm-archive",
                         "title": "Подтвердите архивирование",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -3181,13 +3240,29 @@
                         "id": "file-picker",
                         "title": "Файлы проекта",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "collection",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "collection",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "single",
+                                "rowActivation": "select",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -3293,13 +3368,29 @@
                         "id": "preview-qr",
                         "title": "QR для открытия preview",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -3382,13 +3473,29 @@
                         "id": "project-picker",
                         "title": "Выбор проекта",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "collection",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "collection",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "single",
+                                "rowActivation": "select",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -3675,13 +3782,29 @@
                         "id": "new-project",
                         "title": "new-project",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -3898,13 +4021,29 @@
                         "id": "technical-addendum",
                         "title": "technical-addendum",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -3980,13 +4119,29 @@
                         "id": "prototype-review",
                         "title": "Prototype review",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -4106,13 +4261,29 @@
                         "id": "automation",
                         "title": "automation",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -4329,13 +4500,29 @@
                         "id": "publication",
                         "title": "publication",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "collection",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "regions",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "collection",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -4528,13 +4715,29 @@
                         "id": "confirm-subscription-update",
                         "title": "Review stable update",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -4722,13 +4925,29 @@
                         "id": "confirm-trial-access",
                         "title": "Review Beta access",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -4884,13 +5103,29 @@
                         "id": "confirm-publish",
                         "title": "confirm-publish",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -4989,13 +5224,29 @@
                         "id": "confirm-delete",
                         "title": "confirm-delete",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -5097,13 +5348,29 @@
                         "id": "process",
                         "title": "Development process",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "collection",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "collection",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "single",
+                                "rowActivation": "select",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -5225,13 +5492,29 @@
                     "schema": {
                         "id": "design-revisions",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "collection",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "collection",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "single",
+                                "rowActivation": "select",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -5385,13 +5668,29 @@
                     "schema": {
                         "id": "design-trace",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -5484,13 +5783,29 @@
                     "schema": {
                         "id": "design-context",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -5559,13 +5874,29 @@
                     "schema": {
                         "id": "design-specification",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -5618,13 +5949,29 @@
                     "schema": {
                         "id": "design-delta",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -5694,13 +6041,29 @@
                     "schema": {
                         "id": "model-clarification-answer",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -5801,13 +6164,29 @@
                     "schema": {
                         "id": "design-file-viewer",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -5893,13 +6272,29 @@
                             }
                         ],
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -6125,13 +6520,29 @@
                     "schema": {
                         "id": "design-settings",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -6659,13 +7070,29 @@
                     "schema": {
                         "id": "design-checkpoint",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -6734,13 +7161,29 @@
                     "schema": {
                         "id": "design-return",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -6802,13 +7245,29 @@
                     "schema": {
                         "id": "design-trace-messages",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -6857,13 +7316,29 @@
                     "schema": {
                         "id": "design-conversation-channels",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "widgets": [
                             {
@@ -6919,13 +7394,29 @@
                     "schema": {
                         "id": "about-icon-drafts",
                         "layout": {
-                            "type": "stack",
-                            "areas": [
+                            "version": 2,
+                            "pattern": "collection",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "regions",
+                            "regions": [
                                 {
                                     "id": "main",
-                                    "role": "main"
+                                    "role": "collection",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
                                 }
-                            ]
+                            ],
+                            "interaction": {
+                                "selection": "single",
+                                "rowActivation": "select",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
                         },
                         "autoActions": [
                             {

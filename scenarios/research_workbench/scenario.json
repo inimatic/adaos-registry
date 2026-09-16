@@ -23,14 +23,29 @@
                     "id": "research_workbench",
                     "title": "Research Workbench",
                     "layout": {
-                        "type": "single",
-                        "pattern": "stack",
-                        "areas": [
+                        "version": 2,
+                        "pattern": "task-flow",
+                        "density": "comfortable",
+                        "contentWidth": "fluid",
+                        "scroll": "page",
+                        "regions": [
                             {
                                 "id": "main",
-                                "role": "main"
+                                "role": "main",
+                                "priority": 100,
+                                "scroll": "page",
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "stack"
+                                }
                             }
-                        ]
+                        ],
+                        "interaction": {
+                            "selection": "none",
+                            "rowActivation": "none",
+                            "filters": "inline",
+                            "actions": "adaptive"
+                        }
                     },
                     "widgets": [
                         {

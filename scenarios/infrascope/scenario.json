@@ -16,22 +16,60 @@
           "id": "infrascope",
           "title": "Infrascope",
           "layout": {
-            "type": "split",
-            "pattern": "split",
-            "areas": [
+            "version": 2,
+            "pattern": "collection-detail",
+            "density": "comfortable",
+            "contentWidth": "fluid",
+            "scroll": "regions",
+            "regions": [
               {
                 "id": "sidebar",
-                "role": "sidebar"
+                "role": "navigation",
+                "priority": 80,
+                "scroll": "region",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "drawer"
+                },
+                "size": {
+                  "minPx": 200,
+                  "preferredPx": 280,
+                  "maxPx": 480
+                }
               },
               {
                 "id": "main",
-                "role": "main"
+                "role": "collection",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                }
               },
               {
                 "id": "right",
-                "role": "aux"
+                "role": "detail",
+                "priority": 70,
+                "scroll": "region",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "sheet"
+                },
+                "size": {
+                  "minPx": 220,
+                  "preferredPx": 360,
+                  "maxPx": 600
+                }
               }
-            ]
+            ],
+            "interaction": {
+              "selection": "single",
+              "rowActivation": "open-detail",
+              "filters": "inline",
+              "actions": "adaptive",
+              "detail": "inline"
+            }
           },
           "initialState": {
             "infrascopeMode": "overview",

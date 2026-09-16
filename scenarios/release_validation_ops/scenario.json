@@ -16,13 +16,55 @@
           "id": "release_validation_ops",
           "title": "Release Validation Operations",
           "layout": {
-            "type": "split",
-            "pattern": "split",
-            "areas": [
-              { "id": "main", "role": "main" },
-              { "id": "right", "role": "aux" },
-              { "id": "bottom", "role": "footer" }
-            ]
+            "version": 2,
+            "pattern": "workbench",
+            "density": "comfortable",
+            "contentWidth": "fluid",
+            "scroll": "regions",
+            "regions": [
+              {
+                "id": "main",
+                "role": "main",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                }
+              },
+              {
+                "id": "right",
+                "role": "inspector",
+                "priority": 60,
+                "scroll": "region",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "sheet"
+                },
+                "size": {
+                  "minPx": 220,
+                  "preferredPx": 360,
+                  "maxPx": 600
+                }
+              },
+              {
+                "id": "bottom",
+                "role": "commands",
+                "priority": 90,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "pane"
+                }
+              }
+            ],
+            "interaction": {
+              "selection": "none",
+              "rowActivation": "none",
+              "filters": "inline",
+              "actions": "adaptive",
+              "detail": "inline"
+            }
           },
           "widgets": [
             {
@@ -52,10 +94,22 @@
                 "size": "small",
                 "variant": "stack",
                 "buttons": [
-                  { "id": "refresh", "label": "Refresh validation" },
-                  { "id": "register", "label": "Register contracts" },
-                  { "id": "run", "label": "Run latest pending" },
-                  { "id": "retry", "label": "Retry latest" }
+                  {
+                    "id": "refresh",
+                    "label": "Refresh validation"
+                  },
+                  {
+                    "id": "register",
+                    "label": "Register contracts"
+                  },
+                  {
+                    "id": "run",
+                    "label": "Run latest pending"
+                  },
+                  {
+                    "id": "retry",
+                    "label": "Retry latest"
+                  }
                 ]
               },
               "actions": [
@@ -63,25 +117,33 @@
                   "on": "click:refresh",
                   "type": "callSkill",
                   "target": "release_validation_skill.refresh_snapshot",
-                  "params": { "webspace_id": "$runtime.webspace_id" }
+                  "params": {
+                    "webspace_id": "$runtime.webspace_id"
+                  }
                 },
                 {
                   "on": "click:register",
                   "type": "callSkill",
                   "target": "release_validation_skill.register_default_observe_contracts",
-                  "params": { "webspace_id": "$runtime.webspace_id" }
+                  "params": {
+                    "webspace_id": "$runtime.webspace_id"
+                  }
                 },
                 {
                   "on": "click:run",
                   "type": "callSkill",
                   "target": "release_validation_skill.run_latest_campaign",
-                  "params": { "webspace_id": "$runtime.webspace_id" }
+                  "params": {
+                    "webspace_id": "$runtime.webspace_id"
+                  }
                 },
                 {
                   "on": "click:retry",
                   "type": "callSkill",
                   "target": "release_validation_skill.retry_latest_campaign",
-                  "params": { "webspace_id": "$runtime.webspace_id" }
+                  "params": {
+                    "webspace_id": "$runtime.webspace_id"
+                  }
                 }
               ]
             },
@@ -134,10 +196,26 @@
               "inputs": {
                 "emptyText": "No test nodes registered",
                 "columns": [
-                  { "key": "display_name", "label": "Node" },
-                  { "key": "host", "label": "Host", "width": "150px", "mono": true },
-                  { "key": "profile", "label": "Profile", "width": "100px" },
-                  { "key": "enabled_label", "label": "Enabled", "width": "90px" }
+                  {
+                    "key": "display_name",
+                    "label": "Node"
+                  },
+                  {
+                    "key": "host",
+                    "label": "Host",
+                    "width": "150px",
+                    "mono": true
+                  },
+                  {
+                    "key": "profile",
+                    "label": "Profile",
+                    "width": "100px"
+                  },
+                  {
+                    "key": "enabled_label",
+                    "label": "Enabled",
+                    "width": "90px"
+                  }
                 ]
               }
             },
@@ -153,11 +231,33 @@
               "inputs": {
                 "emptyText": "No validation campaigns",
                 "columns": [
-                  { "key": "campaign_id", "label": "Campaign", "mono": true },
-                  { "key": "state", "label": "State", "width": "110px" },
-                  { "key": "target_build", "label": "Target", "width": "210px", "mono": true },
-                  { "key": "nodes", "label": "Nodes", "width": "145px" },
-                  { "key": "finished_at", "label": "Finished", "width": "185px", "mono": true }
+                  {
+                    "key": "campaign_id",
+                    "label": "Campaign",
+                    "mono": true
+                  },
+                  {
+                    "key": "state",
+                    "label": "State",
+                    "width": "110px"
+                  },
+                  {
+                    "key": "target_build",
+                    "label": "Target",
+                    "width": "210px",
+                    "mono": true
+                  },
+                  {
+                    "key": "nodes",
+                    "label": "Nodes",
+                    "width": "145px"
+                  },
+                  {
+                    "key": "finished_at",
+                    "label": "Finished",
+                    "width": "185px",
+                    "mono": true
+                  }
                 ]
               }
             },
@@ -173,10 +273,26 @@
               "inputs": {
                 "emptyText": "No assignments",
                 "columns": [
-                  { "key": "node_id", "label": "Node", "width": "110px" },
-                  { "key": "state", "label": "State", "width": "75px" },
-                  { "key": "checks_text", "label": "Checks", "width": "65px", "mono": true },
-                  { "key": "reason_label", "label": "Reason" }
+                  {
+                    "key": "node_id",
+                    "label": "Node",
+                    "width": "110px"
+                  },
+                  {
+                    "key": "state",
+                    "label": "State",
+                    "width": "75px"
+                  },
+                  {
+                    "key": "checks_text",
+                    "label": "Checks",
+                    "width": "65px",
+                    "mono": true
+                  },
+                  {
+                    "key": "reason_label",
+                    "label": "Reason"
+                  }
                 ]
               }
             },
@@ -189,7 +305,9 @@
                 "kind": "y",
                 "path": "data/release_validation/detail"
               },
-              "inputs": { "emptyText": "No campaign evidence" }
+              "inputs": {
+                "emptyText": "No campaign evidence"
+              }
             },
             {
               "id": "release-ops-journal",
@@ -213,4 +331,3 @@
     }
   }
 }
-
