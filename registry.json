@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-16T05:07:32+00:00",
+  "updated_at": "2026-09-16T13:34:22+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1038,8 +1038,8 @@
       "kind": "skill",
       "id": "slideshow_skill",
       "name": "slideshow_skill",
-      "version": "0.1.67",
-      "updated_at": "2026-08-18T12:00:00+00:00",
+      "version": "0.1.68",
+      "updated_at": "2026-09-16T13:34:22+00:00",
       "path": "skills/slideshow_skill",
       "manifest": "skills/slideshow_skill/skill.yaml",
       "source": {
@@ -1262,6 +1262,35 @@
         "release": "builder@0.2.127",
         "release_digest": "sha256:691625a36b034a995402165b68b95746cf7f93d857e39f8e6e7b3a399b8ca20f",
         "package_digest": "sha256:53310d271a7db31246955d09030c2ddef07619f37dd28dae74613848be3f207f"
+      }
+    },
+    {
+      "kind": "skill",
+      "id": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+      "name": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+      "version": "0.1.5",
+      "updated_at": "2026-09-16T11:13:13+00:00",
+      "path": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+      "manifest": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill/skill.yaml",
+      "source": {
+        "path": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+        "manifest": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+        "id": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill"
+      },
+      "description": "Persistent volunteer roster with caller-authorized transactional operations.",
+      "entry": "{'module': 'handlers.main'}",
+      "runtime_python": "3.11",
+      "tools_count": 7,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "release": "volunteer_roster_test_-20260916-e2e80de3bec9621@0.1.7",
+        "release_digest": "sha256:85fa756ae3c78197b25b0a0dbcc516bfa9b7fb3dfa97b71a5b98dbb8586c2c34",
+        "package_digest": "sha256:5260dcef84bf875611cc9e2dcdac308aca5bb8737f3d73e47951968b0aa46efd"
       }
     },
     {
@@ -1970,6 +1999,58 @@
           "source_revision": "sha256:166e61c04119eaa40f354aafbfec847a257c9f56c7e7ea97504bfa80fb4df86c",
           "package_digest": "sha256:9f79e2fc862418746aff2be5f40fc653c6d34991934ce42190448d120afdb217",
           "version": "0.1.2"
+        }
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+      "name": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+      "version": "0.1.5",
+      "updated_at": "2026-09-16T11:13:18+00:00",
+      "path": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621",
+      "manifest": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621/scenario.yaml",
+      "source": {
+        "path": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "manifest": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:6474c9b481ca4796c58167cff5449ed7b0aa60485f2c5362e872cee53beafdbc",
+        "path_scope": [
+          "projects/volunteer_roster_test_-20260916-e2e80de3bec9621/"
+        ]
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "id": "volunteer_roster_test_-20260916-e2e80de3bec9621"
+      },
+      "title": "Volunteer Roster [TEST]-20260916-e2e80de3bec9621",
+      "title_i18n": {
+        "key": "scenario.volunteer_roster_test_-20260916-e2e80de3bec9621.title",
+        "fallback": "Volunteer Roster [TEST]-20260916-e2e80de3bec9621"
+      },
+      "description": "Persistent volunteer roster for a community event.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "volunteer_roster_test_-20260916-e2e80de3bec9621_skill"
+        ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "release": "volunteer_roster_test_-20260916-e2e80de3bec9621@0.1.7",
+        "release_digest": "sha256:85fa756ae3c78197b25b0a0dbcc516bfa9b7fb3dfa97b71a5b98dbb8586c2c34",
+        "package_digest": "sha256:b5a0f58713972d63dad5aa7e56135ea3ba9f8df29bc67d7119392f3b9690e763"
+      },
+      "channels": {
+        "stable": {
+          "release": "volunteer_roster_test_-20260916-e2e80de3bec9621@0.1.7",
+          "release_digest": "sha256:85fa756ae3c78197b25b0a0dbcc516bfa9b7fb3dfa97b71a5b98dbb8586c2c34",
+          "source_revision": "sha256:6474c9b481ca4796c58167cff5449ed7b0aa60485f2c5362e872cee53beafdbc",
+          "package_digest": "sha256:b5a0f58713972d63dad5aa7e56135ea3ba9f8df29bc67d7119392f3b9690e763",
+          "version": "0.1.5"
         }
       }
     },
@@ -3816,6 +3897,59 @@
           "source_revision": "sha256:166e61c04119eaa40f354aafbfec847a257c9f56c7e7ea97504bfa80fb4df86c",
           "package_digest": "sha256:9f79e2fc862418746aff2be5f40fc653c6d34991934ce42190448d120afdb217",
           "version": "0.1.1"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+      "name": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+      "version": "0.1.7",
+      "updated_at": "2026-09-16T13:07:47+00:00",
+      "path": "projects/volunteer_roster_test_-20260916-e2e80de3bec9621",
+      "manifest": "projects/volunteer_roster_test_-20260916-e2e80de3bec9621/project.yaml",
+      "source": {
+        "path": "projects/volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "manifest": "projects/volunteer_roster_test_-20260916-e2e80de3bec9621/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "id": "volunteer_roster_test_-20260916-e2e80de3bec9621"
+      },
+      "title": "Volunteer Roster [TEST]-20260916-e2e80de3bec9621",
+      "description": "Create a new application named \"Volunteer Roster [TEST]-20260916-e2e80de3bec9621\" for coordinating a weekend community event.",
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "features": [],
+      "components": [
+        "scenario:volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "skill:volunteer_roster_test_-20260916-e2e80de3bec9621_skill"
+      ],
+      "components_count": 2,
+      "profiles": [],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "release": "volunteer_roster_test_-20260916-e2e80de3bec9621@0.1.7",
+        "release_digest": "sha256:85fa756ae3c78197b25b0a0dbcc516bfa9b7fb3dfa97b71a5b98dbb8586c2c34",
+        "primary_component": "scenario:volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "package_digest": "sha256:b5a0f58713972d63dad5aa7e56135ea3ba9f8df29bc67d7119392f3b9690e763"
+      },
+      "channels": {
+        "stable": {
+          "release": "volunteer_roster_test_-20260916-e2e80de3bec9621@0.1.7",
+          "release_digest": "sha256:85fa756ae3c78197b25b0a0dbcc516bfa9b7fb3dfa97b71a5b98dbb8586c2c34",
+          "source_revision": "sha256:6474c9b481ca4796c58167cff5449ed7b0aa60485f2c5362e872cee53beafdbc",
+          "package_digest": "sha256:b5a0f58713972d63dad5aa7e56135ea3ba9f8df29bc67d7119392f3b9690e763",
+          "version": "0.1.7"
         }
       }
     },
