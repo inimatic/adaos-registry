@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: slideshow
-version: 0.1.0
+version: 0.1.1
 profiles:
 - adaos.builder.component_project.v1
 components:
@@ -10,14 +10,22 @@ components:
     role: primary
     exposure: application
     lifecycle: bound
-    relations: [uses]
+    relations:
+    - uses
   dependencies: []
 entrypoints: []
 catalog:
   title: Slideshow
-  description: ReDevice photo slideshow widget with local folder indexing and endpoint sync.
-  categories: [media, home]
-  tags: [builder-managed, legacy-component, photos, redevice]
+  description: ReDevice photo slideshow widget with local folder indexing and endpoint
+    sync.
+  categories:
+  - media
+  - home
+  tags:
+  - builder-managed
+  - legacy-component
+  - photos
+  - redevice
 publication:
   stage: alpha
   visibility: unlisted
