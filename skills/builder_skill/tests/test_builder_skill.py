@@ -33,6 +33,11 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+# Packaged validation disables bytecode writes. Reuse code, never module state,
+# so each test gets isolation without recompiling the large handler 306 times.
+HANDLER_PATH = SKILL_ROOT / "handlers" / "main.py"
+HANDLER_CODE = compile(HANDLER_PATH.read_text(encoding="utf-8-sig"), str(HANDLER_PATH), "exec")
+
 
 def _load_module():
     if "y_py" not in sys.modules:
@@ -46,7 +51,7 @@ def _load_module():
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    exec(HANDLER_CODE, module.__dict__)
 
     # Runtime self-tests receive the active skill memory path. Keep every
     # freshly loaded test module isolated instead of reading or mutating the
@@ -63,6 +68,32 @@ def _load_module():
     return module
 
 
+def _layout(*region_ids: str, pattern: str | None = None) -> dict:
+    ids = region_ids or ("main",)
+    selected_pattern = pattern or ("document" if len(ids) == 1 else "collection-detail")
+    return {
+        "version": 2,
+        "pattern": selected_pattern,
+        "density": "comfortable",
+        "contentWidth": "bounded",
+        "scroll": "page" if len(ids) == 1 else "regions",
+        "regions": [
+            {
+                "id": region_id,
+                "role": (
+                    "main"
+                    if len(ids) == 1
+                    else ("collection" if index == 0 else "detail")
+                ),
+                "priority": 100 if index == 0 else 70,
+                "scroll": "page" if index == 0 else "region",
+                "presentation": {"wide": "pane", "compact": "stack"},
+            }
+            for index, region_id in enumerate(ids)
+        ],
+    }
+
+
 def test_background_thread_propagates_runtime_context() -> None:
     skill = _load_module()
     runtime_owner = ContextVar("builder_test_runtime_owner", default=None)
@@ -77,6 +108,109 @@ def test_background_thread_propagates_runtime_context() -> None:
 
     assert not thread.is_alive()
     assert observed == ["skill:builder_skill"]
+
+
+def test_async_budget_is_independent_of_transport_and_sync_timeout(monkeypatch):
+    skill = _load_module()
+    monkeypatch.delenv("ADAOS_BUILDER_LLM_JOB_TIMEOUT_S", raising=False)
+    monkeypatch.delenv("ADAOS_BUILDER_LLM_REPAIR_JOB_TIMEOUT_S", raising=False)
+    monkeypatch.delenv("ADAOS_BUILDER_LLM_JOB_SUBMIT_TIMEOUT_S", raising=False)
+    monkeypatch.setattr(skill, "_builder_llm_timeout_s", lambda: 30)
+    assert skill._builder_llm_job_timeout_s() == 600
+    assert skill._builder_llm_repair_job_timeout_s() == 600
+    assert skill._builder_llm_job_submit_timeout_s() == 15
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_JOB_TIMEOUT_S", "1200")
+    assert skill._builder_llm_job_timeout_s() == 1200
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_JOB_TIMEOUT_S", "invalid")
+    assert skill._builder_llm_job_timeout_s() == 600
+
+
+@pytest.mark.parametrize("reason", ["wait_budget_exhausted", "connection_unavailable"])
+def test_wait_interruption_retains_diagnostics_without_reporting_provider_failure(monkeypatch, tmp_path, reason):
+    skill = _load_module()
+    from adaos.sdk.llm import llm_client
+
+    observed = {"job_id": "slow-job", "root_status": "running", "reason": reason,
+                "elapsed_ms": 600000, "last_poll_error": None, "remote_cancelled": False}
+    def wait(*args, **kwargs):
+        raise llm_client.LlmJobWaitTimeout(observed)
+    monkeypatch.setattr(llm_client, "wait_response_job", wait)
+    monkeypatch.setattr(skill, "_builder_topic_ref", lambda *a, **kw: {})
+    saved = []
+    emitted = []
+    monkeypatch.setattr(skill, "_save_session", lambda ws, session: saved.append(copy.deepcopy(session)))
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kw: emitted.append((text, kw)))
+    skill._complete_llm_webui_job(
+        ws="desktop-dev", session_id="scenario:test-app", binding={}, patch={"id": "test-patch"},
+        request_text="Update this prototype", before_webui={}, job_id="slow-job", base_url="",
+        request_id="test-request", auto_apply=False, _meta={},
+        session_snapshot={"scenario_id": "test-app", "artifact_root": str(tmp_path)},
+    )
+    assert saved[-1]["pending_llm_jobs"]["slow-job"]["status"] == "interrupted"
+    terminal = json.loads((tmp_path / "llm_jobs" / "slow-job.json").read_text(encoding="utf-8"))
+    assert terminal["status"] == "interrupted"
+    assert terminal["diagnostic"]["wait_observation"] == observed
+    assert emitted[-1][1]["_meta"]["progress_status"] == "interrupted"
+    assert ("Нет связи с Root" in emitted[-1][0]) == (reason == "connection_unavailable")
+    assert ("Исчерпан локальный бюджет" in emitted[-1][0]) == (reason == "wait_budget_exhausted")
+    assert skill._active_llm_job(saved[-1]) is None
+    assert skill._merged_llm_job_status("interrupted", "running") == "interrupted"
+    assert skill._merged_llm_job_status("interrupted", "succeeded") == "succeeded"
+
+
+@pytest.mark.parametrize("defect", [None, "input_digest", "input_job", "input_request", "baseline_digest", "brief", "revision", "instruction", "root_running", "root_job"])
+def test_semantic_replay_requires_exact_original_context_and_terminal_root(monkeypatch, tmp_path, defect):
+    import hashlib
+    skill = _load_module()
+    from adaos.sdk.llm import llm_client
+
+    brief = {"brief_id": "brief:one", "digest": "sha256:one"}
+    instruction = "Correct this prototype"
+    request = {"scenario_id": "test-app", "job_id": "wrong" if defect == "input_job" else "slow-job",
+               "request_id": "wrong" if defect == "input_request" else "original-request",
+               "generation": {"options": {"output_mode": "semantic_v2"}},
+               "messages": [{"content": json.dumps({"builder_request": {
+                   "instruction": "different" if defect == "instruction" else instruction,
+                   "prototype_brief": {"brief_ref": "brief:one", "brief_digest": "sha256:one"},
+                   "current_semantic": {"revision": "009" if defect == "revision" else "001",
+                                        "digest": "bad" if defect == "baseline_digest" else "sha256:original"},
+               }})}]}
+    directory = tmp_path / "llm_jobs"
+    directory.mkdir()
+    raw = json.dumps(request).encode("utf-8")
+    (directory / "slow-job.request.json").write_bytes(raw)
+    source = {"path": "llm_jobs/slow-job.request.json", "sha256": hashlib.sha256(raw).hexdigest()}
+    if defect == "input_digest":
+        source["sha256"] = "bad"
+    (directory / "slow-job.json").write_text(json.dumps({"status": "interrupted", "scenario_id": "test-app", "request_id": "original-request", "input_artifact": source}), encoding="utf-8")
+    session = {"scenario_id": "test-app", "artifact_root": str(tmp_path), "ui_revision": "001",
+               "accepted_prototype_brief": {} if defect == "brief" else brief,
+               "pending_llm_jobs": {"slow-job": {"status": "interrupted", "request_text": instruction}}}
+    polls = []
+    parsed = []
+    def poll(*args, **kwargs):
+        polls.append(args)
+        return {"status": "running" if defect == "root_running" else "succeeded",
+                "job_id": "different" if defect == "root_job" else "slow-job",
+                "output_text": '{"schema":"adaos.builder.semantic_prototype_candidate.v2"}', "_protocol": {"usage": {"total_tokens": 99}}}
+    def parse(**kwargs):
+        parsed.append(kwargs)
+        return {"ok": True}
+    monkeypatch.setattr(llm_client, "get_response_job", poll)
+    monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", parse)
+    monkeypatch.setattr(skill, "_validate_llm_request_postconditions", lambda value, **kw: value)
+    result = skill._replay_failed_llm_webui_result(session=session, job_id="slow-job", request_text=instruction,
+        expected_ui_revision="001", previous_preview={}, before_webui={"ui": {"application": {"desktop": {"pageSchema": {"meta": {"builder": {"semantic_digest": "sha256:original"}}}}}}})
+    if defect:
+        assert result["ok"] is False
+        assert not parsed
+        assert bool(polls) == defect.startswith("root_")
+    else:
+        assert result["ok"] is True
+        assert parsed[0]["output_mode"] == "semantic_v2"
+        assert parsed[0]["prototype_brief"] == brief
+        assert result["telemetry"]["original_usage"]["total_tokens"] == 99
+        assert result["replay"]["incremental_tokens"] == 0
 
 
 @pytest.mark.parametrize("source,expected", [("api", True), ("e2e", True), ("chat", False), ("unknown", False)])
@@ -442,6 +576,51 @@ def test_chat_forwards_safe_llm_replay_controls(monkeypatch) -> None:
     assert result["ok"] is True
     assert calls[0]["retry_job_id"] == "llm_job_failed"
     assert calls[0]["expected_ui_revision"] == "006"
+
+
+def test_mismatched_llm_replay_does_not_mutate_change_history(monkeypatch) -> None:
+    skill = _load_module()
+    session = {
+        "id": "session-recipes",
+        "scenario_id": "recipes",
+        "artifact_kind": "scenario",
+        "ui_revision": "006",
+        "pending_llm_jobs": {
+            "llm_job_failed": {
+                "status": "failed",
+                "request_text": "Original request",
+            }
+        },
+    }
+    binding = {"dev_webspace_id": "desktop-dev", "runtime_scenario_id": "recipes"}
+    topic = {"thread_id": "prompt-project:scenario:recipes"}
+    monkeypatch.setattr(
+        skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
+    monkeypatch.setattr(skill, "_builder_topic_ref", lambda *_args, **_kwargs: topic)
+    monkeypatch.setattr(skill, "_dialog_state", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        skill,
+        "_upsert_builder_change",
+        lambda **_kwargs: pytest.fail("replay mismatch mutated Change projection"),
+    )
+    monkeypatch.setattr(
+        skill,
+        "_register_builder_change_set",
+        lambda **_kwargs: pytest.fail("replay mismatch mutated workflow"),
+    )
+
+    result = skill.update_current_scenario(
+        "Different request",
+        webspace_id="desktop",
+        retry_job_id="llm_job_failed",
+        expected_ui_revision="006",
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "llm_replay_failed"
+    assert result["error"] == "llm_replay_job_mismatch"
 
 
 def test_chat_does_not_forward_ad_hoc_conversation_metadata(monkeypatch) -> None:
@@ -1958,7 +2137,7 @@ def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(
     page_schema = {
         "id": "todo_list",
         "title": "Todo List",
-        "layout": {"type": "split", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "prototype-form",
@@ -2189,10 +2368,7 @@ def test_one_shot_sync_transform_uses_durable_llm_job(monkeypatch) -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -2255,7 +2431,7 @@ def test_one_shot_sync_transform_uses_durable_llm_job(monkeypatch) -> None:
             "job_id": "llm_job_oneshot",
             "kwargs": {
                 "base_url": "https://ru.api.inimatic.com",
-                "timeout_s": 150.0,
+                "timeout_s": 600.0,
                 "poll_interval_s": 1.0,
                 "request_timeout": 6.0,
             },
@@ -2882,10 +3058,7 @@ def test_llm_candidate_journal_preserves_normalized_result(tmp_path) -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "candidate",
-                        "layout": {
-                            "type": "single",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "content",
@@ -3181,10 +3354,7 @@ def test_deterministic_local_edit_moves_and_renames_only_search(monkeypatch) -> 
                     "pageSchema": {
                         "id": "flowboard",
                         "title": "Flowboard",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "form",
@@ -3337,10 +3507,7 @@ def test_structured_prototype_review_moves_widgets_without_model(monkeypatch) ->
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "details-section",
@@ -3690,7 +3857,7 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(
     page_schema = {
         "id": "llm_context",
         "title": "Todo List",
-        "layout": {"type": "split", "areas": [{"id": "main"}, {"id": "right"}]},
+        "layout": _layout("main", "right"),
         "widgets": [
             {
                 "id": "prototype-cards",
@@ -3754,10 +3921,7 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(
                         "title": "Request details",
                         "schema": {
                             "id": "request_detail_modal_schema",
-                            "layout": {
-                                "type": "single",
-                                "areas": [{"id": "modal-main"}],
-                            },
+                            "layout": _layout('modal-main'),
                             "widgets": [
                                 {
                                     "id": "add-comment-action",
@@ -3779,7 +3943,7 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(
                         "title": "Add comment",
                         "schema": {
                             "id": "comment_modal_schema",
-                            "layout": {"type": "single", "areas": [{"id": "form"}]},
+                            "layout": _layout('form'),
                             "widgets": [
                                 {
                                     "id": "comment-form",
@@ -4049,7 +4213,7 @@ def test_builder_webui_title_uses_scenario_yaml_as_canonical_metadata(tmp_path) 
     stale_page_schema = {
         "id": "prototype_app_4d5758e5",
         "title": "Latency Probe C 2df367",
-        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "prototype-form",
@@ -4171,7 +4335,7 @@ def test_builder_canonical_title_does_not_reintroduce_inline_locale_assets(
             "fallback": "Applications",
             "translations": {"en": "Applications", "ru": "Приложения"},
         },
-        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [],
     }
     (artifact_root / "webui.json").write_text(
@@ -4332,10 +4496,10 @@ def test_async_llm_completion_repairs_missing_page_schema(
             "status": "applied",
             "created_by": "llm_agent",
             "created_at": time.time(),
-            "summary": "add field",
+            "summary": "repair missing page schema",
             "diff": {},
         },
-        request_text="add field",
+        request_text="Repair the missing page schema without changing the accepted interface",
         before_webui={"preview_state": preview},
         job_id="llm_job_repair",
         base_url="https://ru.api.inimatic.com",
@@ -4372,10 +4536,7 @@ def test_repair_uses_partially_transformed_candidate_as_current_webui(
                 "desktop": {
                     "pageSchema": {
                         "id": "store",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "cart",
@@ -4494,7 +4655,7 @@ def test_localization_repair_uses_candidate_dictionary_delta(monkeypatch) -> Non
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {"type": "stack"},
+                        "layout": _layout("modal"),
                         "widgets": [],
                     }
                 }
@@ -4596,7 +4757,7 @@ def test_repair_preserves_candidate_prototype_records(monkeypatch) -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "inspections",
-                        "layout": {"type": "stack"},
+                        "layout": _layout("modal"),
                         "widgets": [],
                     }
                 }
@@ -4684,10 +4845,7 @@ def test_transform_request_reports_existing_component_contract_violations(
                 "desktop": {
                     "pageSchema": {
                         "id": "artifact-editor",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "initialState": {"selectedFileId": "memory", "files": {}},
                         "widgets": [
                             {
@@ -4757,10 +4915,7 @@ def test_repair_replaces_malformed_jsonl_with_atomic_patch_batch(monkeypatch) ->
                 "desktop": {
                     "pageSchema": {
                         "id": "store",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -4841,10 +4996,7 @@ def test_repair_retries_one_malformed_repair_patch(monkeypatch) -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "store",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -4990,10 +5142,7 @@ def test_full_webui_result_preserves_prototype_records() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "kanban",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "summary",
@@ -5058,13 +5207,13 @@ def test_complete_manifest_canonicalizes_unambiguous_stable_id_modal_keys() -> N
         {
             "kind": "modal_schema_layout",
             "from": "",
-            "to": "single:main",
+            "to": "document:main",
             "target": "create-item",
         },
         {
             "kind": "modal_schema_layout",
             "from": "",
-            "to": "single:main",
+            "to": "document:main",
             "target": "different",
         },
     ]
@@ -5080,7 +5229,7 @@ def test_complete_manifest_canonicalizes_single_area_modal_layout() -> None:
                         "id": "edit-item",
                         "schema": {
                             "id": "edit-item",
-                            "layout": {"type": "single", "pattern": "stack"},
+                            "layout": _layout("main"),
                             "widgets": [{"id": "edit-form", "type": "ui.form"}],
                         },
                     }
@@ -5092,15 +5241,9 @@ def test_complete_manifest_canonicalizes_single_area_modal_layout() -> None:
     normalizations = skill._canonicalize_complete_manifest_modal_keys(payload)
 
     schema = payload["ui"]["application"]["modals"]["edit-item"]["schema"]
-    assert schema["layout"]["areas"] == [{"id": "main", "role": "main"}]
+    assert schema["layout"]["regions"][0]["id"] == "main"
     assert schema["widgets"][0]["area"] == "main"
     assert normalizations == [
-        {
-            "kind": "modal_schema_layout_areas",
-            "from": "",
-            "to": "main",
-            "target": "edit-item",
-        },
         {
             "kind": "modal_widget_area",
             "from": "",
@@ -5118,7 +5261,7 @@ def test_complete_manifest_canonicalizes_unambiguous_form_layout_alias() -> None
                 "desktop": {
                     "pageSchema": {
                         "id": "inspection",
-                        "layout": {"type": "single", "areas": [{"id": "main"}]},
+                        "layout": _layout("main"),
                         "widgets": [
                             {
                                 "id": "inspection-form",
@@ -5160,10 +5303,7 @@ def test_complete_manifest_initializes_resource_query_search_state() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "board",
-                        "layout": {
-                            "type": "single",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "board",
@@ -5505,10 +5645,10 @@ def test_complete_manifest_fills_unambiguous_modal_schema_ids() -> None:
                 "modals": {
                     "create-item": {
                         "id": "create-item",
-                        "schema": {"layout": {"type": "single"}, "widgets": []},
+                        "schema": {"layout": _layout("main"), "widgets": []},
                     },
                     "edit-item": {
-                        "schema": {"layout": {"type": "single"}, "widgets": []},
+                        "schema": {"layout": _layout("main"), "widgets": []},
                     },
                 }
             }
@@ -5522,19 +5662,7 @@ def test_complete_manifest_fills_unambiguous_modal_schema_ids() -> None:
     assert modals["edit-item"]["schema"]["id"] == "edit-item"
     assert normalizations == [
         {"kind": "modal_schema_id", "from": "", "to": "create-item"},
-        {
-            "kind": "modal_schema_layout_areas",
-            "from": "",
-            "to": "main",
-            "target": "create-item",
-        },
         {"kind": "modal_schema_id", "from": "", "to": "edit-item"},
-        {
-            "kind": "modal_schema_layout_areas",
-            "from": "",
-            "to": "main",
-            "target": "edit-item",
-        },
     ]
 
 
@@ -5548,10 +5676,7 @@ def test_complete_manifest_fills_unambiguous_modal_widget_areas() -> None:
                         "id": "create-item",
                         "schema": {
                             "id": "create-item",
-                            "layout": {
-                                "type": "single",
-                                "areas": [{"id": "main", "role": "main"}],
-                            },
+                            "layout": _layout('main'),
                             "widgets": [
                                 {"id": "create-form", "type": "ui.form", "inputs": {}}
                             ],
@@ -5560,10 +5685,7 @@ def test_complete_manifest_fills_unambiguous_modal_widget_areas() -> None:
                     "ambiguous": {
                         "schema": {
                             "id": "ambiguous",
-                            "layout": {
-                                "type": "split",
-                                "areas": [{"id": "main"}, {"id": "aside"}],
-                            },
+                            "layout": _layout('main', 'aside'),
                             "widgets": [
                                 {"id": "form", "type": "ui.form", "inputs": {}}
                             ],
@@ -5612,18 +5734,14 @@ def test_complete_manifest_fills_missing_single_area_modal_layout() -> None:
 
     schema = payload["ui"]["application"]["modals"]["create-item"]["schema"]
     assert schema["id"] == "create-item"
-    assert schema["layout"] == {
-        "type": "single",
-        "pattern": "stack",
-        "areas": [{"id": "main", "role": "main"}],
-    }
+    assert schema["layout"] == _layout("main")
     assert schema["widgets"][0]["area"] == "main"
     assert normalizations == [
         {"kind": "modal_schema_id", "from": "", "to": "create-item"},
         {
             "kind": "modal_schema_layout",
             "from": "",
-            "to": "single:main",
+            "to": "document:main",
             "target": "create-item",
         },
         {
@@ -5643,10 +5761,7 @@ def test_complete_manifest_wraps_unambiguous_modal_schema_shorthand() -> None:
                 "modals": {
                     "create-item": {
                         "id": "create-item",
-                        "layout": {
-                            "type": "single",
-                            "areas": [{"id": "modal", "role": "main"}],
-                        },
+                        "layout": _layout('modal'),
                         "widgets": [
                             {
                                 "id": "create-form",
@@ -5667,7 +5782,7 @@ def test_complete_manifest_wraps_unambiguous_modal_schema_shorthand() -> None:
     assert "layout" not in modal
     assert "widgets" not in modal
     assert modal["schema"]["id"] == "create-item"
-    assert modal["schema"]["layout"]["areas"][0]["id"] == "modal"
+    assert modal["schema"]["layout"]["regions"][0]["id"] == "modal"
     assert modal["schema"]["widgets"][0]["area"] == "modal"
     assert normalizations == [
         {
@@ -5690,7 +5805,7 @@ def test_failed_llm_result_replay_recovers_after_session_projection_loss(
     page_before = {
         "id": "replay",
         "title": "Before",
-        "layout": {"type": "single", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "form",
@@ -5816,10 +5931,7 @@ def test_failed_llm_result_replay_uses_normalized_candidate_without_root(
                     "pageSchema": {
                         "id": "candidate-replay",
                         "title": "Before",
-                        "layout": {
-                            "type": "single",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "content",
@@ -5915,10 +6027,7 @@ def test_kanban_request_requires_bounded_prototype_records(monkeypatch) -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "kanban",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -5970,10 +6079,7 @@ def test_generic_brief_stays_dynamic_while_equal_capability_bundles_cache(
                 "desktop": {
                     "pageSchema": {
                         "id": "work",
-                        "layout": {
-                            "type": "single",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -6015,6 +6121,54 @@ def test_generic_brief_stays_dynamic_while_equal_capability_bundles_cache(
     )
 
 
+@pytest.mark.parametrize("authorship,marker,expected", [
+    ("scenario_default", {"empty_canvas": True}, True),
+    ("scenario_default", {"empty_canvas": False}, False),
+    ("builder.semantic_compiler.v2", {"semantic_source": "adaos.webui.semantic.v2"}, True),
+    ("manual", {}, False),
+])
+def test_native_chat_routes_by_source_without_e2e_flags(monkeypatch, authorship, marker, expected):
+    skill = _load_module()
+    monkeypatch.delenv("ADAOS_BUILDER_SEMANTIC_COMPILER", raising=False)
+    monkeypatch.delenv("ADAOS_BUILDER_LLM_OUTPUT_MODE", raising=False)
+    payload = {"generated_by": authorship, "ui": {"application": {"desktop": {
+        "pageSchema": {"meta": {"builder": marker}}
+    }}}}
+    assert skill._builder_semantic_compiler_enabled(current_payload=payload) is expected
+    assert skill._builder_semantic_compiler_enabled({"builder_semantic_compiler": False}, current_payload=payload) is False
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_OUTPUT_MODE", "json_patch_batch_v1")
+    assert skill._builder_semantic_compiler_enabled(current_payload=payload) is False
+
+
+def test_new_native_chat_uses_same_contract_and_budget_as_semantic_e2e(monkeypatch, tmp_path):
+    skill = _load_module()
+    import adaos.sdk.llm.llm_client as llm_client
+    for name in ("ADAOS_BUILDER_SEMANTIC_COMPILER", "ADAOS_BUILDER_LLM_OUTPUT_MODE", "ADAOS_BUILDER_LLM_MAX_TOKENS"):
+        monkeypatch.delenv(name, raising=False)
+    payload = json.loads((REPO_ROOT / "src/adaos/scenario_templates/scenario_default/webui.json").read_text(encoding="utf-8"))
+    monkeypatch.setattr(skill, "_current_webui_payload", lambda *_args: payload)
+    monkeypatch.setattr(skill, "_builder_llm_model_for_session", lambda *_args: "gpt-5")
+    request = skill._builder_llm_webui_transform_request(
+        session={"id": "native", "scenario_id": "work-items"},
+        instruction="Show a list of work items.", preview_state={},
+    )
+    assert request["output_mode"] == "semantic_v2"
+    assert request["capability_user_prompt"] == ""
+    assert "json_patch_batch" not in request["system_prompt"]
+    captured = {}
+    def submit(messages, **kwargs):
+        captured.update(kwargs)
+        return {"job_id": "native-semantic-job", "status": "queued"}
+    monkeypatch.setattr(llm_client, "submit_response_job", submit)
+    result = skill._submit_llm_webui_transform_job(
+        session={"id": "native", "scenario_id": "work-items", "artifact_root": str(tmp_path)},
+        instruction="Show a list of work items.", preview_state={},
+    )
+    assert result["ok"] is True
+    assert captured["max_tokens"] == 128000
+    assert captured["text"]["format"]["schema"]["$id"] == "adaos.builder.semantic_prototype_candidate.v2"
+
+
 def test_semantic_request_keeps_renderer_context_out_of_model_input(
     monkeypatch,
 ) -> None:
@@ -6026,10 +6180,7 @@ def test_semantic_request_keeps_renderer_context_out_of_model_input(
                 "desktop": {
                     "pageSchema": {
                         "id": "legacy-renderer-state",
-                        "layout": {
-                            "type": "single",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {"id": "legacy-form", "type": "ui.form", "inputs": {}}
                         ],
@@ -6086,6 +6237,27 @@ def test_semantic_request_keeps_renderer_context_out_of_model_input(
     assert "query_control" in model_input
     assert "strict output schema" in model_input
     assert "current_webui_json" not in model_input
+
+
+def test_semantic_followup_requires_exact_bounded_source(monkeypatch, tmp_path):
+    import hashlib
+    skill = _load_module()
+    source = {"schema": "adaos.webui.semantic.v2", "document_id": "current", "views": []}
+    digest = "sha256:" + hashlib.sha256(json.dumps(source, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    path = tmp_path / "semantic.webui.json"
+    path.write_text(json.dumps(source), encoding="utf-8")
+    payload = {"generated_by": "builder.semantic_compiler.v2", "ui": {"application": {"desktop": {
+        "pageSchema": {"meta": {"builder": {"semantic_digest": digest}}}
+    }}}}
+    session = {"artifact_root": str(tmp_path), "ui_revision": "001", "scenario_id": "current"}
+    assert skill._current_semantic_context(session, payload)["document"] == source
+    assert skill._current_semantic_context(session, payload)["revision"] == "001"
+    path.write_text('{"changed":true}', encoding="utf-8")
+    with pytest.raises(ValueError, match="compiled revision"):
+        skill._current_semantic_context(session, payload)
+    path.write_bytes(b"x" * (128 * 1024 + 1))
+    with pytest.raises(ValueError, match="bounded context"):
+        skill._current_semantic_context(session, payload)
 
 
 def test_semantic_request_uses_cumulative_accepted_brief(monkeypatch) -> None:
@@ -6282,7 +6454,7 @@ def test_state_repair_context_and_transport_use_patch_contract(tmp_path, monkeyp
     skill = _load_module()
     import adaos.sdk.llm.llm_client as llm_client
 
-    candidate = {"schema": "adaos.builder.semantic_prototype_candidate.v2", "resources": [{"id": "unchanged"}]}
+    candidate = {"schema": "adaos.builder.semantic_prototype_candidate.v2", "title": {"en": "Items"}, "resources": [{"id": "unchanged"}]}
     replacement = {"schema": f"adaos.builder.{kind}_repair.v{version}", "states": [], "views": []}
     merged = {**candidate, "representative_states": []}
     plan = {"task": "Repair only reported states", "output_schema": {"type": "object", "properties": {"schema": {"enum": [replacement["schema"]]}}}, "allowed_state_ids": ["empty"]}
@@ -6481,6 +6653,91 @@ def test_semantic_repair_receives_full_candidate_brief_and_finding(
     assert parsed["output_mode"] == "semantic_v1"
 
 
+def test_semantic_repair_rejects_scoped_envelope_without_provider_call(monkeypatch):
+    skill = _load_module()
+    monkeypatch.setattr(skill, "_builder_llm_model_for_session", lambda *_args: pytest.fail("partial repair must not submit"))
+    result = skill._repair_llm_semantic_transform_once(
+        session={}, instruction="Correct the input", previous_preview={},
+        output_text=json.dumps({"schema": "adaos.builder.binding_repair.v1", "bindings": []}),
+        validation_error={}, prototype_brief={}, project_ref=None, request_id="one", job_id="one",
+        output_mode="semantic_v2", _meta={})
+    assert result["error"] == "semantic_repair_source_invalid"
+    assert "complete" in result["detail"]
+
+
+@pytest.mark.parametrize("tampered", [False, True])
+def test_semantic_replay_uses_digest_bound_merged_candidate_not_scoped_reply(tmp_path, monkeypatch, tampered):
+    import hashlib
+    skill = _load_module()
+    from adaos.sdk.llm import llm_client
+    directory = tmp_path / "llm_jobs"
+    directory.mkdir()
+    candidate = {"schema": "adaos.builder.semantic_prototype_candidate.v2", "title": {"en": "Items"}}
+    raw = json.dumps({"scenario_id": "example", "source_ui_revision": "003", "structured_candidate": candidate}).encode()
+    (directory / "merged.raw.json").write_bytes(raw)
+    request = {"scenario_id": "example", "job_id": "root-job", "request_id": "request",
+               "generation": {"options": {"output_mode": "semantic_v2"}},
+               "messages": [{"content": json.dumps({"builder_request": {"instruction": "Refine", "prototype_brief": {"brief_ref": "brief", "brief_digest": "digest"}}})}]}
+    raw_request = json.dumps(request).encode()
+    (directory / "request.json").write_bytes(raw_request)
+    terminal = {"scenario_id": "example", "status": "failed", "request_id": "request",
+                "input_artifact": {"path": "request.json", "sha256": hashlib.sha256(raw_request).hexdigest()},
+                "diagnostic": {"response": {"content": json.dumps({"schema": "adaos.builder.binding_repair.v1"})},
+                               "result": {"candidate_artifacts": [{"kind": "raw_model_output", "path": "merged.raw.json", "sha256": "bad" if tampered else hashlib.sha256(raw).hexdigest()}]}}}
+    (directory / "root-job.json").write_text(json.dumps(terminal), encoding="utf-8")
+    session = {"scenario_id": "example", "artifact_root": str(tmp_path), "ui_revision": "003",
+               "accepted_prototype_brief": {"brief_id": "brief", "digest": "digest"},
+               "pending_llm_jobs": {"root-job": {"status": "failed", "request_text": "Refine"}}}
+    parsed = []
+    def parse(**kwargs):
+        document = json.loads(kwargs["output_text"])
+        assert document["schema"] == candidate["schema"]
+        parsed.append(document)
+        return {"ok": True}
+    def root(*_args, **_kwargs):
+        assert tampered, "valid retained candidate requires no Root access"
+        return {"status": "succeeded", "job_id": "root-job", "output_text": '{"schema":"adaos.builder.binding_repair.v1"}'}
+    monkeypatch.setattr(llm_client, "get_response_job", root)
+    monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", parse)
+    monkeypatch.setattr(skill, "_validate_llm_request_postconditions", lambda value, **_kw: value)
+    result = skill._replay_failed_llm_webui_result(session=session, job_id="root-job", request_text="Refine",
+        expected_ui_revision="003", previous_preview={}, before_webui={})
+    assert result["ok"] is not tampered
+    assert parsed == ([] if tampered else [candidate])
+    if not tampered:
+        assert result["telemetry"]["source"] == "retained_semantic_candidate"
+        assert result["replay"]["incremental_tokens"] == 0
+
+
+def test_complete_repair_retains_candidate_for_later_binding_scope(tmp_path, monkeypatch):
+    skill = _load_module()
+    import adaos.sdk.llm.llm_client as llm_client
+    from adaos.services.builder.semantic_prototype import SemanticPrototypeValidationError
+
+    candidate = {"schema": "adaos.builder.semantic_prototype_candidate.v2", "title": {"en": "Items"},
+                 "resources": [{"id": "items", "fields": [{"id": "name"}], "records": []}],
+                 "views": [{"id": "items_list"}], "requirement_bindings": []}
+    repaired = {**candidate, "layout": "flow"}
+    findings = [{"code": "requirement.coverage_missing", "requirement_refs": ["job:01"], "detail": "Missing evidence"}]
+    brief = skill.developer_ui.select("Show items.", limit=8)["qualification"]["prototype_brief"]
+    monkeypatch.setattr(llm_client, "submit_response_job", lambda *_args, **_kwargs: {
+        "status": "succeeded", "job_id": "repair", "output_text": json.dumps(repaired)})
+    monkeypatch.setattr(skill, "_semantic_scoped_repair", lambda *_args: ("semantic_candidate", None))
+
+    def incomplete(**_kwargs):
+        raise SemanticPrototypeValidationError(findings)
+
+    monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", incomplete)
+    result = skill._repair_llm_semantic_transform_once(session={"id": "test", "scenario_id": "items", "artifact_root": str(tmp_path)},
+        instruction="Show items", previous_preview={}, output_text=json.dumps(candidate),
+        validation_error={"findings": [{"code": "semantic.validation_failed"}]},
+        prototype_brief=brief, project_ref="scenario:items", request_id="original", job_id="original",
+        output_mode="semantic_v2", _meta={})
+    assert not result["ok"] and result["repair_candidate"] == repaired
+    assert result["validation"]["findings"] == findings
+    assert skill.sdk_builder_prototype.prepare_binding_repair(result["repair_candidate"], findings)
+
+
 def test_non_board_mutations_do_not_receive_board_acceptance_rules(
     monkeypatch,
 ) -> None:
@@ -6492,10 +6749,7 @@ def test_non_board_mutations_do_not_receive_board_acceptance_rules(
                 "desktop": {
                     "pageSchema": {
                         "id": "inspection",
-                        "layout": {
-                            "type": "single",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -6545,6 +6799,111 @@ def test_non_board_mutations_do_not_receive_board_acceptance_rules(
     ]
 
 
+def test_runtime_backed_prototype_edit_does_not_require_local_seed_records(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    current = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "roster",
+                        "layout": _layout('main'),
+                        "widgets": [
+                            {
+                                "id": "volunteers",
+                                "type": "ui.table",
+                                "area": "main",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "roster_skill.list_records",
+                                    "params": {"entity": "Volunteer"},
+                                },
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    monkeypatch.setattr(
+        skill,
+        "_current_webui_payload",
+        lambda *_args, **_kwargs: copy.deepcopy(current),
+    )
+
+    request = skill._builder_llm_webui_transform_request(
+        session={"id": "session", "scenario_id": "roster"},
+        instruction="Add a photo upload field to the volunteer profile.",
+        preview_state={},
+    )
+    stable = json.loads(request["stable_user_prompt"])["stable_builder_context"]
+
+    assert stable["prototype_data_output"]["required"] is False
+    assert "prototype_records" not in stable["requested_output_contract"]
+
+
+def test_builder_discards_records_without_a_prototype_resource_query(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "roster",
+                        "layout": _layout('main'),
+                        "widgets": [
+                            {
+                                "id": "volunteers",
+                                "type": "ui.table",
+                                "area": "main",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "roster_skill.list_records",
+                                    "params": {"entity": "Volunteer"},
+                                },
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    monkeypatch.setattr(
+        skill.developer_ui,
+        "evaluate",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "qualification": {
+                "requirements": {
+                    "prototype_resource": False,
+                    "operation_kinds": ["create"],
+                }
+            },
+            "postconditions": [],
+        },
+    )
+
+    result = skill._validate_llm_request_postconditions(
+        {
+            "ok": True,
+            "payload": payload,
+            "prototype_records": [{"id": "unused"}],
+            "validation": {"ok": True},
+        },
+        instruction="Add a photo upload field to the volunteer profile.",
+        before_webui=payload,
+    )
+
+    assert result["ok"] is True
+    assert "prototype_records" not in result
+
+
 def test_application_manager_request_requires_scenario_locale_dictionaries(
     monkeypatch,
 ) -> None:
@@ -6556,10 +6915,7 @@ def test_application_manager_request_requires_scenario_locale_dictionaries(
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -6626,10 +6982,7 @@ def test_application_manager_layout_request_reuses_existing_scenario_locales(
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -6678,10 +7031,7 @@ def test_application_manager_request_exposes_a_bounded_cumulative_phase(
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -6806,7 +7156,7 @@ def test_finalize_rolls_back_webui_and_session_when_prototype_materialization_fa
                 "desktop": {
                     "pageSchema": {
                         "id": "kanban",
-                        "layout": {"type": "stack"},
+                        "layout": _layout("modal"),
                         "widgets": [],
                     }
                 }
@@ -6913,7 +7263,7 @@ def test_normalise_llm_payload_uses_webui_page_schema_as_source_of_truth() -> No
     skill = _load_module()
     previous_page_schema = {
         "id": "todo",
-        "layout": {"type": "split", "areas": [{"id": "main"}, {"id": "right"}]},
+        "layout": _layout("main", "right"),
         "widgets": [
             {
                 "id": "prototype-form",
@@ -6969,7 +7319,7 @@ def test_normalise_llm_payload_uses_webui_page_schema_as_source_of_truth() -> No
     next_page_schema = {
         "id": "todo",
         "title": "Todo",
-        "layout": {"type": "split", "areas": [{"id": "main"}, {"id": "right"}]},
+        "layout": _layout("main", "right"),
         "widgets": [
             {
                 "id": "prototype-cards",
@@ -7022,7 +7372,7 @@ def test_normalise_llm_payload_accepts_webui_schema_wrapper() -> None:
     skill = _load_module()
     page_schema = {
         "id": "survey",
-        "layout": {"type": "split", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "prototype-form",
@@ -7082,7 +7432,7 @@ def test_normalise_llm_payload_lifts_wrapped_widget_action_examples() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                        "layout": _layout("main"),
                         "widgets": [
                             {
                                 "id": "actions",
@@ -7112,7 +7462,7 @@ def test_normalise_llm_payload_materializes_segmented_control_default() -> None:
     skill = _load_module()
     page_schema = {
         "id": "applications",
-        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "catalog-sections",
@@ -7173,10 +7523,7 @@ def test_normalise_llm_payload_bounds_empty_configured_details() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "details",
-                        "layout": {
-                            "type": "single",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "installation",
@@ -7214,7 +7561,7 @@ def test_normalise_llm_payload_moves_root_modals_into_application() -> None:
     skill = _load_module()
     page_schema = {
         "id": "request_center",
-        "layout": {"type": "split", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "open-comment",
@@ -7238,7 +7585,7 @@ def test_normalise_llm_payload_moves_root_modals_into_application() -> None:
                 "title": "Add comment",
                 "schema": {
                     "id": "comment_modal_schema",
-                    "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+                    "layout": _layout("modal"),
                     "widgets": [
                         {
                             "id": "comment",
@@ -7346,10 +7693,7 @@ def test_builder_patch_stream_applies_to_shadow_and_preserves_unrelated_ui() -> 
                     "pageSchema": {
                         "id": "recipes",
                         "title": "Recipe draft",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "recipe-title",
@@ -7422,10 +7766,7 @@ def test_builder_patch_batch_applies_atomically_as_json_object() -> None:
                     "pageSchema": {
                         "id": "requests",
                         "title": "Request draft",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "request-summary",
@@ -7491,10 +7832,7 @@ def test_builder_patch_stream_returns_bounded_scenario_locale_dictionaries() -> 
                     "pageSchema": {
                         "id": "applications",
                         "title": "Applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -7632,10 +7970,7 @@ def test_builder_patch_stream_extracts_locale_dictionaries_patched_under_complet
                     "pageSchema": {
                         "id": "applications",
                         "title": "Applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -7689,10 +8024,7 @@ def test_builder_patch_stream_removes_action_for_a_removed_button() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "lifecycle",
@@ -7805,7 +8137,7 @@ def test_builder_writes_scenario_locale_assets_and_derives_resource_paths(
                                 "ru": "Приложения",
                             },
                         },
-                        "layout": {"type": "stack", "areas": []},
+                        "layout": _layout("main"),
                         "widgets": [],
                     }
                 },
@@ -7862,10 +8194,7 @@ def test_builder_extracts_misplaced_complete_locale_dictionaries() -> None:
                                 "ru": "Приложения",
                             },
                         },
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "summary",
@@ -7963,10 +8292,7 @@ def test_builder_oneshot_transform_uses_shared_request_postconditions(
                 "desktop": {
                     "pageSchema": {
                         "id": "demo",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "summary",
@@ -8044,10 +8370,7 @@ def test_llm_transform_allows_syntax_and_postcondition_repairs(monkeypatch) -> N
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -8156,10 +8479,7 @@ def test_request_postconditions_apply_deterministic_localization_repairs(
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "install",
@@ -8319,10 +8639,7 @@ def test_request_postconditions_preserve_translation_distinct_from_authored_fall
                         "id": "inspection",
                         "title": "Осмотр оборудования",
                         "title_i18n": {"key": "inspection.title"},
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -8373,10 +8690,7 @@ def test_builder_patch_stream_normalizes_prototype_fixture_alias_path() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "initialState": {
                             "prototypeFixtures": {
                                 "samples": {"marketplace": {"title": "Marketplace"}}
@@ -8446,10 +8760,7 @@ def test_builder_patch_stream_normalizes_replace_for_missing_object_member() -> 
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "initialState": {},
                         "widgets": [
                             {
@@ -8515,10 +8826,7 @@ def test_builder_patch_stream_allows_a_zero_delta_for_qualification() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "demo",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "initialState": {},
                         "widgets": [
                             {
@@ -8576,10 +8884,7 @@ def test_builder_patch_stream_allows_one_noop_to_reach_qualification() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "demo",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "initialState": {},
                         "widgets": [
                             {
@@ -8640,10 +8945,7 @@ def test_builder_patch_stream_rejects_a_mostly_noop_delta() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "demo",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "summary",
@@ -8681,8 +8983,8 @@ def test_builder_patch_stream_rejects_a_mostly_noop_delta() -> None:
                     "type": "patch",
                     "seq": 2,
                     "op": "replace",
-                    "path": "/ui/application/desktop/pageSchema/layout/type",
-                    "value": "stack",
+                    "path": "/ui/application/desktop/pageSchema/layout/pattern",
+                    "value": "document",
                 }
             ),
             json.dumps(
@@ -8737,10 +9039,7 @@ def test_builder_patch_stream_allows_locale_normalization_only_delta() -> None:
                                 "ru": "Демо",
                             },
                         },
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "summary",
@@ -8807,7 +9106,7 @@ def test_builder_patch_stream_extracts_misplaced_prototype_records() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "inspections",
-                        "layout": {"type": "stack"},
+                        "layout": _layout("modal"),
                         "widgets": [],
                     }
                 }
@@ -8856,7 +9155,7 @@ def test_builder_patch_stream_rejects_wrong_base_hash() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "recipes",
-                        "layout": {"type": "stack"},
+                        "layout": _layout("modal"),
                         "widgets": [
                             {
                                 "id": "title",
@@ -8912,10 +9211,7 @@ def test_builder_patch_stream_repairs_truncated_hash_and_list_container_add() ->
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "summary",
@@ -8996,10 +9292,7 @@ def test_builder_patch_stream_repairs_only_missing_outer_line_closer() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "recipes",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {"id": "title", "type": "ui.jsonViewer", "area": "main"}
                         ],
@@ -9065,10 +9358,7 @@ def test_builder_patch_stream_drops_only_truncated_complete_marker() -> None:
                     "pageSchema": {
                         "id": "recipes",
                         "title": "Old title",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {"id": "title", "type": "ui.jsonViewer", "area": "main"}
                         ],
@@ -9126,10 +9416,7 @@ def test_builder_patch_stream_drops_complete_marker_with_missing_quote() -> None
                     "pageSchema": {
                         "id": "recipes",
                         "title": "Old title",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {"id": "title", "type": "ui.jsonViewer", "area": "main"}
                         ],
@@ -9189,10 +9476,7 @@ def test_builder_patch_stream_inserts_single_missing_object_closer() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "applications",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -9263,10 +9547,7 @@ def test_builder_patch_stream_stable_id_path_survives_prior_array_remove() -> No
                 "desktop": {
                     "pageSchema": {
                         "id": "recipes",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [
                             {
                                 "id": "remove-me",
@@ -9382,10 +9663,7 @@ def test_builder_patch_stream_reports_missing_intermediate_parent() -> None:
                 "desktop": {
                     "pageSchema": {
                         "id": "recipes",
-                        "layout": {
-                            "type": "stack",
-                            "areas": [{"id": "main", "role": "main"}],
-                        },
+                        "layout": _layout('main'),
                         "widgets": [],
                     }
                 }
@@ -9412,7 +9690,7 @@ def test_builder_patch_stream_reports_missing_intermediate_parent() -> None:
                         "title": "Details",
                         "schema": {
                             "id": "detail",
-                            "layout": {"type": "stack"},
+                            "layout": _layout("modal"),
                             "widgets": [],
                         },
                     },
@@ -9439,7 +9717,7 @@ def test_builder_component_contract_rejects_data_source_nested_in_inputs() -> No
     skill = _load_module()
     page_schema = {
         "id": "catalog",
-        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "recipe-cards",
@@ -9464,7 +9742,7 @@ def test_builder_component_contract_rejects_unrendered_details_fields() -> None:
     skill = _load_module()
     page_schema = {
         "id": "details",
-        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "recipe-detail",
@@ -9501,7 +9779,7 @@ def test_builder_component_contract_accepts_visible_detail_and_form_actions_but_
                 "desktop": {
                     "pageSchema": {
                         "id": "recipes",
-                        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                        "layout": _layout("main"),
                         "widgets": [
                             {"id": "catalog", "type": "ui.list", "area": "main"}
                         ],
@@ -9511,7 +9789,7 @@ def test_builder_component_contract_accepts_visible_detail_and_form_actions_but_
                     "detail_modal": {
                         "schema": {
                             "id": "detail_modal",
-                            "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+                            "layout": _layout("modal"),
                             "widgets": [
                                 {
                                     "id": "details",
@@ -9532,7 +9810,7 @@ def test_builder_component_contract_accepts_visible_detail_and_form_actions_but_
                     "add_modal": {
                         "schema": {
                             "id": "add_modal",
-                            "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+                            "layout": _layout("modal"),
                             "widgets": [
                                 {
                                     "id": "add_form",
@@ -9556,7 +9834,7 @@ def test_builder_component_contract_accepts_visible_detail_and_form_actions_but_
                     "edit_modal": {
                         "schema": {
                             "id": "edit_modal",
-                            "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+                            "layout": _layout("modal"),
                             "widgets": [
                                 {
                                     "id": "edit_form",
@@ -9594,7 +9872,7 @@ def test_builder_canonical_payload_migrates_legacy_dotted_widget_properties() ->
                 "desktop": {
                     "pageSchema": {
                         "id": "recipes",
-                        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                        "layout": _layout("main"),
                         "widgets": [
                             {"id": "catalog", "type": "ui.list", "area": "main"}
                         ],
@@ -9604,7 +9882,7 @@ def test_builder_canonical_payload_migrates_legacy_dotted_widget_properties() ->
                     "edit_modal": {
                         "schema": {
                             "id": "edit_modal",
-                            "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+                            "layout": _layout("modal"),
                             "widgets": [
                                 {
                                     "id": "edit_form",
@@ -9645,7 +9923,7 @@ def test_builder_component_contract_rejects_flattened_input_properties() -> None
     skill = _load_module()
     page_schema = {
         "id": "recipe-modal",
-        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "recipe-form",
@@ -9674,7 +9952,7 @@ def test_builder_modal_contract_reports_component_and_action_issues_together() -
                 "desktop": {
                     "pageSchema": {
                         "id": "recipes",
-                        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                        "layout": _layout("main"),
                         "widgets": [
                             {"id": "catalog", "type": "ui.list", "area": "main"}
                         ],
@@ -9684,7 +9962,7 @@ def test_builder_modal_contract_reports_component_and_action_issues_together() -
                     "add_recipe": {
                         "schema": {
                             "id": "add_recipe",
-                            "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                            "layout": _layout("main"),
                             "widgets": [
                                 {
                                     "id": "form",
@@ -9728,7 +10006,7 @@ def test_builder_modal_contract_recommends_close_modal_for_pseudo_close_id() -> 
                 "desktop": {
                     "pageSchema": {
                         "id": "recipes",
-                        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                        "layout": _layout("main"),
                         "widgets": [
                             {"id": "catalog", "type": "ui.list", "area": "main"}
                         ],
@@ -9738,7 +10016,7 @@ def test_builder_modal_contract_recommends_close_modal_for_pseudo_close_id() -> 
                     "add_recipe": {
                         "schema": {
                             "id": "add_recipe",
-                            "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                            "layout": _layout("main"),
                             "widgets": [
                                 {
                                     "id": "form",
@@ -9772,7 +10050,7 @@ def test_builder_component_contract_accepts_composed_detail_actions_and_form_can
     skill = _load_module()
     detail_schema = {
         "id": "detail_modal",
-        "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+        "layout": _layout("modal"),
         "widgets": [
             {
                 "id": "details",
@@ -9813,7 +10091,7 @@ def test_builder_component_contract_rejects_secondary_form_action_without_behavi
     skill = _load_module()
     page_schema = {
         "id": "form_modal",
-        "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+        "layout": _layout("modal"),
         "widgets": [
             {
                 "id": "form",
@@ -9837,7 +10115,7 @@ def test_builder_component_contract_rejects_invented_update_state_operators() ->
     skill = _load_module()
     page_schema = {
         "id": "actions",
-        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "favorite",
@@ -9871,7 +10149,7 @@ def test_builder_component_contract_rejects_javascript_like_update_state_values(
     skill = _load_module()
     page_schema = {
         "id": "actions",
-        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "favorite",
@@ -9903,7 +10181,7 @@ def test_builder_component_contract_rejects_unknown_expression_and_wrong_members
     page_schema = {
         "id": "catalog",
         "initialState": {"favorites": []},
-        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "catalog",
@@ -9951,7 +10229,7 @@ def test_builder_component_contract_rejects_unrendered_state_templates() -> None
     skill = _load_module()
     page_schema = {
         "id": "summary",
-        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "rows",
@@ -9996,7 +10274,7 @@ def test_builder_component_contract_rejects_dynamic_state_index_in_static_data()
     page_schema = {
         "id": "artifact-editor",
         "initialState": {"files": {"a": {"content": "text"}}, "selectedFileId": "a"},
-        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "editor",
@@ -10022,7 +10300,7 @@ def test_builder_component_contract_rejects_chained_state_reference_and_dynamic_
     skill = _load_module()
     page_schema = {
         "id": "editor",
-        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "file-editor",
@@ -10061,7 +10339,7 @@ def test_builder_component_contract_rejects_missing_tree_event_fields() -> None:
     skill = _load_module()
     page_schema = {
         "id": "files",
-        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "file-tree",
@@ -10092,7 +10370,7 @@ def test_builder_component_contract_rejects_synthetic_root_in_rootless_tree() ->
     skill = _load_module()
     page_schema = {
         "id": "file-picker",
-        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "files",
@@ -10123,7 +10401,7 @@ def test_builder_component_contract_rejects_conditional_ui_action_buttons() -> N
     skill = _load_module()
     page_schema = {
         "id": "actions",
-        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "archive-actions",
@@ -10156,7 +10434,7 @@ def test_builder_component_contract_distinguishes_state_from_sibling_computed_da
     page_schema = {
         "id": "cart",
         "initialState": {"quantity": 2},
-        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "totals",
@@ -10197,7 +10475,7 @@ def test_builder_component_contract_rejects_computed_data_as_filter_state() -> N
     page_schema = {
         "id": "cart",
         "initialState": {"cart": {"p1": 1}},
-        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "cart-list",
@@ -10251,7 +10529,7 @@ def test_builder_component_contract_accepts_legacy_duplicates_but_rejects_unknow
     }
     page_schema = {
         "id": "detail-modal",
-        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "detail-actions",
@@ -10333,7 +10611,7 @@ def test_builder_component_contract_accepts_field_change_and_rejects_unknown_fie
     skill = _load_module()
     page_schema = {
         "id": "catalog",
-        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "filters",
@@ -10373,7 +10651,7 @@ def test_builder_table_kinds_follow_the_shared_capability_contract(kind) -> None
     skill = _load_module()
     page_schema = {
         "id": "catalog",
-        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "catalog-table",
@@ -10407,7 +10685,7 @@ def test_builder_webui_validation_rejects_select_without_options() -> None:
     page_schema = {
         "id": "city_survey",
         "title": "City survey",
-        "layout": {"type": "split", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "prototype-form",
@@ -10461,7 +10739,7 @@ def test_builder_webui_validation_rejects_undeclared_modal_action() -> None:
     page_schema = {
         "id": "request_center",
         "title": "Request center",
-        "layout": {"type": "split", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "open-detail",
@@ -10496,7 +10774,7 @@ def test_builder_webui_validation_rejects_undeclared_modal_action() -> None:
             "title": "Request detail",
             "schema": {
                 "id": "request_detail_modal_schema",
-                "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+                "layout": _layout("modal"),
                 "widgets": [{"id": "details", "type": "item.details", "area": "modal"}],
             },
         }
@@ -10515,7 +10793,7 @@ def test_builder_webui_validation_rejects_root_level_modals() -> None:
     page_schema = {
         "id": "request_center",
         "title": "Request center",
-        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [{"id": "requests", "type": "ui.list", "area": "main"}],
     }
     payload = {
@@ -10526,7 +10804,7 @@ def test_builder_webui_validation_rejects_root_level_modals() -> None:
                 "title": "Request detail",
                 "schema": {
                     "id": "request_detail_modal_schema",
-                    "layout": {"type": "stack"},
+                    "layout": _layout("modal"),
                     "widgets": [],
                 },
             }
@@ -10547,7 +10825,7 @@ def test_builder_webui_validation_rejects_question_mark_encoding_loss() -> None:
     page_schema = {
         "id": "request_center",
         "title": "Request center",
-        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "open-detail",
@@ -10588,7 +10866,7 @@ def test_write_webui_payload_projects_canonical_page_schema_to_scenario(
     page_schema = {
         "id": "canonical_webui",
         "title": "City survey",
-        "layout": {"type": "split", "areas": [{"id": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "prototype-form",
@@ -10620,7 +10898,7 @@ def test_write_webui_payload_projects_canonical_page_schema_to_scenario(
                         "title": "Comment",
                         "schema": {
                             "id": "comment_modal_schema",
-                            "layout": {"type": "single", "areas": [{"id": "main"}]},
+                            "layout": _layout("main"),
                             "widgets": [],
                         },
                     }
@@ -11590,7 +11868,7 @@ def test_set_ui_revision_current_migrates_legacy_root_modals(
     )
     page_schema = {
         "id": "legacy_modal_revision",
-        "layout": {"type": "single", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "open-details",
@@ -11609,7 +11887,7 @@ def test_set_ui_revision_current_migrates_legacy_root_modals(
     }
     modal_schema = {
         "id": "details_modal",
-        "layout": {"type": "single", "areas": [{"id": "main", "role": "main"}]},
+        "layout": _layout("main"),
         "widgets": [
             {
                 "id": "details",
@@ -12014,7 +12292,7 @@ def test_safe_prototype_write_uses_yaml_truth_and_drops_stale_automation_depende
     page_schema = {
         "id": "safe_prototype",
         "title": "Безопасный прототип",
-        "layout": {"type": "stack"},
+        "layout": _layout("modal"),
         "widgets": [],
         "meta": {
             "builder": {
@@ -13149,6 +13427,28 @@ def test_chat_does_not_create_project_for_edit_like_request_without_target(
     assert not created
 
 
+@pytest.mark.parametrize("text", [
+    "Сделай прототип текущего приложения для списка чтения. Добавь примеры.",
+    "Создай новый прототип выбранного проекта.",
+    "Создай прототип для существующего приложения.",
+    "Сделай текущее приложение удобнее.",
+    "Build a prototype of the current application.",
+    "Please create a prototype for the selected project.",
+    "Make this application work.",
+])
+@pytest.mark.parametrize("has_session", [True, False])
+def test_current_application_prototype_request_never_creates_a_new_application(text, has_session) -> None:
+    skill = _load_module()
+    assert skill._parse_builder_command(text, has_session=has_session)["intent"] == "none"
+
+
+def test_explicit_new_application_can_compare_itself_with_the_current_one() -> None:
+    skill = _load_module()
+    for text in ("Create a new application similar to the current application.",
+                 "Создай новое приложение как прототип текущего приложения."):
+        assert skill._parse_builder_command(text, has_session=True)["intent"] == "project.create"
+
+
 def test_builder_command_parser_prioritises_project_commands() -> None:
     skill = _load_module()
 
@@ -13722,9 +14022,7 @@ def test_chat_handles_builder_project_commands(monkeypatch, tmp_path) -> None:
     import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
-    monkeypatch.setattr(
-        skill.sdk_builder_project_catalog, "list_projects", lambda **kwargs: []
-    )
+    monkeypatch.setattr(skill.developer_projects, "list_projects", lambda **kwargs: [])
     monkeypatch.setattr(
         skill,
         "_request_workbench_refresh",
@@ -14728,7 +15026,8 @@ def test_limited_channel_can_select_existing_dev_scenario_without_local_session(
         "list_projects",
         lambda **kwargs: [
             {
-                "kind": "scenario",
+                "object_type": "scenario",
+                "object_id": "test05_recipes",
                 "id": "test05_recipes",
                 "name": "test05_recipes",
                 "title": "Домашняя книга рецептов",
@@ -15737,7 +16036,7 @@ def test_repeated_checkpoint_preserves_complete_yaml_manifest_and_cyrillic(
     page = {
         "id": "test04_recipes",
         "title": title,
-        "layout": {"type": "stack"},
+        "layout": _layout("modal"),
         "widgets": [],
     }
 

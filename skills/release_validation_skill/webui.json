@@ -57,22 +57,55 @@
         "schema": {
           "id": "release_validation_modal",
           "layout": {
-            "type": "split",
-            "pattern": "split",
-            "areas": [
+            "version": 2,
+            "pattern": "workbench",
+            "density": "comfortable",
+            "contentWidth": "fluid",
+            "scroll": "regions",
+            "regions": [
               {
                 "id": "main",
-                "role": "main"
+                "role": "main",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                }
               },
               {
                 "id": "right",
-                "role": "aux"
+                "role": "inspector",
+                "priority": 60,
+                "scroll": "region",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "sheet"
+                },
+                "size": {
+                  "minPx": 220,
+                  "preferredPx": 360,
+                  "maxPx": 600
+                }
               },
               {
                 "id": "bottom",
-                "role": "footer"
+                "role": "commands",
+                "priority": 90,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "pane"
+                }
               }
-            ]
+            ],
+            "interaction": {
+              "selection": "none",
+              "rowActivation": "none",
+              "filters": "inline",
+              "actions": "adaptive",
+              "detail": "inline"
+            }
           },
           "widgets": [
             {

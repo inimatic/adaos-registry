@@ -8,8 +8,7 @@
           "id": "media_center",
           "title": "Media Center",
           "title_i18n": {
-            "key": "scenario.media_center.title",
-            "fallback": "Media Center"
+            "key": "runtime.media_center.ui.media_center"
           },
           "surfaceClass": "workspace",
           "interaction": {
@@ -121,82 +120,143 @@
             }
           },
           "layout": {
-            "type": "single",
-            "pattern": "stack",
-            "areas": [
+            "version": 2,
+            "pattern": "collection",
+            "density": "compact",
+            "contentWidth": "bounded",
+            "scroll": "regions",
+            "regions": [
               {
                 "id": "main",
-                "role": "main",
-                "label": "Media Center",
-                "label_i18n": {
-                  "key": "runtime.media_center.ui.media_center"
-                }
+                "role": "collection",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                },
+                "label": "Media Center"
               }
             ],
+            "interaction": {
+              "selection": "single",
+              "rowActivation": "select",
+              "filters": "inline",
+              "actions": "adaptive"
+            },
+            "maxContentWidthPx": 1440,
             "variants": [
               {
+                "pattern": "collection",
+                "density": "compact",
+                "contentWidth": "bounded",
+                "scroll": "regions",
+                "regions": [
+                  {
+                    "id": "main",
+                    "role": "collection",
+                    "priority": 100,
+                    "scroll": "page",
+                    "presentation": {
+                      "wide": "pane",
+                      "compact": "stack"
+                    },
+                    "label": "Media Center TV"
+                  }
+                ],
+                "interaction": {
+                  "selection": "single",
+                  "rowActivation": "select",
+                  "filters": "inline",
+                  "actions": "adaptive"
+                },
+                "maxContentWidthPx": 1440,
                 "id": "tv",
-                "when": "$state.surfaceProfile == 'tv'",
-                "type": "single",
-                "pattern": "stack",
-                "areas": [
-                  {
-                    "id": "main",
-                    "role": "main",
-                    "label": "Media Center TV",
-                    "label_i18n": {
-                      "key": "runtime.media_center.ui.media_center_tv"
-                    }
-                  }
-                ]
+                "when": "$state.surfaceProfile == 'tv'"
               },
               {
+                "pattern": "collection",
+                "density": "compact",
+                "contentWidth": "bounded",
+                "scroll": "regions",
+                "regions": [
+                  {
+                    "id": "main",
+                    "role": "collection",
+                    "priority": 100,
+                    "scroll": "page",
+                    "presentation": {
+                      "wide": "pane",
+                      "compact": "stack"
+                    },
+                    "label": "Media Center Remote"
+                  }
+                ],
+                "interaction": {
+                  "selection": "single",
+                  "rowActivation": "select",
+                  "filters": "inline",
+                  "actions": "adaptive"
+                },
+                "maxContentWidthPx": 1440,
                 "id": "mobile-control",
-                "when": "$state.surfaceProfile == 'mobile_control'",
-                "type": "single",
-                "pattern": "stack",
-                "areas": [
-                  {
-                    "id": "main",
-                    "role": "main",
-                    "label": "Media Center Remote",
-                    "label_i18n": {
-                      "key": "runtime.media_center.ui.media_center_remote"
-                    }
-                  }
-                ]
+                "when": "$state.surfaceProfile == 'mobile_control'"
               },
               {
+                "pattern": "collection",
+                "density": "compact",
+                "contentWidth": "bounded",
+                "scroll": "regions",
+                "regions": [
+                  {
+                    "id": "main",
+                    "role": "collection",
+                    "priority": 100,
+                    "scroll": "page",
+                    "presentation": {
+                      "wide": "pane",
+                      "compact": "stack"
+                    },
+                    "label": "Media Center Embedded"
+                  }
+                ],
+                "interaction": {
+                  "selection": "single",
+                  "rowActivation": "select",
+                  "filters": "inline",
+                  "actions": "adaptive"
+                },
+                "maxContentWidthPx": 1440,
                 "id": "embedded",
-                "when": "$state.surfaceProfile == 'embedded'",
-                "type": "single",
-                "pattern": "stack",
-                "areas": [
-                  {
-                    "id": "main",
-                    "role": "main",
-                    "label": "Media Center Embedded",
-                    "label_i18n": {
-                      "key": "runtime.media_center.ui.media_center_embedded"
-                    }
-                  }
-                ]
+                "when": "$state.surfaceProfile == 'embedded'"
               },
               {
-                "id": "desktop",
-                "default": true,
-                "type": "single",
-                "pattern": "stack",
-                "areas": [
+                "pattern": "collection",
+                "density": "compact",
+                "contentWidth": "bounded",
+                "scroll": "regions",
+                "regions": [
                   {
                     "id": "main",
-                    "role": "main",
-                    "label": "Media Center",
-                    "label_i18n": {
-                      "key": "runtime.media_center.ui.media_center"
-                    }
+                    "role": "collection",
+                    "priority": 100,
+                    "scroll": "page",
+                    "presentation": {
+                      "wide": "pane",
+                      "compact": "stack"
+                    },
+                    "label": "Media Center"
                   }
-                ]
+                ],
+                "interaction": {
+                  "selection": "single",
+                  "rowActivation": "select",
+                  "filters": "inline",
+                  "actions": "adaptive"
+                },
+                "maxContentWidthPx": 1440,
+                "id": "desktop",
+                "default": true
               }
             ]
           },
@@ -456,15 +516,23 @@
                     "selectedStateKey": "selectedPlaybackTargetId",
                     "optionLabelPath": "control_label",
                     "optionValuePath": "id",
-                    "optionMetaPaths": ["surface_context_label", "playback_summary", "authorization_label"],
+                    "optionMetaPaths": [
+                      "surface_context_label",
+                      "playback_summary",
+                      "authorization_label"
+                    ],
                     "optionIcon": "tv-outline",
                     "persistFallback": true,
                     "optionsDataSource": {
                       "kind": "skill",
                       "name": "media_control_skill.list_targets",
-                      "params": {"limit": 50},
+                      "params": {
+                        "limit": 50
+                      },
                       "cacheTtlMs": 1000,
-                      "invalidationTags": ["media_control.targets"],
+                      "invalidationTags": [
+                        "media_control.targets"
+                      ],
                       "preserveLastValue": true,
                       "maxRequestHz": 1
                     },
@@ -908,70 +976,70 @@
               },
               "actions": [
                 {
-                "on": "select:folder",
-                "type": "updateState",
-                "params": {
-                  "mediaNavigation": "folders",
-                  "mediaSection": "folders",
-                  "mediaFolderAgentId": "$event.agent_id",
-                  "mediaFolderRootId": "$event.root_id",
-                  "mediaFolderParent": "$event.path",
-                  "mediaCursor": "",
-                  "selectedMediaItemId": null,
-                  "selectedMediaFavorite": false
+                  "on": "select:folder",
+                  "type": "updateState",
+                  "params": {
+                    "mediaNavigation": "folders",
+                    "mediaSection": "folders",
+                    "mediaFolderAgentId": "$event.agent_id",
+                    "mediaFolderRootId": "$event.root_id",
+                    "mediaFolderParent": "$event.path",
+                    "mediaCursor": "",
+                    "selectedMediaItemId": null,
+                    "selectedMediaFavorite": false
+                  }
+                },
+                {
+                  "on": "select:item",
+                  "type": "updateState",
+                  "params": {
+                    "playbackSourceType": "$event.queue_source_type",
+                    "playbackSourceId": "$event.queue_source_id",
+                    "selectedMediaItemId": "$event.id",
+                    "selectedMediaKind": "$event.media_kind",
+                    "selectedMediaFavorite": "$event.favorite"
+                  }
+                },
+                {
+                  "on": "select:item",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "media_center_player"
+                  }
+                },
+                {
+                  "on": "select:collection",
+                  "type": "updateState",
+                  "params": {
+                    "mediaSection": "collection",
+                    "mediaCollectionId": "$event.queue_source_id",
+                    "mediaCollectionTitle": "$event.title",
+                    "mediaCursor": "",
+                    "playbackSourceType": "$event.queue_source_type",
+                    "playbackSourceId": "$event.queue_source_id",
+                    "selectedMediaItemId": "$event.id",
+                    "selectedMediaKind": "$event.media_kind",
+                    "selectedMediaFavorite": "$event.favorite"
+                  }
+                },
+                {
+                  "on": "select:playlist",
+                  "type": "updateState",
+                  "params": {
+                    "playbackSourceType": "$event.queue_source_type",
+                    "playbackSourceId": "$event.queue_source_id",
+                    "selectedMediaItemId": "$event.id",
+                    "selectedMediaKind": "$event.media_kind",
+                    "selectedMediaFavorite": "$event.favorite"
+                  }
+                },
+                {
+                  "on": "select:playlist",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "media_center_player"
+                  }
                 }
-              },
-              {
-                "on": "select:item",
-                "type": "updateState",
-                "params": {
-                  "playbackSourceType": "$event.queue_source_type",
-                  "playbackSourceId": "$event.queue_source_id",
-                  "selectedMediaItemId": "$event.id",
-                  "selectedMediaKind": "$event.media_kind",
-                  "selectedMediaFavorite": "$event.favorite"
-                }
-              },
-              {
-                "on": "select:item",
-                "type": "openModal",
-                "params": {
-                  "modalId": "media_center_player"
-                }
-              },
-              {
-                "on": "select:collection",
-                "type": "updateState",
-                "params": {
-                  "mediaSection": "collection",
-                  "mediaCollectionId": "$event.queue_source_id",
-                  "mediaCollectionTitle": "$event.title",
-                  "mediaCursor": "",
-                  "playbackSourceType": "$event.queue_source_type",
-                  "playbackSourceId": "$event.queue_source_id",
-                  "selectedMediaItemId": "$event.id",
-                  "selectedMediaKind": "$event.media_kind",
-                  "selectedMediaFavorite": "$event.favorite"
-                }
-              },
-              {
-                "on": "select:playlist",
-                "type": "updateState",
-                "params": {
-                  "playbackSourceType": "$event.queue_source_type",
-                  "playbackSourceId": "$event.queue_source_id",
-                  "selectedMediaItemId": "$event.id",
-                  "selectedMediaKind": "$event.media_kind",
-                  "selectedMediaFavorite": "$event.favorite"
-                }
-              },
-              {
-                "on": "select:playlist",
-                "type": "openModal",
-                "params": {
-                  "modalId": "media_center_player"
-                }
-              }
               ],
               "title_i18n": {
                 "key": "runtime.media_center.ui.home"
@@ -1549,10 +1617,7 @@
                 "key": "runtime.media_center.ui.playlists"
               }
             }
-          ],
-          "title_i18n": {
-            "key": "runtime.media_center.ui.media_center"
-          }
+          ]
         }
       },
       "modals": {
@@ -1568,17 +1633,45 @@
             "title": "Now Playing",
             "surfaceClass": "workspace",
             "layout": {
-              "type": "split",
-              "areas": [
+              "version": 2,
+              "pattern": "workbench",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "regions",
+              "regions": [
                 {
                   "id": "main",
-                  "role": "main"
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
                 },
                 {
                   "id": "transport",
-                  "role": "aux"
+                  "role": "inspector",
+                  "priority": 60,
+                  "scroll": "region",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "sheet"
+                  },
+                  "size": {
+                    "minPx": 220,
+                    "preferredPx": 360,
+                    "maxPx": 600
+                  }
                 }
-              ]
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive",
+                "detail": "inline"
+              }
             },
             "widgets": [
               {
@@ -1594,11 +1687,37 @@
                       "label": "Profile",
                       "icon": "person-outline",
                       "selectedStateKey": "profileId",
-                      "label_i18n": {"key": "runtime.media_center.ui.profile"},
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.profile"
+                      },
                       "options": [
-                        {"id": "default", "value": "default", "label": "Personal", "icon": "person-outline", "label_i18n": {"key": "runtime.media_center.ui.personal"}},
-                        {"id": "household", "value": "household", "label": "Household", "icon": "people-outline", "label_i18n": {"key": "runtime.media_center.ui.household"}},
-                        {"id": "kids", "value": "kids", "label": "Kids", "icon": "happy-outline", "label_i18n": {"key": "runtime.media_center.ui.kids"}}
+                        {
+                          "id": "default",
+                          "value": "default",
+                          "label": "Personal",
+                          "icon": "person-outline",
+                          "label_i18n": {
+                            "key": "runtime.media_center.ui.personal"
+                          }
+                        },
+                        {
+                          "id": "household",
+                          "value": "household",
+                          "label": "Household",
+                          "icon": "people-outline",
+                          "label_i18n": {
+                            "key": "runtime.media_center.ui.household"
+                          }
+                        },
+                        {
+                          "id": "kids",
+                          "value": "kids",
+                          "label": "Kids",
+                          "icon": "happy-outline",
+                          "label_i18n": {
+                            "key": "runtime.media_center.ui.kids"
+                          }
+                        }
                       ]
                     }
                   ]
@@ -1607,7 +1726,9 @@
                   {
                     "on": "select:profile",
                     "type": "updateState",
-                    "params": {"profileId": "$event.value"}
+                    "params": {
+                      "profileId": "$event.value"
+                    }
                   }
                 ]
               },
@@ -1662,26 +1783,34 @@
                       "label": "Favorite",
                       "icon": "star-outline",
                       "visibleIf": "$state.selectedMediaFavorite != true",
-                      "label_i18n": {"key": "runtime.media_center.ui.favorite"}
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.favorite"
+                      }
                     },
                     {
                       "id": "unfavorite",
                       "label": "Unfavorite",
                       "icon": "star-half-outline",
                       "visibleIf": "$state.selectedMediaFavorite == true",
-                      "label_i18n": {"key": "runtime.media_center.ui.unfavorite"}
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.unfavorite"
+                      }
                     },
                     {
                       "id": "playlist",
                       "label": "Add to playlist",
                       "icon": "list-outline",
-                      "label_i18n": {"key": "runtime.media_center.ui.add_to_playlist"}
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.add_to_playlist"
+                      }
                     },
                     {
                       "id": "close",
                       "label": "Close to mini-player",
                       "icon": "contract-outline",
-                      "label_i18n": {"key": "runtime.media_center.ui.close_to_mini_player"}
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.close_to_mini_player"
+                      }
                     }
                   ],
                   "remotePlaybackAction": {
@@ -1707,12 +1836,18 @@
                       "favorite": true,
                       "profile_id": "$state.profileId"
                     },
-                    "invalidates": ["media_center.catalog", "media_center.agent", "media_center.roots"]
+                    "invalidates": [
+                      "media_center.catalog",
+                      "media_center.agent",
+                      "media_center.roots"
+                    ]
                   },
                   {
                     "on": "click:favorite",
                     "type": "updateState",
-                    "params": {"selectedMediaFavorite": true}
+                    "params": {
+                      "selectedMediaFavorite": true
+                    }
                   },
                   {
                     "on": "click:unfavorite",
@@ -1723,17 +1858,25 @@
                       "favorite": false,
                       "profile_id": "$state.profileId"
                     },
-                    "invalidates": ["media_center.catalog", "media_center.agent", "media_center.roots"]
+                    "invalidates": [
+                      "media_center.catalog",
+                      "media_center.agent",
+                      "media_center.roots"
+                    ]
                   },
                   {
                     "on": "click:unfavorite",
                     "type": "updateState",
-                    "params": {"selectedMediaFavorite": false}
+                    "params": {
+                      "selectedMediaFavorite": false
+                    }
                   },
                   {
                     "on": "click:playlist",
                     "type": "openModal",
-                    "params": {"modalId": "media_center_add_to_playlist"}
+                    "params": {
+                      "modalId": "media_center_add_to_playlist"
+                    }
                   },
                   {
                     "on": "click:close",
@@ -1758,7 +1901,9 @@
                     "profile_id": "$state.profileId"
                   },
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["media_center.catalog"],
+                  "invalidationTags": [
+                    "media_center.catalog"
+                  ],
                   "preserveLastValue": false,
                   "maxRequestHz": 5
                 },
@@ -1769,29 +1914,140 @@
                   "imageAltKey": "title",
                   "imageRatio": "2 / 3",
                   "stateBindings": {
-                    "selectedMediaTitle": {"path": "item.title", "default": "Media"},
-                    "metadataTitle": {"path": "item.title", "default": ""},
-                    "metadataOriginalTitle": {"path": "item.metadata.original_title", "default": ""},
-                    "metadataOverview": {"path": "item.metadata.overview", "default": ""},
-                    "metadataYear": {"path": "item.year", "default": ""},
-                    "metadataGenres": {"path": "item.genres", "default": []},
-                    "metadataArtists": {"path": "item.artists", "default": []},
-                    "metadataAlbum": {"path": "item.album", "default": ""},
-                    "metadataSeries": {"path": "item.series", "default": ""}
+                    "selectedMediaTitle": {
+                      "path": "item.title",
+                      "default": "Media"
+                    },
+                    "metadataTitle": {
+                      "path": "item.title",
+                      "default": ""
+                    },
+                    "metadataOriginalTitle": {
+                      "path": "item.metadata.original_title",
+                      "default": ""
+                    },
+                    "metadataOverview": {
+                      "path": "item.metadata.overview",
+                      "default": ""
+                    },
+                    "metadataYear": {
+                      "path": "item.year",
+                      "default": ""
+                    },
+                    "metadataGenres": {
+                      "path": "item.genres",
+                      "default": []
+                    },
+                    "metadataArtists": {
+                      "path": "item.artists",
+                      "default": []
+                    },
+                    "metadataAlbum": {
+                      "path": "item.album",
+                      "default": ""
+                    },
+                    "metadataSeries": {
+                      "path": "item.series",
+                      "default": ""
+                    }
                   },
                   "fields": [
-                    {"key": "original_title", "label": "Original title", "path": "metadata.original_title", "label_i18n": {"key": "runtime.media_center.ui.original_title"}},
-                    {"key": "overview", "label": "Overview", "path": "metadata.overview", "label_i18n": {"key": "runtime.media_center.ui.overview"}},
-                    {"key": "year", "label": "Year", "path": "year", "label_i18n": {"key": "runtime.media_center.ui.year"}},
-                    {"key": "genres", "label": "Genres", "path": "genres", "label_i18n": {"key": "runtime.media_center.ui.genres"}},
-                    {"key": "rating", "label": "Rating", "path": "rating", "label_i18n": {"key": "runtime.media_center.ui.rating"}},
-                    {"key": "content_rating", "label": "Content rating", "path": "content_rating", "label_i18n": {"key": "runtime.media_center.ui.content_rating"}},
-                    {"key": "artists", "label": "Artists", "path": "artists", "label_i18n": {"key": "runtime.media_center.ui.artists"}},
-                    {"key": "album", "label": "Album", "path": "album", "label_i18n": {"key": "runtime.media_center.ui.album"}},
-                    {"key": "series", "label": "Series", "path": "series", "label_i18n": {"key": "runtime.media_center.ui.series"}},
-                    {"key": "actors", "label": "Cast", "path": "metadata.actors", "label_i18n": {"key": "runtime.media_center.ui.cast"}},
-                    {"key": "directors", "label": "Directors", "path": "metadata.directors", "label_i18n": {"key": "runtime.media_center.ui.directors"}},
-                    {"key": "external_ids", "label": "External IDs", "path": "metadata.external_ids", "label_i18n": {"key": "runtime.media_center.ui.external_ids"}}
+                    {
+                      "key": "original_title",
+                      "label": "Original title",
+                      "path": "metadata.original_title",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.original_title"
+                      }
+                    },
+                    {
+                      "key": "overview",
+                      "label": "Overview",
+                      "path": "metadata.overview",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.overview"
+                      }
+                    },
+                    {
+                      "key": "year",
+                      "label": "Year",
+                      "path": "year",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.year"
+                      }
+                    },
+                    {
+                      "key": "genres",
+                      "label": "Genres",
+                      "path": "genres",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.genres"
+                      }
+                    },
+                    {
+                      "key": "rating",
+                      "label": "Rating",
+                      "path": "rating",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.rating"
+                      }
+                    },
+                    {
+                      "key": "content_rating",
+                      "label": "Content rating",
+                      "path": "content_rating",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.content_rating"
+                      }
+                    },
+                    {
+                      "key": "artists",
+                      "label": "Artists",
+                      "path": "artists",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.artists"
+                      }
+                    },
+                    {
+                      "key": "album",
+                      "label": "Album",
+                      "path": "album",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.album"
+                      }
+                    },
+                    {
+                      "key": "series",
+                      "label": "Series",
+                      "path": "series",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.series"
+                      }
+                    },
+                    {
+                      "key": "actors",
+                      "label": "Cast",
+                      "path": "metadata.actors",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.cast"
+                      }
+                    },
+                    {
+                      "key": "directors",
+                      "label": "Directors",
+                      "path": "metadata.directors",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.directors"
+                      }
+                    },
+                    {
+                      "key": "external_ids",
+                      "label": "External IDs",
+                      "path": "metadata.external_ids",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.external_ids"
+                      }
+                    }
                   ]
                 }
               },
@@ -1808,13 +2064,17 @@
                       "id": "edit",
                       "label": "Edit metadata",
                       "icon": "create-outline",
-                      "label_i18n": {"key": "runtime.media_center.ui.edit_metadata"}
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.edit_metadata"
+                      }
                     },
                     {
                       "id": "details",
                       "label": "Details",
                       "icon": "information-circle-outline",
-                      "label_i18n": {"key": "runtime.media_center.ui.media_details"}
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.media_details"
+                      }
                     }
                   ]
                 },
@@ -1822,12 +2082,16 @@
                   {
                     "on": "click:edit",
                     "type": "openModal",
-                    "params": {"modalId": "media_center_metadata_edit"}
+                    "params": {
+                      "modalId": "media_center_metadata_edit"
+                    }
                   },
                   {
                     "on": "click:details",
                     "type": "openModal",
-                    "params": {"modalId": "media_center_item_details"}
+                    "params": {
+                      "modalId": "media_center_item_details"
+                    }
                   }
                 ]
               }
@@ -1842,14 +2106,45 @@
         },
         "media_center_item_details": {
           "title": "Details",
-          "title_i18n": {"key": "runtime.media_center.ui.media_details"},
+          "title_i18n": {
+            "key": "runtime.media_center.ui.media_details"
+          },
           "scope": "workspace",
-          "presentation": {"kind": "modal", "restoreFocus": true},
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
           "schema": {
             "id": "media_center_item_details",
             "title": "Details",
-            "title_i18n": {"key": "runtime.media_center.ui.media_details"},
-            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "title_i18n": {
+              "key": "runtime.media_center.ui.media_details"
+            },
+            "layout": {
+              "version": 2,
+              "pattern": "document",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
+                {
+                  "id": "main",
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
+                }
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
+            },
             "widgets": [
               {
                 "id": "media-center-item-technical-details",
@@ -1864,20 +2159,71 @@
                     "profile_id": "$state.profileId"
                   },
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["media_center.catalog"],
+                  "invalidationTags": [
+                    "media_center.catalog"
+                  ],
                   "preserveLastValue": false,
                   "maxRequestHz": 5
                 },
                 "inputs": {
                   "bindField": "item",
                   "fields": [
-                    {"key": "quality", "label": "Media quality", "path": "quality", "label_i18n": {"key": "runtime.media_center.ui.media_quality"}},
-                    {"key": "node", "label": "Storage node", "path": "node_id", "label_i18n": {"key": "runtime.media_center.ui.storage_node"}},
-                    {"key": "path", "label": "Library path", "path": "library_path", "label_i18n": {"key": "runtime.media_center.ui.library_path"}},
-                    {"key": "versions", "label": "Available versions", "path": "versions", "label_i18n": {"key": "runtime.media_center.ui.available_versions"}},
-                    {"key": "provenance", "label": "Metadata sources", "path": "metadata_provenance", "label_i18n": {"key": "runtime.media_center.ui.metadata_sources"}},
-                    {"key": "enrichment_providers", "label": "Enrichment providers", "path": "enrichment.providers", "label_i18n": {"key": "runtime.media_center.ui.providers"}},
-                    {"key": "enrichment_operations", "label": "Enrichment operations", "path": "enrichment.operations", "label_i18n": {"key": "runtime.media_center.ui.background_operations"}}
+                    {
+                      "key": "quality",
+                      "label": "Media quality",
+                      "path": "quality",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.media_quality"
+                      }
+                    },
+                    {
+                      "key": "node",
+                      "label": "Storage node",
+                      "path": "node_id",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.storage_node"
+                      }
+                    },
+                    {
+                      "key": "path",
+                      "label": "Library path",
+                      "path": "library_path",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.library_path"
+                      }
+                    },
+                    {
+                      "key": "versions",
+                      "label": "Available versions",
+                      "path": "versions",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.available_versions"
+                      }
+                    },
+                    {
+                      "key": "provenance",
+                      "label": "Metadata sources",
+                      "path": "metadata_provenance",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.metadata_sources"
+                      }
+                    },
+                    {
+                      "key": "enrichment_providers",
+                      "label": "Enrichment providers",
+                      "path": "enrichment.providers",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.providers"
+                      }
+                    },
+                    {
+                      "key": "enrichment_operations",
+                      "label": "Enrichment operations",
+                      "path": "enrichment.operations",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.background_operations"
+                      }
+                    }
                   ]
                 }
               }
@@ -1886,27 +2232,64 @@
         },
         "media_center_play_on": {
           "title": "Play on",
-          "title_i18n": {"key": "runtime.media_center.ui.play_on"},
+          "title_i18n": {
+            "key": "runtime.media_center.ui.play_on"
+          },
           "scope": "workspace",
-          "presentation": {"kind": "modal", "restoreFocus": true},
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
           "schema": {
             "id": "media_center_play_on",
             "title": "Play on",
-            "title_i18n": {"key": "runtime.media_center.ui.play_on"},
-            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "title_i18n": {
+              "key": "runtime.media_center.ui.play_on"
+            },
+            "layout": {
+              "version": 2,
+              "pattern": "task-flow",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
+                {
+                  "id": "main",
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
+                }
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
+            },
             "widgets": [
               {
                 "id": "media-play-on-target",
                 "type": "input.selector",
                 "area": "main",
                 "title": "Playback device",
-                "title_i18n": {"key": "runtime.media_center.ui.playback_device"},
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.playback_device"
+                },
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_control_skill.list_targets",
-                  "params": {"limit": 50},
+                  "params": {
+                    "limit": 50
+                  },
                   "cacheTtlMs": 1000,
-                  "invalidationTags": ["media_control.targets"],
+                  "invalidationTags": [
+                    "media_control.targets"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 1
                 },
@@ -1914,13 +2297,21 @@
                   "value": "$state.selectedPlaybackTargetId",
                   "optionLabelPath": "control_label",
                   "optionValuePath": "id",
-                  "optionMetaPaths": ["surface_context_label", "playback_summary", "authorization_label"],
+                  "optionMetaPaths": [
+                    "surface_context_label",
+                    "playback_summary",
+                    "authorization_label"
+                  ],
                   "persistFallback": true,
                   "searchable": false,
                   "placeholder": "Choose an online playback device",
-                  "placeholder_i18n": {"key": "runtime.media_center.ui.choose_a_playback_device"},
+                  "placeholder_i18n": {
+                    "key": "runtime.media_center.ui.choose_a_playback_device"
+                  },
                   "emptyText": "No playback targets are online.",
-                  "emptyText_i18n": {"key": "runtime.media_center.ui.no_playback_targets_are_online"}
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.no_playback_targets_are_online"
+                  }
                 },
                 "actions": [
                   {
@@ -1943,8 +2334,23 @@
                 "inputs": {
                   "variant": "toolbar",
                   "buttons": [
-                    {"id": "play", "label": "Play on", "icon": "phone-portrait-outline", "label_i18n": {"key": "runtime.media_center.ui.play_on"}, "disabledIf": "$state.selectedPlaybackTargetId == ''"},
-                    {"id": "close", "label": "Close", "icon": "close-outline", "label_i18n": {"key": "runtime.media_center.ui.close"}}
+                    {
+                      "id": "play",
+                      "label": "Play on",
+                      "icon": "phone-portrait-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.play_on"
+                      },
+                      "enabledIf": "$state.selectedPlaybackTargetId != ''"
+                    },
+                    {
+                      "id": "close",
+                      "label": "Close",
+                      "icon": "close-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.close"
+                      }
+                    }
                   ]
                 },
                 "actions": [
@@ -1962,9 +2368,14 @@
                       "start_item_id": "$state.selectedMediaItemId",
                       "profile_id": "$state.profileId"
                     },
-                    "invalidates": ["media_control.sessions"]
+                    "invalidates": [
+                      "media_control.sessions"
+                    ]
                   },
-                  {"on": "click:close", "type": "closeModal"}
+                  {
+                    "on": "click:close",
+                    "type": "closeModal"
+                  }
                 ]
               }
             ]
@@ -1972,46 +2383,99 @@
         },
         "media_center_add_to_playlist": {
           "title": "Add to playlist",
-          "title_i18n": {"key": "runtime.media_center.ui.add_to_playlist"},
+          "title_i18n": {
+            "key": "runtime.media_center.ui.add_to_playlist"
+          },
           "scope": "workspace",
-          "presentation": {"kind": "modal", "restoreFocus": true},
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
           "schema": {
             "id": "media_center_add_to_playlist",
             "title": "Add to playlist",
-            "title_i18n": {"key": "runtime.media_center.ui.add_to_playlist"},
-            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "title_i18n": {
+              "key": "runtime.media_center.ui.add_to_playlist"
+            },
+            "layout": {
+              "version": 2,
+              "pattern": "collection",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
+                {
+                  "id": "main",
+                  "role": "collection",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
+                }
+              ],
+              "interaction": {
+                "selection": "single",
+                "rowActivation": "select",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
+            },
             "widgets": [
               {
                 "id": "media-playlist-existing",
                 "type": "ui.list",
                 "area": "main",
                 "title": "Existing playlists",
-                "title_i18n": {"key": "runtime.media_center.ui.existing_playlists"},
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.existing_playlists"
+                },
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.list_playlists",
-                  "params": {"profile_id": "$state.profileId", "limit": 50},
+                  "params": {
+                    "profile_id": "$state.profileId",
+                    "limit": 50
+                  },
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["media_center.catalog"],
+                  "invalidationTags": [
+                    "media_center.catalog"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 2
                 },
-                "collection": {"display": "list", "virtualized": true, "cursor": {"enabled": false, "stateKey": "mediaCursor"}},
+                "collection": {
+                  "display": "list",
+                  "virtualized": true,
+                  "cursor": {
+                    "enabled": false,
+                    "stateKey": "mediaCursor"
+                  }
+                },
                 "inputs": {
                   "itemKey": "id",
                   "titleKey": "title",
                   "subtitleKey": "visibility",
                   "badgeKey": "item_count",
                   "emptyText": "No playlists yet.",
-                  "emptyText_i18n": {"key": "runtime.media_center.ui.no_playlists_yet"}
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.no_playlists_yet"
+                  }
                 },
                 "actions": [
                   {
                     "on": "select",
                     "type": "callSkill",
                     "target": "media_center_skill.add_playlist_item",
-                    "params": {"playlist_id": "$event.id", "item_id": "$state.selectedMediaItemId", "profile_id": "$state.profileId"},
-                    "invalidates": ["media_center.catalog"]
+                    "params": {
+                      "playlist_id": "$event.id",
+                      "item_id": "$state.selectedMediaItemId",
+                      "profile_id": "$state.profileId"
+                    },
+                    "invalidates": [
+                      "media_center.catalog"
+                    ]
                   }
                 ]
               },
@@ -2020,21 +2484,33 @@
                 "type": "input.text",
                 "area": "main",
                 "title": "New playlist",
-                "title_i18n": {"key": "runtime.media_center.ui.new_playlist"},
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.new_playlist"
+                },
                 "inputs": {
                   "placeholder": "Playlist name",
                   "initialValue": "",
                   "commitMode": "manual",
                   "saveLabel": "Create and add",
-                  "saveLabel_i18n": {"key": "runtime.media_center.ui.create_and_add"}
+                  "saveLabel_i18n": {
+                    "key": "runtime.media_center.ui.create_and_add"
+                  }
                 },
                 "actions": [
                   {
                     "on": "change",
                     "type": "callSkill",
                     "target": "media_center_skill.create_playlist",
-                    "params": {"title": "$event.value", "profile_id": "$state.profileId", "item_ids": ["$state.selectedMediaItemId"]},
-                    "invalidates": ["media_center.catalog"]
+                    "params": {
+                      "title": "$event.value",
+                      "profile_id": "$state.profileId",
+                      "item_ids": [
+                        "$state.selectedMediaItemId"
+                      ]
+                    },
+                    "invalidates": [
+                      "media_center.catalog"
+                    ]
                   }
                 ]
               },
@@ -2042,52 +2518,399 @@
                 "id": "media-playlist-close",
                 "type": "ui.actions",
                 "area": "main",
-                "inputs": {"variant": "toolbar", "buttons": [{"id": "close", "label": "Close", "icon": "close-outline", "label_i18n": {"key": "runtime.media_center.ui.close"}}]},
-                "actions": [{"on": "click:close", "type": "closeModal"}]
+                "inputs": {
+                  "variant": "toolbar",
+                  "buttons": [
+                    {
+                      "id": "close",
+                      "label": "Close",
+                      "icon": "close-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.close"
+                      }
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click:close",
+                    "type": "closeModal"
+                  }
+                ]
               }
             ]
           }
         },
         "media_center_metadata_edit": {
           "title": "Edit metadata",
-          "title_i18n": {"key": "runtime.media_center.ui.edit_metadata"},
+          "title_i18n": {
+            "key": "runtime.media_center.ui.edit_metadata"
+          },
           "scope": "workspace",
-          "presentation": {"kind": "modal", "restoreFocus": true},
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
           "schema": {
             "id": "media_center_metadata_edit",
             "title": "Edit metadata",
-            "title_i18n": {"key": "runtime.media_center.ui.edit_metadata"},
-            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "title_i18n": {
+              "key": "runtime.media_center.ui.edit_metadata"
+            },
+            "layout": {
+              "version": 2,
+              "pattern": "task-flow",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
+                {
+                  "id": "main",
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
+                }
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
+            },
             "widgets": [
               {
                 "id": "media-metadata-reference",
                 "type": "item.details",
                 "area": "main",
                 "title": "Source identity",
-                "title_i18n": {"key": "runtime.media_center.ui.source_identity"},
-                "dataSource": {"kind": "skill", "name": "media_center_skill.get_item", "params": {"item_id": "$state.selectedMediaItemId", "profile_id": "$state.profileId"}, "cacheTtlMs": 0, "invalidationTags": ["media_center.catalog"], "preserveLastValue": false, "maxRequestHz": 5},
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.source_identity"
+                },
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.get_item",
+                  "params": {
+                    "item_id": "$state.selectedMediaItemId",
+                    "profile_id": "$state.profileId"
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "media_center.catalog"
+                  ],
+                  "preserveLastValue": false,
+                  "maxRequestHz": 5
+                },
                 "inputs": {
                   "bindField": "item",
                   "fields": [
-                    {"key": "file", "label": "File name", "path": "name", "label_i18n": {"key": "runtime.media_center.ui.file_name"}},
-                    {"key": "path", "label": "Library path", "path": "library_path", "label_i18n": {"key": "runtime.media_center.ui.library_path"}},
-                    {"key": "original", "label": "Original title", "path": "metadata.original_title", "label_i18n": {"key": "runtime.media_center.ui.original_title"}},
-                    {"key": "artwork_state", "label": "Artwork state", "path": "artwork.state", "label_i18n": {"key": "runtime.media_center.ui.artwork_state"}},
-                    {"key": "artwork_provider", "label": "Artwork provider", "path": "artwork.provider_id", "label_i18n": {"key": "runtime.media_center.ui.artwork_provider"}},
-                    {"key": "artwork_review", "label": "Artwork review", "path": "metadata.artwork_review.state", "label_i18n": {"key": "runtime.media_center.ui.artwork_review"}},
-                    {"key": "providers", "label": "Metadata sources", "path": "metadata_provenance", "label_i18n": {"key": "runtime.media_center.ui.metadata_sources"}}
+                    {
+                      "key": "file",
+                      "label": "File name",
+                      "path": "name",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.file_name"
+                      }
+                    },
+                    {
+                      "key": "path",
+                      "label": "Library path",
+                      "path": "library_path",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.library_path"
+                      }
+                    },
+                    {
+                      "key": "original",
+                      "label": "Original title",
+                      "path": "metadata.original_title",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.original_title"
+                      }
+                    },
+                    {
+                      "key": "artwork_state",
+                      "label": "Artwork state",
+                      "path": "artwork.state",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.artwork_state"
+                      }
+                    },
+                    {
+                      "key": "artwork_provider",
+                      "label": "Artwork provider",
+                      "path": "artwork.provider_id",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.artwork_provider"
+                      }
+                    },
+                    {
+                      "key": "artwork_review",
+                      "label": "Artwork review",
+                      "path": "metadata.artwork_review.state",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.artwork_review"
+                      }
+                    },
+                    {
+                      "key": "providers",
+                      "label": "Metadata sources",
+                      "path": "metadata_provenance",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.metadata_sources"
+                      }
+                    }
                   ]
                 }
               },
-              {"id": "media-metadata-title", "type": "input.text", "area": "main", "title": "Title", "title_i18n": {"key": "runtime.media_center.ui.title"}, "dataSource": {"kind": "static", "value": {"value": "$state.metadataTitle"}}, "inputs": {"placeholder": "Title"}, "actions": [{"on": "change", "type": "updateState", "params": {"metadataTitle": "$event.value"}}]},
-              {"id": "media-metadata-original-title", "type": "input.text", "area": "main", "title": "Original title", "title_i18n": {"key": "runtime.media_center.ui.original_title"}, "dataSource": {"kind": "static", "value": {"value": "$state.metadataOriginalTitle"}}, "inputs": {"placeholder": "Original title"}, "actions": [{"on": "change", "type": "updateState", "params": {"metadataOriginalTitle": "$event.value"}}]},
-              {"id": "media-metadata-overview", "type": "input.text", "area": "main", "title": "Overview", "title_i18n": {"key": "runtime.media_center.ui.overview"}, "dataSource": {"kind": "static", "value": {"value": "$state.metadataOverview"}}, "inputs": {"placeholder": "Description"}, "actions": [{"on": "change", "type": "updateState", "params": {"metadataOverview": "$event.value"}}]},
-              {"id": "media-metadata-year", "type": "input.text", "area": "main", "title": "Year", "title_i18n": {"key": "runtime.media_center.ui.year"}, "dataSource": {"kind": "static", "value": {"value": "$state.metadataYear"}}, "inputs": {"placeholder": "2026", "inputType": "text"}, "actions": [{"on": "change", "type": "updateState", "params": {"metadataYear": "$event.value"}}]},
-              {"id": "media-metadata-genres", "type": "input.text", "area": "main", "title": "Genres", "title_i18n": {"key": "runtime.media_center.ui.genres"}, "dataSource": {"kind": "static", "value": {"value": "$state.metadataGenres"}}, "inputs": {"placeholder": "Drama, Documentary"}, "actions": [{"on": "change", "type": "updateState", "params": {"metadataGenres": "$event.value"}}]},
-              {"id": "media-metadata-artists", "type": "input.text", "area": "main", "title": "Artists", "title_i18n": {"key": "runtime.media_center.ui.artists"}, "dataSource": {"kind": "static", "value": {"value": "$state.metadataArtists"}}, "inputs": {"placeholder": "Artist"}, "actions": [{"on": "change", "type": "updateState", "params": {"metadataArtists": "$event.value"}}]},
-              {"id": "media-metadata-album", "type": "input.text", "area": "main", "title": "Album", "title_i18n": {"key": "runtime.media_center.ui.album"}, "dataSource": {"kind": "static", "value": {"value": "$state.metadataAlbum"}}, "inputs": {"placeholder": "Album"}, "actions": [{"on": "change", "type": "updateState", "params": {"metadataAlbum": "$event.value"}}]},
-              {"id": "media-metadata-series", "type": "input.text", "area": "main", "title": "Series", "title_i18n": {"key": "runtime.media_center.ui.series"}, "dataSource": {"kind": "static", "value": {"value": "$state.metadataSeries"}}, "inputs": {"placeholder": "Series"}, "actions": [{"on": "change", "type": "updateState", "params": {"metadataSeries": "$event.value"}}]},
-              {"id": "media-metadata-artwork-url", "type": "input.text", "area": "main", "title": "Replacement artwork URL", "title_i18n": {"key": "runtime.media_center.ui.replacement_artwork_url"}, "dataSource": {"kind": "static", "value": {"value": "$state.metadataArtworkUrl"}}, "inputs": {"placeholder": "https://..."}, "actions": [{"on": "change", "type": "updateState", "params": {"metadataArtworkUrl": "$event.value"}}]},
+              {
+                "id": "media-metadata-title",
+                "type": "input.text",
+                "area": "main",
+                "title": "Title",
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.title"
+                },
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.metadataTitle"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "Title"
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "metadataTitle": "$event.value"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "media-metadata-original-title",
+                "type": "input.text",
+                "area": "main",
+                "title": "Original title",
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.original_title"
+                },
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.metadataOriginalTitle"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "Original title"
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "metadataOriginalTitle": "$event.value"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "media-metadata-overview",
+                "type": "input.text",
+                "area": "main",
+                "title": "Overview",
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.overview"
+                },
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.metadataOverview"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "Description"
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "metadataOverview": "$event.value"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "media-metadata-year",
+                "type": "input.text",
+                "area": "main",
+                "title": "Year",
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.year"
+                },
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.metadataYear"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "2026",
+                  "inputType": "text"
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "metadataYear": "$event.value"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "media-metadata-genres",
+                "type": "input.text",
+                "area": "main",
+                "title": "Genres",
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.genres"
+                },
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.metadataGenres"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "Drama, Documentary"
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "metadataGenres": "$event.value"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "media-metadata-artists",
+                "type": "input.text",
+                "area": "main",
+                "title": "Artists",
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.artists"
+                },
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.metadataArtists"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "Artist"
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "metadataArtists": "$event.value"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "media-metadata-album",
+                "type": "input.text",
+                "area": "main",
+                "title": "Album",
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.album"
+                },
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.metadataAlbum"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "Album"
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "metadataAlbum": "$event.value"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "media-metadata-series",
+                "type": "input.text",
+                "area": "main",
+                "title": "Series",
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.series"
+                },
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.metadataSeries"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "Series"
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "metadataSeries": "$event.value"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "media-metadata-artwork-url",
+                "type": "input.text",
+                "area": "main",
+                "title": "Replacement artwork URL",
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.replacement_artwork_url"
+                },
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.metadataArtworkUrl"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "https://..."
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "metadataArtworkUrl": "$event.value"
+                    }
+                  }
+                ]
+              },
               {
                 "id": "media-metadata-artwork-actions",
                 "type": "ui.actions",
@@ -2095,14 +2918,59 @@
                 "inputs": {
                   "variant": "toolbar",
                   "buttons": [
-                    {"id": "confirm", "label": "Confirm artwork", "icon": "checkmark-circle-outline", "label_i18n": {"key": "runtime.media_center.ui.confirm_artwork"}},
-                    {"id": "replace", "label": "Replace artwork", "icon": "image-outline", "label_i18n": {"key": "runtime.media_center.ui.replace_artwork"}}
+                    {
+                      "id": "confirm",
+                      "label": "Confirm artwork",
+                      "icon": "checkmark-circle-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.confirm_artwork"
+                      }
+                    },
+                    {
+                      "id": "replace",
+                      "label": "Replace artwork",
+                      "icon": "image-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.replace_artwork"
+                      }
+                    }
                   ]
                 },
                 "actions": [
-                  {"on": "click:confirm", "type": "callSkill", "target": "media_center_skill.review_item_artwork", "params": {"item_id": "$state.selectedMediaItemId", "profile_id": "$state.profileId", "action": "confirm"}, "invalidates": ["media_center.catalog"]},
-                  {"on": "click:replace", "type": "callSkill", "target": "media_center_skill.review_item_artwork", "params": {"item_id": "$state.selectedMediaItemId", "profile_id": "$state.profileId", "action": "replace", "artwork_url": "$state.metadataArtworkUrl"}, "invalidates": ["media_center.catalog"]},
-                  {"on": "click:replace", "type": "updateState", "params": {"metadataArtworkUrl": ""}}
+                  {
+                    "on": "click:confirm",
+                    "type": "callSkill",
+                    "target": "media_center_skill.review_item_artwork",
+                    "params": {
+                      "item_id": "$state.selectedMediaItemId",
+                      "profile_id": "$state.profileId",
+                      "action": "confirm"
+                    },
+                    "invalidates": [
+                      "media_center.catalog"
+                    ]
+                  },
+                  {
+                    "on": "click:replace",
+                    "type": "callSkill",
+                    "target": "media_center_skill.review_item_artwork",
+                    "params": {
+                      "item_id": "$state.selectedMediaItemId",
+                      "profile_id": "$state.profileId",
+                      "action": "replace",
+                      "artwork_url": "$state.metadataArtworkUrl"
+                    },
+                    "invalidates": [
+                      "media_center.catalog"
+                    ]
+                  },
+                  {
+                    "on": "click:replace",
+                    "type": "updateState",
+                    "params": {
+                      "metadataArtworkUrl": ""
+                    }
+                  }
                 ]
               },
               {
@@ -2112,9 +2980,30 @@
                 "inputs": {
                   "variant": "toolbar",
                   "buttons": [
-                    {"id": "apply", "label": "Apply correction", "icon": "save-outline", "label_i18n": {"key": "runtime.media_center.ui.apply_correction"}},
-                    {"id": "reject", "label": "Reject suggested match", "icon": "unlink-outline", "label_i18n": {"key": "runtime.media_center.ui.reject_suggested_match"}},
-                    {"id": "close", "label": "Close", "icon": "close-outline", "label_i18n": {"key": "runtime.media_center.ui.close"}}
+                    {
+                      "id": "apply",
+                      "label": "Apply correction",
+                      "icon": "save-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.apply_correction"
+                      }
+                    },
+                    {
+                      "id": "reject",
+                      "label": "Reject suggested match",
+                      "icon": "unlink-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.reject_suggested_match"
+                      }
+                    },
+                    {
+                      "id": "close",
+                      "label": "Close",
+                      "icon": "close-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.close"
+                      }
+                    }
                   ]
                 },
                 "actions": [
@@ -2134,16 +3023,30 @@
                       "album": "$state.metadataAlbum",
                       "series": "$state.metadataSeries"
                     },
-                    "invalidates": ["media_center.catalog"]
+                    "invalidates": [
+                      "media_center.catalog"
+                    ]
                   },
                   {
                     "on": "click:reject",
                     "type": "callSkill",
                     "target": "media_center_skill.update_item_metadata",
-                    "params": {"item_id": "$state.selectedMediaItemId", "profile_id": "$state.profileId", "reject_providers": ["media_center.tmdb.v1", "media_center.musicbrainz.v1"]},
-                    "invalidates": ["media_center.catalog"]
+                    "params": {
+                      "item_id": "$state.selectedMediaItemId",
+                      "profile_id": "$state.profileId",
+                      "reject_providers": [
+                        "media_center.tmdb.v1",
+                        "media_center.musicbrainz.v1"
+                      ]
+                    },
+                    "invalidates": [
+                      "media_center.catalog"
+                    ]
                   },
-                  {"on": "click:close", "type": "closeModal"}
+                  {
+                    "on": "click:close",
+                    "type": "closeModal"
+                  }
                 ]
               }
             ]
@@ -2151,16 +3054,44 @@
         },
         "media_center_filters": {
           "title": "Filter and sort",
-          "title_i18n": {"key": "runtime.media_center.ui.filter_and_sort"},
+          "title_i18n": {
+            "key": "runtime.media_center.ui.filter_and_sort"
+          },
           "scope": "workspace",
-          "presentation": {"kind": "drawer", "restoreFocus": true},
+          "presentation": {
+            "kind": "drawer",
+            "restoreFocus": true
+          },
           "schema": {
             "id": "media_center_filters",
             "title": "Filter and sort",
-            "title_i18n": {"key": "runtime.media_center.ui.filter_and_sort"},
+            "title_i18n": {
+              "key": "runtime.media_center.ui.filter_and_sort"
+            },
             "layout": {
-              "type": "stack",
-              "areas": [{"id": "main", "role": "main"}]
+              "version": 2,
+              "pattern": "task-flow",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
+                {
+                  "id": "main",
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
+                }
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
             },
             "widgets": [
               {
@@ -2168,7 +3099,9 @@
                 "type": "input.selector",
                 "area": "main",
                 "title": "Genre",
-                "title_i18n": {"key": "runtime.media_center.ui.genre"},
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.genre"
+                },
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.metadata_facets",
@@ -2180,7 +3113,9 @@
                     "limit": 100
                   },
                   "cacheTtlMs": 5000,
-                  "invalidationTags": ["media_center.catalog"],
+                  "invalidationTags": [
+                    "media_center.catalog"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 1
                 },
@@ -2188,25 +3123,38 @@
                   "value": "$state.mediaGenre",
                   "optionLabelPath": "label",
                   "optionValuePath": "option_value",
-                  "optionMetaPaths": ["count"],
+                  "optionMetaPaths": [
+                    "count"
+                  ],
                   "searchable": true,
                   "emptyText": "No enriched genres yet",
-                  "emptyText_i18n": {"key": "runtime.media_center.ui.no_enriched_genres"},
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.no_enriched_genres"
+                  },
                   "placeholder": "All genres",
-                  "placeholder_i18n": {"key": "runtime.media_center.ui.all_genres"}
+                  "placeholder_i18n": {
+                    "key": "runtime.media_center.ui.all_genres"
+                  }
                 },
-                "actions": [{
-                  "on": "change",
-                  "type": "updateState",
-                  "params": {"mediaGenre": "$event.value", "mediaCursor": ""}
-                }]
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "mediaGenre": "$event.value",
+                      "mediaCursor": ""
+                    }
+                  }
+                ]
               },
               {
                 "id": "media-filter-year",
                 "type": "input.selector",
                 "area": "main",
                 "title": "Year",
-                "title_i18n": {"key": "runtime.media_center.ui.year"},
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.year"
+                },
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.metadata_facets",
@@ -2218,7 +3166,9 @@
                     "limit": 100
                   },
                   "cacheTtlMs": 5000,
-                  "invalidationTags": ["media_center.catalog"],
+                  "invalidationTags": [
+                    "media_center.catalog"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 1
                 },
@@ -2226,91 +3176,255 @@
                   "value": "$state.mediaYear",
                   "optionLabelPath": "label",
                   "optionValuePath": "option_value",
-                  "optionMetaPaths": ["count"],
+                  "optionMetaPaths": [
+                    "count"
+                  ],
                   "searchable": true,
                   "emptyText": "No enriched years yet",
-                  "emptyText_i18n": {"key": "runtime.media_center.ui.no_enriched_years"},
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.no_enriched_years"
+                  },
                   "placeholder": "All years",
-                  "placeholder_i18n": {"key": "runtime.media_center.ui.all_years"}
+                  "placeholder_i18n": {
+                    "key": "runtime.media_center.ui.all_years"
+                  }
                 },
-                "actions": [{
-                  "on": "change",
-                  "type": "updateState",
-                  "params": {"mediaYear": "$event.value", "mediaCursor": ""}
-                }]
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "mediaYear": "$event.value",
+                      "mediaCursor": ""
+                    }
+                  }
+                ]
               },
               {
                 "id": "media-filter-rating",
                 "type": "input.selector",
                 "area": "main",
                 "title": "Minimum rating",
-                "title_i18n": {"key": "runtime.media_center.ui.minimum_rating"},
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.minimum_rating"
+                },
                 "inputs": {
                   "value": "$state.mediaRatingMin",
                   "options": [
-                    {"label": "Any rating", "value": null, "label_i18n": {"key": "runtime.media_center.ui.any_rating"}},
-                    {"label": "6+", "value": 6, "label_i18n": {"key": "runtime.media_center.ui.rating_6_plus"}},
-                    {"label": "7+", "value": 7, "label_i18n": {"key": "runtime.media_center.ui.rating_7_plus"}},
-                    {"label": "8+", "value": 8, "label_i18n": {"key": "runtime.media_center.ui.rating_8_plus"}},
-                    {"label": "9+", "value": 9, "label_i18n": {"key": "runtime.media_center.ui.rating_9_plus"}}
+                    {
+                      "label": "Any rating",
+                      "value": null,
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.any_rating"
+                      }
+                    },
+                    {
+                      "label": "6+",
+                      "value": 6,
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.rating_6_plus"
+                      }
+                    },
+                    {
+                      "label": "7+",
+                      "value": 7,
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.rating_7_plus"
+                      }
+                    },
+                    {
+                      "label": "8+",
+                      "value": 8,
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.rating_8_plus"
+                      }
+                    },
+                    {
+                      "label": "9+",
+                      "value": 9,
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.rating_9_plus"
+                      }
+                    }
                   ]
                 },
-                "actions": [{
-                  "on": "change",
-                  "type": "updateState",
-                  "params": {"mediaRatingMin": "$event.value", "mediaCursor": ""}
-                }]
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "mediaRatingMin": "$event.value",
+                      "mediaCursor": ""
+                    }
+                  }
+                ]
               },
               {
                 "id": "media-sort-order",
                 "type": "input.selector",
                 "area": "main",
                 "title": "Sort by",
-                "title_i18n": {"key": "runtime.media_center.ui.sort_by"},
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.sort_by"
+                },
                 "inputs": {
                   "value": "$state.mediaSort",
                   "options": [
-                    {"label": "Title", "value": "title", "label_i18n": {"key": "runtime.media_center.ui.title"}},
-                    {"label": "Year", "value": "year", "label_i18n": {"key": "runtime.media_center.ui.year"}},
-                    {"label": "Release date", "value": "release_date", "label_i18n": {"key": "runtime.media_center.ui.release_date"}},
-                    {"label": "Critic rating", "value": "critic_rating", "label_i18n": {"key": "runtime.media_center.ui.critic_rating"}},
-                    {"label": "Audience rating", "value": "audience_rating", "label_i18n": {"key": "runtime.media_center.ui.audience_rating"}},
-                    {"label": "Rating", "value": "rating", "label_i18n": {"key": "runtime.media_center.ui.rating"}},
-                    {"label": "Content rating", "value": "content_rating", "label_i18n": {"key": "runtime.media_center.ui.content_rating"}},
-                    {"label": "Duration", "value": "duration", "label_i18n": {"key": "runtime.media_center.ui.duration"}},
-                    {"label": "Progress", "value": "progress", "label_i18n": {"key": "runtime.media_center.ui.progress"}},
-                    {"label": "Plays", "value": "plays", "label_i18n": {"key": "runtime.media_center.ui.plays"}},
-                    {"label": "Date added", "value": "date_added", "label_i18n": {"key": "runtime.media_center.ui.date_added"}},
-                    {"label": "Date viewed", "value": "date_viewed", "label_i18n": {"key": "runtime.media_center.ui.date_viewed"}},
-                    {"label": "Resolution", "value": "resolution", "label_i18n": {"key": "runtime.media_center.ui.resolution"}},
-                    {"label": "Bitrate", "value": "bitrate", "label_i18n": {"key": "runtime.media_center.ui.bitrate"}},
-                    {"label": "Randomly", "value": "random", "label_i18n": {"key": "runtime.media_center.ui.randomly"}}
+                    {
+                      "label": "Title",
+                      "value": "title",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.title"
+                      }
+                    },
+                    {
+                      "label": "Year",
+                      "value": "year",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.year"
+                      }
+                    },
+                    {
+                      "label": "Release date",
+                      "value": "release_date",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.release_date"
+                      }
+                    },
+                    {
+                      "label": "Critic rating",
+                      "value": "critic_rating",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.critic_rating"
+                      }
+                    },
+                    {
+                      "label": "Audience rating",
+                      "value": "audience_rating",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.audience_rating"
+                      }
+                    },
+                    {
+                      "label": "Rating",
+                      "value": "rating",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.rating"
+                      }
+                    },
+                    {
+                      "label": "Content rating",
+                      "value": "content_rating",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.content_rating"
+                      }
+                    },
+                    {
+                      "label": "Duration",
+                      "value": "duration",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.duration"
+                      }
+                    },
+                    {
+                      "label": "Progress",
+                      "value": "progress",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.progress"
+                      }
+                    },
+                    {
+                      "label": "Plays",
+                      "value": "plays",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.plays"
+                      }
+                    },
+                    {
+                      "label": "Date added",
+                      "value": "date_added",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.date_added"
+                      }
+                    },
+                    {
+                      "label": "Date viewed",
+                      "value": "date_viewed",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.date_viewed"
+                      }
+                    },
+                    {
+                      "label": "Resolution",
+                      "value": "resolution",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.resolution"
+                      }
+                    },
+                    {
+                      "label": "Bitrate",
+                      "value": "bitrate",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.bitrate"
+                      }
+                    },
+                    {
+                      "label": "Randomly",
+                      "value": "random",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.randomly"
+                      }
+                    }
                   ]
                 },
-                "actions": [{
-                  "on": "change",
-                  "type": "updateState",
-                  "params": {"mediaSort": "$event.value", "mediaCursor": ""}
-                }]
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "mediaSort": "$event.value",
+                      "mediaCursor": ""
+                    }
+                  }
+                ]
               },
               {
                 "id": "media-sort-direction",
                 "type": "input.selector",
                 "area": "main",
                 "title": "Direction",
-                "title_i18n": {"key": "runtime.media_center.ui.direction"},
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.direction"
+                },
                 "inputs": {
                   "value": "$state.mediaSortDirection",
                   "options": [
-                    {"label": "Ascending", "value": "asc", "label_i18n": {"key": "runtime.media_center.ui.ascending"}},
-                    {"label": "Descending", "value": "desc", "label_i18n": {"key": "runtime.media_center.ui.descending"}}
+                    {
+                      "label": "Ascending",
+                      "value": "asc",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.ascending"
+                      }
+                    },
+                    {
+                      "label": "Descending",
+                      "value": "desc",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.descending"
+                      }
+                    }
                   ]
                 },
-                "actions": [{
-                  "on": "change",
-                  "type": "updateState",
-                  "params": {"mediaSortDirection": "$event.value", "mediaCursor": ""}
-                }]
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "mediaSortDirection": "$event.value",
+                      "mediaCursor": ""
+                    }
+                  }
+                ]
               },
               {
                 "id": "media-filter-actions",
@@ -2319,8 +3433,22 @@
                 "inputs": {
                   "variant": "toolbar",
                   "buttons": [
-                    {"id": "reset", "label": "Reset", "icon": "refresh-outline", "label_i18n": {"key": "runtime.media_center.ui.reset"}},
-                    {"id": "done", "label": "Done", "icon": "checkmark-outline", "label_i18n": {"key": "runtime.media_center.ui.done"}}
+                    {
+                      "id": "reset",
+                      "label": "Reset",
+                      "icon": "refresh-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.reset"
+                      }
+                    },
+                    {
+                      "id": "done",
+                      "label": "Done",
+                      "icon": "checkmark-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.done"
+                      }
+                    }
                   ]
                 },
                 "actions": [
@@ -2328,13 +3456,19 @@
                     "on": "click:reset",
                     "type": "updateState",
                     "params": {
-                      "mediaGenre": "", "mediaYear": null,
-                      "mediaRatingMin": null, "mediaContentRating": "",
-                      "mediaSort": "title", "mediaSortDirection": "asc",
+                      "mediaGenre": "",
+                      "mediaYear": null,
+                      "mediaRatingMin": null,
+                      "mediaContentRating": "",
+                      "mediaSort": "title",
+                      "mediaSortDirection": "asc",
                       "mediaCursor": ""
                     }
                   },
-                  {"on": "click:done", "type": "closeModal"}
+                  {
+                    "on": "click:done",
+                    "type": "closeModal"
+                  }
                 ]
               }
             ]
@@ -2351,13 +3485,29 @@
             "id": "media_center_remote",
             "title": "Media Remote",
             "layout": {
-              "type": "stack",
-              "areas": [
+              "version": 2,
+              "pattern": "collection",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
                 {
                   "id": "main",
-                  "role": "main"
+                  "role": "collection",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
                 }
-              ]
+              ],
+              "interaction": {
+                "selection": "single",
+                "rowActivation": "select",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
             },
             "widgets": [
               {
@@ -2481,14 +3631,53 @@
                   "variant": "toolbar",
                   "size": "small",
                   "buttons": [
-                    {"id": "details", "icon": "information-circle-outline", "label": "Details", "label_i18n": {"key": "runtime.media_center.ui.media_details"}},
-                    {"id": "favorite", "icon": "star-outline", "label": "Favorite", "label_i18n": {"key": "runtime.media_center.ui.favorite"}}
+                    {
+                      "id": "details",
+                      "icon": "information-circle-outline",
+                      "label": "Details",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.media_details"
+                      }
+                    },
+                    {
+                      "id": "favorite",
+                      "icon": "star-outline",
+                      "label": "Favorite",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.favorite"
+                      }
+                    }
                   ]
                 },
                 "actions": [
-                  {"on": "click:details", "type": "openModal", "params": {"modalId": "media_center_player"}},
-                  {"on": "click:favorite", "type": "callSkill", "target": "media_center_skill.set_favorite", "params": {"item_id": "$state.selectedMediaItemId", "favorite": true, "profile_id": "$state.profileId"}, "invalidates": ["media_center.catalog", "media_control.sessions"]},
-                  {"on": "click:favorite", "type": "updateState", "params": {"selectedMediaFavorite": true}}
+                  {
+                    "on": "click:details",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "media_center_player"
+                    }
+                  },
+                  {
+                    "on": "click:favorite",
+                    "type": "callSkill",
+                    "target": "media_center_skill.set_favorite",
+                    "params": {
+                      "item_id": "$state.selectedMediaItemId",
+                      "favorite": true,
+                      "profile_id": "$state.profileId"
+                    },
+                    "invalidates": [
+                      "media_center.catalog",
+                      "media_control.sessions"
+                    ]
+                  },
+                  {
+                    "on": "click:favorite",
+                    "type": "updateState",
+                    "params": {
+                      "selectedMediaFavorite": true
+                    }
+                  }
                 ]
               },
               {
@@ -2500,14 +3689,53 @@
                   "variant": "toolbar",
                   "size": "small",
                   "buttons": [
-                    {"id": "details", "icon": "information-circle-outline", "label": "Details", "label_i18n": {"key": "runtime.media_center.ui.media_details"}},
-                    {"id": "unfavorite", "icon": "star-half-outline", "label": "Unfavorite", "label_i18n": {"key": "runtime.media_center.ui.unfavorite"}}
+                    {
+                      "id": "details",
+                      "icon": "information-circle-outline",
+                      "label": "Details",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.media_details"
+                      }
+                    },
+                    {
+                      "id": "unfavorite",
+                      "icon": "star-half-outline",
+                      "label": "Unfavorite",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.unfavorite"
+                      }
+                    }
                   ]
                 },
                 "actions": [
-                  {"on": "click:details", "type": "openModal", "params": {"modalId": "media_center_player"}},
-                  {"on": "click:unfavorite", "type": "callSkill", "target": "media_center_skill.set_favorite", "params": {"item_id": "$state.selectedMediaItemId", "favorite": false, "profile_id": "$state.profileId"}, "invalidates": ["media_center.catalog", "media_control.sessions"]},
-                  {"on": "click:unfavorite", "type": "updateState", "params": {"selectedMediaFavorite": false}}
+                  {
+                    "on": "click:details",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "media_center_player"
+                    }
+                  },
+                  {
+                    "on": "click:unfavorite",
+                    "type": "callSkill",
+                    "target": "media_center_skill.set_favorite",
+                    "params": {
+                      "item_id": "$state.selectedMediaItemId",
+                      "favorite": false,
+                      "profile_id": "$state.profileId"
+                    },
+                    "invalidates": [
+                      "media_center.catalog",
+                      "media_control.sessions"
+                    ]
+                  },
+                  {
+                    "on": "click:unfavorite",
+                    "type": "updateState",
+                    "params": {
+                      "selectedMediaFavorite": false
+                    }
+                  }
                 ]
               },
               {
@@ -2620,17 +3848,85 @@
                   "variant": "adaptiveToolbar",
                   "size": "small",
                   "buttons": [
-                    {"id": "fullscreen", "icon": "scan-outline", "label": "Fullscreen", "label_i18n": {"key": "runtime.media_center.ui.fullscreen"}},
-                    {"id": "pip", "icon": "browsers-outline", "label": "Picture in Picture", "label_i18n": {"key": "runtime.media_center.ui.picture_in_picture"}},
-                    {"id": "mini", "icon": "contract-outline", "label": "Mini-player", "label_i18n": {"key": "runtime.media_center.ui.mini_player"}}
+                    {
+                      "id": "fullscreen",
+                      "icon": "scan-outline",
+                      "label": "Fullscreen",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.fullscreen"
+                      }
+                    },
+                    {
+                      "id": "pip",
+                      "icon": "browsers-outline",
+                      "label": "Picture in Picture",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.picture_in_picture"
+                      }
+                    },
+                    {
+                      "id": "mini",
+                      "icon": "contract-outline",
+                      "label": "Mini-player",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.mini_player"
+                      }
+                    }
                   ]
                 },
                 "actions": [
-                  {"on": "click:fullscreen", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "presentation", "arguments": {"mode": "fullscreen"}, "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
-                  {"on": "click:pip", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "presentation", "arguments": {"mode": "picture_in_picture"}, "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
-                  {"on": "click:mini", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "presentation", "arguments": {"mode": "mini"}, "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]}
+                  {
+                    "on": "click:fullscreen",
+                    "type": "callSkill",
+                    "target": "media_control_skill.voice_command",
+                    "params": {
+                      "action": "presentation",
+                      "arguments": {
+                        "mode": "fullscreen"
+                      },
+                      "profile_id": "$state.profileId",
+                      "target_id": "$state.selectedPlaybackTargetId"
+                    },
+                    "invalidates": [
+                      "media_control.sessions"
+                    ]
+                  },
+                  {
+                    "on": "click:pip",
+                    "type": "callSkill",
+                    "target": "media_control_skill.voice_command",
+                    "params": {
+                      "action": "presentation",
+                      "arguments": {
+                        "mode": "picture_in_picture"
+                      },
+                      "profile_id": "$state.profileId",
+                      "target_id": "$state.selectedPlaybackTargetId"
+                    },
+                    "invalidates": [
+                      "media_control.sessions"
+                    ]
+                  },
+                  {
+                    "on": "click:mini",
+                    "type": "callSkill",
+                    "target": "media_control_skill.voice_command",
+                    "params": {
+                      "action": "presentation",
+                      "arguments": {
+                        "mode": "mini"
+                      },
+                      "profile_id": "$state.profileId",
+                      "target_id": "$state.selectedPlaybackTargetId"
+                    },
+                    "invalidates": [
+                      "media_control.sessions"
+                    ]
+                  }
                 ],
-                "title_i18n": {"key": "runtime.media_center.ui.presentation"}
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.presentation"
+                }
               },
               {
                 "id": "media-remote-volume",
@@ -2640,13 +3936,42 @@
                 "inputs": {
                   "autoCommit": true,
                   "fields": [
-                    {"id": "volume", "type": "slider", "label": "Volume", "label_i18n": {"key": "runtime.media_center.ui.volume"}, "stateKey": "mediaControlVolume", "defaultValue": 1, "min": 0, "max": 1, "step": 0.05}
+                    {
+                      "id": "volume",
+                      "type": "slider",
+                      "label": "Volume",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.volume"
+                      },
+                      "stateKey": "mediaControlVolume",
+                      "defaultValue": 1,
+                      "min": 0,
+                      "max": 1,
+                      "step": 0.05
+                    }
                   ]
                 },
                 "actions": [
-                  {"on": "change:volume", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "volume", "arguments": {"volume": "$event.value"}, "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]}
+                  {
+                    "on": "change:volume",
+                    "type": "callSkill",
+                    "target": "media_control_skill.voice_command",
+                    "params": {
+                      "action": "volume",
+                      "arguments": {
+                        "volume": "$event.value"
+                      },
+                      "profile_id": "$state.profileId",
+                      "target_id": "$state.selectedPlaybackTargetId"
+                    },
+                    "invalidates": [
+                      "media_control.sessions"
+                    ]
+                  }
                 ],
-                "title_i18n": {"key": "runtime.media_center.ui.volume"}
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.volume"
+                }
               }
             ],
             "title_i18n": {
@@ -2668,13 +3993,29 @@
             "id": "media_center_settings",
             "title": "Media Center Settings",
             "layout": {
-              "type": "stack",
-              "areas": [
+              "version": 2,
+              "pattern": "collection",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "regions",
+              "regions": [
                 {
                   "id": "main",
-                  "role": "main"
+                  "role": "collection",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
                 }
-              ]
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
             },
             "widgets": [
               {
@@ -2801,18 +4142,36 @@
                   "name": "media_center_skill.get_metadata_settings",
                   "params": {},
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["media_center.metadata_settings"],
+                  "invalidationTags": [
+                    "media_center.metadata_settings"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 1
                 },
                 "inputs": {
                   "presentation": "body",
                   "fields": [
-                    {"key": "tmdb_key", "label": "TMDb credential configured", "path": "settings.tmdb_credential_configured", "label_i18n": {"key": "runtime.media_center.ui.tmdb_key_configured"}},
-                    {"key": "locale", "label": "Metadata language", "path": "settings.locale", "label_i18n": {"key": "runtime.media_center.ui.metadata_language"}}
+                    {
+                      "key": "tmdb_key",
+                      "label": "TMDb credential configured",
+                      "path": "settings.tmdb_credential_configured",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.tmdb_key_configured"
+                      }
+                    },
+                    {
+                      "key": "locale",
+                      "label": "Metadata language",
+                      "path": "settings.locale",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.metadata_language"
+                      }
+                    }
                   ]
                 },
-                "title_i18n": {"key": "runtime.media_center.ui.external_metadata"}
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.external_metadata"
+                }
               },
               {
                 "id": "media-metadata-settings-providers",
@@ -2824,7 +4183,9 @@
                   "name": "media_center_skill.get_metadata_settings",
                   "params": {},
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["media_center.metadata_settings"],
+                  "invalidationTags": [
+                    "media_center.metadata_settings"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 1
                 },
@@ -2833,17 +4194,28 @@
                   "itemKey": "provider_id",
                   "titleKey": "provider_id",
                   "subtitleKey": "state",
-                  "meta": [{"key": "reason"}],
+                  "meta": [
+                    {
+                      "key": "reason"
+                    }
+                  ],
                   "emptyText": "No metadata providers are registered.",
-                  "emptyText_i18n": {"key": "runtime.media_center.ui.no_metadata_providers"}
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.no_metadata_providers"
+                  }
                 },
                 "collection": {
                   "display": "list",
                   "focusGroup": "media-metadata-settings-providers",
                   "virtualized": false,
-                  "cursor": {"enabled": false, "stateKey": "mediaCursor"}
+                  "cursor": {
+                    "enabled": false,
+                    "stateKey": "mediaCursor"
+                  }
                 },
-                "title_i18n": {"key": "runtime.media_center.ui.provider_state"}
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.provider_state"
+                }
               },
               {
                 "id": "media-external-metadata-enabled",
@@ -2855,82 +4227,124 @@
                   "name": "media_center_skill.get_metadata_settings",
                   "params": {},
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["media_center.metadata_settings"],
+                  "invalidationTags": [
+                    "media_center.metadata_settings"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 1
                 },
                 "inputs": {
                   "valuePath": "settings.external_enabled",
                   "description": "Send normalized titles and tags to enabled metadata providers.",
-                  "description_i18n": {"key": "runtime.media_center.ui.external_metadata_description"}
+                  "description_i18n": {
+                    "key": "runtime.media_center.ui.external_metadata_description"
+                  }
                 },
-                "actions": [{
-                  "on": "change",
-                  "type": "callSkill",
-                  "target": "media_center_skill.set_metadata_settings",
-                  "timeoutMs": 300000,
-                  "params": {"values": {"external_enabled": "$event.checked"}},
-                  "invalidates": ["media_center.metadata_settings"]
-                }],
-                "title_i18n": {"key": "runtime.media_center.ui.external_metadata_enrichment"}
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "callSkill",
+                    "target": "media_center_skill.set_metadata_settings",
+                    "timeoutMs": 300000,
+                    "params": {
+                      "values": {
+                        "external_enabled": "$event.checked"
+                      }
+                    },
+                    "invalidates": [
+                      "media_center.metadata_settings"
+                    ]
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.external_metadata_enrichment"
+                }
               },
               {
                 "id": "media-musicbrainz-enabled",
                 "type": "input.toggle",
                 "area": "main",
                 "title": "MusicBrainz",
-                "title_i18n": {"key": "runtime.media_center.ui.musicbrainz"},
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.musicbrainz"
+                },
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.get_metadata_settings",
                   "params": {},
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["media_center.metadata_settings"],
+                  "invalidationTags": [
+                    "media_center.metadata_settings"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 1
                 },
                 "inputs": {
                   "valuePath": "settings.musicbrainz_enabled",
                   "description": "Identify audio using normalized title, artist, and album tags.",
-                  "description_i18n": {"key": "runtime.media_center.ui.musicbrainz_description"}
+                  "description_i18n": {
+                    "key": "runtime.media_center.ui.musicbrainz_description"
+                  }
                 },
-                "actions": [{
-                  "on": "change",
-                  "type": "callSkill",
-                  "target": "media_center_skill.set_metadata_settings",
-                  "timeoutMs": 300000,
-                  "params": {"values": {"musicbrainz_enabled": "$event.checked"}},
-                  "invalidates": ["media_center.metadata_settings"]
-                }]
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "callSkill",
+                    "target": "media_center_skill.set_metadata_settings",
+                    "timeoutMs": 300000,
+                    "params": {
+                      "values": {
+                        "musicbrainz_enabled": "$event.checked"
+                      }
+                    },
+                    "invalidates": [
+                      "media_center.metadata_settings"
+                    ]
+                  }
+                ]
               },
               {
                 "id": "media-tmdb-enabled",
                 "type": "input.toggle",
                 "area": "main",
                 "title": "TMDb",
-                "title_i18n": {"key": "runtime.media_center.ui.tmdb"},
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.tmdb"
+                },
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.get_metadata_settings",
                   "params": {},
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["media_center.metadata_settings"],
+                  "invalidationTags": [
+                    "media_center.metadata_settings"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 1
                 },
                 "inputs": {
                   "valuePath": "settings.tmdb_enabled",
                   "description": "Enrich films and series using your free TMDb API key or Read Access Token.",
-                  "description_i18n": {"key": "runtime.media_center.ui.tmdb_description"}
+                  "description_i18n": {
+                    "key": "runtime.media_center.ui.tmdb_description"
+                  }
                 },
-                "actions": [{
-                  "on": "change",
-                  "type": "callSkill",
-                  "target": "media_center_skill.set_metadata_settings",
-                  "timeoutMs": 300000,
-                  "params": {"values": {"tmdb_enabled": "$event.checked"}},
-                  "invalidates": ["media_center.metadata_settings"]
-                }]
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "callSkill",
+                    "target": "media_center_skill.set_metadata_settings",
+                    "timeoutMs": 300000,
+                    "params": {
+                      "values": {
+                        "tmdb_enabled": "$event.checked"
+                      }
+                    },
+                    "invalidates": [
+                      "media_center.metadata_settings"
+                    ]
+                  }
+                ]
               },
               {
                 "id": "media-tmdb-connect-actions",
@@ -2939,21 +4353,27 @@
                 "inputs": {
                   "variant": "toolbar",
                   "size": "small",
-                  "buttons": [{
-                    "id": "open-api-settings",
-                    "label": "Get a free TMDb key",
-                    "icon": "open-outline",
-                    "label_i18n": {"key": "runtime.media_center.ui.get_tmdb_key"}
-                  }]
+                  "buttons": [
+                    {
+                      "id": "open-api-settings",
+                      "label": "Get a free TMDb key",
+                      "icon": "open-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.get_tmdb_key"
+                      }
+                    }
+                  ]
                 },
-                "actions": [{
-                  "on": "click:open-api-settings",
-                  "type": "openUrl",
-                  "params": {
-                    "url": "https://www.themoviedb.org/settings/api",
-                    "target": "_blank"
+                "actions": [
+                  {
+                    "on": "click:open-api-settings",
+                    "type": "openUrl",
+                    "params": {
+                      "url": "https://www.themoviedb.org/settings/api",
+                      "target": "_blank"
+                    }
                   }
-                }]
+                ]
               },
               {
                 "id": "media-tmdb-token",
@@ -2966,20 +4386,32 @@
                   "autocomplete": "new-password",
                   "commitMode": "manual",
                   "saveLabel": "Store key",
-                  "saveLabel_i18n": {"key": "runtime.media_center.ui.store_key"},
+                  "saveLabel_i18n": {
+                    "key": "runtime.media_center.ui.store_key"
+                  },
                   "placeholder": "TMDb API key or Read Access Token",
                   "helper": "Sign in to TMDb, request a Developer API key, then paste API Key (v3 auth) or API Read Access Token. The stored credential is validated and never returned to the interface.",
-                  "helper_i18n": {"key": "runtime.media_center.ui.tmdb_key_private_hint"}
+                  "helper_i18n": {
+                    "key": "runtime.media_center.ui.tmdb_key_private_hint"
+                  }
                 },
-                "actions": [{
-                  "on": "change",
-                  "type": "callSkill",
-                  "target": "media_center_skill.set_metadata_settings",
-                  "timeoutMs": 300000,
-                  "params": {"tmdb_credential": "$event.value"},
-                  "invalidates": ["media_center.metadata_settings"]
-                }],
-                "title_i18n": {"key": "runtime.media_center.ui.tmdb_credential"}
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "callSkill",
+                    "target": "media_center_skill.set_metadata_settings",
+                    "timeoutMs": 300000,
+                    "params": {
+                      "tmdb_credential": "$event.value"
+                    },
+                    "invalidates": [
+                      "media_center.metadata_settings"
+                    ]
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.tmdb_credential"
+                }
               },
               {
                 "id": "media-tmdb-token-actions",
@@ -2988,16 +4420,31 @@
                 "inputs": {
                   "variant": "toolbar",
                   "size": "small",
-                  "buttons": [{"id": "clear", "label": "Remove TMDb key", "icon": "trash-outline", "label_i18n": {"key": "runtime.media_center.ui.remove_tmdb_key"}}]
+                  "buttons": [
+                    {
+                      "id": "clear",
+                      "label": "Remove TMDb key",
+                      "icon": "trash-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.remove_tmdb_key"
+                      }
+                    }
+                  ]
                 },
-                "actions": [{
-                  "on": "click:clear",
-                  "type": "callSkill",
-                  "target": "media_center_skill.set_metadata_settings",
-                  "timeoutMs": 300000,
-                  "params": {"clear_tmdb_credential": true},
-                  "invalidates": ["media_center.metadata_settings"]
-                }]
+                "actions": [
+                  {
+                    "on": "click:clear",
+                    "type": "callSkill",
+                    "target": "media_center_skill.set_metadata_settings",
+                    "timeoutMs": 300000,
+                    "params": {
+                      "clear_tmdb_credential": true
+                    },
+                    "invalidates": [
+                      "media_center.metadata_settings"
+                    ]
+                  }
+                ]
               },
               {
                 "id": "media-scan-progress",
@@ -3170,13 +4617,17 @@
                       "key": "storage_policy.rendition_mode",
                       "label": "Renditions",
                       "width": "120px",
-                      "label_i18n": {"key": "runtime.media_center.ui.renditions"}
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.renditions"
+                      }
                     },
                     {
                       "key": "storage_policy.artwork_mode",
                       "label": "Artwork",
                       "width": "110px",
-                      "label_i18n": {"key": "runtime.media_center.ui.artwork"}
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.artwork"
+                      }
                     },
                     {
                       "key": "actions",
@@ -3188,7 +4639,9 @@
                           "id": "storage",
                           "icon": "server-outline",
                           "title": "Storage policy",
-                          "title_i18n": {"key": "runtime.media_center.ui.storage_policy"}
+                          "title_i18n": {
+                            "key": "runtime.media_center.ui.storage_policy"
+                          }
                         },
                         {
                           "id": "delete",
@@ -3742,13 +5195,29 @@
             "id": "media_center_metadata",
             "title": "Metadata activity",
             "layout": {
-              "type": "stack",
-              "areas": [
+              "version": 2,
+              "pattern": "collection",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "regions",
+              "regions": [
                 {
                   "id": "main",
-                  "role": "main"
+                  "role": "collection",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
                 }
-              ]
+              ],
+              "interaction": {
+                "selection": "single",
+                "rowActivation": "select",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
             },
             "widgets": [
               {
@@ -3764,26 +5233,149 @@
                 "inputs": {
                   "presentation": "body",
                   "fields": [
-                    {"key": "state", "label": "Worker", "path": "runtime.state", "label_i18n": {"key": "runtime.media_center.ui.worker"}},
-                    {"key": "active", "label": "Active jobs", "path": "active_count", "label_i18n": {"key": "runtime.media_center.ui.active_jobs"}},
-                    {"key": "queued", "label": "Queued", "path": "counts.queued", "label_i18n": {"key": "runtime.media_center.ui.queued"}},
-                    {"key": "running", "label": "Running", "path": "counts.running", "label_i18n": {"key": "runtime.media_center.ui.running"}},
-                    {"key": "completed", "label": "Completed", "path": "counts.completed", "label_i18n": {"key": "runtime.media_center.ui.completed"}},
-                    {"key": "failed", "label": "Failed", "path": "counts.failed", "label_i18n": {"key": "runtime.media_center.ui.failed"}},
-                    {"key": "metadata_queued", "label": "Metadata queued", "path": "counts_by_kind.metadata_enrichment.queued", "label_i18n": {"key": "runtime.media_center.ui.metadata_queued"}},
-                    {"key": "metadata_running", "label": "Metadata running", "path": "counts_by_kind.metadata_enrichment.running", "label_i18n": {"key": "runtime.media_center.ui.metadata_running"}},
-                    {"key": "database_size", "label": "Database size", "path": "storage.db_bytes", "format": "bytes", "label_i18n": {"key": "runtime.media_center.ui.database_size"}},
-                    {"key": "reclaimable_storage", "label": "Reclaimable storage", "path": "storage.reclaimable_bytes", "format": "bytes", "label_i18n": {"key": "runtime.media_center.ui.reclaimable_storage"}},
-                    {"key": "compaction_phase", "label": "Catalog compaction", "path": "storage.logical_compaction.phase", "label_i18n": {"key": "runtime.media_center.ui.compaction_phase"}},
-                    {"key": "compaction_scanned", "label": "Compaction scanned", "path": "storage.logical_compaction.scanned", "label_i18n": {"key": "runtime.media_center.ui.compaction_scanned"}},
-                    {"key": "compaction_updated", "label": "Compaction updated", "path": "storage.logical_compaction.updated", "label_i18n": {"key": "runtime.media_center.ui.compaction_updated"}},
-                    {"key": "coverage_total", "label": "Projected items", "path": "coverage.total", "label_i18n": {"key": "runtime.media_center.ui.projected_items"}},
-                    {"key": "coverage_year", "label": "With year", "path": "coverage.with_year", "label_i18n": {"key": "runtime.media_center.ui.with_year"}},
-                    {"key": "coverage_genres", "label": "With genres", "path": "coverage.with_genres", "label_i18n": {"key": "runtime.media_center.ui.with_genres"}},
-                    {"key": "coverage_artists", "label": "With artists", "path": "coverage.with_artists", "label_i18n": {"key": "runtime.media_center.ui.with_artists"}}
+                    {
+                      "key": "state",
+                      "label": "Worker",
+                      "path": "runtime.state",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.worker"
+                      }
+                    },
+                    {
+                      "key": "active",
+                      "label": "Active jobs",
+                      "path": "active_count",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.active_jobs"
+                      }
+                    },
+                    {
+                      "key": "queued",
+                      "label": "Queued",
+                      "path": "counts.queued",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.queued"
+                      }
+                    },
+                    {
+                      "key": "running",
+                      "label": "Running",
+                      "path": "counts.running",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.running"
+                      }
+                    },
+                    {
+                      "key": "completed",
+                      "label": "Completed",
+                      "path": "counts.completed",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.completed"
+                      }
+                    },
+                    {
+                      "key": "failed",
+                      "label": "Failed",
+                      "path": "counts.failed",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.failed"
+                      }
+                    },
+                    {
+                      "key": "metadata_queued",
+                      "label": "Metadata queued",
+                      "path": "counts_by_kind.metadata_enrichment.queued",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.metadata_queued"
+                      }
+                    },
+                    {
+                      "key": "metadata_running",
+                      "label": "Metadata running",
+                      "path": "counts_by_kind.metadata_enrichment.running",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.metadata_running"
+                      }
+                    },
+                    {
+                      "key": "database_size",
+                      "label": "Database size",
+                      "path": "storage.db_bytes",
+                      "format": "bytes",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.database_size"
+                      }
+                    },
+                    {
+                      "key": "reclaimable_storage",
+                      "label": "Reclaimable storage",
+                      "path": "storage.reclaimable_bytes",
+                      "format": "bytes",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.reclaimable_storage"
+                      }
+                    },
+                    {
+                      "key": "compaction_phase",
+                      "label": "Catalog compaction",
+                      "path": "storage.logical_compaction.phase",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.compaction_phase"
+                      }
+                    },
+                    {
+                      "key": "compaction_scanned",
+                      "label": "Compaction scanned",
+                      "path": "storage.logical_compaction.scanned",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.compaction_scanned"
+                      }
+                    },
+                    {
+                      "key": "compaction_updated",
+                      "label": "Compaction updated",
+                      "path": "storage.logical_compaction.updated",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.compaction_updated"
+                      }
+                    },
+                    {
+                      "key": "coverage_total",
+                      "label": "Projected items",
+                      "path": "coverage.total",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.projected_items"
+                      }
+                    },
+                    {
+                      "key": "coverage_year",
+                      "label": "With year",
+                      "path": "coverage.with_year",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.with_year"
+                      }
+                    },
+                    {
+                      "key": "coverage_genres",
+                      "label": "With genres",
+                      "path": "coverage.with_genres",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.with_genres"
+                      }
+                    },
+                    {
+                      "key": "coverage_artists",
+                      "label": "With artists",
+                      "path": "coverage.with_artists",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.with_artists"
+                      }
+                    }
                   ]
                 },
-                "title_i18n": {"key": "runtime.media_center.ui.metadata_providers"}
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.metadata_providers"
+                }
               },
               {
                 "id": "media-metadata-providers",
@@ -3801,24 +5393,45 @@
                   "titleKey": "provider_id",
                   "subtitleKey": "state",
                   "meta": [
-                    {"key": "reason"},
-                    {"key": "request_count"},
-                    {"key": "cache_hit_count"},
-                    {"key": "failure_count"},
-                    {"key": "retry_after_seconds"},
-                    {"key": "last_success_at"},
-                    {"key": "last_error"}
+                    {
+                      "key": "reason"
+                    },
+                    {
+                      "key": "request_count"
+                    },
+                    {
+                      "key": "cache_hit_count"
+                    },
+                    {
+                      "key": "failure_count"
+                    },
+                    {
+                      "key": "retry_after_seconds"
+                    },
+                    {
+                      "key": "last_success_at"
+                    },
+                    {
+                      "key": "last_error"
+                    }
                   ],
                   "emptyText": "No metadata providers are registered.",
-                  "emptyText_i18n": {"key": "runtime.media_center.ui.no_metadata_providers"}
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.no_metadata_providers"
+                  }
                 },
                 "collection": {
                   "display": "list",
                   "focusGroup": "media-metadata-providers",
                   "virtualized": false,
-                  "cursor": {"enabled": false, "stateKey": "mediaCursor"}
+                  "cursor": {
+                    "enabled": false,
+                    "stateKey": "mediaCursor"
+                  }
                 },
-                "title_i18n": {"key": "runtime.media_center.ui.providers"}
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.providers"
+                }
               },
               {
                 "id": "media-provider-artwork-cache",
@@ -3834,16 +5447,68 @@
                 "inputs": {
                   "presentation": "body",
                   "fields": [
-                    {"key": "state", "label": "State", "path": "state", "label_i18n": {"key": "runtime.media_center.ui.status"}},
-                    {"key": "attempts", "label": "Attempts", "path": "attempt_count", "label_i18n": {"key": "runtime.media_center.ui.attempts"}},
-                    {"key": "cache_hits", "label": "Cache hits", "path": "cache_hit_count", "label_i18n": {"key": "runtime.media_center.ui.cache_hits"}},
-                    {"key": "ready", "label": "Cached", "path": "ready_count", "label_i18n": {"key": "runtime.media_center.ui.cached"}},
-                    {"key": "failed", "label": "Failed", "path": "failure_count", "label_i18n": {"key": "runtime.media_center.ui.failed"}},
-                    {"key": "stored_bytes", "label": "Stored bytes", "path": "stored_bytes", "format": "bytes", "label_i18n": {"key": "runtime.media_center.ui.stored_bytes"}},
-                    {"key": "last_error", "label": "Last error", "path": "last_error", "label_i18n": {"key": "runtime.media_center.ui.last_error"}}
+                    {
+                      "key": "state",
+                      "label": "State",
+                      "path": "state",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.status"
+                      }
+                    },
+                    {
+                      "key": "attempts",
+                      "label": "Attempts",
+                      "path": "attempt_count",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.attempts"
+                      }
+                    },
+                    {
+                      "key": "cache_hits",
+                      "label": "Cache hits",
+                      "path": "cache_hit_count",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.cache_hits"
+                      }
+                    },
+                    {
+                      "key": "ready",
+                      "label": "Cached",
+                      "path": "ready_count",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.cached"
+                      }
+                    },
+                    {
+                      "key": "failed",
+                      "label": "Failed",
+                      "path": "failure_count",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.failed"
+                      }
+                    },
+                    {
+                      "key": "stored_bytes",
+                      "label": "Stored bytes",
+                      "path": "stored_bytes",
+                      "format": "bytes",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.stored_bytes"
+                      }
+                    },
+                    {
+                      "key": "last_error",
+                      "label": "Last error",
+                      "path": "last_error",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.last_error"
+                      }
+                    }
                   ]
                 },
-                "title_i18n": {"key": "runtime.media_center.ui.provider_artwork_cache"}
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.provider_artwork_cache"
+                }
               },
               {
                 "id": "media-background-admission",
@@ -3859,15 +5524,59 @@
                 "inputs": {
                   "presentation": "body",
                   "fields": [
-                    {"key": "metadata_active", "label": "Metadata active", "path": "kinds.metadata_enrichment.active", "label_i18n": {"key": "runtime.media_center.ui.metadata_active"}},
-                    {"key": "metadata_window", "label": "Metadata window", "path": "kinds.metadata_enrichment.window", "label_i18n": {"key": "runtime.media_center.ui.metadata_window"}},
-                    {"key": "fingerprint_active", "label": "Fingerprint active", "path": "kinds.fingerprint.active", "label_i18n": {"key": "runtime.media_center.ui.fingerprint_active"}},
-                    {"key": "fingerprint_window", "label": "Fingerprint window", "path": "kinds.fingerprint.window", "label_i18n": {"key": "runtime.media_center.ui.fingerprint_window"}},
-                    {"key": "embedding_active", "label": "Embedding active", "path": "kinds.embedding.active", "label_i18n": {"key": "runtime.media_center.ui.embedding_active"}},
-                    {"key": "embedding_window", "label": "Embedding window", "path": "kinds.embedding.window", "label_i18n": {"key": "runtime.media_center.ui.embedding_window"}}
+                    {
+                      "key": "metadata_active",
+                      "label": "Metadata active",
+                      "path": "kinds.metadata_enrichment.active",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.metadata_active"
+                      }
+                    },
+                    {
+                      "key": "metadata_window",
+                      "label": "Metadata window",
+                      "path": "kinds.metadata_enrichment.window",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.metadata_window"
+                      }
+                    },
+                    {
+                      "key": "fingerprint_active",
+                      "label": "Fingerprint active",
+                      "path": "kinds.fingerprint.active",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.fingerprint_active"
+                      }
+                    },
+                    {
+                      "key": "fingerprint_window",
+                      "label": "Fingerprint window",
+                      "path": "kinds.fingerprint.window",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.fingerprint_window"
+                      }
+                    },
+                    {
+                      "key": "embedding_active",
+                      "label": "Embedding active",
+                      "path": "kinds.embedding.active",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.embedding_active"
+                      }
+                    },
+                    {
+                      "key": "embedding_window",
+                      "label": "Embedding window",
+                      "path": "kinds.embedding.window",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.embedding_window"
+                      }
+                    }
                   ]
                 },
-                "title_i18n": {"key": "runtime.media_center.ui.background_admission"}
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.background_admission"
+                }
               },
               {
                 "id": "media-metadata-operations",
@@ -3884,10 +5593,18 @@
                   "titleKey": "subject_title",
                   "subtitleKey": "status",
                   "meta": [
-                    {"key": "kind"},
-                    {"key": "media_kind"},
-                    {"key": "provider_id"},
-                    {"key": "error_code"}
+                    {
+                      "key": "kind"
+                    },
+                    {
+                      "key": "media_kind"
+                    },
+                    {
+                      "key": "provider_id"
+                    },
+                    {
+                      "key": "error_code"
+                    }
                   ],
                   "emptyText": "No background operations.",
                   "emptyText_i18n": {
@@ -3917,7 +5634,13 @@
                       "playbackSourceContext": {}
                     }
                   },
-                  {"on": "select", "type": "openModal", "params": {"modalId": "media_center_player"}}
+                  {
+                    "on": "select",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "media_center_player"
+                    }
+                  }
                 ],
                 "title_i18n": {
                   "key": "runtime.media_center.ui.background_operations"
@@ -3932,26 +5655,88 @@
                   "kind": "skill",
                   "name": "media_center_skill.rendition_operations",
                   "path": "artwork",
-                  "params": {"limit": 30},
+                  "params": {
+                    "limit": 30
+                  },
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["media_center.renditions"],
+                  "invalidationTags": [
+                    "media_center.renditions"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 1
                 },
                 "inputs": {
                   "presentation": "body",
                   "fields": [
-                    {"key": "state", "label": "State", "path": "state", "label_i18n": {"key": "runtime.media_center.ui.status"}},
-                    {"key": "active", "label": "Active", "path": "active_job_count", "label_i18n": {"key": "runtime.media_center.ui.active_jobs"}},
-                    {"key": "pending", "label": "Pending", "path": "pending_count", "label_i18n": {"key": "runtime.media_center.ui.pending"}},
-                    {"key": "ready", "label": "Ready", "path": "ready_count", "label_i18n": {"key": "runtime.media_center.ui.ready"}},
-                    {"key": "failed", "label": "Failed", "path": "failed_count", "label_i18n": {"key": "runtime.media_center.ui.failed"}},
-                    {"key": "unavailable", "label": "Unavailable", "path": "unavailable_count", "label_i18n": {"key": "runtime.media_center.ui.unavailable"}},
-                    {"key": "examined", "label": "Examined", "path": "examined_count", "label_i18n": {"key": "runtime.media_center.ui.examined"}},
-                    {"key": "last_run", "label": "Last run", "path": "last_run_at", "label_i18n": {"key": "runtime.media_center.ui.last_run"}}
+                    {
+                      "key": "state",
+                      "label": "State",
+                      "path": "state",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.status"
+                      }
+                    },
+                    {
+                      "key": "active",
+                      "label": "Active",
+                      "path": "active_job_count",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.active_jobs"
+                      }
+                    },
+                    {
+                      "key": "pending",
+                      "label": "Pending",
+                      "path": "pending_count",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.pending"
+                      }
+                    },
+                    {
+                      "key": "ready",
+                      "label": "Ready",
+                      "path": "ready_count",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.ready"
+                      }
+                    },
+                    {
+                      "key": "failed",
+                      "label": "Failed",
+                      "path": "failed_count",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.failed"
+                      }
+                    },
+                    {
+                      "key": "unavailable",
+                      "label": "Unavailable",
+                      "path": "unavailable_count",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.unavailable"
+                      }
+                    },
+                    {
+                      "key": "examined",
+                      "label": "Examined",
+                      "path": "examined_count",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.examined"
+                      }
+                    },
+                    {
+                      "key": "last_run",
+                      "label": "Last run",
+                      "path": "last_run_at",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.last_run"
+                      }
+                    }
                   ]
                 },
-                "title_i18n": {"key": "runtime.media_center.ui.artwork_generation"}
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.artwork_generation"
+                }
               },
               {
                 "id": "media-job-retention",
@@ -3962,26 +5747,88 @@
                   "kind": "skill",
                   "name": "media_center_skill.rendition_operations",
                   "path": "job_retention",
-                  "params": {"limit": 1},
+                  "params": {
+                    "limit": 1
+                  },
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["media_center.renditions"],
+                  "invalidationTags": [
+                    "media_center.renditions"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 1
                 },
                 "inputs": {
                   "presentation": "body",
                   "fields": [
-                    {"key": "state", "label": "State", "path": "state", "label_i18n": {"key": "runtime.media_center.ui.status"}},
-                    {"key": "artwork_window", "label": "Artwork queue window", "path": "artwork_queue_window", "label_i18n": {"key": "runtime.media_center.ui.artwork_queue_window"}},
-                    {"key": "artwork_overflow", "label": "Artwork queue overflow", "path": "artwork_queue_overflow", "label_i18n": {"key": "runtime.media_center.ui.artwork_queue_overflow"}},
-                    {"key": "artwork_removed", "label": "Artwork jobs removed", "path": "artwork_queue_removed", "label_i18n": {"key": "runtime.media_center.ui.artwork_jobs_removed"}},
-                    {"key": "rendition_removed", "label": "Conversion history removed", "path": "rendition_history_removed", "label_i18n": {"key": "runtime.media_center.ui.conversion_history_removed"}},
-                    {"key": "scan_removed", "label": "Scan history removed", "path": "scan_history_removed", "label_i18n": {"key": "runtime.media_center.ui.scan_history_removed"}},
-                    {"key": "complete", "label": "Compaction complete", "path": "complete", "label_i18n": {"key": "runtime.media_center.ui.compaction_complete"}},
-                    {"key": "updated", "label": "Updated", "path": "updated_at", "label_i18n": {"key": "runtime.media_center.ui.updated"}}
+                    {
+                      "key": "state",
+                      "label": "State",
+                      "path": "state",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.status"
+                      }
+                    },
+                    {
+                      "key": "artwork_window",
+                      "label": "Artwork queue window",
+                      "path": "artwork_queue_window",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.artwork_queue_window"
+                      }
+                    },
+                    {
+                      "key": "artwork_overflow",
+                      "label": "Artwork queue overflow",
+                      "path": "artwork_queue_overflow",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.artwork_queue_overflow"
+                      }
+                    },
+                    {
+                      "key": "artwork_removed",
+                      "label": "Artwork jobs removed",
+                      "path": "artwork_queue_removed",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.artwork_jobs_removed"
+                      }
+                    },
+                    {
+                      "key": "rendition_removed",
+                      "label": "Conversion history removed",
+                      "path": "rendition_history_removed",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.conversion_history_removed"
+                      }
+                    },
+                    {
+                      "key": "scan_removed",
+                      "label": "Scan history removed",
+                      "path": "scan_history_removed",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.scan_history_removed"
+                      }
+                    },
+                    {
+                      "key": "complete",
+                      "label": "Compaction complete",
+                      "path": "complete",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.compaction_complete"
+                      }
+                    },
+                    {
+                      "key": "updated",
+                      "label": "Updated",
+                      "path": "updated_at",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.updated"
+                      }
+                    }
                   ]
                 },
-                "title_i18n": {"key": "runtime.media_center.ui.background_history_retention"}
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.background_history_retention"
+                }
               },
               {
                 "id": "media-rendition-operations",
@@ -3991,9 +5838,13 @@
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.rendition_operations",
-                  "params": {"limit": 30},
+                  "params": {
+                    "limit": 30
+                  },
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["media_center.renditions"],
+                  "invalidationTags": [
+                    "media_center.renditions"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 1
                 },
@@ -4002,10 +5853,18 @@
                   "titleKey": "source_name",
                   "subtitleKey": "status",
                   "meta": [
-                    {"key": "profile"},
-                    {"key": "output_bytes"},
-                    {"key": "source_relative_path"},
-                    {"key": "error.code"}
+                    {
+                      "key": "profile"
+                    },
+                    {
+                      "key": "output_bytes"
+                    },
+                    {
+                      "key": "source_relative_path"
+                    },
+                    {
+                      "key": "error.code"
+                    }
                   ],
                   "emptyText": "No conversion operations.",
                   "emptyText_i18n": {
@@ -4016,7 +5875,10 @@
                   "display": "list",
                   "focusGroup": "media-rendition-operations",
                   "virtualized": true,
-                  "cursor": {"enabled": false, "stateKey": "mediaCursor"}
+                  "cursor": {
+                    "enabled": false,
+                    "stateKey": "mediaCursor"
+                  }
                 },
                 "title_i18n": {
                   "key": "runtime.media_center.ui.conversion_operations"
@@ -4035,11 +5897,46 @@
                 "inputs": {
                   "presentation": "body",
                   "fields": [
-                    {"key": "status", "label": "Status", "path": "status", "label_i18n": {"key": "runtime.media_center.ui.status"}},
-                    {"key": "source", "label": "Source", "path": "source_name", "label_i18n": {"key": "runtime.media_center.ui.source"}},
-                    {"key": "profile", "label": "Profile", "path": "profile", "label_i18n": {"key": "runtime.media_center.ui.profile"}},
-                    {"key": "output_bytes", "label": "Produced bytes", "path": "output_bytes", "label_i18n": {"key": "runtime.media_center.ui.produced_bytes"}},
-                    {"key": "error", "label": "Diagnostic", "value": "{error.code}: {error.detail}", "label_i18n": {"key": "runtime.media_center.ui.diagnostic"}}
+                    {
+                      "key": "status",
+                      "label": "Status",
+                      "path": "status",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.status"
+                      }
+                    },
+                    {
+                      "key": "source",
+                      "label": "Source",
+                      "path": "source_name",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.source"
+                      }
+                    },
+                    {
+                      "key": "profile",
+                      "label": "Profile",
+                      "path": "profile",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.profile"
+                      }
+                    },
+                    {
+                      "key": "output_bytes",
+                      "label": "Produced bytes",
+                      "path": "output_bytes",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.produced_bytes"
+                      }
+                    },
+                    {
+                      "key": "error",
+                      "label": "Diagnostic",
+                      "value": "{error.code}: {error.detail}",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.diagnostic"
+                      }
+                    }
                   ]
                 },
                 "title_i18n": {
@@ -4055,9 +5952,13 @@
                   "kind": "skill",
                   "name": "media_center_skill.rendition_operations",
                   "path": "storage_migrations",
-                  "params": {"limit": 30},
+                  "params": {
+                    "limit": 30
+                  },
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["media_center.renditions"],
+                  "invalidationTags": [
+                    "media_center.renditions"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 1
                 },
@@ -4066,23 +5967,42 @@
                   "titleKey": "status",
                   "subtitleKey": "root_id",
                   "meta": [
-                    {"key": "processed_count"},
-                    {"key": "total_count"},
-                    {"key": "migrated_count"},
-                    {"key": "failed_count"},
-                    {"key": "processed_bytes"},
-                    {"key": "error.code"}
+                    {
+                      "key": "processed_count"
+                    },
+                    {
+                      "key": "total_count"
+                    },
+                    {
+                      "key": "migrated_count"
+                    },
+                    {
+                      "key": "failed_count"
+                    },
+                    {
+                      "key": "processed_bytes"
+                    },
+                    {
+                      "key": "error.code"
+                    }
                   ],
                   "emptyText": "No rendition storage migrations.",
-                  "emptyText_i18n": {"key": "runtime.media_center.ui.no_storage_migrations"}
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.no_storage_migrations"
+                  }
                 },
                 "collection": {
                   "display": "list",
                   "focusGroup": "media-storage-migrations",
                   "virtualized": true,
-                  "cursor": {"enabled": false, "stateKey": "mediaCursor"}
+                  "cursor": {
+                    "enabled": false,
+                    "stateKey": "mediaCursor"
+                  }
                 },
-                "title_i18n": {"key": "runtime.media_center.ui.storage_migrations"}
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.storage_migrations"
+                }
               },
               {
                 "id": "media-metadata-close",
@@ -4118,44 +6038,119 @@
         },
         "media_center_storage_policy": {
           "title": "Storage policy",
-          "title_i18n": {"key": "runtime.media_center.ui.storage_policy"},
+          "title_i18n": {
+            "key": "runtime.media_center.ui.storage_policy"
+          },
           "scope": "workspace",
-          "presentation": {"kind": "modal", "restoreFocus": true},
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
           "schema": {
             "id": "media_center_storage_policy",
             "title": "Storage policy",
-            "title_i18n": {"key": "runtime.media_center.ui.storage_policy"},
-            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "title_i18n": {
+              "key": "runtime.media_center.ui.storage_policy"
+            },
+            "layout": {
+              "version": 2,
+              "pattern": "task-flow",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
+                {
+                  "id": "main",
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
+                }
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
+            },
             "widgets": [
               {
                 "id": "media-rendition-storage-mode",
                 "type": "input.selector",
                 "area": "main",
                 "title": "Converted media",
-                "title_i18n": {"key": "runtime.media_center.ui.converted_media"},
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.converted_media"
+                },
                 "inputs": {
                   "value": "$state.mediaRenditionStorageMode",
                   "options": [
-                    {"label": "With source files", "value": "source_root", "label_i18n": {"key": "runtime.media_center.ui.with_source_files"}},
-                    {"label": "Node cache", "value": "node_cache", "label_i18n": {"key": "runtime.media_center.ui.node_cache"}}
+                    {
+                      "label": "With source files",
+                      "value": "source_root",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.with_source_files"
+                      }
+                    },
+                    {
+                      "label": "Node cache",
+                      "value": "node_cache",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.node_cache"
+                      }
+                    }
                   ]
                 },
-                "actions": [{"on": "change", "type": "updateState", "params": {"mediaRenditionStorageMode": "$event.value"}}]
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "mediaRenditionStorageMode": "$event.value"
+                    }
+                  }
+                ]
               },
               {
                 "id": "media-artwork-storage-mode",
                 "type": "input.selector",
                 "area": "main",
                 "title": "Artwork and thumbnails",
-                "title_i18n": {"key": "runtime.media_center.ui.artwork_and_thumbnails"},
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.artwork_and_thumbnails"
+                },
                 "inputs": {
                   "value": "$state.mediaArtworkStorageMode",
                   "options": [
-                    {"label": "Node cache", "value": "node_cache", "label_i18n": {"key": "runtime.media_center.ui.node_cache"}},
-                    {"label": "With source files", "value": "source_root", "label_i18n": {"key": "runtime.media_center.ui.with_source_files"}}
+                    {
+                      "label": "Node cache",
+                      "value": "node_cache",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.node_cache"
+                      }
+                    },
+                    {
+                      "label": "With source files",
+                      "value": "source_root",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.with_source_files"
+                      }
+                    }
                   ]
                 },
-                "actions": [{"on": "change", "type": "updateState", "params": {"mediaArtworkStorageMode": "$event.value"}}]
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "mediaArtworkStorageMode": "$event.value"
+                    }
+                  }
+                ]
               },
               {
                 "id": "media-storage-policy-note",
@@ -4175,8 +6170,22 @@
                 "inputs": {
                   "variant": "toolbar",
                   "buttons": [
-                    {"id": "save", "label": "Save", "icon": "save-outline", "label_i18n": {"key": "runtime.media_center.ui.save"}},
-                    {"id": "cancel", "label": "Cancel", "icon": "close-outline", "label_i18n": {"key": "runtime.media_center.ui.cancel"}}
+                    {
+                      "id": "save",
+                      "label": "Save",
+                      "icon": "save-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.save"
+                      }
+                    },
+                    {
+                      "id": "cancel",
+                      "label": "Cancel",
+                      "icon": "close-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.cancel"
+                      }
+                    }
                   ]
                 },
                 "actions": [
@@ -4193,10 +6202,19 @@
                         "legacy_migration": true
                       }
                     },
-                    "invalidates": ["media_center.roots", "media_center.renditions"]
+                    "invalidates": [
+                      "media_center.roots",
+                      "media_center.renditions"
+                    ]
                   },
-                  {"on": "click:save", "type": "closeModal"},
-                  {"on": "click:cancel", "type": "closeModal"}
+                  {
+                    "on": "click:save",
+                    "type": "closeModal"
+                  },
+                  {
+                    "on": "click:cancel",
+                    "type": "closeModal"
+                  }
                 ]
               }
             ]
@@ -4213,13 +6231,29 @@
             "id": "media_center_delete_root",
             "title": "Remove media folder",
             "layout": {
-              "type": "stack",
-              "areas": [
+              "version": 2,
+              "pattern": "document",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
                 {
                   "id": "main",
-                  "role": "main"
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
                 }
-              ]
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
             },
             "widgets": [
               {

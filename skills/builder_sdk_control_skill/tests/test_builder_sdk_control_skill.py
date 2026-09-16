@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import ast
 import importlib.util
+import inspect
+import json
 from pathlib import Path
 
 import pytest
@@ -18,6 +20,77 @@ def _module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+@pytest.fixture(autouse=True)
+def local_trial_sdk(monkeypatch):
+    from adaos.sdk.builder import applications
+
+    calls = []
+    monkeypatch.setattr(applications, "production_webspace_id", lambda value: "desktop")
+    monkeypatch.setattr(
+        applications,
+        "verify_candidate_access",
+        lambda *args, **kwargs: {
+            "required": False,
+            "status": "not_applicable",
+            "reason": "unit_test_without_application_aggregate",
+        },
+    )
+    def place(candidate_id, **kwargs):
+        calls.append((candidate_id, kwargs))
+        return {"ok": True, "trial_activation": {
+            "activation_id": "trial:" + candidate_id,
+            "target": {"webspace_id": kwargs["webspace_id"], "space_kind": "workspace"},
+            "data_mode": "empty", "runtime_binding": {"kind": "isolated_trial_workspace"}}}
+    monkeypatch.setattr(applications, "place_local_trial", place)
+    return calls
+
+
+def test_replaying_existing_trial_still_reconciles_native_desktop(local_trial_sdk, monkeypatch):
+    module = _module()
+    state = {"generation": 7, "project": {"placements": [{
+        "kind": "trial", "status": "active", "result_ref": {"id": "candidate-example"},
+        "target": {"webspace_id": "desktop"}}]}, "delivery": {
+            "status": "trial", "candidate_id": "candidate-example", "package_digest": "sha256:example",
+            "release_digest": "sha256:release"}}
+    monkeypatch.setattr(module.workflow, "get_state", lambda *args: state)
+    for _ in range(2):
+        result = module._ensure_trial_placement("scenario", "example", result={},
+            candidate_id="candidate-example", release_data={"version": "0.1.0"},
+            package_digest="sha256:example", trial_workflow=state, webspace_id="desktop-dev", meta=None)
+        assert result == state
+    assert len(local_trial_sdk) == 2
+    assert all(call[1]["webspace_id"] == "desktop" for call in local_trial_sdk)
+
+
+@pytest.mark.parametrize("changed", [None, "status", "candidate_id", "package_digest", "release_digest"])
+def test_trial_placement_refreshes_generation_but_not_candidate(monkeypatch, local_trial_sdk, changed):
+    module = _module()
+    before = {"generation": 7, "project": {"placements": []}, "delivery": {
+        "status": "trial", "candidate_id": "candidate-example", "package_digest": "sha256:example",
+        "release_digest": "sha256:release"}}
+    current = {**before, "generation": 8, "delivery": dict(before["delivery"])}
+    if changed:
+        current["delivery"][changed] = "different"
+    monkeypatch.setattr(module.workflow, "get_state", lambda *args: current)
+    writes = []
+    def record(*args, expected_generation):
+        assert expected_generation == 8
+        writes.append(args)
+        return {"workflow": current}
+    monkeypatch.setattr(module.workflow, "record_project_placement", record)
+    def reconcile():
+        return module._ensure_trial_placement("scenario", "example", result={}, candidate_id="candidate-example",
+            release_data={"version": "0.1.0"}, package_digest="sha256:example", trial_workflow=before,
+            webspace_id="desktop-dev", meta=None)
+    if changed:
+        with pytest.raises(ValueError, match="delivery changed"):
+            reconcile()
+        assert not writes
+    else:
+        assert reconcile() == current
+        assert len(writes) == 1
 
 
 def test_handler_has_sdk_only_adaos_imports() -> None:
@@ -37,6 +110,277 @@ def test_handler_has_sdk_only_adaos_imports() -> None:
     assert all(
         name == "adaos.sdk" or name.startswith("adaos.sdk.") for name in adaos_imports
     )
+
+
+def test_access_review_binds_declared_permissions_to_sealed_automation(monkeypatch) -> None:
+    from adaos.sdk.builder import applications, automation
+
+    module = _module()
+    monkeypatch.setattr(module, "_identity", lambda *_args: ("project", "roster"))
+    monkeypatch.setattr(module, "_execution_identity", lambda *_args: ("scenario", "roster"))
+    monkeypatch.setattr(
+        applications,
+        "project_access_contract",
+        lambda *_args, **_kwargs: {
+            "status": "present",
+            "declaration_status": "present",
+            "authority_status": "valid",
+            "project_ref": "project:roster",
+            "manifest_ref": "projects/roster/project.yaml",
+            "manifest_digest": "sha256:" + "d" * 64,
+            "profile_digest": "sha256:" + "e" * 64,
+            "profile": {
+                "required": [
+                    {"id": "workspace.read", "purpose": "Read roster"},
+                    {"id": "workspace.write", "purpose": "Manage roster"},
+                ],
+                "optional": [],
+                "data_practices": {
+                    "collected": ["volunteer_profile"],
+                    "linked_to_user": ["volunteer_profile"],
+                    "sent_off_device": [],
+                    "retention": "Until removed",
+                },
+            },
+            "roles": [
+                {
+                    "id": "viewer",
+                    "title": "Viewer",
+                    "grants": ["workspace.read"],
+                    "assignable_to": ["guest"],
+                }
+            ],
+            "statically_inferred": ["workspace.read", "workspace.write"],
+            "undeclared_inferred": [],
+            "unused_declared": [],
+            "diagnostics": [],
+        },
+    )
+    monkeypatch.setattr(
+        automation,
+        "trial_verification_evidence",
+        lambda **_kwargs: {
+            "ok": True,
+            "status": "ready",
+            "task_id": "task.01TEST",
+            "source_commit": "a" * 40,
+            "release_scope": "trial",
+            "regression_evidence": ["suite:checkpoint:test-report"],
+            "access_matrix_evidence": ["suite:access-matrix:contract"],
+            "audit_evidence": ["provenance:test"],
+        },
+    )
+
+    review = module.get_project_access_contract("project", "roster")
+
+    assert review["status"] == "ready"
+    assert review["approval_required"] is True
+    assert review["verification_task_id"] == "task.01TEST"
+    evidence = review["verification_evidence"]
+    assert evidence["source_commit"] == "a" * 40
+    assert evidence["observed_capabilities"] == ["workspace.read", "workspace.write"]
+    assert evidence["release_scope"] == "trial"
+    assert evidence["disclosure_evidence"]
+    assert evidence["redaction_evidence"]
+
+
+def test_workbench_tools_manifest_matches_python_parameters() -> None:
+    module = _module()
+    manifest = yaml.safe_load((Path(__file__).resolve().parents[1] / "skill.yaml").read_text(encoding="utf-8"))
+    names = {"get_workbench", "get_review", "get_codex_options", "set_codex_profile", "get_model_settings",
+             "get_prototype_model_choices", "save_specification_delta", "get_workbench_messages",
+             "append_discussion", "read_readme", "save_readme", "get_about", "list_icon_drafts"}
+    for entry in manifest["tools"]:
+        if entry["name"] in names:
+            signature = inspect.signature(getattr(module, entry["name"]))
+            assert set(entry["input_schema"]["properties"]) <= set(signature.parameters), entry["name"]
+
+
+def test_builder_declares_application_lifecycle_capabilities() -> None:
+    manifest = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / "skill.yaml").read_text(encoding="utf-8")
+    )
+
+    assert set(manifest["capabilities"]) >= {
+        "applications.develop",
+        "applications.publish",
+    }
+
+
+def test_workbench_projects_canonical_state_without_fixture_or_inferred_actor(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "get_project", lambda *args: {"title": "A long application suffix", "availability_state": "available"})
+    monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "primary"))
+    monkeypatch.setattr(module.compositions, "get", lambda *args: {"development": {"initiator_ref": "scenario:initiating_app"}})
+    monkeypatch.setattr(module.workflow, "get_state", lambda *args: {
+        "generation": 42, "active_phase": "automation",
+        "workflow_description": {"state": "automation_waiting", "progress": {"wait_explanation": "Pending execution"},
+            "allowed_commands": [{"command": "accept_verification", "executor": {"available": False}},
+                                 {"command": "retry_automation", "executor": {"available": True}}]},
+        "prototype": {"head_revision": "008", "acceptance": {"revision": "008", "behavior_checks": [
+            {"id": "render.ready", "status": "passed", "evidence_refs": ["report.json"]}]}},
+        "change": {"change_id": "change.1", "source_message_ids": ["message.1"],
+                   "issues": [{"issue_id": "issue.1", "lane": "automation", "source_message_ids": ["message.1"]}],
+                   "runs": [{"run_id": "run.1", "activity": "automation_started", "status": "running", "input_refs": ["input.1"]}]}})
+    result = module.get_workbench("project", "sample")
+    assert result["commands"] == {"retry_automation": True}
+    assert result["view"]["title"] == "A long application suffix"
+    assert result["current"]["summary"] == "Pending execution"
+    assert "actor" not in result["current"]
+    assert result["revision_label"] == "008 | change.1"
+    assert result["initiator"] == "scenario:initiating_app"
+    assert result["issues"][0]["sources"] == "message.1"
+    assert result["runs"][0]["stage"] == "automation_started"
+    assert result["checks"][0]["evidence_refs"] == ["report.json"]
+
+
+@pytest.mark.parametrize("phase,status,summary", [
+    ("automation", "failed", "automation_failed"),
+    ("automation", "cancelled", "automation_cancelled"),
+    ("automation", "running", "automation_ready"),
+    ("prototype", "failed", "automation_ready"),
+])
+def test_workbench_distinguishes_execution_failure_from_retry_gate(monkeypatch, phase, status, summary) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "get_project", lambda *args: {"title": "Sample"})
+    monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "primary"))
+    monkeypatch.setattr(module.compositions, "get", lambda *args: {})
+    monkeypatch.setattr(module.workflow, "get_state", lambda *args: {
+        "active_phase": phase, "automation": {"status": status, "head_task_id": "task.current"},
+        "workflow_description": {"state": "automation_ready", "allowed_commands": [{"command": "retry_automation"}]},
+    })
+    result = module.get_workbench("project", "sample")
+    assert result["current"]["id"] == "automation_ready"
+    assert result["current"]["summary"] == summary
+    assert result["current"]["summary_i18n"]["key"] == "builder.workbench.state." + summary
+    assert result["commands"] == {"retry_automation": True}
+
+
+def test_missing_workbench_clears_previous_actions_and_evidence(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "get_project", lambda *args: {"availability_state": "not_found", "working_label": "Project not found"})
+    monkeypatch.setattr(module.workflow, "get_state", lambda *args: pytest.fail("Missing project must not create workflow state"))
+    result = module.get_workbench("project", "removed")
+    assert result["commands"] == {}
+    assert result["issues"] == result["runs"] == result["checks"] == []
+    assert result["view"]["current"]["summary"] == "Project not found"
+
+
+@pytest.mark.parametrize("task,receipts,expected", [
+    ("task.new", [], "missing"),
+    ("task.old", [{"requirement_id": "check", "ok": True, "digest": "sha256:old"}], "stale_or_unavailable"),
+    ("task.new", [{"requirement_id": "check", "ok": False, "digest": "sha256:new"}], "recorded"),
+])
+def test_review_separates_prototype_from_actual_current_automation_evidence(monkeypatch, task, receipts, expected) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "get_workbench", lambda *args: {"automation_task_id": "task.new", "checks": [
+        {"id": "layout", "stage": "prototype", "result": "passed", "scope": "008"}]})
+    monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "primary"))
+    monkeypatch.setattr(module.automation, "get_state", lambda **kwargs: {"session": {
+        "current_task_id": task, "status": "completed", "completion_readiness": {
+            "task_id": task, "ok": True, "acceptance": {"ok": True, "receipts": receipts}}}})
+    result = module.get_review("project", "sample", "desktop-dev")
+    assert result["automation_evidence"] == expected
+    assert result["items"][0]["stage"] == "prototype"
+    assert result["items"][1]["scope"] == "task.new"
+    assert result["items"][1]["result"] == ("failed" if expected == "recorded" else expected)
+
+
+def test_codex_preferences_resolve_aggregate_primary_without_changing_prototype(monkeypatch) -> None:
+    module = _module()
+    calls = []
+    monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "primary"))
+    monkeypatch.setattr(module.model_settings, "set_codex_profile", lambda *args, **kwargs: calls.append((args, kwargs)) or {"ok": True})
+    module.set_codex_profile("gpt-5.5", "high", "project", "aggregate")
+    assert calls == [(("scenario", "primary"), {"model": "gpt-5.5", "reasoning_effort": "high"})]
+
+
+def test_requirement_editor_saves_delta_with_exact_generation(monkeypatch) -> None:
+    module = _module()
+    calls = []
+    monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "primary"))
+    monkeypatch.setattr(module.workflow, "save_specification_delta", lambda *args, **kwargs: calls.append((args, kwargs)) or {"ok": True})
+    delta = {"operations": [{"op": "add", "stage": "prototype", "title": "A requirement"}]}
+    module.save_specification_delta(json.dumps(delta), 12, "change.1", "project", "aggregate")
+    assert calls[0][0] == ("scenario", "primary", delta)
+    assert calls[0][1]["expected_generation"] == 12
+    assert calls[0][1]["change_id"] == "change.1"
+
+
+def test_prototype_model_preference_reaches_the_primary_execution_context(monkeypatch) -> None:
+    module = _module()
+    calls = []
+    monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "primary"))
+    monkeypatch.setattr(module, "get_llm_options", lambda *args: {"options": [{"id": "gpt-5", "provider": "openai"}]})
+    monkeypatch.setattr(module.prompt_context, "set_preferences", lambda *args, **kwargs: calls.append((args, kwargs)) or {"ok": True})
+    module.set_llm_profile("gpt-5", "project", "aggregate")
+    assert calls[0][0] == ("scenario", "primary")
+    assert calls[0][1]["llm_model"] == "gpt-5"
+
+
+def test_readme_conflict_does_not_record_a_successful_change(monkeypatch) -> None:
+    module = _module()
+    def reject(*args, **kwargs):
+        assert kwargs["expected_digest"] == "old"
+        raise ValueError("stale edit")
+    monkeypatch.setattr(module.documents, "write", reject)
+    monkeypatch.setattr(module, "_record_project_change", lambda **kwargs: pytest.fail("Write failed"))
+    with pytest.raises(ValueError, match="stale edit"):
+        module.save_readme("new text", "old", "project", "sample")
+
+
+@pytest.mark.parametrize("registered", [True, False])
+def test_about_uses_only_registered_owner_and_real_document(monkeypatch, registered):
+    module = _module()
+    monkeypatch.setattr(module, "_project_descriptor", lambda *args: {
+        "title": "Actual application", "version": "1.2.3", "owner": "Untrusted manifest claim"})
+    def identity(application_id):
+        assert application_id == "sample"
+        if not registered:
+            raise FileNotFoundError(application_id)
+        return {"display_name": "Registered owner", "publisher_ref": "subnet:foreign"}
+    monkeypatch.setattr(module.applications, "get_identity", identity)
+    monkeypatch.setattr(module.documents, "read", lambda *args: {"text": "Actual README", "digest": "sha256:one"})
+    result = module.get_about("project", "sample")
+    assert result["text"] == "Actual README" and result["version"] == "1.2.3"
+    assert result["owner_ref"] == ("subnet:foreign" if registered else "")
+    assert result["owner_status"] == ("registered" if registered else "not_registered")
+    assert "Untrusted" not in json.dumps(result)
+
+
+def test_about_does_not_hide_identity_errors_or_infer_component_owner(monkeypatch):
+    module = _module()
+    monkeypatch.setattr(module, "_project_descriptor", lambda *args: {})
+    monkeypatch.setattr(module.documents, "read", lambda *args: {})
+    def broken(*args):
+        raise PermissionError("denied")
+    monkeypatch.setattr(module.applications, "get_identity", broken)
+    with pytest.raises(PermissionError):
+        module.get_about("project", "sample")
+    assert module.get_about("skill", "sample")["owner_status"] == "not_registered"
+
+
+def test_icon_history_is_read_only_and_scoped_to_application(monkeypatch):
+    module = _module()
+    monkeypatch.setattr(module, "_project_descriptor", lambda *args: {})
+    def drafts(**kwargs):
+        assert kwargs == {"context": {"project_ref": "project:sample", "purpose": "application_icon"}, "limit": 10}
+        return [{"request_id": "existing", "status": "completed"}]
+    monkeypatch.setattr(module.image_generation, "list_drafts", drafts)
+    monkeypatch.setattr(module.image_generation, "generate", lambda **kwargs: pytest.fail("No generation on read"))
+    assert module.list_icon_drafts("project", "sample")["items"][0]["request_id"] == "existing"
+
+
+def test_informal_note_is_persisted_but_does_not_execute(monkeypatch) -> None:
+    module = _module()
+    calls = []
+    monkeypatch.setattr(module, "get_workbench_messages", lambda *args: {"conversation_id": "conv", "thread_id": "sample:discussion"})
+    monkeypatch.setattr(module.conversation, "append", lambda **kwargs: calls.append(kwargs) or {"message_id": "message.1"})
+    monkeypatch.setattr(module.automation, "start", lambda **kwargs: pytest.fail("Discussion is not task authorization"))
+    result = module.append_discussion("A note", "project", "sample", "desktop-dev")
+    assert calls[0]["thread_id"] == "sample:discussion"
+    assert calls[0]["meta"]["project_ref"] == "project:sample"
+    assert result["disposition"] == "discussion_only"
 
 
 def test_development_session_resolution_is_scoped_to_selected_project(
@@ -332,20 +676,6 @@ def _root_mgmnt_project(manifest_digest: str = "sha256:" + "c" * 64) -> dict:
     }
 
 
-def _root_mgmnt_catalog_row() -> dict:
-    project = _root_mgmnt_project()
-    catalog = dict(project["catalog"])
-    return {
-        **project,
-        "object_id": project["id"],
-        "title": catalog["title"],
-        "description": catalog["description"],
-        "primary_ref": "scenario:root_mgmnt_ops",
-        "component_refs": ["scenario:root_mgmnt_ops", "skill:root_mgmnt"],
-        "dependency_refs": [],
-    }
-
-
 def _idle_builder_workflow() -> dict:
     return {
         "active_phase": "prototype",
@@ -374,11 +704,21 @@ def _idle_builder_workflow() -> dict:
 
 def test_catalog_lists_composition_project(monkeypatch) -> None:
     module = _module()
+    project = _root_mgmnt_project()
     monkeypatch.setattr(
         module.project_catalog,
         "list_projects",
-        lambda **_kwargs: [_root_mgmnt_catalog_row()],
+        lambda **_kwargs: [
+            {
+                **dict(project),
+                "title": "Root Management",
+                "description": "Private operator project",
+                "primary_ref": "scenario:root_mgmnt_ops",
+                "component_refs": ["scenario:root_mgmnt_ops", "skill:root_mgmnt"],
+            }
+        ],
     )
+    monkeypatch.setattr(module.compositions, "get", lambda _project_id: dict(project))
     monkeypatch.setattr(module.projects, "list_projects", lambda **_kwargs: [])
     monkeypatch.setattr(module, "_context", lambda *_args: {})
     monkeypatch.setattr(module, "_preview_source_webspace_id", lambda *_args: "desktop")
@@ -643,6 +983,7 @@ def test_project_automation_uses_primary_workflow_and_aggregate_worker_scope(
     monkeypatch,
 ) -> None:
     module = _module()
+    monkeypatch.setattr(module.prompt_context, "get", lambda *args: {"builder_codex_profile": {"model": "gpt-5.5", "provider": "openai-codex-cli"}})
     workflow_reads: list[tuple[str, str]] = []
     automation_calls: list[dict] = []
     monkeypatch.setattr(
@@ -696,10 +1037,13 @@ def test_project_trial_uses_composition_candidate_and_primary_checkpoint(
     monkeypatch,
 ) -> None:
     module = _module()
+    from adaos.sdk.builder import applications as builder_applications
+
     project = _root_mgmnt_project()
     transitions: list[tuple[str, str, str]] = []
     placements: list[tuple[str, str, dict, int]] = []
     candidate_calls: list[tuple[str, dict]] = []
+    verification_calls: list[tuple[tuple, dict]] = []
     workflow_state = {
         "capabilities": {"can_prepare_candidate": True},
         "change": {
@@ -722,14 +1066,14 @@ def test_project_trial_uses_composition_candidate_and_primary_checkpoint(
     monkeypatch.setattr(
         module.workflow, "get_state", lambda *_args: dict(workflow_state)
     )
-    monkeypatch.setattr(
-        module.workflow,
-        "transition",
-        lambda kind, object_id, action, **_kwargs: transitions.append(
-            (kind, object_id, action)
-        )
-        or {"ok": True, "workflow": {"change_set": workflow_state["change_set"]}},
-    )
+    def transition(kind, object_id, action, **kwargs):
+        transitions.append((kind, object_id, action))
+        if action == "candidate_prepared":
+            metadata = kwargs["metadata"]
+            workflow_state["delivery"] = {"status": "trial", **{key: metadata[key]
+                for key in ("candidate_id", "package_digest", "release_digest")}}
+        return {"ok": True, "workflow": dict(workflow_state)}
+    monkeypatch.setattr(module.workflow, "transition", transition)
     monkeypatch.setattr(
         module.workflow,
         "record_project_placement",
@@ -778,12 +1122,20 @@ def test_project_trial_uses_composition_candidate_and_primary_checkpoint(
             },
         },
     )
+    monkeypatch.setattr(
+        builder_applications,
+        "verify_candidate_access",
+        lambda *args, **kwargs: verification_calls.append((args, kwargs))
+        or {"required": True, "status": "passed", "application_id": "app-root"},
+    )
 
     result = module.publish_project(
         "project",
         "root_mgmnt",
         dry_run=True,
         confirmed=True,
+        approve_permissions=True,
+        verification_evidence={"source_commit": "root_mgmnt_ops-commit"},
     )
 
     assert transitions[0] == (
@@ -797,14 +1149,25 @@ def test_project_trial_uses_composition_candidate_and_primary_checkpoint(
     assert candidate_calls[0][1]["source_name"] == "root_mgmnt_ops"
     assert candidate_calls[0][1]["source_revision"] == "root_mgmnt_ops-commit"
     assert candidate_calls[0][1]["change_ids"] == ["CS-root", "CP-root"]
-    assert candidate_calls[0][1]["target_webspace_id"] == "desktop-dev"
-    assert candidate_calls[0][1]["target_space_kind"] == "development"
+    assert candidate_calls[0][1]["target_webspace_id"] == "desktop"
+    assert candidate_calls[0][1]["target_space_kind"] == "workspace"
+    assert candidate_calls[0][1]["permission_decision"]["approved"] is True
+    assert verification_calls == [
+        (
+            ("root_mgmnt", "candidate-root"),
+            {
+                "evidence": {"source_commit": "root_mgmnt_ops-commit"},
+                "actor_ref": "builder.user",
+            },
+        )
+    ]
+    assert result["application_verification"]["status"] == "passed"
     assert result["trial_ready"] is True
     assert result["execution_scope"]["context_ref"] == "project:root_mgmnt"
     assert placements[0][0:2] == ("scenario", "root_mgmnt_ops")
     assert placements[0][2]["kind"] == "trial"
     assert placements[0][2]["result_ref"]["id"] == "candidate-root"
-    assert placements[0][2]["target"]["webspace_id"] == "desktop-dev"
+    assert placements[0][2]["target"]["webspace_id"] == "desktop"
 
 
 def test_project_trial_decision_uses_governed_lifecycle(monkeypatch) -> None:
@@ -949,7 +1312,7 @@ def test_project_trial_replay_restores_missing_placement(monkeypatch) -> None:
     assert placements[0][0:2] == ("scenario", "root_mgmnt_ops")
     assert placements[0][2]["kind"] == "trial"
     assert placements[0][2]["result_ref"]["id"] == "candidate-root"
-    assert placements[0][2]["target"]["webspace_id"] == "desktop-dev"
+    assert placements[0][2]["target"]["webspace_id"] == "desktop"
     assert placements[0][3] == 17
 
 
@@ -1162,6 +1525,7 @@ def test_get_state_keeps_capability_failures_separate(monkeypatch) -> None:
 
 def test_file_and_automation_tools_forward_stable_project_identity(monkeypatch) -> None:
     module = _module()
+    monkeypatch.setattr(module.prompt_context, "get", lambda *args: {})
     calls: list[tuple[str, tuple, dict]] = []
     run_calls: list[dict] = []
     monkeypatch.setattr(
@@ -1816,6 +2180,8 @@ def test_transport_guard_accepts_russian_unchanged_and_rejects_lossy_text(
 
 def test_transport_guard_preserves_russian_launch_arguments(monkeypatch) -> None:
     module = _module()
+    profile = {"model": "gpt-5.5", "reasoning_effort": "medium"}
+    monkeypatch.setattr(module.prompt_context, "get", lambda *args: {"builder_codex_profile": profile})
     brief = "Реализовать карточки: имя, цена, описание — всё на русском."
     submitted = "Продолжай; проверь кавычки «ёлочки» и вопрос?"
     launched = []
@@ -1842,7 +2208,9 @@ def test_transport_guard_preserves_russian_launch_arguments(monkeypatch) -> None
     module.submit_automation(submitted, object_type="scenario", object_id="recipes")
 
     assert launched[0]["implementation_brief"] == brief
+    assert launched[0]["agent_profile"] == profile
     assert followups[0][0] == submitted
+    assert followups[0][1]["agent_profile"] == profile
     with pytest.raises(ValueError, match="transport integrity"):
         module.start_automation(
             "Сломано ???", object_type="scenario", object_id="recipes"
@@ -2458,6 +2826,13 @@ def test_publication_attempt_identity_advances_after_reconciliation(
                 "status": "accepted",
                 "candidate_id": "candidate-31",
                 "package_digest": "sha256:" + "2" * 64,
+                "release_digest": "sha256:" + "1" * 64,
+                "permission_decision": {
+                    "approved": True,
+                    "actor": "builder.user",
+                    "actor_type": "user",
+                    "approval_id": "approval:trial-31",
+                },
             },
         },
     )
@@ -2474,10 +2849,11 @@ def test_publication_attempt_identity_advances_after_reconciliation(
             },
         },
     )
+    promotions: list[tuple[tuple, dict]] = []
     monkeypatch.setattr(
         module.projects,
         "promote_candidate",
-        lambda *_args, **_kwargs: {
+        lambda *args, **kwargs: promotions.append((args, kwargs)) or {
             "ok": False,
             "status": "failed",
             "error": "bounded-test-failure",
@@ -2490,6 +2866,11 @@ def test_publication_attempt_identity_advances_after_reconciliation(
     metadata = started[1]["metadata"]
     assert metadata["run_id"] == "candidate:candidate-31:publish:g17"
     assert metadata["idempotency_key"] == "candidate:candidate-31:publish:g17:start"
+    permission = promotions[0][1]["permission_decision"]
+    assert permission["approval_id"] == "approval:trial-31"
+    assert permission["candidate_id"] == "candidate-31"
+    assert permission["release_digest"] == "sha256:" + "1" * 64
+    assert permission["scope"] == "stable_activation"
 
 
 def test_publication_can_finalize_a_partial_local_wait_from_completed_external_result(
@@ -2511,14 +2892,17 @@ def test_publication_can_finalize_a_partial_local_wait_from_completed_external_r
     current_state = dict(state)
     monkeypatch.setattr(module.workflow, "get_state", lambda *args: current_state)
     transitions: list[str] = []
+    publication_metadata: dict = {}
 
-    def _transition(*args, **_kwargs):
+    def _transition(*args, **kwargs):
         transitions.append(args[2])
         if args[2] == "publication_started":
             current_state["governed"] = {
                 "state": "publication_waiting",
                 "generation": 19,
             }
+        if args[2] == "publish":
+            publication_metadata.update(kwargs["metadata"])
         return {
             "ok": True,
             "workflow": {
@@ -2533,7 +2917,7 @@ def test_publication_can_finalize_a_partial_local_wait_from_completed_external_r
         lambda *_args, **_kwargs: {
             "ok": True,
             "candidate_id": "candidate-32",
-            "version": "0.1.2",
+            "version": "0.1.1",
             "release": "workflow_lab_dashboard@0.1.2",
             "package_digest": "sha256:" + "2" * 64,
             "apply_evidence": {
@@ -2554,6 +2938,150 @@ def test_publication_can_finalize_a_partial_local_wait_from_completed_external_r
 
     assert result["ok"] is True
     assert transitions == ["publication_started", "publish"]
+    assert publication_metadata["version"] == "0.1.2"
+
+
+def test_publication_recovers_only_missing_stable_placement_after_publish(
+    monkeypatch,
+) -> None:
+    from adaos.sdk.builder import applications
+
+    module = _module()
+    release_digest = "sha256:" + "1" * 64
+    package_digest = "sha256:" + "2" * 64
+    published = {
+        "generation": 42,
+        "capabilities": {"can_publish": False},
+        "automation": {"head_task_id": "task.42"},
+        "change_set": {"change_set_id": "change-42"},
+        "delivery": {
+            "status": "published",
+            "candidate_id": "candidate-42",
+            "release_digest": release_digest,
+            "package_digest": package_digest,
+        },
+        "publication": {
+            "status": "published",
+            "release": "workflow_lab_dashboard@0.4.2",
+            "release_record": {
+                "candidate_id": "candidate-42",
+                "release_digest": release_digest,
+                "activation": {"operation_id": "activation-42"},
+            },
+        },
+    }
+    monkeypatch.setattr(module, "_execution_identity", lambda *_args: ("scenario", "workflow_lab_dashboard"))
+    monkeypatch.setattr(module.workflow, "get_state", lambda *_args: published)
+    monkeypatch.setattr(
+        module.projects,
+        "promote_candidate",
+        lambda *_args, **_kwargs: pytest.fail("Published release must not be promoted twice"),
+    )
+    monkeypatch.setattr(
+        module.workflow,
+        "transition",
+        lambda *_args, **_kwargs: pytest.fail("Published workflow must not transition twice"),
+    )
+    monkeypatch.setattr(
+        applications,
+        "verify_candidate_access",
+        lambda *args, **kwargs: {
+            "required": True,
+            "status": "passed",
+            "application_id": args[0],
+        },
+    )
+    placement_calls: list[dict] = []
+    monkeypatch.setattr(
+        module,
+        "_ensure_stable_placement",
+        lambda *args, **kwargs: placement_calls.append(kwargs)
+        or ({**published, "generation": 43}, {"ok": True}),
+    )
+
+    result = module.publish_project(
+        "project",
+        "workflow_lab",
+        dry_run=False,
+        confirmed=True,
+        verification_evidence={"source_commit": "abc"},
+        webspace_id="desktop-dev",
+    )
+
+    assert result["duplicate"] is True
+    assert result["recovery_reason"] == "published_stable_placement_reconciled"
+    assert result["workflow"]["generation"] == 43
+    assert result["application_verification"]["status"] == "passed"
+    assert placement_calls[0]["webspace_id"] == "desktop-dev"
+    assert placement_calls[0]["result"]["apply_evidence"]["activation"] == {
+        "operation_id": "activation-42"
+    }
+
+
+def test_stable_placement_normalizes_builder_host_to_production(monkeypatch) -> None:
+    from adaos.sdk.builder import applications
+
+    module = _module()
+    release_digest = "sha256:" + "1" * 64
+    package_digest = "sha256:" + "2" * 64
+    published = {
+        "generation": 42,
+        "publication": {
+            "status": "published",
+            "release": "workflow_lab_dashboard@0.4.2",
+        },
+        "delivery": {
+            "status": "published",
+            "candidate_id": "candidate-42",
+            "release_digest": release_digest,
+            "package_digest": package_digest,
+        },
+        "project": {"placements": []},
+    }
+    placed_workflow = {
+        **published,
+        "generation": 43,
+        "project": {
+            "placements": [
+                {
+                    "kind": "stable",
+                    "status": "active",
+                    "result_ref": {"id": "workflow_lab_dashboard@0.4.2"},
+                    "target": {"webspace_id": "desktop"},
+                }
+            ]
+        },
+    }
+    calls: list[dict] = []
+    monkeypatch.setattr(module, "_preview_source_webspace_id", lambda *_args: "desktop-dev")
+    monkeypatch.setattr(
+        applications,
+        "production_webspace_id",
+        lambda value: value.removesuffix("-dev"),
+    )
+    monkeypatch.setattr(
+        applications,
+        "place_local_stable",
+        lambda application_id, **kwargs: calls.append(
+            {"application_id": application_id, **kwargs}
+        )
+        or {"workflow": placed_workflow, "runtime_refresh": {"ok": True}},
+    )
+
+    workflow_result, materialization = module._ensure_stable_placement(
+        "scenario",
+        "workflow_lab_dashboard",
+        owner_kind="project",
+        owner_id="workflow_lab",
+        result={"release": "workflow_lab_dashboard@0.4.2"},
+        published_workflow=published,
+        webspace_id="desktop-dev",
+        meta=None,
+    )
+
+    assert calls[0]["webspace_id"] == "desktop"
+    assert workflow_result["generation"] == 43
+    assert materialization["ok"] is True
 
 
 def test_publish_does_not_bypass_non_promotable_candidate_state(monkeypatch) -> None:
@@ -2729,10 +3257,8 @@ def test_project_collection_rejects_component_catalog_modes(monkeypatch) -> None
 
 def test_project_collection_hides_archived_projects_by_default(monkeypatch) -> None:
     module = _module()
-    monkeypatch.setattr(
-        module.project_catalog,
-        "list_projects",
-        lambda **kwargs: [
+    def catalog(**kwargs):
+        rows = [
             {
                 "kind": "project",
                 "id": "active",
@@ -2747,13 +3273,10 @@ def test_project_collection_hides_archived_projects_by_default(monkeypatch) -> N
                 "archived": True,
                 "components": {"owned": [], "dependencies": []},
             },
-        ],
-    )
-    monkeypatch.setattr(
-        module,
-        "_catalog_state",
-        lambda _kind, project_id: {"archived": project_id == "archived"},
-    )
+        ]
+        return rows if kwargs.get("include_archived") else rows[:1]
+
+    monkeypatch.setattr(module.project_catalog, "list_projects", catalog)
 
     assert [item["object_id"] for item in module.list_projects()] == ["active"]
     assert [
@@ -2898,7 +3421,7 @@ def test_open_preview_targets_selected_application_and_preserves_pinned_revision
     monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "wanted"))
     target = {"object_type": "scenario", "object_id": existing, "stage": "automation", "revision": "fixed"} if existing else {}
     monkeypatch.setattr(module.preview, "get_binding", lambda source: {"preview_target": target})
-    monkeypatch.setattr(module.preview, "select_project", lambda *args, **kwargs: calls.append((args, kwargs)) or {"ok": True})
+    monkeypatch.setattr(module, "select_preview", lambda *args, **kwargs: calls.append((args, kwargs)) or {"ok": True})
     monkeypatch.setattr(module.preview, "navigation_link", lambda source: {"url": "/?expected_scenario_id=wanted"})
     restored = []
     monkeypatch.setattr(module.preview, "ensure_selected_target", lambda source: restored.append(source) or {"ok": True})
@@ -2907,7 +3430,7 @@ def test_open_preview_targets_selected_application_and_preserves_pinned_revision
     assert len(calls) == (0 if existing == "wanted" else 1)
     assert restored == (["host"] if existing == "wanted" else [])
     if calls:
-        assert calls[0] == (("project", "app"), {"source_webspace_id": "host", "ensure_ready": True, "wait_for_rebuild": True, "publish_event": False})
+        assert calls[0] == (("project", "app"), {"webspace_id": None, "_meta": None})
 
 
 def test_open_preview_does_not_return_a_fallback_link_after_selection_failure(monkeypatch) -> None:
@@ -2915,7 +3438,7 @@ def test_open_preview_does_not_return_a_fallback_link_after_selection_failure(mo
     monkeypatch.setattr(module, "_preview_source_webspace_id", lambda *args: "host")
     monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "wanted"))
     monkeypatch.setattr(module.preview, "get_binding", lambda source: {})
-    monkeypatch.setattr(module.preview, "select_project", lambda *args, **kwargs: {"ok": False, "error": "not_ready"})
+    monkeypatch.setattr(module, "select_preview", lambda *args, **kwargs: {"ok": False, "error": "not_ready"})
     monkeypatch.setattr(module.preview, "navigation_link", lambda source: pytest.fail("No fallback navigation on failure"))
     assert module.open_preview("project", "app") == {"ok": False, "error": "not_ready"}
 
@@ -3035,6 +3558,7 @@ def test_create_project_selects_preview_and_returns_durable_conversation(
 ) -> None:
     module = _module()
     selections: list[dict] = []
+    monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "recipes"))
     monkeypatch.setattr(
         module.compositions,
         "create_with_primary_component",
@@ -3051,8 +3575,8 @@ def test_create_project_selects_preview_and_returns_durable_conversation(
         },
     )
     monkeypatch.setattr(
-        module.preview,
-        "select_project",
+        module,
+        "_select_scenario_preview_target",
         lambda *args, **kwargs: selections.append({"args": args, **kwargs})
         or {"ok": True},
     )
@@ -3088,9 +3612,8 @@ def test_create_project_selects_preview_and_returns_durable_conversation(
         {
             "args": ("project", "recipes"),
             "source_webspace_id": "dev1",
-            "ensure_ready": True,
-            "wait_for_rebuild": True,
-            "publish_event": True,
+            "stage": "prototype",
+            "follow_active": True,
         }
     ]
 
@@ -3101,6 +3624,7 @@ def test_create_project_from_builder_preview_keeps_current_webspace_as_host(
     module = _module()
     selections: list[dict] = []
     source_calls: list[tuple[str, str | None]] = []
+    monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "test05_recipes"))
     monkeypatch.setattr(
         module.compositions,
         "create_with_primary_component",
@@ -3119,8 +3643,8 @@ def test_create_project_from_builder_preview_keeps_current_webspace_as_host(
         or source,
     )
     monkeypatch.setattr(
-        module.preview,
-        "select_project",
+        module,
+        "_select_scenario_preview_target",
         lambda *args, **kwargs: selections.append({"args": args, **kwargs})
         or {"ok": True},
     )
@@ -3153,9 +3677,8 @@ def test_create_project_from_builder_preview_keeps_current_webspace_as_host(
         {
             "args": ("project", "test05_recipes"),
             "source_webspace_id": "dev1-dev",
-            "ensure_ready": True,
-            "wait_for_rebuild": True,
-            "publish_event": True,
+            "stage": "prototype",
+            "follow_active": True,
         }
     ]
 
@@ -3574,70 +4097,28 @@ def test_project_process_exposes_active_trial_placement(monkeypatch) -> None:
     assert placement["revision"] == "0.1.1"
 
 
-def test_project_placement_navigation_uses_workflow_sdk(monkeypatch) -> None:
+def test_project_placement_navigation_uses_workflow_sdk(monkeypatch):
+    from adaos.sdk.builder import applications
+
     module = _module()
-    calls: list[tuple] = []
-    materializations: list[tuple] = []
-    monkeypatch.setattr(
-        module.compositions, "get", lambda *_args: _root_mgmnt_project()
-    )
-    monkeypatch.setattr(
-        module.workflow,
-        "get_project_placement_navigation",
-        lambda *args, **kwargs: calls.append((args, kwargs))
-        or {
-            "url": "https://inimatic.com/?preview_stage=trial",
-            "placement": {
-                "scenario_id": "root_mgmnt_ops",
-                "target": {"webspace_id": "desktop-dev"},
-                "result_ref": {
-                    "version": "0.1.1",
-                    "digest": "sha256:candidate",
-                },
-            },
-        },
-    )
-    monkeypatch.setattr(
-        module.preview,
-        "materialize_revision",
-        lambda *args, **kwargs: materializations.append((args, kwargs)) or {"ok": True},
-    )
-
-    result = module.get_project_placement_navigation(
-        "trial",
-        "project",
-        "root_mgmnt",
-        webspace_id="desktop",
-    )
-
-    assert calls == [
-        (("scenario", "root_mgmnt_ops"), {"kind": "trial", "base_url": None})
-    ]
-    assert result["preview_url"].endswith("preview_stage=trial")
-    assert materializations == [
-        (
-            (),
-            {
-                "webspace_id": "desktop-dev",
-                "scenario_id": "root_mgmnt_ops",
-                "revision": "0.1.1",
-                "preview_stage": "trial",
-                "preview_label": "trial: root_mgmnt · 0.1.1",
-                "source_fingerprint": "sha256:candidate",
-                "event_payload": {
-                    "source": "builder.project.placement_navigation",
-                    "source_webspace_id": "desktop",
-                    "preview_stage": "trial",
-                    "preview_revision": "0.1.1",
-                },
-            },
-        )
-    ]
+    calls = []
+    monkeypatch.setattr(module.compositions, "get", lambda *args: _root_mgmnt_project())
+    monkeypatch.setattr(module.workflow, "get_project_placement_navigation", lambda *args, **kwargs: {
+        "url": "https://inimatic.com/?webspace_id=desktop",
+        "placement": {"scenario_id": "root_mgmnt_ops", "target": {"webspace_id": "desktop"},
+                      "result_ref": {"id": "candidate-root", "version": "0.1.1"}}})
+    monkeypatch.setattr(applications, "open_trial_placement",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or {"ok": True})
+    monkeypatch.setattr(module.preview, "materialize_revision",
+        lambda **kwargs: pytest.fail("Trial must not enter Preview"))
+    result = module.get_project_placement_navigation("trial", "project", "root_mgmnt", webspace_id="desktop")
+    assert calls == [(("candidate-root",), {"webspace_id": "desktop", "scenario_id": "root_mgmnt_ops"})]
+    assert result["preview_url"].endswith("webspace_id=desktop")
     assert result["materialization"]["ok"] is True
-    assert result["execution_scope"]["context_ref"] == "project:root_mgmnt"
 
 
 def test_project_stable_navigation_recovers_published_placement(monkeypatch) -> None:
+    from adaos.sdk.builder import applications
     module = _module()
     calls: list[tuple] = []
     placements: list[tuple] = []
@@ -3676,9 +4157,11 @@ def test_project_stable_navigation_recovers_published_placement(monkeypatch) -> 
     monkeypatch.setattr(
         module.preview,
         "materialize_revision",
-        lambda **kwargs: materializations.append(kwargs)
-        or {"ok": True, "accepted": True},
+        lambda **kwargs: pytest.fail("Stable must not enter DEV Preview"),
     )
+    monkeypatch.setattr(applications, "place_local_stable", lambda application_id, **kwargs:
+        materializations.append({"application_id": application_id, **kwargs})
+        or {"workflow": published, "runtime_refresh": {"ok": True, "accepted": True}})
     monkeypatch.setattr(
         module.workflow,
         "record_project_placement",
@@ -3705,18 +4188,11 @@ def test_project_stable_navigation_recovers_published_placement(monkeypatch) -> 
     assert len(calls) == 2
     assert materializations == [
         {
+            "application_id": "root_mgmnt",
             "webspace_id": "desktop",
-            "scenario_id": "root_mgmnt_ops",
-            "revision": "0.2.3",
-            "preview_stage": "publication",
-            "preview_label": "Root Management",
-            "source_fingerprint": release_digest,
-            "event_payload": {
-                "source": "builder.project.publication",
-                "source_webspace_id": "desktop",
-                "preview_stage": "publication",
-                "preview_revision": "0.2.3",
-            },
+            "candidate_id": "",
+            "candidate_digest": release_digest,
+            "actor_ref": "builder.workbench.publication",
         }
     ]
     assert placements[0][0:2] == ("scenario", "root_mgmnt_ops")
@@ -3730,6 +4206,47 @@ def test_project_stable_navigation_recovers_published_placement(monkeypatch) -> 
     assert placements[0][3] == 21
     assert result["materialization"]["accepted"] is True
     assert result["preview_url"].endswith("preview_stage=publication")
+
+
+def test_icon_generation_is_scoped_explicit_and_never_reads_application_data(monkeypatch):
+    module = _module()
+    calls = []
+    monkeypatch.setattr(module, "_project_descriptor", lambda *args: {"title": "Example"})
+    monkeypatch.setattr(module.projects, "read_file", lambda *args, **kwargs: pytest.fail("No files in image context"))
+    monkeypatch.setattr(module.documents, "write", lambda *args, **kwargs: pytest.fail("No implicit image apply"))
+    monkeypatch.setattr(module.image_generation, "generate", lambda **kwargs: calls.append(kwargs) or {"status": "queued"})
+    result = module.generate_icon("Open book", "gpt-image-1", "one", "project", "example")
+    assert result["status"] == "queued"
+    assert calls[0]["model"] == "gpt-image-1"
+    assert calls[0]["request_id"] == "icon:project:example:one"
+    assert calls[0]["context"] == {"project_ref": "project:example", "purpose": "application_icon"}
+    assert "Example" in calls[0]["prompt"] and "Open book" in calls[0]["prompt"]
+    with pytest.raises(ValueError, match="stable request_id"):
+        module.generate_icon("Open book", "gpt-image-1")
+    with pytest.raises(ValueError, match="1..4000"):
+        module.generate_icon(" ", "gpt-image-1", "two", "project", "example")
+    monkeypatch.setattr(module.image_generation, "get", lambda request_id: {"request_id": request_id})
+    assert module.get_icon_generation("icon:project:example:one", "project", "example")["request_id"] == "icon:project:example:one"
+    with pytest.raises(ValueError, match="another application"):
+        module.get_icon_generation("icon:project:elsewhere:one", "project", "example")
+
+
+def test_readme_generation_uses_declared_components_and_never_saves(monkeypatch):
+    module = _module()
+    calls = []
+    monkeypatch.setattr(module, "_project_descriptor", lambda *args: {"title": "Example", "component_refs": ["skill:example"]})
+    monkeypatch.setattr(module.documents, "read", lambda *args: {"text": "Existing", "digest": "base"})
+    monkeypatch.setattr(module.documents, "write", lambda *args, **kwargs: pytest.fail("Generation must not save"))
+    monkeypatch.setattr(module.projects, "read_file", lambda *args, **kwargs: {
+        "content": "version: 1.0.0\ntools:\n- name: list_records\n  description: List stored records\n", "truncated": False})
+    monkeypatch.setattr(module.content_generation, "generate", lambda **kwargs: calls.append(kwargs) or {"status": "queued"})
+    result = module.generate_readme("Write a short README", request_id="one", object_type="project", object_id="example", model="gpt-5")
+    assert result["status"] == "queued"
+    assert calls[0]["data"]["declared_components"][0]["tools"] == [{"name": "list_records", "description": "List stored records"}]
+    assert calls[0]["context"]["base_digest"] == "base"
+    assert "Write a short README" not in calls[0]["purpose"]
+    with pytest.raises(ValueError, match="requires a stable"):
+        module.generate_readme("Write a README", object_type="project", object_id="example")
 
 
 def test_semantic_ui_tool_forwards_typed_local_reversible_operation(

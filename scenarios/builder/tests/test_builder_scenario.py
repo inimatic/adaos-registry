@@ -55,14 +55,48 @@ def test_builder_declares_companion_skill_runtime_bindings() -> None:
     assert scenario["runtime"]["skills"]["required"] == required
 
 
-def test_ui_preserves_stabilized_three_panel_surface_and_modals() -> None:
+def test_about_preserves_readme_cas_and_explicit_owned_image_drafts() -> None:
+    webui = _load("webui.json")
+    widgets = _by_id(webui)
+    about = widgets["design-readme"]
+    assert about["dataSource"]["name"] == "builder_sdk_control_skill.get_about"
+    assert about["dataSource"]["preserveLastValue"] is False
+    assert about["inputs"]["stateBindings"] == {"readmeText": "text", "readmeDigest": "digest"}
+    fields = {row["key"] for row in about["inputs"]["fields"]}
+    assert {"text", "owner_name", "owner_ref", "owner_status"} <= fields
+    save = widgets["design-readme-form"]["actions"][0]
+    assert save["params"]["expected_digest"] == "$state.readmeDigest"
+    generated = widgets["readme-generated-draft"]["actions"][0]
+    assert generated["params"]["expected_digest"] == "$state.readmeGeneration.context.base_digest"
+    image = widgets["about-icon-generate"]["actions"][0]
+    assert image["on"] == "submit" and image["requestIdParam"] == "request_id"
+    assert image["params"]["model"] == "$event.values.model"
+    assert widgets["about-icon-preview"]["inputs"]["imageKey"] == "media"
+    history = widgets["about-icon-history"]
+    assert history["dataSource"]["name"] == "builder_sdk_control_skill.list_icon_drafts"
+    assert history["dataSource"]["params"]["object_id"] == "$state.selectedProjectId"
+    assert history["actions"][0]["target"] == "builder_sdk_control_skill.get_icon_generation"
+    for node in _walk(webui):
+        if isinstance(node.get("action"), dict):
+            assert node["action"].get("target") != "builder_sdk_control_skill.generate_icon"
+    for locale in ("en", "ru"):
+        strings = _load(f"assets/i18n/workbench-live-{locale}.json")
+        for node in _walk(webui):
+            if str(node.get("key", "")).startswith("builder.about."):
+                assert node["key"] in strings
+
+
+def test_ui_preserves_accepted_two_area_surface_and_operational_modals() -> None:
     webui = _load("webui.json")
     page = webui["ui"]["application"]["desktop"]["pageSchema"]
     ids = set(_by_id(webui))
 
-    assert page["layout"]["type"] == "split"
-    assert [area["id"] for area in page["layout"]["areas"]] == ["left", "center", "right"]
-    assert {"llm-profile", "llmModel", "provider", "voice-input"} <= ids
+    assert page["layout"]["version"] == 2
+    assert page["layout"]["pattern"] == "collection"
+    assert [region["id"] for region in page["layout"]["regions"]] == ["main", "conversation"]
+    assert {"llmModel", "model", "reasoning_effort", "project-picker-table"} <= ids
+    assert page["initialState"]["viewProfile"] == "basic"
+    assert "samples" not in page["initialState"]
     assert "confirm-subscription-update" in webui["ui"]["application"]["modals"]
     assert "prototype-review" in webui["ui"]["application"]["modals"]
     assert page["meta"]["builder"]["functional"] is True
@@ -78,7 +112,7 @@ def test_prototype_approval_collects_evidence_and_uses_canonical_acceptance() ->
     approval_actions = [
         action
         for widget_id, event in (
-            ("context-actions", "click:approve-prototype"),
+            ("design-primary-actions", "click:accept"),
             ("project-tree", "click:stabilize"),
         )
         for action in widgets[widget_id]["actions"]
@@ -106,15 +140,25 @@ def test_prototype_approval_collects_evidence_and_uses_canonical_acceptance() ->
     }
 
 
+def test_clarification_continuation_uses_supported_enablement_contract() -> None:
+    actions = _by_id(_load("webui.json"))["model-clarification-actions"]
+    button = next(row for row in actions["inputs"]["buttons"] if row["id"] == "resume")
+    action = next(row for row in actions["actions"] if row["on"] == "click:resume")
+    assert button["enabledIf"] == action["enabledIf"] == "$state.workbench.clarification.can_resume"
+    assert "disabledIf" not in button
+    assert action["params"]["expected_generation"] == "$state.workbench.clarification.generation"
+    assert action["params"]["confirmed"] is True
+
+
 def test_builder_observes_project_scoped_development_feedback() -> None:
     webui = _load("webui.json")
     widgets = _by_id(webui)
-    tabs = widgets["node-views"]["inputs"]["buttons"]
+    tabs = widgets["design-workbench-views"]["inputs"]["buttons"]
     feedback_list = widgets["development-feedback-list"]
     feedback_detail = widgets["development-feedback-detail"]
 
-    assert any(item["id"] == "feedback" for item in tabs)
-    assert feedback_list["visibleIf"] == "$state.activeView === 'feedback'"
+    assert any(item["id"] == "development-feedback" for item in tabs)
+    assert feedback_list["visibleIf"] == "$state.workbenchView === 'development-feedback'"
     assert feedback_list["dataSource"]["name"] == (
         "builder_sdk_control_skill.list_development_feedback"
     )
@@ -216,10 +260,13 @@ def test_functional_builder_uses_real_contracts_and_explicit_preview_labels() ->
 
     assert actions and any(action["type"] == "callSkill" for action in actions)
     assert sources and any(source.get("kind") == "skill" for source in sources)
-    assert all(value.startswith("builder_sdk_control_skill.") for value in labels["typed_contracts"].values())
-    assert labels["proto"].startswith("proto:")
-    assert labels["active"].startswith("active:")
-    assert labels["public"].startswith("public:")
+    assert labels["workflow_contract"] == "adaos.builder.workflow.v1"
+    current = _by_id(webui)["design-current-work"]
+    assert current["dataSource"]["name"] == "builder_sdk_control_skill.get_workbench"
+    assert current["inputs"]["stateBindings"]["commands"] == "commands"
+    text = json.dumps(webui, ensure_ascii=False)
+    assert "Change 12" not in text
+    assert "$state.samples" not in text
 
 
 def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -> None:
@@ -233,7 +280,7 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
         "name": "builder_sdk_control_skill.list_projects",
         "scope": "local",
         "params": {
-            "limit": 5000,
+            "limit": 500,
             "query": "$state.projectPickerQuery",
             "selected_object_type": "$state.selectedProjectKind",
             "selected_object_id": "$state.selectedProjectId",
@@ -266,9 +313,9 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
         for key, value in picker["dataSource"]["params"].items()
     }
     assert resolved_params == {
-        "limit": 5000,
+        "limit": 500,
         "query": "",
-        "selected_object_type": "scenario",
+        "selected_object_type": "project",
         "selected_object_id": "builder",
         "include_archived": False,
         "_meta": {"current_scenario": "builder"},
@@ -279,7 +326,7 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
     handler = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(handler)
     monkeypatch.setattr(
-        handler.compositions,
+        handler.project_catalog,
         "list_projects",
         lambda **_kwargs: [
             {
@@ -344,9 +391,10 @@ def test_process_inspection_is_separate_from_the_canonical_conversation() -> Non
 
     assert lifecycle["dataSource"]["kind"] == "skill"
     assert lifecycle["dataSource"]["name"] == "builder_sdk_control_skill.get_lifecycle"
-    assert lifecycle["visibleIf"] == "$state.processPinned === true"
-    assert process["dataSource"]["name"] == "builder_sdk_control_skill.get_process_tree"
-    assert "selectedLifecycleStage" not in widgets["builder-chat"]["visibleIf"]
+    assert "visibleIf" not in lifecycle
+    assert process["type"] == "ui.list"
+    assert process["dataSource"]["name"] == "builder_sdk_control_skill.get_process_stages"
+    assert "selectedLifecycleStage" not in widgets["design-conversation-full-task"]["visibleIf"]
     assert any(
         action.get("target") == "builder_sdk_control_skill.inspect_process_ref"
         for action in process["actions"]
@@ -366,8 +414,8 @@ def test_process_inspection_is_separate_from_the_canonical_conversation() -> Non
     assert placement_action["openResultUrl"] is True
     assert placement_action["resultUrlPath"] == "preview_url"
     assert placement_action["resultPreferCurrentOrigin"] is True
-    assert "automation" in widgets["automation-conversation-followup"]["visibleIf"]
-    assert "publication" in widgets["publication-workspace-actions"]["visibleIf"]
+    assert widgets["publication-workspace-actions"]["visibleIf"] == "$state.workbenchView === 'deliveries'"
+    assert any(item.get("target") == "builder_sdk_control_skill.submit_automation" for item in _walk(webui))
     lifecycle_buttons = {
         item["id"] for item in lifecycle["inputs"]["buttons"]
     }
@@ -375,20 +423,19 @@ def test_process_inspection_is_separate_from_the_canonical_conversation() -> Non
         "show-preview", "make-current", "stabilize",
         "go-automation", "go-publication",
     }
-    # Trial is a dependent delivery gate, never an independently mutable phase.
-    source = json.dumps(webui, ensure_ascii=False).lower()
-    assert "automation" in source and "trial" in source and "publication" in source
+    # Stage availability comes from the owner projection, not a client state machine.
+    assert process["inputs"]["disabledKey"] == "disabled"
+    assert placement_action["params"]["placement_kind"] == "$event.placementKind"
 
 
 def test_ui_revision_and_artifact_versions_have_explicit_non_stale_labels() -> None:
     webui = _load("webui.json")
     labels = webui["ui"]["application"]["desktop"]["pageSchema"]["meta"]["builder"]
 
-    assert labels["ui_revision"] == "059"
-    assert labels["proto"] == "proto:059"
-    assert labels["active"] == "active:current"
-    assert labels["public"] == "public:current"
-    assert "proto:058" not in json.dumps(webui, ensure_ascii=False)
+    assert labels["accepted_design_revision"] == "071"
+    header = _by_id(webui)["design-workbench-header"]
+    assert header["inputs"]["statusDataSource"]["value"]["target_label"] == "$state.workbench.revision_label"
+    assert labels["qualification"] == "pending"
 
 
 def test_prototype_declares_no_network_device_or_credential_transport() -> None:
@@ -404,7 +451,7 @@ def test_prototype_declares_no_network_device_or_credential_transport() -> None:
 def test_durable_chat_abi_and_stage_surfaces_are_exact() -> None:
     manifest = yaml.safe_load((ROOT / "scenario.yaml").read_text(encoding="utf-8"))
     widgets = _by_id(_load("webui.json"))
-    chat = widgets["builder-chat"]
+    chat = widgets["design-conversation-full-task"]
     assert "voice_chat_skill" in manifest["runtime"]["skills"]["required"]
     assert chat["dataSource"] == {
         "kind": "stream",
@@ -420,44 +467,43 @@ def test_durable_chat_abi_and_stage_surfaces_are_exact() -> None:
     assert chat["inputs"]["sendCommand"] == "voice.chat.user"
     assert chat["inputs"]["meta"]["active_agent_id"] == "agent:builder_skill:builder"
     assert chat["actions"] == []
-    assert "$state.activeView === 'conversation'" in chat["visibleIf"]
+    assert "$state.workbenchView === 'conversation'" in chat["visibleIf"]
     assert "$state.selectedLifecycleStage" not in chat["visibleIf"]
-    assert widgets["interaction-status"]["dataSource"]["name"] == (
-        "builder_sdk_control_skill.get_interaction_frame"
+    assert widgets["design-current-work"]["dataSource"]["name"] == (
+        "builder_sdk_control_skill.get_workbench"
     )
-    assert any(
-        action.get("params", {}).get("modalId") == "process"
-        for action in widgets["context-actions"]["actions"]
-    )
-    for widget_id in (
-        "chat-side-settings",
-        "automation-conversation-start", "automation-conversation-followup",
-        "automation-conversation-state", "automation-return-to-prototype",
-        "publication-workspace-actions", "publication-workspace-history",
-        "publication-workspace-status",
-    ):
-        assert "$state.activeView === 'conversation'" in widgets[widget_id]["visibleIf"]
+    process = next(button for button in widgets["design-workbench-header"]["inputs"]["buttons"] if button["id"] == "specimens")
+    assert process["optionsDataSource"]["name"] == "builder_sdk_control_skill.get_process_stages"
+    assert process["displaySelectedLabel"] is False
+    assert widgets["design-conversation-side-task"]["inputs"]["sendCommand"] == "voice.chat.user"
+    assert _load("webui.json")["ui"]["application"]["modals"]["automation"]["schema"]["widgets"]
+    publication_actions = widgets["publication-workspace-actions"]["actions"]
     publication_targets = {
         item.get("target")
-        for item in widgets["publication-workspace-actions"]["actions"]
+        for item in publication_actions
         if item.get("type") == "callSkill"
     }
     assert "builder_sdk_control_skill.push_project" in publication_targets
-    assert "builder_sdk_control_skill.publish_project" in publication_targets
+    assert any(
+        item.get("type") == "openModal"
+        and item.get("params", {}).get("modalId") == "confirm-trial-access"
+        for item in publication_actions
+    )
+    trial_modal = _load("webui.json")["ui"]["application"]["modals"]["confirm-trial-access"]
+    assert any(
+        action.get("target") == "builder_sdk_control_skill.publish_project"
+        for widget in trial_modal["schema"]["widgets"]
+        for action in widget.get("actions", [])
+    )
 
 
-def test_long_project_title_owns_the_header_and_context_moves_left() -> None:
+def test_long_project_title_has_a_full_text_surface_besides_the_compact_menu() -> None:
     widgets = _by_id(_load("webui.json"))
-    header_buttons = widgets["project-header"]["inputs"]["buttons"]
-    left_buttons = widgets["left-actions"]["inputs"]["buttons"]
-
-    assert [item["id"] for item in header_buttons] == ["project-label"]
-    assert header_buttons[0]["label"] == "$state.selectedProjectTitle"
-    left_by_id = {item["id"]: item for item in left_buttons}
-    assert left_by_id["change-context"]["label"] == "$state.changeLabel"
-    assert left_by_id["preview-context"]["label"] == "$state.previewViewingLabel"
-    assert left_by_id["change-context"]["disabled"] is True
-    assert left_by_id["preview-context"]["disabled"] is True
+    header_buttons = widgets["design-workbench-header"]["inputs"]["buttons"]
+    assert header_buttons[0]["label"] == "$state.applicationTitle"
+    status = widgets["design-workbench-header"]["inputs"]["statusDataSource"]
+    assert status["value"]["title"] == "$state.applicationTitle"
+    assert len(widgets["design-current-work"]["inputs"]["fields"]) <= 3
 
 
 def test_no_deprecated_update_or_automatic_state_change_retry_surface() -> None:
@@ -475,6 +521,7 @@ def test_no_deprecated_update_or_automatic_state_change_retry_surface() -> None:
 def test_embedded_functional_parity_contract_is_satisfied() -> None:
     webui = _load("webui.json")
     contract = _load("assets/builder_functional_parity.json")
+    contract = {**contract, **contract["profiles"]["workbench"]}
     application = webui["ui"]["application"]
     widgets = _by_id(webui)
     bindings = set()
@@ -488,6 +535,9 @@ def test_embedded_functional_parity_contract_is_satisfied() -> None:
 
     required_bindings = set(contract["required_bindings"])
     required_bindings.update(contract["forward_required_bindings"])
+    for previous, current in contract["forward_binding_replacements"].items():
+        required_bindings.discard(previous)
+        required_bindings.add(current)
     assert set(contract["required_widget_ids"]) <= set(widgets)
     assert set(contract["required_modal_ids"]) <= set(application["modals"])
     assert required_bindings <= bindings
@@ -514,13 +564,31 @@ def test_all_localized_payloads_are_valid_utf8_without_replacement_characters() 
     for path in paths:
         text = path.read_bytes().decode("utf-8")
         assert "\ufffd" not in text
-    assert {path.stem for path in (ROOT / "assets/i18n").glob("*.json")} == {"en", "ru"}
+    assert {"en", "ru", "workbench-live-en", "workbench-live-ru"} <= {path.stem for path in (ROOT / "assets/i18n").glob("*.json")}
 
 
 def test_open_preview_uses_selected_application_not_unselected_global_binding() -> None:
     for name in ("webui.json", "scenario.json"):
-        action = next(item for item in _walk(_load(name)) if item.get("on") == "click:open-dev-link")
+        action = next(item for item in _walk(_load(name)) if item.get("target") == "builder_sdk_control_skill.open_preview")
         assert action["target"] == "builder_sdk_control_skill.open_preview"
         assert action["params"]["object_type"] == "$state.selectedProjectKind"
         assert action["params"]["object_id"] == "$state.selectedProjectId"
         assert action["openResultUrl"] is True
+
+
+def test_creation_retains_template_flow_and_forwards_application_name() -> None:
+    widgets = _by_id(_load("webui.json"))
+    form = widgets["new-project-form"]
+    fields = {field["id"]: field for field in form["inputs"]["fields"]}
+    assert fields["title"]["required"] is True
+    creation = next(action for action in form["actions"] if action.get("target", "").endswith(".create_project"))
+    assert creation["params"]["title"] == "$event.values.title"
+    assert creation["params"]["template"] == "$state.selectedTemplate"
+    assert widgets["new-project-templates"]["dataSource"]["name"].endswith(".list_templates")
+    assert all("workbenchView" not in action.get("params", {})
+               for action in form["actions"] if action["on"].startswith("change:"))
+    # The create SDK can publish the new selection before its response arrives.
+    # A later form action must not erase the already loaded canonical projection.
+    assert all(not {"current", "workbench", "commands", "builderConversationId", "builderThreadId"}
+               .intersection(action.get("params", {})) for action in form["actions"]
+               if action["type"] == "updateState")

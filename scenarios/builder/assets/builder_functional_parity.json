@@ -47,14 +47,12 @@
     "file-picker",
     "new-project",
     "preview-qr",
-    "prototype-review",
     "project-picker",
     "publication",
     "technical-addendum",
     "process"
   ],
   "required_bindings": [
-    "builder_sdk_control_skill.accept_prototype",
     "builder_sdk_control_skill.append_prompt_addendum",
     "builder_sdk_control_skill.apply_subscription_update",
     "builder_sdk_control_skill.archive_project",
@@ -82,6 +80,7 @@
     "builder_sdk_control_skill.set_llm_profile",
     "builder_sdk_control_skill.start_automation",
     "builder_sdk_control_skill.submit_automation",
+    "builder_sdk_control_skill.transition_workflow",
     "builder_sdk_control_skill.update_project_metadata",
     "builder_skill.set_ui_revision_current",
     "stream:voice_chat.messages"
@@ -89,7 +88,9 @@
   "forward_binding_replacements": {
     "builder_sdk_control_skill.transition_workflow": "builder_sdk_control_skill.accept_prototype"
   },
-  "forward_required_modal_ids": ["prototype-review"],
+  "forward_required_modal_ids": [
+    "prototype-review"
+  ],
   "forward_required_bindings": [
     "builder_sdk_control_skill.list_projects",
     "builder_sdk_control_skill.get_interaction_frame",
@@ -110,5 +111,92 @@
   ],
   "forbidden_bindings": [
     "builder_sdk_control_skill.update_project"
-  ]
+  ],
+  "profiles": {
+    "workbench": {
+      "accepted_design_revision": "071",
+      "purpose": "Preserve operational capabilities across the accepted layout migration; widget placement may move into modals.",
+      "required_widget_ids": [
+        "design-workbench-header",
+        "design-current-work",
+        "design-primary-actions",
+        "design-workbench-views",
+        "design-preview-commands",
+        "design-task-brief",
+        "design-scope-requirements",
+        "design-checks",
+        "design-process",
+        "design-component-picker",
+        "design-file-tree",
+        "design-file-content",
+        "design-conversation-side-task",
+        "design-conversation-full-task",
+        "project-picker-table",
+        "project-picker-sample",
+        "project-picker-archived",
+        "project-picker-create",
+        "new-project-form",
+        "new-project-templates",
+        "node-overview",
+        "chat-side-settings",
+        "design-codex-settings",
+        "overview-archive",
+        "overview-restore",
+        "technical-spec-editor",
+        "technical-spec-actions",
+        "technical-spec-addenda",
+        "publication-workspace-status",
+        "publication-workspace-actions",
+        "publication-workspace-history",
+        "development-feedback-filters",
+        "development-feedback-list",
+        "development-feedback-detail",
+        "design-readme",
+        "design-readme-form",
+        "design-delta-form"
+      ],
+      "required_widget_types": {
+        "project-picker-table": "ui.table",
+        "new-project-form": "ui.form",
+        "design-component-picker": "ui.list",
+        "design-file-tree": "collection.tree",
+        "design-process": "ui.list",
+        "design-conversation-full-task": "ui.chat"
+      },
+      "forward_required_modal_ids": [
+        "prototype-review",
+        "design-settings",
+        "design-revisions",
+        "design-readme-editor",
+        "design-delta"
+      ],
+      "forward_binding_replacements": {
+        "builder_sdk_control_skill.transition_workflow": "builder_sdk_control_skill.accept_prototype",
+        "builder_sdk_control_skill.save_project_file": "builder_sdk_control_skill.save_readme",
+        "builder_sdk_control_skill.get_process_tree": "builder_sdk_control_skill.get_process_stages"
+      },
+      "forward_required_bindings": [
+        "builder_sdk_control_skill.list_projects",
+        "builder_sdk_control_skill.get_workbench",
+        "builder_sdk_control_skill.get_process_tree",
+        "builder_sdk_control_skill.inspect_process_ref",
+        "builder_sdk_control_skill.get_model_settings",
+        "builder_sdk_control_skill.get_codex_options",
+        "builder_sdk_control_skill.set_codex_profile",
+        "builder_sdk_control_skill.get_workbench_messages",
+        "builder_sdk_control_skill.append_discussion",
+        "builder_sdk_control_skill.save_specification_delta",
+          "builder_sdk_control_skill.get_about",
+        "builder_sdk_control_skill.open_preview"
+      ],
+      "migration_decisions": {
+        "layout": "Accepted two-area Basic/Detailed layout replaces the three-panel layout, without copying mock state.",
+        "state_projection": "get_workbench projects the canonical Change and WorkflowDescription; it is not another state machine.",
+        "project_picker": "Retain the operational table, test/regular filtering, archived toggle, search, sorting, refresh, pagination and create flow.",
+        "files": "Retain component selection and tree navigation. Accepted MVP narrows generated files to read-only; README is the explicit editable exception.",
+        "settings": "Move metadata, development settings, archive/restore into Settings. Add separately persisted Root-advertised Codex model selection.",
+        "qualification": "Structural parity is necessary but insufficient: require live desktop/mobile and TEST application lifecycle evidence. Workspace remains unchanged until qualified."
+      }
+    }
+  }
 }

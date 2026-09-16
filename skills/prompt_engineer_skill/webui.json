@@ -20,14 +20,29 @@
         "schema": {
           "id": "prompt_ide_workspace",
           "layout": {
-            "type": "single",
-            "pattern": "stack",
-            "areas": [
+            "version": 2,
+            "pattern": "document",
+            "density": "comfortable",
+            "contentWidth": "fluid",
+            "scroll": "page",
+            "regions": [
               {
                 "id": "main",
-                "role": "main"
+                "role": "main",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                }
               }
-            ]
+            ],
+            "interaction": {
+              "selection": "none",
+              "rowActivation": "none",
+              "filters": "inline",
+              "actions": "adaptive"
+            }
           },
           "widgets": [
             {
@@ -92,9 +107,9 @@
       "owner": "skill:prompt_engineer_skill",
       "dictionary": {
         "prompt_ide_skill.title": "Prompt IDE",
-        "prompt_ide_skill.status_title": "Prompt IDE (\u0431\u044d\u043a\u0435\u043d\u0434 \u0422\u0417 \u0433\u043e\u0442\u043e\u0432)",
+        "prompt_ide_skill.status_title": "Prompt IDE (бэкенд ТЗ готов)",
         "prompt_ide_skill.version": "Prompt IDE v0.1",
-        "prompt_ide_skill.status_label": "\u0411\u0430\u0437\u043e\u0432\u043e\u0435 \u0422\u0417 + API \u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0439"
+        "prompt_ide_skill.status_label": "Базовое ТЗ + API дополнений"
       }
     }
   }

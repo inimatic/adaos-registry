@@ -419,18 +419,39 @@
             "notebookSelectedNoteId": ""
           },
           "layout": {
-            "type": "single",
-            "pattern": "stack",
-            "areas": [
+            "version": 2,
+            "pattern": "collection",
+            "density": "comfortable",
+            "contentWidth": "fluid",
+            "scroll": "page",
+            "regions": [
               {
                 "id": "list",
-                "role": "main"
+                "role": "collection",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                }
               },
               {
                 "id": "edit",
-                "role": "main"
+                "role": "utility",
+                "priority": 40,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                }
               }
-            ]
+            ],
+            "interaction": {
+              "selection": "single",
+              "rowActivation": "select",
+              "filters": "inline",
+              "actions": "adaptive"
+            }
           },
           "interaction": {
             "initialFocus": "widget:notebook-notes"

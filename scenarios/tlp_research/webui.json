@@ -9,23 +9,55 @@
           "id": "tlp_research",
           "title": "TLP Research • Experiment E002",
           "layout": {
-            "type": "split",
-            "pattern": "focus-detail",
-            "areas": [
+            "version": 2,
+            "pattern": "collection-detail",
+            "density": "comfortable",
+            "contentWidth": "fluid",
+            "scroll": "regions",
+            "regions": [
               {
                 "id": "commands",
-                "role": "footer"
+                "role": "commands",
+                "priority": 90,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "pane"
+                }
               },
               {
                 "id": "main",
-                "role": "main"
+                "role": "collection",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                }
               },
               {
                 "id": "context",
-                "role": "aux"
+                "role": "detail",
+                "priority": 70,
+                "scroll": "region",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "sheet"
+                },
+                "size": {
+                  "minPx": 220,
+                  "preferredPx": 380,
+                  "maxPx": 600
+                }
               }
             ],
-            "auxWidth": 380
+            "interaction": {
+              "selection": "none",
+              "rowActivation": "none",
+              "filters": "inline",
+              "actions": "adaptive",
+              "detail": "inline"
+            }
           },
           "initialState": {
             "studyId": "study.ee75f7af4b82a95e6525aeb11efe51cfbf6fdf45f58e382cb030bd3f6542675c",
@@ -714,13 +746,29 @@
           "schema": {
             "id": "tlp_research_help",
             "layout": {
-              "type": "stack",
-              "areas": [
+              "version": 2,
+              "pattern": "document",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
                 {
                   "id": "modal",
-                  "role": "main"
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
                 }
-              ]
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
             },
             "widgets": [
               {
@@ -761,7 +809,7 @@
                     ]
                   },
                   "cacheTtlMs": 0,
-                "maxRequestHz": 2,
+                  "maxRequestHz": 2,
                   "invalidationTags": [
                     "research-experiment",
                     "research-tracking",

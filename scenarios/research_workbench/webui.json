@@ -37,60 +37,127 @@
             "selectedArtifactPreviewKind": null
           },
           "layout": {
-            "type": "single",
-            "pattern": "stack",
-            "areas": [
+            "version": 2,
+            "pattern": "collection",
+            "density": "comfortable",
+            "contentWidth": "fluid",
+            "scroll": "regions",
+            "regions": [
               {
                 "id": "portfolio",
-                "role": "main",
+                "role": "collection",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                },
                 "label": "Research directions"
               }
             ],
+            "interaction": {
+              "selection": "single",
+              "rowActivation": "select",
+              "filters": "inline",
+              "actions": "adaptive"
+            },
             "variants": [
               {
-                "id": "compilation",
-                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'",
-                "type": "single",
-                "pattern": "stack",
-                "areas": [
+                "pattern": "collection",
+                "density": "comfortable",
+                "contentWidth": "fluid",
+                "scroll": "regions",
+                "regions": [
                   {
                     "id": "workspace",
-                    "role": "main",
+                    "role": "collection",
+                    "priority": 100,
+                    "scroll": "page",
+                    "presentation": {
+                      "wide": "pane",
+                      "compact": "stack"
+                    },
                     "label": "Research compilation"
                   }
-                ]
+                ],
+                "interaction": {
+                  "selection": "single",
+                  "rowActivation": "select",
+                  "filters": "inline",
+                  "actions": "adaptive"
+                },
+                "id": "compilation",
+                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'"
               },
               {
-                "id": "direction",
-                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null",
-                "type": "split",
-                "pattern": "focus-detail",
-                "sidebarWidth": 340,
-                "areas": [
+                "pattern": "collection",
+                "density": "comfortable",
+                "contentWidth": "fluid",
+                "scroll": "regions",
+                "regions": [
                   {
                     "id": "workspace",
-                    "role": "main",
+                    "role": "collection",
+                    "priority": 100,
+                    "scroll": "page",
+                    "presentation": {
+                      "wide": "pane",
+                      "compact": "stack"
+                    },
                     "label": "Selected research object"
                   },
                   {
                     "id": "context",
-                    "role": "sidebar",
-                    "label": "Research structure"
+                    "role": "navigation",
+                    "priority": 80,
+                    "scroll": "region",
+                    "presentation": {
+                      "wide": "pane",
+                      "compact": "drawer"
+                    },
+                    "label": "Research structure",
+                    "size": {
+                      "minPx": 200,
+                      "preferredPx": 340,
+                      "maxPx": 480
+                    }
                   }
-                ]
+                ],
+                "interaction": {
+                  "selection": "single",
+                  "rowActivation": "select",
+                  "filters": "inline",
+                  "actions": "adaptive"
+                },
+                "id": "direction",
+                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null"
               },
               {
-                "id": "portfolio",
-                "default": true,
-                "type": "single",
-                "pattern": "stack",
-                "areas": [
+                "pattern": "collection",
+                "density": "comfortable",
+                "contentWidth": "fluid",
+                "scroll": "regions",
+                "regions": [
                   {
                     "id": "portfolio",
-                    "role": "main",
+                    "role": "collection",
+                    "priority": 100,
+                    "scroll": "page",
+                    "presentation": {
+                      "wide": "pane",
+                      "compact": "stack"
+                    },
                     "label": "Research directions"
                   }
-                ]
+                ],
+                "interaction": {
+                  "selection": "single",
+                  "rowActivation": "select",
+                  "filters": "inline",
+                  "actions": "adaptive"
+                },
+                "id": "portfolio",
+                "default": true
               }
             ]
           },
@@ -179,8 +246,8 @@
                     "projectReleaseRef": null,
                     "studyRealizationRef": null,
                     "researchExperimentId": null,
-                    "activeResearchTab": "overview"
-                    ,"activeCompilationFacet": "source_analysis"
+                    "activeResearchTab": "overview",
+                    "activeCompilationFacet": "source_analysis"
                   }
                 },
                 {
@@ -706,12 +773,30 @@
                     "label": "Decision",
                     "required": true,
                     "options": [
-                      {"label": "Form research task", "value": "accept_for_research_task"},
-                      {"label": "Form engineering task", "value": "accept_for_engineering_task"},
-                      {"label": "Reuse known solution", "value": "reuse_known_solution"},
-                      {"label": "Defer as intractable", "value": "defer_intractable"},
-                      {"label": "Stop this branch", "value": "stop"},
-                      {"label": "Request revision", "value": "request_revision"}
+                      {
+                        "label": "Form research task",
+                        "value": "accept_for_research_task"
+                      },
+                      {
+                        "label": "Form engineering task",
+                        "value": "accept_for_engineering_task"
+                      },
+                      {
+                        "label": "Reuse known solution",
+                        "value": "reuse_known_solution"
+                      },
+                      {
+                        "label": "Defer as intractable",
+                        "value": "defer_intractable"
+                      },
+                      {
+                        "label": "Stop this branch",
+                        "value": "stop"
+                      },
+                      {
+                        "label": "Request revision",
+                        "value": "request_revision"
+                      }
                     ]
                   },
                   {
@@ -1096,7 +1181,10 @@
                     "task_id": "$state.selectedResearchTaskId",
                     "implementation_track_id": "$state.selectedImplementationTrackId"
                   },
-                  "invalidates": ["research.activity", "research.implementation"]
+                  "invalidates": [
+                    "research.activity",
+                    "research.implementation"
+                  ]
                 },
                 {
                   "on": "click:sync-implementation",
@@ -1107,7 +1195,10 @@
                     "task_id": "$state.selectedResearchTaskId",
                     "implementation_track_id": "$state.selectedImplementationTrackId"
                   },
-                  "invalidates": ["research.activity", "research.implementation"]
+                  "invalidates": [
+                    "research.activity",
+                    "research.implementation"
+                  ]
                 },
                 {
                   "on": "click:prepare-release",
@@ -1120,7 +1211,11 @@
                     "confirmed": true,
                     "bump": "patch"
                   },
-                  "invalidates": ["research.activity", "research.implementation", "research.release"]
+                  "invalidates": [
+                    "research.activity",
+                    "research.implementation",
+                    "research.release"
+                  ]
                 },
                 {
                   "on": "click:publish-release",
@@ -1133,7 +1228,11 @@
                     "confirmed": true,
                     "bump": "patch"
                   },
-                  "invalidates": ["research.activity", "research.implementation", "research.release"]
+                  "invalidates": [
+                    "research.activity",
+                    "research.implementation",
+                    "research.release"
+                  ]
                 },
                 {
                   "on": "click:instantiate-study",
@@ -1145,7 +1244,12 @@
                     "implementation_track_id": "$state.selectedImplementationTrackId",
                     "idempotency_key": "workbench-study-$state.selectedDirectionId-$state.selectedImplementationTrackId"
                   },
-                  "invalidates": ["research.activity", "research.implementation", "research.study", "research.evidence"]
+                  "invalidates": [
+                    "research.activity",
+                    "research.implementation",
+                    "research.study",
+                    "research.evidence"
+                  ]
                 },
                 {
                   "on": "click:start-smoke",
@@ -1158,7 +1262,11 @@
                     "confirmed": true,
                     "idempotency_key": "workbench-smoke-$state.selectedDirectionId-$state.selectedImplementationTrackId"
                   },
-                  "invalidates": ["research.activity", "research.study", "research.evidence"]
+                  "invalidates": [
+                    "research.activity",
+                    "research.study",
+                    "research.evidence"
+                  ]
                 },
                 {
                   "on": "click:sync-study",
@@ -1169,7 +1277,11 @@
                     "task_id": "$state.selectedResearchTaskId",
                     "implementation_track_id": "$state.selectedImplementationTrackId"
                   },
-                  "invalidates": ["research.activity", "research.study", "research.evidence"]
+                  "invalidates": [
+                    "research.activity",
+                    "research.study",
+                    "research.evidence"
+                  ]
                 },
                 {
                   "on": "click:help-modal",
@@ -1329,7 +1441,9 @@
                     "direction_id": "$state.selectedDirectionId",
                     "task_id": "$state.selectedResearchTaskId"
                   },
-                  "invalidates": ["research.activity"]
+                  "invalidates": [
+                    "research.activity"
+                  ]
                 }
               ]
             },
@@ -1412,16 +1526,46 @@
               "inputs": {
                 "emptyText": "No implementation track is selected.",
                 "fields": [
-                  {"key": "selected_implementation_track.ref", "label": "Implementation track"},
-                  {"key": "selected_implementation_track.status", "label": "State"},
-                  {"key": "development_session.session_id", "label": "Development Session"},
-                  {"key": "selected_implementation_track.candidate_release_digest", "label": "Reviewed candidate"},
-                  {"key": "selected_implementation_track.project_release_ref", "label": "ProjectRelease"},
-                  {"key": "selected_implementation_track.project_release_digest", "label": "Release digest"},
-                  {"key": "selected_implementation_track.runner_ref", "label": "Installed runner"},
-                  {"key": "selected_implementation_track.study_realization_ref", "label": "StudyRealization"},
-                  {"key": "selected_implementation_track.study_realization_digest", "label": "Realization digest"},
-                  {"key": "selected_implementation_track.experiment_id", "label": "ResearchManager Experiment"}
+                  {
+                    "key": "selected_implementation_track.ref",
+                    "label": "Implementation track"
+                  },
+                  {
+                    "key": "selected_implementation_track.status",
+                    "label": "State"
+                  },
+                  {
+                    "key": "development_session.session_id",
+                    "label": "Development Session"
+                  },
+                  {
+                    "key": "selected_implementation_track.candidate_release_digest",
+                    "label": "Reviewed candidate"
+                  },
+                  {
+                    "key": "selected_implementation_track.project_release_ref",
+                    "label": "ProjectRelease"
+                  },
+                  {
+                    "key": "selected_implementation_track.project_release_digest",
+                    "label": "Release digest"
+                  },
+                  {
+                    "key": "selected_implementation_track.runner_ref",
+                    "label": "Installed runner"
+                  },
+                  {
+                    "key": "selected_implementation_track.study_realization_ref",
+                    "label": "StudyRealization"
+                  },
+                  {
+                    "key": "selected_implementation_track.study_realization_digest",
+                    "label": "Realization digest"
+                  },
+                  {
+                    "key": "selected_implementation_track.experiment_id",
+                    "label": "ResearchManager Experiment"
+                  }
                 ]
               }
             },
@@ -1449,13 +1593,29 @@
             "id": "research_direction_selector",
             "title": "Choose research direction",
             "layout": {
-              "type": "stack",
-              "areas": [
+              "version": 2,
+              "pattern": "collection",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
                 {
                   "id": "main",
-                  "role": "main"
+                  "role": "collection",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
                 }
-              ]
+              ],
+              "interaction": {
+                "selection": "single",
+                "rowActivation": "select",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
             },
             "widgets": [
               {
@@ -1527,13 +1687,29 @@
             "id": "research_new_direction",
             "title": "New research direction",
             "layout": {
-              "type": "stack",
-              "areas": [
+              "version": 2,
+              "pattern": "task-flow",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
                 {
                   "id": "main",
-                  "role": "main"
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
                 }
-              ]
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
             },
             "widgets": [
               {
@@ -1618,13 +1794,29 @@
             "id": "research_direction_details",
             "title": "Research direction details",
             "layout": {
-              "type": "stack",
-              "areas": [
+              "version": 2,
+              "pattern": "document",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
                 {
                   "id": "main",
-                  "role": "main"
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
                 }
-              ]
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
             },
             "widgets": [
               {
@@ -1651,16 +1843,46 @@
                 },
                 "inputs": {
                   "fields": [
-                    {"key": "direction.ref", "label": "Direction"},
-                    {"key": "direction.artifact_owner_ref", "label": "Artifact custodian"},
-                    {"key": "selected_task.ref", "label": "Selected task"},
-                    {"key": "selected_implementation_track.ref", "label": "Implementation track"},
-                    {"key": "project.ref", "label": "Implementation Project"},
-                    {"key": "direction.status", "label": "Stage"},
-                    {"key": "direction.generation", "label": "Generation"},
-                    {"key": "source_bundle.digest", "label": "Artifact set"},
-                    {"key": "current_prototype.revision", "label": "Prototype revision"},
-                    {"key": "development_session.session_id", "label": "Development Session"}
+                    {
+                      "key": "direction.ref",
+                      "label": "Direction"
+                    },
+                    {
+                      "key": "direction.artifact_owner_ref",
+                      "label": "Artifact custodian"
+                    },
+                    {
+                      "key": "selected_task.ref",
+                      "label": "Selected task"
+                    },
+                    {
+                      "key": "selected_implementation_track.ref",
+                      "label": "Implementation track"
+                    },
+                    {
+                      "key": "project.ref",
+                      "label": "Implementation Project"
+                    },
+                    {
+                      "key": "direction.status",
+                      "label": "Stage"
+                    },
+                    {
+                      "key": "direction.generation",
+                      "label": "Generation"
+                    },
+                    {
+                      "key": "source_bundle.digest",
+                      "label": "Artifact set"
+                    },
+                    {
+                      "key": "current_prototype.revision",
+                      "label": "Prototype revision"
+                    },
+                    {
+                      "key": "development_session.session_id",
+                      "label": "Development Session"
+                    }
                   ]
                 }
               },
@@ -1670,11 +1892,18 @@
                 "area": "main",
                 "inputs": {
                   "buttons": [
-                    {"id": "close", "label": "Close", "icon": "close-outline"}
+                    {
+                      "id": "close",
+                      "label": "Close",
+                      "icon": "close-outline"
+                    }
                   ]
                 },
                 "actions": [
-                  {"on": "click:close", "type": "closeModal"}
+                  {
+                    "on": "click:close",
+                    "type": "closeModal"
+                  }
                 ]
               }
             ]
@@ -1690,10 +1919,29 @@
             "id": "research_artifact_preview",
             "title": "Artifact preview",
             "layout": {
-              "type": "stack",
-              "areas": [
-                {"id": "main", "role": "main"}
-              ]
+              "version": 2,
+              "pattern": "document",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
+                {
+                  "id": "main",
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
+                }
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
             },
             "widgets": [
               {
@@ -1711,11 +1959,15 @@
                     "artifact_id": "$state.selectedArtifactId"
                   },
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["research.artifacts"],
+                  "invalidationTags": [
+                    "research.artifacts"
+                  ],
                   "preserveLastValue": false,
                   "maxRequestHz": 2
                 },
-                "inputs": {"bindField": "content"}
+                "inputs": {
+                  "bindField": "content"
+                }
               },
               {
                 "id": "research-artifact-text-preview",
@@ -1732,7 +1984,9 @@
                     "artifact_id": "$state.selectedArtifactId"
                   },
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["research.artifacts"],
+                  "invalidationTags": [
+                    "research.artifacts"
+                  ],
                   "preserveLastValue": false,
                   "maxRequestHz": 2
                 },
@@ -1757,7 +2011,9 @@
                     "artifact_id": "$state.selectedArtifactId"
                   },
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["research.artifacts"],
+                  "invalidationTags": [
+                    "research.artifacts"
+                  ],
                   "preserveLastValue": false,
                   "maxRequestHz": 2
                 },
@@ -1782,11 +2038,15 @@
                     "artifact_id": "$state.selectedArtifactId"
                   },
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["research.artifacts"],
+                  "invalidationTags": [
+                    "research.artifacts"
+                  ],
                   "preserveLastValue": false,
                   "maxRequestHz": 2
                 },
-                "inputs": {"bindField": "content"}
+                "inputs": {
+                  "bindField": "content"
+                }
               },
               {
                 "id": "research-artifact-preview-close",
@@ -1794,11 +2054,18 @@
                 "area": "main",
                 "inputs": {
                   "buttons": [
-                    {"id": "close", "label": "Close", "icon": "close-outline"}
+                    {
+                      "id": "close",
+                      "label": "Close",
+                      "icon": "close-outline"
+                    }
                   ]
                 },
                 "actions": [
-                  {"on": "click:close", "type": "closeModal"}
+                  {
+                    "on": "click:close",
+                    "type": "closeModal"
+                  }
                 ]
               }
             ]
@@ -1814,13 +2081,29 @@
             "id": "research_workbench_help",
             "title": "Research Workbench — usage and capabilities",
             "layout": {
-              "type": "stack",
-              "areas": [
+              "version": 2,
+              "pattern": "document",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
                 {
                   "id": "main",
-                  "role": "main"
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
                 }
-              ]
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
             },
             "widgets": [
               {

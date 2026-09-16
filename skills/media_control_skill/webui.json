@@ -54,7 +54,9 @@
             "target_id": "$state.mediaControlTargetId"
           },
           "scope": "workspace",
-          "invalidationTags": ["media_control.sessions"]
+          "invalidationTags": [
+            "media_control.sessions"
+          ]
         },
         "statusTitlePath": "title",
         "statusSubtitlePath": "target_label",
@@ -82,9 +84,13 @@
             "optionsDataSource": {
               "kind": "skill",
               "name": "media_control_skill.list_targets",
-              "params": {"limit": 50},
+              "params": {
+                "limit": 50
+              },
               "cacheTtlMs": 1000,
-              "invalidationTags": ["media_control.targets"],
+              "invalidationTags": [
+                "media_control.targets"
+              ],
               "preserveLastValue": true,
               "maxRequestHz": 1
             },
@@ -209,14 +215,29 @@
           "id": "media_control_remote_modal",
           "title": "Media Remote",
           "layout": {
-            "type": "single",
-            "pattern": "stack",
-            "areas": [
+            "version": 2,
+            "pattern": "collection",
+            "density": "comfortable",
+            "contentWidth": "fluid",
+            "scroll": "page",
+            "regions": [
               {
                 "id": "main",
-                "role": "main"
+                "role": "collection",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                }
               }
-            ]
+            ],
+            "interaction": {
+              "selection": "single",
+              "rowActivation": "select",
+              "filters": "inline",
+              "actions": "adaptive"
+            }
           },
           "widgets": [
             {
@@ -423,17 +444,85 @@
                 "variant": "adaptiveToolbar",
                 "size": "small",
                 "buttons": [
-                  {"id": "fullscreen", "icon": "scan-outline", "label": "Fullscreen", "label_i18n": {"key": "runtime.media_control.ui.fullscreen"}},
-                  {"id": "pip", "icon": "browsers-outline", "label": "Picture in Picture", "label_i18n": {"key": "runtime.media_control.ui.picture_in_picture"}},
-                  {"id": "mini", "icon": "contract-outline", "label": "Mini-player", "label_i18n": {"key": "runtime.media_control.ui.mini_player"}}
+                  {
+                    "id": "fullscreen",
+                    "icon": "scan-outline",
+                    "label": "Fullscreen",
+                    "label_i18n": {
+                      "key": "runtime.media_control.ui.fullscreen"
+                    }
+                  },
+                  {
+                    "id": "pip",
+                    "icon": "browsers-outline",
+                    "label": "Picture in Picture",
+                    "label_i18n": {
+                      "key": "runtime.media_control.ui.picture_in_picture"
+                    }
+                  },
+                  {
+                    "id": "mini",
+                    "icon": "contract-outline",
+                    "label": "Mini-player",
+                    "label_i18n": {
+                      "key": "runtime.media_control.ui.mini_player"
+                    }
+                  }
                 ]
               },
               "actions": [
-                {"on": "click:fullscreen", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "presentation", "arguments": {"mode": "fullscreen"}, "profile_id": "default", "target_id": "$state.mediaControlTargetId"}, "invalidates": ["media_control.sessions"]},
-                {"on": "click:pip", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "presentation", "arguments": {"mode": "picture_in_picture"}, "profile_id": "default", "target_id": "$state.mediaControlTargetId"}, "invalidates": ["media_control.sessions"]},
-                {"on": "click:mini", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "presentation", "arguments": {"mode": "mini"}, "profile_id": "default", "target_id": "$state.mediaControlTargetId"}, "invalidates": ["media_control.sessions"]}
+                {
+                  "on": "click:fullscreen",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "presentation",
+                    "arguments": {
+                      "mode": "fullscreen"
+                    },
+                    "profile_id": "default",
+                    "target_id": "$state.mediaControlTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                },
+                {
+                  "on": "click:pip",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "presentation",
+                    "arguments": {
+                      "mode": "picture_in_picture"
+                    },
+                    "profile_id": "default",
+                    "target_id": "$state.mediaControlTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                },
+                {
+                  "on": "click:mini",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "presentation",
+                    "arguments": {
+                      "mode": "mini"
+                    },
+                    "profile_id": "default",
+                    "target_id": "$state.mediaControlTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                }
               ],
-              "title_i18n": {"key": "runtime.media_control.ui.presentation"}
+              "title_i18n": {
+                "key": "runtime.media_control.ui.presentation"
+              }
             },
             {
               "id": "media-control-volume",
@@ -443,13 +532,42 @@
               "inputs": {
                 "autoCommit": true,
                 "fields": [
-                  {"id": "volume", "type": "slider", "label": "Volume", "label_i18n": {"key": "runtime.media_control.ui.volume"}, "stateKey": "mediaControlVolume", "defaultValue": 1, "min": 0, "max": 1, "step": 0.05}
+                  {
+                    "id": "volume",
+                    "type": "slider",
+                    "label": "Volume",
+                    "label_i18n": {
+                      "key": "runtime.media_control.ui.volume"
+                    },
+                    "stateKey": "mediaControlVolume",
+                    "defaultValue": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.05
+                  }
                 ]
               },
               "actions": [
-                {"on": "change:volume", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "volume", "arguments": {"volume": "$event.value"}, "profile_id": "default", "target_id": "$state.mediaControlTargetId"}, "invalidates": ["media_control.sessions"]}
+                {
+                  "on": "change:volume",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "volume",
+                    "arguments": {
+                      "volume": "$event.value"
+                    },
+                    "profile_id": "default",
+                    "target_id": "$state.mediaControlTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                }
               ],
-              "title_i18n": {"key": "runtime.media_control.ui.volume"}
+              "title_i18n": {
+                "key": "runtime.media_control.ui.volume"
+              }
             }
           ],
           "interface": {

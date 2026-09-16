@@ -82,18 +82,39 @@
           "id": "streaming_recipe_book_eval",
           "title": "Домашняя книга рецептов",
           "layout": {
-            "type": "responsive",
-            "pattern": "focus-detail",
-            "areas": [
+            "version": 2,
+            "pattern": "collection",
+            "density": "comfortable",
+            "contentWidth": "fluid",
+            "scroll": "regions",
+            "regions": [
               {
                 "id": "catalog",
-                "role": "main"
+                "role": "collection",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                }
               },
               {
                 "id": "detail",
-                "role": "complementary"
+                "role": "utility",
+                "priority": 40,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                }
               }
-            ]
+            ],
+            "interaction": {
+              "selection": "single",
+              "rowActivation": "select",
+              "filters": "inline",
+              "actions": "adaptive"
+            }
           },
           "initialState": {
             "activeCategory": "all",
@@ -322,14 +343,29 @@
           "schema": {
             "id": "recipe_detail_modal",
             "layout": {
-              "type": "single",
-              "pattern": "modal",
-              "areas": [
+              "version": 2,
+              "pattern": "document",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
                 {
                   "id": "modal",
-                  "role": "main"
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
                 }
-              ]
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
             },
             "widgets": [
               {
@@ -416,14 +452,29 @@
           "schema": {
             "id": "add_recipe_modal",
             "layout": {
-              "type": "single",
-              "pattern": "modal",
-              "areas": [
+              "version": 2,
+              "pattern": "task-flow",
+              "density": "comfortable",
+              "contentWidth": "fluid",
+              "scroll": "page",
+              "regions": [
                 {
                   "id": "modal",
-                  "role": "main"
+                  "role": "main",
+                  "priority": 100,
+                  "scroll": "page",
+                  "presentation": {
+                    "wide": "pane",
+                    "compact": "stack"
+                  }
                 }
-              ]
+              ],
+              "interaction": {
+                "selection": "none",
+                "rowActivation": "none",
+                "filters": "inline",
+                "actions": "adaptive"
+              }
             },
             "widgets": [
               {

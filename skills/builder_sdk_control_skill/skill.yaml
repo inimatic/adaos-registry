@@ -1,6 +1,9 @@
 name: builder_sdk_control_skill
-version: 0.1.115
+version: 0.1.117
 description: SDK-only backend for the functional Builder DEV scenario.
+capabilities:
+- applications.develop
+- applications.publish
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -19,6 +22,497 @@ conversation:
   evidence:
     read: builder_changes
 tools:
+- name: get_clarification
+  description: Read current model questions and retained partial answers.
+  entry: handlers.main:get_clarification
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: answer_clarification
+  description: Save one answer without starting a model run.
+  entry: handlers.main:answer_clarification
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      interaction_id:
+        type: string
+        minLength: 1
+      expected_generation:
+        type: integer
+        minimum: 0
+      question_id:
+        type: string
+        minLength: 1
+      answer:
+        type: string
+        maxLength: 8000
+      idempotency_key:
+        type: string
+        minLength: 1
+    required:
+    - interaction_id
+    - expected_generation
+    - question_id
+    - answer
+    - idempotency_key
+  output_schema:
+    type: object
+- name: resume_clarification
+  description: Continue the exact Change after all questions and explicit consent.
+  entry: handlers.main:resume_clarification
+  side_effects: external_write
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      interaction_id:
+        type: string
+        minLength: 1
+      expected_generation:
+        type: integer
+        minimum: 0
+      confirmed:
+        type: boolean
+        const: true
+    required:
+    - interaction_id
+    - expected_generation
+    - confirmed
+  output_schema:
+    type: object
+- name: get_review
+  description: Read stage-scoped actual acceptance receipts.
+  entry: handlers.main:get_review
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: get_workbench
+  description: Read the canonical live workbench state.
+  entry: handlers.main:get_workbench
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: get_codex_options
+  description: Read the available Codex model collection.
+  entry: handlers.main:get_codex_options
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: get_model_settings
+  description: Read independent saved stage model settings.
+  entry: handlers.main:get_model_settings
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: set_codex_profile
+  description: Save one Root-advertised Codex profile.
+  entry: handlers.main:set_codex_profile
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      model:
+        type: string
+      reasoning_effort:
+        type: string
+    required:
+    - model
+  output_schema:
+    type: object
+- name: get_prototype_model_choices
+  description: Read the prototype model choice collection.
+  entry: handlers.main:get_prototype_model_choices
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: array
+    items:
+      type: object
+- name: get_workbench_messages
+  description: Read a project-owned conversation thread.
+  entry: handlers.main:get_workbench_messages
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+      mode:
+        type: string
+        enum:
+        - task
+        - informal
+  output_schema:
+    type: object
+- name: append_discussion
+  description: Record informal discussion without task execution.
+  entry: handlers.main:append_discussion
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+      text:
+        type: string
+        minLength: 1
+        maxLength: 32000
+    required:
+    - text
+  output_schema:
+    type: object
+- name: save_specification_delta
+  description: Save explicit requirement edits for Change review.
+  entry: handlers.main:save_specification_delta
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      text:
+        type: string
+        maxLength: 131072
+      expected_generation:
+        type: integer
+      change_id:
+        type: string
+    required:
+    - text
+    - expected_generation
+    - change_id
+  output_schema:
+    type: object
+- name: list_icon_drafts
+  description: Read existing owned image drafts for the selected application without
+    provider work.
+  entry: handlers.main:list_icon_drafts
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: generate_icon
+  description: Generate a reviewed icon draft through the subscribed image SDK, with
+    an explicit image model.
+  entry: handlers.main:generate_icon
+  side_effects: external_write
+  input_schema:
+    type: object
+    required:
+    - prompt
+    - model
+    properties:
+      prompt:
+        type: string
+        minLength: 1
+        maxLength: 4000
+      model:
+        type: string
+        minLength: 1
+      request_id:
+        type:
+        - string
+        - 'null'
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: get_icon_generation
+  description: Read an owned icon draft without repeating generation or changing source
+    assets.
+  entry: handlers.main:get_icon_generation
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - request_id
+    properties:
+      request_id:
+        type: string
+        minLength: 1
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: generate_readme
+  description: Generate or improve a reviewed README draft using the runtime content
+    SDK.
+  entry: handlers.main:generate_readme
+  side_effects: external_write
+  input_schema:
+    type: object
+    required:
+    - prompt
+    properties:
+      prompt:
+        type: string
+        minLength: 1
+      request_id:
+        type:
+        - string
+        - 'null'
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      model:
+        type:
+        - string
+        - 'null'
+      reasoning_effort:
+        type: string
+        enum:
+        - minimal
+        - low
+        - medium
+        - high
+  output_schema:
+    type: object
+- name: get_readme_generation
+  description: Read a durable README draft without regenerating it.
+  entry: handlers.main:get_readme_generation
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - request_id
+    properties:
+      request_id:
+        type: string
+        minLength: 1
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: get_about
+  description: Read public documentation and the registered application owner, without
+    creating identity or changing source.
+  entry: handlers.main:get_about
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: read_readme
+  description: Read the public README with its exact edit revision.
+  entry: handlers.main:read_readme
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: save_readme
+  description: Save README with a stale-edit precondition.
+  entry: handlers.main:save_readme
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+      text:
+        type: string
+      expected_digest:
+        type: string
+        minLength: 1
+    required:
+    - text
+    - expected_digest
+  output_schema:
+    type: object
 - name: list_projects
   description: List bounded DEV projects available to Builder.
   entry: handlers.main:list_projects
@@ -73,6 +567,24 @@ tools:
         minLength: 1
       webspace_id:
         type: string
+  output_schema:
+    type: object
+- name: get_project_access_contract
+  description: Review the selected DEV project's Application permissions and roles.
+  entry: handlers.main:get_project_access_contract
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
   output_schema:
     type: object
 - name: list_project_files
@@ -1249,6 +1761,30 @@ tools:
         minLength: 1
   output_schema:
     type: object
+- name: get_process_stages
+  description: Read revision-scoped Process stages with current and disabled markers.
+  entry: handlers.main:get_process_stages
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      revision:
+        type:
+        - string
+        - 'null'
+  output_schema:
+    type: array
+    items:
+      type: object
 - name: get_process_tree
   description: List dependent Process nodes for collection-tree renderers.
   entry: handlers.main:get_process_tree
@@ -1633,6 +2169,13 @@ tools:
       confirmed:
         type: boolean
         description: Explicit user confirmation for Trial activation or Publication.
+      approve_permissions:
+        type: boolean
+        description: Explicit approval of the reviewed permission delta for Trial
+          activation.
+      verification_evidence:
+        type: object
+        description: Release-bound Builder Final Verification evidence.
       webspace_id:
         type: string
   output_schema:
@@ -1809,6 +2352,259 @@ tools:
     - selected
     - content
 data_routes:
+- surface: scenario:builder.about
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_about
+  first_paint: no identity or documentation until the selected application is loaded
+  recovery: explicit refresh or matching selected-application change reloads once
+  budget:
+    max_payload_bytes: 196608
+    max_items: 1
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: false
+    invalidation_tags:
+    - builder.project.metadata
+    - builder.project.lifecycle
+    - builder.project.preview
+    - builder.project.automation
+    - builder.project.publication
+    - builder.project.change
+  guard_visibility:
+    degraded_state: selected application About is unavailable
+    metric: data_route.builder_about_read
+- surface: modal:builder.icon_drafts
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: list_icon_drafts
+  first_paint: empty list until owned drafts for the selected application are loaded
+  recovery: explicit refresh or image draft invalidation reloads once
+  budget:
+    max_payload_bytes: 196608
+    max_items: 10
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: false
+    invalidation_tags:
+    - builder.project.icon_drafts
+  guard_visibility:
+    degraded_state: owned image drafts are unavailable
+    metric: data_route.builder_icon_drafts_read
+- surface: widget:builder.get_review
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_review
+  first_paint: stage-scoped receipts or explicit missing evidence
+  recovery: refresh after an exact task evidence update
+  budget:
+    max_payload_bytes: 524288
+    max_items: 500
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: false
+    invalidation_tags:
+    - builder.project.lifecycle
+    - builder.project.automation
+    - builder.project.change
+  guard_visibility:
+    degraded_state: acceptance evidence unavailable
+    metric: data_route.builder_get_review
+- surface: widget:builder.get_workbench
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_workbench
+  first_paint: exact project data or an explicit empty state
+  recovery: retry or select another project
+  budget:
+    max_payload_bytes: 524288
+    max_items: 500
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.metadata
+    - builder.project.lifecycle
+    - builder.project.automation
+    - builder.project.files
+    - builder.project.llm
+    - builder.project.change
+  guard_visibility:
+    degraded_state: current project data is unavailable
+    metric: data_route.builder_get_workbench
+- surface: widget:builder.get_codex_options
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_codex_options
+  first_paint: exact project data or an explicit empty state
+  recovery: retry or select another project
+  budget:
+    max_payload_bytes: 524288
+    max_items: 500
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.metadata
+    - builder.project.lifecycle
+    - builder.project.automation
+    - builder.project.files
+    - builder.project.llm
+    - builder.project.change
+  guard_visibility:
+    degraded_state: current project data is unavailable
+    metric: data_route.builder_get_codex_options
+- surface: widget:builder.get_model_settings
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_model_settings
+  first_paint: exact project data or an explicit empty state
+  recovery: retry or select another project
+  budget:
+    max_payload_bytes: 524288
+    max_items: 500
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.metadata
+    - builder.project.lifecycle
+    - builder.project.automation
+    - builder.project.files
+    - builder.project.llm
+    - builder.project.change
+  guard_visibility:
+    degraded_state: current project data is unavailable
+    metric: data_route.builder_get_model_settings
+- surface: widget:builder.get_prototype_model_choices
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_prototype_model_choices
+  first_paint: exact project data or an explicit empty state
+  recovery: retry or select another project
+  budget:
+    max_payload_bytes: 524288
+    max_items: 500
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.metadata
+    - builder.project.lifecycle
+    - builder.project.automation
+    - builder.project.files
+    - builder.project.llm
+    - builder.project.change
+  guard_visibility:
+    degraded_state: current project data is unavailable
+    metric: data_route.builder_get_prototype_model_choices
+- surface: widget:builder.get_workbench_messages
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_workbench_messages
+  first_paint: exact project data or an explicit empty state
+  recovery: retry or select another project
+  budget:
+    max_payload_bytes: 524288
+    max_items: 500
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.metadata
+    - builder.project.lifecycle
+    - builder.project.automation
+    - builder.project.files
+    - builder.project.llm
+    - builder.project.change
+  guard_visibility:
+    degraded_state: current project data is unavailable
+    metric: data_route.builder_get_workbench_messages
+- surface: widget:builder.read_readme
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: read_readme
+  first_paint: exact project data or an explicit empty state
+  recovery: retry or select another project
+  budget:
+    max_payload_bytes: 524288
+    max_items: 500
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.metadata
+    - builder.project.lifecycle
+    - builder.project.automation
+    - builder.project.files
+    - builder.project.llm
+    - builder.project.change
+  guard_visibility:
+    degraded_state: current project data is unavailable
+    metric: data_route.builder_read_readme
 - surface: widget:builder.skill_preview
   route: tool/details
   owner: skill:builder_sdk_control_skill
@@ -2030,6 +2826,38 @@ data_routes:
     log: service.builder_sdk_control_skill.runtime.log
     quarantine: false
     metric: data_route.builder_project_read
+- surface: modal:builder.trial_access_review
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_project_access_contract
+  first_paint: current DEV permission profile, roles, and data practices
+  recovery: preserve the last reviewed contract while an explicit refresh retries
+  update_source:
+  - submit_automation
+  - retry_failed_automation
+  - push_project
+  budget:
+    max_payload_bytes: 65536
+    max_items: 100
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.access
+    - builder.project.automation
+    - builder.project.publication
+  guard_visibility:
+    degraded_state: access declaration is stale; Trial approval remains disabled
+    log: service.builder_sdk_control_skill.runtime.log
+    quarantine: false
+    metric: data_route.builder_trial_access_review
 - surface: modal:builder.publication.project_status
   route: tool/details
   owner: skill:builder_sdk_control_skill
@@ -2352,13 +3180,12 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-09-16T05:07:15+00:00'
+updated_at: '2026-09-16T13:42:33+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.1018+6545.848f9be11
-    recorded_at: '2026-09-16T05:07:15+00:00'
+    min_version: 0.1.1002+6139.cdc1a0cfc
+    recorded_at: '2026-09-04T20:22:49+00:00'
     source: skill_push
-    min_commit: 848f9be11c73f8c80d63585b421daf62df13c484
-    min_short_commit: 848f9be1
-    build_date: '2026-09-16T08:05:34+03:00'
-
+    min_commit: cdc1a0cfc10886c891b013e3010fd6bc7ca94856
+    min_short_commit: cdc1a0cf
+    build_date: '2026-09-04T22:38:35+03:00'

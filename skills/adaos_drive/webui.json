@@ -296,30 +296,74 @@
           },
           "surfaceClass": "workspace",
           "layout": {
-            "type": "split",
-            "pattern": "focus-detail",
-            "areas": [
+            "version": 2,
+            "pattern": "collection-detail",
+            "density": "comfortable",
+            "contentWidth": "fluid",
+            "scroll": "regions",
+            "regions": [
               {
                 "id": "left",
-                "role": "sidebar",
-                "label": "Left panel"
+                "role": "navigation",
+                "priority": 80,
+                "scroll": "region",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "drawer"
+                },
+                "label": "Left panel",
+                "size": {
+                  "minPx": 200,
+                  "preferredPx": 280,
+                  "maxPx": 480
+                }
               },
               {
                 "id": "right",
-                "role": "main",
+                "role": "collection",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                },
                 "label": "Right panel"
               },
               {
                 "id": "preview",
-                "role": "aux",
-                "label": "Preview and links"
+                "role": "detail",
+                "priority": 70,
+                "scroll": "region",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "sheet"
+                },
+                "label": "Preview and links",
+                "size": {
+                  "minPx": 220,
+                  "preferredPx": 360,
+                  "maxPx": 600
+                }
               },
               {
                 "id": "bottom",
-                "role": "footer",
+                "role": "commands",
+                "priority": 90,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "pane"
+                },
                 "label": "Commands and sources"
               }
-            ]
+            ],
+            "interaction": {
+              "selection": "single",
+              "rowActivation": "open-detail",
+              "filters": "inline",
+              "actions": "adaptive",
+              "detail": "inline"
+            }
           },
           "initialState": {
             "adaosDriveActivePanel": "left",

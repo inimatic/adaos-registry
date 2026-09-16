@@ -10,12 +10,13 @@ from uuid import uuid4
 
 import yaml
 
-from adaos.sdk import conversation, navigation
+from adaos.sdk import applications, conversation, navigation
 from adaos.sdk.builder import (
     automation,
     development_sessions,
     issues as builder_issues,
     lifecycle as builder_lifecycle,
+    model_settings,
     preview,
     project_catalog,
     review,
@@ -23,8 +24,10 @@ from adaos.sdk.builder import (
     workflow,
 )
 from adaos.sdk.core.decorators import tool
-from adaos.sdk.developer import compositions, projects, prompt_context
+from adaos.sdk.developer import compositions, documents, projects, prompt_context
 from adaos.sdk.llm.llm_client import list_llm_models
+from adaos.sdk.llm import content as content_generation
+from adaos.sdk.llm import images as image_generation
 
 SKILL_ID = "builder_sdk_control_skill"
 DEFAULT_PROJECT_KIND = "scenario"
@@ -1686,6 +1689,139 @@ def get_project(
 
 
 @tool(
+    "get_project_access_contract",
+    summary="Review the selected DEV project's Application permissions and roles.",
+    side_effects="none",
+)
+def get_project_access_contract(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    execution_kind, execution_id = _execution_identity(kind, project_id)
+    from adaos.sdk.builder import applications as builder_applications
+    from adaos.sdk.builder import automation as builder_automation
+
+    contract = builder_applications.project_access_contract(
+        f"{execution_kind}:{execution_id}",
+        project_ref=f"project:{project_id}" if kind == "project" else None,
+    )
+    profile = (
+        contract.get("profile")
+        if isinstance(contract.get("profile"), Mapping)
+        else {}
+    )
+    required = profile.get("required") if isinstance(profile.get("required"), list) else []
+    optional = profile.get("optional") if isinstance(profile.get("optional"), list) else []
+    roles = contract.get("roles") if isinstance(contract.get("roles"), list) else []
+    practices = (
+        profile.get("data_practices")
+        if isinstance(profile.get("data_practices"), Mapping)
+        else {}
+    )
+
+    def permission_text(values: list[Any]) -> str:
+        rows = []
+        for value in values:
+            if not isinstance(value, Mapping):
+                continue
+            permission_id = str(value.get("id") or "").strip()
+            purpose = str(value.get("purpose") or "").strip()
+            if permission_id:
+                rows.append(permission_id + (f" - {purpose}" if purpose else ""))
+        return "\n".join(rows) if rows else "None"
+
+    role_rows = []
+    for role in roles:
+        if not isinstance(role, Mapping):
+            continue
+        role_id = str(role.get("id") or role.get("role_id") or "").strip()
+        title = str(role.get("title") or role_id).strip()
+        grants = _list_text(role.get("grants"), empty="no grants")
+        assignable = _list_text(role.get("assignable_to"), empty="nobody")
+        if role_id:
+            role_rows.append(f"{title}: {grants}; assignable to {assignable}")
+    declaration_status = str(contract.get("declaration_status") or "unavailable")
+    undeclared = contract.get("undeclared_inferred") or []
+    declaration_ready = (
+        contract.get("status") == "present"
+        and declaration_status == "present"
+        and not undeclared
+    )
+    trusted_evidence = builder_automation.trial_verification_evidence(
+        object_type=execution_kind,
+        object_id=execution_id,
+        webspace_id="desktop-dev",
+    )
+    verification_evidence: dict[str, Any] = {}
+    if trusted_evidence.get("status") == "ready":
+        manifest_ref = str(contract.get("manifest_ref") or "").strip()
+        manifest_digest = str(contract.get("manifest_digest") or "").strip()
+        manifest_evidence = (
+            f"manifest:{manifest_ref}#{manifest_digest}"
+            if manifest_ref and manifest_digest
+            else ""
+        )
+        verification_evidence = {
+            key: value
+            for key, value in trusted_evidence.items()
+            if key not in {"ok", "status", "task_id", "evidence_manifest_schema"}
+        }
+        verification_evidence.update(
+            {
+                "observed_capabilities": list(contract.get("statically_inferred") or []),
+                "inferred_capabilities": list(contract.get("statically_inferred") or []),
+                "pending_action_evidence": [
+                    "skip:bounded:no_external_or_confirmation_required_application_tools"
+                ],
+                "disclosure_evidence": [manifest_evidence] if manifest_evidence else [],
+                "redaction_evidence": (
+                    [manifest_evidence + "#secrets"] if manifest_evidence else []
+                ),
+            }
+        )
+    verification_ready = bool(
+        trusted_evidence.get("status") == "ready"
+        and verification_evidence.get("disclosure_evidence")
+        and verification_evidence.get("redaction_evidence")
+    )
+    ready = declaration_ready and verification_ready
+    return {
+        "ok": True,
+        "status": "ready" if ready else "blocked",
+        "declaration_status": declaration_status,
+        "authority_status": contract.get("authority_status"),
+        "project_ref": contract.get("project_ref"),
+        "profile_digest": contract.get("profile_digest"),
+        "required_permissions": permission_text(required),
+        "optional_permissions": permission_text(optional),
+        "roles": "\n".join(role_rows) if role_rows else "No differentiated roles",
+        "collected_data": _list_text(practices.get("collected"), empty="None"),
+        "linked_to_user": _list_text(practices.get("linked_to_user"), empty="None"),
+        "sent_off_device": _list_text(practices.get("sent_off_device"), empty="None"),
+        "retention": practices.get("retention") or "Not declared",
+        "undeclared_inferred": _list_text(undeclared, empty="None"),
+        "unused_declared": _list_text(contract.get("unused_declared"), empty="None"),
+        "diagnostics": _list_text(contract.get("diagnostics"), empty="None"),
+        "verification_status": trusted_evidence.get("status") or "blocked",
+        "verification_reason": trusted_evidence.get("reason") or "sealed_automation_evidence_ready",
+        "verification_task_id": trusted_evidence.get("task_id"),
+        "verification_evidence": verification_evidence,
+        "approval_required": ready,
+        "approval_summary": (
+            "Approving prepares the immutable Beta and binds this permission profile digest to the sealed Automation evidence."
+            if ready
+            else (
+                "Complete and checkpoint Automation with an access-matrix test before preparing Beta."
+                if declaration_ready
+                else "Repair the Application access declaration before preparing Beta."
+            )
+        ),
+        "raw": contract,
+    }
+
+
+@tool(
     "list_project_objects",
     summary="List a project and its declared skill dependencies.",
     side_effects="none",
@@ -2328,7 +2464,7 @@ def get_llm_options(
     object_type: str = DEFAULT_PROJECT_KIND,
     object_id: str = DEFAULT_PROJECT_ID,
 ) -> dict[str, Any]:
-    kind, project_id = _identity(object_type, object_id)
+    kind, project_id = _execution_identity(*_identity(object_type, object_id))
     try:
         payload = list_llm_models(timeout=5, scope="development")
         source = "root"
@@ -2353,7 +2489,7 @@ def set_llm_profile(
     object_type: str = DEFAULT_PROJECT_KIND,
     object_id: str = DEFAULT_PROJECT_ID,
 ) -> dict[str, Any]:
-    kind, project_id = _identity(object_type, object_id)
+    kind, project_id = _execution_identity(*_identity(object_type, object_id))
     selection = get_llm_options(kind, project_id)
     option = next(
         (item for item in selection["options"] if item["id"] == str(model).strip()),
@@ -2368,6 +2504,32 @@ def set_llm_profile(
         llm_provider=option.get("provider"),
         llm_profile=option,
     )
+
+
+@tool("get_codex_options", summary="Read Root-advertised Codex choices for this application.", side_effects="none")
+def get_codex_options(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID) -> dict[str, Any]:
+    kind, project_id = _execution_identity(*_identity(object_type, object_id))
+    result = model_settings.codex_options(kind, project_id)
+    return {**result, "items": [row for row in result["options"] if row["available"]]}
+
+
+@tool("set_codex_profile", summary="Save the independently selected Codex execution model.", side_effects="local_write")
+def set_codex_profile(model: str, reasoning_effort: str | None = None,
+                      object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID) -> dict[str, Any]:
+    kind, project_id = _execution_identity(*_identity(object_type, object_id))
+    return model_settings.set_codex_profile(kind, project_id, model=model, reasoning_effort=reasoning_effort)
+
+
+@tool("get_model_settings", summary="Read saved stage settings without changing selection.", side_effects="none")
+def get_model_settings(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    execution_kind, execution_id = _execution_identity(kind, project_id)
+    prototype = prompt_context.get(execution_kind, execution_id)
+    codex = prototype.get("builder_codex_profile") or {}
+    return {"prototype_model": prototype.get("builder_llm_model"),
+            "codex_model": codex.get("model"), "codex_effort": codex.get("reasoning_effort"),
+            "codex_provider": codex.get("provider"),
+            "execution_ref": f"{execution_kind}:{execution_id}"}
 
 
 @tool(
@@ -3279,14 +3441,17 @@ def _select_scenario_preview_target(
     if revision is not None:
         options["revision"] = revision
     result = preview.select_target(kind, project_id, **options)
+    if result.get("ok") is False:
+        return result
     selected = result.get("target") if isinstance(result.get("target"), Mapping) else {}
     selected_stage = str(selected.get("stage") or stage or "prototype").strip()
     selected_revision = str(selected.get("revision") or revision or "current").strip()
     try:
-        current = workflow.get_state(kind, project_id)
+        execution_kind, execution_id = _execution_identity(kind, project_id)
+        current = workflow.get_state(execution_kind, execution_id)
         interaction = workflow.update_interaction_context(
-            kind,
-            project_id,
+            execution_kind,
+            execution_id,
             {"preview_target": f"{selected_stage}:{project_id}:{selected_revision}"},
             expected_generation=int(current.get("generation") or 0),
         )
@@ -3313,7 +3478,7 @@ def select_preview(
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
-    if kind == "scenario":
+    if kind == "scenario" or (kind == "project" and _execution_identity(kind, project_id)[0] == "scenario"):
         return _select_scenario_preview_target(
             kind,
             project_id,
@@ -3346,37 +3511,6 @@ def select_preview_target(
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
-    if kind == "project":
-        if (
-            str(stage or "").strip().lower() not in {"", "prototype"}
-            and not follow_active
-        ):
-            raise ValueError(
-                "only the project prototype entrypoint can be shown in Preview"
-            )
-        result = preview.select_project(
-            kind,
-            project_id,
-            source_webspace_id=_preview_source_webspace_id(webspace_id, _meta),
-            ensure_ready=True,
-            wait_for_rebuild=True,
-            publish_event=True,
-        )
-        try:
-            execution_kind, execution_id = _execution_identity(kind, project_id)
-            current = workflow.get_state(execution_kind, execution_id)
-            interaction = workflow.update_interaction_context(
-                execution_kind,
-                execution_id,
-                {"preview_target": f"prototype:{project_id}:current"},
-                expected_generation=int(current.get("generation") or 0),
-            )
-            result["interaction_updated"] = True
-            result["interaction"] = interaction.get("workflow", {}).get("interaction")
-        except Exception as exc:
-            result["interaction_updated"] = False
-            result["interaction_error"] = str(exc)
-        return result
     return _select_scenario_preview_target(
         kind,
         project_id,
@@ -3452,7 +3586,7 @@ def open_preview(
     target = binding.get("preview_target") or {}
     selected = (target.get("object_type"), target.get("object_id"))
     if selected not in {(kind, project_id), (execution_kind, execution_id)}:
-        if kind == "scenario":
+        if execution_kind == "scenario":
             selection = select_preview(kind, project_id, webspace_id=webspace_id, _meta=_meta)
         else:
             # A navigation URL must name the materialized preview, not its pending host.
@@ -3827,6 +3961,21 @@ def get_process_tree(
     return list(get_process(object_type, object_id).get("tree") or [])
 
 
+@tool("get_process_stages", summary="Read stages of the selected Change and Prototype revision.", side_effects="none")
+def get_process_stages(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID,
+                       revision: str | None = None) -> list[dict[str, Any]]:
+    kind, project_id = _execution_identity(*_identity(object_type, object_id))
+    rows = workflow.get_process_stages(kind, project_id, revision=revision)
+    for row in rows:
+        row["title_i18n"] = {"key": "builder.stage." + row["stage"], "fallback": row["title"]}
+        row["subtitle_i18n"] = {"key": "builder.stage." + ("gate." + row["stage"] if row["disabled"] else "status." + row["status"]), "fallback": row["subtitle"]}
+        row["label"] = row["title"]
+        row["label_i18n"] = row["title_i18n"]
+        row["view"] = {"change": "brief", "prototype": "result", "automation": "result",
+                       "verification": "checks", "trial": "deliveries", "stable": "deliveries"}[row["stage"]]
+    return rows
+
+
 @tool(
     "get_project_placement_navigation",
     summary="Open one active Project placement through the topology-aware navigation contract.",
@@ -3909,21 +4058,10 @@ def get_project_placement_navigation(
         target_webspace_id = str(target.get("webspace_id") or "").strip()
         if not scenario_id or not revision or not target_webspace_id:
             raise ValueError("Active Project trial placement is incomplete")
-        source_webspace_id = _preview_source_webspace_id(webspace_id, _meta)
-        materialization = preview.materialize_revision(
-            webspace_id=target_webspace_id,
-            scenario_id=scenario_id,
-            revision=revision,
-            preview_stage="trial",
-            preview_label=f"trial: {project_id} · {revision}",
-            source_fingerprint=str(result_ref.get("digest") or "").strip() or None,
-            event_payload={
-                "source": "builder.project.placement_navigation",
-                "source_webspace_id": source_webspace_id,
-                "preview_stage": "trial",
-                "preview_revision": revision,
-            },
-        )
+        from adaos.sdk.builder.applications import open_trial_placement
+
+        materialization = open_trial_placement(
+            str(result_ref.get("id") or ""), webspace_id=target_webspace_id, scenario_id=scenario_id)
         if materialization.get("ok") is False:
             raise ValueError(
                 str(
@@ -4413,7 +4551,7 @@ def start_automation(
             brief_path=brief_path,
             change_set_id=str(change_set.get("change_set_id") or "").strip() or None,
             execution_budget=execution_budget,
-            agent_profile=agent_profile,
+            agent_profile=agent_profile or prompt_context.get(workflow_kind, workflow_id).get("builder_codex_profile"),
             mcp=mcp,
         )
         or {}
@@ -4437,6 +4575,7 @@ def submit_automation(
 ) -> dict[str, Any]:
     _require_transport_integrity(text)
     kind, project_id = _identity(object_type, object_id)
+    workflow_kind, workflow_id = _execution_identity(kind, project_id)
     source = _webspace_id(webspace_id, _meta)
     topic = _project_topic(kind, project_id, webspace_id=source)
     result = dict(
@@ -4449,6 +4588,7 @@ def submit_automation(
                 conversation_id or topic.get("conversation_id") or ""
             ).strip()
             or None,
+            agent_profile=prompt_context.get(workflow_kind, workflow_id).get("builder_codex_profile"),
         )
         or {}
     )
@@ -5148,6 +5288,25 @@ def _ensure_trial_placement(
     webspace_id: str | None,
     meta: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    from adaos.sdk.builder.applications import place_local_trial, production_webspace_id
+
+    production = production_webspace_id(
+        _webspace_id(webspace_id, meta)
+    )
+    admitted = place_local_trial(candidate_id, webspace_id=production, actor_ref="builder.candidate")
+    trial_activation = admitted["trial_activation"]
+    # Runtime refresh can advance Preview selection while the effect runs.
+    # Rebase only its projection, never a changed Candidate or delivery decision.
+    current = workflow.get_state(workflow_kind, workflow_id)
+    current_delivery = current.get("delivery") or {}
+    admitted_delivery = trial_workflow.get("delivery") or {}
+    if (current_delivery.get("status") != "trial"
+            or not admitted_delivery.get("release_digest")
+            or current_delivery.get("candidate_id") != candidate_id
+            or current_delivery.get("package_digest") != package_digest
+            or current_delivery.get("release_digest") != admitted_delivery.get("release_digest")):
+        raise ValueError("Trial delivery changed while reconciling its placement")
+    trial_workflow = current
     project = (
         trial_workflow.get("project")
         if isinstance(trial_workflow.get("project"), Mapping)
@@ -5165,13 +5324,9 @@ def _ensure_trial_placement(
             str(placement.get("kind") or "") == "trial"
             and str(placement.get("status") or "") == "active"
             and str(result_ref.get("id") or "") == candidate_id
+            and (placement.get("target") or {}).get("webspace_id") == production
         ):
             return dict(trial_workflow)
-    trial_activation = (
-        result.get("trial_activation")
-        if isinstance(result.get("trial_activation"), Mapping)
-        else {}
-    )
     if not trial_activation:
         raise ValueError("Candidate trial has no signed activation placement")
     activation_target = (
@@ -5194,8 +5349,8 @@ def _ensure_trial_placement(
                 "zone": activation_target.get("zone"),
                 "subnet_id": activation_target.get("subnet_id"),
                 "webspace_id": activation_target.get("webspace_id")
-                or _preview_dev_webspace_id(_webspace_id(webspace_id, meta)),
-                "space_kind": activation_target.get("space_kind") or "development",
+                or production,
+                "space_kind": "workspace",
             },
             "scenario_id": activation_target.get("scenario_id") or workflow_id,
             "data_mode": trial_activation.get("data_mode") or "empty",
@@ -5245,24 +5400,21 @@ def _ensure_stable_placement(
     if not release_id or not release_version or not release_digest:
         raise ValueError("Published Project release identity is incomplete")
 
-    target_webspace_id = _preview_source_webspace_id(webspace_id, meta)
-    project_title = str(
-        _project_descriptor(owner_kind, owner_id).get("title") or owner_id
-    ).strip()
-    materialization = preview.materialize_revision(
-        webspace_id=target_webspace_id,
-        scenario_id=workflow_id,
-        revision=release_version,
-        preview_stage="publication",
-        preview_label=project_title,
-        source_fingerprint=release_digest,
-        event_payload={
-            "source": "builder.project.publication",
-            "source_webspace_id": target_webspace_id,
-            "preview_stage": "publication",
-            "preview_revision": release_version,
-        },
+    from adaos.sdk.builder.applications import (
+        place_local_stable,
+        production_webspace_id,
     )
+
+    target_webspace_id = production_webspace_id(
+        _preview_source_webspace_id(webspace_id, meta)
+    )
+
+    stable = place_local_stable(owner_id, webspace_id=target_webspace_id,
+        candidate_id=str(delivery.get("candidate_id") or ""),
+        candidate_digest=str(delivery.get("package_digest") or delivery.get("release_digest") or ""),
+        actor_ref="builder.workbench.publication")
+    published_workflow = stable["workflow"]
+    materialization = stable["runtime_refresh"]
     if materialization.get("ok") is False:
         raise ValueError(
             str(
@@ -5469,6 +5621,8 @@ def publish_project(
     dry_run: bool = True,
     force: bool = False,
     confirmed: bool = False,
+    approve_permissions: bool = False,
+    verification_evidence: Mapping[str, Any] | None = None,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -5503,9 +5657,100 @@ def publish_project(
     if not confirmed:
         operation = "Trial activation" if dry_run else "Publication"
         raise ValueError(f"{operation} requires explicit user confirmation")
+    publication_before = (
+        workflow_before.get("publication")
+        if isinstance(workflow_before.get("publication"), Mapping)
+        else {}
+    )
+    if (
+        not dry_run
+        and kind == "project"
+        and str(delivery.get("status") or "").strip() == "published"
+        and str(publication_before.get("status") or "").strip() == "published"
+    ):
+        release_record = (
+            publication_before.get("release_record")
+            if isinstance(publication_before.get("release_record"), Mapping)
+            else {}
+        )
+        candidate_id = str(delivery.get("candidate_id") or "").strip()
+        candidate_digest = str(
+            delivery.get("package_digest") or delivery.get("release_digest") or ""
+        ).strip()
+        if (
+            not candidate_id
+            or str(release_record.get("candidate_id") or "").strip() != candidate_id
+            or str(release_record.get("release_digest") or "").strip()
+            != str(delivery.get("release_digest") or "").strip()
+        ):
+            raise ValueError(
+                "Published Project placement recovery requires the exact applied Candidate"
+            )
+        from adaos.sdk.builder import applications as builder_applications
+
+        publication_evidence = (
+            dict(verification_evidence)
+            if isinstance(verification_evidence, Mapping)
+            else None
+        )
+        if publication_evidence is not None:
+            publication_evidence["release_scope"] = "publication"
+        access_verification = builder_applications.verify_candidate_access(
+            project_id,
+            candidate_id,
+            evidence=publication_evidence,
+            actor_ref="builder.user",
+        )
+        retained_result = {
+            "ok": True,
+            "status": "published",
+            "duplicate": True,
+            "candidate_id": candidate_id,
+            "release": publication_before.get("release"),
+            "release_digest": delivery.get("release_digest"),
+            "package_digest": candidate_digest,
+            "apply_evidence": {
+                "activation": release_record.get("activation") or {},
+            },
+        }
+        published_workflow, stable_materialization = _ensure_stable_placement(
+            workflow_kind,
+            workflow_id,
+            owner_kind=kind,
+            owner_id=project_id,
+            result=retained_result,
+            published_workflow=workflow_before,
+            webspace_id=webspace_id,
+            meta=_meta,
+        )
+        return {
+            **retained_result,
+            "recovered": True,
+            "recovery_reason": "published_stable_placement_reconciled",
+            "stable_materialization": stable_materialization,
+            "application_verification": access_verification,
+            "workflow": published_workflow,
+            "execution_scope": _execution_scope(kind, project_id),
+        }
     if dry_run:
         source_webspace_id = _preview_source_webspace_id(webspace_id, _meta)
-        trial_webspace_id = _preview_dev_webspace_id(source_webspace_id)
+        from adaos.sdk.builder import applications as builder_applications
+        from adaos.sdk.builder.applications import production_webspace_id
+
+        trial_webspace_id = production_webspace_id(source_webspace_id)
+        permission_decision = (
+            {
+                "approved": True,
+                "actor": "builder.user",
+                "actor_type": "user",
+                "approval_id": (
+                    f"builder:{workflow_kind}:{workflow_id}:"
+                    f"{delivery.get('package_digest')}:permissions"
+                ),
+            }
+            if approve_permissions
+            else None
+        )
         if kind == "project" and str(delivery.get("status") or "").strip() == "trial":
             candidate_id = str(delivery.get("candidate_id") or "").strip()
             existing = projects.get_candidate(candidate_id)
@@ -5620,7 +5865,8 @@ def publish_project(
                         f"project:{project_id}:{delivery.get('source_revision')}:{stale_candidate_id or 'initial'}"
                     ),
                     target_webspace_id=trial_webspace_id,
-                    target_space_kind="development",
+                    target_space_kind="workspace",
+                    permission_decision=permission_decision,
                 )
             elif stale_candidate_id:
                 result = projects.prepare_rebased_candidate(
@@ -5628,6 +5874,7 @@ def publish_project(
                     kind,
                     project_id,
                     validation_evidence=validation_evidence,
+                    permission_decision=permission_decision,
                 )
             else:
                 result = projects.prepare_candidate(
@@ -5635,6 +5882,9 @@ def publish_project(
                     project_id,
                     change_ids=candidate_change_ids,
                     validation_evidence=validation_evidence,
+                    target_webspace_id=trial_webspace_id,
+                    target_space_kind="workspace",
+                    permission_decision=permission_decision,
                 )
         except Exception as exc:
             workflow.transition(
@@ -5685,6 +5935,17 @@ def publish_project(
             raise ValueError(
                 "Candidate preparation returned incomplete immutable identity"
             )
+        access_verification = builder_applications.verify_candidate_access(
+            str(release_data.get("project_id") or project_id),
+            candidate_id,
+            evidence=(
+                dict(verification_evidence)
+                if isinstance(verification_evidence, Mapping)
+                else None
+            ),
+            actor_ref="builder.user",
+        )
+        result = {**dict(result), "application_verification": access_verification}
         _ensure_trial_waiting_before_result(
             workflow_kind,
             workflow_id,
@@ -5714,6 +5975,17 @@ def publish_project(
                 "base_release": candidate.get("base_release"),
                 "base_release_digest": candidate.get("base_release_digest"),
                 "trial_workspace": result.get("trial_workspace"),
+                "permission_decision": permission_decision,
+                "application_verification": {
+                    "required": bool(access_verification.get("required")),
+                    "status": access_verification.get("status"),
+                    "application_id": access_verification.get("application_id"),
+                    "report_digest": (
+                        access_verification.get("verification", {}).get("report", {}).get("report_digest")
+                        if isinstance(access_verification.get("verification"), Mapping)
+                        else None
+                    ),
+                },
                 "idempotency_key": f"candidate:{candidate_id}:prepared",
                 "recovered": bool(result.get("recovered")),
             },
@@ -5723,7 +5995,9 @@ def publish_project(
             if isinstance(workflow_result.get("workflow"), Mapping)
             else {}
         )
-        if kind == "project":
+        if workflow_kind == "scenario" and isinstance(
+            result.get("trial_activation"), Mapping
+        ):
             trial_workflow = _ensure_trial_placement(
                 workflow_kind,
                 workflow_id,
@@ -5766,6 +6040,23 @@ def publish_project(
         delivery_status == "publication_waiting"
         and str(governed_before.get("state") or "").strip() == "publication_ready"
     )
+    publication_access_verification: dict[str, Any] | None = None
+    if delivery_status in {"trial", "accepted"}:
+        from adaos.sdk.builder import applications as builder_applications
+
+        publication_evidence = (
+            dict(verification_evidence)
+            if isinstance(verification_evidence, Mapping)
+            else None
+        )
+        if publication_evidence is not None:
+            publication_evidence["release_scope"] = "publication"
+        publication_access_verification = builder_applications.verify_candidate_access(
+            project_id,
+            candidate_id,
+            evidence=publication_evidence,
+            actor_ref="builder.user",
+        )
     if delivery_status == "trial":
         decided = projects.decide_candidate(
             candidate_id,
@@ -5816,6 +6107,43 @@ def publish_project(
     elif not bool(capabilities.get("can_publish")) and not partial_publication_wait:
         raise ValueError("Publication requires an accepted candidate trial")
 
+    retained_permission_decision = (
+        delivery.get("permission_decision")
+        if isinstance(delivery.get("permission_decision"), Mapping)
+        else None
+    )
+    verification_report = (
+        publication_access_verification.get("verification", {}).get("report", {})
+        if isinstance(publication_access_verification, Mapping)
+        and isinstance(publication_access_verification.get("verification"), Mapping)
+        else {}
+    )
+    if retained_permission_decision is not None:
+        if (
+            retained_permission_decision.get("approved") is not True
+            or not str(retained_permission_decision.get("actor") or "").strip()
+            or not str(retained_permission_decision.get("approval_id") or "").strip()
+        ):
+            raise ValueError(
+                "Stable activation requires the explicit permission decision retained from Trial"
+            )
+        promotion_permission_decision = {
+            **dict(retained_permission_decision),
+            "candidate_id": candidate_id,
+            "release_digest": str(delivery.get("release_digest") or "").strip(),
+            "permission_profile_digest": str(
+                verification_report.get("permission_profile_digest") or ""
+            ).strip()
+            or None,
+            "verification_report_digest": str(
+                verification_report.get("report_digest") or ""
+            ).strip()
+            or None,
+            "scope": "stable_activation",
+        }
+    else:
+        promotion_permission_decision = None
+
     publication_generation = int(
         governed_before.get("generation") or workflow_before.get("generation") or 0
     )
@@ -5839,7 +6167,10 @@ def publish_project(
         },
     )
     try:
-        result = projects.promote_candidate(candidate_id)
+        result = projects.promote_candidate(
+            candidate_id,
+            permission_decision=promotion_permission_decision,
+        )
     except Exception as exc:
         workflow.transition(
             workflow_kind,
@@ -5957,14 +6288,16 @@ def publish_project(
             "workflow": failed.get("workflow"),
             "execution_scope": _execution_scope(kind, project_id),
         }
-    version = (
-        str(result.get("version") or result.get("published_version") or "").strip()
-        or None
-    )
     release = (
         str(
             result.get("release") or result.get("release_id") or result.get("url") or ""
         ).strip()
+        or None
+    )
+    release_version = release.rpartition("@")[2].strip() if release and "@" in release else ""
+    version = (
+        release_version
+        or str(result.get("version") or result.get("published_version") or "").strip()
         or None
     )
     summary = f"Published {kind} {project_id}" + (f" v{version}" if version else "")
@@ -6010,6 +6343,24 @@ def publish_project(
             "canonical_change_id": canonical_change_id or None,
             "context_packet_digest": context_packet_digest or None,
             "apply_evidence": result.get("apply_evidence"),
+            "application_verification": (
+                {
+                    "required": bool(publication_access_verification.get("required")),
+                    "status": publication_access_verification.get("status"),
+                    "application_id": publication_access_verification.get("application_id"),
+                    "report_digest": (
+                        publication_access_verification.get("verification", {})
+                        .get("report", {})
+                        .get("report_digest")
+                        if isinstance(
+                            publication_access_verification.get("verification"), Mapping
+                        )
+                        else None
+                    ),
+                }
+                if publication_access_verification is not None
+                else None
+            ),
         },
     )
     published_workflow = (
@@ -6046,6 +6397,7 @@ def publish_project(
         "change_id": evidence.get("change_id"),
         "evidence": evidence,
         "stable_materialization": stable_materialization,
+        "application_verification": publication_access_verification,
         "workflow": published_workflow,
         "execution_scope": _execution_scope(kind, project_id),
     }
@@ -6153,7 +6505,307 @@ def get_state(
     }
 
 
+@tool("get_clarification", summary="Read the current exact-run question batch and partial answers.", side_effects="none")
+def get_clarification(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID) -> dict[str, Any]:
+    kind, project_id = _execution_identity(*_identity(object_type, object_id))
+    result = automation.get_clarification(object_type=kind, object_id=project_id)
+    result["questions"] = [{**row, "interaction_id": result["interaction_id"], "generation": result["generation"],
+        "suggestions": "\n".join(row.get("options") or []), "object_type": kind, "object_id": project_id}
+        for row in result.get("questions", [])]
+    return result
+
+
+@tool("answer_clarification", summary="Save one answer without starting Codex.", side_effects="local_write")
+def answer_clarification(interaction_id: str, expected_generation: int, question_id: str, answer: str,
+                         idempotency_key: str, object_type: str = DEFAULT_PROJECT_KIND,
+                         object_id: str = DEFAULT_PROJECT_ID) -> dict[str, Any]:
+    kind, project_id = _execution_identity(*_identity(object_type, object_id))
+    return automation.answer_clarification(object_type=kind, object_id=project_id, interaction_id=interaction_id,
+        expected_generation=expected_generation, answers={question_id: answer}, idempotency_key=idempotency_key)
+
+
+@tool("resume_clarification", summary="Explicitly continue after all questions are answered.", side_effects="external_write")
+def resume_clarification(interaction_id: str, expected_generation: int, confirmed: bool,
+                         object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID) -> dict[str, Any]:
+    kind, project_id = _execution_identity(*_identity(object_type, object_id))
+    return automation.resume_clarification(object_type=kind, object_id=project_id, interaction_id=interaction_id,
+        expected_generation=expected_generation, confirmed=confirmed)
+
+
+@tool("get_workbench", summary="Project canonical Builder state into the accepted workbench.", side_effects="none")
+def get_workbench(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID,
+                  webspace_id: str | None = None, _meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    project = get_project(kind, project_id, webspace_id, _meta)
+    if project.get("availability_state") == "not_found":
+        payload = {**project, "title": project_id, "current": {"id": "not_found", "title": project_id,
+                "summary": project["working_label"]}, "commands": {}, "issues": [], "checks": [], "runs": []}
+        return {**payload, "view": dict(payload)}
+    execution_kind, execution_id = _execution_identity(kind, project_id)
+    state = workflow.get_state(execution_kind, execution_id)
+    change = state.get("change") or state.get("change_set") or {}
+    prototype = state.get("prototype") or {}
+    implementation = state.get("automation") or {}
+    description = state.get("workflow_description") or {}
+    process_state = str(description.get("state") or "ready")
+    commands = {row["command"]: True for row in description.get("allowed_commands", [])
+                if isinstance(row, Mapping) and row.get("command") and (row.get("executor") or {}).get("available", True)}
+    phase = str(state.get("active_phase") or "prototype")
+    acceptance = prototype.get("acceptance") or {}
+    checks = []
+    for row in [*acceptance.get("behavior_checks", []), *acceptance.get("visual_checks", [])]:
+        if isinstance(row, Mapping):
+            checks.append({**row, "id": row.get("id") or row.get("breakpoint"),
+                           "name": row.get("id") or row.get("breakpoint"),
+                           "stage": "prototype", "result": row.get("status"), "scope": acceptance.get("revision")})
+    issues = [{**row, "id": row.get("issue_id"), "sources": ", ".join(row.get("source_message_ids") or []),
+               "result": ", ".join(str(x) for x in row.get("result_refs") or []), "stage": row.get("lane")}
+              for row in change.get("issues", []) if isinstance(row, Mapping)]
+    runs = [{**row, "id": row.get("run_id"), "title": row.get("purpose") or row.get("run_id"),
+             "stage": row.get("activity"), "status": row.get("status")}
+            for row in change.get("runs", []) if isinstance(row, Mapping)]
+    title = str(project.get("title") or project_id)
+    composition = compositions.get(project_id) if kind == "project" else compositions.project_for_component(f"{kind}:{project_id}")
+    development = (composition or {}).get("development") or {}
+    current = {"id": process_state, "title": title,
+               "summary": str((description.get("progress") or {}).get("wait_explanation") or process_state),
+               "timing": state.get("updated_at"), "revision": prototype.get("head_revision"),
+               "change": change.get("change_id") or change.get("change_set_id"), "phase": phase,
+               "run": implementation.get("head_task_id"), "checks": checks, "process": runs}
+    summary_state = process_state
+    # A retry-ready gate does not mean its last execution succeeded.
+    if phase == "automation" and implementation.get("status") in {"failed", "cancelled"}:
+        summary_state = "automation_" + implementation["status"]
+        current["summary"] = summary_state
+    clarification = get_clarification(kind, project_id) if implementation.get("head_task_id") else {"pending": False}
+    if clarification.get("pending"):
+        summary_state = "awaiting_clarification"
+        current["summary"] = summary_state
+        commands["retry_automation"] = False
+    current["execution_status"] = implementation.get("status") if phase == "automation" else prototype.get("status")
+    current["summary_i18n"] = {"key": f"builder.workbench.state.{summary_state}", "fallback": current["summary"]}
+    payload = {**project, "title": title, "current": current, "phase": phase,
+            "workflow_generation": state.get("generation"), "commands": commands,
+            "clarification": clarification,
+            "request": change.get("request"), "change_id": current["change"],
+            "prototype_revision": prototype.get("head_revision"),
+            "revision_label": " | ".join(str(value) for value in (
+                prototype.get("head_revision"), current["change"]) if value),
+            "accepted_revision": acceptance.get("revision"), "automation_task_id": implementation.get("head_task_id"),
+            "issues": issues, "runs": runs, "checks": checks,
+            "specification": state.get("application_specification") or {},
+            "specification_delta": change.get("specification_delta"),
+            "specification_delta_text": json.dumps(change.get("specification_delta") or {"operations": []}, ensure_ascii=False, indent=2),
+            "delivery": state.get("delivery") or {}, "publication": state.get("publication") or {},
+            "blockers": description.get("blockers") or [],
+            "initiator": development.get("initiator_ref"),
+            "context_digest": (state.get("context_packet") or {}).get("digest"),
+            "source_message_ids": change.get("source_message_ids") or []}
+    return {**payload, "view": dict(payload)}
+
+
+@tool("get_review", summary="Read stage-scoped review evidence without treating worker completion as acceptance.", side_effects="none")
+def get_review(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID,
+               webspace_id: str | None = None, _meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    view = get_workbench(object_type, object_id, webspace_id, _meta)
+    checks = [{**row, "id": "prototype:" + str(row["id"])} for row in view.get("checks", [])]
+    task_id = view.get("automation_task_id")
+    if not task_id:
+        return {"items": checks, "automation_evidence": "not_started"}
+    kind, project_id = _execution_identity(*_identity(object_type, object_id))
+    result = automation.get_state(object_type=kind, object_id=project_id, webspace_id=_webspace_id(webspace_id, _meta))
+    session = result.get("session") or {}
+    readiness = session.get("completion_readiness") or {}
+    current = session.get("current_task_id") == task_id and readiness.get("task_id") == task_id
+    acceptance = readiness.get("acceptance") or {}
+    receipts = acceptance.get("receipts") or []
+    for receipt in receipts if current else []:
+        identifier = str(receipt.get("requirement_id") or receipt.get("digest") or "")
+        checks.append({"id": "automation:" + identifier, "name": identifier, "stage": "automation",
+                       "result": "passed" if receipt.get("ok") is True else "failed", "scope": task_id,
+                       "evidence_refs": [receipt["digest"]] if receipt.get("digest") else [],
+                       "details": receipt})
+    status = "recorded" if current and receipts else "missing" if current else "stale_or_unavailable"
+    if status != "recorded":
+        checks.append({"id": "automation:evidence", "name": "Independent acceptance evidence", "stage": "automation",
+                       "result": status, "scope": task_id, "evidence_refs": []})
+    return {"items": checks, "automation_evidence": status}
+
+
+@tool("get_prototype_model_choices", summary="Read the prototype model choice collection.", side_effects="none")
+def get_prototype_model_choices(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID) -> list[dict[str, Any]]:
+    return get_llm_options(object_type, object_id)["options"]
+
+
+@tool("read_readme", summary="Read the actual public application README, including its edit revision.", side_effects="none")
+def read_readme(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID) -> dict[str, Any]:
+    return documents.read(*_identity(object_type, object_id))
+
+
+@tool("get_about", summary="Read public documentation and registered owner identity without creating ownership.", side_effects="none")
+def get_about(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    project = _project_descriptor(kind, project_id)
+    identity = None
+    if kind == "project":
+        try:
+            identity = applications.get_identity(project_id)
+        except FileNotFoundError:
+            pass
+    return {**documents.read(kind, project_id), "title": project.get("title") or project_id,
+            "version": project.get("version") or "", "project_ref": f"{kind}:{project_id}",
+            "owner_name": identity["display_name"] if identity else "",
+            "owner_ref": identity["publisher_ref"] if identity else "",
+            "owner_status": "registered" if identity else "not_registered"}
+
+
+@tool("save_readme", summary="Save README only if the user's opened edition is still current.", side_effects="local_write")
+def save_readme(text: str, expected_digest: str, object_type: str = DEFAULT_PROJECT_KIND,
+                 object_id: str = DEFAULT_PROJECT_ID, webspace_id: str | None = None,
+                 _meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    _require_transport_integrity(text)
+    kind, project_id = _identity(object_type, object_id)
+    result = documents.write(kind, project_id, text, expected_digest=expected_digest)
+    evidence = _record_project_change(kind=kind, project_id=project_id, action="file_save", summary="Updated README.md",
+                                      webspace_id=_webspace_id(webspace_id, _meta), path="README.md")
+    return {**result, "evidence": evidence}
+
+
+@tool("generate_readme", summary="Generate a README draft through the subscribed runtime content SDK; never save automatically.", side_effects="external_write")
+def generate_readme(prompt: str, request_id: str | None = None, object_type: str = DEFAULT_PROJECT_KIND,
+                    object_id: str = DEFAULT_PROJECT_ID, model: str | None = None,
+                    reasoning_effort: str = "low", _meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    request_id = str(request_id or (_meta or {}).get("request_id") or "").strip()
+    if not request_id:
+        raise ValueError("README generation requires a stable request_id")
+    if reasoning_effort not in {"minimal", "low", "medium", "high"}:
+        raise ValueError("Unsupported reasoning effort")
+    before = documents.read(kind, project_id)
+    project = _project_descriptor(kind, project_id)
+    refs = project.get("component_refs") if kind == "project" else [f"{kind}:{project_id}"]
+    declarations = []
+    for ref in refs or []:
+        component_kind, _, component_id = str(ref).partition(":")
+        if component_kind not in {"skill", "scenario"}:
+            continue
+        source = projects.read_file(component_kind, component_id,
+            "skill.yaml" if component_kind == "skill" else "scenario.yaml", max_bytes=1_048_576)
+        if source.get("truncated"):
+            raise ValueError(f"README context manifest is too large: {ref}; narrow the documentation request")
+        manifest = yaml.safe_load(source["content"]) or {}
+        declarations.append({"ref": ref, "version": manifest.get("version"), "description": manifest.get("description"),
+            "tools": [{"name": item.get("name"), "description": item.get("description")}
+                      for item in manifest.get("tools") or [] if isinstance(item, Mapping)]})
+    return content_generation.generate(
+        request_id=f"readme:{kind}:{project_id}:{request_id}",
+        purpose="Write or improve this application's public README.md in Markdown. "
+                "Describe only the supplied application and the user's requested documentation changes. "
+                "Do not invent implemented features, execute code, change software or generate images.",
+        prompt=prompt, data={"title": project.get("title"), "description": project.get("description"),
+                            "declared_components": declarations, "readme": before["text"]},
+        schema={"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"], "additionalProperties": False},
+        model=model or get_model_settings(kind, project_id).get("prototype_model"),
+        reasoning={"effort": reasoning_effort},
+        context={"project_ref": f"{kind}:{project_id}", "base_digest": before["digest"]})
+
+
+@tool("get_readme_generation", summary="Read a pending README draft without generating again.", side_effects="none")
+def get_readme_generation(request_id: str, object_type: str = DEFAULT_PROJECT_KIND,
+                          object_id: str = DEFAULT_PROJECT_ID) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    if not request_id.startswith(f"readme:{kind}:{project_id}:"):
+        raise ValueError("README generation belongs to another project")
+    return content_generation.get(request_id)
+
+
+@tool("generate_icon", summary="Generate an owned application icon draft; never apply it automatically.", side_effects="external_write")
+def generate_icon(prompt: str, model: str, request_id: str | None = None,
+                  object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID,
+                  _meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    request_id = str(request_id or (_meta or {}).get("request_id") or "").strip()
+    if not request_id:
+        raise ValueError("Icon generation requires a stable request_id")
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 4000:
+        raise ValueError("Icon instructions must contain 1..4000 characters")
+    project = _project_descriptor(kind, project_id)
+    return image_generation.generate(request_id=f"icon:{kind}:{project_id}:{request_id}", model=model,
+        prompt="Create a square application icon. No text or surrounding UI. "
+               f"Application title: {project.get('title') or project_id}.\nUser instructions: {prompt}",
+        size="1024x1024", quality="low", output_format="png", background="opaque",
+        context={"project_ref": f"{kind}:{project_id}", "purpose": "application_icon"})
+
+
+@tool("get_icon_generation", summary="Read an owned icon draft without generating another image.", side_effects="none")
+def get_icon_generation(request_id: str, object_type: str = DEFAULT_PROJECT_KIND,
+                        object_id: str = DEFAULT_PROJECT_ID) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    if not request_id.startswith(f"icon:{kind}:{project_id}:"):
+        raise ValueError("Icon generation belongs to another application")
+    _project_descriptor(kind, project_id)
+    return image_generation.get(request_id)
+
+
+@tool("list_icon_drafts", summary="Observe existing owned icon drafts for this application; never generate on read.", side_effects="none")
+def list_icon_drafts(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    _project_descriptor(kind, project_id)
+    return {"items": image_generation.list_drafts(context={"project_ref": f"{kind}:{project_id}",
+                                                         "purpose": "application_icon"}, limit=10)}
+
+
+@tool("save_specification_delta", summary="Save explicit Change requirement edits against the current base.", side_effects="local_write")
+def save_specification_delta(text: str, expected_generation: int, change_id: str,
+                              object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID) -> dict[str, Any]:
+    _require_transport_integrity(text)
+    kind, project_id = _execution_identity(*_identity(object_type, object_id))
+    return workflow.save_specification_delta(kind, project_id, json.loads(text),
+                                             change_id=change_id, expected_generation=expected_generation,
+                                             actor="builder.workbench.specification")
+
+
+@tool("get_workbench_messages", summary="Read the selected project's formal or informal thread.", side_effects="none")
+def get_workbench_messages(mode: str = "task", object_type: str = DEFAULT_PROJECT_KIND,
+                           object_id: str = DEFAULT_PROJECT_ID, webspace_id: str | None = None,
+                           _meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    if mode not in {"task", "informal"}:
+        raise ValueError("Unknown conversation mode")
+    kind, project_id = _identity(object_type, object_id)
+    _project_descriptor(kind, project_id)
+    topic = _project_topic(kind, project_id, webspace_id=webspace_id, meta=_meta)
+    thread = str(topic.get("thread_id") or topic.get("topic_id"))
+    if mode == "informal":
+        thread += ":discussion"
+    messages = conversation.get(topic["conversation_id"], thread_id=thread, limit=100)
+    return {**messages, "mode": mode, "conversation_id": topic["conversation_id"], "thread_id": thread}
+
+
+@tool("append_discussion", summary="Record an informal note without starting or changing a task.", side_effects="local_write")
+def append_discussion(text: str, object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID,
+                       webspace_id: str | None = None, _meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    _require_transport_integrity(text)
+    if not text.strip() or len(text) > 32000:
+        raise ValueError("Discussion text must contain 1..32000 characters")
+    target = get_workbench_messages("informal", object_type, object_id, webspace_id, _meta)
+    message = conversation.append(conversation_id=target["conversation_id"], thread_id=target["thread_id"],
+                                  text=text, role="user", owner="skill:builder_skill",
+                                  webspace_id=_webspace_id(webspace_id, _meta),
+                                  meta={"builder_mode": "informal", "project_ref": f"{object_type}:{object_id}"})
+    if not message:
+        raise RuntimeError("Discussion message was not persisted")
+    return {"ok": True, "message": message, "disposition": "discussion_only"}
+
+
 __all__ = [
+    "get_about", "list_icon_drafts",
+    "generate_icon", "get_icon_generation",
+    "get_clarification", "answer_clarification", "resume_clarification",
+    "generate_readme", "get_readme_generation",
+    "get_process_stages",
+    "get_workbench", "get_review", "get_workbench_messages", "append_discussion", "save_specification_delta",
+    "get_codex_options", "get_model_settings", "set_codex_profile",
+    "get_prototype_model_choices", "read_readme", "save_readme",
     "accept_prototype",
     "add_change_issues",
     "append_prompt_addendum",
@@ -6168,6 +6820,7 @@ __all__ = [
     "get_development_feedback",
     "get_prompt_context",
     "get_project",
+    "get_project_access_contract",
     "get_state",
     "list_changes",
     "list_development_feedback",
