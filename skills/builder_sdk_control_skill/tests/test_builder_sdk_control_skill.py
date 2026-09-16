@@ -332,6 +332,20 @@ def _root_mgmnt_project(manifest_digest: str = "sha256:" + "c" * 64) -> dict:
     }
 
 
+def _root_mgmnt_catalog_row() -> dict:
+    project = _root_mgmnt_project()
+    catalog = dict(project["catalog"])
+    return {
+        **project,
+        "object_id": project["id"],
+        "title": catalog["title"],
+        "description": catalog["description"],
+        "primary_ref": "scenario:root_mgmnt_ops",
+        "component_refs": ["scenario:root_mgmnt_ops", "skill:root_mgmnt"],
+        "dependency_refs": [],
+    }
+
+
 def _idle_builder_workflow() -> dict:
     return {
         "active_phase": "prototype",
@@ -360,11 +374,11 @@ def _idle_builder_workflow() -> dict:
 
 def test_catalog_lists_composition_project(monkeypatch) -> None:
     module = _module()
-    project = _root_mgmnt_project()
     monkeypatch.setattr(
-        module.compositions, "list_projects", lambda **_kwargs: [{"id": "root_mgmnt"}]
+        module.project_catalog,
+        "list_projects",
+        lambda **_kwargs: [_root_mgmnt_catalog_row()],
     )
-    monkeypatch.setattr(module.compositions, "get", lambda _project_id: dict(project))
     monkeypatch.setattr(module.projects, "list_projects", lambda **_kwargs: [])
     monkeypatch.setattr(module, "_context", lambda *_args: {})
     monkeypatch.setattr(module, "_preview_source_webspace_id", lambda *_args: "desktop")
@@ -2599,7 +2613,7 @@ def test_publish_does_not_bypass_non_promotable_candidate_state(monkeypatch) -> 
 def test_project_catalog_and_component_files_are_browser_ready(monkeypatch) -> None:
     module = _module()
     monkeypatch.setattr(
-        module.compositions,
+        module.project_catalog,
         "list_projects",
         lambda **kwargs: [
             {
@@ -2657,7 +2671,7 @@ def test_project_catalog_and_component_files_are_browser_ready(monkeypatch) -> N
 def test_project_collection_default_labels_are_readable(monkeypatch) -> None:
     module = _module()
     monkeypatch.setattr(
-        module.compositions,
+        module.project_catalog,
         "list_projects",
         lambda **kwargs: [
             {
@@ -2684,7 +2698,7 @@ def test_project_collection_default_labels_are_readable(monkeypatch) -> None:
 def test_project_collection_rejects_component_catalog_modes(monkeypatch) -> None:
     module = _module()
     monkeypatch.setattr(
-        module.compositions,
+        module.project_catalog,
         "list_projects",
         lambda **kwargs: [
             {
@@ -2716,19 +2730,21 @@ def test_project_collection_rejects_component_catalog_modes(monkeypatch) -> None
 def test_project_collection_hides_archived_projects_by_default(monkeypatch) -> None:
     module = _module()
     monkeypatch.setattr(
-        module.compositions,
+        module.project_catalog,
         "list_projects",
         lambda **kwargs: [
             {
                 "kind": "project",
                 "id": "active",
                 "version": "1.0.0",
+                "archived": False,
                 "components": {"owned": [], "dependencies": []},
             },
             {
                 "kind": "project",
                 "id": "archived",
                 "version": "0.9.0",
+                "archived": True,
                 "components": {"owned": [], "dependencies": []},
             },
         ],
@@ -2751,7 +2767,7 @@ def test_project_collection_hides_archived_projects_by_default(monkeypatch) -> N
 def test_project_catalog_uses_lightweight_state(monkeypatch) -> None:
     module = _module()
     monkeypatch.setattr(
-        module.compositions,
+        module.project_catalog,
         "list_projects",
         lambda **kwargs: [
             {
@@ -2794,7 +2810,7 @@ def test_catalog_updated_uses_owned_component_state_not_preview_or_dependencies(
 def test_catalog_orders_by_update_before_limit(monkeypatch) -> None:
     module = _module()
     monkeypatch.setattr(module, "_catalog_state", lambda *_args: {})
-    monkeypatch.setattr(module.compositions, "list_projects", lambda **_kwargs: [
+    monkeypatch.setattr(module.project_catalog, "list_projects", lambda **_kwargs: [
         {"id": "old", "created_at": "2026-09-10T00:00:00Z", "components": {"owned": []}},
         {"id": "new", "created_at": "2026-09-11T00:00:00Z", "components": {"owned": []}},
     ])
@@ -2807,7 +2823,7 @@ def test_project_catalog_propagates_sdk_failure(monkeypatch) -> None:
     def unavailable(**kwargs):
         raise RuntimeError("catalog unavailable")
 
-    monkeypatch.setattr(module.compositions, "list_projects", unavailable)
+    monkeypatch.setattr(module.project_catalog, "list_projects", unavailable)
     with pytest.raises(RuntimeError, match="catalog unavailable"):
         module.list_projects(query="test")
 
@@ -2821,10 +2837,20 @@ def test_project_catalog_search_precedes_limit_and_marks_test_samples(monkeypatc
         return [{"id": "z_test", "title": "Sample [TEST]-20260911-e2eabc",
                  "components": {"owned": [], "dependencies": []}}]
 
-    monkeypatch.setattr(module.compositions, "list_projects", catalog)
+    monkeypatch.setattr(module.project_catalog, "list_projects", catalog)
     monkeypatch.setattr(module, "_catalog_state", lambda *_args: {"archived": False})
     rows = module.list_projects(query="E2EABC", limit=1)
-    assert calls == [{"query": "e2eabc", "limit": 5000}]
+    assert calls == [
+        {
+            "kind": "project",
+            "query": "e2eabc",
+            "limit": 5000,
+            "selected_object_type": None,
+            "selected_object_id": None,
+            "webspace_id": "desktop",
+            "include_archived": False,
+        }
+    ]
     assert rows[0]["test_sample"] == "test"
     assert rows[0]["object_id"] == "z_test"
 
@@ -2833,7 +2859,7 @@ def test_project_catalog_resolves_dev_space_once(monkeypatch) -> None:
     module = _module()
     calls: list[str] = []
     monkeypatch.setattr(
-        module.compositions,
+        module.project_catalog,
         "list_projects",
         lambda **_kwargs: [
             {

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-15T19:06:06+00:00",
+  "updated_at": "2026-09-16T05:07:15+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -135,8 +135,8 @@
       "kind": "skill",
       "id": "builder_sdk_control_skill",
       "name": "builder_sdk_control_skill",
-      "version": "0.1.114",
-      "updated_at": "2026-09-12T13:23:29+00:00",
+      "version": "0.1.115",
+      "updated_at": "2026-09-16T05:07:15+00:00",
       "path": "skills/builder_sdk_control_skill",
       "manifest": "skills/builder_sdk_control_skill/skill.yaml",
       "source": {
@@ -151,14 +151,7 @@
       "description": "SDK-only backend for the functional Builder DEV scenario.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 62,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "builder",
-        "release": "builder@0.2.127",
-        "release_digest": "sha256:691625a36b034a995402165b68b95746cf7f93d857e39f8e6e7b3a399b8ca20f",
-        "package_digest": "sha256:7fd85995953553e4ad6ae702a11c542557474dc96bbcdad2e61dce94be121b76"
-      }
+      "tools_count": 62
     },
     {
       "kind": "skill",
@@ -1332,8 +1325,8 @@
       "kind": "skill",
       "id": "workbench_test_20260914_b_skill",
       "name": "workbench_test_20260914_b_skill",
-      "version": "0.1.3",
-      "updated_at": "2026-09-15T17:50:36+00:00",
+      "version": "0.1.7",
+      "updated_at": "2026-09-15T21:19:20+00:00",
       "path": "skills/workbench_test_20260914_b_skill",
       "manifest": "skills/workbench_test_20260914_b_skill/skill.yaml",
       "source": {
@@ -1352,9 +1345,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "workbench_test_20260914_b",
-        "release": "workbench_test_20260914_b@0.1.4",
-        "release_digest": "sha256:aee52799abd3d6688d0d552a6a178de0ac928a1e350f4b2c0a3c8f85d6209d5e",
-        "package_digest": "sha256:16e6f23a182f0418ee2d04b4ae546f66fbafd9b29575b86b4d1ceb86a50ea276"
+        "release": "workbench_test_20260914_b@0.1.8",
+        "release_digest": "sha256:096460d80c4939a2049675d2d20069affcf9cec4af478bb0db4e5a255f1db2bc",
+        "package_digest": "sha256:d1df3ab58758eb0cecefc295694459f0c61e221e42982362c126222a656deefa"
       }
     },
     {
@@ -2019,8 +2012,8 @@
       "kind": "scenario",
       "id": "workbench_test_20260914_b",
       "name": "workbench_test_20260914_b",
-      "version": "0.1.4",
-      "updated_at": "2026-09-15T17:50:41+00:00",
+      "version": "0.1.8",
+      "updated_at": "2026-09-15T21:19:25+00:00",
       "path": "scenarios/workbench_test_20260914_b",
       "manifest": "scenarios/workbench_test_20260914_b/scenario.yaml",
       "source": {
@@ -2028,7 +2021,7 @@
         "manifest": "scenarios/workbench_test_20260914_b/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:6a8a6669d092f49b54c0bc6014db743f20480005804851f97dcab5927565415c",
+        "revision": "sha256:68913b0e08cc5aaf2525792a51249498a021a7def9ccac0cb4bcc741297c8177",
         "path_scope": [
           "projects/workbench_test_20260914_b/"
         ]
@@ -2052,17 +2045,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "workbench_test_20260914_b",
-        "release": "workbench_test_20260914_b@0.1.4",
-        "release_digest": "sha256:aee52799abd3d6688d0d552a6a178de0ac928a1e350f4b2c0a3c8f85d6209d5e",
-        "package_digest": "sha256:82516db7c042e7fc7dabfbc65d80df73e893ee3362fd02b31b59af8acfc14838"
+        "release": "workbench_test_20260914_b@0.1.8",
+        "release_digest": "sha256:096460d80c4939a2049675d2d20069affcf9cec4af478bb0db4e5a255f1db2bc",
+        "package_digest": "sha256:2d4c7fc4d8620c0efff588fc1d973482a6576de5c6a40233ed4e666867258e74"
       },
       "channels": {
         "stable": {
-          "release": "workbench_test_20260914_b@0.1.4",
-          "release_digest": "sha256:aee52799abd3d6688d0d552a6a178de0ac928a1e350f4b2c0a3c8f85d6209d5e",
-          "source_revision": "sha256:6a8a6669d092f49b54c0bc6014db743f20480005804851f97dcab5927565415c",
-          "package_digest": "sha256:82516db7c042e7fc7dabfbc65d80df73e893ee3362fd02b31b59af8acfc14838",
-          "version": "0.1.4"
+          "release": "workbench_test_20260914_b@0.1.8",
+          "release_digest": "sha256:096460d80c4939a2049675d2d20069affcf9cec4af478bb0db4e5a255f1db2bc",
+          "source_revision": "sha256:68913b0e08cc5aaf2525792a51249498a021a7def9ccac0cb4bcc741297c8177",
+          "package_digest": "sha256:2d4c7fc4d8620c0efff588fc1d973482a6576de5c6a40233ed4e666867258e74",
+          "version": "0.1.8"
         }
       }
     }
@@ -3944,8 +3937,8 @@
       "kind": "project",
       "id": "workbench_test_20260914_b",
       "name": "workbench_test_20260914_b",
-      "version": "0.1.4",
-      "updated_at": "2026-09-15T18:40:37+00:00",
+      "version": "0.1.8",
+      "updated_at": "2026-09-15T21:49:59+00:00",
       "path": "projects/workbench_test_20260914_b",
       "manifest": "projects/workbench_test_20260914_b/project.yaml",
       "source": {
@@ -3977,18 +3970,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "workbench_test_20260914_b",
-        "release": "workbench_test_20260914_b@0.1.4",
-        "release_digest": "sha256:aee52799abd3d6688d0d552a6a178de0ac928a1e350f4b2c0a3c8f85d6209d5e",
+        "release": "workbench_test_20260914_b@0.1.8",
+        "release_digest": "sha256:096460d80c4939a2049675d2d20069affcf9cec4af478bb0db4e5a255f1db2bc",
         "primary_component": "scenario:workbench_test_20260914_b",
-        "package_digest": "sha256:82516db7c042e7fc7dabfbc65d80df73e893ee3362fd02b31b59af8acfc14838"
+        "package_digest": "sha256:2d4c7fc4d8620c0efff588fc1d973482a6576de5c6a40233ed4e666867258e74"
       },
       "channels": {
         "stable": {
-          "release": "workbench_test_20260914_b@0.1.4",
-          "release_digest": "sha256:aee52799abd3d6688d0d552a6a178de0ac928a1e350f4b2c0a3c8f85d6209d5e",
-          "source_revision": "sha256:6a8a6669d092f49b54c0bc6014db743f20480005804851f97dcab5927565415c",
-          "package_digest": "sha256:82516db7c042e7fc7dabfbc65d80df73e893ee3362fd02b31b59af8acfc14838",
-          "version": "0.1.4"
+          "release": "workbench_test_20260914_b@0.1.8",
+          "release_digest": "sha256:096460d80c4939a2049675d2d20069affcf9cec4af478bb0db4e5a255f1db2bc",
+          "source_revision": "sha256:68913b0e08cc5aaf2525792a51249498a021a7def9ccac0cb4bcc741297c8177",
+          "package_digest": "sha256:2d4c7fc4d8620c0efff588fc1d973482a6576de5c6a40233ed4e666867258e74",
+          "version": "0.1.8"
         }
       }
     },

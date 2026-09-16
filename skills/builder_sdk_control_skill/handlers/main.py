@@ -17,6 +17,7 @@ from adaos.sdk.builder import (
     issues as builder_issues,
     lifecycle as builder_lifecycle,
     preview,
+    project_catalog,
     review,
     semantic_ui,
     workflow,
@@ -1348,23 +1349,95 @@ def list_projects(
     dev_space = _preview_dev_webspace_id(source)
     items: list[dict[str, Any]] = []
     if requested_kind in {"", "project"}:
-        project_items = compositions.list_projects(query=needle or None, limit=5000)
+        project_items = project_catalog.list_projects(
+            kind="project",
+            query=needle or None,
+            limit=5000,
+            selected_object_type=selected_kind or None,
+            selected_object_id=selected_id or None,
+            webspace_id=source,
+            include_archived=include_archived,
+        )
         for project_item in project_items:
+            if not isinstance(project_item, Mapping):
+                continue
             object_id = str(
-                project_item.get("id") or project_item.get("name") or ""
+                project_item.get("object_id")
+                or project_item.get("id")
+                or project_item.get("name")
+                or ""
             ).strip()
+            if object_id.startswith("project:"):
+                object_id = object_id.split(":", 1)[1]
             if not object_id or object_id.startswith((".", "_")):
                 continue
-            item = _project_descriptor("project", object_id, project_item)
-            title = str(item.get("title") or item.get("name") or object_id)
-            description = str(item.get("description") or "")
+            components = (
+                project_item.get("components")
+                if isinstance(project_item.get("components"), Mapping)
+                else {}
+            )
+            owned_components = [
+                dict(item)
+                for item in components.get("owned") or []
+                if isinstance(item, Mapping)
+            ]
+            dependency_components = [
+                dict(item)
+                for item in components.get("dependencies") or []
+                if isinstance(item, Mapping)
+            ]
+            primary_component = next(
+                (
+                    item
+                    for item in owned_components
+                    if str(item.get("role") or "") == "primary"
+                ),
+                owned_components[0] if owned_components else {},
+            )
+            component_refs = [
+                str(ref).strip()
+                for ref in (
+                    project_item.get("component_refs")
+                    or [
+                        item.get("ref")
+                        for item in owned_components
+                        if str(item.get("ref") or "").strip()
+                    ]
+                )
+                if str(ref).strip()
+            ]
+            dependency_refs = [
+                str(ref).strip()
+                for ref in (
+                    project_item.get("dependency_refs")
+                    or project_item.get("depends")
+                    or [
+                        item.get("ref")
+                        for item in dependency_components
+                        if str(item.get("ref") or "").strip()
+                    ]
+                )
+                if str(ref).strip()
+            ]
+            primary_ref = str(
+                project_item.get("primary_ref") or primary_component.get("ref") or ""
+            ).strip()
+            title = str(project_item.get("title") or project_item.get("name") or object_id)
+            description = str(project_item.get("description") or "")
             if needle and needle not in f"{object_id} {title} {description}".casefold():
                 continue
-            state = _catalog_state("project", object_id)
-            if state.get("archived") and not include_archived:
+            updated_at = project_item.get("updated")
+            state = {
+                "archived": bool(project_item.get("archived")),
+                "updated_at": updated_at if updated_at != "DEV" else None,
+                "builder_llm_model": project_item.get("builder_llm_model"),
+            }
+            archived = bool(state.get("archived"))
+            if archived and not include_archived:
                 continue
-            current = selected_kind == "project" and object_id == selected_id
-            primary_ref = str(item.get("primary_ref") or "").strip()
+            current = bool(project_item.get("current")) or (
+                selected_kind == "project" and object_id == selected_id
+            )
             primary_identity = _split_component_ref(primary_ref)
             conversation_identity = primary_identity or ("project", object_id)
             conversation_topic_id = (
@@ -1376,23 +1449,30 @@ def list_projects(
                 and selected_id == primary_identity[1]
             ):
                 current = True
+            version = str(project_item.get("version") or "DEV")
+            catalog_item = {
+                **dict(project_item),
+                "created_at": project_item.get("created_at"),
+                "component_refs": component_refs,
+                "dependency_refs": dependency_refs,
+            }
             items.append(
                 {
                     "kind": "project",
-                    "name": str(item.get("name") or object_id),
+                    "name": str(project_item.get("name") or object_id),
                     "project_type": "project",
-                    "depends": list(item.get("depends") or []),
-                    "manifest": str(item.get("manifest") or "project.yaml"),
-                    "profiles": list(item.get("profiles") or []),
-                    "primary_ref": item.get("primary_ref"),
+                    "depends": dependency_refs,
+                    "manifest": str(project_item.get("manifest") or "project.yaml"),
+                    "profiles": list(project_item.get("profiles") or []),
+                    "primary_ref": primary_ref or None,
                     "target_object_type": primary_identity[0]
                     if primary_identity
                     else "project",
                     "target_object_id": primary_identity[1]
                     if primary_identity
                     else object_id,
-                    "component_refs": list(item.get("component_refs") or []),
-                    "dependency_refs": list(item.get("dependency_refs") or []),
+                    "component_refs": component_refs,
+                    "dependency_refs": dependency_refs,
                     "id": f"project:{object_id}",
                     "object_type": "project",
                     "object_id": object_id,
@@ -1402,17 +1482,17 @@ def list_projects(
                     "conversation_thread_id": conversation_topic_id,
                     "title": title,
                     "subtitle": description
-                    or f"project · {item.get('version') or 'DEV'}",
+                    or f"project · {version}",
                     "type": "Project",
                     "type_i18n": {"key": "builder.project_type.project"},
-                    "stage": "Архив" if state.get("archived") else "Прототип",
+                    "stage": "Архив" if archived else "Прототип",
                     "stage_i18n": {
                         "key": "builder.project_stage.archive"
-                        if state.get("archived")
+                        if archived
                         else "builder.project_stage.prototype"
                     },
-                    "version": str(item.get("version") or "DEV"),
-                    "stable": str(item.get("version") or "—"),
+                    "version": version,
+                    "stable": str(project_item.get("version") or "—"),
                     "space": dev_space,
                     "sync": "Текущий" if current else "Доступен в DEV",
                     "sync_i18n": {
@@ -1420,10 +1500,10 @@ def list_projects(
                         if current
                         else "builder.project_sync.available_dev"
                     },
-                    "updated": _catalog_updated(item, state),
+                    "updated": _catalog_updated(catalog_item, state),
                     "current": current,
                     "test_sample": "test" if "[TEST]" in title else "regular",
-                    "archived": bool(state.get("archived")),
+                    "archived": archived,
                     "builder_llm_model": state.get("builder_llm_model"),
                 }
             )
