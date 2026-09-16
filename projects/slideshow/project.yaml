@@ -1,0 +1,41 @@
+schema: adaos.project.v1
+kind: project
+id: slideshow
+version: 0.1.0
+profiles:
+- adaos.builder.component_project.v1
+components:
+  owned:
+  - ref: skill:slideshow_skill
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [uses]
+  dependencies: []
+entrypoints: []
+catalog:
+  title: Slideshow
+  description: ReDevice photo slideshow widget with local folder indexing and endpoint sync.
+  categories: [media, home]
+  tags: [builder-managed, legacy-component, photos, redevice]
+publication:
+  stage: alpha
+  visibility: unlisted
+  channel: stable
+install:
+  default: false
+  features:
+  - id: default
+    title: Slideshow
+    default: true
+    optional: false
+    components:
+    - skill:slideshow_skill
+compatibility: {}
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-09-16T00:00:00+00:00'
+created_by: AdaOS Builder
