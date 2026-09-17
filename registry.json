@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-17T17:24:54+00:00",
+  "updated_at": "2026-09-17T20:00:58+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -135,8 +135,8 @@
       "kind": "skill",
       "id": "builder_sdk_control_skill",
       "name": "builder_sdk_control_skill",
-      "version": "0.1.117",
-      "updated_at": "2026-09-16T13:42:33+00:00",
+      "version": "0.1.120",
+      "updated_at": "2026-09-17T19:40:48+00:00",
       "path": "skills/builder_sdk_control_skill",
       "manifest": "skills/builder_sdk_control_skill/skill.yaml",
       "source": {
@@ -155,17 +155,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "builder",
-        "release": "builder@0.2.159",
-        "release_digest": "sha256:293e72ab133640d9259f98529420441d912e6e96fb97cf44ef44bc27f738481f",
-        "package_digest": "sha256:2e2c5e9aeb02f5fd088750c9e78d4ad3fb00540fc0769229a01e465a0026d96a"
+        "release": "builder@0.2.167",
+        "release_digest": "sha256:a23a7c08251e4762c54cc549ebcc23565d472099c85d628d809c4c44d5ee554c",
+        "package_digest": "sha256:4ce1b0201d4769aac39b1791b3699aa31199aa65322eab14a63003bee74b444d"
       }
     },
     {
       "kind": "skill",
       "id": "builder_skill",
       "name": "builder_skill",
-      "version": "0.3.173",
-      "updated_at": "2026-09-16T13:42:06+00:00",
+      "version": "0.3.175",
+      "updated_at": "2026-09-17T19:40:26+00:00",
       "path": "skills/builder_skill",
       "manifest": "skills/builder_skill/skill.yaml",
       "source": {
@@ -184,9 +184,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "builder",
-        "release": "builder@0.2.159",
-        "release_digest": "sha256:293e72ab133640d9259f98529420441d912e6e96fb97cf44ef44bc27f738481f",
-        "package_digest": "sha256:de14b0356446762a9b2fd4e436ec50087c332ebe20e48c01658f795ae78bf795"
+        "release": "builder@0.2.167",
+        "release_digest": "sha256:a23a7c08251e4762c54cc549ebcc23565d472099c85d628d809c4c44d5ee554c",
+        "package_digest": "sha256:681bca132d249577f6b29c7af8161e247448cc4c8457b8220ad03abc276035de"
       }
     },
     {
@@ -280,8 +280,8 @@
       "kind": "skill",
       "id": "demo_metrics_skill",
       "name": "demo_metrics_skill",
-      "version": "0.13.31",
-      "updated_at": "2026-09-02T23:19:37+00:00",
+      "version": "0.13.34",
+      "updated_at": "2026-09-17T19:56:57+00:00",
       "path": "skills/demo_metrics_skill",
       "manifest": "skills/demo_metrics_skill/skill.yaml",
       "source": {
@@ -299,9 +299,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "semantic_ui_demo",
-        "release": "semantic_ui_demo@0.10.7",
-        "release_digest": "sha256:7443ed501ebe7ec28cacb092991fea8575ccb8e6f6dd09126241dbc63fc973cb",
-        "package_digest": "sha256:36e8e1e47e5a6fa8ad7c35b89992dd5ce413a256f58ae446f5f16b94914d5058"
+        "release": "semantic_ui_demo@0.10.21",
+        "release_digest": "sha256:c5cc47377fd00f0a910de53a200ffbd3d722f479fdc357dc375c181b8fd18514",
+        "package_digest": "sha256:b58ff4b2cc804ed4b48c1000dcb3439064ba68e8fc1dfc9fab2f7d2521193e4b"
       }
     },
     {
@@ -1125,8 +1125,8 @@
       "kind": "skill",
       "id": "subscription_status_skill",
       "name": "subscription_status_skill",
-      "version": "0.1.22",
-      "updated_at": "2026-09-17T17:24:02+00:00",
+      "version": "0.1.24",
+      "updated_at": "2026-09-17T20:00:06+00:00",
       "path": "skills/subscription_status_skill",
       "manifest": "skills/subscription_status_skill/skill.yaml",
       "source": {
@@ -1134,7 +1134,7 @@
         "manifest": "skills/subscription_status_skill/skill.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:014a8685818f9a114807147507746e8cb6cfaf754abc108931323220336f2f90",
+        "revision": "sha256:c68e7499937e0af312dbe0007fec516260950d1ce89b5d29271b28bcd4e21e7f",
         "path_scope": [
           "projects/subscription_status/"
         ]
@@ -1149,18 +1149,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "subscription_status",
-        "release": "subscription_status@0.1.8",
-        "release_digest": "sha256:28fb4447f0249b8bdae7c48774a10705c490dd1bf8a7ead3798dc8fba6b6198d",
-        "package_digest": "sha256:399a7777decf4d0cc683a836da228c4a0b73815dcc5e62949a822ff3836b6e1a"
+        "release": "subscription_status@0.1.11",
+        "release_digest": "sha256:1ab25bbe90a523bb8b0acb60193a15c2c62e1c0dd33ed9a236076eab18b27538",
+        "package_digest": "sha256:a8972f19ac9fe7203eee5ee97393b93eb62049b5fce44e25b5c136ff3b0a4c02"
       },
       "tools_count": 5,
       "channels": {
         "stable": {
-          "release": "subscription_status@0.1.8",
-          "release_digest": "sha256:28fb4447f0249b8bdae7c48774a10705c490dd1bf8a7ead3798dc8fba6b6198d",
-          "source_revision": "sha256:014a8685818f9a114807147507746e8cb6cfaf754abc108931323220336f2f90",
-          "package_digest": "sha256:399a7777decf4d0cc683a836da228c4a0b73815dcc5e62949a822ff3836b6e1a",
-          "version": "0.1.22"
+          "release": "subscription_status@0.1.11",
+          "release_digest": "sha256:1ab25bbe90a523bb8b0acb60193a15c2c62e1c0dd33ed9a236076eab18b27538",
+          "source_revision": "sha256:c68e7499937e0af312dbe0007fec516260950d1ce89b5d29271b28bcd4e21e7f",
+          "package_digest": "sha256:a8972f19ac9fe7203eee5ee97393b93eb62049b5fce44e25b5c136ff3b0a4c02",
+          "version": "0.1.24"
         }
       }
     },
@@ -1286,8 +1286,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "builder",
-        "release": "builder@0.2.159",
-        "release_digest": "sha256:293e72ab133640d9259f98529420441d912e6e96fb97cf44ef44bc27f738481f",
+        "release": "builder@0.2.167",
+        "release_digest": "sha256:a23a7c08251e4762c54cc549ebcc23565d472099c85d628d809c4c44d5ee554c",
         "package_digest": "sha256:53310d271a7db31246955d09030c2ddef07619f37dd28dae74613848be3f207f"
       }
     },
@@ -1336,8 +1336,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "semantic_ui_demo",
-        "release": "semantic_ui_demo@0.10.7",
-        "release_digest": "sha256:7443ed501ebe7ec28cacb092991fea8575ccb8e6f6dd09126241dbc63fc973cb",
+        "release": "semantic_ui_demo@0.10.21",
+        "release_digest": "sha256:c5cc47377fd00f0a910de53a200ffbd3d722f479fdc357dc375c181b8fd18514",
         "package_digest": "sha256:dc6b9e208019a45a30e2d155e310802559c21a7ff6262acfb9fd524ec4a543de"
       }
     },
@@ -1395,8 +1395,8 @@
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.91",
-      "updated_at": "2026-09-16T13:41:45+00:00",
+      "version": "0.2.93",
+      "updated_at": "2026-09-17T19:40:12+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.yaml",
       "source": {
@@ -1404,7 +1404,7 @@
         "manifest": "scenarios/builder/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:032f9dd74076237d706e209522b9e550810af121d623fad9888c50b92eb48279",
+        "revision": "sha256:eb09f619eb066b09b4ed4efcb0c2d2a1118d64edc7d0a4fb04cfc6ee2177d19b",
         "path_scope": [
           "projects/builder/"
         ]
@@ -1430,17 +1430,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "builder",
-        "release": "builder@0.2.159",
-        "release_digest": "sha256:293e72ab133640d9259f98529420441d912e6e96fb97cf44ef44bc27f738481f",
-        "package_digest": "sha256:534ba51a8ea6483018a8714ac1d021c91fb3eb00bcb08d1a664015948457af48"
+        "release": "builder@0.2.167",
+        "release_digest": "sha256:a23a7c08251e4762c54cc549ebcc23565d472099c85d628d809c4c44d5ee554c",
+        "package_digest": "sha256:1e20af5847454ef69d854594a79e490d8d9e51bf705fb5de72aea6f85e8d0af3"
       },
       "channels": {
         "stable": {
-          "release": "builder@0.2.159",
-          "release_digest": "sha256:293e72ab133640d9259f98529420441d912e6e96fb97cf44ef44bc27f738481f",
-          "source_revision": "sha256:032f9dd74076237d706e209522b9e550810af121d623fad9888c50b92eb48279",
-          "package_digest": "sha256:534ba51a8ea6483018a8714ac1d021c91fb3eb00bcb08d1a664015948457af48",
-          "version": "0.2.91"
+          "release": "builder@0.2.167",
+          "release_digest": "sha256:a23a7c08251e4762c54cc549ebcc23565d472099c85d628d809c4c44d5ee554c",
+          "source_revision": "sha256:eb09f619eb066b09b4ed4efcb0c2d2a1118d64edc7d0a4fb04cfc6ee2177d19b",
+          "package_digest": "sha256:1e20af5847454ef69d854594a79e490d8d9e51bf705fb5de72aea6f85e8d0af3",
+          "version": "0.2.93"
         }
       }
     },
@@ -1812,16 +1812,16 @@
       "kind": "scenario",
       "id": "taiga_ui_demo_scenario",
       "name": "taiga_ui_demo_scenario",
-      "version": "0.11.4",
-      "updated_at": "2026-09-02T10:07:21+00:00",
+      "version": "0.11.9",
+      "updated_at": "2026-09-17T19:56:51+00:00",
       "path": "scenarios/taiga_ui_demo_scenario",
       "manifest": "scenarios/taiga_ui_demo_scenario/scenario.yaml",
       "source": {
         "path": "scenarios/taiga_ui_demo_scenario",
         "manifest": "scenarios/taiga_ui_demo_scenario/scenario.yaml",
-        "forge": "adaos-root",
-        "repository": "inimatic/adaos-registry",
-        "revision": "8497c4b88698fc61729ff27cfb7f356d5ada3981",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:2d82a0ce215433ffcd130da2c94dd5071b0feae4a5aefc6f5abdd8a54b356edd",
         "path_scope": [
           "projects/semantic_ui_demo/"
         ]
@@ -1832,7 +1832,7 @@
         "id": "taiga_ui_demo_scenario"
       },
       "title": "Taiga UI Demo Scenario",
-      "description": "Desktop demo scenario for the first semantic Web UI control task with a table, chart payload, and live event stream.",
+      "description": "Desktop demo scenario for reusable semantic navigation, disclosure, typed input, adaptive commands, tables, charts, and live event streams.",
       "skills": {
         "required": [
           "web_desktop_skill",
@@ -1842,17 +1842,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "semantic_ui_demo",
-        "release": "semantic_ui_demo@0.10.7",
-        "release_digest": "sha256:7443ed501ebe7ec28cacb092991fea8575ccb8e6f6dd09126241dbc63fc973cb",
-        "package_digest": "sha256:d901c016df02e92ce98b0ae1533753705729e60060c1a1b4dc7cda4960b9c307"
+        "release": "semantic_ui_demo@0.10.21",
+        "release_digest": "sha256:c5cc47377fd00f0a910de53a200ffbd3d722f479fdc357dc375c181b8fd18514",
+        "package_digest": "sha256:fa10221d162b803b83292dc2627ba5aedf6f78ad6ed9d609490eea47e1d8ab42"
       },
       "channels": {
         "stable": {
-          "release": "semantic_ui_demo@0.10.7",
-          "release_digest": "sha256:7443ed501ebe7ec28cacb092991fea8575ccb8e6f6dd09126241dbc63fc973cb",
-          "source_revision": "8497c4b88698fc61729ff27cfb7f356d5ada3981",
-          "package_digest": "sha256:d901c016df02e92ce98b0ae1533753705729e60060c1a1b4dc7cda4960b9c307",
-          "version": "0.11.4"
+          "release": "semantic_ui_demo@0.10.21",
+          "release_digest": "sha256:c5cc47377fd00f0a910de53a200ffbd3d722f479fdc357dc375c181b8fd18514",
+          "source_revision": "sha256:2d82a0ce215433ffcd130da2c94dd5071b0feae4a5aefc6f5abdd8a54b356edd",
+          "package_digest": "sha256:fa10221d162b803b83292dc2627ba5aedf6f78ad6ed9d609490eea47e1d8ab42",
+          "version": "0.11.9"
         }
       }
     },
@@ -2188,8 +2188,8 @@
       "kind": "project",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.159",
-      "updated_at": "2026-09-16T13:47:16+00:00",
+      "version": "0.2.167",
+      "updated_at": "2026-09-17T19:45:09+00:00",
       "path": "projects/builder",
       "manifest": "projects/builder/project.yaml",
       "source": {
@@ -2223,18 +2223,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "builder",
-        "release": "builder@0.2.159",
-        "release_digest": "sha256:293e72ab133640d9259f98529420441d912e6e96fb97cf44ef44bc27f738481f",
+        "release": "builder@0.2.167",
+        "release_digest": "sha256:a23a7c08251e4762c54cc549ebcc23565d472099c85d628d809c4c44d5ee554c",
         "primary_component": "scenario:builder",
-        "package_digest": "sha256:534ba51a8ea6483018a8714ac1d021c91fb3eb00bcb08d1a664015948457af48"
+        "package_digest": "sha256:1e20af5847454ef69d854594a79e490d8d9e51bf705fb5de72aea6f85e8d0af3"
       },
       "channels": {
         "stable": {
-          "release": "builder@0.2.159",
-          "release_digest": "sha256:293e72ab133640d9259f98529420441d912e6e96fb97cf44ef44bc27f738481f",
-          "source_revision": "sha256:032f9dd74076237d706e209522b9e550810af121d623fad9888c50b92eb48279",
-          "package_digest": "sha256:534ba51a8ea6483018a8714ac1d021c91fb3eb00bcb08d1a664015948457af48",
-          "version": "0.2.159"
+          "release": "builder@0.2.167",
+          "release_digest": "sha256:a23a7c08251e4762c54cc549ebcc23565d472099c85d628d809c4c44d5ee554c",
+          "source_revision": "sha256:eb09f619eb066b09b4ed4efcb0c2d2a1118d64edc7d0a4fb04cfc6ee2177d19b",
+          "package_digest": "sha256:1e20af5847454ef69d854594a79e490d8d9e51bf705fb5de72aea6f85e8d0af3",
+          "version": "0.2.167"
         }
       }
     },
@@ -3520,8 +3520,8 @@
       "kind": "project",
       "id": "semantic_ui_demo",
       "name": "semantic_ui_demo",
-      "version": "0.10.7",
-      "updated_at": "2026-09-04T17:52:25+00:00",
+      "version": "0.10.21",
+      "updated_at": "2026-09-17T19:58:09+00:00",
       "path": "projects/semantic_ui_demo",
       "manifest": "projects/semantic_ui_demo/project.yaml",
       "source": {
@@ -3589,18 +3589,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "semantic_ui_demo",
-        "release": "semantic_ui_demo@0.10.7",
-        "release_digest": "sha256:7443ed501ebe7ec28cacb092991fea8575ccb8e6f6dd09126241dbc63fc973cb",
+        "release": "semantic_ui_demo@0.10.21",
+        "release_digest": "sha256:c5cc47377fd00f0a910de53a200ffbd3d722f479fdc357dc375c181b8fd18514",
         "primary_component": "scenario:taiga_ui_demo_scenario",
-        "package_digest": "sha256:d901c016df02e92ce98b0ae1533753705729e60060c1a1b4dc7cda4960b9c307"
+        "package_digest": "sha256:fa10221d162b803b83292dc2627ba5aedf6f78ad6ed9d609490eea47e1d8ab42"
       },
       "channels": {
         "stable": {
-          "release": "semantic_ui_demo@0.10.7",
-          "release_digest": "sha256:7443ed501ebe7ec28cacb092991fea8575ccb8e6f6dd09126241dbc63fc973cb",
-          "source_revision": "8497c4b88698fc61729ff27cfb7f356d5ada3981",
-          "package_digest": "sha256:d901c016df02e92ce98b0ae1533753705729e60060c1a1b4dc7cda4960b9c307",
-          "version": "0.10.7"
+          "release": "semantic_ui_demo@0.10.21",
+          "release_digest": "sha256:c5cc47377fd00f0a910de53a200ffbd3d722f479fdc357dc375c181b8fd18514",
+          "source_revision": "sha256:2d82a0ce215433ffcd130da2c94dd5071b0feae4a5aefc6f5abdd8a54b356edd",
+          "package_digest": "sha256:fa10221d162b803b83292dc2627ba5aedf6f78ad6ed9d609490eea47e1d8ab42",
+          "version": "0.10.21"
         }
       }
     },
@@ -3661,8 +3661,8 @@
       "kind": "project",
       "id": "subscription_status",
       "name": "subscription_status",
-      "version": "0.1.8",
-      "updated_at": "2026-09-17T17:24:54+00:00",
+      "version": "0.1.11",
+      "updated_at": "2026-09-17T20:00:58+00:00",
       "path": "projects/subscription_status",
       "manifest": "projects/subscription_status/project.yaml",
       "source": {
@@ -3713,18 +3713,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "subscription_status",
-        "release": "subscription_status@0.1.8",
-        "release_digest": "sha256:28fb4447f0249b8bdae7c48774a10705c490dd1bf8a7ead3798dc8fba6b6198d",
+        "release": "subscription_status@0.1.11",
+        "release_digest": "sha256:1ab25bbe90a523bb8b0acb60193a15c2c62e1c0dd33ed9a236076eab18b27538",
         "primary_component": "skill:subscription_status_skill",
-        "package_digest": "sha256:399a7777decf4d0cc683a836da228c4a0b73815dcc5e62949a822ff3836b6e1a"
+        "package_digest": "sha256:a8972f19ac9fe7203eee5ee97393b93eb62049b5fce44e25b5c136ff3b0a4c02"
       },
       "channels": {
         "stable": {
-          "release": "subscription_status@0.1.8",
-          "release_digest": "sha256:28fb4447f0249b8bdae7c48774a10705c490dd1bf8a7ead3798dc8fba6b6198d",
-          "source_revision": "sha256:014a8685818f9a114807147507746e8cb6cfaf754abc108931323220336f2f90",
-          "package_digest": "sha256:399a7777decf4d0cc683a836da228c4a0b73815dcc5e62949a822ff3836b6e1a",
-          "version": "0.1.8"
+          "release": "subscription_status@0.1.11",
+          "release_digest": "sha256:1ab25bbe90a523bb8b0acb60193a15c2c62e1c0dd33ed9a236076eab18b27538",
+          "source_revision": "sha256:c68e7499937e0af312dbe0007fec516260950d1ce89b5d29271b28bcd4e21e7f",
+          "package_digest": "sha256:a8972f19ac9fe7203eee5ee97393b93eb62049b5fce44e25b5c136ff3b0a4c02",
+          "version": "0.1.11"
         }
       }
     },

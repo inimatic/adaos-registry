@@ -95,6 +95,22 @@ def test_refresh_action_preserves_the_snapshot_written_by_refresh_status() -> No
     assert "invalidates" not in refresh_action
 
 
+def test_subscription_modal_refreshes_after_user_identity_is_ready() -> None:
+    skill_dir = Path(__file__).resolve().parents[1]
+    webui = json.loads((skill_dir / "webui.json").read_text(encoding="utf-8"))
+
+    modal = webui["registry"]["modals"]["subscription_status_modal"]["schema"]
+    command_bar = next(widget for widget in modal["widgets"] if widget["id"] == "subscription-status-actions")
+    mount_action = next(action for action in command_bar["actions"] if action["on"] == "mount")
+
+    assert mount_action == {
+        "on": "mount",
+        "type": "callSkill",
+        "target": "subscription_status_skill.refresh_status",
+        "params": {"webspace_id": "$client.webspaceId"},
+    }
+
+
 def test_status_projection_exposes_quota_rows(monkeypatch) -> None:
     module = _load_module()
     projection = _Projection()
@@ -225,9 +241,11 @@ def test_refresh_status_pulls_root_entitlement(monkeypatch) -> None:
     assert calls == ["refresh"]
     assert payload["refresh"]["ok"] is True
     assert payload["current"]["value"] == "builder"
+    assert len(projection.values) == 2
     assert projection.values[0][0] == "subscription_status.snapshot"
-    assert projection.values[0][1]["refresh"]["status"] == "refreshed"
-    assert projection.values[0][1]["refresh"]["updated_at"] == "2026-08-27T15:00:00Z"
+    assert projection.values[0][1]["refresh"]["status"] == "refreshing"
+    assert projection.values[1][1]["refresh"]["status"] == "refreshed"
+    assert projection.values[1][1]["refresh"]["updated_at"] == "2026-08-27T15:00:00Z"
 
 
 def test_get_status_refreshes_root_when_entitlement_is_missing(monkeypatch) -> None:

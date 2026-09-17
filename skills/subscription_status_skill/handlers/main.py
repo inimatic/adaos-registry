@@ -328,6 +328,20 @@ def _refresh_projection(
     }
 
 
+def _write_refreshing_projection(*, webspace_id: str) -> None:
+    status = current_subnet_economic_status()
+    payload = _projection_payload(status)
+    payload["refresh"] = {
+        "status": "refreshing",
+        "updated_at": _now_iso(),
+        "root_base_url": _text(
+            _as_mapping(status.get("management_authority")).get("configured_root_base_url")
+        ),
+        "detail": "Refreshing the authoritative Root entitlement snapshot.",
+    }
+    ctx_current_user.set("subscription_status.snapshot", payload, webspace_id=webspace_id)
+
+
 def _needs_root_refresh(status: Mapping[str, Any]) -> bool:
     snapshot = _as_mapping(status.get("entitlement_snapshot"))
     subscription_state = _text(status.get("subscription_state")).lower()
@@ -394,7 +408,9 @@ def get_status(webspace_id: str | None = None, refresh_root_if_missing: bool = T
 
 @tool("refresh_status")
 def refresh_status(webspace_id: str | None = None) -> dict[str, Any]:
-    return _project_status(webspace_id=_webspace_id(webspace_id), refresh_root=True)
+    target = _webspace_id(webspace_id)
+    _write_refreshing_projection(webspace_id=target)
+    return _project_status(webspace_id=target, refresh_root=True)
 
 
 @tool("list_resources")

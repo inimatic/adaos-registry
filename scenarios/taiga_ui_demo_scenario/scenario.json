@@ -1,7 +1,7 @@
 {
     "$schema": "../../../../src/adaos/abi/scenario.schema.json",
     "id": "taiga_ui_demo_scenario",
-    "version": "0.11.7",
+    "version": "0.11.9",
     "name": "taiga_ui_demo_scenario",
     "type": "desktop",
     "title": "Taiga UI Demo Scenario",
@@ -314,16 +314,27 @@
                             "inputs": {
                                 "ariaLabel": "Demo location",
                                 "items": [
-                                    { "id": "components", "label": "Components" },
-                                    { "id": "navigation", "label": "Navigation" },
-                                    { "id": "current", "label": "Current specimen" }
+                                    {
+                                        "id": "components",
+                                        "label": "Components"
+                                    },
+                                    {
+                                        "id": "navigation",
+                                        "label": "Navigation"
+                                    },
+                                    {
+                                        "id": "current",
+                                        "label": "Current specimen"
+                                    }
                                 ]
                             },
                             "actions": [
                                 {
                                     "on": "click",
                                     "type": "updateState",
-                                    "params": { "demoBreadcrumb": "$event.id" }
+                                    "params": {
+                                        "demoBreadcrumb": "$event.id"
+                                    }
                                 }
                             ]
                         },
@@ -335,16 +346,27 @@
                             "inputs": {
                                 "selectedStateKey": "demoTab",
                                 "buttons": [
-                                    { "id": "overview", "label": "Overview" },
-                                    { "id": "access", "label": "Access" },
-                                    { "id": "history", "label": "History" }
+                                    {
+                                        "id": "overview",
+                                        "label": "Overview"
+                                    },
+                                    {
+                                        "id": "access",
+                                        "label": "Access"
+                                    },
+                                    {
+                                        "id": "history",
+                                        "label": "History"
+                                    }
                                 ]
                             },
                             "actions": [
                                 {
                                     "on": "click",
                                     "type": "updateState",
-                                    "params": { "demoTab": "$event.id" }
+                                    "params": {
+                                        "demoTab": "$event.id"
+                                    }
                                 }
                             ]
                         },
@@ -357,18 +379,48 @@
                                 "variant": "autoOverflow",
                                 "overflowLabel": "More demo actions",
                                 "buttons": [
-                                    { "id": "save", "label": "Save", "icon": "save-outline", "kind": "primary", "priority": 100, "overflow": "never" },
-                                    { "id": "duplicate", "label": "Duplicate", "icon": "copy-outline", "priority": 40 },
-                                    { "id": "share", "label": "Share", "icon": "share-outline", "priority": 20 },
-                                    { "id": "archive", "label": "Archive", "icon": "archive-outline", "priority": 10 },
-                                    { "id": "delete", "label": "Delete", "icon": "trash-outline", "kind": "danger", "priority": 0 }
+                                    {
+                                        "id": "save",
+                                        "label": "Save",
+                                        "icon": "save-outline",
+                                        "kind": "primary",
+                                        "priority": 100,
+                                        "overflow": "never"
+                                    },
+                                    {
+                                        "id": "duplicate",
+                                        "label": "Duplicate",
+                                        "icon": "copy-outline",
+                                        "priority": 40
+                                    },
+                                    {
+                                        "id": "share",
+                                        "label": "Share",
+                                        "icon": "share-outline",
+                                        "priority": 20
+                                    },
+                                    {
+                                        "id": "archive",
+                                        "label": "Archive",
+                                        "icon": "archive-outline",
+                                        "priority": 10
+                                    },
+                                    {
+                                        "id": "delete",
+                                        "label": "Delete",
+                                        "icon": "trash-outline",
+                                        "kind": "danger",
+                                        "priority": 0
+                                    }
                                 ]
                             },
                             "actions": [
                                 {
                                     "on": "click",
                                     "type": "updateState",
-                                    "params": { "lastDemoCommand": "$event.id" }
+                                    "params": {
+                                        "lastDemoCommand": "$event.id"
+                                    }
                                 }
                             ]
                         },
@@ -382,18 +434,50 @@
                                 "minFieldWidth": 170,
                                 "submitLabel": "Apply specimen",
                                 "fields": [
-                                    { "id": "name", "type": "shortText", "label": "Name", "required": true },
-                                    { "id": "category", "type": "dropdown", "label": "Category", "options": ["Metric", "Event", "Report"] },
-                                    { "id": "threshold", "type": "number", "label": "Threshold", "min": 0, "max": 100, "step": 5 },
-                                    { "id": "due_at", "type": "dateTime", "label": "Due at" },
-                                    { "id": "enabled", "type": "toggle", "label": "Enabled", "defaultValue": true }
+                                    {
+                                        "id": "name",
+                                        "type": "shortText",
+                                        "label": "Name",
+                                        "required": true
+                                    },
+                                    {
+                                        "id": "category",
+                                        "type": "dropdown",
+                                        "label": "Category",
+                                        "options": [
+                                            "Metric",
+                                            "Event",
+                                            "Report"
+                                        ]
+                                    },
+                                    {
+                                        "id": "threshold",
+                                        "type": "number",
+                                        "label": "Threshold",
+                                        "min": 0,
+                                        "max": 100,
+                                        "step": 5
+                                    },
+                                    {
+                                        "id": "due_at",
+                                        "type": "dateTime",
+                                        "label": "Due at"
+                                    },
+                                    {
+                                        "id": "enabled",
+                                        "type": "toggle",
+                                        "label": "Enabled",
+                                        "defaultValue": true
+                                    }
                                 ]
                             },
                             "actions": [
                                 {
                                     "on": "submit",
                                     "type": "updateState",
-                                    "params": { "lastTypedForm": "$event.values" }
+                                    "params": {
+                                        "lastTypedForm": "$event.values"
+                                    }
                                 }
                             ]
                         },
@@ -405,9 +489,21 @@
                             "inputs": {
                                 "expandedStateKey": "demoDisclosure",
                                 "items": [
-                                    { "id": "behavior", "title": "Behavior", "content": "Only one section is expanded and the selected section is kept in page state." },
-                                    { "id": "responsive", "title": "Responsive use", "content": "Use disclosure for secondary material, not primary navigation." },
-                                    { "id": "accessibility", "title": "Accessibility", "content": "Headings expose expanded state and remain keyboard operable." }
+                                    {
+                                        "id": "behavior",
+                                        "title": "Behavior",
+                                        "content": "Only one section is expanded and the selected section is kept in page state."
+                                    },
+                                    {
+                                        "id": "responsive",
+                                        "title": "Responsive use",
+                                        "content": "Use disclosure for secondary material, not primary navigation."
+                                    },
+                                    {
+                                        "id": "accessibility",
+                                        "title": "Accessibility",
+                                        "content": "Headings expose expanded state and remain keyboard operable."
+                                    }
                                 ]
                             }
                         },
@@ -607,6 +703,12 @@
                                             "icon": "construct-outline",
                                             "kind": "primary",
                                             "title": "Open Resource Workbench"
+                                        },
+                                        {
+                                            "id": "open-component-specimens",
+                                            "label": "Component specimens",
+                                            "icon": "grid-outline",
+                                            "title": "Open reusable component specimens"
                                         }
                                     ]
                                 },
@@ -620,6 +722,14 @@
                                             "modalId": "demo_metrics_resource_workbench_modal",
                                             "route": "demo_metrics_resource_workbench",
                                             "view": "demo_metrics_skill.demo_metrics_resource_workbench_modal"
+                                        }
+                                    },
+                                    {
+                                        "ref": "action:demo_metrics.open_component_specimens",
+                                        "kind": "open_modal",
+                                        "trigger": "click:open-component-specimens",
+                                        "payload": {
+                                            "modalId": "component-specimens"
                                         }
                                     }
                                 ]
@@ -1310,13 +1420,273 @@
                     }
                 }
             },
-            "modals": {},
+            "modals": {
+                "component-specimens": {
+                    "id": "component-specimens",
+                    "title": "Reusable component specimens",
+                    "presentation": {
+                        "kind": "modal",
+                        "size": "large"
+                    },
+                    "schema": {
+                        "id": "component-specimens-schema",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "workbench",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "regions",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "region",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                },
+                                {
+                                    "id": "right",
+                                    "role": "inspector",
+                                    "priority": 70,
+                                    "scroll": "region",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "sheet"
+                                    },
+                                    "size": {
+                                        "minPx": 260,
+                                        "preferredPx": 380,
+                                        "maxPx": 560
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive",
+                                "detail": "inspector"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "specimen-breadcrumbs",
+                                "type": "navigation.breadcrumbs",
+                                "area": "main",
+                                "title": "Breadcrumbs",
+                                "inputs": {
+                                    "ariaLabel": "Specimen location",
+                                    "items": [
+                                        {
+                                            "id": "components",
+                                            "label": "Components"
+                                        },
+                                        {
+                                            "id": "navigation",
+                                            "label": "Navigation"
+                                        },
+                                        {
+                                            "id": "current",
+                                            "label": "Current specimen"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click",
+                                        "type": "updateState",
+                                        "params": {
+                                            "specimenBreadcrumb": "$event.id"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "specimen-tabs",
+                                "type": "navigation.tabs",
+                                "area": "main",
+                                "title": "Semantic tabs",
+                                "inputs": {
+                                    "selectedStateKey": "specimenTab",
+                                    "buttons": [
+                                        {
+                                            "id": "overview",
+                                            "label": "Overview"
+                                        },
+                                        {
+                                            "id": "access",
+                                            "label": "Access"
+                                        },
+                                        {
+                                            "id": "history",
+                                            "label": "History"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click",
+                                        "type": "updateState",
+                                        "params": {
+                                            "specimenTab": "$event.id"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "specimen-overflow-actions",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "title": "Automatic command overflow",
+                                "inputs": {
+                                    "variant": "autoOverflow",
+                                    "overflowLabel": "More specimen actions",
+                                    "buttons": [
+                                        {
+                                            "id": "save",
+                                            "label": "Save",
+                                            "icon": "save-outline",
+                                            "kind": "primary",
+                                            "priority": 100,
+                                            "overflow": "never"
+                                        },
+                                        {
+                                            "id": "duplicate",
+                                            "label": "Duplicate",
+                                            "icon": "copy-outline",
+                                            "priority": 40
+                                        },
+                                        {
+                                            "id": "share",
+                                            "label": "Share",
+                                            "icon": "share-outline",
+                                            "priority": 20
+                                        },
+                                        {
+                                            "id": "archive",
+                                            "label": "Archive",
+                                            "icon": "archive-outline",
+                                            "priority": 10
+                                        },
+                                        {
+                                            "id": "delete",
+                                            "label": "Delete",
+                                            "icon": "trash-outline",
+                                            "kind": "danger",
+                                            "priority": 0
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click",
+                                        "type": "updateState",
+                                        "params": {
+                                            "lastSpecimenCommand": "$event.id"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "specimen-typed-form",
+                                "type": "ui.form",
+                                "area": "right",
+                                "title": "Typed form controls",
+                                "inputs": {
+                                    "layout": "responsiveGrid",
+                                    "minFieldWidth": 170,
+                                    "submitLabel": "Apply specimen",
+                                    "fields": [
+                                        {
+                                            "id": "name",
+                                            "type": "shortText",
+                                            "label": "Name",
+                                            "required": true
+                                        },
+                                        {
+                                            "id": "category",
+                                            "type": "dropdown",
+                                            "label": "Category",
+                                            "options": [
+                                                "Metric",
+                                                "Event",
+                                                "Report"
+                                            ]
+                                        },
+                                        {
+                                            "id": "threshold",
+                                            "type": "number",
+                                            "label": "Threshold",
+                                            "min": 0,
+                                            "max": 100,
+                                            "step": 5
+                                        },
+                                        {
+                                            "id": "due_at",
+                                            "type": "dateTime",
+                                            "label": "Due at"
+                                        },
+                                        {
+                                            "id": "enabled",
+                                            "type": "toggle",
+                                            "label": "Enabled",
+                                            "defaultValue": true
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "submit",
+                                        "type": "updateState",
+                                        "params": {
+                                            "lastTypedForm": "$event.values"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "specimen-accordion",
+                                "type": "disclosure.accordion",
+                                "area": "right",
+                                "title": "Accordion disclosure",
+                                "inputs": {
+                                    "expandedStateKey": "specimenDisclosure",
+                                    "items": [
+                                        {
+                                            "id": "behavior",
+                                            "title": "Behavior",
+                                            "content": "Only one section is expanded and the selected section is kept in page state."
+                                        },
+                                        {
+                                            "id": "responsive",
+                                            "title": "Responsive use",
+                                            "content": "Use disclosure for secondary material, not primary navigation."
+                                        },
+                                        {
+                                            "id": "accessibility",
+                                            "title": "Accessibility",
+                                            "content": "Headings expose expanded state and remain keyboard operable."
+                                        }
+                                    ]
+                                }
+                            }
+                        ],
+                        "initialState": {
+                            "specimenTab": "overview",
+                            "specimenDisclosure": "behavior"
+                        }
+                    }
+                }
+            },
             "interfaces": {
                 "taiga_ui_demo_scenario": {}
             }
         }
     },
-    "updated_at": "2026-09-17T17:41:43+00:00",
+    "updated_at": "2026-09-17T19:56:51+00:00",
     "data_projections": [
         {
             "scope": "webspace",

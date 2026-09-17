@@ -166,6 +166,14 @@
               },
               "actions": [
                 {
+                  "on": "mount",
+                  "type": "callSkill",
+                  "target": "subscription_status_skill.refresh_status",
+                  "params": {
+                    "webspace_id": "$client.webspaceId"
+                  }
+                },
+                {
                   "on": "click:refresh",
                   "type": "callSkill",
                   "target": "subscription_status_skill.refresh_status",
