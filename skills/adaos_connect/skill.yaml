@@ -1,5 +1,5 @@
 name: adaos_connect
-version: 0.16.7
+version: 0.16.9
 entry: handlers/main.py
 description: Network expansion assistant for browser, Telegram, and node join flows
   via YJS-driven modal UI.
@@ -24,6 +24,14 @@ data_projections:
   targets:
   - backend: yjs
     path: data/adaos_connect/current
+memory_budget:
+  expected_rss_mb: 64
+  caches:
+  - name: PREPARE_CACHE
+    storage: process_memory
+    max_items: 128
+    ttl_seconds: 900
+    cleanup_hook: _prune_prepare_cache
 tools:
 - name: prepare
   description: Prepare browser, Telegram, or node join connection data and project
@@ -70,4 +78,3 @@ compatibility:
     min_commit: d0c42079b61fba5df8dbcbb9c481abaee6218717
     min_short_commit: d0c42079
     build_date: '2026-08-14T22:38:55+03:00'
-

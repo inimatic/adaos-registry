@@ -32,6 +32,7 @@ _DEFAULT_ROOT_BASES = {"https://api.inimatic.com", "http://api.inimatic.com"}
 _BROWSER_PAIR_TTL_S = 600
 _TELEGRAM_PAIR_TTL_S = 600
 _NODE_JOIN_CODE_TTL_S = 15 * 60
+_PREPARE_CACHE_MAX_ITEMS = 128
 _prepare_request_counter = count(1)
 _prepare_latest_request: dict[str, str] = {}
 _prepare_tasks: dict[str, asyncio.Task[Dict[str, Any]]] = {}
@@ -239,10 +240,30 @@ def _cache_key(webspace_id: str, mode: str) -> tuple[str, str]:
     return (str(webspace_id or "").strip() or default_webspace_id(), str(mode or "browser").strip().lower() or "browser")
 
 
+def _prune_prepare_cache(*, now: float | None = None, reserve: int = 0) -> None:
+    current_time = time.time() if now is None else float(now)
+    for key, entry in list(_prepare_cache.items()):
+        expires_at = _parse_expiry_epoch(entry.get("expires_at_epoch")) if isinstance(entry, dict) else None
+        if expires_at is None or expires_at <= current_time:
+            _prepare_cache.pop(key, None)
+    target_size = max(0, _PREPARE_CACHE_MAX_ITEMS - max(0, int(reserve)))
+    overflow = len(_prepare_cache) - target_size
+    if overflow <= 0:
+        return
+    by_expiry = sorted(
+        _prepare_cache,
+        key=lambda key: _parse_expiry_epoch(_prepare_cache[key].get("expires_at_epoch")) or 0,
+    )
+    for key in by_expiry[:overflow]:
+        _prepare_cache.pop(key, None)
+
+
 def _cache_current(webspace_id: str, mode: str, context: Dict[str, Any], current: Dict[str, Any]) -> None:
+    now = time.time()
+    _prune_prepare_cache(now=now, reserve=1)
     expires_at_epoch = _parse_expiry_epoch(current.get("expires_at_epoch") or current.get("expires_at"))
     key = _cache_key(webspace_id, mode)
-    if expires_at_epoch is None or expires_at_epoch <= time.time():
+    if expires_at_epoch is None or expires_at_epoch <= now:
         _prepare_cache.pop(key, None)
         return
     _prepare_cache[key] = {
@@ -253,6 +274,8 @@ def _cache_current(webspace_id: str, mode: str, context: Dict[str, Any], current
 
 
 def _cached_current(webspace_id: str, mode: str, context: Dict[str, Any], *, request_id: str) -> Dict[str, Any] | None:
+    now = time.time()
+    _prune_prepare_cache(now=now)
     key = _cache_key(webspace_id, mode)
     entry = _prepare_cache.get(key)
     if not isinstance(entry, dict):
@@ -261,7 +284,7 @@ def _cached_current(webspace_id: str, mode: str, context: Dict[str, Any], *, req
         _prepare_cache.pop(key, None)
         return None
     expires_at_epoch = _parse_expiry_epoch(entry.get("expires_at_epoch"))
-    if expires_at_epoch is None or expires_at_epoch <= time.time():
+    if expires_at_epoch is None or expires_at_epoch <= now:
         _prepare_cache.pop(key, None)
         return None
     current = _base_current(mode)
