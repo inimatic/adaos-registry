@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: subscription_status
-version: 0.1.8
+version: 0.1.9
 profiles:
 - adaos.builder.component_project.v1
 components:
