@@ -256,6 +256,31 @@ def test_workbench_distinguishes_execution_failure_from_retry_gate(monkeypatch, 
     assert result["commands"] == {"retry_automation": True}
 
 
+def test_workbench_projects_cancelled_terminal_failure_as_cancellation(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "get_project", lambda *args: {"title": "Sample"})
+    monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "primary"))
+    monkeypatch.setattr(module.compositions, "get", lambda *args: {})
+    monkeypatch.setattr(module.workflow, "get_state", lambda *args: {
+        "active_phase": "automation",
+        "automation": {
+            "status": "failed",
+            "head_task_id": "task.cancelled",
+            "error": "Cancelled before activation; Builder implementation is direct.",
+        },
+        "workflow_description": {
+            "state": "automation_ready",
+            "allowed_commands": [{"command": "retry_automation"}],
+        },
+    })
+
+    result = module.get_workbench("project", "sample")
+
+    assert result["current"]["execution_status"] == "cancelled"
+    assert result["current"]["summary"] == "automation_cancelled"
+    assert result["commands"] == {"retry_automation": True}
+
+
 def test_missing_workbench_clears_previous_actions_and_evidence(monkeypatch) -> None:
     module = _module()
     monkeypatch.setattr(module, "get_project", lambda *args: {"availability_state": "not_found", "working_label": "Project not found"})
@@ -1688,6 +1713,11 @@ def test_accept_prototype_forwards_exact_review_evidence(monkeypatch) -> None:
         lambda kind, object_id: ("scenario", object_id),
     )
     monkeypatch.setattr(
+        module,
+        "_composition_domain_packs",
+        lambda kind, object_id: ("applications.compatibility.v1",),
+    )
+    monkeypatch.setattr(
         module.workflow,
         "accept_prototype",
         lambda *args, **kwargs: calls.append({"args": args, "kwargs": kwargs})
@@ -1726,6 +1756,9 @@ def test_accept_prototype_forwards_exact_review_evidence(monkeypatch) -> None:
         "delegated_by": "user:dmitry",
     }
     assert calls[0]["kwargs"]["expected_generation"] == 7
+    assert calls[0]["kwargs"]["domain_packs"] == (
+        "applications.compatibility.v1",
+    )
 
 
 def test_get_automation_exposes_missing_session_as_idle(monkeypatch) -> None:
@@ -2738,6 +2771,69 @@ def test_publish_recovers_exact_running_trial_without_repeating_activation(
     assert result["recovered"] is True
     assert result["candidate"]["candidate_id"] == candidate_id
     assert transitions == ["candidate_preparation_started", "candidate_prepared"]
+
+
+def test_access_preflight_blocks_before_candidate_side_effects(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "_identity", lambda *_args: ("project", "access_app"))
+    monkeypatch.setattr(
+        module, "_execution_identity", lambda *_args: ("scenario", "access_app")
+    )
+    monkeypatch.setattr(
+        module.compositions,
+        "get",
+        lambda *_args: {
+            "id": "access_app",
+            "permission_profile": {"required": [], "optional": []},
+        },
+    )
+    monkeypatch.setattr(
+        module.workflow,
+        "get_state",
+        lambda *_args: {
+            "capabilities": {"can_prepare_candidate": True},
+            "change_set": {"change_set_id": "change-access"},
+            "automation": {"head_task_id": "task.access"},
+            "delivery": {
+                "status": "checkpoint",
+                "checkpoint_change_id": "checkpoint-access",
+                "package_digest": "sha256:" + "2" * 64,
+                "source_revision": "a" * 40,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        module,
+        "get_project_access_contract",
+        lambda *_args, **_kwargs: {
+            "status": "blocked",
+            "declaration_status": "present",
+            "verification_reason": "sealed_automation_evidence_missing",
+        },
+    )
+    monkeypatch.setattr(
+        module.workflow,
+        "transition",
+        lambda *_args, **_kwargs: pytest.fail(
+            "workflow must not enter candidate preparation after failed preflight"
+        ),
+    )
+    monkeypatch.setattr(
+        module.compositions,
+        "prepare_candidate",
+        lambda *_args, **_kwargs: pytest.fail(
+            "immutable Candidate must not be created after failed preflight"
+        ),
+    )
+
+    with pytest.raises(ValueError, match="preflight is blocked"):
+        module.publish_project(
+            "project",
+            "access_app",
+            dry_run=True,
+            confirmed=True,
+            approve_permissions=True,
+        )
 
 
 def test_trial_result_reconciles_lost_local_waiting_state_without_external_activation(

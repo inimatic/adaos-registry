@@ -121,6 +121,27 @@ def _composition_manifest(project_id: str) -> dict[str, Any]:
     return dict(compositions.get(project_id))
 
 
+def _composition_domain_packs(kind: str, project_id: str) -> tuple[str, ...]:
+    composition = (
+        compositions.get(project_id)
+        if kind == "project"
+        else compositions.project_for_component(f"{kind}:{project_id}")
+    )
+    development = (
+        composition.get("development")
+        if isinstance(composition, Mapping)
+        and isinstance(composition.get("development"), Mapping)
+        else {}
+    )
+    return tuple(
+        dict.fromkeys(
+            str(item).strip()
+            for item in development.get("domain_packs") or []
+            if str(item).strip()
+        )
+    )
+
+
 def _composition_catalog(project: Mapping[str, Any]) -> dict[str, Any]:
     return (
         dict(project.get("catalog"))
@@ -2704,6 +2725,7 @@ def accept_prototype(
         ],
         actor="builder.prototype.review",
         expected_generation=expected_generation,
+        domain_packs=_composition_domain_packs(kind, project_id),
     )
     result["execution_scope"] = _execution_scope(kind, project_id)
     return result
@@ -4226,7 +4248,7 @@ def get_lifecycle(
         if isinstance(workflow_projection.get("automation"), Mapping)
         else {}
     )
-    automation_status = str(workflow_automation.get("status") or "not_started")
+    automation_status = _automation_execution_status(workflow_automation)
     project_version = str(project.get("version") or "DEV")
     # Prototype adaptation is transition evidence, not a second Automation
     # release. Keep the durable workflow result authoritative for that job.
@@ -4267,6 +4289,7 @@ def get_lifecycle(
         combined_automation["status"] = (
             workflow_automation.get("status") or runtime_status
         )
+    combined_automation["status"] = _automation_execution_status(combined_automation)
     automation_children = _automation_children(
         combined_automation, project_version=project_version
     )
@@ -5609,6 +5632,98 @@ def _ensure_publication_waiting_before_result(
     )
 
 
+_TRIAL_ACCESS_EVIDENCE_FIELDS = (
+    "regression_evidence",
+    "access_matrix_evidence",
+    "pending_action_evidence",
+    "audit_evidence",
+    "disclosure_evidence",
+    "redaction_evidence",
+)
+
+
+def _preflight_candidate_access(
+    kind: str,
+    project_id: str,
+    *,
+    delivery: Mapping[str, Any],
+    automation_task_id: str | None,
+    approve_permissions: bool,
+    verification_evidence: Mapping[str, Any] | None,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Validate access-aware Trial inputs before creating immutable state."""
+
+    if kind != "project":
+        return None, {"required": False, "status": "not_applicable"}
+    project = _composition_manifest(project_id)
+    if not isinstance(project.get("permission_profile"), Mapping):
+        return None, {
+            "required": False,
+            "status": "not_applicable",
+            "reason": "project_has_no_permission_profile",
+        }
+    if not approve_permissions:
+        raise ValueError(
+            "Access-aware Trial requires explicit permission approval before Candidate preparation"
+        )
+
+    review = get_project_access_contract("project", project_id)
+    if str(review.get("status") or "").strip() != "ready":
+        reason = str(
+            review.get("verification_reason")
+            or review.get("diagnostics")
+            or review.get("declaration_status")
+            or "access_contract_not_ready"
+        ).strip()
+        raise ValueError(
+            "Access-aware Trial preflight is blocked before Candidate preparation: "
+            + reason
+        )
+
+    trusted = (
+        dict(review.get("verification_evidence"))
+        if isinstance(review.get("verification_evidence"), Mapping)
+        else {}
+    )
+    payload = (
+        dict(verification_evidence)
+        if isinstance(verification_evidence, Mapping)
+        else trusted
+    )
+    expected_commit = str(trusted.get("source_commit") or "").strip()
+    source_commit = str(payload.get("source_commit") or "").strip()
+    if not expected_commit or source_commit != expected_commit:
+        raise ValueError(
+            "Application Final Verification source_commit must match the trusted sealed evidence"
+        )
+    expected_task_id = str(automation_task_id or "").strip()
+    evidence_task_id = str(review.get("verification_task_id") or "").strip()
+    if expected_task_id and evidence_task_id != expected_task_id:
+        raise ValueError(
+            "Application Final Verification evidence does not belong to the current Automation task"
+        )
+    missing = [
+        field
+        for field in _TRIAL_ACCESS_EVIDENCE_FIELDS
+        if not isinstance(payload.get(field), (list, tuple))
+        or not any(str(item).strip() for item in payload.get(field) or ())
+    ]
+    if missing:
+        raise ValueError(
+            "Application Final Verification evidence is incomplete before Candidate preparation: "
+            + ", ".join(missing)
+        )
+    payload["release_scope"] = "trial"
+    return payload, {
+        "required": True,
+        "status": "passed",
+        "source_commit": source_commit,
+        "checkpoint_source_revision": delivery.get("source_revision"),
+        "profile_digest": review.get("profile_digest"),
+        "verification_task_id": evidence_task_id or None,
+    }
+
+
 @tool(
     "publish_project",
     summary="Validate or publish a DEV project release.",
@@ -5810,6 +5925,14 @@ def publish_project(
             "canonical_change_id": canonical_change_id or None,
             "context_packet_digest": context_packet_digest or None,
         }
+        candidate_access_evidence, access_preflight = _preflight_candidate_access(
+            kind,
+            project_id,
+            delivery=delivery,
+            automation_task_id=str(automation_workflow.get("head_task_id") or ""),
+            approve_permissions=approve_permissions,
+            verification_evidence=verification_evidence,
+        )
         candidate_change_ids = list(
             dict.fromkeys(
                 [
@@ -5939,13 +6062,19 @@ def publish_project(
             str(release_data.get("project_id") or project_id),
             candidate_id,
             evidence=(
-                dict(verification_evidence)
+                dict(candidate_access_evidence)
+                if isinstance(candidate_access_evidence, Mapping)
+                else dict(verification_evidence)
                 if isinstance(verification_evidence, Mapping)
                 else None
             ),
             actor_ref="builder.user",
         )
-        result = {**dict(result), "application_verification": access_verification}
+        result = {
+            **dict(result),
+            "access_preflight": access_preflight,
+            "application_verification": access_verification,
+        }
         _ensure_trial_waiting_before_result(
             workflow_kind,
             workflow_id,
@@ -6532,6 +6661,16 @@ def resume_clarification(interaction_id: str, expected_generation: int, confirme
         expected_generation=expected_generation, confirmed=confirmed)
 
 
+def _automation_execution_status(value: Mapping[str, Any] | None) -> str:
+    projection = value if isinstance(value, Mapping) else {}
+    status = str(projection.get("status") or "not_started").strip().lower()
+    terminal = str(projection.get("terminal_status") or "").strip().lower()
+    error = str(projection.get("error") or "").strip().lower()
+    if status == "failed" and (terminal == "cancelled" or error.startswith("cancelled")):
+        return "cancelled"
+    return status
+
+
 @tool("get_workbench", summary="Project canonical Builder state into the accepted workbench.", side_effects="none")
 def get_workbench(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFAULT_PROJECT_ID,
                   webspace_id: str | None = None, _meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -6545,7 +6684,8 @@ def get_workbench(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFA
     state = workflow.get_state(execution_kind, execution_id)
     change = state.get("change") or state.get("change_set") or {}
     prototype = state.get("prototype") or {}
-    implementation = state.get("automation") or {}
+    implementation = dict(state.get("automation") or {})
+    implementation["status"] = _automation_execution_status(implementation)
     description = state.get("workflow_description") or {}
     process_state = str(description.get("state") or "ready")
     commands = {row["command"]: True for row in description.get("allowed_commands", [])

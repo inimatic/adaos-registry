@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import ctx_current_user
+from adaos.sdk.subscriptions import project_codex_usage_window
 
 ROOT_GOVERNED_RESOURCES: tuple[str, ...] = (
     "llm.requests",
@@ -146,6 +147,9 @@ def _resource_rows(status: Mapping[str, Any]) -> list[dict[str, Any]]:
         item = _as_mapping(usage.get(resource))
         disabled = disabled_map.get(resource)
         quota = _as_mapping(item.get("quota"))
+        breakdown = _as_mapping(item.get("usage_breakdown"))
+        window_24h = _as_mapping(breakdown.get("window_24h"))
+        window_30d = _as_mapping(breakdown.get("window_30d"))
         metering = _text(item.get("metering"))
         if resource == "codex.api.tokens" and metering in {"", "manual_adjustment_pending_codex_stream"}:
             metering = "codex_usage_stream"
@@ -165,6 +169,18 @@ def _resource_rows(status: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "accuracy": _text(item.get("accuracy")),
                 "last_model": _text(item.get("last_model")),
                 "last_seen_at": _text(item.get("last_seen_at")),
+                "quota_metric": _text(item.get("quota_metric")),
+                "optimization_metric": _text(item.get("optimization_metric")),
+                "fresh_plus_output_24h": _int_value(
+                    window_24h.get("fresh_plus_output_tokens")
+                ),
+                "cached_input_24h": _int_value(window_24h.get("cached_input_tokens")),
+                "output_tokens_24h": _int_value(window_24h.get("output_tokens")),
+                "runs_24h": _int_value(window_24h.get("runs")),
+                "zero_model_tasks_24h": _int_value(window_24h.get("zero_model_tasks")),
+                "fresh_plus_output_30d": _int_value(
+                    window_30d.get("fresh_plus_output_tokens")
+                ),
             }
         )
     return rows
@@ -175,15 +191,17 @@ def _current_tile(status: Mapping[str, Any], rows: list[Mapping[str, Any]]) -> d
     exhausted = sum(1 for row in rows if row.get("state") == "exhausted")
     warn = sum(1 for row in rows if row.get("state") == "warn")
     subscription_state = _text(status.get("subscription_state")) or "unknown"
-    entitlement_state = _text(status.get("entitlement_state")) or "unknown"
     inactive = subscription_state not in {"active", "trial"}
-    llm = _as_mapping(_as_mapping(status.get("usage")).get("llm.requests"))
+    llm = next((row for row in rows if row.get("resource") == "llm.requests"), {})
     codex = next((row for row in rows if row.get("resource") == "codex.api.tokens"), {})
     llm_limit = llm.get("quota_limit")
     llm_left = llm.get("quota_remaining")
     codex_left = codex.get("quota_remaining")
+    codex_used_24h = _int_value(codex.get("used_24h"))
     codex_used = _int_value(codex.get("used_30d"))
     codex_accuracy = _text(codex.get("accuracy"))
+    codex_effective_24h = _int_value(codex.get("fresh_plus_output_24h"))
+    codex_cached_24h = _int_value(codex.get("cached_input_24h"))
     llm_quota = f"/{_int_value(llm_limit)}" if llm_limit not in {"", None} else ""
     llm_remaining = f", left {_int_value(llm_left)}" if llm_left not in {"", None} else ""
     codex_suffix = ""
@@ -196,10 +214,12 @@ def _current_tile(status: Mapping[str, Any], rows: list[Mapping[str, Any]]) -> d
     return {
         "value": _text(status.get("plan_id")) or "none",
         "label": "AdaOS subscription",
-        "subtitle": f"{subscription_state} / {entitlement_state}",
+        "subtitle": f"Plan: {_text(status.get('plan_id')) or 'none'}; status: {subscription_state}",
         "description": (
-            f"LLM 24h: {_int_value(llm.get('used_24h'))}{llm_quota}{llm_remaining}; "
-            f"disabled: {disabled}; warn: {warn}; exhausted: {exhausted}{codex_suffix}"
+            f"Usage in the last 24h: LLM {_int_value(llm.get('used_24h'))}{llm_quota}{llm_remaining}; "
+            f"Codex quota {codex_used_24h}; "
+            f"fresh + output {codex_effective_24h}; cached input {codex_cached_24h}; "
+            f"features needing attention: {warn + exhausted}; unavailable: {disabled}{codex_suffix}"
         ),
         "color": "danger" if exhausted or inactive else "warning" if warn or disabled else "success",
         "generated_at": status.get("generated_at"),
@@ -248,6 +268,12 @@ def _usage_history_rows(rows: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
                 "accuracy": _text(row.get("accuracy")),
                 "last_model": _text(row.get("last_model")),
                 "last_seen_at": _text(row.get("last_seen_at")),
+                "fresh_plus_output_24h": _int_value(row.get("fresh_plus_output_24h")),
+                "cached_input_24h": _int_value(row.get("cached_input_24h")),
+                "output_tokens_24h": _int_value(row.get("output_tokens_24h")),
+                "runs_24h": _int_value(row.get("runs_24h")),
+                "zero_model_tasks_24h": _int_value(row.get("zero_model_tasks_24h")),
+                "fresh_plus_output_30d": _int_value(row.get("fresh_plus_output_30d")),
                 "reason": _text(row.get("reason")),
             }
         )
@@ -256,13 +282,49 @@ def _usage_history_rows(rows: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
 
 def _projection_payload(status: Mapping[str, Any]) -> dict[str, Any]:
     rows = _resource_rows(status)
+    usage = _as_mapping(_as_mapping(status.get("usage")).get("codex.api.tokens"))
+    window = _as_mapping(_as_mapping(usage.get("usage_breakdown")).get("window_24h"))
+    codex = project_codex_usage_window(window)
+    model_rows = []
+    for row in codex["by_model"]:
+        cost = row["cost"]
+        amount = cost.get("estimated_usd")
+        model_rows.append({**row, "model": row["model"] or "Unknown",
+                           "cost_status": cost["status"],
+                           "estimated_usd": f"{amount:.6f}" if amount is not None else "",
+                           "unpriced_runs": cost.get("unpriced_runs")})
     return {
         "current": _current_tile(status, rows),
         "buttons": [{"id": "details", "label": "Details", "kind": "primary"}],
         "resources": {"items": rows, "generated_at": status.get("generated_at")},
         "usage_history": {"items": _usage_history_rows(rows), "generated_at": status.get("generated_at")},
+        "codex_models": {"items": model_rows, "cost": codex["cost"],
+                         "generated_at": status.get("generated_at")},
         "plan_change": _plan_change_projection(status),
         "raw": dict(status),
+    }
+
+
+def _refresh_projection(
+    status: Mapping[str, Any],
+    refresh: Mapping[str, Any],
+) -> dict[str, Any]:
+    snapshot = _as_mapping(status.get("entitlement_snapshot"))
+    attempted = bool(refresh.get("attempted"))
+    ok = refresh.get("ok") is True if attempted else bool(snapshot.get("loaded"))
+    updated_at = _text(
+        refresh.get("retrieved_at")
+        or snapshot.get("updated_at")
+        or status.get("generated_at")
+    )
+    return {
+        "status": "refreshed" if attempted and ok else "failed" if attempted else "loaded",
+        "updated_at": updated_at,
+        "root_base_url": _text(
+            refresh.get("root_base_url")
+            or _as_mapping(status.get("management_authority")).get("configured_root_base_url")
+        ),
+        "detail": _text(refresh.get("detail") or refresh.get("error")),
     }
 
 
@@ -317,8 +379,9 @@ def _project_status(
         if refresh.get("ok") is True:
             status = current_subnet_economic_status()
     payload = _projection_payload(status)
+    payload["refresh"] = _refresh_projection(status, refresh)
     ctx_current_user.set("subscription_status.snapshot", payload, webspace_id=target)
-    return {"ok": True, "webspace_id": target, "refresh": refresh, **payload}
+    return {**payload, "ok": True, "webspace_id": target, "refresh": refresh}
 
 
 @tool("get_status")

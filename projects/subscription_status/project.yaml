@@ -1,0 +1,46 @@
+schema: adaos.project.v1
+kind: project
+id: subscription_status
+version: 0.1.8
+profiles:
+- adaos.builder.component_project.v1
+components:
+  owned:
+  - ref: skill:subscription_status_skill
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations:
+    - uses
+  dependencies: []
+entrypoints: []
+catalog:
+  title: subscription_status_skill
+  description: User-facing AdaOS subscription status widget and modal backed by the
+    local economic entitlement snapshot with explicit Root refresh.
+  categories:
+  - development
+  tags:
+  - builder-managed
+  - legacy-component
+publication:
+  stage: alpha
+  visibility: unlisted
+  channel: stable
+install:
+  default: false
+  features:
+  - id: default
+    title: subscription_status_skill
+    default: true
+    optional: false
+    components:
+    - skill:subscription_status_skill
+compatibility: {}
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-09-02T17:23:11.121480Z'
+created_by: builder:qualifier

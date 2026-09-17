@@ -2,7 +2,7 @@
   "schema": "adaos.webui.v1",
   "generated_by": "builder-owned-live-implementation",
   "ui": {
-    "version": "0.2.91",
+    "version": "0.2.92",
     "application": {
       "desktop": {
         "pageSchema": {

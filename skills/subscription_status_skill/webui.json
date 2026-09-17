@@ -16,6 +16,10 @@
       "items": [],
       "generated_at": ""
     },
+    "data/subscription_status/codex_models": {
+      "items": [],
+      "generated_at": ""
+    },
     "data/subscription_status/plan_change": {
       "value": "none",
       "label": "Plan request",
@@ -26,6 +30,12 @@
       "desired_plan_id": "",
       "requested_at": "",
       "note": ""
+    },
+    "data/subscription_status/refresh": {
+      "status": "loading",
+      "updated_at": "",
+      "root_base_url": "",
+      "detail": ""
     },
     "data/subscription_status/raw": {
       "schema": "adaos.subnet.economic_status.v1",
@@ -55,7 +65,8 @@
       "icon": "card-outline",
       "dataSource": {
         "kind": "y",
-        "path": "data/subscription_status"
+        "path": "data/subscription_status",
+        "scope": "shared"
       },
       "loading": {
         "loadingText": "Loading subscription...",
@@ -74,16 +85,15 @@
       },
       "actions": [
         {
-          "on": "click:details",
-          "type": "navigate",
+          "on": "mount",
+          "type": "callSkill",
+          "target": "subscription_status_skill.refresh_status",
           "params": {
-            "to": "subscription_status_skill.subscription_status_modal",
-            "surface": "modal",
-            "modalId": "subscription_status_modal"
+            "webspace_id": "$client.webspaceId"
           }
         },
         {
-          "on": "click",
+          "on": "click:details",
           "type": "navigate",
           "params": {
             "to": "subscription_status_skill.subscription_status_modal",
@@ -161,10 +171,7 @@
                   "target": "subscription_status_skill.refresh_status",
                   "params": {
                     "webspace_id": "$client.webspaceId"
-                  },
-                  "invalidates": [
-                    "subscription_status.snapshot"
-                  ]
+                  }
                 }
               ]
             },
@@ -175,7 +182,8 @@
               "title": "Current plan",
               "dataSource": {
                 "kind": "y",
-                "path": "data/subscription_status"
+                "path": "data/subscription_status",
+                "scope": "shared"
               },
               "inputs": {
                 "valuePath": "current.value",
@@ -188,13 +196,47 @@
               }
             },
             {
+              "id": "subscription-status-refresh-receipt",
+              "type": "item.details",
+              "area": "main",
+              "title": "Refresh status",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/subscription_status/refresh",
+                "scope": "shared"
+              },
+              "inputs": {
+                "presentation": "section",
+                "fields": [
+                  {
+                    "label": "Status",
+                    "path": "status"
+                  },
+                  {
+                    "label": "Last updated",
+                    "path": "updated_at",
+                    "format": "datetime"
+                  },
+                  {
+                    "label": "Authority",
+                    "path": "root_base_url"
+                  },
+                  {
+                    "label": "Error",
+                    "path": "detail"
+                  }
+                ]
+              }
+            },
+            {
               "id": "subscription-status-resources",
               "type": "ui.table",
               "area": "main",
               "title": "Resources",
               "dataSource": {
                 "kind": "y",
-                "path": "data/subscription_status/resources"
+                "path": "data/subscription_status/resources",
+                "scope": "shared"
               },
               "inputs": {
                 "emptyText": "No subscription resource data",
@@ -263,7 +305,8 @@
               "title": "Usage window",
               "dataSource": {
                 "kind": "y",
-                "path": "data/subscription_status/usage_history"
+                "path": "data/subscription_status/usage_history",
+                "scope": "shared"
               },
               "inputs": {
                 "emptyText": "No observed usage yet",
@@ -281,13 +324,43 @@
                   },
                   {
                     "key": "used_24h",
-                    "label": "24h",
+                    "label": "Quota 24h",
                     "mono": true,
-                    "width": "80px"
+                    "width": "100px"
                   },
                   {
-                    "key": "used_30d",
-                    "label": "30d",
+                    "key": "fresh_plus_output_24h",
+                    "label": "Fresh + output",
+                    "mono": true,
+                    "width": "125px"
+                  },
+                  {
+                    "key": "cached_input_24h",
+                    "label": "Cached input",
+                    "mono": true,
+                    "width": "115px"
+                  },
+                  {
+                    "key": "output_tokens_24h",
+                    "label": "Output",
+                    "mono": true,
+                    "width": "85px"
+                  },
+                  {
+                    "key": "fresh_plus_output_30d",
+                    "label": "Fresh 30d",
+                    "mono": true,
+                    "width": "100px"
+                  },
+                  {
+                    "key": "runs_24h",
+                    "label": "Runs",
+                    "mono": true,
+                    "width": "70px"
+                  },
+                  {
+                    "key": "zero_model_tasks_24h",
+                    "label": "No-model",
                     "mono": true,
                     "width": "90px"
                   },
@@ -319,13 +392,70 @@
               }
             },
             {
+              "id": "subscription-status-codex-models",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Codex by model / 24h",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/subscription_status/codex_models",
+                "scope": "shared"
+              },
+              "inputs": {
+                "emptyText": "No model usage receipts",
+                "columns": [
+                  {
+                    "key": "model",
+                    "label": "Model",
+                    "width": "160px"
+                  },
+                  {
+                    "key": "runs",
+                    "label": "Runs",
+                    "width": "70px"
+                  },
+                  {
+                    "key": "fresh_input_tokens",
+                    "label": "Fresh input",
+                    "width": "110px"
+                  },
+                  {
+                    "key": "cached_input_tokens",
+                    "label": "Cached input",
+                    "width": "110px"
+                  },
+                  {
+                    "key": "output_tokens",
+                    "label": "Output",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "estimated_usd",
+                    "label": "Estimate USD",
+                    "width": "115px"
+                  },
+                  {
+                    "key": "cost_status",
+                    "label": "Cost coverage",
+                    "width": "115px"
+                  },
+                  {
+                    "key": "unpriced_runs",
+                    "label": "Unpriced runs",
+                    "width": "115px"
+                  }
+                ]
+              }
+            },
+            {
               "id": "subscription-status-plan-request-state",
               "type": "visual.metricTile",
               "area": "main",
               "title": "Plan request",
               "dataSource": {
                 "kind": "y",
-                "path": "data/subscription_status"
+                "path": "data/subscription_status",
+                "scope": "shared"
               },
               "inputs": {
                 "valuePath": "plan_change.value",
@@ -402,7 +532,8 @@
               "title": "Local entitlement snapshot",
               "dataSource": {
                 "kind": "y",
-                "path": "data/subscription_status/raw"
+                "path": "data/subscription_status/raw",
+                "scope": "shared"
               },
               "inputs": {
                 "emptyText": "No local economic status"

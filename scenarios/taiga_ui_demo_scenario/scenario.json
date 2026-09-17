@@ -1,11 +1,11 @@
 {
     "$schema": "../../../../src/adaos/abi/scenario.schema.json",
     "id": "taiga_ui_demo_scenario",
-    "version": "0.11.4",
+    "version": "0.11.7",
     "name": "taiga_ui_demo_scenario",
     "type": "desktop",
     "title": "Taiga UI Demo Scenario",
-    "description": "Desktop demo scenario for the first semantic Web UI control task with a table, chart payload, and live event stream.",
+    "description": "Desktop demo scenario for reusable semantic navigation, disclosure, typed input, adaptive commands, tables, charts, and live event streams.",
     "depends": [
         "web_desktop_skill",
         "demo_metrics_skill"
@@ -304,6 +304,111 @@
                                 "compactIndent": true,
                                 "wrapTitles": true,
                                 "emptyText": "No component groups"
+                            }
+                        },
+                        {
+                            "id": "demo-breadcrumbs",
+                            "type": "navigation.breadcrumbs",
+                            "area": "main",
+                            "title": "Breadcrumbs",
+                            "inputs": {
+                                "ariaLabel": "Demo location",
+                                "items": [
+                                    { "id": "components", "label": "Components" },
+                                    { "id": "navigation", "label": "Navigation" },
+                                    { "id": "current", "label": "Current specimen" }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click",
+                                    "type": "updateState",
+                                    "params": { "demoBreadcrumb": "$event.id" }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "demo-tabs",
+                            "type": "navigation.tabs",
+                            "area": "main",
+                            "title": "Semantic tabs",
+                            "inputs": {
+                                "selectedStateKey": "demoTab",
+                                "buttons": [
+                                    { "id": "overview", "label": "Overview" },
+                                    { "id": "access", "label": "Access" },
+                                    { "id": "history", "label": "History" }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click",
+                                    "type": "updateState",
+                                    "params": { "demoTab": "$event.id" }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "demo-overflow-actions",
+                            "type": "ui.actions",
+                            "area": "main",
+                            "title": "Automatic command overflow",
+                            "inputs": {
+                                "variant": "autoOverflow",
+                                "overflowLabel": "More demo actions",
+                                "buttons": [
+                                    { "id": "save", "label": "Save", "icon": "save-outline", "kind": "primary", "priority": 100, "overflow": "never" },
+                                    { "id": "duplicate", "label": "Duplicate", "icon": "copy-outline", "priority": 40 },
+                                    { "id": "share", "label": "Share", "icon": "share-outline", "priority": 20 },
+                                    { "id": "archive", "label": "Archive", "icon": "archive-outline", "priority": 10 },
+                                    { "id": "delete", "label": "Delete", "icon": "trash-outline", "kind": "danger", "priority": 0 }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click",
+                                    "type": "updateState",
+                                    "params": { "lastDemoCommand": "$event.id" }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "demo-typed-form",
+                            "type": "ui.form",
+                            "area": "right",
+                            "title": "Typed form controls",
+                            "inputs": {
+                                "layout": "responsiveGrid",
+                                "minFieldWidth": 170,
+                                "submitLabel": "Apply specimen",
+                                "fields": [
+                                    { "id": "name", "type": "shortText", "label": "Name", "required": true },
+                                    { "id": "category", "type": "dropdown", "label": "Category", "options": ["Metric", "Event", "Report"] },
+                                    { "id": "threshold", "type": "number", "label": "Threshold", "min": 0, "max": 100, "step": 5 },
+                                    { "id": "due_at", "type": "dateTime", "label": "Due at" },
+                                    { "id": "enabled", "type": "toggle", "label": "Enabled", "defaultValue": true }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "submit",
+                                    "type": "updateState",
+                                    "params": { "lastTypedForm": "$event.values" }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "demo-accordion",
+                            "type": "disclosure.accordion",
+                            "area": "right",
+                            "title": "Accordion disclosure",
+                            "inputs": {
+                                "expandedStateKey": "demoDisclosure",
+                                "items": [
+                                    { "id": "behavior", "title": "Behavior", "content": "Only one section is expanded and the selected section is kept in page state." },
+                                    { "id": "responsive", "title": "Responsive use", "content": "Use disclosure for secondary material, not primary navigation." },
+                                    { "id": "accessibility", "title": "Accessibility", "content": "Headings expose expanded state and remain keyboard operable." }
+                                ]
                             }
                         },
                         {
@@ -1211,7 +1316,7 @@
             }
         }
     },
-    "updated_at": "2026-09-02T10:07:21+00:00",
+    "updated_at": "2026-09-17T17:41:43+00:00",
     "data_projections": [
         {
             "scope": "webspace",
