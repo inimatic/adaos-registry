@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: ops_infrascope
-version: 0.10.23
+version: 0.10.24
 profiles:
 - adaos.operations.infrascope.v1
 components:
@@ -18,12 +18,6 @@ components:
     lifecycle: bound
     relations:
     - realizes
-  - ref: skill:infrastate_skill
-    role: supporting
-    exposure: application
-    lifecycle: bound
-    relations:
-    - uses
   - ref: skill:infra_access_skill
     role: supporting
     exposure: advanced
@@ -86,7 +80,6 @@ install:
     components:
     - scenario:infrascope
     - skill:infrascope_skill
-    - skill:infrastate_skill
   - id: infra-access
     title: Managed infra access
     title_i18n:
