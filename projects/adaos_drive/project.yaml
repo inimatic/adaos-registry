@@ -27,6 +27,7 @@ entrypoints:
     surface: files
 catalog:
   title: AdaOS Drive
+  icon: folder-open-outline
   title_i18n:
     en: AdaOS Drive
     ru: Диск AdaOS

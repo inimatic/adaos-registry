@@ -1,5 +1,5 @@
-"""Expose public handlers for the weather skill."""
+"""Expose the handlers declared by the current weather skill manifest."""
 
-from .main import handle  # noqa: F401
+from .main import dispose, get_runtime_status, get_snapshot, get_weather
 
-__all__ = ["handle"]
+__all__ = ["dispose", "get_runtime_status", "get_snapshot", "get_weather"]

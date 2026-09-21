@@ -38,6 +38,7 @@ entrypoints:
   bindings: {}
 catalog:
   title: Builder
+  icon: construct-outline
   description: AdaOS project development workbench.
   categories: []
   tags: []

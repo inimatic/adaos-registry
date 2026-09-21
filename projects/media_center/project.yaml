@@ -63,6 +63,7 @@ entrypoints:
     shared_surface: false
 catalog:
   title: Media Center
+  icon: play-circle-outline
   title_i18n:
     en: Media Center
     ru: Медиацентр

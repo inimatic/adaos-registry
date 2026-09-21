@@ -66,6 +66,7 @@ entrypoints:
     preview: skill
 catalog:
   title: AdaOS Builder
+  icon: construct-outline
   title_i18n:
     en: AdaOS Builder
     ru: Конструктор AdaOS
