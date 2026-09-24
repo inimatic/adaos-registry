@@ -59,6 +59,7 @@ def load_module(monkeypatch, memory=None, skills_root: Path | None = None, base_
     monkeypatch.setattr(mod, "stream_publish", lambda receiver, data=None, _meta=None: streams.append((receiver, data, _meta)))
     monkeypatch.setattr(mod, "skill_memory_get", lambda key, default=None: memory.get(key, default))
     monkeypatch.setattr(mod, "skill_memory_set", lambda key, value: memory.__setitem__(key, value))
+    monkeypatch.setattr(mod, "_mem_snapshot", lambda: deepcopy(memory))
     if skills_root is not None:
         monkeypatch.setattr(mod, "_skills_root", lambda: skills_root)
     runtime_base = base_dir or (skills_root.parent / "base" if skills_root is not None else None)
@@ -154,13 +155,51 @@ def test_snapshot_reuses_directory_view_and_refresh_invalidates_it(monkeypatch, 
     assert "beta.txt" in {item["name"] for item in refreshed["items"]}
 
 
-def test_scandir_item_reuses_one_metadata_snapshot(monkeypatch, tmp_path):
+def test_initial_state_uses_one_skill_memory_snapshot(monkeypatch, tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    memory = {}
+    mod, _streams = load_module(monkeypatch, memory=memory)
+    state = mod._default_state()
+    source = mod._source_payload("Root", root)
+    state["sources"] = [source]
+    state["panels"]["left"]["source_id"] = source["id"]
+    state["panels"]["right"]["source_id"] = source["id"]
+    memory[mod._state_key("test")] = state
+    memory[mod._GLOBAL_SOURCES_KEY] = [source]
+    calls = 0
+
+    def snapshot():
+        nonlocal calls
+        calls += 1
+        return deepcopy(memory)
+
+    monkeypatch.setattr(mod, "_mem_snapshot", snapshot)
+    monkeypatch.setattr(
+        mod,
+        "_sharing_stream_snapshot",
+        lambda _state, _webspace_id: {
+            "recent_links": {"items": []},
+            "public_links": {"items": []},
+            "public_downloads": {"items": [], "summary": {}},
+        },
+    )
+    mod._STATE_BY_WEBSPACE.clear()
+
+    result = mod.get_snapshot({"webspace_id": "test"})
+
+    assert result["ok"] is True
+    assert calls == 1
+
+
+def test_scandir_item_reuses_metadata_and_precomputed_relative_path(
+    monkeypatch, tmp_path
+):
     root = tmp_path / "root"
     root.mkdir()
     child = root / "alpha.txt"
     child.write_text("hello", encoding="utf-8")
     mod, _streams = load_module(monkeypatch)
-    source = mod._source_payload("Root", root)
 
     class CountingEntry:
         name = child.name
@@ -186,13 +225,13 @@ def test_scandir_item_reuses_one_metadata_snapshot(monkeypatch, tmp_path):
 
     entry = CountingEntry()
     item = mod._item_for_entry(
-        source,
         entry,
+        rel_path="docs/alpha.txt",
         is_dir=entry.is_dir(follow_symlinks=False),
         is_file=entry.is_file(follow_symlinks=False),
     )
 
-    assert item["name"] == "alpha.txt"
+    assert item["path"] == "docs/alpha.txt"
     assert item["size_bytes"] == 5
     assert entry.calls == {"is_dir": 1, "is_file": 1, "stat": 1}
 

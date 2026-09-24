@@ -175,6 +175,18 @@ def _mem_set(key: str, value: Any) -> None:
         _FALLBACK_MEMORY[key] = deepcopy(value)
 
 
+def _mem_snapshot() -> dict[str, Any]:
+    """Read the skill environment once for a coherent initial state."""
+
+    try:
+        from adaos.sdk.data import skill_env
+
+        value = skill_env.read_env()
+        return dict(value) if isinstance(value, Mapping) else {}
+    except Exception:
+        return deepcopy(_FALLBACK_MEMORY)
+
+
 def _safe_label(value: Any, fallback: str) -> str:
     label = str(value or "").strip()
     return label[:80] if label else fallback
@@ -259,12 +271,17 @@ def _ensure_panel_sources(state: dict[str, Any]) -> None:
         panels[panel] = panel_state
 
 
-def _load_global_sources(webspace_id: str | None = None) -> list[dict[str, Any]]:
-    candidates: list[Any] = [_mem_get(_GLOBAL_SOURCES_KEY, None)]
+def _load_global_sources(
+    webspace_id: str | None = None,
+    *,
+    memory: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    snapshot = dict(memory) if isinstance(memory, Mapping) else _mem_snapshot()
+    candidates: list[Any] = [snapshot.get(_GLOBAL_SOURCES_KEY)]
     ws = _webspace_id(webspace_id)
-    for candidate_ws in (ws, _DEFAULT_WEBSPACE_ID):
+    for candidate_ws in dict.fromkeys((ws, _DEFAULT_WEBSPACE_ID)):
         if candidate_ws:
-            persisted = _mem_get(_state_key(candidate_ws), None)
+            persisted = snapshot.get(_state_key(candidate_ws))
             if isinstance(persisted, Mapping):
                 candidates.append(persisted.get("sources"))
     return _merge_sources(*candidates)
@@ -381,8 +398,12 @@ def _coerce_state(value: Any) -> dict[str, Any] | None:
 
 
 def _load_persisted_state(webspace_id: str) -> dict[str, Any]:
-    state = _coerce_state(_mem_get(_state_key(webspace_id), None)) or _default_state()
-    state["sources"] = _merge_sources(state.get("sources"), _load_global_sources(webspace_id))
+    memory = _mem_snapshot()
+    state = _coerce_state(memory.get(_state_key(webspace_id))) or _default_state()
+    state["sources"] = _merge_sources(
+        state.get("sources"),
+        _load_global_sources(webspace_id, memory=memory),
+    )
     _ensure_panel_sources(state)
     return state
 
@@ -616,13 +637,13 @@ def _item_for(source: Mapping[str, Any], path: Path, *, is_parent: bool = False)
 
 
 def _item_for_entry(
-    source: Mapping[str, Any],
     entry: os.DirEntry[str],
     *,
+    rel_path: str,
     is_dir: bool,
     is_file: bool,
 ) -> dict[str, Any]:
-    """Build one item from scandir metadata without repeated path probes."""
+    """Build one item from the metadata already returned by ``scandir``."""
 
     path = Path(entry.path)
     try:
@@ -640,12 +661,11 @@ def _item_for_entry(
         summary_parts.append(_human_size(size_bytes))
     if modified_at:
         summary_parts.append(_modified_label(modified_at))
-    rel = _rel_from_path(source, path)
     return {
-        "id": rel or "__root__",
-        "name": entry.name or str(source.get("label") or "Root"),
+        "id": rel_path,
+        "name": entry.name,
         "extension": suffix,
-        "path": rel,
+        "path": rel_path,
         "kind": kind,
         "is_dir": is_dir,
         "is_file": is_file,
@@ -719,10 +739,11 @@ def _list_dir_uncached(
     children.sort(key=lambda item: (not item[0], item[2].name.lower()))
     for is_dir, is_file, entry in children[: max(0, int(limit))]:
         try:
+            child_rel = f"{current_rel}/{entry.name}" if current_rel else entry.name
             items.append(
                 _item_for_entry(
-                    source,
                     entry,
+                    rel_path=child_rel,
                     is_dir=is_dir,
                     is_file=is_file,
                 )
