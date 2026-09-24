@@ -1,6 +1,6 @@
 id: adaos_drive
 name: adaos_drive
-version: 0.1.1
+version: 0.1.8
 title: AdaOS Drive
 description: Two-panel browser file manager for connected local folders.
 type: desktop
@@ -39,7 +39,8 @@ guidance:
     help_intent: adaos_drive.open
     next_steps_intent: adaos_drive.next_steps
 llm_hints:
-  description: Open AdaOS Drive for local file browsing, upload, download, preview, rename and cross-panel copy.
+  description: Open AdaOS Drive for local file browsing, upload, download, preview,
+    rename and cross-panel copy.
   aliases:
   - adaos drive
   - drive
@@ -64,4 +65,4 @@ nlu:
     slot_schemas: {}
     entities: []
 steps: []
-updated_at: '2026-08-18T00:00:00+00:00'
+updated_at: '2026-09-24T00:05:01+00:00'

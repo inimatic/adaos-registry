@@ -1,6 +1,9 @@
 name: adaos_drive
-version: 0.1.2
+version: 0.1.12
 description: Two-panel browser file manager for explicitly connected local folders.
+capabilities:
+- workspace.read
+- workspace.write
 supported_locales:
 - en
 - ru
@@ -95,13 +98,44 @@ memory_budget:
     storage: process_memory
     max_items: 8
     cleanup_hook: reset_drive
+  - name: DIRECTORY_CACHE
+    storage: process_memory
+    max_items: 64
+    ttl_seconds: 2
+    cleanup_hook: drain_runtime
 lifecycle:
   persist_before_switch: persist_state
   rehydrate: rehydrate
+  drain: drain_runtime
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases: []
 tools:
+- name: drain_runtime
+  entry: handlers.main:drain_runtime
+  description: Persist bounded panel state and stop accepting process-local snapshots
+    during runtime drain.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      reason:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      persisted_webspaces:
+        type: integer
 - name: get_snapshot
   entry: handlers.main:get_snapshot
-  description: Return the current bounded AdaOS Drive snapshot without publishing it.
+  description: Return the current bounded AdaOS Drive snapshot without publishing
+    it.
   side_effects: read_only
   side_effect_class: read_only
   input_schema:
@@ -673,7 +707,7 @@ nlu:
     - show files
     slot_schemas: {}
     entities: []
-updated_at: '2026-08-17T20:11:20+00:00'
+updated_at: '2026-09-24T00:05:01+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.852+5172.db034608

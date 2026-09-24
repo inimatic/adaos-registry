@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: adaos_drive
-version: 0.1.7
+version: 0.1.14
 profiles:
 - adaos.drive.v1
 components:
@@ -71,3 +71,37 @@ lifecycle:
     source_artifacts: retain
 created_at: '2026-08-27T00:00:00+00:00'
 created_by: AdaOS Project Composition
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.read
+    purpose: Browse connected local folders and inspect bounded file metadata and
+      previews.
+    approval_policy: grant_on_install
+  - id: workspace.write
+    purpose: Persist panel state and perform explicitly requested file operations
+      in connected folders.
+    approval_policy: owner_only
+    sensitive: true
+  optional: []
+  secrets: []
+  external_providers: []
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected:
+    - local_file_metadata
+    - local_file_content
+    linked_to_user: []
+    retention: File content remains in user-selected folders; bounded navigation state
+      is retained in local skill memory.
+    sent_off_device: []
+    tracking: false
+  privacy_labels:
+    collected:
+    - local_file_metadata
+    - local_file_content
+    linked_to_user: false
+    sent_off_device: false
+    tracking: false

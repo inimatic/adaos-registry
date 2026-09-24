@@ -36,6 +36,14 @@ public-link summaries, and download-event summaries are bounded before they are
 materialized. Full public-link diagnostics remain available through the explicit
 `list_public_links` tool.
 
+Directory views use a short, bounded process cache so two panels or concurrent
+stream subscriptions do not enumerate the same network folder repeatedly.
+`refresh` bypasses that cache, and every Drive file mutation invalidates the
+affected source before publishing its next panel snapshot. Concurrent misses
+for the same directory use a bounded single-flight wait. An invalidation that
+races a slow enumeration prevents that older result from repopulating the
+cache; a stuck filesystem call cannot hold followers indefinitely.
+
 ## Safety model
 
 All filesystem operations are constrained to the selected source root. Relative

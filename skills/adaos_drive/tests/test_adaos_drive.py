@@ -3,11 +3,14 @@ from __future__ import annotations
 import importlib
 import json
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -19,7 +22,27 @@ if str(SRC_ROOT) not in sys.path:
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
-from adaos.services.skill.validation import validate_webui_file_contract
+from adaos.services.skill.validation import validate_webui_file_contract  # noqa: E402
+
+
+def test_application_permissions_cover_every_drive_tool_side_effect() -> None:
+    skill = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    project = yaml.safe_load(
+        (SKILL_ROOT.parents[1] / "projects" / "adaos_drive" / "project.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert set(skill["capabilities"]) == {"workspace.read", "workspace.write"}
+    declared = {
+        item["id"] for item in project["permission_profile"]["required"]
+    }
+    required_by_effect = {
+        "workspace.read" if tool["side_effect_class"] == "read_only" else "workspace.write"
+        for tool in skill["tools"]
+    }
+    assert required_by_effect == {"workspace.read", "workspace.write"}
+    assert required_by_effect <= declared
 
 
 def load_module(monkeypatch, memory=None, skills_root: Path | None = None, base_dir: Path | None = None):
@@ -97,6 +120,155 @@ def test_snapshot_lists_files_and_lazy_tree(monkeypatch, tmp_path):
     assert streams[-1][2]["webspace_id"] == "test"
 
 
+def test_snapshot_reuses_directory_view_and_refresh_invalidates_it(monkeypatch, tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "alpha.txt").write_text("hello", encoding="utf-8")
+    mod, streams = load_module(monkeypatch)
+    mod.reset_drive({"root": str(root), "webspace_id": "test"})
+    mod._invalidate_directory_cache()
+
+    uncached_calls = 0
+    original = mod._list_dir_uncached
+
+    def counted(*args, **kwargs):
+        nonlocal uncached_calls
+        uncached_calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(mod, "_list_dir_uncached", counted)
+
+    snapshot = mod.get_snapshot({"webspace_id": "test"})["snapshot"]
+    assert uncached_calls == 1
+    assert snapshot["panels"]["left"]["items"] == snapshot["panels"]["right"]["items"]
+
+    (root / "beta.txt").write_text("new", encoding="utf-8")
+    cached = mod.get_snapshot({"webspace_id": "test"})["snapshot"]
+    assert uncached_calls == 1
+    assert "beta.txt" not in {item["name"] for item in cached["panels"]["left"]["items"]}
+
+    streams.clear()
+    mod.refresh({"panel": "left", "webspace_id": "test"})
+    refreshed = latest_stream(streams, "adaos_drive.left")
+    assert uncached_calls == 2
+    assert "beta.txt" in {item["name"] for item in refreshed["items"]}
+
+
+def test_scandir_item_reuses_one_metadata_snapshot(monkeypatch, tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    child = root / "alpha.txt"
+    child.write_text("hello", encoding="utf-8")
+    mod, _streams = load_module(monkeypatch)
+    source = mod._source_payload("Root", root)
+
+    class CountingEntry:
+        name = child.name
+        path = str(child)
+
+        def __init__(self):
+            self.calls = {"is_dir": 0, "is_file": 0, "stat": 0}
+
+        def is_dir(self, *, follow_symlinks=True):
+            assert follow_symlinks is False
+            self.calls["is_dir"] += 1
+            return False
+
+        def is_file(self, *, follow_symlinks=True):
+            assert follow_symlinks is False
+            self.calls["is_file"] += 1
+            return True
+
+        def stat(self, *, follow_symlinks=True):
+            assert follow_symlinks is False
+            self.calls["stat"] += 1
+            return child.stat()
+
+    entry = CountingEntry()
+    item = mod._item_for_entry(
+        source,
+        entry,
+        is_dir=entry.is_dir(follow_symlinks=False),
+        is_file=entry.is_file(follow_symlinks=False),
+    )
+
+    assert item["name"] == "alpha.txt"
+    assert item["size_bytes"] == 5
+    assert entry.calls == {"is_dir": 1, "is_file": 1, "stat": 1}
+
+
+def test_concurrent_directory_reads_share_one_physical_enumeration(monkeypatch, tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "alpha.txt").write_text("hello", encoding="utf-8")
+    mod, _streams = load_module(monkeypatch)
+    source = mod._source_payload("Root", root)
+    mod._invalidate_directory_cache()
+
+    entered = threading.Event()
+    release = threading.Event()
+    calls = 0
+    calls_lock = threading.Lock()
+    original = mod._list_dir_uncached
+
+    def slow(*args, **kwargs):
+        nonlocal calls
+        with calls_lock:
+            calls += 1
+        entered.set()
+        assert release.wait(2.0)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(mod, "_list_dir_uncached", slow)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(mod._list_dir, source, "")
+        assert entered.wait(1.0)
+        second = executor.submit(mod._list_dir, source, "")
+        release.set()
+        assert first.result(timeout=2.0) == second.result(timeout=2.0)
+
+    assert calls == 1
+    assert mod._DIRECTORY_CACHE_INFLIGHT == {}
+
+
+def test_invalidation_during_directory_read_does_not_restore_stale_cache(monkeypatch, tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "alpha.txt").write_text("hello", encoding="utf-8")
+    mod, _streams = load_module(monkeypatch)
+    source = mod._source_payload("Root", root)
+    mod._invalidate_directory_cache()
+
+    entered = threading.Event()
+    release = threading.Event()
+    calls = 0
+    original = mod._list_dir_uncached
+
+    def slow(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            result = original(*args, **kwargs)
+            entered.set()
+            assert release.wait(2.0)
+            return result
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(mod, "_list_dir_uncached", slow)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        pending = executor.submit(mod._list_dir, source, "")
+        assert entered.wait(1.0)
+        (root / "beta.txt").write_text("new", encoding="utf-8")
+        mod._invalidate_directory_cache(source)
+        release.set()
+        stale = pending.result(timeout=2.0)
+
+    assert "beta.txt" not in {item["name"] for item in stale}
+    fresh = mod._list_dir(source, "")
+    assert "beta.txt" in {item["name"] for item in fresh}
+    assert calls == 2
+
+
 def test_path_traversal_is_rejected(monkeypatch, tmp_path):
     root = tmp_path / "root"
     root.mkdir()
@@ -118,13 +290,13 @@ def test_activate_item_opens_folders_and_parent_rows(monkeypatch, tmp_path):
     mod, streams = load_module(monkeypatch)
     mod.reset_drive({"root": str(root), "webspace_id": "test"})
 
-    opened = mod.activate_item({"panel": "left", "path": "scenarios", "webspace_id": "test"})
+    mod.activate_item({"panel": "left", "path": "scenarios", "webspace_id": "test"})
     assert latest_stream(streams, "adaos_drive.left")["path"] == "scenarios"
 
-    selected = mod.activate_item({"panel": "left", "path": "scenarios/scenario.yaml", "webspace_id": "test"})
+    mod.activate_item({"panel": "left", "path": "scenarios/scenario.yaml", "webspace_id": "test"})
     assert latest_stream(streams, "adaos_drive.left")["selected_path"] == "scenarios/scenario.yaml"
 
-    parent = mod.activate_item({"panel": "left", "path": "__parent__", "webspace_id": "test"})
+    mod.activate_item({"panel": "left", "path": "__parent__", "webspace_id": "test"})
     assert latest_stream(streams, "adaos_drive.left")["path"] == ""
 
 
@@ -143,7 +315,7 @@ def test_sources_are_shared_across_drive_webspaces(monkeypatch, tmp_path):
     assert source_id in {item["id"] for item in home["sources"]}
     assert {item["webspace_id"] for item in home["source_options"]} == {"Homepoint"}
 
-    selected = mod.select_source({"panel": "right", "source_id": source_id, "webspace_id": "Homepoint"})
+    mod.select_source({"panel": "right", "source_id": source_id, "webspace_id": "Homepoint"})
     assert latest_stream(streams, "adaos_drive.right")["selector"]["current"] == source_id
 
 
@@ -360,18 +532,36 @@ def test_rehydrate_keeps_newer_in_memory_folder_state(monkeypatch, tmp_path):
 
     mod.reset_drive({"root": str(root), "webspace_id": "test"})
     stale_state = deepcopy(mod._load_state("test"))
-    opened = mod.open_folder({"panel": "left", "path": "scenarios", "webspace_id": "test"})
+    mod.open_folder({"panel": "left", "path": "scenarios", "webspace_id": "test"})
     opened_snapshot = latest_stream(streams, "adaos_drive.left")
     assert opened_snapshot["path"] == "scenarios"
     stale_state["sequence"] = 0
     memory[mod._state_key("test")] = stale_state
 
-    rehydrated = mod.rehydrate({"webspace_id": "test"})
+    mod.rehydrate({"webspace_id": "test"})
 
     rehydrated_snapshot = latest_stream(streams, "adaos_drive.left")
     assert rehydrated_snapshot["path"] == "scenarios"
     assert rehydrated_snapshot["_stream_require_revision"] is True
     assert rehydrated_snapshot["_stream_rev"] >= opened_snapshot["_stream_rev"]
+
+
+def test_runtime_drain_persists_and_releases_process_state(monkeypatch, tmp_path):
+    memory = {}
+    root = tmp_path / "root"
+    root.mkdir()
+    mod, _streams = load_module(monkeypatch, memory=memory)
+    mod.reset_drive({"root": str(root), "webspace_id": "test"})
+
+    result = mod.drain_runtime({"reason": "application_cutover"})
+
+    assert result == {
+        "ok": True,
+        "reason": "application_cutover",
+        "persisted_webspaces": 1,
+    }
+    assert mod._STATE_BY_WEBSPACE == {}
+    assert memory[mod._state_key("test")]["sources"][0]["path"] == str(root.resolve())
 
 
 def test_snapshot_requests_publish_only_the_requested_receiver(monkeypatch, tmp_path):

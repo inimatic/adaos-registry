@@ -7,6 +7,7 @@ import mimetypes
 import os
 import re
 import shutil
+import threading
 import time
 import uuid
 from copy import deepcopy
@@ -34,7 +35,7 @@ from adaos.services.drive_public_links import (
 )
 from adaos.services.agent_context import get_ctx
 from adaos.services.node_config import load_config
-from adaos.services.skill.artifacts import resolve_skill_file_path, skill_files_dir
+from adaos.services.skill.artifacts import resolve_skill_file_path
 from adaos.services.webspace_id import coerce_webspace_id
 from adaos.services.zone_hosts import DEFAULT_PUBLIC_APP_BASE_URL, canonical_zone_id, zone_public_base_url
 
@@ -62,6 +63,9 @@ _MAX_TREE_BRANCHES = 4
 _MAX_PREVIEW_BYTES = 32 * 1024
 _MAX_PUBLIC_LINKS = 8
 _MAX_PUBLIC_DOWNLOADS = 16
+_DIRECTORY_CACHE_TTL_SECONDS = 2.0
+_DIRECTORY_CACHE_MAX_ENTRIES = 64
+_DIRECTORY_CACHE_SINGLE_FLIGHT_WAIT_SECONDS = 5.0
 _UPLOAD_PURPOSE = "uploads"
 _DEFAULT_PUBLIC_DOWNLOAD_BASE_URL = DEFAULT_PUBLIC_APP_BASE_URL
 _LOG = logging.getLogger(_SKILL_NAME)
@@ -112,6 +116,12 @@ _DOC_EXTENSIONS = {".doc", ".docx", ".odt", ".pdf", ".ppt", ".pptx", ".rtf", ".x
 
 _STATE_BY_WEBSPACE: dict[str, dict[str, Any]] = {}
 _FALLBACK_MEMORY: dict[str, Any] = {}
+_DIRECTORY_CACHE: dict[tuple[str, str, int], tuple[float, list[dict[str, Any]]]] = {}
+_DIRECTORY_CACHE_INFLIGHT: dict[
+    tuple[str, str, int], tuple[threading.Event, int]
+] = {}
+_DIRECTORY_CACHE_LOCK = threading.Lock()
+_DIRECTORY_CACHE_EPOCH = 0
 _GLOBAL_SOURCES_KEY = f"{_STATE_MEMORY_PREFIX}.sources"
 
 
@@ -605,7 +615,88 @@ def _item_for(source: Mapping[str, Any], path: Path, *, is_parent: bool = False)
     }
 
 
-def _list_dir(source: Mapping[str, Any], rel_path: Any, *, limit: int = _MAX_ITEMS_PER_FOLDER) -> list[dict[str, Any]]:
+def _item_for_entry(
+    source: Mapping[str, Any],
+    entry: os.DirEntry[str],
+    *,
+    is_dir: bool,
+    is_file: bool,
+) -> dict[str, Any]:
+    """Build one item from scandir metadata without repeated path probes."""
+
+    path = Path(entry.path)
+    try:
+        stat = entry.stat(follow_symlinks=False)
+    except OSError:
+        stat = None
+    size_bytes = None if is_dir or stat is None else int(stat.st_size)
+    modified_at = float(stat.st_mtime) if stat is not None else 0.0
+    suffix = "" if is_dir else path.suffix.lower().lstrip(".")
+    kind = "folder" if is_dir else "file"
+    summary_parts = [kind.capitalize()]
+    if suffix:
+        summary_parts.append(suffix.upper())
+    if size_bytes is not None:
+        summary_parts.append(_human_size(size_bytes))
+    if modified_at:
+        summary_parts.append(_modified_label(modified_at))
+    rel = _rel_from_path(source, path)
+    return {
+        "id": rel or "__root__",
+        "name": entry.name or str(source.get("label") or "Root"),
+        "extension": suffix,
+        "path": rel,
+        "kind": kind,
+        "is_dir": is_dir,
+        "is_file": is_file,
+        "is_parent": False,
+        "size": _human_size(size_bytes),
+        "size_bytes": size_bytes,
+        "modified_at": modified_at or None,
+        "modified_label": _modified_label(modified_at) if modified_at else "",
+        "icon": _icon_for(path, is_dir=is_dir),
+        "summary": " | ".join(summary_parts),
+        "can_expand": is_dir,
+        "can_preview": is_file and _can_preview(path),
+        "can_download": is_file,
+        "mime": mimetypes.guess_type(entry.name)[0] or "application/octet-stream",
+    }
+
+
+def _directory_cache_key(
+    source: Mapping[str, Any],
+    rel_path: Any,
+    *,
+    limit: int,
+) -> tuple[str, str, int]:
+    return (
+        str(source.get("path") or source.get("root_path") or "").strip(),
+        _clean_rel(rel_path),
+        max(0, int(limit)),
+    )
+
+
+def _invalidate_directory_cache(source: Mapping[str, Any] | None = None) -> None:
+    global _DIRECTORY_CACHE_EPOCH
+    with _DIRECTORY_CACHE_LOCK:
+        # A scan that started before invalidation may still return to its caller,
+        # but it must never repopulate the cache with the stale directory view.
+        _DIRECTORY_CACHE_EPOCH += 1
+        if source is None:
+            _DIRECTORY_CACHE.clear()
+            return
+        source_path = str(source.get("path") or source.get("root_path") or "").strip()
+        stale = [key for key in _DIRECTORY_CACHE if key[0] == source_path]
+        for key in stale:
+            _DIRECTORY_CACHE.pop(key, None)
+
+
+def _list_dir_uncached(
+    source: Mapping[str, Any],
+    rel_path: Any,
+    *,
+    limit: int = _MAX_ITEMS_PER_FOLDER,
+) -> list[dict[str, Any]]:
     target = _resolve_entry(source, rel_path)
     if not target.is_dir():
         raise NotADirectoryError(str(rel_path or ""))
@@ -613,15 +704,29 @@ def _list_dir(source: Mapping[str, Any], rel_path: Any, *, limit: int = _MAX_ITE
     current_rel = _clean_rel(rel_path)
     if current_rel:
         items.append(_item_for(source, target.parent, is_parent=True))
-    children: list[Path] = []
+    children: list[tuple[bool, bool, os.DirEntry[str]]] = []
     try:
-        children = list(islice(target.iterdir(), max(0, int(limit)) + 1))
+        with os.scandir(target) as entries:
+            for entry in islice(entries, max(0, int(limit)) + 1):
+                try:
+                    is_dir = entry.is_dir(follow_symlinks=False)
+                    is_file = entry.is_file(follow_symlinks=False)
+                except OSError:
+                    continue
+                children.append((is_dir, is_file, entry))
     except PermissionError:
         return items
-    children.sort(key=lambda p: (not p.is_dir(), p.name.lower()))
-    for child in children[: max(0, int(limit))]:
+    children.sort(key=lambda item: (not item[0], item[2].name.lower()))
+    for is_dir, is_file, entry in children[: max(0, int(limit))]:
         try:
-            items.append(_item_for(source, child))
+            items.append(
+                _item_for_entry(
+                    source,
+                    entry,
+                    is_dir=is_dir,
+                    is_file=is_file,
+                )
+            )
         except OSError:
             continue
     if len(children) > limit:
@@ -645,6 +750,63 @@ def _list_dir(source: Mapping[str, Any], rel_path: Any, *, limit: int = _MAX_ITE
                 "can_download": False,
             }
         )
+    return items
+
+
+def _list_dir(
+    source: Mapping[str, Any],
+    rel_path: Any,
+    *,
+    limit: int = _MAX_ITEMS_PER_FOLDER,
+) -> list[dict[str, Any]]:
+    cache_key = _directory_cache_key(source, rel_path, limit=limit)
+    while True:
+        now = time.monotonic()
+        with _DIRECTORY_CACHE_LOCK:
+            cached = _DIRECTORY_CACHE.get(cache_key)
+            if cached is not None and cached[0] > now:
+                return deepcopy(cached[1])
+            if cached is not None:
+                _DIRECTORY_CACHE.pop(cache_key, None)
+            flight = _DIRECTORY_CACHE_INFLIGHT.get(cache_key)
+            if flight is None:
+                event = threading.Event()
+                generation = _DIRECTORY_CACHE_EPOCH
+                _DIRECTORY_CACHE_INFLIGHT[cache_key] = (event, generation)
+                break
+            event, _generation = flight
+
+        # Network-backed directory enumeration can be slow. Coalesce normal
+        # concurrent reads, but do not let one stuck filesystem call block all
+        # followers indefinitely.
+        if not event.wait(_DIRECTORY_CACHE_SINGLE_FLIGHT_WAIT_SECONDS):
+            return _list_dir_uncached(source, rel_path, limit=limit)
+
+    try:
+        items = _list_dir_uncached(source, rel_path, limit=limit)
+    except Exception:
+        with _DIRECTORY_CACHE_LOCK:
+            current = _DIRECTORY_CACHE_INFLIGHT.get(cache_key)
+            if current is not None and current[0] is event:
+                _DIRECTORY_CACHE_INFLIGHT.pop(cache_key, None)
+                event.set()
+        raise
+
+    expires_at = time.monotonic() + _DIRECTORY_CACHE_TTL_SECONDS
+    with _DIRECTORY_CACHE_LOCK:
+        current = _DIRECTORY_CACHE_INFLIGHT.get(cache_key)
+        owns_flight = current is not None and current[0] is event
+        if owns_flight and generation == _DIRECTORY_CACHE_EPOCH:
+            if len(_DIRECTORY_CACHE) >= _DIRECTORY_CACHE_MAX_ENTRIES:
+                oldest_key = min(
+                    _DIRECTORY_CACHE,
+                    key=lambda key: _DIRECTORY_CACHE[key][0],
+                )
+                _DIRECTORY_CACHE.pop(oldest_key, None)
+            _DIRECTORY_CACHE[cache_key] = (expires_at, deepcopy(items))
+        if owns_flight:
+            _DIRECTORY_CACHE_INFLIGHT.pop(cache_key, None)
+            event.set()
     return items
 
 
@@ -989,13 +1151,21 @@ def _receiver_snapshot(state: dict[str, Any], webspace_id: str, receiver: str) -
 
 
 def _snapshot(state: dict[str, Any], webspace_id: str) -> dict[str, Any]:
+    started = time.perf_counter()
     ws = _webspace_id(webspace_id)
     sources = _source_options(state, ws)
+    sources_ms = (time.perf_counter() - started) * 1000.0
+    phase_started = time.perf_counter()
     left = _panel_snapshot(state, "left")
+    left_ms = (time.perf_counter() - phase_started) * 1000.0
+    phase_started = time.perf_counter()
     right = _panel_snapshot(state, "right")
+    right_ms = (time.perf_counter() - phase_started) * 1000.0
+    phase_started = time.perf_counter()
     sharing = _sharing_stream_snapshot(state, ws)
+    sharing_ms = (time.perf_counter() - phase_started) * 1000.0
     revision = _state_revision(state)
-    return {
+    snapshot = {
         "ok": True,
         "schema": "adaos_drive.snapshot.v1",
         "status": "ready",
@@ -1019,6 +1189,18 @@ def _snapshot(state: dict[str, Any], webspace_id: str) -> dict[str, Any]:
         "sequence": revision,
         "updated_at": _now_iso(state.get("updated_at") or _now()),
     }
+    total_ms = (time.perf_counter() - started) * 1000.0
+    if total_ms >= 250.0:
+        _LOG.warning(
+            "Drive snapshot slow webspace=%s total_ms=%.1f sources_ms=%.1f left_ms=%.1f right_ms=%.1f sharing_ms=%.1f",
+            ws,
+            total_ms,
+            sources_ms,
+            left_ms,
+            right_ms,
+            sharing_ms,
+        )
+    return snapshot
 
 
 def _ack(state: Mapping[str, Any], webspace_id: str, receivers: tuple[str, ...] | list[str], **values: Any) -> dict[str, Any]:
@@ -1708,10 +1890,22 @@ def _set_preview_from_path(state: dict[str, Any], source: Mapping[str, Any], pat
 
 @tool("get_snapshot")
 def get_snapshot(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
+    started = time.perf_counter()
     data = _payload(evt, **kwargs)
     ws = _webspace_id(data.get("webspace_id"))
     state = _load_state(ws)
-    return {"ok": True, "snapshot": _snapshot(state, ws)}
+    load_state_ms = (time.perf_counter() - started) * 1000.0
+    snapshot = _snapshot(state, ws)
+    total_ms = (time.perf_counter() - started) * 1000.0
+    if total_ms >= 250.0:
+        _LOG.warning(
+            "Drive get_snapshot slow webspace=%s total_ms=%.1f load_state_ms=%.1f snapshot_ms=%.1f",
+            ws,
+            total_ms,
+            load_state_ms,
+            total_ms - load_state_ms,
+        )
+    return {"ok": True, "snapshot": snapshot}
 
 
 @tool("add_source")
@@ -1918,6 +2112,7 @@ def rename_selected(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     if target.exists():
         raise FileExistsError("target name already exists")
     path.rename(target)
+    _invalidate_directory_cache(source)
     panel_state = _panel_state(state, panel)
     panel_state["selected_path"] = _rel_from_path(source, target)
     panel_state["selected_id"] = panel_state["selected_path"]
@@ -1945,6 +2140,7 @@ def copy_to_other_panel(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     if not dst_dir.is_dir():
         raise NotADirectoryError("target panel is not a folder")
     _copy_any(src, dst_dir / src.name)
+    _invalidate_directory_cache(to_source)
     state["active_panel"] = from_panel
     ack = _save_and_publish(
         state,
@@ -2123,6 +2319,7 @@ def upload_to_panel(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     target_name = _safe_name(requested_name)
     target = _destination_name(dst_dir / target_name)
     shutil.copy2(src, target)
+    _invalidate_directory_cache(source)
     panel_state = _panel_state(state, panel)
     panel_state["selected_path"] = _rel_from_path(source, target)
     panel_state["selected_id"] = panel_state["selected_path"]
@@ -2142,6 +2339,7 @@ def make_folder(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     dst_dir = _resolve_entry(source, _panel_state(state, panel).get("path") or "")
     target = _destination_name(dst_dir / name)
     target.mkdir(parents=False, exist_ok=False)
+    _invalidate_directory_cache(source)
     panel_state = _panel_state(state, panel)
     panel_state["selected_path"] = _rel_from_path(source, target)
     panel_state["selected_id"] = panel_state["selected_path"]
@@ -2158,9 +2356,11 @@ def refresh(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     panel = data.get("panel")
     if panel:
         selected_panel = _panel_name(panel, state)
+        _invalidate_directory_cache(_source_for_panel(state, selected_panel))
         state["active_panel"] = selected_panel
         receivers = (_PANEL_RECEIVERS[selected_panel],)
     else:
+        _invalidate_directory_cache()
         receivers = _RECEIVERS
     return _save_and_publish(state, ws, receivers)
 
@@ -2189,6 +2389,23 @@ def rehydrate(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     return _publish_receivers(state, ws, _RECEIVERS)
 
 
+@tool("drain_runtime")
+def drain_runtime(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
+    """Persist bounded state and release process-local ownership before cutover."""
+
+    persisted = 0
+    for webspace_id, state in tuple(_STATE_BY_WEBSPACE.items()):
+        _persist_state(webspace_id, state)
+        persisted += 1
+    _STATE_BY_WEBSPACE.clear()
+    _invalidate_directory_cache()
+    return {
+        "ok": True,
+        "reason": str(_payload(evt, **kwargs).get("reason") or "drain"),
+        "persisted_webspaces": persisted,
+    }
+
+
 @tool("reset_drive")
 def reset_drive(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     data = _payload(evt, **kwargs)
@@ -2202,6 +2419,7 @@ def reset_drive(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
             state["panels"][panel]["source_id"] = source["id"]
     else:
         state = _default_state()
+    _invalidate_directory_cache()
     _STATE_BY_WEBSPACE[ws] = state
     return _save_and_publish(state, ws, _RECEIVERS)
 
