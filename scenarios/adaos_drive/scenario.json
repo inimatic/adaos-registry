@@ -1,7 +1,7 @@
 {
     "id": "adaos_drive",
     "name": "adaos_drive",
-    "version": "0.1.9",
+    "version": "0.1.10",
     "title": "AdaOS Drive",
     "description": "Two-panel browser file manager for connected local folders.",
     "type": "desktop",
@@ -88,5 +88,5 @@
         }
     },
     "steps": [],
-    "updated_at": "2026-09-24T01:27:20+00:00"
+    "updated_at": "2026-09-24T01:28:30+00:00"
 }
