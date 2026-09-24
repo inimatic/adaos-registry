@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: adaos_drive
-version: 0.1.15
+version: 0.1.16
 profiles:
 - adaos.drive.v1
 components:
