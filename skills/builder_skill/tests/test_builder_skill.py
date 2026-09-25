@@ -6332,14 +6332,20 @@ def test_semantic_followup_requires_exact_bounded_source(monkeypatch, tmp_path):
         "pageSchema": {"meta": {"builder": {"semantic_digest": digest}}}
     }}}}
     session = {"artifact_root": str(tmp_path), "ui_revision": "001", "scenario_id": "current"}
-    assert skill._current_semantic_context(session, payload)["document"] == source
-    assert skill._current_semantic_context(session, payload)["revision"] == "001"
+    brief = skill.developer_ui.select("Show a list of work items.", limit=8)[
+        "qualification"
+    ]["prototype_brief"]
+    context = skill._current_semantic_context(session, payload, brief)
+    assert context["document"] == source
+    assert context["revision"] == "001"
+    assert context["source_ref"] == "semantic.webui.json"
+    assert context["digest"] == digest
     path.write_text('{"changed":true}', encoding="utf-8")
     with pytest.raises(ValueError, match="compiled revision"):
-        skill._current_semantic_context(session, payload)
+        skill._current_semantic_context(session, payload, brief)
     path.write_bytes(b"x" * (128 * 1024 + 1))
     with pytest.raises(ValueError, match="bounded context"):
-        skill._current_semantic_context(session, payload)
+        skill._current_semantic_context(session, payload, brief)
 
 
 def test_semantic_request_uses_cumulative_accepted_brief(monkeypatch) -> None:
