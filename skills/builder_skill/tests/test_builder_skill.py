@@ -6534,7 +6534,49 @@ def test_semantic_repair_chains_distinct_scopes_and_preserves_candidate(monkeypa
     assert len(result["candidate_artifacts"]) == 2
     assert "repair_candidate" not in result
     if not second_passes:
-        assert result["repair"]["stop_reason"] == "no_new_bounded_scope_or_no_progress"
+        assert result["repair"]["stop_reason"] == "repair_cycle_detected"
+
+
+def test_semantic_repair_can_repeat_scope_for_new_findings(monkeypatch):
+    skill = _load_module()
+    original = {"states": [], "step": 0}
+    calls = []
+
+    def once(**kwargs):
+        candidate = json.loads(kwargs["output_text"])
+        calls.append(kwargs)
+        step = len(calls)
+        return {
+            "ok": step == 2,
+            "repair_candidate": {**candidate, "step": step},
+            "validation": {
+                "findings": [{"code": f"state_finding_{step + 1}"}]
+            },
+            "repair": {
+                "kind": "semantic_state_repair",
+                "request_id": f"req{step}",
+                "job_id": f"job{step}",
+            },
+            "candidate_artifacts": [],
+            "attempts": [],
+        }
+
+    monkeypatch.setattr(skill, "_repair_llm_semantic_transform_once", once)
+    monkeypatch.setattr(
+        skill,
+        "_semantic_scoped_repair",
+        lambda *_args: ("semantic_state_repair", {"task": "repair next state"}),
+    )
+
+    result = skill._repair_llm_semantic_transform_output(
+        output_text=json.dumps(original),
+        validation_error={"findings": [{"code": "state_finding_1"}]},
+    )
+
+    assert result["ok"] is True
+    assert len(calls) == 2
+    assert [item["attempt_number"] for item in calls] == [2, 3]
+    assert len(result["repair"]["history"]) == 2
 
 
 def test_semantic_repair_receives_full_candidate_brief_and_finding(
@@ -13447,6 +13489,81 @@ def test_explicit_new_application_can_compare_itself_with_the_current_one() -> N
     for text in ("Create a new application similar to the current application.",
                  "Создай новое приложение как прототип текущего приложения."):
         assert skill._parse_builder_command(text, has_session=True)["intent"] == "project.create"
+
+
+def test_branded_adaos_application_request_creates_instead_of_editing_selected_project() -> None:
+    skill = _load_module()
+    text = (
+        'Create a new private AdaOS Application named "Gmail CBS Cleanroom" '
+        "from scratch, with technical id gmail_cbs_cleanroom."
+    )
+
+    parsed = skill._parse_builder_command(text, has_session=True)
+
+    assert parsed["intent"] == "project.create"
+    assert skill._is_application_create_request(parsed["idea"]) is True
+
+
+def test_confirmed_technical_application_id_preserves_exact_identity(monkeypatch) -> None:
+    skill = _load_module()
+    scenario_calls: list[dict] = []
+    monkeypatch.setattr(
+        skill.sdk_builder_applications,
+        "publisher_context",
+        lambda: {"publisher_ref": "publisher:test"},
+    )
+    monkeypatch.setattr(
+        skill,
+        "create_scenario_draft",
+        lambda **kwargs: scenario_calls.append(kwargs)
+        or {
+            "ok": False,
+            "status": "draft_creation_failed",
+            "error": "builder_draft_creation_failed",
+        },
+    )
+
+    result = skill.create_application_draft(
+        'Create a new private AdaOS Application named "Mail Follow-up Queue" '
+        "with the exact technical id mail_followup_queue.",
+        webspace_id="desktop-dev",
+        _meta={
+            "application_id": "mail_followup_queue",
+            "technical_application_id_confirmed": True,
+        },
+    )
+
+    assert result["application_id"] == "mail_followup_queue"
+    assert scenario_calls[0]["scenario_id"] == "mail_followup_queue"
+
+
+def test_conflicting_confirmed_technical_application_id_fails_before_creation(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    monkeypatch.setattr(
+        skill.sdk_builder_applications,
+        "publisher_context",
+        lambda: pytest.fail("identity mismatch must fail before publisher preflight"),
+    )
+    monkeypatch.setattr(
+        skill,
+        "create_scenario_draft",
+        lambda **_kwargs: pytest.fail("identity mismatch must not create a scenario"),
+    )
+
+    result = skill.create_application_draft(
+        "Create an Application with exact technical id requested_mail_app.",
+        webspace_id="desktop-dev",
+        _meta={
+            "application_id": "different_mail_app",
+            "technical_application_id_confirmed": True,
+        },
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "application_identity_confirmation_invalid"
+    assert "requested_mail_app" in result["message"]
 
 
 def test_builder_command_parser_prioritises_project_commands() -> None:

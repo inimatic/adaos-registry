@@ -1461,6 +1461,45 @@ def _application_id_from_idea(idea: str) -> str:
     return _scenario_id_from_idea(idea)
 
 
+def _explicit_technical_application_id(idea: str) -> str:
+    text = _repair_mojibake_text(idea).strip()
+    if not text:
+        return ""
+    for pattern in (
+        r"\b(?:exact\s+)?technical\s+(?:application\s+)?id\s*(?:is|=|:)?\s*[`\"']?([a-z](?:[a-z0-9_.-]{0,126}[a-z0-9])?)",
+        r"\bapplication\s+id\s*(?:is|=|:)?\s*[`\"']?([a-z](?:[a-z0-9_.-]{0,126}[a-z0-9])?)",
+        r"\b\u0442\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a(?:\u0438\u0439|\u043e\u0433\u043e)\s+(?:id|\u0438\u0434\u0435\u043d\u0442\u0438\u0444\u0438\u043a\u0430\u0442\u043e\u0440)\s*(?:=|:)?\s*[`\"']?([a-z](?:[a-z0-9_.-]{0,126}[a-z0-9])?)",
+    ):
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return str(match.group(1) or "").strip()
+    return ""
+
+
+def _confirmed_application_id_from_meta(
+    idea: str,
+    metadata: Mapping[str, Any] | None,
+) -> tuple[str, str | None]:
+    source = metadata if isinstance(metadata, Mapping) else {}
+    if source.get("technical_application_id_confirmed") is not True:
+        return "", None
+    confirmed = str(source.get("application_id") or "").strip()
+    if not confirmed:
+        return "", "confirmed technical Application id is missing"
+    if not re.fullmatch(r"[a-z](?:[a-z0-9_.-]{0,126}[a-z0-9])?", confirmed):
+        return "", (
+            "confirmed technical Application id must already be a stable lowercase "
+            "AdaOS identifier"
+        )
+    declared = _explicit_technical_application_id(idea)
+    if declared and declared != confirmed:
+        return "", (
+            "confirmed technical Application id does not match the id declared in "
+            f"the request: confirmed {confirmed}, declared {declared}"
+        )
+    return confirmed, None
+
+
 def _canonical_conversation_context(
     value: Mapping[str, Any] | None,
 ) -> Mapping[str, Any] | None:
@@ -13727,14 +13766,34 @@ def _repair_llm_semantic_transform_output(**kwargs: Any) -> dict[str, Any]:
     current = dict(kwargs)
     history, artifacts, attempts = [], [], []
     telemetry: dict[str, Any] = {}
-    seen = set()
+    seen_repair_inputs: set[tuple[str, str]] = set()
+    seen_candidates = {
+        hashlib.sha256(
+            str(current.get("output_text") or "").encode("utf-8", errors="replace")
+        ).hexdigest()
+    }
+    max_repair_passes = 4
     while True:
         result = _repair_llm_semantic_transform_once(**current, attempt_number=len(history) + 2)
         merged = result.pop("repair_candidate", None)
         repair = result.get("repair") or {}
         if repair:
             history.append(copy.deepcopy(dict(repair)))
-            seen.add(repair.get("kind"))
+            validation_input = (
+                current.get("validation_error")
+                if isinstance(current.get("validation_error"), Mapping)
+                else {}
+            )
+            seen_repair_inputs.add(
+                (
+                    str(repair.get("kind") or ""),
+                    hashlib.sha256(
+                        _compact_json(validation_input).encode(
+                            "utf-8", errors="replace"
+                        )
+                    ).hexdigest(),
+                )
+            )
             telemetry = _combine_llm_job_telemetry(telemetry, result)
         artifacts.extend(result.get("candidate_artifacts") or [])
         step_attempts = result.get("attempts") or []
@@ -13743,10 +13802,28 @@ def _repair_llm_semantic_transform_output(**kwargs: Any) -> dict[str, Any]:
             break
         findings = (result.get("validation") or {}).get("findings") or []
         next_kind, plan = _semantic_scoped_repair(merged, findings)
-        if not plan or next_kind in seen or merged == _extract_json_object(current["output_text"]):
+        next_validation = {"findings": findings}
+        next_input = (
+            next_kind,
+            hashlib.sha256(
+                _compact_json(next_validation).encode("utf-8", errors="replace")
+            ).hexdigest(),
+        )
+        merged_text = _compact_json(merged)
+        merged_digest = hashlib.sha256(
+            merged_text.encode("utf-8", errors="replace")
+        ).hexdigest()
+        if not plan or merged == _extract_json_object(current["output_text"]):
             repair["stop_reason"] = "no_new_bounded_scope_or_no_progress"
             break
-        current.update(output_text=_compact_json(merged), validation_error=result["validation"],
+        if next_input in seen_repair_inputs or merged_digest in seen_candidates:
+            repair["stop_reason"] = "repair_cycle_detected"
+            break
+        if len(history) >= max_repair_passes:
+            repair["stop_reason"] = "repair_pass_limit"
+            break
+        seen_candidates.add(merged_digest)
+        current.update(output_text=merged_text, validation_error=result["validation"],
                        request_id=repair["request_id"], job_id=repair["job_id"])
     if history:
         result["repair"]["history"] = history
@@ -15366,7 +15443,10 @@ def _is_explicit_create_request(text: str) -> bool:
     # beginning of the utterance so UI copy such as "New project" cannot switch
     # an active Builder session to an unrelated draft.
     object_en = r"(?:app(?:lication)?|project|scenario|prototype|skill)"
-    adjective_en = r"(?:(?:full-screen|protected|system|private|public|new)\s+){0,5}"
+    # Product naming is a presentation modifier, not part of the object kind.
+    # "AdaOS Application" must remain a create command even when another
+    # project is selected; otherwise the turn is silently routed as an edit.
+    adjective_en = r"(?:(?:adaos|full-screen|protected|system|private|public|new)\s+){0,6}"
     object_ru = (
         r"(?:\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435|\u043f\u0440\u043e\u0435\u043a\u0442|\u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439|"
         r"\u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f|\u043d\u0430\u0432\u044b\u043a)"
@@ -15410,7 +15490,7 @@ def _is_application_create_request(text: str) -> bool:
     return bool(
         re.match(
             r"^(?:(?:please|let'?s)\s+)?(?:create|build|make)\s+"
-            r"(?:(?:a|an|the)\s+){0,2}(?:(?:full-screen|protected|system|private|public|new)\s+){0,5}"
+            r"(?:(?:a|an|the)\s+){0,2}(?:(?:adaos|full-screen|protected|system|private|public|new)\s+){0,6}"
             r"(?:app|application)\b",
             lowered,
         )
@@ -18477,14 +18557,31 @@ def chat(
             "dialog": _dialog_state(ws, topic_ref=topic),
         }
     if intent == "project.create":
-        create = (
-            create_application_draft
-            if _is_application_create_request(utterance)
-            else create_scenario_draft
+        is_application = _is_application_create_request(utterance)
+        confirmed_application_id, identity_error = _confirmed_application_id_from_meta(
+            utterance,
+            turn_meta,
         )
-        result = create(
-            idea=utterance or "prototype app", webspace_id=ws, _meta=turn_meta
-        )
+        if identity_error:
+            return {
+                "ok": False,
+                "status": "application_identity_confirmation_invalid",
+                "error": "application_identity_confirmation_invalid",
+                "message": f"{AGENT_LABEL}: {identity_error}.",
+                "command": command,
+                "dialog": _dialog_state(ws, topic_ref=topic),
+            }
+        if is_application:
+            result = create_application_draft(
+                idea=utterance or "application prototype",
+                application_id=confirmed_application_id or None,
+                webspace_id=ws,
+                _meta=turn_meta,
+            )
+        else:
+            result = create_scenario_draft(
+                idea=utterance or "prototype app", webspace_id=ws, _meta=turn_meta
+            )
         _project_external_user_turn(
             utterance, webspace_id=ws, _meta=turn_meta,
             session={"scenario_id": result["scenario_id"], "draft_id": result.get("draft_id")}
@@ -18930,10 +19027,41 @@ def create_application_draft(
     _reject_transport_corrupted_text(idea, field="idea")
     ws = _source_webspace_id(webspace_id, _meta)
     source_idea = str(idea or "").strip() or "application prototype"
+    confirmed_application_id, identity_error = _confirmed_application_id_from_meta(
+        source_idea,
+        _meta,
+    )
+    if identity_error:
+        return {
+            "ok": False,
+            "status": "application_identity_confirmation_invalid",
+            "error": "application_identity_confirmation_invalid",
+            "message": f"{AGENT_LABEL}: {identity_error}.",
+        }
+    explicit_application_id = str(application_id or "").strip()
+    if (
+        confirmed_application_id
+        and explicit_application_id
+        and confirmed_application_id != explicit_application_id
+    ):
+        return {
+            "ok": False,
+            "status": "application_identity_confirmation_invalid",
+            "error": "application_identity_confirmation_invalid",
+            "message": (
+                f"{AGENT_LABEL}: confirmed technical Application id "
+                f"{confirmed_application_id} does not match the requested id "
+                f"{explicit_application_id}."
+            ),
+        }
     app_id = re.sub(
         r"[^a-z0-9_.-]+",
         "_",
-        str(application_id or _application_id_from_idea(source_idea)).strip().lower(),
+        str(
+            confirmed_application_id
+            or explicit_application_id
+            or _application_id_from_idea(source_idea)
+        ).strip().lower(),
     ).strip("._-")
     if not app_id:
         return {
