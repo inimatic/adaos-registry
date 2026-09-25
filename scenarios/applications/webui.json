@@ -410,6 +410,7 @@
                                 "toolId": "applications.assess_updates",
                                 "arguments": {},
                                 "dryRun": true,
+                                "startPolicy": "materialization_ready",
                                 "resultPath": "response.result",
                                 "invalidationTags": [
                                     "applications.catalog",
@@ -583,6 +584,7 @@
                                     "installed_only": true
                                 },
                                 "dryRun": true,
+                                "startPolicy": "materialization_ready",
                                 "resultPath": "response.result.applications",
                                 "invalidationTags": [
                                     "applications.catalog",
@@ -865,6 +867,7 @@
                                     "catalog_only": true
                                 },
                                 "dryRun": true,
+                                "startPolicy": "materialization_ready",
                                 "resultPath": "response.result.applications",
                                 "invalidationTags": [
                                     "applications.catalog",
@@ -1168,6 +1171,7 @@
                                     "developed_only": true
                                 },
                                 "dryRun": true,
+                                "startPolicy": "materialization_ready",
                                 "resultPath": "response.result.applications",
                                 "invalidationTags": [
                                     "applications.catalog",
