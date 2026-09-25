@@ -81,6 +81,23 @@ def test_connection_discovery_does_not_attach(consumer):
     assert c.calls[-1]==(PROVIDER+'attach_reusable_connection',{'account_id':'synthetic'})
 
 
+def test_clean_subnet_can_start_provider_owned_connection(consumer):
+    widget = consumer.widget('connect-gmail')
+    actions = [action for action in widget['actions'] if action['on'] == 'click:connect']
+    assert actions[0]['target'] == PROVIDER+'portable_begin_connection'
+    assert actions[0]['resultStateKey'] == 'gmailConnection'
+    assert actions[1] == {
+        'on': 'click:connect',
+        'type': 'openUrl',
+        'params': {
+            'url': '$state.gmailConnection.authorization_url',
+            'target': '_blank',
+            'withAuth': False,
+        },
+    }
+    assert consumer.state['gmailConnection'] is None
+
+
 def test_independent_labels_and_visible_failure_fields(consumer):
     assert consumer.widget('v_mailboxes')['dataSource']['params']=={}
     fields=consumer.widget('message-read-status')['inputs']['fields']

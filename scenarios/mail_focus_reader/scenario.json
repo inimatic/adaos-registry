@@ -1,7 +1,7 @@
 {
     "id": "mail_focus_reader",
     "name": "mail_focus_reader",
-    "version": "0.1.2",
+    "version": "0.1.4",
     "title": "Mail Focus Reader",
     "title_i18n": {
         "key": "scenario.mail_focus_reader.title",
@@ -46,5 +46,5 @@
     },
     "steps": [],
     "prototype": "scenario_default",
-    "updated_at": "2026-09-25T04:04:44+00:00"
+    "updated_at": "2026-09-25T16:02:46+00:00"
 }

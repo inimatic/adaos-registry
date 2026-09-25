@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-25T15:31:21+00:00",
+  "updated_at": "2026-09-25T16:09:27+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -369,9 +369,9 @@
       "runtime_python": "3.11",
       "activation": {
         "mode": "package_lock",
-        "project_id": "gmail_cbs_cleanroom",
-        "release": "gmail_cbs_cleanroom@0.1.10",
-        "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+        "project_id": "mail_focus_reader",
+        "release": "mail_focus_reader@0.1.3",
+        "release_digest": "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
         "package_digest": "sha256:403e924b61e66ae9d04aa69a4594d3fe2873349f75904c5633e3e01212c0df19"
       },
       "tools_count": 18
@@ -549,9 +549,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "mail_focus_reader",
-        "release": "mail_focus_reader@0.1.2",
-        "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
-        "package_digest": "sha256:824a45a1bb3b15520260c0284151893f051f6079b3dfc14fb6a9d165067860ed"
+        "release": "mail_focus_reader@0.1.3",
+        "release_digest": "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
+        "package_digest": "sha256:7aa48ff31dded2a4b6d18d294b9eecb9d7a0e09fb568233bd1fd01f833ff5421"
       }
     },
     {
@@ -1904,8 +1904,8 @@
       "kind": "scenario",
       "id": "mail_focus_reader",
       "name": "mail_focus_reader",
-      "version": "0.1.2",
-      "updated_at": "2026-09-25T04:04:44+00:00",
+      "version": "0.1.4",
+      "updated_at": "2026-09-25T16:02:46+00:00",
       "path": "scenarios/mail_focus_reader",
       "manifest": "scenarios/mail_focus_reader/scenario.yaml",
       "source": {
@@ -1913,7 +1913,7 @@
         "manifest": "scenarios/mail_focus_reader/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:7d11ce2ab800f87bc3344dda1256f27feb0e4c9144bcc98980ef520877a367a3",
+        "revision": "sha256:af3f2aa68139bfd66dcb94f9c09b42ac6ed9fce64814d40e6ad0db95b87102f2",
         "path_scope": [
           "projects/mail_focus_reader/"
         ]
@@ -1938,17 +1938,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "mail_focus_reader",
-        "release": "mail_focus_reader@0.1.2",
-        "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
-        "package_digest": "sha256:1a07e0d95b0100e48c3ce72cbe899e8a92f147548962b3a7aebbf3645f0f81e4"
+        "release": "mail_focus_reader@0.1.3",
+        "release_digest": "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
+        "package_digest": "sha256:2b5f8b6ba8b935eaff6ee37599a3a38953d7d52bcb9bad136559a03699e51661"
       },
       "channels": {
         "stable": {
-          "release": "mail_focus_reader@0.1.2",
-          "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
-          "source_revision": "sha256:7d11ce2ab800f87bc3344dda1256f27feb0e4c9144bcc98980ef520877a367a3",
-          "package_digest": "sha256:1a07e0d95b0100e48c3ce72cbe899e8a92f147548962b3a7aebbf3645f0f81e4",
-          "version": "0.1.2"
+          "release": "mail_focus_reader@0.1.3",
+          "release_digest": "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
+          "source_revision": "sha256:af3f2aa68139bfd66dcb94f9c09b42ac6ed9fce64814d40e6ad0db95b87102f2",
+          "package_digest": "sha256:2b5f8b6ba8b935eaff6ee37599a3a38953d7d52bcb9bad136559a03699e51661",
+          "version": "0.1.4"
         }
       }
     },
@@ -3383,8 +3383,8 @@
       "kind": "project",
       "id": "mail_focus_reader",
       "name": "mail_focus_reader",
-      "version": "0.1.2",
-      "updated_at": "2026-09-25T04:12:34+00:00",
+      "version": "0.1.3",
+      "updated_at": "2026-09-25T16:09:27+00:00",
       "path": "projects/mail_focus_reader",
       "manifest": "projects/mail_focus_reader/project.yaml",
       "source": {
@@ -3417,18 +3417,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "mail_focus_reader",
-        "release": "mail_focus_reader@0.1.2",
-        "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+        "release": "mail_focus_reader@0.1.3",
+        "release_digest": "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
         "primary_component": "scenario:mail_focus_reader",
-        "package_digest": "sha256:1a07e0d95b0100e48c3ce72cbe899e8a92f147548962b3a7aebbf3645f0f81e4"
+        "package_digest": "sha256:2b5f8b6ba8b935eaff6ee37599a3a38953d7d52bcb9bad136559a03699e51661"
       },
       "channels": {
         "stable": {
-          "release": "mail_focus_reader@0.1.2",
-          "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
-          "source_revision": "sha256:7d11ce2ab800f87bc3344dda1256f27feb0e4c9144bcc98980ef520877a367a3",
-          "package_digest": "sha256:1a07e0d95b0100e48c3ce72cbe899e8a92f147548962b3a7aebbf3645f0f81e4",
-          "version": "0.1.2"
+          "release": "mail_focus_reader@0.1.3",
+          "release_digest": "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
+          "source_revision": "sha256:af3f2aa68139bfd66dcb94f9c09b42ac6ed9fce64814d40e6ad0db95b87102f2",
+          "package_digest": "sha256:2b5f8b6ba8b935eaff6ee37599a3a38953d7d52bcb9bad136559a03699e51661",
+          "version": "0.1.3"
         }
       }
     },

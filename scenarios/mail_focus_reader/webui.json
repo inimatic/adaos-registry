@@ -514,6 +514,7 @@
                         }
                     ],
                     "initialState": {
+                        "gmailConnection": null,
                         "selected_connection_id": "",
                         "selected_mailbox_id": "",
                         "selected_message_id": "",
@@ -1217,6 +1218,58 @@
                         },
                         "widgets": [
                             {
+                                "id": "connect-gmail",
+                                "type": "ui.actions",
+                                "area": "supporting",
+                                "inputs": {
+                                    "variant": "adaptiveToolbar",
+                                    "buttons": [
+                                        {
+                                            "id": "connect",
+                                            "label": "Connect Gmail",
+                                            "label_i18n": "gmail.connect",
+                                            "icon": "link-outline"
+                                        },
+                                        {
+                                            "id": "refresh",
+                                            "label": "Refresh",
+                                            "label_i18n": "gmail.refresh",
+                                            "icon": "refresh-outline"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:connect",
+                                        "type": "callSkill",
+                                        "target": "gmail_cbs_cleanroom_skill.portable_begin_connection",
+                                        "params": {},
+                                        "invalidates": [],
+                                        "resultStateKey": "gmailConnection"
+                                    },
+                                    {
+                                        "on": "click:connect",
+                                        "type": "openUrl",
+                                        "params": {
+                                            "url": "$state.gmailConnection.authorization_url",
+                                            "target": "_blank",
+                                            "withAuth": false
+                                        }
+                                    },
+                                    {
+                                        "on": "click:refresh",
+                                        "type": "callSkill",
+                                        "target": "gmail_cbs_cleanroom_skill.portable_connection_status",
+                                        "params": {},
+                                        "invalidates": [
+                                            "mail.connection",
+                                            "mail.labels",
+                                            "mail.messages"
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
                                 "id": "connection-status",
                                 "type": "item.details",
                                 "area": "supporting",
@@ -1315,7 +1368,7 @@
                 }
             }
         },
-        "version": "0.1.2",
+        "version": "0.1.4",
         "manifest": "webui.json"
     }
 }
