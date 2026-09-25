@@ -21,9 +21,9 @@
       "application_id": "applications",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 3,
-      "stable_release_digest": "sha256:8aea0cbbc0acf317974d389a5e517d391abdec1a87e1bdea103f427c6e4d750d",
-      "release_key": "applications@sha256:8aea0cbbc0acf317974d389a5e517d391abdec1a87e1bdea103f427c6e4d750d",
-      "projection_digest": "sha256:82e52ec7e0f2683f89946ea2ed1f7197b96451f7357ea444cefc137e1326fa69"
+      "stable_release_digest": "sha256:92e3d0c12b8dbec064d609fee711f3aec682ce6d3592a5201fbbf4b61750959a",
+      "release_key": "applications@sha256:92e3d0c12b8dbec064d609fee711f3aec682ce6d3592a5201fbbf4b61750959a",
+      "projection_digest": "sha256:364fa011bcd4b8b277fe32a25625208e1983a67b7543161881299dc591c38265"
     },
     "web_desktop": {
       "application_id": "web_desktop",
@@ -74,7 +74,15 @@
       "release_digest": "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
       "path": "semantic/catalog/releases/mail_focus_reader/dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d.json",
       "projection_digest": "sha256:87ba863ec0144d00940a643677884ede8dadbbf5fd1c541f5ff5b0e8a061a44a"
+    },
+    "applications@sha256:92e3d0c12b8dbec064d609fee711f3aec682ce6d3592a5201fbbf4b61750959a": {
+      "application_id": "applications",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.38",
+      "release_digest": "sha256:92e3d0c12b8dbec064d609fee711f3aec682ce6d3592a5201fbbf4b61750959a",
+      "path": "semantic/catalog/releases/applications/92e3d0c12b8dbec064d609fee711f3aec682ce6d3592a5201fbbf4b61750959a.json",
+      "projection_digest": "sha256:364fa011bcd4b8b277fe32a25625208e1983a67b7543161881299dc591c38265"
     }
   },
-  "index_digest": "sha256:4b9993e60cca0ef9dac8f417385290c8795a848594aa801e32534435b91553f2"
+  "index_digest": "sha256:d1a05bc162e21ec10bf58c2805a0781f027887a8c132224c3867f6e08f7a5c3d"
 }
