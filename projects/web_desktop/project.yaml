@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: web_desktop
-version: 0.3.21
+version: 0.3.52
 profiles:
 - adaos.desktop.shell.v1
 - adaos.default_install.v1
@@ -13,43 +13,38 @@ components:
     lifecycle: bound
     relations:
     - presents
-  - ref: skill:web_desktop_skill
+  - ref: skill:web_desktop_runtime_skill
     role: implementation
     exposure: project_only
     lifecycle: bound
     relations:
     - realizes
+  dependencies:
+  - ref: skill:web_desktop_skill
+    version: null
+    lifecycle: shared
+    relations:
+    - uses
   - ref: skill:greet_on_boot_skill
-    role: supporting
-    exposure: project_only
-    lifecycle: bound
+    version: null
+    lifecycle: shared
     relations:
     - uses
   - ref: skill:pair_new_device_skill
-    role: supporting
-    exposure: project_only
-    lifecycle: bound
-    relations:
-    - uses
-  - ref: skill:adaos_connect
-    role: supporting
-    exposure: advanced
-    lifecycle: bound
+    version: null
+    lifecycle: shared
     relations:
     - uses
   - ref: skill:voice_chat_skill
-    role: supporting
-    exposure: advanced
-    lifecycle: bound
+    version: null
+    lifecycle: shared
     relations:
     - uses
   - ref: skill:browsers_skill
-    role: supporting
-    exposure: advanced
-    lifecycle: bound
+    version: null
+    lifecycle: shared
     relations:
     - uses
-  dependencies: []
 entrypoints:
 - id: desktop
   presentation: scenario:web_desktop
@@ -58,16 +53,17 @@ entrypoints:
     shell: web_desktop
 catalog:
   title: Web Desktop
+  icon: desktop-outline
   title_i18n:
     en: Web Desktop
     ru: Веб-рабочий стол
-  description: Default AdaOS desktop shell, join flow, voice bridge, and browser surface
-    support.
+  description: Default AdaOS desktop shell with project-owned connection flows, voice
+    bridge, and browser surface support.
   description_i18n:
     en: Default AdaOS desktop shell, join flow, voice bridge, and browser surface
       support.
-    ru: Стандартная web-оболочка AdaOS, join flow, voice bridge и поддержка browser
-      surface.
+    ru: Стандартная веб-оболочка AdaOS, подключение устройств, голосовой мост и поддержка
+      браузерных интерфейсов.
   categories:
   - system
   - desktop
@@ -93,33 +89,69 @@ install:
     optional: false
     components:
     - scenario:web_desktop
-    - skill:web_desktop_skill
-  - id: onboarding
-    title: Node onboarding
-    title_i18n:
-      en: Node onboarding
-      ru: Подключение ноды
-    default: true
-    optional: false
-    components:
-    - skill:greet_on_boot_skill
-    - skill:pair_new_device_skill
-    - skill:adaos_connect
-  - id: browser-voice
-    title: Browser and voice bridge
-    title_i18n:
-      en: Browser and voice bridge
-      ru: Браузерный и голосовой мост
-    default: true
-    optional: false
-    components:
-    - skill:browsers_skill
-    - skill:voice_chat_skill
+    - skill:web_desktop_runtime_skill
 compatibility:
   required_entrypoints:
   - desktop
   validation_profiles:
   - desktop.default
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.read
+    approval_policy: grant_on_install
+    purpose: Open desktop applications and read desktop launcher state.
+  - id: workspace.write
+    approval_policy: grant_on_install
+    purpose: Update the user's desktop layout, pins, widgets, and preferences.
+    sensitive: true
+  - id: profile.read.self
+    approval_policy: grant_on_install
+    purpose: Read the signed-in user's display profile and portable preferences.
+  - id: profile.write.self
+    approval_policy: grant_on_install
+    purpose: Update the signed-in user's own display profile and portable preferences.
+    sensitive: true
+  optional: []
+  secrets: []
+  data_practices:
+    collected: []
+    sent_off_device: []
+    linked_to_user: []
+    tracking: false
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  external_providers: []
+application_roles:
+- id: desktop_owner
+  title: Desktop owner
+  grants:
+  - desktop.open
+  - desktop.settings.write
+  assignable_to:
+  - owner
+  - co_owner
+  - admin
+  default_for:
+    owner: desktop_owner
+  requires_permissions:
+  - workspace.read
+  - workspace.write
+  - profile.read.self
+  - profile.write.self
+- id: desktop_member
+  title: Desktop member
+  grants:
+  - desktop.open
+  assignable_to:
+  - member
+  - child
+  - guest
+  requires_permissions:
+  - workspace.read
+  - profile.read.self
+  - profile.write.self
 lifecycle:
   uninstall:
     components: retain

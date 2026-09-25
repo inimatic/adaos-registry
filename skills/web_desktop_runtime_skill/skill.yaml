@@ -1,0 +1,749 @@
+name: web_desktop_runtime_skill
+version: 0.1.26
+entry: handlers/main.py
+runtime:
+  python: '3.11'
+description: Project-owned runtime actions for opening Web Desktop applications, managing
+  Home, and preparing browser, Telegram, and node connection flows.
+dependencies:
+- httpx>=0.27
+memory_budget:
+  caches:
+  - name: application_cache
+    ttl_seconds: 15
+    cleanup_hook: handlers.main:_invalidate_application_cache
+  - name: prepare_cache
+    max_items: 128
+    ttl_seconds: 900
+    cleanup_hook: handlers.connect:_prune_prepare_cache
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases: []
+capabilities:
+- workspace.read
+- workspace.write
+events:
+  subscribe: []
+  publish: []
+tools:
+- name: list_applications
+  description: List desktop applications from the authoritative Applications SDK.
+  entry: handlers.main:list_applications
+  side_effects: none
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: desktop.open
+  input_schema:
+    type: object
+    properties:
+      installed_only:
+        type: boolean
+        default: false
+      pinned_only:
+        type: boolean
+        default: false
+      catalog_only:
+        type: boolean
+        default: false
+      available_only:
+        type: boolean
+        default: false
+      developed_only:
+        type: boolean
+        default: false
+      launchable_only:
+        type: boolean
+        default: false
+      application_id:
+        type:
+        - string
+        - 'null'
+      require_selection:
+        type: boolean
+        default: false
+      query:
+        type:
+        - string
+        - 'null'
+      webspace_id:
+        type:
+        - string
+        - 'null'
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 40
+        default: 40
+  output_schema:
+    type: object
+    required:
+    - ok
+    - items
+    - count
+    - total
+    - empty
+    - truncated
+    properties:
+      ok:
+        type: boolean
+      items:
+        type: array
+        items:
+          type: object
+          required:
+          - id
+          - title
+          - summary
+          - icon
+          - publisher
+          - categories
+          - category
+          - installed
+          - installed_state
+          - effective_version
+          - effective_channel
+          - update_state
+          - scenario_id
+          - launchable
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+            summary:
+              type: string
+            icon:
+              type: string
+            publisher:
+              type: string
+            categories:
+              type: array
+              items:
+                type: string
+            category:
+              type: string
+            installed:
+              type: boolean
+            installed_state:
+              type: string
+            local_beta_active:
+              type: boolean
+            effective_version:
+              type: string
+            effective_channel:
+              type: string
+            channel:
+              type: string
+            update_state:
+              type: string
+            has_update:
+              type: boolean
+            scenario_id:
+              type:
+              - string
+              - 'null'
+            launchable:
+              type: boolean
+            pinned:
+              type: boolean
+            home_order:
+              type: integer
+      item:
+        type: object
+      count:
+        type: integer
+      total:
+        type: integer
+      empty:
+        type: boolean
+      truncated:
+        type: boolean
+      error:
+        type: string
+      message:
+        type: string
+- name: list_home_widgets
+  description: List desktop widgets pinned to the Home surface.
+  entry: handlers.main:list_home_widgets
+  side_effects: none
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: desktop.open
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type:
+        - string
+        - 'null'
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 40
+        default: 40
+  output_schema:
+    type: object
+    required:
+    - ok
+    - items
+    - count
+    - total
+    - empty
+    - truncated
+    properties:
+      ok:
+        type: boolean
+      items:
+        type: array
+        items:
+          type: object
+      count:
+        type: integer
+      total:
+        type: integer
+      empty:
+        type: boolean
+      truncated:
+        type: boolean
+      error:
+        type: string
+      message:
+        type: string
+- name: list_devices
+  description: List real node devices and browser sessions from the control-plane
+    SDK.
+  entry: handlers.main:list_devices
+  side_effects: none
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: desktop.open
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type:
+        - string
+        - 'null'
+      device_id:
+        type:
+        - string
+        - 'null'
+      require_selection:
+        type: boolean
+        default: false
+      query:
+        type:
+        - string
+        - 'null'
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 40
+        default: 40
+  output_schema:
+    type: object
+    required:
+    - ok
+    - items
+    - count
+    - total
+    - empty
+    - truncated
+    properties:
+      ok:
+        type: boolean
+      items:
+        type: array
+        items:
+          type: object
+      count:
+        type: integer
+      total:
+        type: integer
+      empty:
+        type: boolean
+      truncated:
+        type: boolean
+      error:
+        type: string
+      message:
+        type: string
+- name: get_system_overview
+  description: Read the real local system and reliability projections.
+  entry: handlers.main:get_system_overview
+  side_effects: none
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: desktop.open
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type:
+        - string
+        - 'null'
+      section:
+        type:
+        - string
+        - 'null'
+        enum:
+        - summary
+        - services
+        - connections
+        - quotas
+        - incidents
+        - update
+        - all
+        - 'null'
+  output_schema:
+    type: object
+    required:
+    - ok
+    - subject
+    - services
+    - connections
+    - quotas
+    - incidents
+    - update
+    - metrics
+    - items
+    - count
+    - total
+    - empty
+    - truncated
+    properties:
+      ok:
+        type: boolean
+      subject:
+        type: object
+      services:
+        type: array
+        items:
+          type: object
+      connections:
+        type: array
+        items:
+          type: object
+      quotas:
+        type: array
+        items:
+          type: object
+      incidents:
+        type: array
+        items:
+          type: object
+      update:
+        type: object
+      metrics:
+        type: object
+      items:
+        type: array
+        items:
+          type: object
+      count:
+        type: integer
+      total:
+        type: integer
+      empty:
+        type: boolean
+      truncated:
+        type: boolean
+      error:
+        type: string
+      message:
+        type: string
+- name: list_developments
+  description: List real development projects from the public developer SDK.
+  entry: handlers.main:list_developments
+  side_effects: none
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: desktop.open
+  input_schema:
+    type: object
+    properties:
+      development_id:
+        type:
+        - string
+        - 'null'
+      require_selection:
+        type: boolean
+        default: false
+      query:
+        type:
+        - string
+        - 'null'
+      profile:
+        type:
+        - string
+        - 'null'
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 40
+        default: 40
+  output_schema:
+    type: object
+    required:
+    - ok
+    - items
+    - count
+    - total
+    - empty
+    - truncated
+    properties:
+      ok:
+        type: boolean
+      items:
+        type: array
+        items:
+          type: object
+      count:
+        type: integer
+      total:
+        type: integer
+      empty:
+        type: boolean
+      truncated:
+        type: boolean
+      error:
+        type: string
+      message:
+        type: string
+- name: get_preferences
+  description: Read the current user and device preferences for Web Desktop settings.
+  entry: handlers.main:get_preferences
+  side_effects: none
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: desktop.open
+  input_schema:
+    type: object
+    properties: {}
+  output_schema:
+    type: object
+    required:
+    - ok
+    - items
+    - item
+    properties:
+      ok:
+        type: boolean
+      items:
+        type: array
+        items:
+          type: object
+      item:
+        type: object
+      error:
+        type: string
+      message:
+        type: string
+- name: update_preferences
+  description: Persist allowlisted Web Desktop profile and preference fields.
+  entry: handlers.main:update_preferences
+  side_effects: local_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    required:
+    - values
+    properties:
+      values:
+        type: object
+      device_override:
+        type: boolean
+        default: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - items
+    - item
+    properties:
+      ok:
+        type: boolean
+      updated_fields:
+        type: array
+        items:
+          type: string
+      items:
+        type: array
+        items:
+          type: object
+      item:
+        type: object
+      error:
+        type: string
+      message:
+        type: string
+- name: update_home_item
+  description: Update a Home widget; application mutations are owned by Root MCP.
+  entry: handlers.main:update_home_item
+  side_effects: local_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    required:
+    - item_type
+    - item_id
+    - action
+    properties:
+      item_type:
+        type: string
+        enum:
+        - application
+        - app
+        - widget
+        - panel
+      item_id:
+        type: string
+      action:
+        type: string
+        enum:
+        - pin
+        - add
+        - unpin
+        - remove
+        - move
+        - reorder
+      to_index:
+        type:
+        - integer
+        - 'null'
+      webspace_id:
+        type:
+        - string
+        - 'null'
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      item_type:
+        type: string
+      item_id:
+        type: string
+      action:
+        type: string
+      applications:
+        type: array
+        items:
+          type: string
+      widgets:
+        type: array
+        items:
+          type:
+          - object
+          - string
+      error:
+        type: string
+      message:
+        type: string
+- name: prepare_connection
+  description: Prepare browser, Telegram, or node connection data for a Desktop device
+    action without relying on the legacy AdaOS Connect skill.
+  entry: handlers.main:prepare_connection
+  side_effects: external_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    properties:
+      mode:
+        type: string
+        enum:
+        - browser
+        - telegram
+        - node
+      webspace_id:
+        type:
+        - string
+        - 'null'
+      refresh:
+        type: boolean
+        default: true
+      force_new:
+        type: boolean
+        default: false
+      renew:
+        type: boolean
+        default: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - current
+    properties:
+      ok:
+        type: boolean
+      cached:
+        type: boolean
+      current:
+        type: object
+exports:
+  tools:
+  - list_applications
+  - list_home_widgets
+  - list_devices
+  - get_system_overview
+  - list_developments
+  - get_preferences
+  - update_preferences
+  - update_home_item
+  - prepare_connection
+data_routes:
+- surface: widget:web_desktop.applications
+  route: tool
+  tool: list_applications
+  first_paint: Empty application collection until the authorized registry projection
+    arrives.
+  recovery: Explicit retry preserves the last successful application projection.
+  guard_visibility: Show an authorization or read error without reporting an empty
+    registry as success.
+  budget:
+    max_payload_bytes: 32768
+    max_items: 40
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - web_desktop.applications
+- surface: widget:web_desktop.home_widgets
+  route: tool
+  tool: list_home_widgets
+  first_paint: Empty widget collection until the authorized Home projection arrives.
+  recovery: Explicit retry preserves the last successful Home widget projection.
+  guard_visibility: Show an authorization or read error without reporting widget state
+    as current.
+  budget:
+    max_payload_bytes: 32768
+    max_items: 40
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - web_desktop.home_widgets
+- surface: widget:web_desktop.devices
+  route: tool
+  tool: list_devices
+  first_paint: Empty device collection until the authorized control-plane projection
+    arrives.
+  recovery: Explicit retry preserves the last successful device projection.
+  guard_visibility: Show an authorization or read error without reporting stale device
+    state as current.
+  budget:
+    max_payload_bytes: 32768
+    max_items: 40
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - reconnect
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - web_desktop.devices
+- surface: widget:web_desktop.system
+  route: tool
+  tool: get_system_overview
+  first_paint: Unknown system state until the requested authorized projection arrives.
+  recovery: Explicit retry preserves the last successful section and never treats
+    an unqueried section as healthy.
+  guard_visibility: Show unavailable diagnostics without turning missing observations
+    into a healthy status.
+  budget:
+    max_payload_bytes: 65536
+    max_items: 40
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - reconnect
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - web_desktop.system
+- surface: widget:web_desktop.developments
+  route: tool
+  tool: list_developments
+  first_paint: Empty development collection until the authorized project index arrives.
+  recovery: Explicit retry preserves the last successful development projection.
+  guard_visibility: Show an authorization or read error without exposing local source
+    paths.
+  budget:
+    max_payload_bytes: 32768
+    max_items: 40
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - web_desktop.developments
+- surface: widget:web_desktop.preferences
+  route: tool
+  tool: get_preferences
+  first_paint: Default form state until the authorized profile preferences arrive.
+  recovery: Explicit retry preserves the last successful preference projection.
+  guard_visibility: Keep preference forms unavailable when the governed profile read
+    is denied.
+  budget:
+    max_payload_bytes: 16384
+    max_items: 1
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - web_desktop.preferences
+prototype: default
+updated_at: '2026-09-21T19:34:39+00:00'

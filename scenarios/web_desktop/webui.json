@@ -1,0 +1,3488 @@
+{
+    "generated_by": "builder_skill",
+    "schema": "adaos.webui.v1",
+    "ui": {
+        "application": {
+            "desktop": {
+                "pageSchema": {
+                    "id": "desktop",
+                    "title": "Рабочий стол",
+                    "layout": {
+                        "version": 2,
+                        "pattern": "dashboard",
+                        "density": "comfortable",
+                        "contentWidth": "fluid",
+                        "scroll": "page",
+                        "regions": [
+                            {
+                                "id": "toolbar",
+                                "presentation": {
+                                    "compact": "stack",
+                                    "wide": "pane"
+                                },
+                                "priority": 50,
+                                "role": "toolbar",
+                                "scroll": "page"
+                            },
+                            {
+                                "id": "pinned",
+                                "presentation": {
+                                    "compact": "stack",
+                                    "wide": "pane"
+                                },
+                                "priority": 100,
+                                "role": "main",
+                                "scroll": "page"
+                            },
+                            {
+                                "id": "attention",
+                                "presentation": {
+                                    "compact": "stack",
+                                    "wide": "pane"
+                                },
+                                "priority": 95,
+                                "role": "utility",
+                                "scroll": "page"
+                            },
+                            {
+                                "id": "continue",
+                                "presentation": {
+                                    "compact": "stack",
+                                    "wide": "pane"
+                                },
+                                "priority": 96,
+                                "role": "utility",
+                                "scroll": "page"
+                            },
+                            {
+                                "id": "health",
+                                "presentation": {
+                                    "compact": "stack",
+                                    "wide": "pane"
+                                },
+                                "priority": 97,
+                                "role": "utility",
+                                "scroll": "page"
+                            },
+                            {
+                                "id": "activity",
+                                "presentation": {
+                                    "compact": "stack",
+                                    "wide": "pane"
+                                },
+                                "priority": 98,
+                                "role": "utility",
+                                "scroll": "page"
+                            }
+                        ],
+                        "interaction": {
+                            "selection": "single",
+                            "rowActivation": "select",
+                            "filters": "inline",
+                            "actions": "adaptive"
+                        },
+                        "variants": [
+                            {
+                                "contentWidth": "fluid",
+                                "density": "comfortable",
+                                "id": "devices-variant",
+                                "interaction": {
+                                    "actions": "adaptive",
+                                    "filters": "inline",
+                                    "rowActivation": "open-detail",
+                                    "selection": "none"
+                                },
+                                "pattern": "collection-detail",
+                                "regions": [
+                                    {
+                                        "id": "toolbar",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 50,
+                                        "role": "toolbar",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "devices-collection",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 100,
+                                        "role": "collection",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "devices-detail",
+                                        "presentation": {
+                                            "compact": "sheet",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 100,
+                                        "role": "detail",
+                                        "scroll": "page"
+                                    }
+                                ],
+                                "scroll": "page",
+                                "when": "$state.activeTab === 'devices'"
+                            },
+                            {
+                                "contentWidth": "fluid",
+                                "density": "comfortable",
+                                "id": "activity-variant",
+                                "interaction": {
+                                    "actions": "adaptive",
+                                    "filters": "inline",
+                                    "rowActivation": "open-detail",
+                                    "selection": "none"
+                                },
+                                "pattern": "collection-detail",
+                                "regions": [
+                                    {
+                                        "id": "toolbar",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 50,
+                                        "role": "toolbar",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "activity-collection",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 100,
+                                        "role": "collection",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "activity-detail",
+                                        "presentation": {
+                                            "compact": "sheet",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 100,
+                                        "role": "detail",
+                                        "scroll": "page"
+                                    }
+                                ],
+                                "scroll": "page",
+                                "when": "$state.activeTab === 'activity'"
+                            },
+                            {
+                                "id": "settings-variant",
+                                "when": "$state.activeTab === 'settings'",
+                                "pattern": "settings",
+                                "contentWidth": "fluid",
+                                "density": "comfortable",
+                                "scroll": "page",
+                                "interaction": {
+                                    "actions": "adaptive",
+                                    "filters": "inline",
+                                    "rowActivation": "select",
+                                    "selection": "single"
+                                },
+                                "regions": [
+                                    {
+                                        "id": "toolbar",
+                                        "role": "toolbar",
+                                        "priority": 50,
+                                        "scroll": "page",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        }
+                                    },
+                                    {
+                                        "id": "settings-navigation",
+                                        "role": "navigation",
+                                        "priority": 90,
+                                        "scroll": "page",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        }
+                                    },
+                                    {
+                                        "id": "settings-main",
+                                        "role": "main",
+                                        "priority": 100,
+                                        "scroll": "page",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        }
+                                    },
+                                    {
+                                        "id": "settings-commands",
+                                        "role": "commands",
+                                        "priority": 95,
+                                        "scroll": "page",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "contentWidth": "fluid",
+                                "density": "comfortable",
+                                "id": "system-variant",
+                                "interaction": {
+                                    "actions": "adaptive",
+                                    "filters": "inline",
+                                    "rowActivation": "select",
+                                    "selection": "single"
+                                },
+                                "pattern": "dashboard",
+                                "regions": [
+                                    {
+                                        "id": "toolbar",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 50,
+                                        "role": "toolbar",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "system-summary",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 100,
+                                        "role": "status",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "system-update",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 100,
+                                        "role": "status",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "system-connections",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 100,
+                                        "role": "status",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "system-quotas",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 100,
+                                        "role": "status",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "system-services",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 100,
+                                        "role": "main",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "system-attention",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 99,
+                                        "role": "utility",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "system-recent",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 98,
+                                        "role": "utility",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "system-commands",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 95,
+                                        "role": "utility",
+                                        "scroll": "page"
+                                    }
+                                ],
+                                "scroll": "page",
+                                "when": "$state.activeTab === 'system'"
+                            },
+                            {
+                                "contentWidth": "fluid",
+                                "density": "comfortable",
+                                "id": "development-variant",
+                                "interaction": {
+                                    "actions": "adaptive",
+                                    "filters": "inline",
+                                    "rowActivation": "open-detail",
+                                    "selection": "none"
+                                },
+                                "pattern": "collection-detail",
+                                "regions": [
+                                    {
+                                        "id": "toolbar",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 50,
+                                        "role": "toolbar",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "development-commands",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 100,
+                                        "role": "inspector",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "development-collection",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 100,
+                                        "role": "collection",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "development-detail",
+                                        "presentation": {
+                                            "compact": "sheet",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 100,
+                                        "role": "detail",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "development-progress",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 99,
+                                        "role": "inspector",
+                                        "scroll": "page"
+                                    }
+                                ],
+                                "scroll": "page",
+                                "when": "$state.activeTab === 'dev'"
+                            },
+                            {
+                                "contentWidth": "fluid",
+                                "density": "comfortable",
+                                "id": "chat-variant",
+                                "interaction": {
+                                    "actions": "adaptive",
+                                    "filters": "inline",
+                                    "rowActivation": "select",
+                                    "selection": "single"
+                                },
+                                "pattern": "dashboard",
+                                "regions": [
+                                    {
+                                        "id": "toolbar",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 50,
+                                        "role": "toolbar",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "chat-navigation",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 90,
+                                        "role": "navigation",
+                                        "scroll": "page"
+                                    },
+                                    {
+                                        "id": "chat-main",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 100,
+                                        "role": "main",
+                                        "scroll": "page"
+                                    }
+                                ],
+                                "scroll": "page",
+                                "when": "$state.activeTab === 'chat'"
+                            }
+                        ]
+                    },
+                    "widgets": [
+                        {
+                            "id": "primary-nav",
+                            "type": "navigation.tabs",
+                            "area": "toolbar",
+                            "title": "Навигация",
+                            "title_i18n": "web_desktop.nav.title",
+                            "inputs": {
+                                "variant": "tabs",
+                                "selectedStateKey": "activeTab",
+                                "buttons": [
+                                    {
+                                        "id": "home",
+                                        "label": "Главная",
+                                        "label_i18n": "web_desktop.nav.home"
+                                    },
+                                    {
+                                        "id": "devices",
+                                        "label": "Устройства",
+                                        "label_i18n": "web_desktop.nav.devices"
+                                    },
+                                    {
+                                        "id": "chat",
+                                        "label": "Чат",
+                                        "label_i18n": "web_desktop.nav.chat"
+                                    },
+                                    {
+                                        "id": "activity",
+                                        "label": "Активность",
+                                        "label_i18n": "web_desktop.nav.activity"
+                                    },
+                                    {
+                                        "id": "settings",
+                                        "label": "Настройки",
+                                        "label_i18n": "web_desktop.nav.settings"
+                                    },
+                                    {
+                                        "id": "system",
+                                        "label": "Система",
+                                        "label_i18n": "web_desktop.nav.system"
+                                    },
+                                    {
+                                        "id": "dev",
+                                        "label": "Разработка",
+                                        "label_i18n": "web_desktop.nav.dev"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:home",
+                                    "params": {
+                                        "activeTab": "home"
+                                    },
+                                    "type": "updateState"
+                                },
+                                {
+                                    "on": "click:devices",
+                                    "params": {
+                                        "activeTab": "devices"
+                                    },
+                                    "type": "updateState"
+                                },
+                                {
+                                    "on": "click:activity",
+                                    "params": {
+                                        "activeTab": "activity"
+                                    },
+                                    "type": "updateState"
+                                },
+                                {
+                                    "on": "click:settings",
+                                    "params": {
+                                        "activeTab": "settings"
+                                    },
+                                    "type": "updateState"
+                                },
+                                {
+                                    "on": "click:system",
+                                    "params": {
+                                        "activeTab": "system"
+                                    },
+                                    "type": "updateState"
+                                },
+                                {
+                                    "on": "click:dev",
+                                    "params": {
+                                        "activeTab": "dev"
+                                    },
+                                    "type": "updateState"
+                                },
+                                {
+                                    "on": "click:chat",
+                                    "params": {
+                                        "activeTab": "chat"
+                                    },
+                                    "type": "updateState"
+                                },
+                                {
+                                    "on": "click:chat",
+                                    "type": "callHost",
+                                    "target": "dialog.channel.select",
+                                    "params": {
+                                        "channel_id": "general",
+                                        "webspace_id": "$client.webspaceId"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "area": "pinned",
+                            "id": "desktop-icons",
+                            "type": "collection.grid",
+                            "title": "Pinned applications",
+                            "title_i18n": "web_desktop.apps.pinned.title",
+                            "visibleIf": "$state.activeTab === 'home'",
+                            "dataSource": {
+                                "kind": "y",
+                                "transform": "desktop.icons",
+                                "excludeIds": [
+                                    "web_desktop",
+                                    "scenario:web_desktop",
+                                    "adaos_connect_app",
+                                    "skill_preview",
+                                    "scenario:skill_preview"
+                                ]
+                            },
+                            "inputs": {
+                                "tileMinWidth": 132,
+                                "customization": {
+                                    "stateKey": "homeCustomizeMode",
+                                    "mode": "compactContextual",
+                                    "reorder": true,
+                                    "unpin": true
+                                },
+                                "headerActions": [
+                                    {
+                                        "id": "customize",
+                                        "label": "Customize layout",
+                                        "label_i18n": "web_desktop.home.customize_layout",
+                                        "icon": "settings-2",
+                                        "kind": "icon",
+                                        "visibleIf": "$state.homeCustomizeMode !== true"
+                                    },
+                                    {
+                                        "id": "finish_customize",
+                                        "label": "Done",
+                                        "label_i18n": "ui.action.done",
+                                        "icon": "check",
+                                        "kind": "icon",
+                                        "visibleIf": "$state.homeCustomizeMode === true"
+                                    }
+                                ],
+                                "itemActions": [
+                                    {
+                                        "id": "move",
+                                        "label": "Move",
+                                        "label_i18n": "ui.action.move",
+                                        "icon": "grip-vertical",
+                                        "kind": "icon",
+                                        "visibleIf": "$state.homeCustomizeMode === true"
+                                    },
+                                    {
+                                        "id": "unpin",
+                                        "label": "Unpin",
+                                        "label_i18n": "ui.action.unpin",
+                                        "icon": "pin-off",
+                                        "kind": "icon",
+                                        "visibleIf": "$state.homeCustomizeMode === true"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "id": "open-application",
+                                    "on": "select",
+                                    "enabledIf": "$state.homeCustomizeMode !== true",
+                                    "type": "callHost",
+                                    "target": "desktop.scenario.set",
+                                    "params": {
+                                        "scenario_id": "$event.scenario_id",
+                                        "webspace_id": "$client.webspaceId"
+                                    }
+                                },
+                                {
+                                    "id": "customize-home-layout",
+                                    "on": "click:customize",
+                                    "type": "updateState",
+                                    "params": {
+                                        "homeCustomizeMode": true
+                                    }
+                                },
+                                {
+                                    "id": "finish-home-layout",
+                                    "on": "click:finish_customize",
+                                    "type": "updateState",
+                                    "params": {
+                                        "homeCustomizeMode": false
+                                    }
+                                },
+                                {
+                                    "id": "move-application-launcher",
+                                    "on": "move",
+                                    "type": "callMcp",
+                                    "target": "applications.reorder_home",
+                                    "params": {
+                                        "application_id": "$event.id",
+                                        "to_index": "$event.currentIndex",
+                                        "webspace_id": "$client.webspaceId"
+                                    },
+                                    "invalidates": [
+                                        "web_desktop.applications",
+                                        "web_desktop.home_widgets"
+                                    ],
+                                    "resultStateKey": "lastHomeLayoutUpdate"
+                                },
+                                {
+                                    "id": "unpin-application-launcher",
+                                    "on": "click:unpin",
+                                    "type": "callMcp",
+                                    "target": "applications.set_home_pin",
+                                    "params": {
+                                        "application_id": "$event.id",
+                                        "pinned": false,
+                                        "webspace_id": "$client.webspaceId"
+                                    },
+                                    "invalidates": [
+                                        "web_desktop.applications",
+                                        "web_desktop.home_widgets"
+                                    ],
+                                    "resultStateKey": "lastHomeLayoutUpdate"
+                                }
+                            ]
+                        },
+                        {
+                            "area": "attention",
+                            "id": "home-attention",
+                            "type": "ui.list",
+                            "title": "Требуют внимания",
+                            "title_i18n": "web_desktop.home.attention",
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "title",
+                                "subtitleKey": "summary",
+                                "badgeKey": "severity",
+                                "emptyText": "Open System to inspect current reliability incidents.",
+                                "pagination": true,
+                                "pageSize": 8
+                            },
+                            "visibleIf": "$state.activeTab === 'home'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_system_overview",
+                                "params": {
+                                    "section": "summary"
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "web_desktop.system"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "actions": []
+                        },
+                        {
+                            "area": "continue",
+                            "id": "home-continue-list",
+                            "type": "ui.list",
+                            "title": "Продолжить работу",
+                            "title_i18n": "web_desktop.home.continue",
+                            "inputs": {
+                                "variant": "list",
+                                "titleKey": "title",
+                                "subtitleKey": "status",
+                                "previewKey": "summary",
+                                "badgeKey": "validation_status",
+                                "emptyText": "No resumable work is available from an admitted service.",
+                                "buttons": [
+                                    {
+                                        "id": "open",
+                                        "label": "Open",
+                                        "label_i18n": "ui.action.open",
+                                        "kind": "primary",
+                                        "whenKey": "launchable",
+                                        "whenEquals": true
+                                    }
+                                ]
+                            },
+                            "visibleIf": "$state.activeTab === 'home'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.list_developments",
+                                "params": {
+                                    "limit": 6
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 1,
+                                "invalidationTags": [
+                                    "web_desktop.developments"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "actions": [
+                                {
+                                    "id": "open",
+                                    "on": "click:open",
+                                    "type": "callHost",
+                                    "target": "desktop.scenario.set",
+                                    "params": {
+                                        "scenario_id": "$event.scenario_id",
+                                        "webspace_id": "$client.webspaceId"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "area": "health",
+                            "id": "home-space-status",
+                            "type": "item.details",
+                            "title": "Состояние пространства",
+                            "title_i18n": "web_desktop.home.space_health",
+                            "inputs": {
+                                "presentation": "section",
+                                "fields": [
+                                    {
+                                        "key": "subject.title",
+                                        "label": "Node"
+                                    },
+                                    {
+                                        "key": "subject.status",
+                                        "label": "Status"
+                                    },
+                                    {
+                                        "key": "metrics.services.value",
+                                        "label": "Observed services"
+                                    },
+                                    {
+                                        "key": "metrics.incidents.value",
+                                        "label": "Observed incidents"
+                                    }
+                                ],
+                                "emptyText": "No details available."
+                            },
+                            "visibleIf": "$state.activeTab === 'home'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_system_overview",
+                                "params": {
+                                    "section": "summary"
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "web_desktop.system"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "actions": []
+                        },
+                        {
+                            "area": "activity",
+                            "id": "home-activity-list",
+                            "type": "ui.list",
+                            "title": "Недавняя активность",
+                            "title_i18n": "web_desktop.home.activity",
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "audit_id",
+                                "titleKey": "event_type",
+                                "subtitleKey": "occurred_at",
+                                "badgeKey": "decision.decision",
+                                "emptyText": "No recent activity."
+                            },
+                            "visibleIf": "$state.activeTab === 'home'",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "users_access.summary",
+                                "arguments": {
+                                    "audit_limit": 8,
+                                    "sections": [
+                                        "audit"
+                                    ],
+                                    "detail": "compact"
+                                },
+                                "dryRun": true,
+                                "resultPath": "response.result.administration.audit"
+                            },
+                            "actions": []
+                        },
+                        {
+                            "area": "toolbar",
+                            "id": "devices-query",
+                            "inputs": {
+                                "controls": [
+                                    {
+                                        "id": "devices-q-search",
+                                        "inputType": "search",
+                                        "kind": "search",
+                                        "label": "Search devices",
+                                        "label_i18n": "web_desktop.devices.search",
+                                        "stateKey": "deviceSearch"
+                                    },
+                                    {
+                                        "id": "devices-q-status",
+                                        "inputType": "select",
+                                        "kind": "filter",
+                                        "label": "Status",
+                                        "label_i18n": "web_desktop.devices.status",
+                                        "stateKey": "devicesStatus",
+                                        "options": [
+                                            {
+                                                "value": "active",
+                                                "label": "Connected",
+                                                "label_i18n": "web_desktop.devices.status.active"
+                                            },
+                                            {
+                                                "value": "all",
+                                                "label": "All",
+                                                "label_i18n": "web_desktop.devices.status.all"
+                                            },
+                                            {
+                                                "value": "offline",
+                                                "label": "Offline",
+                                                "label_i18n": "web_desktop.devices.status.offline"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            "title": "Search and filters",
+                            "title_i18n": "web_desktop.devices.query.title",
+                            "type": "ui.queryToolbar",
+                            "visibleIf": "$state.activeTab === 'devices'"
+                        },
+                        {
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedDeviceId": "$event.id",
+                                        "selectedDeviceTitle": "$event.title"
+                                    }
+                                }
+                            ],
+                            "area": "devices-collection",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.list_devices",
+                                "params": {
+                                    "query": "$state.deviceSearch",
+                                    "status": "$state.devicesStatus",
+                                    "limit": 20
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 1,
+                                "invalidationTags": [
+                                    "web_desktop.devices"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "id": "devices-list",
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "title",
+                                "subtitleKey": "summary",
+                                "badgeKey": "status",
+                                "currentKey": "current",
+                                "meta": [
+                                    {
+                                        "key": "device_type",
+                                        "label": "Type",
+                                        "kind": "text"
+                                    },
+                                    {
+                                        "key": "connection",
+                                        "label": "Connection",
+                                        "kind": "badge"
+                                    },
+                                    {
+                                        "key": "last_seen",
+                                        "label": "Last seen",
+                                        "kind": "text"
+                                    }
+                                ],
+                                "filters": [
+                                    {
+                                        "key": "title",
+                                        "stateKey": "deviceSearch",
+                                        "operator": "contains"
+                                    }
+                                ],
+                                "pagination": true,
+                                "pageSize": 20,
+                                "pageSizeOptions": [
+                                    10,
+                                    20,
+                                    40
+                                ],
+                                "emptyText": "No devices are registered."
+                            },
+                            "title": "Devices",
+                            "title_i18n": "web_desktop.nav.devices",
+                            "type": "ui.list",
+                            "visibleIf": "$state.activeTab === 'devices'"
+                        },
+                        {
+                            "actions": [
+                                {
+                                    "id": "resetPairbrowser",
+                                    "on": "click:pair_browser",
+                                    "type": "updateState",
+                                    "params": {
+                                        "lastPairingPrepareResult": {
+                                            "ok": true,
+                                            "current": {
+                                                "mode": "browser",
+                                                "status": "pending",
+                                                "summary": "Preparing browser pairing data...",
+                                                "code": "",
+                                                "expires_at_display": "",
+                                                "link": "",
+                                                "qr_text": "",
+                                                "linux_command": "",
+                                                "windows_ps_command": ""
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "pairBrowser",
+                                    "on": "click:pair_browser",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "pair-browser"
+                                    }
+                                },
+                                {
+                                    "id": "preparePairBrowser",
+                                    "on": "click:pair_browser",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.prepare_connection",
+                                    "params": {
+                                        "mode": "browser",
+                                        "refresh": true
+                                    },
+                                    "invalidates": [
+                                        "users_access.summary"
+                                    ],
+                                    "resultStateKey": "lastPairingPrepareResult"
+                                },
+                                {
+                                    "id": "resetPairtelegram",
+                                    "on": "click:pair_telegram",
+                                    "type": "updateState",
+                                    "params": {
+                                        "lastPairingPrepareResult": {
+                                            "ok": true,
+                                            "current": {
+                                                "mode": "telegram",
+                                                "status": "pending",
+                                                "summary": "Preparing Telegram pairing data...",
+                                                "code": "",
+                                                "expires_at_display": "",
+                                                "link": "",
+                                                "qr_text": "",
+                                                "linux_command": "",
+                                                "windows_ps_command": ""
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "pairTelegram",
+                                    "on": "click:pair_telegram",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "pair-telegram"
+                                    }
+                                },
+                                {
+                                    "id": "preparePairTelegram",
+                                    "on": "click:pair_telegram",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.prepare_connection",
+                                    "params": {
+                                        "mode": "telegram",
+                                        "refresh": true
+                                    },
+                                    "invalidates": [
+                                        "users_access.summary"
+                                    ],
+                                    "resultStateKey": "lastPairingPrepareResult"
+                                },
+                                {
+                                    "id": "resetPairnode",
+                                    "on": "click:pair_node",
+                                    "type": "updateState",
+                                    "params": {
+                                        "lastPairingPrepareResult": {
+                                            "ok": true,
+                                            "current": {
+                                                "mode": "node",
+                                                "status": "pending",
+                                                "summary": "Preparing node pairing data...",
+                                                "code": "",
+                                                "expires_at_display": "",
+                                                "link": "",
+                                                "qr_text": "",
+                                                "linux_command": "",
+                                                "windows_ps_command": ""
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "pairNode",
+                                    "on": "click:pair_node",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "pair-node"
+                                    }
+                                },
+                                {
+                                    "id": "preparePairNode",
+                                    "on": "click:pair_node",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.prepare_connection",
+                                    "params": {
+                                        "mode": "node",
+                                        "refresh": true
+                                    },
+                                    "invalidates": [
+                                        "users_access.summary"
+                                    ],
+                                    "resultStateKey": "lastPairingPrepareResult"
+                                }
+                            ],
+                            "area": "toolbar",
+                            "id": "devices-actions",
+                            "inputs": {
+                                "buttons": [
+                                    {
+                                        "id": "pair_browser",
+                                        "kind": "primary",
+                                        "label": "Pair Browser",
+                                        "label_i18n": "web_desktop.devices.action.pair_browser",
+                                        "priority": 90
+                                    },
+                                    {
+                                        "id": "pair_telegram",
+                                        "kind": "secondary",
+                                        "label": "Pair Telegram",
+                                        "label_i18n": "web_desktop.devices.action.pair_telegram",
+                                        "priority": 80
+                                    },
+                                    {
+                                        "id": "pair_node",
+                                        "kind": "secondary",
+                                        "label": "Pair Node",
+                                        "label_i18n": "web_desktop.devices.action.pair_node",
+                                        "priority": 70
+                                    }
+                                ],
+                                "variant": "adaptiveToolbar"
+                            },
+                            "title": "Actions",
+                            "title_i18n": "web_desktop.devices.actions.title",
+                            "type": "ui.actions",
+                            "visibleIf": "$state.activeTab === 'devices'"
+                        },
+                        {
+                            "actions": [],
+                            "area": "devices-detail",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.list_devices",
+                                "params": {
+                                    "device_id": "$state.selectedDeviceId",
+                                    "require_selection": true,
+                                    "limit": 1
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 1,
+                                "invalidationTags": [
+                                    "web_desktop.devices"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "id": "devices-details",
+                            "inputs": {
+                                "presentation": "section",
+                                "selectedStateKey": "selectedDeviceId",
+                                "emptyText": "No device selected.",
+                                "fields": [
+                                    {
+                                        "key": "device_type",
+                                        "label": "Type"
+                                    },
+                                    {
+                                        "key": "status",
+                                        "label": "Status"
+                                    },
+                                    {
+                                        "key": "connection",
+                                        "label": "Connection"
+                                    },
+                                    {
+                                        "key": "last_seen",
+                                        "label": "Last seen",
+                                        "format": "datetime"
+                                    },
+                                    {
+                                        "key": "version",
+                                        "label": "Software version"
+                                    },
+                                    {
+                                        "key": "route_mode",
+                                        "label": "Route"
+                                    },
+                                    {
+                                        "key": "workspace_ids",
+                                        "label": "Representations"
+                                    },
+                                    {
+                                        "key": "owner",
+                                        "label": "Owner"
+                                    }
+                                ]
+                            },
+                            "title": "$state.selectedDeviceTitle",
+                            "type": "item.details",
+                            "visibleIf": "$state.activeTab === 'devices' && $state.selectedDeviceId !== ''"
+                        },
+                        {
+                            "area": "activity-collection",
+                            "id": "activity-query",
+                            "inputs": {
+                                "controls": [
+                                    {
+                                        "id": "activity-q-search",
+                                        "inputType": "search",
+                                        "kind": "search",
+                                        "label": "Search activity",
+                                        "label_i18n": "web_desktop.activity.search",
+                                        "stateKey": "activitySearch"
+                                    }
+                                ]
+                            },
+                            "title": "Search and filters",
+                            "title_i18n": "web_desktop.activity.query.title",
+                            "type": "ui.queryToolbar",
+                            "visibleIf": "$state.activeTab === 'activity'"
+                        },
+                        {
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedActivityId": "$event.audit_id",
+                                        "selectedActivityTitle": "$event.event_type"
+                                    }
+                                }
+                            ],
+                            "area": "activity-collection",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "users_access.summary",
+                                "arguments": {
+                                    "audit_limit": 40,
+                                    "sections": [
+                                        "audit"
+                                    ],
+                                    "detail": "compact"
+                                },
+                                "dryRun": true,
+                                "resultPath": "response.result.administration.audit"
+                            },
+                            "id": "activity-list",
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "audit_id",
+                                "titleKey": "event_type",
+                                "subtitleKey": "occurred_at",
+                                "badgeKey": "decision.decision",
+                                "meta": [
+                                    {
+                                        "key": "actor_ref",
+                                        "label": "Actor",
+                                        "kind": "text"
+                                    },
+                                    {
+                                        "key": "scope_ref",
+                                        "label": "Scope",
+                                        "kind": "text"
+                                    },
+                                    {
+                                        "key": "source",
+                                        "label": "Source",
+                                        "kind": "text"
+                                    }
+                                ],
+                                "filters": [
+                                    {
+                                        "key": "event_type",
+                                        "stateKey": "activitySearch",
+                                        "operator": "contains"
+                                    }
+                                ],
+                                "pagination": true,
+                                "pageSize": 20,
+                                "pageSizeOptions": [
+                                    10,
+                                    20,
+                                    40
+                                ],
+                                "emptyText": "No activity has been recorded."
+                            },
+                            "title": "Activity",
+                            "title_i18n": "web_desktop.nav.activity",
+                            "type": "ui.list",
+                            "visibleIf": "$state.activeTab === 'activity'"
+                        },
+                        {
+                            "actions": [],
+                            "area": "activity-detail",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "users_access.summary",
+                                "arguments": {
+                                    "audit_limit": 40,
+                                    "sections": [
+                                        "audit"
+                                    ],
+                                    "detail": "compact"
+                                },
+                                "dryRun": true,
+                                "resultPath": "response.result.administration.audit"
+                            },
+                            "id": "activity-details",
+                            "inputs": {
+                                "presentation": "section",
+                                "selectedStateKey": "selectedActivityId",
+                                "itemIdKey": "audit_id",
+                                "emptyText": "No activity selected.",
+                                "fields": [
+                                    {
+                                        "key": "event_type",
+                                        "label": "Event"
+                                    },
+                                    {
+                                        "key": "occurred_at",
+                                        "label": "Occurred",
+                                        "format": "datetime"
+                                    },
+                                    {
+                                        "key": "actor_ref",
+                                        "label": "Actor"
+                                    },
+                                    {
+                                        "key": "scope_ref",
+                                        "label": "Scope"
+                                    },
+                                    {
+                                        "key": "decision.decision",
+                                        "label": "Decision"
+                                    },
+                                    {
+                                        "key": "decision.reason_code",
+                                        "label": "Reason"
+                                    },
+                                    {
+                                        "key": "decision.action",
+                                        "label": "Action"
+                                    },
+                                    {
+                                        "key": "resource",
+                                        "label": "Resource"
+                                    },
+                                    {
+                                        "key": "source",
+                                        "label": "Source"
+                                    }
+                                ]
+                            },
+                            "title": "$state.selectedActivityTitle",
+                            "type": "item.details",
+                            "visibleIf": "$state.activeTab === 'activity' && $state.selectedActivityId !== ''"
+                        },
+                        {
+                            "area": "settings-navigation",
+                            "id": "settings-sections",
+                            "type": "navigation.tabs",
+                            "title": "Разделы",
+                            "title_i18n": "web_desktop.settings.nav.title",
+                            "visibleIf": "$state.activeTab === 'settings'",
+                            "inputs": {
+                                "variant": "tabs",
+                                "buttons": [
+                                    {
+                                        "id": "account",
+                                        "label": "Account",
+                                        "label_i18n": "web_desktop.settings.scope.account"
+                                    },
+                                    {
+                                        "id": "device",
+                                        "label": "Device/browser",
+                                        "label_i18n": "web_desktop.settings.scope.device"
+                                    },
+                                    {
+                                        "id": "workspace",
+                                        "label": "Workspace",
+                                        "label_i18n": "web_desktop.settings.scope.workspace"
+                                    },
+                                    {
+                                        "id": "applications",
+                                        "label": "Applications",
+                                        "label_i18n": "web_desktop.settings.scope.applications"
+                                    },
+                                    {
+                                        "id": "a11y_privacy",
+                                        "label": "Accessibility/privacy",
+                                        "label_i18n": "web_desktop.settings.scope.a11y_privacy"
+                                    }
+                                ],
+                                "selectedStateKey": "settingsSection"
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:account",
+                                    "type": "updateState",
+                                    "params": {
+                                        "settingsSection": "account"
+                                    }
+                                },
+                                {
+                                    "on": "click:device",
+                                    "type": "updateState",
+                                    "params": {
+                                        "settingsSection": "device"
+                                    }
+                                },
+                                {
+                                    "on": "click:workspace",
+                                    "type": "updateState",
+                                    "params": {
+                                        "settingsSection": "workspace"
+                                    }
+                                },
+                                {
+                                    "on": "click:applications",
+                                    "type": "updateState",
+                                    "params": {
+                                        "settingsSection": "applications"
+                                    }
+                                },
+                                {
+                                    "on": "click:a11y_privacy",
+                                    "type": "updateState",
+                                    "params": {
+                                        "settingsSection": "a11y_privacy"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "area": "settings-commands",
+                            "id": "settings-scope",
+                            "type": "item.details",
+                            "title": "Settings scope",
+                            "title_i18n": "web_desktop.settings.scope.title",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": {
+                                    "scope": "Current settings section"
+                                }
+                            },
+                            "inputs": {
+                                "presentation": "section",
+                                "fields": [
+                                    {
+                                        "id": "scope",
+                                        "label": "Scope",
+                                        "value": "$state.settingsSection"
+                                    },
+                                    {
+                                        "id": "lastSave",
+                                        "label": "Last save",
+                                        "value": "$state.lastPreferencesUpdate.ok"
+                                    }
+                                ],
+                                "emptyText": "No details available."
+                            },
+                            "visibleIf": "$state.activeTab === 'settings'"
+                        },
+                        {
+                            "actions": [],
+                            "area": "system-summary",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_system_overview",
+                                "params": {
+                                    "section": "summary"
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "web_desktop.system"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "id": "system-summary-details",
+                            "inputs": {
+                                "presentation": "section",
+                                "fields": [
+                                    {
+                                        "key": "subject.title",
+                                        "label": "Node"
+                                    },
+                                    {
+                                        "key": "subject.status",
+                                        "label": "Status"
+                                    },
+                                    {
+                                        "key": "metrics.capacity.value",
+                                        "label": "Active skills"
+                                    },
+                                    {
+                                        "key": "metrics.services.description",
+                                        "label": "Runtime capacity"
+                                    }
+                                ],
+                                "emptyText": "System identity is unavailable."
+                            },
+                            "title": "Current node",
+                            "type": "item.details",
+                            "visibleIf": "$state.activeTab === 'system'"
+                        },
+                        {
+                            "actions": [],
+                            "area": "system-update",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_system_overview",
+                                "params": {
+                                    "section": "update"
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "web_desktop.system"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "id": "system-update-details",
+                            "inputs": {
+                                "presentation": "section",
+                                "fields": [
+                                    {
+                                        "key": "update.state",
+                                        "label": "State"
+                                    },
+                                    {
+                                        "key": "update.phase",
+                                        "label": "Phase"
+                                    },
+                                    {
+                                        "key": "update.target_version",
+                                        "label": "Target version"
+                                    },
+                                    {
+                                        "key": "update.message",
+                                        "label": "Message"
+                                    }
+                                ],
+                                "emptyText": "No update transition is active."
+                            },
+                            "title": "Core update",
+                            "type": "item.details",
+                            "visibleIf": "$state.activeTab === 'system'"
+                        },
+                        {
+                            "actions": [],
+                            "area": "system-connections",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_system_overview",
+                                "params": {
+                                    "section": "connections"
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "web_desktop.system"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "id": "system-connections-list",
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "title",
+                                "subtitleKey": "summary",
+                                "badgeKey": "status",
+                                "pagination": true,
+                                "pageSize": 10,
+                                "pageSizeOptions": [
+                                    10,
+                                    20,
+                                    40
+                                ],
+                                "emptyText": "No control-plane connections are visible.",
+                                "collectionKey": "connections"
+                            },
+                            "title": "Connections",
+                            "type": "ui.list",
+                            "visibleIf": "$state.activeTab === 'system'"
+                        },
+                        {
+                            "actions": [],
+                            "area": "system-quotas",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_system_overview",
+                                "params": {
+                                    "section": "quotas"
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "web_desktop.system"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "id": "system-quotas-list",
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "title",
+                                "subtitleKey": "summary",
+                                "badgeKey": "status",
+                                "pagination": true,
+                                "pageSize": 10,
+                                "pageSizeOptions": [
+                                    10,
+                                    20,
+                                    40
+                                ],
+                                "emptyText": "No transport quotas are reported.",
+                                "collectionKey": "quotas"
+                            },
+                            "title": "Transport quotas",
+                            "type": "ui.list",
+                            "visibleIf": "$state.activeTab === 'system'"
+                        },
+                        {
+                            "actions": [],
+                            "area": "system-services",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_system_overview",
+                                "params": {
+                                    "section": "services"
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "web_desktop.system"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "id": "system-services-list",
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "title",
+                                "subtitleKey": "summary",
+                                "badgeKey": "status",
+                                "pagination": true,
+                                "pageSize": 20,
+                                "pageSizeOptions": [
+                                    10,
+                                    20,
+                                    40
+                                ],
+                                "emptyText": "No services are visible.",
+                                "collectionKey": "services"
+                            },
+                            "title": "Services",
+                            "title_i18n": "web_desktop.system.services.title",
+                            "type": "ui.list",
+                            "visibleIf": "$state.activeTab === 'system'"
+                        },
+                        {
+                            "actions": [],
+                            "area": "system-attention",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_system_overview",
+                                "params": {
+                                    "section": "incidents"
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "web_desktop.system"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "id": "system-attention-list",
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "title",
+                                "subtitleKey": "summary",
+                                "badgeKey": "severity",
+                                "pagination": true,
+                                "pageSize": 20,
+                                "pageSizeOptions": [
+                                    10,
+                                    20,
+                                    40
+                                ],
+                                "emptyText": "No observed incidents.",
+                                "collectionKey": "incidents"
+                            },
+                            "title": "Attention",
+                            "title_i18n": "web_desktop.system.attention.title",
+                            "type": "ui.list",
+                            "visibleIf": "$state.activeTab === 'system'"
+                        },
+                        {
+                            "area": "system-recent",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "users_access.summary",
+                                "arguments": {
+                                    "audit_limit": 20,
+                                    "sections": [
+                                        "audit"
+                                    ],
+                                    "detail": "compact"
+                                },
+                                "dryRun": true,
+                                "resultPath": "response.result.administration.audit"
+                            },
+                            "id": "system-recent-checks",
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "audit_id",
+                                "titleKey": "event_type",
+                                "subtitleKey": "occurred_at",
+                                "badgeKey": "decision.decision",
+                                "emptyText": "No recent system activity."
+                            },
+                            "title": "Recent system activity",
+                            "title_i18n": "web_desktop.system.recent.title",
+                            "type": "ui.list",
+                            "visibleIf": "$state.activeTab === 'system'",
+                            "actions": []
+                        },
+                        {
+                            "area": "development-collection",
+                            "id": "development-query",
+                            "type": "ui.queryToolbar",
+                            "title": "Search and filters",
+                            "title_i18n": "web_desktop.dev.query.title",
+                            "inputs": {
+                                "controls": [
+                                    {
+                                        "id": "dev-q-search",
+                                        "kind": "search",
+                                        "inputType": "search",
+                                        "label": "Search work",
+                                        "label_i18n": "web_desktop.dev.search",
+                                        "stateKey": "developmentSearch"
+                                    }
+                                ]
+                            },
+                            "visibleIf": "$state.activeTab === 'dev'"
+                        },
+                        {
+                            "area": "development-collection",
+                            "id": "development-list",
+                            "type": "ui.list",
+                            "title": "Active work",
+                            "title_i18n": "web_desktop.dev.list.title",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.list_developments",
+                                "params": {
+                                    "query": "$state.developmentSearch",
+                                    "limit": 40
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 1,
+                                "invalidationTags": [
+                                    "web_desktop.developments"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "title",
+                                "subtitleKey": "summary",
+                                "badgeKey": "stage",
+                                "meta": [
+                                    {
+                                        "key": "version",
+                                        "label": "Version",
+                                        "kind": "text"
+                                    },
+                                    {
+                                        "key": "validation_status",
+                                        "label": "Validation",
+                                        "kind": "badge"
+                                    }
+                                ],
+                                "filters": [
+                                    {
+                                        "key": "title",
+                                        "stateKey": "developmentSearch",
+                                        "operator": "contains"
+                                    }
+                                ],
+                                "pagination": true,
+                                "pageSize": 20,
+                                "pageSizeOptions": [
+                                    10,
+                                    20,
+                                    40
+                                ],
+                                "emptyText": "No development projects are available."
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedDevelopmentId": "$event.id",
+                                        "selectedDevelopmentTitle": "$event.title",
+                                        "selectedDevelopmentScenarioId": "$event.scenario_id",
+                                        "canOpenDevelopmentPreview": "$event.launchable"
+                                    }
+                                }
+                            ],
+                            "visibleIf": "$state.activeTab === 'dev'"
+                        },
+                        {
+                            "area": "development-detail",
+                            "id": "development-details",
+                            "type": "item.details",
+                            "title": "$state.selectedDevelopmentTitle",
+                            "inputs": {
+                                "presentation": "section",
+                                "selectedStateKey": "selectedDevelopmentId",
+                                "emptyText": "No development selected.",
+                                "fields": [
+                                    {
+                                        "key": "summary",
+                                        "label": "About"
+                                    },
+                                    {
+                                        "key": "version",
+                                        "label": "Version"
+                                    },
+                                    {
+                                        "key": "stage",
+                                        "label": "Stage"
+                                    },
+                                    {
+                                        "key": "visibility",
+                                        "label": "Visibility"
+                                    },
+                                    {
+                                        "key": "validation_status",
+                                        "label": "Validation"
+                                    },
+                                    {
+                                        "key": "primary_ref",
+                                        "label": "Primary component"
+                                    }
+                                ]
+                            },
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.list_developments",
+                                "params": {
+                                    "development_id": "$state.selectedDevelopmentId",
+                                    "require_selection": true,
+                                    "limit": 1
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 1,
+                                "invalidationTags": [
+                                    "web_desktop.developments"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "visibleIf": "$state.activeTab === 'dev' && $state.selectedDevelopmentId !== ''",
+                            "actions": []
+                        },
+                        {
+                            "area": "development-commands",
+                            "id": "development-actions",
+                            "type": "ui.actions",
+                            "title": "Commands",
+                            "title_i18n": "web_desktop.system.actions.title",
+                            "inputs": {
+                                "variant": "adaptiveToolbar",
+                                "buttons": [
+                                    {
+                                        "id": "open_builder",
+                                        "kind": "primary",
+                                        "label": "Open Builder"
+                                    },
+                                    {
+                                        "id": "open_preview",
+                                        "kind": "secondary",
+                                        "label": "Open preview",
+                                        "enabledIf": "$state.canOpenDevelopmentPreview === true"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "id": "openBuilder",
+                                    "on": "click:open_builder",
+                                    "type": "callHost",
+                                    "target": "desktop.scenario.set",
+                                    "params": {
+                                        "scenario_id": "builder",
+                                        "webspace_id": "$client.webspaceId"
+                                    }
+                                },
+                                {
+                                    "id": "openPreview",
+                                    "on": "click:open_preview",
+                                    "type": "callHost",
+                                    "target": "desktop.scenario.set",
+                                    "enabledIf": "$state.canOpenDevelopmentPreview === true",
+                                    "params": {
+                                        "scenario_id": "$state.selectedDevelopmentScenarioId",
+                                        "webspace_id": "$client.webspaceId"
+                                    }
+                                }
+                            ],
+                            "visibleIf": "$state.activeTab === 'dev'"
+                        },
+                        {
+                            "area": "chat-navigation",
+                            "id": "chat-channel-selector",
+                            "inputs": {
+                                "buttons": [
+                                    {
+                                        "id": "general",
+                                        "label": "General",
+                                        "label_i18n": "web_desktop.chat.channel.general"
+                                    },
+                                    {
+                                        "id": "family",
+                                        "label": "Family",
+                                        "label_i18n": "web_desktop.chat.channel.family"
+                                    }
+                                ],
+                                "selectedStateKey": "chatChannel",
+                                "variant": "tabs"
+                            },
+                            "title": "Channels",
+                            "title_i18n": "web_desktop.chat.channels.title",
+                            "type": "navigation.tabs",
+                            "actions": [
+                                {
+                                    "on": "click:general",
+                                    "type": "updateState",
+                                    "params": {
+                                        "chatChannel": "general",
+                                        "chatAgentId": "agent:core:general"
+                                    }
+                                },
+                                {
+                                    "on": "click:general",
+                                    "type": "callHost",
+                                    "target": "dialog.channel.select",
+                                    "params": {
+                                        "channel_id": "general",
+                                        "webspace_id": "$client.webspaceId"
+                                    }
+                                },
+                                {
+                                    "on": "click:family",
+                                    "type": "updateState",
+                                    "params": {
+                                        "chatChannel": "family",
+                                        "chatAgentId": "agent:conversation_companions:nika"
+                                    }
+                                },
+                                {
+                                    "on": "click:family",
+                                    "type": "callHost",
+                                    "target": "dialog.channel.select",
+                                    "params": {
+                                        "channel_id": "family",
+                                        "webspace_id": "$client.webspaceId"
+                                    }
+                                }
+                            ],
+                            "visibleIf": "$state.activeTab === 'chat'"
+                        },
+                        {
+                            "area": "chat-navigation",
+                            "id": "chat-agent-selector",
+                            "title": "Agent",
+                            "type": "navigation.tabs",
+                            "visibleIf": "$state.activeTab === 'chat' && $state.chatChannel === 'family'",
+                            "inputs": {
+                                "variant": "segmented",
+                                "selectedStateKey": "chatAgentId",
+                                "buttons": [
+                                    {
+                                        "id": "agent:conversation_companions:arseni",
+                                        "label": "Arseni"
+                                    },
+                                    {
+                                        "id": "agent:conversation_companions:nika",
+                                        "label": "Nika"
+                                    },
+                                    {
+                                        "id": "agent:conversation_companions:mira",
+                                        "label": "Mira"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:agent:conversation_companions:arseni",
+                                    "type": "updateState",
+                                    "params": {
+                                        "chatAgentId": "agent:conversation_companions:arseni"
+                                    }
+                                },
+                                {
+                                    "on": "click:agent:conversation_companions:nika",
+                                    "type": "updateState",
+                                    "params": {
+                                        "chatAgentId": "agent:conversation_companions:nika"
+                                    }
+                                },
+                                {
+                                    "on": "click:agent:conversation_companions:mira",
+                                    "type": "updateState",
+                                    "params": {
+                                        "chatAgentId": "agent:conversation_companions:mira"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "area": "chat-navigation",
+                            "id": "chat-voice-input",
+                            "title": "Voice",
+                            "type": "ui.voiceInput",
+                            "visibleIf": "$state.activeTab === 'chat'",
+                            "inputs": {
+                                "compact": true,
+                                "startLabel": "Listen",
+                                "stopLabel": "Stop",
+                                "sendCommand": "voice.chat.user",
+                                "scope": "shared",
+                                "autoSpeak": true,
+                                "autoSpeakFrom": "hub",
+                                "channelSelector": false,
+                                "agentChip": true,
+                                "meta": {
+                                    "route_id": "voice_chat",
+                                    "voice_chat_scope": "shared",
+                                    "dialog_channel_id": "$state.chatChannel",
+                                    "active_agent_id": "$state.chatAgentId"
+                                },
+                                "ttsProfiles": {
+                                    "core": {
+                                        "agent_id": "agent:core:general",
+                                        "gender": "female",
+                                        "voice": "ru-female"
+                                    },
+                                    "arseni": {
+                                        "agent_id": "agent:conversation_companions:arseni",
+                                        "gender": "male",
+                                        "voice": "ru-male"
+                                    },
+                                    "nika": {
+                                        "agent_id": "agent:conversation_companions:nika",
+                                        "gender": "female",
+                                        "voice": "ru-female"
+                                    },
+                                    "mira": {
+                                        "agent_id": "agent:conversation_companions:mira",
+                                        "gender": "female",
+                                        "voice": "ru-female"
+                                    }
+                                },
+                                "stt": {
+                                    "provider": "hub-wav",
+                                    "pushToTalk": true,
+                                    "autoSend": true,
+                                    "vad": true,
+                                    "vadSilenceMs": 900
+                                }
+                            }
+                        },
+                        {
+                            "area": "chat-main",
+                            "id": "desktop-chat",
+                            "inputs": {
+                                "fillHeight": true,
+                                "multiline": true,
+                                "placeholder": "Type a message…",
+                                "placeholder_i18n": "web_desktop.chat.placeholder",
+                                "composerRows": 2,
+                                "meta": {
+                                    "dialog_channel_id": "$state.chatChannel",
+                                    "active_agent_id": "$state.chatAgentId"
+                                },
+                                "sendCommand": "voice.chat.user",
+                                "sendResultStateKey": "lastChatSend",
+                                "sendPendingStateKey": "chatSendPending",
+                                "sendErrorStateKey": "chatSendError",
+                                "resultDelivery": "conversation",
+                                "pendingText": "Sending...",
+                                "pendingText_i18n": "web_desktop.chat.pending",
+                                "errorText": "Message could not be sent.",
+                                "errorText_i18n": "web_desktop.chat.error",
+                                "retry": {
+                                    "enabled": true,
+                                    "command": "voice.chat.user"
+                                }
+                            },
+                            "type": "ui.chat",
+                            "dataSource": {
+                                "kind": "stream",
+                                "receiver": "voice_chat.messages",
+                                "scope": "shared",
+                                "params": {
+                                    "dialog_channel_id": "$state.chatChannel",
+                                    "active_agent_id": "$state.chatAgentId"
+                                }
+                            },
+                            "title": "Chat",
+                            "title_i18n": "web_desktop.nav.chat",
+                            "visibleIf": "$state.activeTab === 'chat'"
+                        },
+                        {
+                            "area": "settings-main",
+                            "id": "settings-form-account",
+                            "type": "ui.form",
+                            "title": "Account",
+                            "title_i18n": "web_desktop.settings.scope.account",
+                            "visibleIf": "$state.activeTab === 'settings' && $state.settingsSection === 'account'",
+                            "inputs": {
+                                "layout": "responsiveGrid",
+                                "fields": [
+                                    {
+                                        "id": "display_name",
+                                        "label": "Отображаемое имя",
+                                        "label_i18n": "web_desktop.settings.account.profile_name",
+                                        "type": "text",
+                                        "required": true,
+                                        "stateKey": "prefProfileName"
+                                    },
+                                    {
+                                        "id": "timezone",
+                                        "label": "Часовой пояс",
+                                        "label_i18n": "web_desktop.settings.account.time_zone",
+                                        "type": "dropdown",
+                                        "required": true,
+                                        "stateKey": "prefTimeZone",
+                                        "options": [
+                                            {
+                                                "label": "Europe/Moscow (UTC+3)",
+                                                "value": "Europe/Moscow"
+                                            },
+                                            {
+                                                "label": "UTC",
+                                                "value": "UTC"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "language",
+                                        "label": "Language",
+                                        "label_i18n": "web_desktop.settings.general.language",
+                                        "type": "dropdown",
+                                        "required": true,
+                                        "stateKey": "prefLanguage",
+                                        "options": [
+                                            {
+                                                "label": "English",
+                                                "label_i18n": "web_desktop.settings.language.en",
+                                                "value": "en"
+                                            },
+                                            {
+                                                "label": "Русский",
+                                                "label_i18n": "web_desktop.settings.language.ru",
+                                                "value": "ru"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "start_destination",
+                                        "label": "Start destination",
+                                        "label_i18n": "web_desktop.settings.general.start_destination",
+                                        "type": "dropdown",
+                                        "required": true,
+                                        "stateKey": "prefStartDestination",
+                                        "options": [
+                                            {
+                                                "label": "Home",
+                                                "label_i18n": "web_desktop.settings.start.home",
+                                                "value": "home"
+                                            },
+                                            {
+                                                "label": "Devices",
+                                                "label_i18n": "web_desktop.nav.devices",
+                                                "value": "devices"
+                                            },
+                                            {
+                                                "label": "Chat",
+                                                "label_i18n": "web_desktop.nav.chat",
+                                                "value": "chat"
+                                            },
+                                            {
+                                                "label": "Activity",
+                                                "label_i18n": "web_desktop.nav.activity",
+                                                "value": "activity"
+                                            },
+                                            {
+                                                "label": "Settings",
+                                                "label_i18n": "web_desktop.nav.settings",
+                                                "value": "settings"
+                                            },
+                                            {
+                                                "label": "System",
+                                                "label_i18n": "web_desktop.nav.system",
+                                                "value": "system"
+                                            },
+                                            {
+                                                "label": "Development",
+                                                "label_i18n": "web_desktop.nav.dev",
+                                                "value": "dev"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "show_presence",
+                                        "label": "Show presence to members",
+                                        "label_i18n": "web_desktop.settings.privacy.show_presence",
+                                        "type": "toggle",
+                                        "stateKey": "prefShowPresence"
+                                    }
+                                ],
+                                "buttons": [
+                                    {
+                                        "id": "saveAccount",
+                                        "kind": "primary",
+                                        "label": "Save",
+                                        "label_i18n": "ui.action.save"
+                                    }
+                                ],
+                                "selectedStateKey": "selectedPreferencesId"
+                            },
+                            "actions": [
+                                {
+                                    "id": "saveAccount",
+                                    "on": "submit",
+                                    "type": "callMcp",
+                                    "target": "users_access.update_current_profile",
+                                    "idempotencyKey": "auto",
+                                    "params": {
+                                        "display_name": "$event.values.display_name",
+                                        "timezone": "$event.values.timezone",
+                                        "language": "$event.values.language",
+                                        "start_destination": "$event.values.start_destination",
+                                        "show_presence": "$event.values.show_presence"
+                                    },
+                                    "invalidates": [
+                                        "users_access.current_profile"
+                                    ],
+                                    "resultStateKey": "lastPreferencesUpdate"
+                                },
+                                {
+                                    "id": "saveAccount",
+                                    "on": "submit",
+                                    "type": "setLanguage",
+                                    "params": {
+                                        "language": "$event.values.language"
+                                    }
+                                }
+                            ],
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "users_access.current_profile",
+                                "resultPath": "response.result.profile",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 1,
+                                "invalidationTags": [
+                                    "users_access.current_profile"
+                                ],
+                                "preserveLastValue": true
+                            }
+                        },
+                        {
+                            "area": "settings-main",
+                            "id": "settings-form-device",
+                            "type": "ui.form",
+                            "title": "Device/browser",
+                            "title_i18n": "web_desktop.settings.scope.device",
+                            "visibleIf": "$state.activeTab === 'settings' && $state.settingsSection === 'device'",
+                            "inputs": {
+                                "layout": "responsiveGrid",
+                                "fields": [
+                                    {
+                                        "id": "deviceLabel",
+                                        "label": "Название этого устройства",
+                                        "label_i18n": "web_desktop.settings.device.label",
+                                        "type": "text",
+                                        "required": true,
+                                        "stateKey": "prefDeviceLabel"
+                                    },
+                                    {
+                                        "id": "theme",
+                                        "label": "Theme",
+                                        "label_i18n": "web_desktop.settings.general.theme",
+                                        "type": "dropdown",
+                                        "required": true,
+                                        "stateKey": "prefTheme",
+                                        "options": [
+                                            {
+                                                "label": "System",
+                                                "label_i18n": "web_desktop.settings.theme.system",
+                                                "value": "system"
+                                            },
+                                            {
+                                                "label": "Dark",
+                                                "label_i18n": "web_desktop.settings.theme.dark",
+                                                "value": "dark"
+                                            },
+                                            {
+                                                "label": "Light",
+                                                "label_i18n": "web_desktop.settings.theme.light",
+                                                "value": "light"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "density",
+                                        "label": "Interface density",
+                                        "label_i18n": "web_desktop.settings.general.density",
+                                        "type": "dropdown",
+                                        "required": true,
+                                        "stateKey": "prefDensity",
+                                        "options": [
+                                            {
+                                                "label": "Comfortable",
+                                                "label_i18n": "web_desktop.settings.density.comfortable",
+                                                "value": "comfortable"
+                                            },
+                                            {
+                                                "label": "Compact",
+                                                "label_i18n": "web_desktop.settings.density.compact",
+                                                "value": "compact"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "textSize",
+                                        "label": "Text size",
+                                        "label_i18n": "web_desktop.settings.general.text_size",
+                                        "type": "dropdown",
+                                        "required": true,
+                                        "stateKey": "prefTextSize",
+                                        "options": [
+                                            {
+                                                "label": "Default",
+                                                "label_i18n": "web_desktop.settings.text_size.default",
+                                                "value": "default"
+                                            },
+                                            {
+                                                "label": "Large",
+                                                "label_i18n": "web_desktop.settings.text_size.large",
+                                                "value": "large"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "reduceMotion",
+                                        "label": "Reduce motion",
+                                        "label_i18n": "web_desktop.settings.general.reduce_motion",
+                                        "type": "toggle",
+                                        "stateKey": "prefReduceMotion"
+                                    }
+                                ],
+                                "buttons": [
+                                    {
+                                        "id": "saveDevice",
+                                        "kind": "primary",
+                                        "label": "Save",
+                                        "label_i18n": "ui.action.save"
+                                    }
+                                ],
+                                "selectedStateKey": "selectedPreferencesId"
+                            },
+                            "actions": [
+                                {
+                                    "id": "saveDevice",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.update_preferences",
+                                    "params": {
+                                        "values": "$event.values",
+                                        "device_override": true
+                                    },
+                                    "invalidates": [
+                                        "web_desktop.preferences"
+                                    ],
+                                    "resultStateKey": "lastPreferencesUpdate"
+                                }
+                            ],
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_preferences",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 1,
+                                "invalidationTags": [
+                                    "web_desktop.preferences"
+                                ],
+                                "preserveLastValue": true
+                            }
+                        },
+                        {
+                            "area": "settings-main",
+                            "id": "settings-form-workspace",
+                            "type": "ui.form",
+                            "title": "Workspace",
+                            "title_i18n": "web_desktop.settings.scope.workspace",
+                            "visibleIf": "$state.activeTab === 'settings' && $state.settingsSection === 'workspace'",
+                            "inputs": {
+                                "layout": "responsiveGrid",
+                                "fields": [
+                                    {
+                                        "id": "workspaceLabel",
+                                        "label": "Название пространства",
+                                        "label_i18n": "web_desktop.settings.workspace.label",
+                                        "type": "text",
+                                        "required": true,
+                                        "stateKey": "prefWorkspaceLabel"
+                                    },
+                                    {
+                                        "id": "notifyDevActivity",
+                                        "label": "Development activity notifications",
+                                        "label_i18n": "web_desktop.settings.notifications.dev_activity",
+                                        "stateKey": "prefNotifyDevActivity",
+                                        "type": "toggle"
+                                    },
+                                    {
+                                        "id": "notifySecurity",
+                                        "label": "Security alerts",
+                                        "label_i18n": "web_desktop.settings.notifications.security",
+                                        "type": "toggle",
+                                        "stateKey": "prefNotifySecurity"
+                                    },
+                                    {
+                                        "id": "notifyDeviceStatus",
+                                        "label": "Device status",
+                                        "label_i18n": "web_desktop.settings.notifications.device_status",
+                                        "type": "toggle",
+                                        "stateKey": "prefNotifyDeviceStatus"
+                                    },
+                                    {
+                                        "id": "quietHours",
+                                        "label": "Quiet hours",
+                                        "label_i18n": "web_desktop.settings.notifications.quiet_hours",
+                                        "type": "dropdown",
+                                        "required": true,
+                                        "stateKey": "prefQuietHours",
+                                        "options": [
+                                            {
+                                                "label": "Off",
+                                                "label_i18n": "web_desktop.settings.quiet_hours.off",
+                                                "value": "off"
+                                            },
+                                            {
+                                                "label": "Night",
+                                                "label_i18n": "web_desktop.settings.quiet_hours.night",
+                                                "value": "night"
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "buttons": [
+                                    {
+                                        "id": "saveWorkspace",
+                                        "kind": "primary",
+                                        "label": "Save",
+                                        "label_i18n": "ui.action.save"
+                                    }
+                                ],
+                                "selectedStateKey": "selectedPreferencesId"
+                            },
+                            "actions": [
+                                {
+                                    "id": "saveWorkspace",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.update_preferences",
+                                    "params": {
+                                        "values": "$event.values",
+                                        "device_override": false
+                                    },
+                                    "invalidates": [
+                                        "web_desktop.preferences"
+                                    ],
+                                    "resultStateKey": "lastPreferencesUpdate"
+                                }
+                            ],
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_preferences",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 1,
+                                "invalidationTags": [
+                                    "web_desktop.preferences"
+                                ],
+                                "preserveLastValue": true
+                            }
+                        },
+                        {
+                            "area": "settings-main",
+                            "id": "settings-form-applications",
+                            "type": "ui.form",
+                            "title": "Applications",
+                            "title_i18n": "web_desktop.settings.scope.applications",
+                            "visibleIf": "$state.activeTab === 'settings' && $state.settingsSection === 'applications'",
+                            "inputs": {
+                                "layout": "responsiveGrid",
+                                "fields": [
+                                    {
+                                        "id": "notifyAppUpdates",
+                                        "label": "Application update notifications",
+                                        "label_i18n": "web_desktop.settings.notifications.app_updates",
+                                        "stateKey": "prefNotifyAppUpdates",
+                                        "type": "toggle"
+                                    },
+                                    {
+                                        "id": "autoUpdate",
+                                        "label": "Auto updates",
+                                        "label_i18n": "web_desktop.settings.updates.auto_update",
+                                        "type": "toggle",
+                                        "stateKey": "prefAutoUpdate"
+                                    },
+                                    {
+                                        "id": "followPrerelease",
+                                        "label": "Prerelease versions",
+                                        "label_i18n": "web_desktop.settings.updates.prerelease",
+                                        "type": "toggle",
+                                        "stateKey": "prefFollowPrerelease"
+                                    },
+                                    {
+                                        "id": "updateWindow",
+                                        "label": "Update window",
+                                        "label_i18n": "web_desktop.settings.updates.window",
+                                        "type": "dropdown",
+                                        "required": true,
+                                        "stateKey": "prefUpdateWindow",
+                                        "options": [
+                                            {
+                                                "label": "Any time",
+                                                "label_i18n": "web_desktop.settings.update_window.any",
+                                                "value": "any"
+                                            },
+                                            {
+                                                "label": "Night",
+                                                "label_i18n": "web_desktop.settings.update_window.night",
+                                                "value": "night"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "meteredDownloads",
+                                        "label": "Metered downloads",
+                                        "label_i18n": "web_desktop.settings.updates.metered",
+                                        "type": "toggle",
+                                        "stateKey": "prefMeteredDownloads"
+                                    }
+                                ],
+                                "buttons": [
+                                    {
+                                        "id": "saveApplications",
+                                        "kind": "primary",
+                                        "label": "Save",
+                                        "label_i18n": "ui.action.save"
+                                    }
+                                ],
+                                "selectedStateKey": "selectedPreferencesId"
+                            },
+                            "actions": [
+                                {
+                                    "id": "saveApplications",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.update_preferences",
+                                    "params": {
+                                        "values": "$event.values",
+                                        "device_override": false
+                                    },
+                                    "invalidates": [
+                                        "web_desktop.preferences"
+                                    ],
+                                    "resultStateKey": "lastPreferencesUpdate"
+                                }
+                            ],
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_preferences",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 1,
+                                "invalidationTags": [
+                                    "web_desktop.preferences"
+                                ],
+                                "preserveLastValue": true
+                            }
+                        },
+                        {
+                            "area": "settings-main",
+                            "id": "settings-form-a11y-privacy",
+                            "type": "ui.form",
+                            "title": "Accessibility/privacy",
+                            "title_i18n": "web_desktop.settings.scope.a11y_privacy",
+                            "visibleIf": "$state.activeTab === 'settings' && $state.settingsSection === 'a11y_privacy'",
+                            "inputs": {
+                                "layout": "responsiveGrid",
+                                "fields": [
+                                    {
+                                        "id": "shareTelemetry",
+                                        "label": "Send diagnostics",
+                                        "label_i18n": "web_desktop.settings.privacy.telemetry",
+                                        "type": "toggle",
+                                        "stateKey": "prefShareTelemetry"
+                                    },
+                                    {
+                                        "id": "activityRetention",
+                                        "label": "Activity retention",
+                                        "label_i18n": "web_desktop.settings.privacy.retention",
+                                        "type": "dropdown",
+                                        "required": true,
+                                        "stateKey": "prefActivityRetention",
+                                        "options": [
+                                            {
+                                                "label": "30 days",
+                                                "label_i18n": "web_desktop.settings.retention.30",
+                                                "value": "30"
+                                            },
+                                            {
+                                                "label": "90 days",
+                                                "label_i18n": "web_desktop.settings.retention.90",
+                                                "value": "90"
+                                            },
+                                            {
+                                                "label": "365 days",
+                                                "label_i18n": "web_desktop.settings.retention.365",
+                                                "value": "365"
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "buttons": [
+                                    {
+                                        "id": "saveA11yPrivacy",
+                                        "kind": "primary",
+                                        "label": "Save",
+                                        "label_i18n": "ui.action.save"
+                                    }
+                                ],
+                                "selectedStateKey": "selectedPreferencesId"
+                            },
+                            "actions": [
+                                {
+                                    "id": "saveA11yPrivacy",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.update_preferences",
+                                    "params": {
+                                        "values": "$event.values",
+                                        "device_override": false
+                                    },
+                                    "invalidates": [
+                                        "web_desktop.preferences"
+                                    ],
+                                    "resultStateKey": "lastPreferencesUpdate"
+                                }
+                            ],
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_preferences",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 1,
+                                "invalidationTags": [
+                                    "web_desktop.preferences"
+                                ],
+                                "preserveLastValue": true
+                            }
+                        },
+                        {
+                            "area": "system-node",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_system_overview",
+                                "params": {
+                                    "section": "all"
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "web_desktop.system"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "id": "system-node-tile",
+                            "inputs": {
+                                "valuePath": "metrics.node.value",
+                                "labelPath": "metrics.node.label",
+                                "descriptionPath": "metrics.node.description",
+                                "colorPath": "metrics.node.color",
+                                "emptyText": "--"
+                            },
+                            "title": "Node",
+                            "title_i18n": "web_desktop.system.informer.local_node",
+                            "type": "visual.metricTile",
+                            "visibleIf": "$state.activeTab === 'system'",
+                            "actions": []
+                        },
+                        {
+                            "area": "system-sync",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_system_overview",
+                                "params": {
+                                    "section": "all"
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "web_desktop.system"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "id": "system-sync-tile",
+                            "inputs": {
+                                "valuePath": "metrics.services.value",
+                                "labelPath": "metrics.services.label",
+                                "descriptionPath": "metrics.services.description",
+                                "colorPath": "metrics.services.color",
+                                "emptyText": "--"
+                            },
+                            "title": "Services",
+                            "title_i18n": "web_desktop.system.informer.sync",
+                            "type": "visual.metricTile",
+                            "visibleIf": "$state.activeTab === 'system'",
+                            "actions": []
+                        },
+                        {
+                            "area": "system-storage",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_system_overview",
+                                "params": {
+                                    "section": "all"
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "web_desktop.system"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "id": "system-storage-tile",
+                            "inputs": {
+                                "valuePath": "metrics.capacity.value",
+                                "labelPath": "metrics.capacity.label",
+                                "descriptionPath": "metrics.capacity.description",
+                                "colorPath": "metrics.capacity.color",
+                                "emptyText": "--"
+                            },
+                            "title": "Capacity",
+                            "title_i18n": "web_desktop.system.informer.storage_backup",
+                            "type": "visual.metricTile",
+                            "visibleIf": "$state.activeTab === 'system'",
+                            "actions": []
+                        },
+                        {
+                            "area": "system-route",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_system_overview",
+                                "params": {
+                                    "section": "all"
+                                },
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "web_desktop.system"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "id": "system-route-tile",
+                            "inputs": {
+                                "valuePath": "metrics.incidents.value",
+                                "labelPath": "metrics.incidents.label",
+                                "descriptionPath": "metrics.incidents.description",
+                                "colorPath": "metrics.incidents.color",
+                                "emptyText": "--"
+                            },
+                            "title": "Incidents",
+                            "title_i18n": "web_desktop.system.informer.external_route",
+                            "type": "visual.metricTile",
+                            "visibleIf": "$state.activeTab === 'system'",
+                            "actions": []
+                        },
+                        {
+                            "id": "desktop-widgets",
+                            "type": "desktop.widgets",
+                            "area": "pinned",
+                            "dataSource": {
+                                "kind": "y",
+                                "transform": "desktop.widgets"
+                            },
+                            "title": "Desktop widgets",
+                            "visibleIf": "$state.activeTab === 'home'",
+                            "title_i18n": "web_desktop.widget.widgets",
+                            "inputs": {
+                                "customization": {
+                                    "stateKey": "homeCustomizeMode",
+                                    "mode": "compactContextual",
+                                    "reorder": true,
+                                    "unpin": true
+                                },
+                                "itemActions": [
+                                    {
+                                        "id": "move",
+                                        "label": "Move",
+                                        "label_i18n": "ui.action.move",
+                                        "icon": "grip-vertical",
+                                        "kind": "icon",
+                                        "visibleIf": "$state.homeCustomizeMode === true"
+                                    },
+                                    {
+                                        "id": "unpin",
+                                        "label": "Unpin",
+                                        "label_i18n": "ui.action.unpin",
+                                        "icon": "pin-off",
+                                        "kind": "icon",
+                                        "visibleIf": "$state.homeCustomizeMode === true"
+                                    }
+                                ],
+                                "emptyText": "No pinned widgets are available.",
+                                "emptyText_i18n": "web_desktop.widgets.empty"
+                            },
+                            "actions": [
+                                {
+                                    "id": "move-home-widget",
+                                    "on": "move",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.update_home_item",
+                                    "params": {
+                                        "item_type": "widget",
+                                        "item_id": "$event.id",
+                                        "action": "move",
+                                        "to_index": "$event.currentIndex",
+                                        "webspace_id": "$client.webspaceId"
+                                    },
+                                    "invalidates": [
+                                        "web_desktop.home_widgets"
+                                    ],
+                                    "resultStateKey": "lastHomeLayoutUpdate"
+                                },
+                                {
+                                    "id": "unpin-home-widget",
+                                    "on": "click:unpin",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.update_home_item",
+                                    "params": {
+                                        "item_type": "widget",
+                                        "item_id": "$event.id",
+                                        "action": "unpin",
+                                        "webspace_id": "$client.webspaceId"
+                                    },
+                                    "invalidates": [
+                                        "web_desktop.home_widgets"
+                                    ],
+                                    "resultStateKey": "lastHomeLayoutUpdate"
+                                }
+                            ]
+                        }
+                    ],
+                    "title_i18n": {
+                        "key": "scenario.web_desktop.title",
+                        "fallback": "Рабочий стол"
+                    },
+                    "initialState": {
+                        "activeTab": "home",
+                        "devicesStatus": "active",
+                        "devicesType": "all",
+                        "lastAccessAction": "",
+                        "lastDeviceAction": "",
+                        "search": "",
+                        "selectedAppHasUpdate": false,
+                        "selectedAppId": "",
+                        "selectedAppInstalled": false,
+                        "selectedAppTitle": "",
+                        "selectedCanLocate": true,
+                        "selectedCanManage": false,
+                        "selectedCanReconnect": false,
+                        "selectedCanRemove": false,
+                        "selectedCanRestore": false,
+                        "selectedDeviceId": "",
+                        "selectedDeviceTitle": "",
+                        "selectedIdentityId": "",
+                        "selectedIdentityTitle": "",
+                        "selectedIdentityName": "",
+                        "selectedIdentityRole": "viewer",
+                        "selectedIdentityStatus": "active",
+                        "space": "Домашний ассистент",
+                        "activitySearch": "",
+                        "activityCategory": "all",
+                        "activityOutcome": "all",
+                        "selectedActivityId": "",
+                        "selectedActivityTitle": "",
+                        "selectedActivityCanOpen": false,
+                        "selectedActivityCanAcknowledge": false,
+                        "lastActivityAction": "",
+                        "settingsSection": "account",
+                        "lastSettingsAction": "",
+                        "prefProfileName": "",
+                        "prefTimeZone": "UTC",
+                        "prefDeviceLabel": "",
+                        "prefWorkspaceLabel": "",
+                        "prefLanguage": "en",
+                        "prefTheme": "system",
+                        "prefDensity": "comfortable",
+                        "prefStartDestination": "home",
+                        "prefReduceMotion": false,
+                        "prefTextSize": "default",
+                        "prefNotifySecurity": true,
+                        "prefNotifyAppUpdates": true,
+                        "prefNotifyDeviceStatus": true,
+                        "prefNotifyDevActivity": false,
+                        "prefQuietHours": "off",
+                        "prefAutoUpdate": true,
+                        "prefFollowPrerelease": false,
+                        "prefUpdateWindow": "any",
+                        "prefMeteredDownloads": false,
+                        "prefShareTelemetry": false,
+                        "prefActivityRetention": "90",
+                        "prefShowPresence": true,
+                        "lastSystemCheck": "",
+                        "lastSystemAction": "",
+                        "selectedDevelopmentId": "",
+                        "selectedDevelopmentTitle": "",
+                        "canOpenDevelopmentPreview": true,
+                        "canViewDevelopmentChecks": true,
+                        "developmentSearch": "",
+                        "developmentPhase": "all",
+                        "lastDevelopmentAction": "",
+                        "selectedItemTitle": "",
+                        "prefLayoutCustomize": false,
+                        "chatChannel": "general",
+                        "chatAgentId": "agent:core:general",
+                        "lastChatSend": {},
+                        "chatSendPending": false,
+                        "chatSendError": "",
+                        "selectedPreferencesId": "current",
+                        "deviceSearch": "",
+                        "lastHomeLayoutUpdate": {},
+                        "homeCustomizeMode": false
+                    },
+                    "meta": {
+                        "builder": {
+                            "proto": "006",
+                            "ui_revision": "006",
+                            "scenario_id": "web_desktop"
+                        }
+                    }
+                }
+            },
+            "resources": {
+                "desktop.avatar.dmitry": {
+                    "kind": "image",
+                    "role": "avatar",
+                    "path": "assets/avatars/dmitry.svg",
+                    "mime": "image/svg+xml",
+                    "delivery": "core"
+                },
+                "desktop.avatar.anna": {
+                    "kind": "image",
+                    "role": "avatar",
+                    "path": "assets/avatars/anna.svg",
+                    "mime": "image/svg+xml",
+                    "delivery": "core"
+                },
+                "desktop.avatar.sergey": {
+                    "kind": "image",
+                    "role": "avatar",
+                    "path": "assets/avatars/sergey.svg",
+                    "mime": "image/svg+xml",
+                    "delivery": "core"
+                },
+                "desktop.avatar.olga": {
+                    "kind": "image",
+                    "role": "avatar",
+                    "path": "assets/avatars/olga.svg",
+                    "mime": "image/svg+xml",
+                    "delivery": "core"
+                },
+                "desktop.avatar.pavel": {
+                    "kind": "image",
+                    "role": "avatar",
+                    "path": "assets/avatars/pavel.svg",
+                    "mime": "image/svg+xml",
+                    "delivery": "core"
+                },
+                "desktop.avatar.service": {
+                    "kind": "image",
+                    "role": "avatar",
+                    "path": "assets/avatars/service.svg",
+                    "mime": "image/svg+xml",
+                    "delivery": "core"
+                },
+                "desktop.i18n.en": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "en",
+                    "path": "assets/i18n/en.json",
+                    "mime": "application/json",
+                    "delivery": "core"
+                },
+                "desktop.i18n.ru": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "ru",
+                    "path": "assets/i18n/ru.json",
+                    "mime": "application/json",
+                    "delivery": "core"
+                }
+            },
+            "modals": {
+                "pair-browser": {
+                    "title": "Pair Browser",
+                    "presentation": {
+                        "kind": "modal",
+                        "size": {
+                            "width": 58,
+                            "height": 68
+                        }
+                    },
+                    "schema": {
+                        "id": "pair-browser-schema",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "dashboard",
+                            "contentWidth": "fluid",
+                            "density": "comfortable",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "modal-main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "compact": "stack",
+                                        "wide": "pane"
+                                    }
+                                },
+                                {
+                                    "id": "modal-aux",
+                                    "role": "detail",
+                                    "priority": 90,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "compact": "stack",
+                                        "wide": "pane"
+                                    }
+                                }
+                            ]
+                        },
+                        "widgets": [
+                            {
+                                "id": "pair-browser-details",
+                                "area": "modal-main",
+                                "type": "item.details",
+                                "title": "Подключить браузер",
+                                "inputs": {
+                                    "presentation": "section",
+                                    "emptyText": "Preparing connection data...",
+                                    "fields": [
+                                        {
+                                            "key": "summary",
+                                            "label": "Instructions",
+                                            "wide": true
+                                        },
+                                        {
+                                            "key": "code",
+                                            "label": "Code"
+                                        },
+                                        {
+                                            "key": "expires_at_display",
+                                            "label": "Expires"
+                                        },
+                                        {
+                                            "key": "link",
+                                            "label": "Link",
+                                            "wide": true
+                                        }
+                                    ]
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.lastPairingPrepareResult.current"
+                                }
+                            },
+                            {
+                                "id": "pair-browser-qr",
+                                "area": "modal-aux",
+                                "type": "visual.qrCode",
+                                "title": "Scan to pair",
+                                "inputs": {
+                                    "bindField": "qr_text",
+                                    "captionField": "code",
+                                    "width": 220
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.lastPairingPrepareResult.current"
+                                }
+                            }
+                        ]
+                    }
+                },
+                "pair-telegram": {
+                    "title": "Pair Telegram",
+                    "presentation": {
+                        "kind": "modal",
+                        "size": {
+                            "width": 58,
+                            "height": 68
+                        }
+                    },
+                    "schema": {
+                        "id": "pair-telegram-schema",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "dashboard",
+                            "contentWidth": "fluid",
+                            "density": "comfortable",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "modal-main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "compact": "stack",
+                                        "wide": "pane"
+                                    }
+                                },
+                                {
+                                    "id": "modal-aux",
+                                    "role": "detail",
+                                    "priority": 90,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "compact": "stack",
+                                        "wide": "pane"
+                                    }
+                                }
+                            ]
+                        },
+                        "widgets": [
+                            {
+                                "id": "pair-telegram-details",
+                                "area": "modal-main",
+                                "type": "item.details",
+                                "title": "Подключить Telegram",
+                                "inputs": {
+                                    "presentation": "section",
+                                    "emptyText": "Preparing connection data...",
+                                    "fields": [
+                                        {
+                                            "key": "summary",
+                                            "label": "Instructions",
+                                            "wide": true
+                                        },
+                                        {
+                                            "key": "code",
+                                            "label": "Code"
+                                        },
+                                        {
+                                            "key": "expires_at_display",
+                                            "label": "Expires"
+                                        },
+                                        {
+                                            "key": "link",
+                                            "label": "Link",
+                                            "wide": true
+                                        }
+                                    ]
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.lastPairingPrepareResult.current"
+                                }
+                            },
+                            {
+                                "id": "pair-telegram-qr",
+                                "area": "modal-aux",
+                                "type": "visual.qrCode",
+                                "title": "Open Telegram",
+                                "inputs": {
+                                    "bindField": "qr_text",
+                                    "captionField": "code",
+                                    "width": 220
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.lastPairingPrepareResult.current"
+                                }
+                            }
+                        ]
+                    }
+                },
+                "pair-node": {
+                    "title": "Pair Node",
+                    "presentation": {
+                        "kind": "modal",
+                        "size": {
+                            "width": 64,
+                            "height": 72
+                        }
+                    },
+                    "schema": {
+                        "id": "pair-node-schema",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "dashboard",
+                            "contentWidth": "fluid",
+                            "density": "comfortable",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "modal-main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "compact": "stack",
+                                        "wide": "pane"
+                                    }
+                                },
+                                {
+                                    "id": "modal-aux",
+                                    "role": "detail",
+                                    "priority": 90,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "compact": "stack",
+                                        "wide": "pane"
+                                    }
+                                }
+                            ]
+                        },
+                        "widgets": [
+                            {
+                                "id": "pair-node-details",
+                                "area": "modal-main",
+                                "type": "item.details",
+                                "title": "Подключить AdaOS Node",
+                                "inputs": {
+                                    "presentation": "section",
+                                    "emptyText": "Preparing connection data...",
+                                    "fields": [
+                                        {
+                                            "key": "summary",
+                                            "label": "Instructions",
+                                            "wide": true
+                                        },
+                                        {
+                                            "key": "code",
+                                            "label": "Code"
+                                        },
+                                        {
+                                            "key": "expires_at_display",
+                                            "label": "Expires"
+                                        },
+                                        {
+                                            "key": "link",
+                                            "label": "Link",
+                                            "wide": true
+                                        },
+                                        {
+                                            "key": "linux_command",
+                                            "label": "Linux",
+                                            "wide": true
+                                        },
+                                        {
+                                            "key": "windows_ps_command",
+                                            "label": "PowerShell",
+                                            "wide": true
+                                        }
+                                    ]
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.lastPairingPrepareResult.current"
+                                }
+                            },
+                            {
+                                "id": "pair-node-qr",
+                                "area": "modal-aux",
+                                "type": "visual.qrCode",
+                                "title": "Scan to pair",
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.lastPairingPrepareResult.current"
+                                },
+                                "inputs": {
+                                    "bindField": "qr_text",
+                                    "captionField": "code",
+                                    "width": 220
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        "version": "0.3.43",
+        "manifest": "webui.json"
+    },
+    "locale_dictionaries": {
+        "en": {
+            "scenario.web_desktop.title": "Desktop",
+            "web_desktop.search.title": "Search",
+            "web_desktop.search.placeholder": "Search and commands",
+            "web_desktop.nav.title": "Navigation",
+            "web_desktop.nav.home": "Home",
+            "web_desktop.nav.apps": "Applications",
+            "web_desktop.nav.access": "Users & Access",
+            "web_desktop.nav.devices": "Devices",
+            "web_desktop.nav.activity": "Activity",
+            "web_desktop.nav.settings": "Settings",
+            "web_desktop.nav.system": "System",
+            "web_desktop.nav.dev": "Development",
+            "ui.action.open": "Open",
+            "ui.action.install": "Install",
+            "ui.action.invite": "Invite",
+            "ui.action.cancel": "Cancel",
+            "web_desktop.home.pinned_apps": "Pinned applications",
+            "web_desktop.home.attention": "Needs attention",
+            "web_desktop.home.attention.action": "Action",
+            "web_desktop.home.continue": "Continue",
+            "web_desktop.home.space_health": "Space health",
+            "web_desktop.home.health": "Health",
+            "web_desktop.home.activity": "Recent activity",
+            "web_desktop.health.overall": "Overall",
+            "web_desktop.health.devices": "Devices",
+            "web_desktop.health.sync": "Last sync",
+            "web_desktop.health.warning": "Warning",
+            "web_desktop.apps.search": "Search apps",
+            "web_desktop.apps.channel": "Channel",
+            "web_desktop.apps.channel.all": "All",
+            "web_desktop.apps.channel.stable": "Stable",
+            "web_desktop.apps.channel.beta": "Beta",
+            "web_desktop.apps.install_state": "State",
+            "web_desktop.apps.install_state.all": "All",
+            "web_desktop.apps.install_state.installed": "Installed",
+            "web_desktop.apps.install_state.available": "Available",
+            "web_desktop.apps.query.title": "Search and filters",
+            "web_desktop.apps.catalog.title": "Applications",
+            "web_desktop.apps.details.description": "Description",
+            "web_desktop.apps.details.publisher": "Publisher",
+            "web_desktop.apps.details.status": "Status",
+            "web_desktop.apps.details.installed": "Installed version",
+            "web_desktop.apps.details.available": "Available version",
+            "web_desktop.apps.details.channel": "Channel",
+            "web_desktop.apps.details.policy": "Update policy",
+            "web_desktop.apps.details.permissions": "Permissions",
+            "web_desktop.access.query.title": "Search and filters",
+            "web_desktop.access.search": "Search people and identities",
+            "web_desktop.access.role": "Role",
+            "web_desktop.access.role.all": "All",
+            "web_desktop.access.role.owner": "Owner",
+            "web_desktop.access.role.coordinator": "Coordinator",
+            "web_desktop.access.role.member": "Member",
+            "web_desktop.access.role.viewer": "Viewer",
+            "web_desktop.access.role.service": "Service",
+            "web_desktop.access.status": "Status",
+            "web_desktop.access.status.all": "All",
+            "web_desktop.access.status.active": "Active",
+            "web_desktop.access.status.away": "Away",
+            "web_desktop.access.status.invited": "Invited",
+            "web_desktop.access.status.suspended": "Suspended",
+            "web_desktop.access.members.title": "Members and access",
+            "web_desktop.access.details.role": "Role",
+            "web_desktop.access.details.kind": "Identity type",
+            "web_desktop.access.details.status": "Status",
+            "web_desktop.access.details.lastActivity": "Last activity",
+            "web_desktop.access.details.trustedDevices": "Trusted devices",
+            "web_desktop.access.details.authMethod": "Authentication",
+            "web_desktop.access.details.effectiveAccess": "Effective access",
+            "web_desktop.access.action.manageRole": "Manage role",
+            "web_desktop.access.action.activity": "Activity",
+            "web_desktop.access.action.edit": "Edit",
+            "web_desktop.access.action.suspend": "Suspend",
+            "web_desktop.access.action.restore": "Restore",
+            "web_desktop.access.action.openApp": "Open Users & Access",
+            "web_desktop.access.invite.title": "New invitation",
+            "web_desktop.access.invite.email": "Email",
+            "web_desktop.access.invite.role": "Role",
+            "web_desktop.access.invite.expiry": "Expiry date (optional)",
+            "web_desktop.access.invite.submit": "Send invitation",
+            "web_desktop.apps.pinned.title": "Pinned applications",
+            "web_desktop.home.customize_layout": "Customize layout",
+            "ui.action.done": "Done",
+            "ui.action.move": "Move",
+            "ui.action.unpin": "Unpin",
+            "web_desktop.chat.pending": "Sending...",
+            "web_desktop.chat.error": "Message could not be sent.",
+            "web_desktop.widgets.empty": "No pinned widgets are available."
+        },
+        "ru": {
+            "scenario.web_desktop.title": "Рабочий стол",
+            "web_desktop.search.title": "Поиск",
+            "web_desktop.search.placeholder": "Поиск и команды",
+            "web_desktop.nav.title": "Навигация",
+            "web_desktop.nav.home": "Главная",
+            "web_desktop.nav.apps": "Приложения",
+            "web_desktop.nav.access": "Пользователи и доступ",
+            "web_desktop.nav.devices": "Устройства",
+            "web_desktop.nav.activity": "Активность",
+            "web_desktop.nav.settings": "Настройки",
+            "web_desktop.nav.system": "Система",
+            "web_desktop.nav.dev": "Разработка",
+            "ui.action.open": "Открыть",
+            "ui.action.install": "Установить",
+            "ui.action.invite": "Пригласить",
+            "ui.action.cancel": "Отмена",
+            "web_desktop.home.pinned_apps": "Закрепленные приложения",
+            "web_desktop.home.attention": "Требуют внимания",
+            "web_desktop.home.attention.action": "Действие",
+            "web_desktop.home.continue": "Продолжить работу",
+            "web_desktop.home.space_health": "Состояние пространства",
+            "web_desktop.home.health": "Состояние",
+            "web_desktop.home.activity": "Недавняя активность",
+            "web_desktop.health.overall": "Общее состояние",
+            "web_desktop.health.devices": "Устройства",
+            "web_desktop.health.sync": "Последняя синхронизация",
+            "web_desktop.health.warning": "Предупреждение",
+            "web_desktop.apps.search": "Поиск приложений",
+            "web_desktop.apps.channel": "Канал",
+            "web_desktop.apps.channel.all": "Все",
+            "web_desktop.apps.channel.stable": "Stable",
+            "web_desktop.apps.channel.beta": "Beta",
+            "web_desktop.apps.install_state": "Состояние",
+            "web_desktop.apps.install_state.all": "Все",
+            "web_desktop.apps.install_state.installed": "Установленные",
+            "web_desktop.apps.install_state.available": "Доступные",
+            "web_desktop.apps.query.title": "Поиск и фильтры",
+            "web_desktop.apps.catalog.title": "Приложения",
+            "web_desktop.apps.details.description": "Описание",
+            "web_desktop.apps.details.publisher": "Издатель",
+            "web_desktop.apps.details.status": "Статус",
+            "web_desktop.apps.details.installed": "Установленная версия",
+            "web_desktop.apps.details.available": "Доступная версия",
+            "web_desktop.apps.details.channel": "Канал",
+            "web_desktop.apps.details.policy": "Политика обновлений",
+            "web_desktop.apps.details.permissions": "Разрешения",
+            "web_desktop.access.query.title": "Поиск и фильтры",
+            "web_desktop.access.search": "Поиск людей и идентичностей",
+            "web_desktop.access.role": "Роль",
+            "web_desktop.access.role.all": "Все",
+            "web_desktop.access.role.owner": "Owner",
+            "web_desktop.access.role.coordinator": "Coordinator",
+            "web_desktop.access.role.member": "Member",
+            "web_desktop.access.role.viewer": "Viewer",
+            "web_desktop.access.role.service": "Service",
+            "web_desktop.access.status": "Статус",
+            "web_desktop.access.status.all": "Все",
+            "web_desktop.access.status.active": "Активен",
+            "web_desktop.access.status.away": "Нет на месте",
+            "web_desktop.access.status.invited": "Приглашён",
+            "web_desktop.access.status.suspended": "Приостановлен",
+            "web_desktop.access.members.title": "Участники и доступ",
+            "web_desktop.access.details.role": "Роль",
+            "web_desktop.access.details.kind": "Тип идентичности",
+            "web_desktop.access.details.status": "Статус",
+            "web_desktop.access.details.lastActivity": "Последняя активность",
+            "web_desktop.access.details.trustedDevices": "Доверенные устройства",
+            "web_desktop.access.details.authMethod": "Аутентификация",
+            "web_desktop.access.details.effectiveAccess": "Эффективный доступ",
+            "web_desktop.access.action.manageRole": "Изменить роль",
+            "web_desktop.access.action.activity": "Активность",
+            "web_desktop.access.action.edit": "Редактировать",
+            "web_desktop.access.action.suspend": "Приостановить",
+            "web_desktop.access.action.restore": "Восстановить",
+            "web_desktop.access.action.openApp": "Открыть Users & Access",
+            "web_desktop.access.invite.title": "Новый пригласительный",
+            "web_desktop.access.invite.email": "Email",
+            "web_desktop.access.invite.role": "Роль",
+            "web_desktop.access.invite.expiry": "Срок действия (необязательно)",
+            "web_desktop.access.invite.submit": "Отправить приглашение",
+            "web_desktop.apps.pinned.title": "Закрепленные приложения",
+            "web_desktop.home.customize_layout": "Настроить раскладку",
+            "ui.action.done": "Готово",
+            "ui.action.move": "Переместить",
+            "ui.action.unpin": "Открепить",
+            "web_desktop.chat.pending": "Отправка...",
+            "web_desktop.chat.error": "Не удалось отправить сообщение.",
+            "web_desktop.widgets.empty": "Нет закрепленных виджетов."
+        }
+    }
+}

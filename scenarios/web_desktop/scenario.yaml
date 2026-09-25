@@ -1,6 +1,6 @@
 id: web_desktop
-version: 0.3.11
-title: Web Desktop
+version: 0.3.43
+title: Рабочий стол
 description: Desktop shell scenario that defines the main UI layout, registry and
   base catalog.
 type: desktop
@@ -8,11 +8,12 @@ supported_locales:
 - en
 - ru
 depends:
+- web_desktop_runtime_skill
 - web_desktop_skill
 - greet_on_boot_skill
 - pair_new_device_skill
 - voice_chat_skill
-updated_at: '2026-08-11T09:33:02+00:00'
+updated_at: '2026-09-25T16:37:15+00:00'
 data_projections:
 - scope: current_user
   slot: profile.settings
@@ -30,4 +31,18 @@ data_projections:
   targets:
   - backend: yjs
     path: data/infra/status
-
+name: web_desktop
+title_i18n:
+  key: scenario.web_desktop.title
+  fallback: Рабочий стол
+runtime:
+  skills:
+    required: []
+ui:
+  manifest: webui.json
+llm_hints:
+  aliases:
+  - desktop
+  - home
+  - рабочий стол
+  - главная
