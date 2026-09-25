@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: applications
-version: 0.1.36
+version: 0.1.37
 profiles:
 - adaos.system.applications.v1
 components:
@@ -70,7 +70,8 @@ permission_profile:
     approval_policy: owner_only
     sensitive: true
   - id: applications.publish
-    purpose: Promote an accepted Application release and publish its exact source and portable CBS projection to the shared registry.
+    purpose: Promote an accepted Application release and publish its exact source
+      and portable CBS projection to the shared registry.
     approval_policy: owner_only
     sensitive: true
   optional: []

@@ -1,6 +1,6 @@
 {
     "id": "applications",
-    "version": "0.1.63",
+    "version": "0.1.64",
     "name": "applications",
     "description": "Builder-created rapid prototype scenario.",
     "triggers": [],
@@ -70,7 +70,7 @@
     },
     "steps": [],
     "prototype": "builder_scenario",
-    "updated_at": "2026-09-25T14:29:38+00:00",
+    "updated_at": "2026-09-25T20:53:57+00:00",
     "type": "desktop",
     "title": "Applications",
     "title_i18n": {
