@@ -8,6 +8,14 @@
       "stable_release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
       "release_key": "gmail_cbs_cleanroom@sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
       "projection_digest": "sha256:7bdf8ccbadac567dc419cf012a93b66a0e3f61057c3b2083897b485fefa92eed"
+    },
+    "mail_focus_reader": {
+      "application_id": "mail_focus_reader",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "application_revision": 2,
+      "stable_release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+      "release_key": "mail_focus_reader@sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+      "projection_digest": "sha256:4ab0d646ec32942fe54abeef4bc4dcfb6e8a5dedc3dbb35d3a8cb3b08f4f5287"
     }
   },
   "releases": {
@@ -18,7 +26,15 @@
       "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
       "path": "semantic/catalog/releases/gmail_cbs_cleanroom/f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83.json",
       "projection_digest": "sha256:7bdf8ccbadac567dc419cf012a93b66a0e3f61057c3b2083897b485fefa92eed"
+    },
+    "mail_focus_reader@sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387": {
+      "application_id": "mail_focus_reader",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.2",
+      "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+      "path": "semantic/catalog/releases/mail_focus_reader/7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387.json",
+      "projection_digest": "sha256:4ab0d646ec32942fe54abeef4bc4dcfb6e8a5dedc3dbb35d3a8cb3b08f4f5287"
     }
   },
-  "index_digest": "sha256:857e35930803bf5b3f45297c863ca5719028dc3cf106389c0df16aa3305cf630"
+  "index_digest": "sha256:a6d1b7e903cccc97206a8f29d9c3acc9aedc7566eb63fdae5570fc3278f0ad72"
 }

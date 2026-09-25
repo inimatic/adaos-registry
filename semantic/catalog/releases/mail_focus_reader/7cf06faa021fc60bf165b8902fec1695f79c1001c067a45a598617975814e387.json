@@ -1,0 +1,410 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "mail_focus_reader",
+    "legacy_project_id": "mail_focus_reader",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "mail_focus_reader",
+    "display": {
+      "title": "Mail Focus Reader",
+      "summary": "Create a new private application named \"Mail Focus Reader\". The exact technical Application id is mail_focus_reader.\n\nBuild the shortest complete viable mail reading and triage application, not a Gmail clone. Desktop-first UI: a compact folders/labels list on the left and a message list on the right. Selecting a message replaces the list region with the message detail; an explicit Back action restores the list and preserves the selected folder. Only support read/unread, star/unstar, and archive."
+    },
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "main",
+        "presentation_ref": "scenario:mail_focus_reader"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 2,
+    "created_at": "2026-09-24T20:29:58+00:00",
+    "updated_at": "2026-09-25T13:19:17+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "mail_focus_reader",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "mail_focus_reader",
+    "version": "0.1.2",
+    "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "mail_focus_reader",
+      "version": "0.1.2",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:7d11ce2ab800f87bc3344dda1256f27feb0e4c9144bcc98980ef520877a367a3",
+        "path_scope": [
+          "projects/mail_focus_reader/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "mail_focus_reader",
+          "version": "0.1.2",
+          "digest": "sha256:1a07e0d95b0100e48c3ce72cbe899e8a92f147548962b3a7aebbf3645f0f81e4",
+          "manifest_digest": "sha256:664371801577cfb9b4a10ab53afcec3533c767a3007af7912da1989b8c19c4e1",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:7d11ce2ab800f87bc3344dda1256f27feb0e4c9144bcc98980ef520877a367a3",
+            "path_scope": [
+              "scenarios/mail_focus_reader/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/mail_focus_reader",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "mail_focus_reader_skill",
+          "version": "0.1.2",
+          "digest": "sha256:824a45a1bb3b15520260c0284151893f051f6079b3dfc14fb6a9d165067860ed",
+          "manifest_digest": "sha256:d5890b082f349f9b9c211352e945dd0ad3767f179e4366e374dfdbf02d134b88",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:7d11ce2ab800f87bc3344dda1256f27feb0e4c9144bcc98980ef520877a367a3",
+            "path_scope": [
+              "skills/mail_focus_reader_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/mail_focus_reader_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [
+        {
+          "kind": "skill",
+          "artifact_id": "gmail_cbs_cleanroom_skill",
+          "version": "0.1.7",
+          "package_digest": "sha256:856b0d49468f44dcfc6b790136baa16420c685996d771e4866090383c11434c0",
+          "optional": false,
+          "version_spec": "==0.1.7"
+        }
+      ],
+      "permissions": [
+        "providers.google.gmail",
+        "storage.relational",
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:7d11ce2ab800f87bc3344dda1256f27feb0e4c9144bcc98980ef520877a367a3",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:2b89191a29a670ba8904a1d516a20996e890419ba726dbcae3e8424cd883a720"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:9d1c8e3c2bc94fabb5ce2b5c7f862f083508144a3924ff1e291ee426be4cd979",
+        "profiles": [],
+        "members": [
+          {
+            "ref": "scenario:mail_focus_reader",
+            "package_digest": "sha256:1a07e0d95b0100e48c3ce72cbe899e8a92f147548962b3a7aebbf3645f0f81e4",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          },
+          {
+            "ref": "skill:mail_focus_reader_skill",
+            "package_digest": "sha256:824a45a1bb3b15520260c0284151893f051f6079b3dfc14fb6a9d165067860ed",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes",
+              "uses"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "main",
+            "presentation": "scenario:mail_focus_reader",
+            "default": true,
+            "bindings": {}
+          }
+        ],
+        "compatibility": {},
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "providers.google.gmail",
+              "purpose": "Use the selected shared mail delivery.",
+              "approval_policy": "on_install"
+            },
+            {
+              "id": "storage.relational",
+              "purpose": "Shared delivery storage requirements.",
+              "approval_policy": "on_install"
+            },
+            {
+              "id": "workspace.read",
+              "purpose": "Read authorized mailbox data.",
+              "approval_policy": "on_install"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Apply explicit mail triage and connection attachment.",
+              "approval_policy": "on_install",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "mail_content",
+              "mail_metadata"
+            ],
+            "sent_off_device": [
+              "mail_action",
+              "mail_query"
+            ],
+            "linked_to_user": [
+              "mail_content",
+              "mail_metadata"
+            ],
+            "tracking": false,
+            "retention": "provider_owned"
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [
+            {
+              "id": "google.gmail",
+              "account_id": "google.gmail",
+              "title": "Gmail account",
+              "purpose": "Provider-owned mail delivery and credentials.",
+              "required": true,
+              "destination": "gmail.googleapis.com",
+              "account_modes": [
+                "delegated_user"
+              ],
+              "scopes": [
+                "https://www.googleapis.com/auth/gmail.modify"
+              ]
+            }
+          ],
+          "privacy_labels": {
+            "collected": [
+              "mail_content",
+              "mail_metadata"
+            ],
+            "sent_off_device": true,
+            "linked_to_user": true,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "Mail Focus Reader",
+        "description": "Create a new private application named \"Mail Focus Reader\". The exact technical Application id is mail_focus_reader.\n\nBuild the shortest complete viable mail reading and triage application, not a Gmail clone. Desktop-first UI: a compact folders/labels list on the left and a message list on the right. Selecting a message replaces the list region with the message detail; an explicit Back action restores the list and preserves the selected folder. Only support read/unread, star/unstar, and archive. Do not add compose/send, OAuth settings, label administration, a local mailbox copy, or dashboard widgets.\n\nThe Application must consume the existing portable capability mail.messages.manage ^1.0.0. It must not implement Gmail API or OAuth, and its semantic Application must not name a package, provider, or skill. Reuse the installed CBS Binding/PackageDelivery and an explicitly attachable reusable Gmail credential owned by the capability/provider plane. Use bounded message summaries and progressive next-page pagination for first paint. Fetch full message content only after selection. Mutations require an explicit user gesture. Show connection status and a clear way to attach an existing Gmail connection.\n\nAcceptance: labels load independently; the first message page performs no N+1 metadata fetch; empty, loading, and error states are visible; detail/back preserves the folder; the result can advance through beta, Trial, and workspace; Applications shows only required permissions. Prefer existing AdaOS components and the minimum number of owned artifacts.",
+        "categories": [],
+        "tags": []
+      },
+      "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387"
+    },
+    "accepted_candidate_id": "mail_focus_reader-0-1-2-17975814e387",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "builder.release.preflight",
+        "checkpoint_package_digest": "sha256:5ccdaaa7bc89f3a8917aee0d4fd9b632714b4468bed5bcb6124927a8c6bb1345",
+        "checkpoint_source_revision": "b9a1336e0c73fce17b9e1b99799cf90faf4e6777",
+        "automation_task_id": "task.01M3BBEENT0SNDAPSY8X88F5QS",
+        "change_id": "builder_change_3a6cd340",
+        "checkpoint_component_ref": "scenario:mail_focus_reader"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "providers.google.gmail",
+          "purpose": "Use the selected shared mail delivery.",
+          "approval_policy": "on_install"
+        },
+        {
+          "id": "storage.relational",
+          "purpose": "Shared delivery storage requirements.",
+          "approval_policy": "on_install"
+        },
+        {
+          "id": "workspace.read",
+          "purpose": "Read authorized mailbox data.",
+          "approval_policy": "on_install"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Apply explicit mail triage and connection attachment.",
+          "approval_policy": "on_install",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "mail_content",
+          "mail_metadata"
+        ],
+        "sent_off_device": [
+          "mail_action",
+          "mail_query"
+        ],
+        "linked_to_user": [
+          "mail_content",
+          "mail_metadata"
+        ],
+        "tracking": false,
+        "retention": "provider_owned"
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [
+        {
+          "id": "google.gmail",
+          "account_id": "google.gmail",
+          "title": "Gmail account",
+          "purpose": "Provider-owned mail delivery and credentials.",
+          "required": true,
+          "destination": "gmail.googleapis.com",
+          "account_modes": [
+            "delegated_user"
+          ],
+          "scopes": [
+            "https://www.googleapis.com/auth/gmail.modify"
+          ]
+        }
+      ],
+      "privacy_labels": {
+        "collected": [
+          "mail_content",
+          "mail_metadata"
+        ],
+        "sent_off_device": true,
+        "linked_to_user": true,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:150f3ee59d8c36888b16e4322a8ea33ca40ed0cba9f79232f9fcb44bf4eb28f4",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "mail_focus_reader",
+      "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [
+        {
+          "id": "google.gmail",
+          "title": "Gmail account",
+          "purpose": "Provider-owned mail delivery and credentials.",
+          "required": true,
+          "scopes": [
+            "https://www.googleapis.com/auth/gmail.modify"
+          ]
+        }
+      ],
+      "permissions": [
+        {
+          "id": "providers.google.gmail",
+          "title": "Providers.Google.Gmail",
+          "purpose": "Use the selected shared mail delivery.",
+          "required": true
+        },
+        {
+          "id": "storage.relational",
+          "title": "Storage.Relational",
+          "purpose": "Shared delivery storage requirements.",
+          "required": true
+        },
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Read authorized mailbox data.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Apply explicit mail triage and connection attachment.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:c06d4b5906b5b009eb14fe0f23673eacd24ba70e77a973b09bf04d4b220eb071"
+  },
+  "channels": {
+    "stable": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387"
+  },
+  "semantic": {
+    "projection_digest": "sha256:c2f4cb4f357dee4b0ae0e2f4815a0b2515db6f4fb5c0f2a2229b51e5c2b27f90",
+    "path": "semantic/applications/mail_focus_reader/7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387.json"
+  },
+  "projection_digest": "sha256:4ab0d646ec32942fe54abeef4bc4dcfb6e8a5dedc3dbb35d3a8cb3b08f4f5287"
+}
