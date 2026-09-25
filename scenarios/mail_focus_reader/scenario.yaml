@@ -1,6 +1,6 @@
 id: mail_focus_reader
 name: mail_focus_reader
-version: 0.1.4
+version: 0.1.5
 title: Mail Focus Reader
 title_i18n:
   key: scenario.mail_focus_reader.title
@@ -61,4 +61,4 @@ nlu:
     entities: []
 steps: []
 prototype: scenario_default
-updated_at: '2026-09-25T16:02:46+00:00'
+updated_at: '2026-09-25T17:56:54+00:00'

@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: mail_focus_reader
-version: 0.1.3
+version: 0.1.4
 profiles: []
 components:
   owned:
@@ -80,16 +80,16 @@ permission_profile:
   required:
   - id: workspace.read
     purpose: Read authorized mailbox data.
-    approval_policy: on_install
+    approval_policy: grant_on_install
   - id: workspace.write
     purpose: Apply explicit mail triage and connection attachment.
-    approval_policy: on_install
+    approval_policy: grant_on_install
   - id: providers.google.gmail
     purpose: Use the selected shared mail delivery.
-    approval_policy: on_install
+    approval_policy: grant_on_install
   - id: storage.relational
     purpose: Shared delivery storage requirements.
-    approval_policy: on_install
+    approval_policy: grant_on_install
   optional: []
   secrets: []
   external_providers:

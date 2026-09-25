@@ -9,7 +9,8 @@
     "adaos.capability.contract.v1|capability:mail.messages.manage|1.0.0": "sha256:f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698",
     "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86": "sha256:3f0c261c64a324b85d1810bbccf44d97f6ae6fbe48435bce00171be2e74f1ab3",
     "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:f7b8c285a1644362e3b77da22d0bdf1cdb6da7fb3c9271edb2305acc9b47f8ee": "sha256:b8422a2a2e3a9a38544d70c31642336765908808c24326a0c141085c9553628e",
-    "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:11194a05df2d41f31700d308121b6b0d83c73187b30bc00988aabdeb0a48735d": "sha256:29d462e3dd460877ccf46385754550773692c9f1353d540c9438b616f9fb8c91"
+    "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:11194a05df2d41f31700d308121b6b0d83c73187b30bc00988aabdeb0a48735d": "sha256:29d462e3dd460877ccf46385754550773692c9f1353d540c9438b616f9fb8c91",
+    "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:39dbbeee6e87d158a347b2bd075dbee193a686ac30c78fe9a339f25dd681c150": "sha256:20e67d86bcba5cd54c360adac8c08a8f20f47b3080c53aafe460ec78e9bb9861"
   },
   "records": {
     "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1": {
@@ -21,6 +22,7 @@
         "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
         "sha256:8aea0cbbc0acf317974d389a5e517d391abdec1a87e1bdea103f427c6e4d750d",
         "sha256:bb70fc2dcd1d61c30e63666d79b5372d3207400d89b5077208fd3f21f1ca6916",
+        "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
         "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
       ]
     },
@@ -31,6 +33,7 @@
       "path": "semantic/records/sha256/53/5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2.json",
       "published_by_release_digests": [
         "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
+        "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
         "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
       ]
     },
@@ -41,6 +44,7 @@
       "path": "semantic/records/sha256/77/778e63e38aa078e0ee4e5e97026e6262ef7b89d699fae4bd67adc2750df80b4d.json",
       "published_by_release_digests": [
         "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
+        "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
         "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
       ]
     },
@@ -53,6 +57,7 @@
         "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
         "sha256:8aea0cbbc0acf317974d389a5e517d391abdec1a87e1bdea103f427c6e4d750d",
         "sha256:bb70fc2dcd1d61c30e63666d79b5372d3207400d89b5077208fd3f21f1ca6916",
+        "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
         "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
       ]
     },
@@ -72,6 +77,7 @@
       "path": "semantic/records/sha256/f6/f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698.json",
       "published_by_release_digests": [
         "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
+        "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
         "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
       ]
     },
@@ -100,6 +106,15 @@
       "path": "semantic/records/sha256/29/29d462e3dd460877ccf46385754550773692c9f1353d540c9438b616f9fb8c91.json",
       "published_by_release_digests": [
         "sha256:bb70fc2dcd1d61c30e63666d79b5372d3207400d89b5077208fd3f21f1ca6916"
+      ]
+    },
+    "sha256:20e67d86bcba5cd54c360adac8c08a8f20f47b3080c53aafe460ec78e9bb9861": {
+      "schema": "adaos.binding.delivery.v1",
+      "identity": "binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "revision": "sha256:39dbbeee6e87d158a347b2bd075dbee193a686ac30c78fe9a339f25dd681c150",
+      "path": "semantic/records/sha256/20/20e67d86bcba5cd54c360adac8c08a8f20f47b3080c53aafe460ec78e9bb9861.json",
+      "published_by_release_digests": [
+        "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d"
       ]
     }
   },
@@ -139,7 +154,16 @@
       "semantic_revision_digest": "sha256:7adf9d0da4e4fa4f00be21054e4f9900a6f4366c863c0fd05d5e9f33bac05467",
       "path": "semantic/applications/web_desktop/bb70fc2dcd1d61c30e63666d79b5372d3207400d89b5077208fd3f21f1ca6916.json",
       "projection_digest": "sha256:ac26d8e66f4f56143046fb109c8a1ad7793d8a00c4caf0713d811f860e006332"
+    },
+    "project:mail_focus_reader@sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d": {
+      "project_id": "mail_focus_reader",
+      "version": "0.1.4",
+      "application_ref": "scenario:mail_focus_reader",
+      "project_release_digest": "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
+      "semantic_revision_digest": "sha256:ad34ad99a011e59e39b0d24e810925b3f2393385f6e343a178af42b7a736c5fe",
+      "path": "semantic/applications/mail_focus_reader/dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d.json",
+      "projection_digest": "sha256:3d2c5f66d88bed8388798dc85f972f6ad51fffe92370a822a46a303e77d8f653"
     }
   },
-  "index_digest": "sha256:6a86997273c507ccb5003511b28dead13b79300a3ff3f3f3c16d7e102107c163"
+  "index_digest": "sha256:60dface97cb7101597cf423b77b4a796b40bab29e923ddf93eb993268ee57824"
 }

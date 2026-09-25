@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:application.ui.render.webui-v1",
+  "binding_definition_digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+  "logical_entrypoint": "application.ui.render.webui-v1",
+  "package": {
+    "kind": "scenario",
+    "id": "mail_focus_reader",
+    "version": "0.1.5",
+    "digest": "sha256:39dbbeee6e87d158a347b2bd075dbee193a686ac30c78fe9a339f25dd681c150"
+  },
+  "physical_member": "webui.json",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:20e67d86bcba5cd54c360adac8c08a8f20f47b3080c53aafe460ec78e9bb9861"
+}
