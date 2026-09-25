@@ -6582,8 +6582,7 @@ def test_state_repair_context_and_transport_use_patch_contract(tmp_path, monkeyp
         assert f"adaos.builder.state_repair.v{other}" not in submitted["messages"][0]["content"]
 
 
-@pytest.mark.parametrize("second_passes", [False, True])
-def test_semantic_repair_chains_distinct_scopes_and_preserves_candidate(monkeypatch, second_passes):
+def test_semantic_repair_runs_one_bounded_pass_and_retains_checkpoint(monkeypatch):
     skill = _load_module()
     original = {"resources": [{"records": [["row", "keep"]]}], "reference": ""}
     calls = []
@@ -6592,11 +6591,7 @@ def test_semantic_repair_chains_distinct_scopes_and_preserves_candidate(monkeypa
         candidate = json.loads(kwargs["output_text"])
         assert candidate["resources"] == original["resources"]
         calls.append(kwargs)
-        if len(calls) == 1:
-            merged, kind, ok = {**candidate, "reference": "id"}, "reference", False
-        else:
-            assert candidate["reference"] == "id"
-            merged, kind, ok = {**candidate, "bindings": ["required"]}, "binding", second_passes
+        merged, kind, ok = {**candidate, "reference": "id"}, "reference", False
         return {"ok": ok, "repair_candidate": merged,
                 "validation": {"findings": [{"code": "missing_binding"}]},
                 "repair": {"kind": f"semantic_{kind}_repair", "request_id": f"req{len(calls)}",
@@ -6605,21 +6600,19 @@ def test_semantic_repair_chains_distinct_scopes_and_preserves_candidate(monkeypa
                 "attempts": [{"ok": False}, {"ok": ok}]}
 
     monkeypatch.setattr(skill, "_repair_llm_semantic_transform_once", once)
-    monkeypatch.setattr(skill, "_semantic_scoped_repair", lambda *args: ("semantic_binding_repair", {"task": "bind"}))
     result = skill._repair_llm_semantic_transform_output(output_text=json.dumps(original))
-    assert len(calls) == 2
-    assert [item["attempt_number"] for item in calls] == [2, 3]
-    assert result["ok"] is second_passes
-    assert result["repair"]["telemetry"]["usage"]["total_tokens"] == 20
-    assert len(result["repair"]["history"]) == 2
-    assert [item["attempt"] for item in result["attempts"]] == [1, 2, 3]
-    assert len(result["candidate_artifacts"]) == 2
+    assert len(calls) == 1
+    assert [item["attempt_number"] for item in calls] == [2]
+    assert result["ok"] is False
+    assert len(result["repair"]["history"]) == 1
+    assert [item["attempt"] for item in result["attempts"]] == [1, 2]
+    assert len(result["candidate_artifacts"]) == 1
     assert "repair_candidate" not in result
-    if not second_passes:
-        assert result["repair"]["stop_reason"] == "repair_cycle_detected"
+    assert result["repair"]["stop_reason"] == "single_bounded_repair_limit"
+    assert result["repair"]["checkpoint_retained"] is True
 
 
-def test_semantic_repair_can_repeat_scope_for_new_findings(monkeypatch):
+def test_semantic_repair_does_not_repeat_scope_for_new_findings(monkeypatch):
     skill = _load_module()
     original = {"states": [], "step": 0}
     calls = []
@@ -6629,7 +6622,7 @@ def test_semantic_repair_can_repeat_scope_for_new_findings(monkeypatch):
         calls.append(kwargs)
         step = len(calls)
         return {
-            "ok": step == 2,
+            "ok": False,
             "repair_candidate": {**candidate, "step": step},
             "validation": {
                 "findings": [{"code": f"state_finding_{step + 1}"}]
@@ -6644,21 +6637,16 @@ def test_semantic_repair_can_repeat_scope_for_new_findings(monkeypatch):
         }
 
     monkeypatch.setattr(skill, "_repair_llm_semantic_transform_once", once)
-    monkeypatch.setattr(
-        skill,
-        "_semantic_scoped_repair",
-        lambda *_args: ("semantic_state_repair", {"task": "repair next state"}),
-    )
-
     result = skill._repair_llm_semantic_transform_output(
         output_text=json.dumps(original),
         validation_error={"findings": [{"code": "state_finding_1"}]},
     )
 
-    assert result["ok"] is True
-    assert len(calls) == 2
-    assert [item["attempt_number"] for item in calls] == [2, 3]
-    assert len(result["repair"]["history"]) == 2
+    assert result["ok"] is False
+    assert len(calls) == 1
+    assert [item["attempt_number"] for item in calls] == [2]
+    assert len(result["repair"]["history"]) == 1
+    assert result["repair"]["stop_reason"] == "single_bounded_repair_limit"
 
 
 def test_semantic_repair_receives_full_candidate_brief_and_finding(

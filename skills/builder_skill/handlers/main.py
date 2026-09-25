@@ -13856,76 +13856,29 @@ def _semantic_scoped_repair(candidate, findings):
 
 
 def _repair_llm_semantic_transform_output(**kwargs: Any) -> dict[str, Any]:
-    """Repair distinct compiler findings without rewriting a preserved candidate."""
-    current = dict(kwargs)
-    history, artifacts, attempts = [], [], []
-    telemetry: dict[str, Any] = {}
-    seen_repair_inputs: set[tuple[str, str]] = set()
-    seen_candidates = {
-        hashlib.sha256(
-            str(current.get("output_text") or "").encode("utf-8", errors="replace")
-        ).hexdigest()
-    }
-    max_repair_passes = 4
-    while True:
-        result = _repair_llm_semantic_transform_once(**current, attempt_number=len(history) + 2)
-        merged = result.pop("repair_candidate", None)
-        repair = result.get("repair") or {}
-        if repair:
-            history.append(copy.deepcopy(dict(repair)))
-            validation_input = (
-                current.get("validation_error")
-                if isinstance(current.get("validation_error"), Mapping)
-                else {}
-            )
-            seen_repair_inputs.add(
-                (
-                    str(repair.get("kind") or ""),
-                    hashlib.sha256(
-                        _compact_json(validation_input).encode(
-                            "utf-8", errors="replace"
-                        )
-                    ).hexdigest(),
-                )
-            )
-            telemetry = _combine_llm_job_telemetry(telemetry, result)
-        artifacts.extend(result.get("candidate_artifacts") or [])
-        step_attempts = result.get("attempts") or []
-        attempts.extend(step_attempts if not attempts else step_attempts[1:])
-        if result.get("ok") or not isinstance(merged, Mapping):
-            break
-        findings = (result.get("validation") or {}).get("findings") or []
-        next_kind, plan = _semantic_scoped_repair(merged, findings)
-        next_validation = {"findings": findings}
-        next_input = (
-            next_kind,
-            hashlib.sha256(
-                _compact_json(next_validation).encode("utf-8", errors="replace")
-            ).hexdigest(),
-        )
-        merged_text = _compact_json(merged)
-        merged_digest = hashlib.sha256(
-            merged_text.encode("utf-8", errors="replace")
-        ).hexdigest()
-        if not plan or merged == _extract_json_object(current["output_text"]):
-            repair["stop_reason"] = "no_new_bounded_scope_or_no_progress"
-            break
-        if next_input in seen_repair_inputs or merged_digest in seen_candidates:
-            repair["stop_reason"] = "repair_cycle_detected"
-            break
-        if len(history) >= max_repair_passes:
-            repair["stop_reason"] = "repair_pass_limit"
-            break
-        seen_candidates.add(merged_digest)
-        current.update(output_text=merged_text, validation_error=result["validation"],
-                       request_id=repair["request_id"], job_id=repair["job_id"])
-    if history:
-        result["repair"]["history"] = history
-        if len(history) > 1:
-            result["repair"]["telemetry"] = telemetry
-    result["candidate_artifacts"] = artifacts
+    """Run one bounded repair and retain its exact checkpoint.
+
+    A single user/model turn must not hide an open-ended model loop.  If the
+    bounded patch exposes another defect, fail closed with the merged
+    candidate retained by the repair artifacts; a later explicit retry may
+    resume from that checkpoint without repeating the primary generation.
+    """
+
+    result = _repair_llm_semantic_transform_once(**kwargs, attempt_number=2)
+    merged = result.pop("repair_candidate", None)
+    repair = result.get("repair")
+    if isinstance(repair, dict):
+        repair["history"] = [copy.deepcopy(dict(repair))]
+        if not result.get("ok") and isinstance(merged, Mapping):
+            repair["stop_reason"] = "single_bounded_repair_limit"
+            repair["checkpoint_retained"] = True
+    attempts = result.get("attempts") or []
     if attempts:
-        result["attempts"] = [{**item, "attempt": index} for index, item in enumerate(attempts, 1)]
+        result["attempts"] = [
+            {**dict(item), "attempt": index}
+            for index, item in enumerate(attempts, 1)
+            if isinstance(item, Mapping)
+        ]
     return result
 
 
