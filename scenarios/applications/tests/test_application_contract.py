@@ -189,6 +189,12 @@ def test_application_detail_fields_project_from_published_record():
             'trial': {'status': 'accepted', 'candidate_id': 'candidate.synthetic',
                       'candidate_digest': 'sha256:' + 'a' * 64, 'evidence_present': True},
             'publication': {'status': 'not_started'},
+            'source_registry': {
+                'status': 'not_published',
+                'semantic_publication': {'record_count': 0},
+                'installable_catalog_status': 'not_published',
+            },
+            'readme': 'Synthetic README',
         },
         'effective_navigation': {'message': 'Unavailable', 'reason': 'not_installed_in_webspace'},
     }
@@ -420,8 +426,8 @@ def test_configure_requires_installed_and_authoritative_setup(installed, availab
     assert eval(predicate, {'__builtins__': {}}) is (installed and available)
 
 
-def test_access_reads_follow_installed_default_and_explicit_version_selection():
-    installed, candidate, explicit = ['sha256:' + c * 64 for c in 'abc']
+def test_access_reads_follow_installed_release_after_versions_section_removal():
+    installed, candidate = ['sha256:' + c * 64 for c in 'ab']
     record = {'installation_summary': {'release_digest': installed},
               'effective_release': {'release_digest': candidate}}
     bindings = WIDGETS['application-details']['inputs']['stateBindings']
@@ -435,13 +441,11 @@ def test_access_reads_follow_installed_default_and_explicit_version_selection():
     reads = [n for n in walk(modal) if n.get('kind') == 'mcp'
              and 'release_digest' in n.get('arguments', {})]
     assert reads
-    for expected in [installed, explicit]:
-        for read in reads:
-            args = resolve(read['arguments'], state, {})
-            assert args['release_digest'] == expected
-            jsonschema.validate(args, CONTRACTS[read['toolId']]['input_schema'])
-        for action in WIDGETS['releases-list']['actions']:
-            state.update(resolve(action['params'], state, {'release_digest': explicit}))
+    assert 'releases-list' not in WIDGETS
+    for read in reads:
+        args = resolve(read['arguments'], state, {})
+        assert args['release_digest'] == installed
+        jsonschema.validate(args, CONTRACTS[read['toolId']]['input_schema'])
     assert state['effectiveReleaseDigest'] == candidate
     opening = [a for a in WIDGETS['lifecycle-actions']['actions'] if a.get('on') == 'click:manage-access']
     assert opening == [{'type': 'openModal', 'on': 'click:manage-access',

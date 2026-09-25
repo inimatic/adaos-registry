@@ -50,7 +50,7 @@
                         "selectedExplicitDenies": [],
                         "detailOpen": false,
                         "trackSwitchProgress": false,
-                        "applicationPinnedToHome": true,
+                        "applicationPinnedToHome": false,
                         "operationToast": "",
                         "reviewedTransition": {},
                         "selectedConnectedAccount": {},
@@ -78,7 +78,14 @@
                         "applicationDefinitionRevision": 0,
                         "accessContext": {},
                         "accountContext": {},
-                        "effectiveTarget": null
+                        "effectiveTarget": null,
+                        "trialCandidateId": "",
+                        "trialCandidateDigest": "",
+                        "trialReleaseDigest": "",
+                        "stableReleaseDigest": null,
+                        "sourceRegistryPublished": false,
+                        "sourceRegistryStatus": "not_published",
+                        "sourceRegistryCommit": ""
                     },
                     "layout": {
                         "version": 2,
@@ -1630,6 +1637,34 @@
                                     "effectiveTarget": {
                                         "path": "effective_navigation.target",
                                         "default": null
+                                    },
+                                    "trialCandidateId": {
+                                        "path": "local_development.trial.candidate_id",
+                                        "default": ""
+                                    },
+                                    "trialCandidateDigest": {
+                                        "path": "local_development.trial.candidate_digest",
+                                        "default": ""
+                                    },
+                                    "trialReleaseDigest": {
+                                        "path": "local_development.trial.release_digest",
+                                        "default": ""
+                                    },
+                                    "stableReleaseDigest": {
+                                        "path": "channels.stable",
+                                        "default": null
+                                    },
+                                    "sourceRegistryPublished": {
+                                        "path": "local_development.source_registry.installable_distribution",
+                                        "default": false
+                                    },
+                                    "sourceRegistryStatus": {
+                                        "path": "local_development.source_registry.installable_catalog_status",
+                                        "default": "not_published"
+                                    },
+                                    "sourceRegistryCommit": {
+                                        "path": "local_development.source_registry.commit",
+                                        "default": ""
                                     }
                                 },
                                 "stateOnly": true
@@ -1740,168 +1775,17 @@
                                         "selectedExplicitDenies": [],
                                         "setupSupported": false,
                                         "componentRevision": null,
-                                        "effectiveTarget": null
+                                        "effectiveTarget": null,
+                                        "trialCandidateId": "",
+                                        "trialCandidateDigest": "",
+                                        "trialReleaseDigest": "",
+                                        "stableReleaseDigest": null,
+                                        "sourceRegistryPublished": false,
+                                        "sourceRegistryStatus": "not_published",
+                                        "sourceRegistryCommit": ""
                                     }
                                 }
                             ]
-                        },
-                        {
-                            "area": "detail",
-                            "dataSource": {
-                                "kind": "mcp",
-                                "toolId": "applications.show",
-                                "arguments": {
-                                    "application_id": "$state.selectedApplicationId"
-                                },
-                                "dryRun": true,
-                                "resultPath": "response.result.application",
-                                "invalidationTags": [
-                                    "applications.catalog",
-                                    "applications.detail",
-                                    "applications.setup",
-                                    "applications.access",
-                                    "applications.placement"
-                                ]
-                            },
-                            "id": "application-header",
-                            "inputs": {
-                                "emptyText": "No details available.",
-                                "fields": [
-                                    {
-                                        "label": "Summary",
-                                        "path": "application.display.summary"
-                                    },
-                                    {
-                                        "label": "Publisher",
-                                        "path": "application.publisher.display_name"
-                                    },
-                                    {
-                                        "label": "Identifier",
-                                        "path": "application.application_id"
-                                    },
-                                    {
-                                        "label": "Installed version",
-                                        "path": "active_release.version"
-                                    },
-                                    {
-                                        "label": "Latest available",
-                                        "path": "marketplace_release.version"
-                                    }
-                                ],
-                                "presentation": "header",
-                                "emptyText_i18n": "widgets.application-header.emptyText"
-                            },
-                            "title": "{application.display.title}",
-                            "type": "item.details",
-                            "visibleIf": "($state.detailApplicationId) && $state.selectedApplicationId"
-                        },
-                        {
-                            "area": "detail",
-                            "dataSource": {
-                                "kind": "mcp",
-                                "toolId": "applications.show",
-                                "arguments": {
-                                    "application_id": "$state.selectedApplicationId"
-                                },
-                                "dryRun": true,
-                                "resultPath": "response.result.application",
-                                "invalidationTags": [
-                                    "applications.catalog",
-                                    "applications.detail",
-                                    "applications.setup",
-                                    "applications.access",
-                                    "applications.placement"
-                                ]
-                            },
-                            "id": "local-beta-status",
-                            "inputs": {
-                                "title_i18n": "widgets.local-beta-status.title",
-                                "fields": [
-                                    {
-                                        "label": "Prototype",
-                                        "path": "local_development.prototype_evidence"
-                                    },
-                                    {
-                                        "label": "Automation",
-                                        "path": "local_development.automation_evidence"
-                                    },
-                                    {
-                                        "label": "Trial",
-                                        "path": "local_development.trial.status"
-                                    },
-                                    {
-                                        "label": "Accepted candidate",
-                                        "path": "local_development.trial.candidate_id"
-                                    },
-                                    {
-                                        "label": "Candidate digest",
-                                        "path": "local_development.trial.candidate_digest"
-                                    },
-                                    {
-                                        "label": "Trial evidence",
-                                        "path": "local_development.trial.evidence_present"
-                                    },
-                                    {
-                                        "label": "Publication",
-                                        "path": "local_development.publication"
-                                    }
-                                ],
-                                "presentation": "section"
-                            },
-                            "title": "Builder Beta",
-                            "type": "item.details",
-                            "visibleIf": "($state.localDevelopmentAvailable == true) && $state.selectedApplicationId"
-                        },
-                        {
-                            "area": "detail",
-                            "dataSource": {
-                                "kind": "mcp",
-                                "toolId": "applications.show",
-                                "arguments": {
-                                    "application_id": "$state.selectedApplicationId"
-                                },
-                                "dryRun": true,
-                                "resultPath": "response.result.application",
-                                "invalidationTags": [
-                                    "applications.catalog",
-                                    "applications.detail",
-                                    "applications.placement"
-                                ]
-                            },
-                            "id": "cbs-lifecycle",
-                            "inputs": {
-                                "emptyText": "CBS lifecycle is not compiled for this Application.",
-                                "fields": [
-                                    {
-                                        "label": "1. Requirement",
-                                        "path": "cbs_lifecycle.requirement.summary"
-                                    },
-                                    {
-                                        "label": "2. Resolution",
-                                        "path": "cbs_lifecycle.resolution.summary"
-                                    },
-                                    {
-                                        "label": "3. Plan",
-                                        "path": "cbs_lifecycle.plan.summary"
-                                    },
-                                    {
-                                        "label": "4. Activation",
-                                        "path": "cbs_lifecycle.activation.summary"
-                                    },
-                                    {
-                                        "label": "5. Workspace lock",
-                                        "path": "cbs_lifecycle.lock.summary"
-                                    },
-                                    {
-                                        "label": "Authority",
-                                        "path": "cbs_lifecycle.authority_note"
-                                    }
-                                ],
-                                "presentation": "section"
-                            },
-                            "title": "Capability lifecycle",
-                            "type": "item.details",
-                            "visibleIf": "($state.detailApplicationId) && $state.selectedApplicationId"
                         },
                         {
                             "actions": [
@@ -2093,6 +1977,46 @@
                                         "expectedScenarioId": "$state.effectiveTarget.expected_scenario_id",
                                         "newWindow": true
                                     }
+                                },
+                                {
+                                    "type": "callMcp",
+                                    "on": "click:finalize-stable",
+                                    "target": "applications.development.promote_stable",
+                                    "idempotencyKey": "auto",
+                                    "enabledIf": "$state.selectedApplicationId && $state.trialCandidateId && $state.trialCandidateDigest && $state.applicationDefinitionRevision >= 0",
+                                    "params": {
+                                        "application_id": "$state.selectedApplicationId",
+                                        "candidate_id": "$state.trialCandidateId",
+                                        "expected_stable_digest": "$state.stableReleaseDigest",
+                                        "expected_revision": "$state.applicationDefinitionRevision"
+                                    },
+                                    "invalidates": [
+                                        "applications.catalog",
+                                        "applications.detail",
+                                        "applications.setup",
+                                        "applications.access",
+                                        "applications.placement"
+                                    ]
+                                },
+                                {
+                                    "type": "callMcp",
+                                    "on": "click:publish-registry",
+                                    "target": "applications.development.publish_to_registry",
+                                    "idempotencyKey": "auto",
+                                    "enabledIf": "$state.selectedApplicationId && $state.stableReleaseDigest && $state.applicationDefinitionRevision >= 0",
+                                    "params": {
+                                        "application_id": "$state.selectedApplicationId",
+                                        "release_digest": "$state.stableReleaseDigest",
+                                        "release_notes": "Published from Applications with portable CBS semantic projection.",
+                                        "expected_revision": "$state.applicationDefinitionRevision"
+                                    },
+                                    "invalidates": [
+                                        "applications.catalog",
+                                        "applications.detail",
+                                        "applications.setup",
+                                        "applications.access",
+                                        "applications.placement"
+                                    ]
                                 }
                             ],
                             "area": "detail",
@@ -2201,12 +2125,209 @@
                                         "label": "Unpin from Home",
                                         "label_i18n": "widgets.lifecycle-actions.buttons.unpin-home.label",
                                         "visibleIf": "$state.applicationInstalled == true && $state.applicationPinnedToHome == true"
+                                    },
+                                    {
+                                        "id": "finalize-stable",
+                                        "icon": "checkmark-done-outline",
+                                        "kind": "primary",
+                                        "label": "Finalize",
+                                        "visibleIf": "$state.localDevelopmentAvailable == true && $state.trialAccepted == true && $state.trialCandidateId && $state.trialCandidateDigest && $state.trialReleaseDigest && $state.stableReleaseDigest != $state.trialReleaseDigest"
+                                    },
+                                    {
+                                        "id": "publish-registry",
+                                        "icon": "cloud-upload-outline",
+                                        "kind": "primary",
+                                        "label": "Publish",
+                                        "visibleIf": "$state.localDevelopmentAvailable == true && $state.stableReleaseDigest && $state.sourceRegistryPublished != true",
+                                        "enabledIf": "$state.selectedApplicationId && $state.stableReleaseDigest"
                                     }
                                 ],
-                                "variant": "autoOverflow"
+                                "variant": "toolbar"
                             },
                             "type": "ui.actions",
                             "visibleIf": "$state.detailApplicationId == $state.selectedApplicationId && $state.selectedApplicationId"
+                        },
+                        {
+                            "area": "detail",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "applications.show",
+                                "arguments": {
+                                    "application_id": "$state.selectedApplicationId"
+                                },
+                                "dryRun": true,
+                                "resultPath": "response.result.application",
+                                "invalidationTags": [
+                                    "applications.catalog",
+                                    "applications.detail",
+                                    "applications.setup",
+                                    "applications.access",
+                                    "applications.placement"
+                                ]
+                            },
+                            "id": "application-header",
+                            "inputs": {
+                                "emptyText": "No details available.",
+                                "fields": [
+                                    {
+                                        "label": "Summary",
+                                        "path": "application.display.summary"
+                                    },
+                                    {
+                                        "label": "Publisher",
+                                        "path": "application.publisher.display_name"
+                                    },
+                                    {
+                                        "label": "Identifier",
+                                        "path": "application.application_id"
+                                    },
+                                    {
+                                        "label": "Installed version",
+                                        "path": "active_release.version"
+                                    },
+                                    {
+                                        "label": "Latest available",
+                                        "path": "marketplace_release.version"
+                                    },
+                                    {
+                                        "label": "Lifecycle",
+                                        "path": "application.lifecycle"
+                                    },
+                                    {
+                                        "label": "Registry commit",
+                                        "path": "local_development.source_registry.commit"
+                                    }
+                                ],
+                                "presentation": "header",
+                                "emptyText_i18n": "widgets.application-header.emptyText"
+                            },
+                            "title": "{application.display.title}",
+                            "type": "item.details",
+                            "visibleIf": "($state.detailApplicationId) && $state.selectedApplicationId"
+                        },
+                        {
+                            "area": "detail",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "applications.show",
+                                "arguments": {
+                                    "application_id": "$state.selectedApplicationId"
+                                },
+                                "dryRun": true,
+                                "resultPath": "response.result.application",
+                                "invalidationTags": [
+                                    "applications.catalog",
+                                    "applications.detail",
+                                    "applications.setup",
+                                    "applications.access",
+                                    "applications.placement"
+                                ]
+                            },
+                            "id": "local-beta-status",
+                            "inputs": {
+                                "title_i18n": "widgets.local-beta-status.title",
+                                "fields": [
+                                    {
+                                        "label": "Prototype",
+                                        "path": "local_development.prototype_evidence"
+                                    },
+                                    {
+                                        "label": "Automation",
+                                        "path": "local_development.automation_evidence"
+                                    },
+                                    {
+                                        "label": "Trial",
+                                        "path": "local_development.trial.status"
+                                    },
+                                    {
+                                        "label": "Accepted candidate",
+                                        "path": "local_development.trial.candidate_id"
+                                    },
+                                    {
+                                        "label": "Candidate digest",
+                                        "path": "local_development.trial.candidate_digest"
+                                    },
+                                    {
+                                        "label": "Trial evidence",
+                                        "path": "local_development.trial.evidence_present"
+                                    },
+                                    {
+                                        "label": "Publication",
+                                        "path": "local_development.publication"
+                                    },
+                                    {
+                                        "label": "Source registry",
+                                        "path": "local_development.source_registry.status"
+                                    },
+                                    {
+                                        "label": "Semantic records",
+                                        "path": "local_development.source_registry.semantic_publication.record_count"
+                                    },
+                                    {
+                                        "label": "Installable catalog",
+                                        "path": "local_development.source_registry.installable_catalog_status"
+                                    },
+                                    {
+                                        "label": "README",
+                                        "path": "local_development.readme"
+                                    }
+                                ],
+                                "presentation": "section"
+                            },
+                            "title": "Builder Beta",
+                            "type": "item.details",
+                            "visibleIf": "($state.localDevelopmentAvailable == true) && $state.selectedApplicationId"
+                        },
+                        {
+                            "area": "detail",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "applications.show",
+                                "arguments": {
+                                    "application_id": "$state.selectedApplicationId"
+                                },
+                                "dryRun": true,
+                                "resultPath": "response.result.application",
+                                "invalidationTags": [
+                                    "applications.catalog",
+                                    "applications.detail",
+                                    "applications.placement"
+                                ]
+                            },
+                            "id": "cbs-lifecycle",
+                            "inputs": {
+                                "emptyText": "CBS lifecycle is not compiled for this Application.",
+                                "fields": [
+                                    {
+                                        "label": "1. Requirement",
+                                        "path": "cbs_lifecycle.requirement.summary"
+                                    },
+                                    {
+                                        "label": "2. Resolution",
+                                        "path": "cbs_lifecycle.resolution.summary"
+                                    },
+                                    {
+                                        "label": "3. Plan",
+                                        "path": "cbs_lifecycle.plan.summary"
+                                    },
+                                    {
+                                        "label": "4. Activation",
+                                        "path": "cbs_lifecycle.activation.summary"
+                                    },
+                                    {
+                                        "label": "5. Workspace lock",
+                                        "path": "cbs_lifecycle.lock.summary"
+                                    },
+                                    {
+                                        "label": "Authority",
+                                        "path": "cbs_lifecycle.authority_note"
+                                    }
+                                ],
+                                "presentation": "section"
+                            },
+                            "title": "Capability lifecycle",
+                            "type": "item.details",
+                            "visibleIf": "($state.detailApplicationId) && $state.selectedApplicationId"
                         },
                         {
                             "id": "application-open-unavailable",
@@ -2836,65 +2957,6 @@
                                     "type": "updateState"
                                 }
                             ]
-                        },
-                        {
-                            "actions": [
-                                {
-                                    "on": "select",
-                                    "params": {
-                                        "reviewedPlan": {},
-                                        "selectedReleaseDigest": "$event.release_digest",
-                                        "selectedAccessGrantId": "",
-                                        "selectedConnectedAccountId": "",
-                                        "selectedSetupId": "",
-                                        "selectedCredentialId": "",
-                                        "accessContext": {},
-                                        "accountContext": {},
-                                        "permissionApproved": false
-                                    },
-                                    "type": "updateState"
-                                }
-                            ],
-                            "area": "detail",
-                            "dataSource": {
-                                "arguments": {
-                                    "application_id": "$state.selectedApplicationId"
-                                },
-                                "kind": "mcp",
-                                "resultPath": "response.result.releases",
-                                "toolId": "applications.list_releases",
-                                "dryRun": true,
-                                "invalidationTags": [
-                                    "applications.catalog",
-                                    "applications.detail",
-                                    "applications.setup",
-                                    "applications.access",
-                                    "applications.placement"
-                                ]
-                            },
-                            "id": "releases-list",
-                            "inputs": {
-                                "emptyText": "No versions available.",
-                                "pagination": true,
-                                "pageSize": 10,
-                                "pageSizeOptions": [
-                                    10,
-                                    25,
-                                    50
-                                ],
-                                "search": true,
-                                "searchPlaceholder": "Search versions",
-                                "itemIdKey": "release_digest",
-                                "previewKey": "release_digest",
-                                "subtitleKey": "lifecycle",
-                                "titleKey": "version",
-                                "emptyText_i18n": "widgets.releases-list.emptyText",
-                                "subtitleI18nPrefix": "applications.release.lifecycle."
-                            },
-                            "title": "Versions",
-                            "type": "ui.list",
-                            "visibleIf": "($state.detailApplicationId == $state.selectedApplicationId && $state.selectedApplicationId) && $state.selectedApplicationId",
-                            "title_i18n": "widgets.releases-list.title"
                         },
                         {
                             "area": "detail",
@@ -6500,7 +6562,7 @@
                 }
             }
         },
-        "version": "0.1.60",
+        "version": "0.1.63",
         "manifest": "webui.json"
     },
     "generated_by": "builder_skill"
