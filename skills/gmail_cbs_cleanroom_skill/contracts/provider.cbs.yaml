@@ -1,0 +1,89 @@
+schema: adaos.cbs.provider_authoring.v1
+authorship:
+  origin: builder_inferred
+capability:
+  ref: capability:mail.messages.manage
+  version: 1.0.0
+  title: Manage mail messages
+  operations:
+  - operation_id: connection_status
+    tool: portable_connection_status
+    errors:
+    - account_not_connected
+    - permission_denied
+    - provider_unavailable
+  - operation_id: begin_connection
+    tool: portable_begin_connection
+    errors:
+    - oauth_not_configured
+    - permission_denied
+    - provider_unavailable
+  - operation_id: list_messages
+    tool: portable_list_messages
+    errors:
+    - account_not_connected
+    - permission_denied
+    - provider_unavailable
+  - operation_id: get_message
+    tool: portable_get_message
+    errors:
+    - account_not_connected
+    - permission_denied
+    - provider_unavailable
+  - operation_id: list_labels
+    tool: portable_list_labels
+    errors:
+    - account_not_connected
+    - permission_denied
+    - provider_unavailable
+  - operation_id: mutate_message
+    tool: portable_mutate_message
+    errors:
+    - account_not_connected
+    - permission_denied
+    - provider_unavailable
+  - operation_id: prepare_send
+    tool: portable_prepare_send
+    errors:
+    - permission_denied
+  - operation_id: send_message
+    tool: portable_send_message
+    errors:
+    - account_not_connected
+    - permission_denied
+    - send_unconfirmed
+  invariants:
+  - credentials and OAuth tokens never cross the Core provider boundary
+  - a send command is issued at most once for one application subject and command
+    id
+  - mail content is transient and is not persisted by the binding
+  effects:
+  - reads mail through an authorized account
+  - changes Gmail labels and trash state only on explicit user action
+  - sends one composed message only after explicit user action
+  authority_requirements:
+  - providers.google.gmail
+  conformance_refs:
+  - scenario:mail.messages.manage.v1
+binding:
+  ref: binding-definition:mail.messages.manage.google-gmail-local
+  version: 1.0.0
+  entry_protocol: adaos.skill.tools.v1
+  logical_entrypoint: mail.messages.manage.google-gmail
+  physical_member: handlers/main.py
+  modes:
+  - production
+  profile_classes:
+  - local
+  provider_features:
+  - oauth_pkce
+  - gmail_modify
+  - send_idempotency
+  authority_requirements:
+  - providers.google.gmail
+  - storage.relational
+  - workspace.read
+  - workspace.write
+  conformance_obligations:
+  - capability_conformance
+  - external_evidence_freshness

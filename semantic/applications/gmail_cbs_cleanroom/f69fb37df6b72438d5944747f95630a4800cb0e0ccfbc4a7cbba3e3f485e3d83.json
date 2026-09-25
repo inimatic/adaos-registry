@@ -1,0 +1,146 @@
+{
+  "schema": "adaos.semantic_registry.application_release.v1",
+  "project_id": "gmail_cbs_cleanroom",
+  "version": "0.1.10",
+  "application_ref": "scenario:gmail_cbs_cleanroom",
+  "project_release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+  "source_ref": {
+    "schema": "adaos.artifact.source_ref.v1",
+    "forge": "content-addressed-dev",
+    "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+    "revision": "sha256:417b4c8371db444d1f5e0b08fc80c80a5f7743c71cffa6712b7b69f640d643e6",
+    "path_scope": [
+      "projects/gmail_cbs_cleanroom/"
+    ]
+  },
+  "compilation_digest": "sha256:6fd80b946e0e95fc59ab548b0bdf337c23138ca8968d16b359fbeef02b7d7432",
+  "semantic_revision_digest": "sha256:f9607679842eaca8cc15b5b50654d93bc46f6e6d13463e187c7ed5a05946e076",
+  "requirements": [
+    {
+      "requirement_ref": "requirement:scenario.gmail_cbs_cleanroom.ui",
+      "capability_ref": "capability:application.ui.render",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "simulation",
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:c8f3a9e81f5b9727d08caa0bbc27bdbf76d24a0a8d9333aa6a2bbccc60d2491e"
+    },
+    {
+      "requirement_ref": "requirement:scenario.gmail_cbs_cleanroom.mail_messages_manage",
+      "capability_ref": "capability:mail.messages.manage",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "simulation",
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:895e519445bdd2d1b48ac9398ed2ec3527f82ce81fac40f7e17ad77aaa186be1"
+    }
+  ],
+  "portable_artifacts": {
+    "adaos.binding.definition.v1": [
+      "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2"
+    ],
+    "adaos.binding.delivery.v1": [
+      "sha256:3f0c261c64a324b85d1810bbccf44d97f6ae6fbe48435bce00171be2e74f1ab3",
+      "sha256:778e63e38aa078e0ee4e5e97026e6262ef7b89d699fae4bd67adc2750df80b4d"
+    ],
+    "adaos.capability.contract.v1": [
+      "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7",
+      "sha256:f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698"
+    ]
+  },
+  "distribution": {
+    "thin": {
+      "requirements_only": true,
+      "registry_required": true
+    },
+    "resolved": {
+      "project_release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+      "package_closure": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "gmail_cbs_cleanroom",
+          "version": "0.1.6",
+          "digest": "sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86",
+          "manifest_digest": "sha256:2da3d532f935dae233677d5d6e6315c895e4b12c7030ce6be615a06181f6b0da",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:417b4c8371db444d1f5e0b08fc80c80a5f7743c71cffa6712b7b69f640d643e6",
+            "path_scope": [
+              "scenarios/gmail_cbs_cleanroom/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/gmail_cbs_cleanroom",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "gmail_cbs_cleanroom_skill",
+          "version": "0.1.7",
+          "digest": "sha256:403e924b61e66ae9d04aa69a4594d3fe2873349f75904c5633e3e01212c0df19",
+          "manifest_digest": "sha256:d1b0ffe60cbf7f21be6c6fb58d224a15bf15ccbcf23543a4c7b783ac226fa64f",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:417b4c8371db444d1f5e0b08fc80c80a5f7743c71cffa6712b7b69f640d643e6",
+            "path_scope": [
+              "skills/gmail_cbs_cleanroom_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/gmail_cbs_cleanroom_skill",
+          "schema_locks": []
+        }
+      ],
+      "portable_artifact_digests": [
+        "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+        "sha256:3f0c261c64a324b85d1810bbccf44d97f6ae6fbe48435bce00171be2e74f1ab3",
+        "sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2",
+        "sha256:778e63e38aa078e0ee4e5e97026e6262ef7b89d699fae4bd67adc2750df80b4d",
+        "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7",
+        "sha256:f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698"
+      ]
+    }
+  },
+  "projection_digest": "sha256:27707575ddd3c42fd9d1d9676fbccfe9badc3d88b46f656f3135dd93ca16b90e"
+}

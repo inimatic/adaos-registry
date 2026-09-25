@@ -1,0 +1,133 @@
+schema: adaos.project.v1
+kind: project
+id: gmail_cbs_cleanroom
+version: 0.1.10
+profiles: []
+components:
+  owned:
+  - ref: scenario:gmail_cbs_cleanroom
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations:
+    - uses
+  - ref: skill:gmail_cbs_cleanroom_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations:
+    - realizes
+    - uses
+  dependencies: []
+entrypoints:
+- id: main
+  presentation: scenario:gmail_cbs_cleanroom
+  default: true
+  bindings: {}
+catalog:
+  title: Gmail CBS Cleanroom
+  description: 'Create a new private AdaOS Application named "Gmail CBS Cleanroom"
+    from
+
+    scratch, with technical id gmail_cbs_cleanroom. It must be CBS-compatible. Its
+
+    semantic Application requires capability:mail.messages.manage version ^1.0.0
+
+    without naming Gmail, a package, a skill, endpoints, account ids, or
+
+    credentials. For this first beta, realize that requirement with an
+
+    Application-local Gmail binding.
+
+
+    The user experience must include connection and setup status, inbox and label
+
+    navigation, search and unread/starred filters, message list and reading,
+
+    labels, archive, trash, read/unread, star/unstar, compose, and send. Include
+
+    responsive wide and compact layouts and deterministic loading, empty, offline,
+
+    provider-error, permission-denied, and authorization-required states. Explain
+
+    least-privilege access. OAuth secrets and tokens must never enter UI state,
+
+    manifests, fixtures, logs, errors, or telemetry. Keep shared provider reuse and
+
+    a global capability registry outside this first stage.
+
+
+    Build the executable Prototype now. Keep real external operations as explicit
+
+    pending Automation requirements; do not simulate successful authorization or
+
+    use live Gmail data in the Prototype.'
+  categories: []
+  tags: []
+publication:
+  stage: alpha
+  visibility: unlisted
+  channel: stable
+install:
+  default: false
+  features: []
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-09-24T06:00:15Z'
+created_by: builder.chat
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: providers.google.gmail
+    purpose: Use the connected Gmail account.
+    approval_policy: explicit
+    sensitive: true
+  - id: workspace.read
+    purpose: Read authorized mailbox projections and command state.
+    approval_policy: explicit
+  - id: workspace.write
+    purpose: Execute explicitly requested mailbox changes and claim send commands.
+    approval_policy: explicit
+  - id: storage.relational
+    purpose: Persist content-free send deduplication records.
+    approval_policy: explicit
+  optional: []
+  secrets: []
+  external_providers:
+  - id: google.gmail
+    account_id: google.gmail
+    title: Gmail account
+    purpose: Read, organize, trash and send mail requested by the user.
+    required: true
+    destination: gmail.googleapis.com
+    account_modes:
+    - delegated_user
+    scopes:
+    - https://www.googleapis.com/auth/gmail.modify
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected:
+    - mail_metadata
+    - mail_content
+    - send_command_id
+    sent_off_device:
+    - mail_query
+    - mail_content
+    - mail_recipient
+    linked_to_user:
+    - mail_metadata
+    - mail_content
+    - send_command_id
+    retention: transient_mail_durable_send_command_ids
+    tracking: false
+  privacy_labels:
+    collected:
+    - Mail content is transient; command IDs prevent duplicate sends.
+    linked_to_user: true
+    sent_off_device: true
+    tracking: false

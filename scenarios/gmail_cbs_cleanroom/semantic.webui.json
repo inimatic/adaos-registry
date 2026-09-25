@@ -1,0 +1,1276 @@
+{
+  "schema": "adaos.webui.semantic.v2",
+  "document_id": "gmail_cbs_cleanroom.v1",
+  "brief_ref": "brief:d394e480fede8de766634de1",
+  "brief_digest": "sha256:d394e480fede8de766634de12d7249ab317305edfc05b4251e64387d25f187a2",
+  "title": {
+    "key": "prototype.gmail_cbs_cleanroom.v1.title",
+    "en": "Mail Cleanroom Prototype",
+    "ru": "Почтовый прототип Cleanroom"
+  },
+  "layout": {
+    "pattern": "split"
+  },
+  "resources": [
+    {
+      "fields": [
+        {
+          "editable": true,
+          "id": "name",
+          "label": {
+            "key": "field.name.label",
+            "en": "Account Name",
+            "ru": "Имя аккаунта"
+          },
+          "required": true,
+          "value_type": "short_text"
+        },
+        {
+          "editable": true,
+          "id": "status",
+          "label": {
+            "key": "field.status.label",
+            "en": "Status",
+            "ru": "Статус"
+          },
+          "options": [
+            {
+              "label": {
+                "key": "field.status.option.disconnected",
+                "en": "Disconnected",
+                "ru": "Отключено"
+              },
+              "value": "disconnected"
+            },
+            {
+              "label": {
+                "key": "field.status.option.connecting",
+                "en": "Connecting",
+                "ru": "Подключение"
+              },
+              "value": "connecting"
+            },
+            {
+              "label": {
+                "key": "field.status.option.connected",
+                "en": "Connected",
+                "ru": "Подключено"
+              },
+              "value": "connected"
+            },
+            {
+              "label": {
+                "key": "field.status.option.offline",
+                "en": "Offline",
+                "ru": "Оффлайн"
+              },
+              "value": "offline"
+            },
+            {
+              "label": {
+                "key": "field.status.option.permission_denied",
+                "en": "Permission Denied",
+                "ru": "Доступ запрещен"
+              },
+              "value": "permission_denied"
+            },
+            {
+              "label": {
+                "key": "field.status.option.auth_required",
+                "en": "Authorization Required",
+                "ru": "Требуется авторизация"
+              },
+              "value": "auth_required"
+            },
+            {
+              "label": {
+                "key": "field.status.option.provider_error",
+                "en": "Provider Error",
+                "ru": "Ошибка провайдера"
+              },
+              "value": "provider_error"
+            }
+          ],
+          "required": true,
+          "value_type": "choice"
+        },
+        {
+          "editable": false,
+          "id": "least_privilege_note",
+          "label": {
+            "key": "field.least_privilege_note.label",
+            "en": "Least-Privilege Disclosure",
+            "ru": "Заявление о минимальных правах"
+          },
+          "required": false,
+          "value_type": "long_text"
+        },
+        {
+          "editable": false,
+          "id": "reusable_connection_note",
+          "label": {
+            "key": "field.reusable_connection_note.label",
+            "en": "Reusable Connection (0.1.3)",
+            "ru": "Повторно используемое подключение (0.1.3)"
+          },
+          "required": false,
+          "value_type": "long_text",
+          "display_format": "markdown"
+        }
+      ],
+      "id": "Account",
+      "item_label": {
+        "key": "resource.Account.item",
+        "en": "Account",
+        "ru": "Аккаунт"
+      },
+      "item_semantics": "Connection/setup status for a mail provider account; no secrets stored; provider 0.1.3 reusable_connections boundary visible",
+      "records": [
+        {
+          "name": "Cleanroom Mail",
+          "status": "connected",
+          "least_privilege_note": "This Prototype shows a local-only connection placeholder. It avoids storing secrets or tokens and requests only minimal message scopes when automated.",
+          "reusable_connection_note": "Provider 0.1.3 enables reusable_connections. Another CBS consumer may attach the same Core-owned Gmail connection without copying credentials. This Prototype does not store or expose secrets.",
+          "id": "acct1"
+        },
+        {
+          "name": "Cleanroom Mail (Offline)",
+          "status": "offline",
+          "least_privilege_note": "",
+          "reusable_connection_note": "Provider 0.1.3 reusable_connections available; offline state shown locally.",
+          "id": "acct_offline"
+        },
+        {
+          "name": "Cleanroom Mail (Denied)",
+          "status": "permission_denied",
+          "least_privilege_note": "",
+          "reusable_connection_note": "Permission denied surfaced locally; no secrets stored.",
+          "id": "acct_perm"
+        },
+        {
+          "name": "Cleanroom Mail (Auth Required)",
+          "status": "auth_required",
+          "least_privilege_note": "",
+          "reusable_connection_note": "Authorization required; automation will handle OAuth later.",
+          "id": "acct_auth"
+        },
+        {
+          "name": "Cleanroom Mail (Provider Error)",
+          "status": "provider_error",
+          "least_privilege_note": "",
+          "reusable_connection_note": "Provider error surfaced without tokens in logs.",
+          "id": "acct_provider_err"
+        }
+      ],
+      "identity_field_refs": [
+        "id"
+      ]
+    },
+    {
+      "fields": [
+        {
+          "editable": true,
+          "id": "title",
+          "label": {
+            "key": "field.title.label",
+            "en": "Title",
+            "ru": "Название"
+          },
+          "required": true,
+          "value_type": "short_text"
+        },
+        {
+          "editable": true,
+          "id": "system",
+          "label": {
+            "key": "field.system.label",
+            "en": "System",
+            "ru": "Системная"
+          },
+          "required": true,
+          "value_type": "boolean"
+        }
+      ],
+      "id": "Label",
+      "item_label": {
+        "key": "resource.Label.item",
+        "en": "Labels",
+        "ru": "Метки"
+      },
+      "item_semantics": "Mail labels/folders for navigation; local placeholders",
+      "records": [
+        {
+          "title": "Inbox",
+          "system": true,
+          "id": "inbox"
+        },
+        {
+          "title": "Starred",
+          "system": true,
+          "id": "starred"
+        },
+        {
+          "title": "Sent",
+          "system": true,
+          "id": "sent"
+        },
+        {
+          "title": "Trash",
+          "system": true,
+          "id": "trash"
+        }
+      ],
+      "identity_field_refs": [
+        "id"
+      ]
+    },
+    {
+      "fields": [
+        {
+          "editable": true,
+          "id": "Message.subject",
+          "label": {
+            "key": "field.Message.subject.label",
+            "en": "Subject",
+            "ru": "Тема"
+          },
+          "required": true,
+          "value_type": "short_text"
+        },
+        {
+          "editable": true,
+          "id": "snippet",
+          "label": {
+            "key": "field.snippet.label",
+            "en": "Snippet",
+            "ru": "Фрагмент"
+          },
+          "required": false,
+          "value_type": "long_text"
+        },
+        {
+          "editable": true,
+          "id": "from",
+          "label": {
+            "key": "field.from.label",
+            "en": "From",
+            "ru": "От"
+          },
+          "required": true,
+          "value_type": "short_text"
+        },
+        {
+          "editable": true,
+          "id": "Message.to",
+          "label": {
+            "key": "field.Message.to.label",
+            "en": "To",
+            "ru": "Кому"
+          },
+          "required": true,
+          "value_type": "short_text"
+        },
+        {
+          "editable": true,
+          "id": "date",
+          "label": {
+            "key": "field.date.label",
+            "en": "Date",
+            "ru": "Дата"
+          },
+          "required": true,
+          "value_type": "date"
+        },
+        {
+          "editable": true,
+          "id": "unread",
+          "label": {
+            "key": "field.unread.label",
+            "en": "Unread",
+            "ru": "Непрочитано"
+          },
+          "required": true,
+          "value_type": "boolean"
+        },
+        {
+          "editable": true,
+          "id": "starred",
+          "label": {
+            "key": "field.starred.label",
+            "en": "Starred",
+            "ru": "Помечено ★"
+          },
+          "required": true,
+          "value_type": "boolean"
+        },
+        {
+          "editable": true,
+          "id": "labels_ref",
+          "label": {
+            "key": "field.labels_ref.label",
+            "en": "Label",
+            "ru": "Метка"
+          },
+          "options": [
+            {
+              "value": "inbox",
+              "label": {
+                "key": "relationship.Message_labels.option.inbox",
+                "en": "Inbox",
+                "ru": "Inbox"
+              }
+            },
+            {
+              "value": "starred",
+              "label": {
+                "key": "relationship.Message_labels.option.starred",
+                "en": "Starred",
+                "ru": "Starred"
+              }
+            },
+            {
+              "value": "sent",
+              "label": {
+                "key": "relationship.Message_labels.option.sent",
+                "en": "Sent",
+                "ru": "Sent"
+              }
+            },
+            {
+              "value": "trash",
+              "label": {
+                "key": "relationship.Message_labels.option.trash",
+                "en": "Trash",
+                "ru": "Trash"
+              }
+            }
+          ],
+          "required": true,
+          "value_type": "choice"
+        },
+        {
+          "editable": true,
+          "id": "Message.body",
+          "label": {
+            "key": "field.Message.body.label",
+            "en": "Body (placeholder)",
+            "ru": "Тело (заглушка)"
+          },
+          "required": false,
+          "value_type": "long_text"
+        }
+      ],
+      "id": "Message",
+      "item_label": {
+        "key": "resource.Message.item",
+        "en": "Message",
+        "ru": "Письмо"
+      },
+      "item_semantics": "Prototype-local mail messages without real external content",
+      "records": [
+        {
+          "Message.subject": "Welcome to Cleanroom",
+          "snippet": "Thanks for trying the prototype.",
+          "from": "team@example.com",
+          "Message.to": "you@example.com",
+          "date": "2026-09-01",
+          "unread": true,
+          "starred": false,
+          "labels_ref": "inbox",
+          "Message.body": "This is a placeholder body. No real provider data is stored.",
+          "id": "m1"
+        },
+        {
+          "Message.subject": "Your receipt",
+          "snippet": "Order #12345 processed.",
+          "from": "store@example.com",
+          "Message.to": "you@example.com",
+          "date": "2026-09-05",
+          "unread": false,
+          "starred": true,
+          "labels_ref": "inbox",
+          "Message.body": "Placeholder message content for demo only.",
+          "id": "m2"
+        },
+        {
+          "Message.subject": "Draft sent copy",
+          "snippet": "A copy in Sent.",
+          "from": "you@example.com",
+          "Message.to": "friend@example.com",
+          "date": "2026-09-10",
+          "unread": false,
+          "starred": false,
+          "labels_ref": "sent",
+          "Message.body": "Local-only sample.",
+          "id": "m3"
+        }
+      ],
+      "identity_field_refs": [
+        "id"
+      ]
+    },
+    {
+      "fields": [
+        {
+          "editable": true,
+          "id": "Composer.to",
+          "label": {
+            "key": "field.Composer.to.label",
+            "en": "To",
+            "ru": "Кому"
+          },
+          "required": true,
+          "value_type": "short_text"
+        },
+        {
+          "editable": true,
+          "id": "Composer.subject",
+          "label": {
+            "key": "field.Composer.subject.label",
+            "en": "Subject",
+            "ru": "Тема"
+          },
+          "required": true,
+          "value_type": "short_text"
+        },
+        {
+          "editable": true,
+          "id": "Composer.body",
+          "label": {
+            "key": "field.Composer.body.label",
+            "en": "Body",
+            "ru": "Текст"
+          },
+          "required": true,
+          "value_type": "long_text"
+        },
+        {
+          "editable": false,
+          "id": "disclosure",
+          "label": {
+            "key": "field.disclosure.label",
+            "en": "Sending Disclosure",
+            "ru": "Уведомление об отправке"
+          },
+          "required": false,
+          "value_type": "long_text"
+        }
+      ],
+      "id": "Composer",
+      "item_label": {
+        "key": "resource.Composer.item",
+        "en": "Composer",
+        "ru": "Компонент написания"
+      },
+      "item_semantics": "Compose a new local message; sending deferred to Automation",
+      "records": [
+        {
+          "Composer.to": "",
+          "Composer.subject": "",
+          "Composer.body": "",
+          "disclosure": "Send will queue a local placeholder and defer real delivery to Automation; no external provider is contacted.",
+          "id": "compose1"
+        }
+      ],
+      "identity_field_refs": [
+        "id"
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "many_to_one",
+      "from_field_ref": "labels_ref",
+      "from_resource_ref": "Message",
+      "id": "Message_labels",
+      "label_field_refs": [
+        "title"
+      ],
+      "to_field_ref": "id",
+      "to_resource_ref": "Label"
+    }
+  ],
+  "views": [
+    {
+      "empty_state": {
+        "detail": {
+          "key": "view.Account.collection.empty.detail",
+          "en": "Add an account placeholder to proceed.",
+          "ru": "Добавьте аккаунт-заглушку для продолжения."
+        },
+        "title": {
+          "key": "view.Account.collection.empty.title",
+          "en": "No accounts",
+          "ru": "Нет аккаунтов"
+        }
+      },
+      "field_refs": [
+        "name",
+        "status"
+      ],
+      "id": "Account.collection",
+      "presentation": "list",
+      "region_role": "supporting",
+      "role": "collection",
+      "title": {
+        "key": "view.Account.collection.title",
+        "en": "Accounts",
+        "ru": "Аккаунты"
+      },
+      "resource_ref": "Account",
+      "surface": "inline",
+      "scope_filters": [],
+      "field_display": [],
+      "media": null,
+      "presentation_options": null,
+      "selection_filter": null,
+      "section": null
+    },
+    {
+      "field_refs": [
+        "name",
+        "status",
+        "least_privilege_note",
+        "reusable_connection_note"
+      ],
+      "id": "Account.details",
+      "region_role": "supporting",
+      "role": "details",
+      "title": {
+        "key": "view.Account.details.title",
+        "en": "Connection",
+        "ru": "Подключение"
+      },
+      "resource_ref": "Account",
+      "surface": "inline",
+      "scope_filters": [],
+      "field_display": [],
+      "media": null,
+      "presentation_options": null,
+      "selection_filter": null,
+      "section": null
+    },
+    {
+      "field_refs": [
+        "status"
+      ],
+      "id": "Account.editor.status",
+      "region_role": "actions",
+      "role": "editor",
+      "title": {
+        "key": "view.Account.editor.status.title",
+        "en": "Set Status (Prototype)",
+        "ru": "Установить статус (прототип)"
+      },
+      "resource_ref": "Account",
+      "surface": "modal",
+      "scope_filters": [],
+      "field_display": [],
+      "media": null,
+      "presentation_options": null,
+      "selection_filter": null,
+      "section": null
+    },
+    {
+      "empty_state": {
+        "detail": {
+          "key": "view.Labels.collection.empty.detail",
+          "en": "Add a label to browse messages.",
+          "ru": "Добавьте метку для просмотра писем."
+        },
+        "title": {
+          "key": "view.Labels.collection.empty.title",
+          "en": "No labels",
+          "ru": "Нет меток"
+        }
+      },
+      "field_refs": [
+        "title"
+      ],
+      "id": "Labels.collection",
+      "presentation": "list",
+      "region_role": "supporting",
+      "role": "collection",
+      "title": {
+        "key": "view.Labels.collection.title",
+        "en": "Labels",
+        "ru": "Метки"
+      },
+      "resource_ref": "Label",
+      "surface": "inline",
+      "scope_filters": [],
+      "field_display": [],
+      "media": null,
+      "presentation_options": null,
+      "selection_filter": null,
+      "section": null
+    },
+    {
+      "empty_state": {
+        "detail": {
+          "key": "view.Messages.collection.empty.detail",
+          "en": "Try different filters or select another label.",
+          "ru": "Попробуйте другие фильтры или выберите другую метку."
+        },
+        "title": {
+          "key": "view.Messages.collection.empty.title",
+          "en": "No messages",
+          "ru": "Нет писем"
+        }
+      },
+      "field_refs": [
+        "unread",
+        "starred",
+        "from",
+        "Message.subject",
+        "date"
+      ],
+      "id": "Messages.collection",
+      "presentation": "table",
+      "query_controls": [
+        {
+          "id": "msg_search",
+          "kind": "search",
+          "label": {
+            "key": "query.msg_search.label",
+            "en": "Search",
+            "ru": "Поиск"
+          }
+        },
+        {
+          "field_ref": "unread",
+          "id": "unread_filter",
+          "kind": "filter",
+          "label": {
+            "key": "query.unread_filter.label",
+            "en": "Unread",
+            "ru": "Непрочитано"
+          }
+        },
+        {
+          "field_ref": "starred",
+          "id": "starred_filter",
+          "kind": "filter",
+          "label": {
+            "key": "query.starred_filter.label",
+            "en": "Starred",
+            "ru": "Помечено ★"
+          }
+        }
+      ],
+      "region_role": "primary",
+      "role": "collection",
+      "title": {
+        "key": "view.Messages.collection.title",
+        "en": "Messages",
+        "ru": "Письма"
+      },
+      "resource_ref": "Message",
+      "surface": "inline",
+      "scope_filters": [],
+      "field_display": [
+        {
+          "align": "start",
+          "field_ref": "Message.subject",
+          "overflow": "truncate"
+        }
+      ],
+      "media": null,
+      "presentation_options": null,
+      "selection_filter": {
+        "field_ref": "labels_ref",
+        "source_view_ref": "Labels.collection",
+        "source_field_ref": null
+      },
+      "section": null
+    },
+    {
+      "field_refs": [
+        "from",
+        "Message.to",
+        "date",
+        "Message.subject",
+        "Message.body",
+        "labels_ref",
+        "unread",
+        "starred"
+      ],
+      "id": "Message.details",
+      "region_role": "supporting",
+      "role": "details",
+      "title": {
+        "key": "view.Message.details.title",
+        "en": "Reader",
+        "ru": "Просмотр"
+      },
+      "resource_ref": "Message",
+      "surface": "inline",
+      "scope_filters": [],
+      "field_display": [],
+      "media": null,
+      "presentation_options": null,
+      "selection_filter": null,
+      "section": null
+    },
+    {
+      "field_refs": [
+        "unread",
+        "starred",
+        "labels_ref"
+      ],
+      "id": "Message.editor.quick",
+      "region_role": "actions",
+      "role": "editor",
+      "title": {
+        "key": "view.Message.editor.quick.title",
+        "en": "Quick Update",
+        "ru": "Быстрое изменение"
+      },
+      "resource_ref": "Message",
+      "surface": "side_sheet",
+      "scope_filters": [],
+      "field_display": [],
+      "media": null,
+      "presentation_options": null,
+      "selection_filter": null,
+      "section": null
+    },
+    {
+      "empty_state": {
+        "detail": {
+          "key": "view.Composer.collection.empty.detail",
+          "en": "Open Compose to start a new draft.",
+          "ru": "Откройте окно написания, чтобы создать черновик."
+        },
+        "title": {
+          "key": "view.Composer.collection.empty.title",
+          "en": "No composer drafts",
+          "ru": "Нет черновиков"
+        }
+      },
+      "field_refs": [
+        "Composer.subject"
+      ],
+      "id": "Composer.collection",
+      "presentation": "list",
+      "region_role": "supporting",
+      "role": "collection",
+      "title": {
+        "key": "view.Composer.collection.title",
+        "en": "Composers",
+        "ru": "Черновики"
+      },
+      "resource_ref": "Composer",
+      "surface": "inline",
+      "scope_filters": [],
+      "field_display": [],
+      "media": null,
+      "presentation_options": null,
+      "selection_filter": null,
+      "section": null
+    },
+    {
+      "field_refs": [
+        "Composer.to",
+        "Composer.subject",
+        "Composer.body",
+        "disclosure"
+      ],
+      "id": "Composer.editor",
+      "region_role": "actions",
+      "role": "editor",
+      "title": {
+        "key": "view.Composer.editor.title",
+        "en": "Compose",
+        "ru": "Написать"
+      },
+      "resource_ref": "Composer",
+      "surface": "modal",
+      "scope_filters": [],
+      "field_display": [],
+      "media": null,
+      "presentation_options": null,
+      "selection_filter": null,
+      "section": null
+    }
+  ],
+  "commands": [
+    {
+      "id": "cmd.account.set_status",
+      "input_field_refs": [
+        "status"
+      ],
+      "kind": "update",
+      "label": {
+        "key": "command.cmd.account.set_status.label",
+        "en": "Apply",
+        "ru": "Применить"
+      },
+      "view_ref": "Account.editor.status"
+    },
+    {
+      "id": "cmd.message.toggle_read",
+      "input_field_refs": [
+        "unread"
+      ],
+      "kind": "update",
+      "label": {
+        "key": "command.cmd.message.toggle_read.label",
+        "en": "Mark Read/Unread",
+        "ru": "Отметить проч./непроч."
+      },
+      "view_ref": "Message.editor.quick"
+    },
+    {
+      "id": "cmd.message.toggle_star",
+      "input_field_refs": [
+        "starred"
+      ],
+      "kind": "update",
+      "label": {
+        "key": "command.cmd.message.toggle_star.label",
+        "en": "Star/Unstar",
+        "ru": "Пометить/снять метку ★"
+      },
+      "view_ref": "Message.editor.quick"
+    },
+    {
+      "confirmation": {
+        "key": "command.cmd.message.move_archive.confirmation",
+        "en": "Move selected message out of Inbox?",
+        "ru": "Переместить выбранное письмо из Входящих?"
+      },
+      "fixed_values": {
+        "labels_ref": "sent"
+      },
+      "id": "cmd.message.move_archive",
+      "input_field_refs": [
+        "labels_ref"
+      ],
+      "kind": "update",
+      "label": {
+        "key": "command.cmd.message.move_archive.label",
+        "en": "Archive",
+        "ru": "Архивировать"
+      },
+      "view_ref": "Message.editor.quick"
+    },
+    {
+      "confirmation": {
+        "key": "command.cmd.message.move_trash.confirmation",
+        "en": "Move selected message to Trash?",
+        "ru": "Переместить выбранное письмо в корзину?"
+      },
+      "fixed_values": {
+        "labels_ref": "trash"
+      },
+      "id": "cmd.message.move_trash",
+      "input_field_refs": [
+        "labels_ref"
+      ],
+      "kind": "update",
+      "label": {
+        "key": "command.cmd.message.move_trash.label",
+        "en": "Move to Trash",
+        "ru": "В корзину"
+      },
+      "view_ref": "Message.editor.quick"
+    },
+    {
+      "confirmation": {
+        "key": "command.cmd.compose.send_local.confirmation",
+        "en": "Send will create a local placeholder and defer real delivery.",
+        "ru": "Отправка создаст локальный черновик; реальная доставка отложена."
+      },
+      "guard": {
+        "require_nonempty": [
+          "Composer.to",
+          "Composer.subject",
+          "Composer.body"
+        ],
+        "when": {
+          "field_ref": "Composer.subject",
+          "operator": "nonempty",
+          "value": null
+        }
+      },
+      "id": "cmd.compose.send_local",
+      "input_field_refs": [
+        "Composer.to",
+        "Composer.subject",
+        "Composer.body"
+      ],
+      "kind": "create",
+      "label": {
+        "key": "command.cmd.compose.send_local.label",
+        "en": "Send (queue locally)",
+        "ru": "Отправить (локально)"
+      },
+      "view_ref": "Composer.editor"
+    }
+  ],
+  "representative_states": [
+    {
+      "filters": [
+        {
+          "field_ref": "status",
+          "operator": "eq",
+          "value": "offline"
+        }
+      ],
+      "id": "state.offline",
+      "label": {
+        "key": "state.state.offline.label",
+        "en": "Offline",
+        "ru": "Оффлайн"
+      },
+      "max_items": 1,
+      "min_items": 1,
+      "view_ref": "Account.details",
+      "proof": {
+        "kind": "field_predicate",
+        "visible_field_refs": [
+          "status"
+        ]
+      }
+    },
+    {
+      "filters": [
+        {
+          "field_ref": "status",
+          "operator": "eq",
+          "value": "permission_denied"
+        }
+      ],
+      "id": "state.permission_denied",
+      "label": {
+        "key": "state.state.permission_denied.label",
+        "en": "Permission Denied",
+        "ru": "Доступ запрещен"
+      },
+      "max_items": 1,
+      "min_items": 1,
+      "view_ref": "Account.details",
+      "proof": {
+        "kind": "field_predicate",
+        "visible_field_refs": [
+          "status"
+        ]
+      }
+    },
+    {
+      "filters": [
+        {
+          "field_ref": "status",
+          "operator": "eq",
+          "value": "auth_required"
+        }
+      ],
+      "id": "state.auth_required",
+      "label": {
+        "key": "state.state.auth_required.label",
+        "en": "Authorization Required",
+        "ru": "Требуется авторизация"
+      },
+      "max_items": 1,
+      "min_items": 1,
+      "view_ref": "Account.details",
+      "proof": {
+        "kind": "field_predicate",
+        "visible_field_refs": [
+          "status"
+        ]
+      }
+    },
+    {
+      "filters": [
+        {
+          "field_ref": "status",
+          "operator": "eq",
+          "value": "provider_error"
+        }
+      ],
+      "id": "state.provider_error",
+      "label": {
+        "key": "state.state.provider_error.label",
+        "en": "Provider Error",
+        "ru": "Ошибка провайдера"
+      },
+      "max_items": 1,
+      "min_items": 1,
+      "view_ref": "Account.details",
+      "proof": {
+        "kind": "field_predicate",
+        "visible_field_refs": [
+          "status"
+        ]
+      }
+    },
+    {
+      "filters": [
+        {
+          "field_ref": "name",
+          "operator": "eq",
+          "value": "Cleanroom Mail"
+        }
+      ],
+      "id": "state.cbs_cleanroom",
+      "label": {
+        "key": "state.state.cbs_cleanroom.label",
+        "en": "CBS Cleanroom",
+        "ru": "CBS Cleanroom"
+      },
+      "max_items": 1,
+      "min_items": 1,
+      "view_ref": "Account.details",
+      "proof": {
+        "kind": "field_predicate",
+        "visible_field_refs": [
+          "name"
+        ]
+      }
+    },
+    {
+      "filters": [],
+      "id": "state.loading",
+      "label": {
+        "key": "state.state.loading.label",
+        "en": "Loading",
+        "ru": "Загрузка"
+      },
+      "max_items": 0,
+      "min_items": 0,
+      "view_ref": "Messages.collection",
+      "proof": {
+        "kind": "collection_empty",
+        "visible_field_refs": []
+      }
+    },
+    {
+      "filters": [
+        {
+          "field_ref": "labels_ref",
+          "operator": "eq",
+          "value": "inbox"
+        },
+        {
+          "field_ref": "unread",
+          "operator": "eq",
+          "value": false
+        },
+        {
+          "field_ref": "starred",
+          "operator": "eq",
+          "value": false
+        }
+      ],
+      "id": "state.empty",
+      "label": {
+        "key": "state.state.empty.label",
+        "en": "Empty Inbox",
+        "ru": "Пустые Входящие"
+      },
+      "max_items": 0,
+      "min_items": 0,
+      "view_ref": "Messages.collection",
+      "proof": {
+        "kind": "query_empty",
+        "visible_field_refs": [
+          "unread",
+          "starred"
+        ]
+      }
+    }
+  ],
+  "requirement_bindings": [
+    {
+      "requirement_ref": "job:01",
+      "semantic_refs": [
+        "resource:Account",
+        "view:Account.details"
+      ]
+    },
+    {
+      "requirement_ref": "job:02",
+      "semantic_refs": [
+        "resource:Account",
+        "state:state.cbs_cleanroom",
+        "view:Account.details"
+      ]
+    },
+    {
+      "requirement_ref": "job:03",
+      "semantic_refs": [
+        "state:state.empty",
+        "state:state.loading"
+      ]
+    },
+    {
+      "requirement_ref": "job:04",
+      "semantic_refs": [
+        "command:cmd.compose.send_local",
+        "resource:Composer",
+        "view:Composer.editor"
+      ]
+    },
+    {
+      "requirement_ref": "residual:01",
+      "semantic_refs": [
+        "resource:Account",
+        "state:state.cbs_cleanroom",
+        "view:Account.details"
+      ]
+    },
+    {
+      "requirement_ref": "residual:02",
+      "semantic_refs": [
+        "resource:Account",
+        "state:state.cbs_cleanroom",
+        "view:Account.details"
+      ]
+    },
+    {
+      "requirement_ref": "residual:03",
+      "semantic_refs": [
+        "resource:Account",
+        "resource:Label",
+        "resource:Message",
+        "view:Account.details",
+        "view:Labels.collection",
+        "view:Messages.collection"
+      ]
+    },
+    {
+      "requirement_ref": "residual:04",
+      "semantic_refs": [
+        "resource:Account",
+        "state:state.cbs_cleanroom",
+        "view:Account.details"
+      ]
+    },
+    {
+      "requirement_ref": "residual:05",
+      "semantic_refs": [
+        "state:state.cbs_cleanroom"
+      ]
+    },
+    {
+      "requirement_ref": "operation:update",
+      "semantic_refs": [
+        "resource:Account"
+      ]
+    },
+    {
+      "requirement_ref": "operation:create",
+      "semantic_refs": [
+        "resource:Account"
+      ]
+    },
+    {
+      "requirement_ref": "operation:update:2",
+      "semantic_refs": [
+        "resource:Account",
+        "view:Account.details"
+      ]
+    },
+    {
+      "requirement_ref": "operation:transition",
+      "semantic_refs": [
+        "state:state.cbs_cleanroom"
+      ]
+    }
+  ],
+  "capability_gaps": [],
+  "automation_requirements": [
+    {
+      "requirement_ref": "job:01",
+      "reason": "business_rule",
+      "disclosure": {
+        "en": "Provider 0.1.3 reusable_connections are recognized; Prototype exposes the reuse boundary only.",
+        "ru": "Провайдер 0.1.3 поддерживает reusable_connections; прототип лишь отображает границу повторного использования."
+      },
+      "acceptance": "Account details show a reusable_connections note; no secret storage; offline/denied/auth-required/provider-error remain local.",
+      "statement": "The intended change is already present: provider version 0"
+    },
+    {
+      "requirement_ref": "job:02",
+      "reason": "business_rule",
+      "disclosure": {
+        "en": "attach_reusable_connection will be automated later; no credentials are copied.",
+        "ru": "attach_reusable_connection будет автоматизирован позже; учетные данные не копируются."
+      },
+      "acceptance": "Another CBS consumer can attach in Automation; Prototype shows disclosure text without performing attachment.",
+      "statement": "3 adds reusable_connections and attach_reusable_connection so another CBS consumer can explicitly attach the same Core-owned Gmail connection without copying credentials"
+    },
+    {
+      "requirement_ref": "job:03",
+      "reason": "business_rule",
+      "disclosure": {
+        "en": "Hermetic tests and CBS conformance remain validated out of band; UI exposes statuses for inspection.",
+        "ru": "Герметичные тесты и соответствие CBS проверяются вне UI; статусы видимы для инспекции."
+      },
+      "acceptance": "States render correctly for connected/offline/permission/auth/provider-error on Account details.",
+      "statement": "Treat this as a bounded release/validation change: expose the reuse boundary in the application contract and evidence, validate the existing hermetic tests and CBS conformance"
+    },
+    {
+      "requirement_ref": "job:04",
+      "reason": "business_rule",
+      "disclosure": {
+        "en": "Advancing to shared provider release will occur via Automation; no live Gmail calls.",
+        "ru": "Переход к общему релизу провайдера произойдет через автоматизацию; реальных вызовов Gmail нет."
+      },
+      "acceptance": "Prototype shows disclosures; commands operate locally; no external effects.",
+      "statement": "advance it through Prototype/Automation so 0"
+    },
+    {
+      "requirement_ref": "residual:01",
+      "reason": "business_rule",
+      "disclosure": {
+        "en": "This release prepares the existing Gmail Cleanroom app from current DEV without UI changes.\n\nNo secrets/tokens are stored or logged in Prototype.",
+        "ru": "Этот релиз готовит существующее приложение Gmail Cleanroom из текущего DEV без изменений UI.\n\nСекреты/токены не хранятся и не логируются в прототипе."
+      },
+      "acceptance": "Screens/layout unchanged; only disclosures updated.\n\nInspection of fields shows only placeholder text; no token fields exist.",
+      "statement": "Prepare a new release of the existing Gmail CBS Cleanroom application from its current DEV source"
+    },
+    {
+      "requirement_ref": "residual:03",
+      "reason": "business_rule",
+      "disclosure": {
+        "en": "Existing Gmail client behaviors and UI are preserved.",
+        "ru": "Существующее поведение клиента Gmail и UI сохранены."
+      },
+      "acceptance": "Collections, details, editors and commands remain as before.",
+      "statement": "Preserve every existing Gmail client behavior and the current UI"
+    },
+    {
+      "requirement_ref": "residual:05",
+      "reason": "business_rule",
+      "disclosure": {
+        "en": "Provider 0.1.3 can become the shared release after Automation passes.",
+        "ru": "Провайдер 0.1.3 станет общим релизом после прохождения автоматизации."
+      },
+      "acceptance": "No secrets/tokens in state; reuse boundary visible; ready for Automation gating.",
+      "statement": "3 can become the exact shared provider release"
+    },
+    {
+      "requirement_ref": "residual:02",
+      "reason": "business_rule",
+      "disclosure": {
+        "en": "No live Gmail, no mailbox writes, no second provider, no secret copying.",
+        "ru": "Без живого Gmail, без записей в почтовый ящик, без второго провайдера, без копирования секретов."
+      },
+      "acceptance": "All actions are local placeholders; disclosures present.",
+      "statement": "1"
+    },
+    {
+      "requirement_ref": "residual:04",
+      "reason": "business_rule",
+      "disclosure": {
+        "en": "Release validation is bounded; evidence is visible in Account details.",
+        "ru": "Валидация релиза ограниченная; доказательства видимы в деталях аккаунта."
+      },
+      "acceptance": "Account details contain 0.1.3 reuse note; states cover failure cases.",
+      "statement": "1"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "authority_requirements": [
+    "providers.google.gmail",
+    "storage.relational",
+    "workspace.read",
+    "workspace.write"
+  ],
+  "binding_definition_ref": "binding-definition:mail.messages.manage.google-gmail-local",
+  "capability_ref": "capability:mail.messages.manage",
+  "capability_version": "1.0.0",
+  "conformance_obligations": [
+    "capability_conformance",
+    "external_evidence_freshness"
+  ],
+  "definition_digest": "sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2",
+  "entry_protocol": "adaos.skill.tools.v1",
+  "environment_constraints": {
+    "profile_classes": [
+      "local"
+    ],
+    "provider_features": [
+      "oauth_pkce",
+      "gmail_modify",
+      "send_idempotency"
+    ]
+  },
+  "implementation_entrypoint": "mail.messages.manage.google-gmail",
+  "modes": [
+    "production"
+  ],
+  "schema": "adaos.binding.definition.v1",
+  "state_support": [],
+  "version": "1.0.0"
+}

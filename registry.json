@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-17T20:00:58+00:00",
+  "updated_at": "2026-09-25T13:09:48+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -28,8 +28,8 @@
       "kind": "skill",
       "id": "adaos_drive",
       "name": "adaos_drive",
-      "version": "0.1.2",
-      "updated_at": "2026-08-17T20:11:20+00:00",
+      "version": "0.1.15",
+      "updated_at": "2026-09-24T01:43:14+00:00",
       "path": "skills/adaos_drive",
       "manifest": "skills/adaos_drive/skill.yaml",
       "source": {
@@ -43,7 +43,14 @@
       },
       "description": "Two-panel browser file manager for explicitly connected local folders.",
       "runtime_python": "3.11",
-      "tools_count": 24
+      "tools_count": 25,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "adaos_drive",
+        "release": "adaos_drive@0.1.17",
+        "release_digest": "sha256:ad28d3d702e14e711e91d08edcf4e3dc643409e96557b14caadea999530dc18a",
+        "package_digest": "sha256:4dd968d44f65b5cf64792bb075a17c28dd08bb04b0ebc8095b0fb1b475ea09ac"
+      }
     },
     {
       "kind": "skill",
@@ -70,8 +77,8 @@
       "kind": "skill",
       "id": "browsers_skill",
       "name": "browsers_skill",
-      "version": "0.15.22",
-      "updated_at": "2026-08-11T09:23:14+00:00",
+      "version": "0.15.24",
+      "updated_at": "2026-09-21T01:06:30+00:00",
       "path": "skills/browsers_skill",
       "manifest": "skills/browsers_skill/skill.yaml",
       "source": {
@@ -85,7 +92,14 @@
       },
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 12
+      "tools_count": 19,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.48",
+        "release_digest": "sha256:a4d3d571ca3d93ecf3d7ec213b6d490b0d719b213b04b5e3dc24b92fd39aa512",
+        "package_digest": "sha256:a9845236d2c671e108310f27acff6bc28c6f1ff9a2508b2510764274ebe6f04d"
+      }
     },
     {
       "kind": "skill",
@@ -308,8 +322,8 @@
       "kind": "skill",
       "id": "flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
       "name": "flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
-      "version": "0.1.6",
-      "updated_at": "2026-09-04T20:04:02+00:00",
+      "version": "0.1.7",
+      "updated_at": "2026-09-23T17:13:19+00:00",
       "path": "skills/flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
       "manifest": "skills/flowboard_lab_for_safely_prototyping_a_r_17528146_skill/skill.yaml",
       "source": {
@@ -328,9 +342,67 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.7",
-        "release_digest": "sha256:bd45a8329b72060154920f62e20838f805a7651fb33d5a996b6758010b9b29df",
-        "package_digest": "sha256:154e0934123fb949db42ec903daa7bd9e57661cbe3b3b2ab69ef8417ef985712"
+        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.15",
+        "release_digest": "sha256:28fafe6223638bbfa62011d92073c73b4fb43317fd18b0ffb29e364a98919b72",
+        "package_digest": "sha256:c2e7608fbd91bfa562c5a98fdaabdce0382538f3af4da323220ce8f5f98017e6"
+      }
+    },
+    {
+      "kind": "skill",
+      "id": "gmail_cbs_cleanroom_skill",
+      "name": "gmail_cbs_cleanroom_skill",
+      "version": "0.1.7",
+      "updated_at": "2026-09-24T22:34:09+00:00",
+      "path": "skills/gmail_cbs_cleanroom_skill",
+      "manifest": "skills/gmail_cbs_cleanroom_skill/skill.yaml",
+      "source": {
+        "path": "skills/gmail_cbs_cleanroom_skill",
+        "manifest": "skills/gmail_cbs_cleanroom_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "gmail_cbs_cleanroom_skill",
+        "id": "gmail_cbs_cleanroom_skill"
+      },
+      "description": "Reusable governed Gmail binding tools. Mail content is transient.",
+      "entry": "{'script': 'handlers/main.py'}",
+      "runtime_python": "3.11",
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "gmail_cbs_cleanroom",
+        "release": "gmail_cbs_cleanroom@0.1.10",
+        "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+        "package_digest": "sha256:403e924b61e66ae9d04aa69a4594d3fe2873349f75904c5633e3e01212c0df19"
+      },
+      "tools_count": 18
+    },
+    {
+      "kind": "skill",
+      "id": "gmail_mail_client_provider_skill",
+      "name": "gmail_mail_client_provider_skill",
+      "version": "0.1.1",
+      "updated_at": "2026-09-24T02:07:46+00:00",
+      "path": "skills/gmail_mail_client_provider_skill",
+      "manifest": "skills/gmail_mail_client_provider_skill/skill.yaml",
+      "source": {
+        "path": "skills/gmail_mail_client_provider_skill",
+        "manifest": "skills/gmail_mail_client_provider_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "gmail_mail_client_provider_skill",
+        "id": "gmail_mail_client_provider_skill"
+      },
+      "description": "Application-local Gmail SDK adapter with transient mail reads and durable send deduplication.",
+      "entry": "{'module': 'handlers.main', 'callable': 'connection_status'}",
+      "runtime_python": "3.11",
+      "tools_count": 8,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "gmail_mail_client",
+        "release": "gmail_mail_client@0.1.4",
+        "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+        "package_digest": "sha256:57945818da0ee3173d4a861523ef2feb15dc4a60ac89ad5852bd81f7a7d975ff"
       }
     },
     {
@@ -343,13 +415,7 @@
       "manifest": "skills/greet_on_boot_skill/skill.yaml",
       "source": {
         "path": "skills/greet_on_boot_skill",
-        "manifest": "skills/greet_on_boot_skill/skill.yaml",
-        "forge": "adaos-root",
-        "repository": "inimatic/adaos-registry",
-        "revision": "a6038c69c74efba37b9122338e2710490adcb8e9",
-        "path_scope": [
-          "subnets/sn_6acf0c01/nodes/8db40740-b3ff-44bf-baf5-9fb013b35b01/skills/greet_on_boot_skill/"
-        ]
+        "manifest": "skills/greet_on_boot_skill/skill.yaml"
       },
       "install": {
         "kind": "skill",
@@ -361,19 +427,10 @@
       "tools_count": 2,
       "activation": {
         "mode": "package_lock",
-        "project_id": "greet_on_boot_skill",
-        "release": "greet_on_boot_skill@0.2.4",
-        "release_digest": "sha256:f32701220f9846a75e18fc3561dbf62ec1724cb3ff4af40734cb31edff87d655",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.48",
+        "release_digest": "sha256:a4d3d571ca3d93ecf3d7ec213b6d490b0d719b213b04b5e3dc24b92fd39aa512",
         "package_digest": "sha256:eb695ac298aed7839c2cb7ac4d098b8313cdcd8887073e4fad8b645304e3feae"
-      },
-      "channels": {
-        "stable": {
-          "release": "greet_on_boot_skill@0.2.4",
-          "release_digest": "sha256:f32701220f9846a75e18fc3561dbf62ec1724cb3ff4af40734cb31edff87d655",
-          "source_revision": "a6038c69c74efba37b9122338e2710490adcb8e9",
-          "package_digest": "sha256:eb695ac298aed7839c2cb7ac4d098b8313cdcd8887073e4fad8b645304e3feae",
-          "version": "0.2.4"
-        }
       }
     },
     {
@@ -469,6 +526,33 @@
         "background_refresh": true
       },
       "tools_count": 8
+    },
+    {
+      "kind": "skill",
+      "id": "mail_focus_reader_skill",
+      "name": "mail_focus_reader_skill",
+      "version": "0.1.2",
+      "updated_at": "2026-09-25T04:04:39+00:00",
+      "path": "skills/mail_focus_reader_skill",
+      "manifest": "skills/mail_focus_reader_skill/skill.yaml",
+      "source": {
+        "path": "skills/mail_focus_reader_skill",
+        "manifest": "skills/mail_focus_reader_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "mail_focus_reader_skill",
+        "id": "mail_focus_reader_skill"
+      },
+      "description": "Project-owned resource implementation for project:mail_focus_reader. Realize the accepted Prototype according to the separate Automation brief.",
+      "runtime_python": "3.11",
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "mail_focus_reader",
+        "release": "mail_focus_reader@0.1.2",
+        "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+        "package_digest": "sha256:824a45a1bb3b15520260c0284151893f051f6079b3dfc14fb6a9d165067860ed"
+      }
     },
     {
       "kind": "skill",
@@ -749,7 +833,14 @@
       "description": "Hub-side pairing skill. Generates short-lived pairing IDs and stores payloads needed to provision new browsers (TV/Smart displays).",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 1
+      "tools_count": 1,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.48",
+        "release_digest": "sha256:a4d3d571ca3d93ecf3d7ec213b6d490b0d719b213b04b5e3dc24b92fd39aa512",
+        "package_digest": "sha256:ddac2904f52eea9e23a1b13cf530ae5dc6e4a8f33a44374685ca90df110a4ded"
+      }
     },
     {
       "kind": "skill",
@@ -1285,9 +1376,9 @@
       "tools_count": 7,
       "activation": {
         "mode": "package_lock",
-        "project_id": "builder",
-        "release": "builder@0.2.167",
-        "release_digest": "sha256:a23a7c08251e4762c54cc549ebcc23565d472099c85d628d809c4c44d5ee554c",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.48",
+        "release_digest": "sha256:a4d3d571ca3d93ecf3d7ec213b6d490b0d719b213b04b5e3dc24b92fd39aa512",
         "package_digest": "sha256:53310d271a7db31246955d09030c2ddef07619f37dd28dae74613848be3f207f"
       }
     },
@@ -1314,6 +1405,35 @@
     },
     {
       "kind": "skill",
+      "id": "web_desktop_runtime_skill",
+      "name": "web_desktop_runtime_skill",
+      "version": "0.1.22",
+      "updated_at": "2026-09-21T13:43:38+00:00",
+      "path": "skills/web_desktop_runtime_skill",
+      "manifest": "skills/web_desktop_runtime_skill/skill.yaml",
+      "source": {
+        "path": "skills/web_desktop_runtime_skill",
+        "manifest": "skills/web_desktop_runtime_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "web_desktop_runtime_skill",
+        "id": "web_desktop_runtime_skill"
+      },
+      "description": "Project-owned runtime actions for opening Web Desktop applications, managing Home, and preparing browser, Telegram, and node connection flows.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 9,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.48",
+        "release_digest": "sha256:a4d3d571ca3d93ecf3d7ec213b6d490b0d719b213b04b5e3dc24b92fd39aa512",
+        "package_digest": "sha256:1bf63075a9be9bbb07867ba1a1d1d34ff2addf7ee79c9d014f1d2327fe532fc3"
+      }
+    },
+    {
+      "kind": "skill",
       "id": "web_desktop_skill",
       "name": "web_desktop_skill",
       "version": "0.2.4",
@@ -1335,9 +1455,9 @@
       "tools_count": 0,
       "activation": {
         "mode": "package_lock",
-        "project_id": "semantic_ui_demo",
-        "release": "semantic_ui_demo@0.10.21",
-        "release_digest": "sha256:c5cc47377fd00f0a910de53a200ffbd3d722f479fdc357dc375c181b8fd18514",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.48",
+        "release_digest": "sha256:a4d3d571ca3d93ecf3d7ec213b6d490b0d719b213b04b5e3dc24b92fd39aa512",
         "package_digest": "sha256:dc6b9e208019a45a30e2d155e310802559c21a7ff6262acfb9fd524ec4a543de"
       }
     },
@@ -1369,13 +1489,19 @@
       "kind": "scenario",
       "id": "adaos_drive",
       "name": "adaos_drive",
-      "version": "0.1.1",
-      "updated_at": "2026-08-18T00:00:00+00:00",
+      "version": "0.1.11",
+      "updated_at": "2026-09-24T01:43:19+00:00",
       "path": "scenarios/adaos_drive",
       "manifest": "scenarios/adaos_drive/scenario.yaml",
       "source": {
         "path": "scenarios/adaos_drive",
-        "manifest": "scenarios/adaos_drive/scenario.yaml"
+        "manifest": "scenarios/adaos_drive/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:3302c7393ff1b04d91ec1df8e1624541938516e80c05a47d51bc8eda2afd4d3e",
+        "path_scope": [
+          "projects/adaos_drive/"
+        ]
       },
       "install": {
         "kind": "scenario",
@@ -1389,6 +1515,79 @@
         "required": [
           "adaos_drive"
         ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "adaos_drive",
+        "release": "adaos_drive@0.1.17",
+        "release_digest": "sha256:ad28d3d702e14e711e91d08edcf4e3dc643409e96557b14caadea999530dc18a",
+        "package_digest": "sha256:141e7e98aa2d300af734a56597b4968a0e6f77daf4c3dd95165c9784a922a57b"
+      },
+      "channels": {
+        "stable": {
+          "release": "adaos_drive@0.1.17",
+          "release_digest": "sha256:ad28d3d702e14e711e91d08edcf4e3dc643409e96557b14caadea999530dc18a",
+          "source_revision": "sha256:3302c7393ff1b04d91ec1df8e1624541938516e80c05a47d51bc8eda2afd4d3e",
+          "package_digest": "sha256:141e7e98aa2d300af734a56597b4968a0e6f77daf4c3dd95165c9784a922a57b",
+          "version": "0.1.11"
+        }
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "applications",
+      "name": "applications",
+      "version": "0.1.60",
+      "updated_at": "2026-09-23T10:26:33+00:00",
+      "path": "scenarios/applications",
+      "manifest": "scenarios/applications/scenario.yaml",
+      "source": {
+        "path": "scenarios/applications",
+        "manifest": "scenarios/applications/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:2b0071f244c21438aa2e0e8b49b2fb83bdc9de791e7349ed021964c0fbbf823e",
+        "path_scope": [
+          "projects/applications/"
+        ]
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "applications",
+        "id": "applications"
+      },
+      "title": "Applications",
+      "title_i18n": {
+        "fallback": "Applications",
+        "key": "scenario.applications.title"
+      },
+      "description": "Builder-created rapid prototype scenario.",
+      "io": {
+        "input": [
+          "voice",
+          "text"
+        ],
+        "output": [
+          "voice",
+          "text",
+          "web"
+        ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "applications",
+        "release": "applications@0.1.34",
+        "release_digest": "sha256:671797afb038e28b2453de707022d20ede8d7654ba0f7093d0c32a7d35b40618",
+        "package_digest": "sha256:658760489332b0774843fd5c07e618f96323e4bd0e54ddcb2e6358d4f1c71e71"
+      },
+      "channels": {
+        "stable": {
+          "release": "applications@0.1.34",
+          "release_digest": "sha256:671797afb038e28b2453de707022d20ede8d7654ba0f7093d0c32a7d35b40618",
+          "source_revision": "sha256:2b0071f244c21438aa2e0e8b49b2fb83bdc9de791e7349ed021964c0fbbf823e",
+          "package_digest": "sha256:658760489332b0774843fd5c07e618f96323e4bd0e54ddcb2e6358d4f1c71e71",
+          "version": "0.1.60"
+        }
       }
     },
     {
@@ -1467,8 +1666,8 @@
       "kind": "scenario",
       "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
       "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-      "version": "0.1.21",
-      "updated_at": "2026-09-04T21:20:03+00:00",
+      "version": "0.1.22",
+      "updated_at": "2026-09-23T17:13:13+00:00",
       "path": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146",
       "manifest": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146/scenario.yaml",
       "source": {
@@ -1476,7 +1675,7 @@
         "manifest": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:071b988dfffec9bc2e74aa75ccf19f9a874b88df623fc2d83aa7ec0cddcd6f82",
+        "revision": "sha256:ce57cfd11c0f465edc0c559ac9c033b0f086e26f79312ba4b452eb8a0d9489c2",
         "path_scope": [
           "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/"
         ]
@@ -1506,17 +1705,173 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.7",
-        "release_digest": "sha256:bd45a8329b72060154920f62e20838f805a7651fb33d5a996b6758010b9b29df",
-        "package_digest": "sha256:bc5ac59554acbb12552b9e6e2f1114b3eb5483326b3a9d6d7991dc89005050ec"
+        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.15",
+        "release_digest": "sha256:28fafe6223638bbfa62011d92073c73b4fb43317fd18b0ffb29e364a98919b72",
+        "package_digest": "sha256:577456cb44e528fb340d34d828ccb2cd80c2a4486b9f13b2b745cf63f0d0b7a7"
       },
       "channels": {
         "stable": {
-          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.7",
-          "release_digest": "sha256:bd45a8329b72060154920f62e20838f805a7651fb33d5a996b6758010b9b29df",
-          "source_revision": "sha256:071b988dfffec9bc2e74aa75ccf19f9a874b88df623fc2d83aa7ec0cddcd6f82",
-          "package_digest": "sha256:bc5ac59554acbb12552b9e6e2f1114b3eb5483326b3a9d6d7991dc89005050ec",
-          "version": "0.1.21"
+          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.15",
+          "release_digest": "sha256:28fafe6223638bbfa62011d92073c73b4fb43317fd18b0ffb29e364a98919b72",
+          "source_revision": "sha256:ce57cfd11c0f465edc0c559ac9c033b0f086e26f79312ba4b452eb8a0d9489c2",
+          "package_digest": "sha256:577456cb44e528fb340d34d828ccb2cd80c2a4486b9f13b2b745cf63f0d0b7a7",
+          "version": "0.1.22"
+        }
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "gmail_cbs_cleanroom",
+      "name": "gmail_cbs_cleanroom",
+      "version": "0.1.6",
+      "updated_at": "2026-09-25T12:47:11+00:00",
+      "path": "scenarios/gmail_cbs_cleanroom",
+      "manifest": "scenarios/gmail_cbs_cleanroom/scenario.yaml",
+      "source": {
+        "path": "scenarios/gmail_cbs_cleanroom",
+        "manifest": "scenarios/gmail_cbs_cleanroom/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:417b4c8371db444d1f5e0b08fc80c80a5f7743c71cffa6712b7b69f640d643e6",
+        "path_scope": [
+          "projects/gmail_cbs_cleanroom/"
+        ]
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "gmail_cbs_cleanroom",
+        "id": "gmail_cbs_cleanroom"
+      },
+      "title": "Mail Cleanroom Prototype",
+      "title_i18n": {
+        "key": "scenario.gmail_cbs_cleanroom.title",
+        "fallback": "Gmail CBS Cleanroom"
+      },
+      "description": "Empty AdaOS desktop canvas ready for Builder authoring.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "gmail_cbs_cleanroom_skill"
+        ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "gmail_cbs_cleanroom",
+        "release": "gmail_cbs_cleanroom@0.1.10",
+        "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+        "package_digest": "sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86"
+      },
+      "channels": {
+        "stable": {
+          "release": "gmail_cbs_cleanroom@0.1.10",
+          "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+          "source_revision": "sha256:417b4c8371db444d1f5e0b08fc80c80a5f7743c71cffa6712b7b69f640d643e6",
+          "package_digest": "sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86",
+          "version": "0.1.6"
+        }
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "gmail_mail_client",
+      "name": "gmail_mail_client",
+      "version": "0.1.2",
+      "updated_at": "2026-09-24T02:08:08+00:00",
+      "path": "scenarios/gmail_mail_client",
+      "manifest": "scenarios/gmail_mail_client/scenario.yaml",
+      "source": {
+        "path": "scenarios/gmail_mail_client",
+        "manifest": "scenarios/gmail_mail_client/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:05a29791dea8402855aaf1d52075dbe21579e49f2a59fc7d951d01dc5377bda6",
+        "path_scope": [
+          "projects/gmail_mail_client/"
+        ]
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "gmail_mail_client",
+        "id": "gmail_mail_client"
+      },
+      "title": "Gmail Mail Client",
+      "title_i18n": {
+        "key": "scenario.gmail_mail_client.title",
+        "fallback": "Gmail Mail Client"
+      },
+      "description": "Empty AdaOS desktop canvas ready for Builder authoring.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "gmail_mail_client_provider_skill"
+        ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "gmail_mail_client",
+        "release": "gmail_mail_client@0.1.4",
+        "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+        "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa"
+      },
+      "channels": {
+        "stable": {
+          "release": "gmail_mail_client@0.1.4",
+          "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+          "source_revision": "sha256:05a29791dea8402855aaf1d52075dbe21579e49f2a59fc7d951d01dc5377bda6",
+          "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa",
+          "version": "0.1.2"
+        }
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "inbox_triage",
+      "name": "inbox_triage",
+      "version": "0.1.4",
+      "updated_at": "2026-09-24T18:14:41+00:00",
+      "path": "scenarios/inbox_triage",
+      "manifest": "scenarios/inbox_triage/scenario.yaml",
+      "source": {
+        "path": "scenarios/inbox_triage",
+        "manifest": "scenarios/inbox_triage/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:45d5bd886bd03a99d132b709cb9825f3af6d2c78624b3424f02a73c6a0521ccb",
+        "path_scope": [
+          "projects/inbox_triage/"
+        ]
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "inbox_triage",
+        "id": "inbox_triage"
+      },
+      "title": "Inbox Triage",
+      "title_i18n": {
+        "key": "scenario.inbox_triage.title",
+        "fallback": "Inbox Triage"
+      },
+      "description": "Focused inbox triage using an explicitly attached shared mail connection.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "gmail_cbs_cleanroom_skill"
+        ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "inbox_triage",
+        "release": "inbox_triage@0.1.4",
+        "release_digest": "sha256:d6e3b4809c1e2ec531acdf40ae6f858a5f51340113d2bf54ca53d3a12fd92b8a",
+        "package_digest": "sha256:2fa808efdae12b4bc2b3c36279ce947efad5e4a3e212837f6a68e4db216f3703"
+      },
+      "channels": {
+        "stable": {
+          "release": "inbox_triage@0.1.4",
+          "release_digest": "sha256:d6e3b4809c1e2ec531acdf40ae6f858a5f51340113d2bf54ca53d3a12fd92b8a",
+          "source_revision": "sha256:45d5bd886bd03a99d132b709cb9825f3af6d2c78624b3424f02a73c6a0521ccb",
+          "package_digest": "sha256:2fa808efdae12b4bc2b3c36279ce947efad5e4a3e212837f6a68e4db216f3703",
+          "version": "0.1.4"
         }
       }
     },
@@ -1543,6 +1898,58 @@
         "required": [
           "infrascope_skill"
         ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "mail_focus_reader",
+      "name": "mail_focus_reader",
+      "version": "0.1.2",
+      "updated_at": "2026-09-25T04:04:44+00:00",
+      "path": "scenarios/mail_focus_reader",
+      "manifest": "scenarios/mail_focus_reader/scenario.yaml",
+      "source": {
+        "path": "scenarios/mail_focus_reader",
+        "manifest": "scenarios/mail_focus_reader/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:7d11ce2ab800f87bc3344dda1256f27feb0e4c9144bcc98980ef520877a367a3",
+        "path_scope": [
+          "projects/mail_focus_reader/"
+        ]
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "mail_focus_reader",
+        "id": "mail_focus_reader"
+      },
+      "title": "Mail Focus Reader",
+      "title_i18n": {
+        "key": "scenario.mail_focus_reader.title",
+        "fallback": "Mail Focus Reader"
+      },
+      "description": "Empty AdaOS desktop canvas ready for Builder authoring.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "gmail_cbs_cleanroom_skill"
+        ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "mail_focus_reader",
+        "release": "mail_focus_reader@0.1.2",
+        "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+        "package_digest": "sha256:1a07e0d95b0100e48c3ce72cbe899e8a92f147548962b3a7aebbf3645f0f81e4"
+      },
+      "channels": {
+        "stable": {
+          "release": "mail_focus_reader@0.1.2",
+          "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+          "source_revision": "sha256:7d11ce2ab800f87bc3344dda1256f27feb0e4c9144bcc98980ef520877a367a3",
+          "package_digest": "sha256:1a07e0d95b0100e48c3ce72cbe899e8a92f147548962b3a7aebbf3645f0f81e4",
+          "version": "0.1.2"
+        }
       }
     },
     {
@@ -1918,28 +2325,55 @@
       "kind": "scenario",
       "id": "web_desktop",
       "name": "web_desktop",
-      "version": "0.3.11",
-      "updated_at": "2026-08-11T09:33:02+00:00",
+      "version": "0.3.38",
+      "updated_at": "2026-09-21T15:35:56+00:00",
       "path": "scenarios/web_desktop",
       "manifest": "scenarios/web_desktop/scenario.yaml",
       "source": {
         "path": "scenarios/web_desktop",
-        "manifest": "scenarios/web_desktop/scenario.yaml"
+        "manifest": "scenarios/web_desktop/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:d7ec37f48304cd6c470177499b7b7f0ea88bb5bec9122923892fc924036c5d90",
+        "path_scope": [
+          "projects/web_desktop/"
+        ]
       },
       "install": {
         "kind": "scenario",
         "name": "web_desktop",
         "id": "web_desktop"
       },
-      "title": "Web Desktop",
+      "title": "Рабочий стол",
+      "title_i18n": {
+        "key": "scenario.web_desktop.title",
+        "fallback": "Рабочий стол"
+      },
       "description": "Desktop shell scenario that defines the main UI layout, registry and base catalog.",
       "skills": {
         "required": [
+          "web_desktop_runtime_skill",
           "web_desktop_skill",
           "greet_on_boot_skill",
           "pair_new_device_skill",
           "voice_chat_skill"
         ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.48",
+        "release_digest": "sha256:a4d3d571ca3d93ecf3d7ec213b6d490b0d719b213b04b5e3dc24b92fd39aa512",
+        "package_digest": "sha256:5c7e0d1b1f440a6a3465889f9c2e6581998055bd0f801cdd744a9c710ab5ab5a"
+      },
+      "channels": {
+        "stable": {
+          "release": "web_desktop@0.3.48",
+          "release_digest": "sha256:a4d3d571ca3d93ecf3d7ec213b6d490b0d719b213b04b5e3dc24b92fd39aa512",
+          "source_revision": "sha256:d7ec37f48304cd6c470177499b7b7f0ea88bb5bec9122923892fc924036c5d90",
+          "package_digest": "sha256:5c7e0d1b1f440a6a3465889f9c2e6581998055bd0f801cdd744a9c710ab5ab5a",
+          "version": "0.3.38"
+        }
       }
     }
   ],
@@ -2065,8 +2499,8 @@
       "kind": "project",
       "id": "adaos_drive",
       "name": "adaos_drive",
-      "version": "0.1.3",
-      "updated_at": "2026-08-27T21:05:39+00:00",
+      "version": "0.1.17",
+      "updated_at": "2026-09-24T01:44:35+00:00",
       "path": "projects/adaos_drive",
       "manifest": "projects/adaos_drive/project.yaml",
       "source": {
@@ -2129,7 +2563,24 @@
       "components_count": 2,
       "profiles": [
         "adaos.drive.v1"
-      ]
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "adaos_drive",
+        "release": "adaos_drive@0.1.17",
+        "release_digest": "sha256:ad28d3d702e14e711e91d08edcf4e3dc643409e96557b14caadea999530dc18a",
+        "primary_component": "scenario:adaos_drive",
+        "package_digest": "sha256:141e7e98aa2d300af734a56597b4968a0e6f77daf4c3dd95165c9784a922a57b"
+      },
+      "channels": {
+        "stable": {
+          "release": "adaos_drive@0.1.17",
+          "release_digest": "sha256:ad28d3d702e14e711e91d08edcf4e3dc643409e96557b14caadea999530dc18a",
+          "source_revision": "sha256:3302c7393ff1b04d91ec1df8e1624541938516e80c05a47d51bc8eda2afd4d3e",
+          "package_digest": "sha256:141e7e98aa2d300af734a56597b4968a0e6f77daf4c3dd95165c9784a922a57b",
+          "version": "0.1.17"
+        }
+      }
     },
     {
       "kind": "project",
@@ -2183,6 +2634,68 @@
       "profiles": [
         "adaos.analysis.events.v1"
       ]
+    },
+    {
+      "kind": "project",
+      "id": "applications",
+      "name": "applications",
+      "version": "0.1.34",
+      "updated_at": "2026-09-23T10:54:45+00:00",
+      "path": "projects/applications",
+      "manifest": "projects/applications/project.yaml",
+      "source": {
+        "path": "projects/applications",
+        "manifest": "projects/applications/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "applications",
+        "id": "applications"
+      },
+      "title": "Applications",
+      "description": "Manage installed applications, Marketplace discovery, releases, updates, permissions, runtime placement, and development status.",
+      "categories": [
+        "system"
+      ],
+      "tags": [
+        "applications",
+        "marketplace",
+        "permissions"
+      ],
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "features": [],
+      "components": [
+        "scenario:applications"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.system.applications.v1"
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "applications",
+        "release": "applications@0.1.34",
+        "release_digest": "sha256:671797afb038e28b2453de707022d20ede8d7654ba0f7093d0c32a7d35b40618",
+        "primary_component": "scenario:applications",
+        "package_digest": "sha256:658760489332b0774843fd5c07e618f96323e4bd0e54ddcb2e6358d4f1c71e71"
+      },
+      "channels": {
+        "stable": {
+          "release": "applications@0.1.34",
+          "release_digest": "sha256:671797afb038e28b2453de707022d20ede8d7654ba0f7093d0c32a7d35b40618",
+          "source_revision": "sha256:2b0071f244c21438aa2e0e8b49b2fb83bdc9de791e7349ed021964c0fbbf823e",
+          "package_digest": "sha256:658760489332b0774843fd5c07e618f96323e4bd0e54ddcb2e6358d4f1c71e71",
+          "version": "0.1.34"
+        }
+      }
     },
     {
       "kind": "project",
@@ -2466,8 +2979,8 @@
       "kind": "project",
       "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
       "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-      "version": "0.1.7",
-      "updated_at": "2026-09-04T21:24:26+00:00",
+      "version": "0.1.15",
+      "updated_at": "2026-09-23T17:14:43+00:00",
       "path": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146",
       "manifest": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/project.yaml",
       "source": {
@@ -2500,18 +3013,124 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.7",
-        "release_digest": "sha256:bd45a8329b72060154920f62e20838f805a7651fb33d5a996b6758010b9b29df",
+        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.15",
+        "release_digest": "sha256:28fafe6223638bbfa62011d92073c73b4fb43317fd18b0ffb29e364a98919b72",
         "primary_component": "scenario:flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "package_digest": "sha256:bc5ac59554acbb12552b9e6e2f1114b3eb5483326b3a9d6d7991dc89005050ec"
+        "package_digest": "sha256:577456cb44e528fb340d34d828ccb2cd80c2a4486b9f13b2b745cf63f0d0b7a7"
       },
       "channels": {
         "stable": {
-          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.7",
-          "release_digest": "sha256:bd45a8329b72060154920f62e20838f805a7651fb33d5a996b6758010b9b29df",
-          "source_revision": "sha256:071b988dfffec9bc2e74aa75ccf19f9a874b88df623fc2d83aa7ec0cddcd6f82",
-          "package_digest": "sha256:bc5ac59554acbb12552b9e6e2f1114b3eb5483326b3a9d6d7991dc89005050ec",
-          "version": "0.1.7"
+          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.15",
+          "release_digest": "sha256:28fafe6223638bbfa62011d92073c73b4fb43317fd18b0ffb29e364a98919b72",
+          "source_revision": "sha256:ce57cfd11c0f465edc0c559ac9c033b0f086e26f79312ba4b452eb8a0d9489c2",
+          "package_digest": "sha256:577456cb44e528fb340d34d828ccb2cd80c2a4486b9f13b2b745cf63f0d0b7a7",
+          "version": "0.1.15"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "gmail_cbs_cleanroom",
+      "name": "gmail_cbs_cleanroom",
+      "version": "0.1.10",
+      "updated_at": "2026-09-25T13:09:48+00:00",
+      "path": "projects/gmail_cbs_cleanroom",
+      "manifest": "projects/gmail_cbs_cleanroom/project.yaml",
+      "source": {
+        "path": "projects/gmail_cbs_cleanroom",
+        "manifest": "projects/gmail_cbs_cleanroom/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "gmail_cbs_cleanroom",
+        "id": "gmail_cbs_cleanroom"
+      },
+      "title": "Gmail CBS Cleanroom",
+      "description": "Create a new private AdaOS Application named \"Gmail CBS Cleanroom\" from\nscratch, with technical id gmail_cbs_cleanroom. It must be CBS-compatible. Its\nsemantic Application requires capability:mail.messages.manage version ^1.0.0\nwithout naming Gmail, a package, a skill, endpoints, account ids, or\ncredentials. For this first beta, realize that requirement with an\nApplication-local Gmail binding.\n\nThe user experience must include connection and setup status, inbox and label\nnavigation, search and unread/starred filters, message list and reading,\nlabels, archive, trash, read/unread, star/unstar, compose, and send. Include\nresponsive wide and compact layouts and deterministic loading, empty, offline,\nprovider-error, permission-denied, and authorization-required states. Explain\nleast-privilege access. OAuth secrets and tokens must never enter UI state,\nmanifests, fixtures, logs, errors, or telemetry. Keep shared provider reuse and\na global capability registry outside this first stage.\n\nBuild the executable Prototype now. Keep real external operations as explicit\npending Automation requirements; do not simulate successful authorization or\nuse live Gmail data in the Prototype.",
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "features": [],
+      "components": [
+        "scenario:gmail_cbs_cleanroom",
+        "skill:gmail_cbs_cleanroom_skill"
+      ],
+      "components_count": 2,
+      "profiles": [],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "gmail_cbs_cleanroom",
+        "release": "gmail_cbs_cleanroom@0.1.10",
+        "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+        "primary_component": "scenario:gmail_cbs_cleanroom",
+        "package_digest": "sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86"
+      },
+      "channels": {
+        "stable": {
+          "release": "gmail_cbs_cleanroom@0.1.10",
+          "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+          "source_revision": "sha256:417b4c8371db444d1f5e0b08fc80c80a5f7743c71cffa6712b7b69f640d643e6",
+          "package_digest": "sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86",
+          "version": "0.1.10"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "gmail_mail_client",
+      "name": "gmail_mail_client",
+      "version": "0.1.4",
+      "updated_at": "2026-09-24T02:29:50+00:00",
+      "path": "projects/gmail_mail_client",
+      "manifest": "projects/gmail_mail_client/project.yaml",
+      "source": {
+        "path": "projects/gmail_mail_client",
+        "manifest": "projects/gmail_mail_client/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "gmail_mail_client",
+        "id": "gmail_mail_client"
+      },
+      "title": "Gmail Mail Client",
+      "description": "Create a new private AdaOS Application named \"Gmail Mail Client\" from scratch. It must be CBS-compatible. Its semantic application requires capability:mail.messages.manage version ^1.0.0 without naming Gmail, a package, a skill, or credentials. For the first beta, implement an application-local Gmail binding. The UI must provide inbox search and filters, message reading, labels, archive, trash, compose and send, connection/setup status, explicit least-privilege disclosures, and deterministic empty/loading/error/permission-denied states. Account credentials and OAuth tokens must never be stored in UI state or logs. Keep shared provider reuse and a global capability registry out of this first stage.",
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "features": [],
+      "components": [
+        "scenario:gmail_mail_client",
+        "skill:gmail_mail_client_provider_skill"
+      ],
+      "components_count": 2,
+      "profiles": [],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "gmail_mail_client",
+        "release": "gmail_mail_client@0.1.4",
+        "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+        "primary_component": "scenario:gmail_mail_client",
+        "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa"
+      },
+      "channels": {
+        "stable": {
+          "release": "gmail_mail_client@0.1.4",
+          "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+          "source_revision": "sha256:05a29791dea8402855aaf1d52075dbe21579e49f2a59fc7d951d01dc5377bda6",
+          "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa",
+          "version": "0.1.4"
         }
       }
     },
@@ -2707,6 +3326,111 @@
       "profiles": [
         "adaos.home.shopping_list.v1"
       ]
+    },
+    {
+      "kind": "project",
+      "id": "inbox_triage",
+      "name": "inbox_triage",
+      "version": "0.1.4",
+      "updated_at": "2026-09-24T18:22:37+00:00",
+      "path": "projects/inbox_triage",
+      "manifest": "projects/inbox_triage/project.yaml",
+      "source": {
+        "path": "projects/inbox_triage",
+        "manifest": "projects/inbox_triage/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "inbox_triage",
+        "id": "inbox_triage"
+      },
+      "title": "Inbox Triage",
+      "description": "Create a new private AdaOS Application named Inbox Triage, technical id mail_inbox_triage, from scratch.\n\nIts semantic Application requires capability:mail.messages.manage version ^1.0.0. Keep semantic intent provider-, package-, skill-, account-, and credential-neutral. At materialization time reuse an installed compatible Capability Binding and its shared Core-owned connected Gmail credential through an explicit user attachment when available. Do not create, copy, fork, or edit any Gmail provider implementation. If no reusable connection exists, offer fresh OAuth setup.\n\nThis is not a mail client. It is a focused inbox triage tool: show unread messages older than seven days and optionally starred messages; show sender, subject, date, and snippet; allow explicit mark-read, archive, star/unstar, and trash actions. Do not implement compose, send, label administration, attachment browsing, or mailbox settings.\n\nThe Prototype must be safe and deterministic. Represent loading, empty, authorization-required, reusable-account-available, connected, offline, permission-denied, provider-error, and success states without contacting Gmail and without storing secrets or real mail. Provide responsive wide and compact layouts. Explain least privilege. Prototype data is disposable synthetic review data; Automation must replace it with the selected compatible binding after acceptance.",
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "features": [],
+      "components": [
+        "scenario:inbox_triage"
+      ],
+      "components_count": 1,
+      "profiles": [],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "inbox_triage",
+        "release": "inbox_triage@0.1.4",
+        "release_digest": "sha256:d6e3b4809c1e2ec531acdf40ae6f858a5f51340113d2bf54ca53d3a12fd92b8a",
+        "primary_component": "scenario:inbox_triage",
+        "package_digest": "sha256:2fa808efdae12b4bc2b3c36279ce947efad5e4a3e212837f6a68e4db216f3703"
+      },
+      "channels": {
+        "stable": {
+          "release": "inbox_triage@0.1.4",
+          "release_digest": "sha256:d6e3b4809c1e2ec531acdf40ae6f858a5f51340113d2bf54ca53d3a12fd92b8a",
+          "source_revision": "sha256:45d5bd886bd03a99d132b709cb9825f3af6d2c78624b3424f02a73c6a0521ccb",
+          "package_digest": "sha256:2fa808efdae12b4bc2b3c36279ce947efad5e4a3e212837f6a68e4db216f3703",
+          "version": "0.1.4"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "mail_focus_reader",
+      "name": "mail_focus_reader",
+      "version": "0.1.2",
+      "updated_at": "2026-09-25T04:12:34+00:00",
+      "path": "projects/mail_focus_reader",
+      "manifest": "projects/mail_focus_reader/project.yaml",
+      "source": {
+        "path": "projects/mail_focus_reader",
+        "manifest": "projects/mail_focus_reader/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "mail_focus_reader",
+        "id": "mail_focus_reader"
+      },
+      "title": "Mail Focus Reader",
+      "description": "Create a new private application named \"Mail Focus Reader\". The exact technical Application id is mail_focus_reader.\n\nBuild the shortest complete viable mail reading and triage application, not a Gmail clone. Desktop-first UI: a compact folders/labels list on the left and a message list on the right. Selecting a message replaces the list region with the message detail; an explicit Back action restores the list and preserves the selected folder. Only support read/unread, star/unstar, and archive. Do not add compose/send, OAuth settings, label administration, a local mailbox copy, or dashboard widgets.\n\nThe Application must consume the existing portable capability mail.messages.manage ^1.0.0. It must not implement Gmail API or OAuth, and its semantic Application must not name a package, provider, or skill. Reuse the installed CBS Binding/PackageDelivery and an explicitly attachable reusable Gmail credential owned by the capability/provider plane. Use bounded message summaries and progressive next-page pagination for first paint. Fetch full message content only after selection. Mutations require an explicit user gesture. Show connection status and a clear way to attach an existing Gmail connection.\n\nAcceptance: labels load independently; the first message page performs no N+1 metadata fetch; empty, loading, and error states are visible; detail/back preserves the folder; the result can advance through beta, Trial, and workspace; Applications shows only required permissions. Prefer existing AdaOS components and the minimum number of owned artifacts.",
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "features": [],
+      "components": [
+        "scenario:mail_focus_reader",
+        "skill:mail_focus_reader_skill"
+      ],
+      "components_count": 2,
+      "profiles": [],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "mail_focus_reader",
+        "release": "mail_focus_reader@0.1.2",
+        "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+        "primary_component": "scenario:mail_focus_reader",
+        "package_digest": "sha256:1a07e0d95b0100e48c3ce72cbe899e8a92f147548962b3a7aebbf3645f0f81e4"
+      },
+      "channels": {
+        "stable": {
+          "release": "mail_focus_reader@0.1.2",
+          "release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+          "source_revision": "sha256:7d11ce2ab800f87bc3344dda1256f27feb0e4c9144bcc98980ef520877a367a3",
+          "package_digest": "sha256:1a07e0d95b0100e48c3ce72cbe899e8a92f147548962b3a7aebbf3645f0f81e4",
+          "version": "0.1.2"
+        }
+      }
     },
     {
       "kind": "project",
@@ -3732,8 +4456,8 @@
       "kind": "project",
       "id": "web_desktop",
       "name": "web_desktop",
-      "version": "0.3.12",
-      "updated_at": "2026-08-27T21:05:40+00:00",
+      "version": "0.3.48",
+      "updated_at": "2026-09-24T14:29:10+00:00",
       "path": "projects/web_desktop",
       "manifest": "projects/web_desktop/project.yaml",
       "source": {
@@ -3750,10 +4474,10 @@
         "en": "Web Desktop",
         "ru": "Веб-рабочий стол"
       },
-      "description": "Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.",
+      "description": "Default AdaOS desktop shell with project-owned connection flows, voice bridge, and browser surface support.",
       "description_i18n": {
         "en": "Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.",
-        "ru": "Стандартная web-оболочка AdaOS, join flow, voice bridge и поддержка browser surface."
+        "ru": "Стандартная веб-оболочка AdaOS, подключение устройств, голосовой мост и поддержка браузерных интерфейсов."
       },
       "categories": [
         "system",
@@ -3787,53 +4511,36 @@
           "optional": false,
           "components": [
             "scenario:web_desktop",
-            "skill:web_desktop_skill"
-          ]
-        },
-        {
-          "id": "onboarding",
-          "title": "Node onboarding",
-          "title_i18n": {
-            "en": "Node onboarding",
-            "ru": "Подключение ноды"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "skill:greet_on_boot_skill",
-            "skill:pair_new_device_skill",
-            "skill:adaos_connect"
-          ]
-        },
-        {
-          "id": "browser-voice",
-          "title": "Browser and voice bridge",
-          "title_i18n": {
-            "en": "Browser and voice bridge",
-            "ru": "Браузерный и голосовой мост"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "skill:browsers_skill",
-            "skill:voice_chat_skill"
+            "skill:web_desktop_runtime_skill"
           ]
         }
       ],
       "components": [
         "scenario:web_desktop",
-        "skill:web_desktop_skill",
-        "skill:greet_on_boot_skill",
-        "skill:pair_new_device_skill",
-        "skill:adaos_connect",
-        "skill:voice_chat_skill",
-        "skill:browsers_skill"
+        "skill:web_desktop_runtime_skill"
       ],
-      "components_count": 7,
+      "components_count": 2,
       "profiles": [
         "adaos.desktop.shell.v1",
         "adaos.default_install.v1"
-      ]
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.48",
+        "release_digest": "sha256:a4d3d571ca3d93ecf3d7ec213b6d490b0d719b213b04b5e3dc24b92fd39aa512",
+        "primary_component": "scenario:web_desktop",
+        "package_digest": "sha256:5c7e0d1b1f440a6a3465889f9c2e6581998055bd0f801cdd744a9c710ab5ab5a"
+      },
+      "channels": {
+        "stable": {
+          "release": "web_desktop@0.3.48",
+          "release_digest": "sha256:a4d3d571ca3d93ecf3d7ec213b6d490b0d719b213b04b5e3dc24b92fd39aa512",
+          "source_revision": "sha256:d7ec37f48304cd6c470177499b7b7f0ea88bb5bec9122923892fc924036c5d90",
+          "package_digest": "sha256:5c7e0d1b1f440a6a3465889f9c2e6581998055bd0f801cdd744a9c710ab5ab5a",
+          "version": "0.3.48"
+        }
+      }
     },
     {
       "kind": "project",

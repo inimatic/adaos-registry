@@ -1,0 +1,1186 @@
+name: gmail_cbs_cleanroom_skill
+version: 0.1.7
+supported_locales:
+- en
+- ru
+entry:
+  script: handlers/main.py
+runtime:
+  python: '3.11'
+  activation:
+    mode: on_demand
+    startup_allowed: false
+    background_refresh: false
+    assessment:
+      schema: adaos.skill.activation_assessment.v1
+      assessor: builder.compiler
+      classification: tool_only
+      handler_digest: sha256:94266adc9331d217cd82a598acceec9ec7d8596d51ee176000beef5664f96074
+      observed_subscriptions: []
+      declared_subscriptions: []
+      dynamic_subscription_count: 0
+      tool_count: 18
+      reasons:
+      - tool_invocation_can_import_handler_on_demand
+description: Reusable governed Gmail binding tools. Mail content is transient.
+default_tool: connection_status
+dependencies: []
+capabilities:
+- providers.google.gmail
+- workspace.read
+- workspace.write
+- storage.relational
+exports:
+  tools:
+  - connection_status
+  - begin_connection
+  - reusable_connections
+  - attach_reusable_connection
+  - list_labels
+  - list_messages
+  - get_message
+  - mutate_message
+  - prepare_send
+  - send_message
+  - portable_connection_status
+  - portable_begin_connection
+  - portable_list_messages
+  - portable_get_message
+  - portable_list_labels
+  - portable_mutate_message
+  - portable_prepare_send
+  - portable_send_message
+tools:
+- name: connection_status
+  description: Connection status
+  entry: handlers.main:connection_status
+  side_effects: none
+  permissions:
+  - workspace.read
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties:
+      id:
+        type: string
+        maxLength: 256
+    required: []
+    additionalProperties: false
+  output_schema:
+    type: object
+    properties:
+      ok: &id001
+        type: boolean
+      error:
+        type: string
+        maxLength: 80
+      message:
+        type: string
+        maxLength: 2000
+      items:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+              maxLength: 256
+            name:
+              type: string
+              maxLength: 320
+            status:
+              type: string
+              maxLength: 40
+            least_privilege_note:
+              type: string
+              maxLength: 1000
+          required:
+          - id
+          - name
+          - status
+          - least_privilege_note
+          additionalProperties: false
+        maxItems: 1
+    required:
+    - ok
+    additionalProperties: false
+- name: begin_connection
+  description: Begin connection
+  entry: handlers.main:begin_connection
+  side_effects: external_write
+  permissions:
+  - workspace.write
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties: {}
+    required: []
+    additionalProperties: false
+  output_schema:
+    type: object
+    properties:
+      ok: *id001
+      error:
+        type: string
+        maxLength: 80
+      message:
+        type: string
+        maxLength: 2000
+      authorization_url:
+        type: string
+        maxLength: 8192
+      expires_at:
+        type: string
+        maxLength: 100
+    required:
+    - ok
+    additionalProperties: false
+- name: reusable_connections
+  description: List redacted Gmail accounts that this user may explicitly reuse
+  entry: handlers.main:reusable_connections
+  side_effects: none
+  permissions:
+  - workspace.read
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties: {}
+    required: []
+    additionalProperties: false
+  output_schema:
+    type: object
+    properties:
+      ok: *id001
+      error:
+        type: string
+        maxLength: 80
+      message:
+        type: string
+        maxLength: 2000
+      items:
+        type: array
+        maxItems: 10
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+              maxLength: 256
+            email_address:
+              type: string
+              maxLength: 320
+            status:
+              type: string
+              maxLength: 40
+            attached:
+              type: boolean
+          required:
+          - id
+          - email_address
+          - status
+          - attached
+          additionalProperties: false
+    required:
+    - ok
+    additionalProperties: false
+- name: attach_reusable_connection
+  description: Explicitly attach an existing Core-owned Gmail account
+  entry: handlers.main:attach_reusable_connection
+  side_effects: local_write
+  permissions:
+  - workspace.write
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties:
+      account_id:
+        type: string
+        maxLength: 256
+    required: []
+    additionalProperties: false
+  output_schema:
+    type: object
+    properties:
+      ok: *id001
+      error:
+        type: string
+        maxLength: 80
+      message:
+        type: string
+        maxLength: 2000
+      id:
+        type: string
+        maxLength: 256
+      email_address:
+        type: string
+        maxLength: 320
+      status:
+        type: string
+        maxLength: 40
+      attached:
+        type: boolean
+      reused_credential:
+        type: boolean
+    required:
+    - ok
+    additionalProperties: false
+- name: list_labels
+  description: List labels
+  entry: handlers.main:list_labels
+  side_effects: none
+  permissions:
+  - workspace.read
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties: {}
+    required: []
+    additionalProperties: false
+  output_schema:
+    type: object
+    properties:
+      ok: *id001
+      error:
+        type: string
+        maxLength: 80
+      message:
+        type: string
+        maxLength: 2000
+      items:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+              maxLength: 128
+            title:
+              type: string
+              maxLength: 256
+          required:
+          - id
+          - title
+          additionalProperties: false
+        maxItems: 200
+      status: &id003
+        type: string
+        enum:
+        - disconnected
+        - auth_required
+        - permission_denied
+        - offline
+        - provider_error
+      notice: &id004
+        type: string
+        maxLength: 2000
+    required:
+    - ok
+    additionalProperties: false
+- name: list_messages
+  description: List at most 20 message summaries using one bounded provider batch;
+    message bodies are loaded only by get_message after selection.
+  entry: handlers.main:list_messages
+  side_effects: none
+  behavioral_guarantees:
+    collection_projection: summary_only
+    detail_loading: on_demand
+    provider_fetch_strategy: batch
+    max_provider_round_trips: 2
+    max_items: 20
+    evidence_refs:
+    - tests/test_behavior_contract.py::test_message_collection_uses_one_core_aggregate
+  permissions:
+  - workspace.read
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+        maxLength: 2000
+      label_id:
+        type: string
+        maxLength: 128
+      unread: &id002
+        oneOf:
+        - *id001
+        - const: ''
+      starred: *id002
+      page_token:
+        type: string
+        maxLength: 2048
+    required: []
+    additionalProperties: false
+  output_schema:
+    type: object
+    properties:
+      ok: *id001
+      error:
+        type: string
+        maxLength: 80
+      message:
+        type: string
+        maxLength: 2000
+      items:
+        type: array
+        items: &id005
+          type: object
+          properties:
+            id:
+              type: string
+              maxLength: 256
+            thread_id:
+              type: string
+              maxLength: 256
+            from:
+              type: string
+              maxLength: 1000
+            date:
+              type: string
+              maxLength: 1000
+            Message:
+              type: object
+              properties:
+                subject:
+                  type: string
+                  maxLength: 1000
+                to:
+                  type: string
+                  maxLength: 1000
+                body:
+                  type: string
+                  maxLength: 16000
+              required:
+              - subject
+              - to
+              - body
+              additionalProperties: false
+            labels_ref:
+              type: string
+              maxLength: 128
+            labels:
+              type: array
+              items:
+                type: string
+                maxLength: 128
+              maxItems: 100
+            unread: *id001
+            starred: *id001
+          required:
+          - id
+          - thread_id
+          - from
+          - date
+          - Message
+          - labels_ref
+          - labels
+          - unread
+          - starred
+          additionalProperties: false
+        maxItems: 20
+      next_page_token:
+        type: string
+        maxLength: 2048
+      status: *id003
+      notice: *id004
+    required:
+    - ok
+    additionalProperties: false
+- name: get_message
+  description: Get message
+  entry: handlers.main:get_message
+  side_effects: none
+  permissions:
+  - workspace.read
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties:
+      id:
+        type: string
+        maxLength: 256
+    required: []
+    additionalProperties: false
+  output_schema:
+    type: object
+    properties:
+      ok: *id001
+      error:
+        type: string
+        maxLength: 80
+      message:
+        type: string
+        maxLength: 2000
+      items:
+        type: array
+        items: *id005
+        maxItems: 1
+      status: *id003
+      notice: *id004
+    required:
+    - ok
+    additionalProperties: false
+- name: mutate_message
+  description: Mutate message
+  entry: handlers.main:mutate_message
+  side_effects: external_write
+  permissions:
+  - workspace.write
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties:
+      id:
+        type: string
+        maxLength: 256
+      action:
+        enum:
+        - archive
+        - trash
+        - unread
+        - starred
+        - label
+      value:
+        type:
+        - boolean
+        - string
+        - 'null'
+        maxLength: 128
+    required:
+    - id
+    - action
+    additionalProperties: false
+  output_schema:
+    type: object
+    properties:
+      ok: *id001
+      error:
+        type: string
+        maxLength: 80
+      message:
+        type: string
+        maxLength: 2000
+      id:
+        type: string
+        maxLength: 256
+      labels:
+        type: array
+        items:
+          type: string
+          maxLength: 128
+        maxItems: 100
+    required:
+    - ok
+    additionalProperties: false
+- name: prepare_send
+  description: Prepare send
+  entry: handlers.main:prepare_send
+  side_effects: local_write
+  permissions:
+  - workspace.write
+  - providers.google.gmail
+  - storage.relational
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties: {}
+    required: []
+    additionalProperties: false
+  output_schema:
+    type: object
+    properties:
+      ok: *id001
+      error:
+        type: string
+        maxLength: 80
+      message:
+        type: string
+        maxLength: 2000
+      command_id:
+        type: string
+        maxLength: 36
+    required:
+    - ok
+    additionalProperties: false
+- name: send_message
+  description: Send message
+  entry: handlers.main:send_message
+  side_effects: external_write
+  permissions:
+  - workspace.write
+  - providers.google.gmail
+  - storage.relational
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties:
+      command_id:
+        type: string
+        maxLength: 36
+      to:
+        type: string
+        maxLength: 2000
+      subject:
+        type: string
+        maxLength: 998
+      body:
+        type: string
+        maxLength: 50000
+    required:
+    - command_id
+    - to
+    - subject
+    - body
+    additionalProperties: false
+  output_schema:
+    type: object
+    properties:
+      ok: *id001
+      error:
+        type: string
+        maxLength: 80
+      message:
+        type: string
+        maxLength: 2000
+      id:
+        type: string
+        maxLength: 256
+      duplicate: *id001
+      delivery_status:
+        const: unknown
+    required:
+    - ok
+    additionalProperties: false
+- name: portable_connection_status
+  description: Connection status
+  entry: handlers.main:portable_connection_status
+  side_effects: none
+  permissions:
+  - workspace.read
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    additionalProperties: false
+    properties: {}
+    type: object
+  output_schema:
+    additionalProperties: false
+    properties:
+      email_address:
+        maxLength: 2048
+        type: string
+      error:
+        maxLength: 2048
+        type: string
+      message:
+        maxLength: 2048
+        type: string
+      ok:
+        type: boolean
+      retryable:
+        type: boolean
+      status:
+        maxLength: 2048
+        type: string
+    required:
+    - ok
+    type: object
+- name: portable_begin_connection
+  description: Begin connection
+  entry: handlers.main:portable_begin_connection
+  side_effects: external_write
+  permissions:
+  - workspace.write
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    additionalProperties: false
+    properties: {}
+    type: object
+  output_schema:
+    additionalProperties: false
+    properties:
+      authorization_url:
+        maxLength: 8192
+        type: string
+      error:
+        maxLength: 2048
+        type: string
+      expires_at:
+        maxLength: 2048
+        type: string
+      message:
+        maxLength: 2048
+        type: string
+      ok:
+        type: boolean
+      retryable:
+        type: boolean
+      status:
+        maxLength: 2048
+        type: string
+    required:
+    - ok
+    type: object
+- name: portable_list_messages
+  description: List at most 25 portable message summaries using one bounded provider
+    batch; message bodies are loaded only by portable_get_message after selection.
+  entry: handlers.main:portable_list_messages
+  side_effects: none
+  behavioral_guarantees:
+    collection_projection: summary_only
+    detail_loading: on_demand
+    provider_fetch_strategy: batch
+    max_provider_round_trips: 2
+    max_items: 25
+    evidence_refs:
+    - tests/test_portable_contract.py::test_list_messages_uses_one_summary_batch_without_n_plus_one
+  permissions:
+  - workspace.read
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    additionalProperties: false
+    properties:
+      label:
+        type: string
+      page_token:
+        type: string
+      query:
+        type: string
+      starred:
+        type:
+        - boolean
+        - string
+      tab:
+        type: string
+      unread:
+        type:
+        - boolean
+        - string
+    type: object
+  output_schema:
+    additionalProperties: false
+    properties:
+      error:
+        maxLength: 2048
+        type: string
+      items:
+        items:
+          additionalProperties: false
+          properties:
+            body:
+              maxLength: 50000
+              type: string
+            date:
+              maxLength: 2048
+              type: string
+            from:
+              maxLength: 2048
+              type: string
+            icon:
+              maxLength: 2048
+              type: string
+            id:
+              maxLength: 256
+              type: string
+            isStarred:
+              type: boolean
+            isUnread:
+              type: boolean
+            labelIds:
+              items:
+                maxLength: 256
+                type: string
+              maxItems: 100
+              type: array
+            snippet:
+              maxLength: 2048
+              type: string
+            subject:
+              maxLength: 2048
+              type: string
+            threadId:
+              maxLength: 256
+              type: string
+          type: object
+        maxItems: 25
+        type: array
+      message:
+        maxLength: 2048
+        type: string
+      nextPageToken:
+        maxLength: 2048
+        type: string
+      ok:
+        type: boolean
+      pagination:
+        items:
+          additionalProperties: false
+          properties:
+            id:
+              maxLength: 256
+              type: string
+            nextPageToken:
+              maxLength: 2048
+              type: string
+            summary:
+              maxLength: 2048
+              type: string
+          required:
+          - id
+          - nextPageToken
+          - summary
+          type: object
+        maxItems: 1
+        type: array
+      retryable:
+        type: boolean
+      status:
+        maxLength: 2048
+        type: string
+    required:
+    - ok
+    type: object
+- name: portable_get_message
+  description: Get message
+  entry: handlers.main:portable_get_message
+  side_effects: none
+  permissions:
+  - workspace.read
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+    type: object
+  output_schema:
+    additionalProperties: false
+    properties:
+      error:
+        maxLength: 2048
+        type: string
+      item:
+        additionalProperties: false
+        properties:
+          body:
+            maxLength: 50000
+            type: string
+          date:
+            maxLength: 2048
+            type: string
+          from:
+            maxLength: 2048
+            type: string
+          icon:
+            maxLength: 2048
+            type: string
+          id:
+            maxLength: 256
+            type: string
+          isStarred:
+            type: boolean
+          isUnread:
+            type: boolean
+          labelIds:
+            items:
+              maxLength: 256
+              type: string
+            maxItems: 100
+            type: array
+          snippet:
+            maxLength: 2048
+            type: string
+          subject:
+            maxLength: 2048
+            type: string
+          threadId:
+            maxLength: 256
+            type: string
+        type: object
+      message:
+        maxLength: 2048
+        type: string
+      ok:
+        type: boolean
+      retryable:
+        type: boolean
+      status:
+        maxLength: 2048
+        type: string
+    required:
+    - ok
+    type: object
+- name: portable_list_labels
+  description: List labels
+  entry: handlers.main:portable_list_labels
+  side_effects: none
+  permissions:
+  - workspace.read
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    additionalProperties: false
+    properties: {}
+    type: object
+  output_schema:
+    additionalProperties: false
+    properties:
+      error:
+        maxLength: 2048
+        type: string
+      items:
+        items:
+          additionalProperties: false
+          properties:
+            id:
+              maxLength: 256
+              type: string
+            name:
+              maxLength: 2048
+              type: string
+          required:
+          - id
+          - name
+          type: object
+        maxItems: 500
+        type: array
+      message:
+        maxLength: 2048
+        type: string
+      ok:
+        type: boolean
+      retryable:
+        type: boolean
+      status:
+        maxLength: 2048
+        type: string
+    required:
+    - ok
+    type: object
+- name: portable_mutate_message
+  description: Mutate message
+  entry: handlers.main:portable_mutate_message
+  side_effects: external_write
+  permissions:
+  - workspace.write
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    additionalProperties: false
+    properties:
+      action:
+        enum:
+        - archive
+        - trash
+        - mark_read
+        - mark_unread
+        - star
+        - unstar
+        - label
+        - remove_label
+      id:
+        type: string
+      label:
+        type: string
+    required:
+    - id
+    - action
+    type: object
+  output_schema:
+    additionalProperties: false
+    properties:
+      error:
+        maxLength: 2048
+        type: string
+      item:
+        additionalProperties: false
+        properties:
+          body:
+            maxLength: 50000
+            type: string
+          date:
+            maxLength: 2048
+            type: string
+          from:
+            maxLength: 2048
+            type: string
+          icon:
+            maxLength: 2048
+            type: string
+          id:
+            maxLength: 256
+            type: string
+          isStarred:
+            type: boolean
+          isUnread:
+            type: boolean
+          labelIds:
+            items:
+              maxLength: 256
+              type: string
+            maxItems: 100
+            type: array
+          snippet:
+            maxLength: 2048
+            type: string
+          subject:
+            maxLength: 2048
+            type: string
+          threadId:
+            maxLength: 256
+            type: string
+        type: object
+      message:
+        maxLength: 2048
+        type: string
+      ok:
+        type: boolean
+      retryable:
+        type: boolean
+      status:
+        maxLength: 2048
+        type: string
+    required:
+    - ok
+    type: object
+- name: portable_prepare_send
+  description: Prepare send
+  entry: handlers.main:portable_prepare_send
+  side_effects: local_write
+  permissions:
+  - workspace.write
+  - providers.google.gmail
+  - storage.relational
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    additionalProperties: false
+    properties: {}
+    type: object
+  output_schema:
+    additionalProperties: false
+    properties:
+      command_id:
+        format: uuid
+        type: string
+      error:
+        maxLength: 2048
+        type: string
+      message:
+        maxLength: 2048
+        type: string
+      ok:
+        type: boolean
+      retryable:
+        type: boolean
+      status:
+        maxLength: 2048
+        type: string
+    required:
+    - ok
+    type: object
+- name: portable_send_message
+  description: Send message
+  entry: handlers.main:portable_send_message
+  side_effects: external_write
+  permissions:
+  - workspace.write
+  - providers.google.gmail
+  - storage.relational
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    additionalProperties: false
+    properties:
+      command_id:
+        format: uuid
+        type: string
+      values:
+        additionalProperties: false
+        properties:
+          body:
+            type: string
+          subject:
+            type: string
+          to:
+            type: string
+        required:
+        - to
+        - subject
+        - body
+        type: object
+    required:
+    - command_id
+    - values
+    type: object
+  output_schema:
+    additionalProperties: false
+    properties:
+      delivery_status:
+        enum:
+        - confirmed
+        - unknown
+      duplicate:
+        type: boolean
+      error:
+        maxLength: 2048
+        type: string
+      id:
+        maxLength: 256
+        type: string
+      message:
+        maxLength: 2048
+        type: string
+      ok:
+        type: boolean
+      retryable:
+        type: boolean
+      status:
+        maxLength: 2048
+        type: string
+    required:
+    - ok
+    type: object
+data_routes:
+- surface: gmail.connection_status
+  route: tool
+  tool: connection_status
+  first_paint: empty until the authorized read completes
+  recovery: explicit retry; preserve the last successful value
+  guard_visibility: show the read error without reporting success
+  budget:
+    max_payload_bytes: 262144
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - gmail.account
+- surface: gmail.list_labels
+  route: tool
+  tool: list_labels
+  first_paint: empty until the authorized read completes
+  recovery: explicit retry; preserve the last successful value
+  guard_visibility: show the read error without reporting success
+  budget:
+    max_payload_bytes: 262144
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - gmail.mail
+- surface: gmail.list_messages
+  route: tool
+  tool: list_messages
+  first_paint: empty until the authorized read completes
+  recovery: explicit retry; preserve the last successful value
+  guard_visibility: show the read error without reporting success
+  budget:
+    max_payload_bytes: 262144
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - gmail.mail
+- surface: gmail.get_message
+  route: tool
+  tool: get_message
+  first_paint: empty until the authorized read completes
+  recovery: explicit retry; preserve the last successful value
+  guard_visibility: show the read error without reporting success
+  budget:
+    max_payload_bytes: 262144
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - gmail.mail
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases:
+  - path: send_commands.sqlite3
+    migrations:
+    - version: 1
+      name: send_command_claims
+      statements:
+      - CREATE TABLE IF NOT EXISTS send_commands (command_id TEXT PRIMARY KEY, scope
+        TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('ready','unknown','sent')),
+        message_id TEXT)
+nlu_hints:
+  aliases: []
+  examples: []
+  slot_schemas: {}
+  entities: []
+prototype: skill_default
+updated_at: '2026-09-24T22:34:09+00:00'
+events:
+  subscribe: []

@@ -1,0 +1,33 @@
+{
+  "capability_ref": "capability:application.ui.render",
+  "version": "1.0.0",
+  "title": "Render an AdaOS Application WebUI",
+  "operations": [
+    {
+      "operation_id": "render",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "errors": [
+        "webui_contract_invalid",
+        "renderer_unavailable"
+      ]
+    }
+  ],
+  "invariants": [
+    "the rendered document is the exact package member"
+  ],
+  "effects": [],
+  "authority_requirements": [],
+  "dependencies": [],
+  "state_ports": [],
+  "conformance_refs": [
+    "schema:adaos.webui.v1"
+  ],
+  "compatibility": {},
+  "schema": "adaos.capability.contract.v1",
+  "contract_digest": "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7"
+}

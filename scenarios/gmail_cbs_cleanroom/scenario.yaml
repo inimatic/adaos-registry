@@ -1,0 +1,73 @@
+id: gmail_cbs_cleanroom
+name: gmail_cbs_cleanroom
+version: 0.1.6
+title: Mail Cleanroom Prototype
+title_i18n:
+  key: scenario.gmail_cbs_cleanroom.title
+  fallback: Gmail CBS Cleanroom
+description: Empty AdaOS desktop canvas ready for Builder authoring.
+type: desktop
+supported_locales:
+- en
+- ru
+depends:
+- gmail_cbs_cleanroom_skill
+runtime:
+  skills:
+    required:
+    - gmail_cbs_cleanroom_skill
+    optional: []
+ui:
+  manifest: webui.json
+trigger: manual
+vars: {}
+llm_hints:
+  description: 'Create a new private AdaOS Application named "Gmail CBS Cleanroom"
+    from
+
+    scratch, with technical id gmail_cbs_cleanroom. It must be CBS-compatible. Its
+
+    semantic Application requires capability:mail.messages.manage version ^1.0.0
+
+    without naming Gmail, a package, a skill, endpoints, account ids, or
+
+    credentials. For this first beta, realize that requirement with an
+
+    Application-local Gmail binding.
+
+
+    The user experience must include connection and setup status, inbox and label
+
+    navigation, search and unread/starred filters, message list and reading,
+
+    labels, archive, trash, read/unread, star/unstar, compose, and send. Include
+
+    responsive wide and compact layouts and deterministic loading, empty, offline,
+
+    provider-error, permission-denied, and authorization-required states. Explain
+
+    least-privilege access. OAuth secrets and tokens must never enter UI state,
+
+    manifests, fixtures, logs, errors, or telemetry. Keep shared provider reuse and
+
+    a global capability registry outside this first stage.
+
+
+    Build the executable Prototype now. Keep real external operations as explicit
+
+    pending Automation requirements; do not simulate successful authorization or
+
+    use live Gmail data in the Prototype.'
+  aliases: []
+  primary_actions: []
+  examples: []
+  owner_hints: []
+nlu:
+  nlu_hints:
+    aliases: []
+    examples: []
+    slot_schemas: {}
+    entities: []
+steps: []
+prototype: scenario_default
+updated_at: '2026-09-25T12:47:11+00:00'

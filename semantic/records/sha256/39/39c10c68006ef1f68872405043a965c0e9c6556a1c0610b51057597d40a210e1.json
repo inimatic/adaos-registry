@@ -1,0 +1,26 @@
+{
+  "binding_definition_ref": "binding-definition:application.ui.render.webui-v1",
+  "version": "1.0.0",
+  "capability_ref": "capability:application.ui.render",
+  "capability_version": "1.0.0",
+  "entry_protocol": "adaos.webui.v1",
+  "implementation_entrypoint": "application.ui.render.webui-v1",
+  "state_support": [],
+  "modes": [
+    "production"
+  ],
+  "environment_constraints": {
+    "profile_classes": [
+      "local"
+    ],
+    "provider_features": [
+      "webui_v1"
+    ]
+  },
+  "authority_requirements": [],
+  "conformance_obligations": [
+    "capability_conformance"
+  ],
+  "schema": "adaos.binding.definition.v1",
+  "definition_digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1"
+}

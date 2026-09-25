@@ -1,0 +1,669 @@
+{
+  "authority_requirements": [
+    "providers.google.gmail"
+  ],
+  "capability_ref": "capability:mail.messages.manage",
+  "compatibility": {},
+  "conformance_refs": [
+    "scenario:mail.messages.manage.v1"
+  ],
+  "contract_digest": "sha256:f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698",
+  "dependencies": [],
+  "effects": [
+    "reads mail through an authorized account",
+    "changes Gmail labels and trash state only on explicit user action",
+    "sends one composed message only after explicit user action"
+  ],
+  "invariants": [
+    "credentials and OAuth tokens never cross the Core provider boundary",
+    "a send command is issued at most once for one application subject and command id",
+    "mail content is transient and is not persisted by the binding"
+  ],
+  "operations": [
+    {
+      "errors": [
+        "account_not_connected",
+        "permission_denied",
+        "provider_unavailable"
+      ],
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "operation_id": "connection_status",
+      "output_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "email_address": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "error": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "maxLength": 2048,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "oauth_not_configured",
+        "permission_denied",
+        "provider_unavailable"
+      ],
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "operation_id": "begin_connection",
+      "output_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "authorization_url": {
+            "maxLength": 8192,
+            "type": "string"
+          },
+          "error": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "expires_at": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "maxLength": 2048,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "account_not_connected",
+        "permission_denied",
+        "provider_unavailable"
+      ],
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "page_token": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "starred": {
+            "type": [
+              "boolean",
+              "string"
+            ]
+          },
+          "tab": {
+            "type": "string"
+          },
+          "unread": {
+            "type": [
+              "boolean",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "list_messages",
+      "output_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "body": {
+                  "maxLength": 50000,
+                  "type": "string"
+                },
+                "date": {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                "from": {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                "icon": {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                "id": {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                "isStarred": {
+                  "type": "boolean"
+                },
+                "isUnread": {
+                  "type": "boolean"
+                },
+                "labelIds": {
+                  "items": {
+                    "maxLength": 256,
+                    "type": "string"
+                  },
+                  "maxItems": 100,
+                  "type": "array"
+                },
+                "snippet": {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                "subject": {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                "threadId": {
+                  "maxLength": 256,
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "maxItems": 25,
+            "type": "array"
+          },
+          "message": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "nextPageToken": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "pagination": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                "nextPageToken": {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                "summary": {
+                  "maxLength": 2048,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "nextPageToken",
+                "summary"
+              ],
+              "type": "object"
+            },
+            "maxItems": 1,
+            "type": "array"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "maxLength": 2048,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "account_not_connected",
+        "permission_denied",
+        "provider_unavailable"
+      ],
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "get_message",
+      "output_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "item": {
+            "additionalProperties": false,
+            "properties": {
+              "body": {
+                "maxLength": 50000,
+                "type": "string"
+              },
+              "date": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "from": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "icon": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "id": {
+                "maxLength": 256,
+                "type": "string"
+              },
+              "isStarred": {
+                "type": "boolean"
+              },
+              "isUnread": {
+                "type": "boolean"
+              },
+              "labelIds": {
+                "items": {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
+              "snippet": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "subject": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "threadId": {
+                "maxLength": 256,
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "message": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "maxLength": 2048,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "account_not_connected",
+        "permission_denied",
+        "provider_unavailable"
+      ],
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "operation_id": "list_labels",
+      "output_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                "name": {
+                  "maxLength": 2048,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "type": "array"
+          },
+          "message": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "maxLength": 2048,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "account_not_connected",
+        "permission_denied",
+        "provider_unavailable"
+      ],
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "archive",
+              "trash",
+              "mark_read",
+              "mark_unread",
+              "star",
+              "unstar",
+              "label",
+              "remove_label"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "action"
+        ],
+        "type": "object"
+      },
+      "operation_id": "mutate_message",
+      "output_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "item": {
+            "additionalProperties": false,
+            "properties": {
+              "body": {
+                "maxLength": 50000,
+                "type": "string"
+              },
+              "date": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "from": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "icon": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "id": {
+                "maxLength": 256,
+                "type": "string"
+              },
+              "isStarred": {
+                "type": "boolean"
+              },
+              "isUnread": {
+                "type": "boolean"
+              },
+              "labelIds": {
+                "items": {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
+              "snippet": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "subject": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "threadId": {
+                "maxLength": 256,
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "message": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "maxLength": 2048,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "permission_denied"
+      ],
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "operation_id": "prepare_send",
+      "output_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "error": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "maxLength": 2048,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "account_not_connected",
+        "permission_denied",
+        "send_unconfirmed"
+      ],
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": false,
+            "properties": {
+              "body": {
+                "type": "string"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "to",
+              "subject",
+              "body"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "command_id",
+          "values"
+        ],
+        "type": "object"
+      },
+      "operation_id": "send_message",
+      "output_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "delivery_status": {
+            "enum": [
+              "confirmed",
+              "unknown"
+            ]
+          },
+          "duplicate": {
+            "type": "boolean"
+          },
+          "error": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 256,
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "maxLength": 2048,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    }
+  ],
+  "schema": "adaos.capability.contract.v1",
+  "state_ports": [],
+  "title": "Manage mail messages",
+  "version": "1.0.0"
+}

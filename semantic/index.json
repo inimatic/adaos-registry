@@ -1,0 +1,79 @@
+{
+  "schema": "adaos.semantic_registry.index.v1",
+  "identities": {
+    "adaos.binding.definition.v1|binding-definition:application.ui.render.webui-v1|1.0.0": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+    "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86": "sha256:3f0c261c64a324b85d1810bbccf44d97f6ae6fbe48435bce00171be2e74f1ab3",
+    "adaos.binding.definition.v1|binding-definition:mail.messages.manage.google-gmail-local|1.0.0": "sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2",
+    "adaos.binding.delivery.v1|binding-definition:mail.messages.manage.google-gmail-local@sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2|sha256:403e924b61e66ae9d04aa69a4594d3fe2873349f75904c5633e3e01212c0df19": "sha256:778e63e38aa078e0ee4e5e97026e6262ef7b89d699fae4bd67adc2750df80b4d",
+    "adaos.capability.contract.v1|capability:application.ui.render|1.0.0": "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7",
+    "adaos.capability.contract.v1|capability:mail.messages.manage|1.0.0": "sha256:f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698"
+  },
+  "records": {
+    "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1": {
+      "schema": "adaos.binding.definition.v1",
+      "identity": "binding-definition:application.ui.render.webui-v1",
+      "revision": "1.0.0",
+      "path": "semantic/records/sha256/39/39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1.json",
+      "published_by_release_digests": [
+        "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
+      ]
+    },
+    "sha256:3f0c261c64a324b85d1810bbccf44d97f6ae6fbe48435bce00171be2e74f1ab3": {
+      "schema": "adaos.binding.delivery.v1",
+      "identity": "binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "revision": "sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86",
+      "path": "semantic/records/sha256/3f/3f0c261c64a324b85d1810bbccf44d97f6ae6fbe48435bce00171be2e74f1ab3.json",
+      "published_by_release_digests": [
+        "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
+      ]
+    },
+    "sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2": {
+      "schema": "adaos.binding.definition.v1",
+      "identity": "binding-definition:mail.messages.manage.google-gmail-local",
+      "revision": "1.0.0",
+      "path": "semantic/records/sha256/53/5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2.json",
+      "published_by_release_digests": [
+        "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
+      ]
+    },
+    "sha256:778e63e38aa078e0ee4e5e97026e6262ef7b89d699fae4bd67adc2750df80b4d": {
+      "schema": "adaos.binding.delivery.v1",
+      "identity": "binding-definition:mail.messages.manage.google-gmail-local@sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2",
+      "revision": "sha256:403e924b61e66ae9d04aa69a4594d3fe2873349f75904c5633e3e01212c0df19",
+      "path": "semantic/records/sha256/77/778e63e38aa078e0ee4e5e97026e6262ef7b89d699fae4bd67adc2750df80b4d.json",
+      "published_by_release_digests": [
+        "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
+      ]
+    },
+    "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7": {
+      "schema": "adaos.capability.contract.v1",
+      "identity": "capability:application.ui.render",
+      "revision": "1.0.0",
+      "path": "semantic/records/sha256/80/80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7.json",
+      "published_by_release_digests": [
+        "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
+      ]
+    },
+    "sha256:f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698": {
+      "schema": "adaos.capability.contract.v1",
+      "identity": "capability:mail.messages.manage",
+      "revision": "1.0.0",
+      "path": "semantic/records/sha256/f6/f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698.json",
+      "published_by_release_digests": [
+        "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
+      ]
+    }
+  },
+  "application_releases": {
+    "project:gmail_cbs_cleanroom@sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83": {
+      "project_id": "gmail_cbs_cleanroom",
+      "version": "0.1.10",
+      "application_ref": "scenario:gmail_cbs_cleanroom",
+      "project_release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+      "semantic_revision_digest": "sha256:f9607679842eaca8cc15b5b50654d93bc46f6e6d13463e187c7ed5a05946e076",
+      "path": "semantic/applications/gmail_cbs_cleanroom/f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83.json",
+      "projection_digest": "sha256:27707575ddd3c42fd9d1d9676fbccfe9badc3d88b46f656f3135dd93ca16b90e"
+    }
+  },
+  "index_digest": "sha256:b3776e3419dd0574ce10b1ad7bca48ad9727847edfb61101befbd9a21e823a08"
+}
