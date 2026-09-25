@@ -1,0 +1,21 @@
+{
+  "mail.detail.back": "Назад",
+  "mail.detail.body": "Сообщение",
+  "mail.detail.date": "Дата",
+  "mail.detail.from": "От",
+  "mail.detail.to": "Кому",
+  "mail.folders.open": "Открыть",
+  "mail.folders.title": "Папки",
+  "mail.list.header": "Почтовый ящик",
+  "mail.list.next": "Далее",
+  "mail.list.prev": "Назад",
+  "mail.list.refresh": "Обновить",
+  "mail.msg.archive": "Архивировать",
+  "mail.msg.toggle_read": "Проч./Непроч.",
+  "mail.msg.toggle_star": "Пометить/Снять",
+  "scenario.mail_focus_reader.title": "Mail Focus Reader",
+  "mail.back": "Назад",
+  "mail.unread": "Не прочитано",
+  "mail.account": "Аккаунт",
+  "mail.message": "Сообщение"
+}

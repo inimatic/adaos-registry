@@ -1,0 +1,34 @@
+name: mail_focus_reader_skill
+version: 0.1.2
+description: Project-owned resource implementation for project:mail_focus_reader.
+  Realize the accepted Prototype according to the separate Automation brief.
+supported_locales:
+- en
+- ru
+runtime:
+  python: '3.11'
+  activation:
+    mode: on_demand
+    startup_allowed: false
+    background_refresh: false
+    assessment:
+      schema: adaos.skill.activation_assessment.v1
+      assessor: builder.compiler
+      classification: tool_only
+      handler_digest: sha256:f1aefc82a78a4fba61b9bce5de69ec500e3fa921c94485b7b10702d6000e6aac
+      observed_subscriptions: []
+      declared_subscriptions: []
+      dynamic_subscription_count: 0
+      tool_count: 0
+      reasons:
+      - tool_invocation_can_import_handler_on_demand
+capabilities: []
+exports:
+  tools: []
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases: []
+updated_at: '2026-09-25T04:04:39+00:00'
+events:
+  subscribe: []

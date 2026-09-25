@@ -1,0 +1,127 @@
+schema: adaos.project.v1
+kind: project
+id: mail_focus_reader
+version: 0.1.2
+profiles: []
+components:
+  owned:
+  - ref: scenario:mail_focus_reader
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations:
+    - uses
+  - ref: skill:mail_focus_reader_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations:
+    - realizes
+    - uses
+  dependencies:
+  - ref: skill:gmail_cbs_cleanroom_skill
+    version: ==0.1.7
+    lifecycle: shared
+    relations:
+    - realizes
+    - uses
+entrypoints:
+- id: main
+  presentation: scenario:mail_focus_reader
+  default: true
+  bindings: {}
+catalog:
+  title: Mail Focus Reader
+  description: 'Create a new private application named "Mail Focus Reader". The exact
+    technical Application id is mail_focus_reader.
+
+
+    Build the shortest complete viable mail reading and triage application, not a
+    Gmail clone. Desktop-first UI: a compact folders/labels list on the left and a
+    message list on the right. Selecting a message replaces the list region with the
+    message detail; an explicit Back action restores the list and preserves the selected
+    folder. Only support read/unread, star/unstar, and archive. Do not add compose/send,
+    OAuth settings, label administration, a local mailbox copy, or dashboard widgets.
+
+
+    The Application must consume the existing portable capability mail.messages.manage
+    ^1.0.0. It must not implement Gmail API or OAuth, and its semantic Application
+    must not name a package, provider, or skill. Reuse the installed CBS Binding/PackageDelivery
+    and an explicitly attachable reusable Gmail credential owned by the capability/provider
+    plane. Use bounded message summaries and progressive next-page pagination for
+    first paint. Fetch full message content only after selection. Mutations require
+    an explicit user gesture. Show connection status and a clear way to attach an
+    existing Gmail connection.
+
+
+    Acceptance: labels load independently; the first message page performs no N+1
+    metadata fetch; empty, loading, and error states are visible; detail/back preserves
+    the folder; the result can advance through beta, Trial, and workspace; Applications
+    shows only required permissions. Prefer existing AdaOS components and the minimum
+    number of owned artifacts.'
+  categories: []
+  tags: []
+publication:
+  stage: alpha
+  visibility: unlisted
+  channel: stable
+install:
+  default: false
+  features: []
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-09-24T20:29:56Z'
+created_by: builder.chat
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.read
+    purpose: Read authorized mailbox data.
+    approval_policy: on_install
+  - id: workspace.write
+    purpose: Apply explicit mail triage and connection attachment.
+    approval_policy: on_install
+  - id: providers.google.gmail
+    purpose: Use the selected shared mail delivery.
+    approval_policy: on_install
+  - id: storage.relational
+    purpose: Shared delivery storage requirements.
+    approval_policy: on_install
+  optional: []
+  secrets: []
+  external_providers:
+  - id: google.gmail
+    account_id: google.gmail
+    title: Gmail account
+    purpose: Provider-owned mail delivery and credentials.
+    required: true
+    destination: gmail.googleapis.com
+    account_modes:
+    - delegated_user
+    scopes:
+    - https://www.googleapis.com/auth/gmail.modify
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected:
+    - mail_content
+    - mail_metadata
+    sent_off_device:
+    - mail_query
+    - mail_action
+    linked_to_user:
+    - mail_content
+    - mail_metadata
+    tracking: false
+    retention: provider_owned
+  privacy_labels:
+    collected:
+    - mail_content
+    - mail_metadata
+    sent_off_device: true
+    linked_to_user: true
+    tracking: false

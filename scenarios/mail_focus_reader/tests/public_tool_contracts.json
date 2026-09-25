@@ -1,0 +1,607 @@
+{
+  "reusable_connections": {
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "maxLength": 256
+              },
+              "email_address": {
+                "type": "string",
+                "maxLength": 320
+              },
+              "status": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "attached": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "email_address",
+              "status",
+              "attached"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": false
+    },
+    "permissions": [
+      "workspace.read",
+      "providers.google.gmail"
+    ],
+    "application_access": {
+      "permission": "providers.google.gmail",
+      "capability": "providers.google.gmail"
+    }
+  },
+  "attach_reusable_connection": {
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "maxLength": 256
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "id": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "email_address": {
+          "type": "string",
+          "maxLength": 320
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "attached": {
+          "type": "boolean"
+        },
+        "reused_credential": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": false
+    },
+    "permissions": [
+      "workspace.write",
+      "providers.google.gmail"
+    ],
+    "application_access": {
+      "permission": "providers.google.gmail",
+      "capability": "providers.google.gmail"
+    }
+  },
+  "portable_connection_status": {
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "email_address": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "error": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "status": {
+          "maxLength": 2048,
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    },
+    "permissions": [
+      "workspace.read",
+      "providers.google.gmail"
+    ],
+    "application_access": {
+      "permission": "providers.google.gmail",
+      "capability": "providers.google.gmail"
+    }
+  },
+  "portable_list_messages": {
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "page_token": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string"
+        },
+        "starred": {
+          "type": [
+            "boolean",
+            "string"
+          ]
+        },
+        "tab": {
+          "type": "string"
+        },
+        "unread": {
+          "type": [
+            "boolean",
+            "string"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "body": {
+                "maxLength": 50000,
+                "type": "string"
+              },
+              "date": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "from": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "icon": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "id": {
+                "maxLength": 256,
+                "type": "string"
+              },
+              "isStarred": {
+                "type": "boolean"
+              },
+              "isUnread": {
+                "type": "boolean"
+              },
+              "labelIds": {
+                "items": {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
+              "snippet": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "subject": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "threadId": {
+                "maxLength": 256,
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "maxItems": 25,
+          "type": "array"
+        },
+        "message": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "nextPageToken": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "pagination": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "maxLength": 256,
+                "type": "string"
+              },
+              "nextPageToken": {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              "summary": {
+                "maxLength": 2048,
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "nextPageToken",
+              "summary"
+            ],
+            "type": "object"
+          },
+          "maxItems": 1,
+          "type": "array"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "status": {
+          "maxLength": 2048,
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    },
+    "permissions": [
+      "workspace.read",
+      "providers.google.gmail"
+    ],
+    "application_access": {
+      "permission": "providers.google.gmail",
+      "capability": "providers.google.gmail"
+    }
+  },
+  "portable_get_message": {
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "item": {
+          "additionalProperties": false,
+          "properties": {
+            "body": {
+              "maxLength": 50000,
+              "type": "string"
+            },
+            "date": {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            "from": {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            "icon": {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            "id": {
+              "maxLength": 256,
+              "type": "string"
+            },
+            "isStarred": {
+              "type": "boolean"
+            },
+            "isUnread": {
+              "type": "boolean"
+            },
+            "labelIds": {
+              "items": {
+                "maxLength": 256,
+                "type": "string"
+              },
+              "maxItems": 100,
+              "type": "array"
+            },
+            "snippet": {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            "subject": {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            "threadId": {
+              "maxLength": 256,
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "message": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "status": {
+          "maxLength": 2048,
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    },
+    "permissions": [
+      "workspace.read",
+      "providers.google.gmail"
+    ],
+    "application_access": {
+      "permission": "providers.google.gmail",
+      "capability": "providers.google.gmail"
+    }
+  },
+  "portable_list_labels": {
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "maxLength": 256,
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 2048,
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "message": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "status": {
+          "maxLength": 2048,
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    },
+    "permissions": [
+      "workspace.read",
+      "providers.google.gmail"
+    ],
+    "application_access": {
+      "permission": "providers.google.gmail",
+      "capability": "providers.google.gmail"
+    }
+  },
+  "portable_mutate_message": {
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "archive",
+            "trash",
+            "mark_read",
+            "mark_unread",
+            "star",
+            "unstar",
+            "label",
+            "remove_label"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "action"
+      ],
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "item": {
+          "additionalProperties": false,
+          "properties": {
+            "body": {
+              "maxLength": 50000,
+              "type": "string"
+            },
+            "date": {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            "from": {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            "icon": {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            "id": {
+              "maxLength": 256,
+              "type": "string"
+            },
+            "isStarred": {
+              "type": "boolean"
+            },
+            "isUnread": {
+              "type": "boolean"
+            },
+            "labelIds": {
+              "items": {
+                "maxLength": 256,
+                "type": "string"
+              },
+              "maxItems": 100,
+              "type": "array"
+            },
+            "snippet": {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            "subject": {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            "threadId": {
+              "maxLength": 256,
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "message": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "status": {
+          "maxLength": 2048,
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    },
+    "permissions": [
+      "workspace.write",
+      "providers.google.gmail"
+    ],
+    "application_access": {
+      "permission": "providers.google.gmail",
+      "capability": "providers.google.gmail"
+    }
+  }
+}

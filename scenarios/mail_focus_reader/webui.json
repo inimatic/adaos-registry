@@ -1,0 +1,1321 @@
+{
+    "schema": "adaos.webui.v1",
+    "generated_by": "builder.semantic_compiler.v2",
+    "ui": {
+        "application": {
+            "desktop": {
+                "pageSchema": {
+                    "id": "mail_focus_reader",
+                    "title": "Mail Focus Reader",
+                    "title_i18n": {
+                        "key": "scenario.mail_focus_reader.title",
+                        "fallback": "Mail Focus Reader"
+                    },
+                    "layout": {
+                        "version": 2,
+                        "pattern": "collection-detail",
+                        "density": "comfortable",
+                        "contentWidth": "fluid",
+                        "scroll": "regions",
+                        "regions": [
+                            {
+                                "id": "primary",
+                                "role": "collection",
+                                "priority": 100,
+                                "scroll": "page",
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "stack"
+                                }
+                            },
+                            {
+                                "id": "supporting",
+                                "role": "detail",
+                                "priority": 70,
+                                "scroll": "region",
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "sheet"
+                                },
+                                "size": {
+                                    "minPx": 220,
+                                    "preferredPx": 360,
+                                    "maxPx": 600
+                                }
+                            },
+                            {
+                                "id": "actions",
+                                "role": "commands",
+                                "priority": 90,
+                                "scroll": "page",
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "pane"
+                                }
+                            }
+                        ],
+                        "interaction": {
+                            "selection": "single",
+                            "rowActivation": "open-detail",
+                            "detail": "inline",
+                            "filters": "disclosure",
+                            "actions": "adaptive"
+                        }
+                    },
+                    "widgets": [
+                        {
+                            "id": "prototype-settings",
+                            "type": "ui.actions",
+                            "area": "primary",
+                            "inputs": {
+                                "variant": "adaptiveToolbar",
+                                "buttons": [
+                                    {
+                                        "id": "settings",
+                                        "label": "Settings",
+                                        "label_i18n": "section.settings",
+                                        "icon": "settings-outline"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:settings",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "settings-settings"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "v_mailboxes",
+                            "area": "supporting",
+                            "title": "Mailboxes",
+                            "title_i18n": "view.v_mailboxes.title",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "gmail_cbs_cleanroom_skill.portable_list_labels",
+                                "params": {},
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "mail.labels"
+                                ],
+                                "preserveLastValue": false,
+                                "maxRequestHz": 1
+                            },
+                            "type": "ui.list",
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "name",
+                                "meta": [],
+                                "emptyState": {
+                                    "title": "No mailboxes",
+                                    "title_i18n": "view.v_mailboxes.empty.title",
+                                    "subtitle": "Add a connection to load folders",
+                                    "subtitle_i18n": "view.v_mailboxes.empty.detail"
+                                }
+                            },
+                            "actions": [
+                                {
+                                    "id": "select-v_mailboxes",
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selected_mailbox_id": "$event.id",
+                                        "selected_message_id": "",
+                                        "page_token": ""
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "queries-v_messages",
+                            "type": "ui.form",
+                            "area": "primary",
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "id": "query",
+                                        "type": "shortText",
+                                        "title": "Search",
+                                        "title_i18n": "query.q_search.label",
+                                        "stateKey": "search_draft"
+                                    }
+                                ],
+                                "buttons": [
+                                    {
+                                        "id": "search",
+                                        "label": "Search",
+                                        "label_i18n": "query.q_search.label"
+                                    }
+                                ],
+                                "resetOnSuccess": false
+                            },
+                            "visibleIf": "$state.selected_message_id === ''",
+                            "actions": [
+                                {
+                                    "type": "updateState",
+                                    "params": {
+                                        "query_q_search": "$event.values.query",
+                                        "page_token": ""
+                                    },
+                                    "id": "search",
+                                    "on": "submit"
+                                }
+                            ]
+                        },
+                        {
+                            "id": "open-e_toggle_read",
+                            "area": "primary",
+                            "type": "ui.actions",
+                            "inputs": {
+                                "variant": "adaptiveToolbar",
+                                "buttons": [
+                                    {
+                                        "id": "edit",
+                                        "label": "Mark Read/Unread",
+                                        "label_i18n": "view.e_toggle_read.title",
+                                        "icon": "create-outline",
+                                        "enabledIf": "$state.selected_message_id !== ''"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:edit",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "editor-e_toggle_read"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "open-e_toggle_star",
+                            "area": "primary",
+                            "type": "ui.actions",
+                            "inputs": {
+                                "variant": "adaptiveToolbar",
+                                "buttons": [
+                                    {
+                                        "id": "edit",
+                                        "label": "Star/Unstar",
+                                        "label_i18n": "view.e_toggle_star.title",
+                                        "icon": "create-outline",
+                                        "enabledIf": "$state.selected_message_id !== ''"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:edit",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "editor-e_toggle_star"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "open-e_archive",
+                            "area": "primary",
+                            "type": "ui.actions",
+                            "inputs": {
+                                "variant": "adaptiveToolbar",
+                                "buttons": [
+                                    {
+                                        "id": "edit",
+                                        "label": "Archive Message",
+                                        "label_i18n": "view.e_archive.title",
+                                        "icon": "create-outline",
+                                        "enabledIf": "$state.selected_message_id !== ''"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:edit",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "editor-e_archive"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "v_messages",
+                            "area": "primary",
+                            "title": "Messages",
+                            "title_i18n": "view.v_messages.title",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "gmail_cbs_cleanroom_skill.portable_list_messages",
+                                "params": {
+                                    "label": "$state.selected_mailbox_id",
+                                    "query": "$state.query_q_search",
+                                    "page_token": "$state.page_token"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "mail.messages"
+                                ],
+                                "preserveLastValue": false,
+                                "maxRequestHz": 1
+                            },
+                            "type": "ui.list",
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "from",
+                                "meta": [
+                                    {
+                                        "key": "isStarred",
+                                        "label": "Starred",
+                                        "label_i18n": "field.is_starred.label",
+                                        "kind": "boolean"
+                                    },
+                                    {
+                                        "key": "isUnread",
+                                        "label": "Unread",
+                                        "label_i18n": "mail.unread",
+                                        "kind": "boolean"
+                                    },
+                                    {
+                                        "key": "subject",
+                                        "label": "Subject",
+                                        "label_i18n": "field.subject.label",
+                                        "kind": "text"
+                                    },
+                                    {
+                                        "key": "snippet",
+                                        "label": "Snippet",
+                                        "label_i18n": "field.snippet.label",
+                                        "kind": "text",
+                                        "overflow": "truncate",
+                                        "align": "start"
+                                    },
+                                    {
+                                        "key": "date",
+                                        "label": "Date",
+                                        "label_i18n": "field.date.label",
+                                        "kind": "text"
+                                    }
+                                ],
+                                "emptyState": {
+                                    "title": "No messages",
+                                    "title_i18n": "view.v_messages.empty.title",
+                                    "subtitle": "This folder is empty",
+                                    "subtitle_i18n": "view.v_messages.empty.detail"
+                                }
+                            },
+                            "actions": [
+                                {
+                                    "id": "select-v_messages",
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selected_message_id": "$event.id"
+                                    }
+                                }
+                            ],
+                            "visibleIf": "$state.selected_message_id === ''"
+                        },
+                        {
+                            "id": "v_message_detail",
+                            "area": "primary",
+                            "title": "Message",
+                            "title_i18n": "view.v_message_detail.title",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "gmail_cbs_cleanroom_skill.portable_get_message",
+                                "params": {
+                                    "id": "$state.selected_message_id"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "mail.messages"
+                                ],
+                                "preserveLastValue": false,
+                                "maxRequestHz": 1
+                            },
+                            "type": "item.details",
+                            "selectedStateKey": "selected_message_id",
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "id": "subject",
+                                        "label": "Subject",
+                                        "label_i18n": "field.subject.label",
+                                        "path": "item.subject"
+                                    },
+                                    {
+                                        "id": "from",
+                                        "label": "From",
+                                        "label_i18n": "field.from.label",
+                                        "path": "item.from"
+                                    },
+                                    {
+                                        "id": "date",
+                                        "label": "Date",
+                                        "label_i18n": "field.date.label",
+                                        "path": "item.date"
+                                    },
+                                    {
+                                        "id": "body",
+                                        "label": "Body",
+                                        "label_i18n": "field.body_markdown.label",
+                                        "path": "item.body"
+                                    },
+                                    {
+                                        "id": "error",
+                                        "label": "Error",
+                                        "label_i18n": "field.error_message.label"
+                                    },
+                                    {
+                                        "id": "message",
+                                        "label": "Message",
+                                        "label_i18n": "mail.message"
+                                    }
+                                ],
+                                "emptyText": "No details available."
+                            },
+                            "visibleIf": "$state.selected_message_id !== ''"
+                        },
+                        {
+                            "id": "back-to-messages",
+                            "type": "ui.actions",
+                            "area": "primary",
+                            "visibleIf": "$state.selected_message_id !== ''",
+                            "inputs": {
+                                "buttons": [
+                                    {
+                                        "id": "back",
+                                        "label": "Back",
+                                        "label_i18n": "mail.back"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "type": "updateState",
+                                    "params": {
+                                        "selected_message_id": ""
+                                    },
+                                    "on": "click:back"
+                                }
+                            ]
+                        },
+                        {
+                            "id": "next-page",
+                            "type": "ui.list",
+                            "area": "primary",
+                            "visibleIf": "$state.selected_message_id === ''",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "gmail_cbs_cleanroom_skill.portable_list_messages",
+                                "params": {
+                                    "label": "$state.selected_mailbox_id",
+                                    "query": "$state.query_q_search",
+                                    "page_token": "$state.page_token"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "mail.messages"
+                                ],
+                                "preserveLastValue": false,
+                                "maxRequestHz": 1
+                            },
+                            "inputs": {
+                                "collectionKey": "pagination",
+                                "itemIdKey": "id",
+                                "titleKey": "summary",
+                                "emptyState": {
+                                    "title": "",
+                                    "subtitle": ""
+                                }
+                            },
+                            "actions": [
+                                {
+                                    "type": "updateState",
+                                    "params": {
+                                        "page_token": "$event.nextPageToken"
+                                    },
+                                    "on": "select"
+                                }
+                            ]
+                        },
+                        {
+                            "id": "message-read-status",
+                            "type": "item.details",
+                            "area": "primary",
+                            "visibleIf": "$state.selected_message_id === ''",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "gmail_cbs_cleanroom_skill.portable_list_messages",
+                                "params": {
+                                    "label": "$state.selected_mailbox_id",
+                                    "query": "$state.query_q_search",
+                                    "page_token": "$state.page_token"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "mail.messages"
+                                ],
+                                "preserveLastValue": false,
+                                "maxRequestHz": 1
+                            },
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "id": "error",
+                                        "label": "Error",
+                                        "label_i18n": "field.error_message.label"
+                                    },
+                                    {
+                                        "id": "message",
+                                        "label": "Message",
+                                        "label_i18n": "mail.message"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "label-read-status",
+                            "type": "item.details",
+                            "area": "supporting",
+                            "visibleIf": true,
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "gmail_cbs_cleanroom_skill.portable_list_labels",
+                                "params": {},
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "mail.labels"
+                                ],
+                                "preserveLastValue": false,
+                                "maxRequestHz": 1
+                            },
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "id": "error",
+                                        "label": "Error",
+                                        "label_i18n": "field.error_message.label"
+                                    },
+                                    {
+                                        "id": "message",
+                                        "label": "Message",
+                                        "label_i18n": "mail.message"
+                                    }
+                                ]
+                            }
+                        }
+                    ],
+                    "initialState": {
+                        "selected_connection_id": "",
+                        "selected_mailbox_id": "",
+                        "selected_message_id": "",
+                        "query_q_search": "",
+                        "page_token": "",
+                        "search_draft": ""
+                    },
+                    "meta": {
+                        "builder": {
+                            "semantic_source": "adaos.webui.semantic.v2",
+                            "prototype_record_schemas": {
+                                "prototype.project.mail_focus_reader.connection": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string",
+                                            "minLength": 1
+                                        },
+                                        "revision": {
+                                            "type": "integer",
+                                            "minimum": 1
+                                        },
+                                        "name": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "status": {
+                                            "enum": [
+                                                "connected",
+                                                "disconnected",
+                                                null
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "revision"
+                                    ],
+                                    "additionalProperties": false
+                                },
+                                "prototype.project.mail_focus_reader.mailbox": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string",
+                                            "minLength": 1
+                                        },
+                                        "revision": {
+                                            "type": "integer",
+                                            "minimum": 1
+                                        },
+                                        "title": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "revision"
+                                    ],
+                                    "additionalProperties": false
+                                },
+                                "prototype.project.mail_focus_reader.message": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string",
+                                            "minLength": 1
+                                        },
+                                        "revision": {
+                                            "type": "integer",
+                                            "minimum": 1
+                                        },
+                                        "mailbox_id": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "from": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "subject": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "snippet": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "date": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "is_read": {
+                                            "type": [
+                                                "boolean",
+                                                "null"
+                                            ]
+                                        },
+                                        "is_starred": {
+                                            "type": [
+                                                "boolean",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "revision"
+                                    ],
+                                    "additionalProperties": false
+                                },
+                                "prototype.project.mail_focus_reader.message_body": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string",
+                                            "minLength": 1
+                                        },
+                                        "revision": {
+                                            "type": "integer",
+                                            "minimum": 1
+                                        },
+                                        "message_id": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "body_markdown": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "attachments": {
+                                            "type": [
+                                                "array",
+                                                "null"
+                                            ],
+                                            "items": {
+                                                "type": "string",
+                                                "format": "adaos-attachment"
+                                            }
+                                        },
+                                        "load_state": {
+                                            "enum": [
+                                                "idle",
+                                                "loading",
+                                                "error",
+                                                null
+                                            ]
+                                        },
+                                        "error_message": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "revision"
+                                    ],
+                                    "additionalProperties": false
+                                }
+                            },
+                            "prototype_resource_policies": {
+                                "prototype.project.mail_focus_reader.message": {
+                                    "relationships": [
+                                        {
+                                            "field_ref": "mailbox_id",
+                                            "target_resource_type": "prototype.project.mail_focus_reader.mailbox",
+                                            "target_field_ref": "id"
+                                        }
+                                    ]
+                                },
+                                "prototype.project.mail_focus_reader.message_body": {
+                                    "relationships": [
+                                        {
+                                            "field_ref": "message_id",
+                                            "target_resource_type": "prototype.project.mail_focus_reader.message",
+                                            "target_field_ref": "id"
+                                        }
+                                    ]
+                                }
+                            },
+                            "semantic_digest": "sha256:25bca4be25760712a4470a0be54199dbd412dbeb84699edbfe71bc7c8ab064a9",
+                            "brief_ref": "brief:e1f6b484fa4dbe897e998d63",
+                            "relationships": [
+                                {
+                                    "id": "rel_message_mailbox",
+                                    "from_resource_ref": "message",
+                                    "from_field_ref": "mailbox_id",
+                                    "to_resource_ref": "mailbox",
+                                    "to_field_ref": "id",
+                                    "label_field_refs": [
+                                        "title"
+                                    ],
+                                    "cardinality": "many_to_one"
+                                },
+                                {
+                                    "id": "rel_body_message",
+                                    "from_resource_ref": "message_body",
+                                    "from_field_ref": "message_id",
+                                    "to_resource_ref": "message",
+                                    "to_field_ref": "id",
+                                    "label_field_refs": [
+                                        "subject"
+                                    ],
+                                    "cardinality": "many_to_one"
+                                }
+                            ],
+                            "capability_gaps": [],
+                            "acceptance_stage": "prototype",
+                            "automation_requirements": [
+                                {
+                                    "requirement_ref": "job:03",
+                                    "reason": "business_rule",
+                                    "disclosure": {
+                                        "en": "Read/unread, star/unstar and archive are local prototype updates; external mailbox effects are not enforced here."
+                                    },
+                                    "acceptance": "When Automation runs, toggling read/star and archiving must update the remote mailbox via the required capability.",
+                                    "statement": "Support only read/unread, star/unstar, and archive, each from an explicit user gesture",
+                                    "prototype_refs": [
+                                        "command:cmd_archive",
+                                        "command:cmd_toggle_read",
+                                        "command:cmd_toggle_star",
+                                        "resource:message",
+                                        "view:e_archive",
+                                        "view:e_toggle_read",
+                                        "view:e_toggle_star"
+                                    ],
+                                    "status": "pending_automation",
+                                    "brief_ref": "brief:e1f6b484fa4dbe897e998d63",
+                                    "brief_digest": "sha256:e1f6b484fa4dbe897e998d6389dba1fad0f3467114b50d0289835c103d596e97"
+                                },
+                                {
+                                    "requirement_ref": "residual:03",
+                                    "reason": "external_integration",
+                                    "disclosure": {
+                                        "en": "This app requires capability mail.messages.manage ^1.0.0 to list, inspect and archive messages. No provider is named."
+                                    },
+                                    "acceptance": "Capability is declared and bound by Automation without naming a specific provider.",
+                                    "statement": "The semantic Application must require the existing portable capability mail.messages.manage ^1",
+                                    "prototype_refs": [
+                                        "resource:connection",
+                                        "view:v_connections"
+                                    ],
+                                    "status": "pending_automation",
+                                    "brief_ref": "brief:e1f6b484fa4dbe897e998d63",
+                                    "brief_digest": "sha256:e1f6b484fa4dbe897e998d6389dba1fad0f3467114b50d0289835c103d596e97"
+                                }
+                            ],
+                            "process_constraints": [],
+                            "proto": "009",
+                            "ui_revision": "009",
+                            "scenario_id": "mail_focus_reader",
+                            "cbs_intent": {
+                                "schema": "adaos.builder.cbs_intent.v1",
+                                "requirements": [
+                                    {
+                                        "id": "mail_messages_manage",
+                                        "capability_ref": "capability:mail.messages.manage",
+                                        "contract_range": "^1.0.0",
+                                        "origin": "human_explicit"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            "modals": {
+                "editor-e_attach_connection": {
+                    "title": "Attach Existing Connection",
+                    "title_i18n": "view.e_attach_connection.title",
+                    "presentation": {
+                        "kind": "modal"
+                    },
+                    "schema": {
+                        "id": "editor-e_attach_connection",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "reading",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "e_attach_connection",
+                                "area": "main",
+                                "title": "Attach Existing Connection",
+                                "title_i18n": "view.e_attach_connection.title",
+                                "type": "ui.form",
+                                "inputs": {
+                                    "layout": "responsiveGrid",
+                                    "fields": [],
+                                    "buttons": [
+                                        {
+                                            "id": "cmd_attach_connection",
+                                            "label": "Attach",
+                                            "label_i18n": "command.cmd_attach_connection.label",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.selected_connection_id !== ''"
+                                        }
+                                    ],
+                                    "selectedStateKey": "selected_connection_id",
+                                    "closeOnSuccess": true,
+                                    "resetOnSuccess": false
+                                },
+                                "actions": [
+                                    {
+                                        "type": "callSkill",
+                                        "target": "gmail_cbs_cleanroom_skill.attach_reusable_connection",
+                                        "params": {
+                                            "account_id": "$state.selected_connection_id"
+                                        },
+                                        "invalidates": [
+                                            "mail.messages",
+                                            "mail.connection",
+                                            "mail.labels"
+                                        ],
+                                        "id": "cmd_attach_connection",
+                                        "on": "submit"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "editor-e_toggle_read": {
+                    "title": "Mark Read/Unread",
+                    "title_i18n": "view.e_toggle_read.title",
+                    "presentation": {
+                        "kind": "modal"
+                    },
+                    "schema": {
+                        "id": "editor-e_toggle_read",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "reading",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "e_toggle_read",
+                                "area": "main",
+                                "title": "Mark Read/Unread",
+                                "title_i18n": "view.e_toggle_read.title",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "gmail_cbs_cleanroom_skill.portable_get_message",
+                                    "params": {
+                                        "id": "$state.selected_message_id"
+                                    },
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "mail.messages"
+                                    ],
+                                    "preserveLastValue": false,
+                                    "maxRequestHz": 1
+                                },
+                                "type": "ui.form",
+                                "inputs": {
+                                    "layout": "responsiveGrid",
+                                    "fields": [
+                                        {
+                                            "id": "isUnread",
+                                            "title": "Unread",
+                                            "title_i18n": "mail.unread",
+                                            "type": "boolean",
+                                            "required": true
+                                        }
+                                    ],
+                                    "buttons": [
+                                        {
+                                            "id": "cmd_toggle_read",
+                                            "label": "Save",
+                                            "label_i18n": "command.cmd_toggle_read.label",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.selected_message_id !== ''"
+                                        }
+                                    ],
+                                    "selectedStateKey": "selected_message_id",
+                                    "closeOnSuccess": true,
+                                    "resetOnSuccess": false
+                                },
+                                "actions": [
+                                    {
+                                        "type": "callSkill",
+                                        "target": "gmail_cbs_cleanroom_skill.portable_mutate_message",
+                                        "params": {
+                                            "id": "$event.record.id",
+                                            "action": {
+                                                "kind": "expression",
+                                                "op": "if",
+                                                "condition": "$event.values.isUnread",
+                                                "then": "mark_unread",
+                                                "else": "mark_read"
+                                            }
+                                        },
+                                        "invalidates": [
+                                            "mail.messages",
+                                            "mail.connection",
+                                            "mail.labels"
+                                        ],
+                                        "id": "cmd_toggle_read",
+                                        "on": "submit"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "editor-e_toggle_star": {
+                    "title": "Star/Unstar",
+                    "title_i18n": "view.e_toggle_star.title",
+                    "presentation": {
+                        "kind": "modal"
+                    },
+                    "schema": {
+                        "id": "editor-e_toggle_star",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "reading",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "e_toggle_star",
+                                "area": "main",
+                                "title": "Star/Unstar",
+                                "title_i18n": "view.e_toggle_star.title",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "gmail_cbs_cleanroom_skill.portable_get_message",
+                                    "params": {
+                                        "id": "$state.selected_message_id"
+                                    },
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "mail.messages"
+                                    ],
+                                    "preserveLastValue": false,
+                                    "maxRequestHz": 1
+                                },
+                                "type": "ui.form",
+                                "inputs": {
+                                    "layout": "responsiveGrid",
+                                    "fields": [
+                                        {
+                                            "id": "isStarred",
+                                            "title": "Starred",
+                                            "title_i18n": "field.is_starred.label",
+                                            "type": "boolean",
+                                            "required": true
+                                        }
+                                    ],
+                                    "buttons": [
+                                        {
+                                            "id": "cmd_toggle_star",
+                                            "label": "Save",
+                                            "label_i18n": "command.cmd_toggle_star.label",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.selected_message_id !== ''"
+                                        }
+                                    ],
+                                    "selectedStateKey": "selected_message_id",
+                                    "closeOnSuccess": true,
+                                    "resetOnSuccess": false
+                                },
+                                "actions": [
+                                    {
+                                        "type": "callSkill",
+                                        "target": "gmail_cbs_cleanroom_skill.portable_mutate_message",
+                                        "params": {
+                                            "id": "$event.record.id",
+                                            "action": {
+                                                "kind": "expression",
+                                                "op": "if",
+                                                "condition": "$event.values.isStarred",
+                                                "then": "star",
+                                                "else": "unstar"
+                                            }
+                                        },
+                                        "invalidates": [
+                                            "mail.messages",
+                                            "mail.connection",
+                                            "mail.labels"
+                                        ],
+                                        "id": "cmd_toggle_star",
+                                        "on": "submit"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "editor-e_archive": {
+                    "title": "Archive Message",
+                    "title_i18n": "view.e_archive.title",
+                    "presentation": {
+                        "kind": "modal"
+                    },
+                    "schema": {
+                        "id": "editor-e_archive",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "reading",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "e_archive",
+                                "area": "main",
+                                "title": "Archive Message",
+                                "title_i18n": "view.e_archive.title",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "gmail_cbs_cleanroom_skill.portable_get_message",
+                                    "params": {
+                                        "id": "$state.selected_message_id"
+                                    },
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "mail.messages"
+                                    ],
+                                    "preserveLastValue": false,
+                                    "maxRequestHz": 1
+                                },
+                                "type": "ui.form",
+                                "inputs": {
+                                    "layout": "responsiveGrid",
+                                    "fields": [],
+                                    "buttons": [
+                                        {
+                                            "id": "cmd_archive",
+                                            "label": "Move to Archive",
+                                            "label_i18n": "command.cmd_archive.label",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.selected_message_id !== ''"
+                                        }
+                                    ],
+                                    "selectedStateKey": "selected_message_id",
+                                    "closeOnSuccess": true,
+                                    "resetOnSuccess": false
+                                },
+                                "actions": [
+                                    {
+                                        "type": "callSkill",
+                                        "target": "gmail_cbs_cleanroom_skill.portable_mutate_message",
+                                        "params": {
+                                            "id": "$event.record.id",
+                                            "action": "archive"
+                                        },
+                                        "invalidates": [
+                                            "mail.messages",
+                                            "mail.connection",
+                                            "mail.labels"
+                                        ],
+                                        "id": "cmd_archive",
+                                        "on": "submit",
+                                        "confirmation": {
+                                            "message": "Archive this message?",
+                                            "message_i18n": "command.cmd_archive.confirmation",
+                                            "confirmLabel": "Move to Archive",
+                                            "confirmLabel_i18n": "command.cmd_archive.label"
+                                        }
+                                    },
+                                    {
+                                        "type": "updateState",
+                                        "params": {
+                                            "selected_message_id": "",
+                                            "page_token": ""
+                                        },
+                                        "id": "cmd_archive",
+                                        "on": "submit"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "settings-settings": {
+                    "title": "Settings",
+                    "title_i18n": "section.settings",
+                    "schema": {
+                        "id": "settings-settings",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "settings",
+                            "density": "comfortable",
+                            "contentWidth": "reading",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "supporting",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    },
+                                    "size": {
+                                        "minPx": 220,
+                                        "preferredPx": 360,
+                                        "maxPx": 600
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "selection": "single",
+                                "rowActivation": "open-detail",
+                                "detail": "inline",
+                                "filters": "disclosure",
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "connection-status",
+                                "type": "item.details",
+                                "area": "supporting",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "gmail_cbs_cleanroom_skill.portable_connection_status",
+                                    "params": {},
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "mail.connection"
+                                    ],
+                                    "preserveLastValue": false,
+                                    "maxRequestHz": 1
+                                },
+                                "inputs": {
+                                    "fields": [
+                                        {
+                                            "id": "status",
+                                            "label": "Status",
+                                            "label_i18n": "field.status.label"
+                                        },
+                                        {
+                                            "id": "email_address",
+                                            "label": "Account",
+                                            "label_i18n": "mail.account"
+                                        },
+                                        {
+                                            "id": "message",
+                                            "label": "Message",
+                                            "label_i18n": "mail.message"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "v_connections",
+                                "area": "supporting",
+                                "title": "Connections",
+                                "title_i18n": "view.v_connections.title",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "gmail_cbs_cleanroom_skill.reusable_connections",
+                                    "params": {},
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "mail.connection"
+                                    ],
+                                    "preserveLastValue": false,
+                                    "maxRequestHz": 1
+                                },
+                                "type": "ui.list",
+                                "inputs": {
+                                    "variant": "list",
+                                    "itemIdKey": "id",
+                                    "titleKey": "email_address",
+                                    "meta": [
+                                        {
+                                            "key": "status",
+                                            "label": "Status",
+                                            "label_i18n": "field.status.label",
+                                            "kind": "badge",
+                                            "valueI18nPrefix": "value.status.",
+                                            "valueLabels": {
+                                                "connected": "Connected",
+                                                "disconnected": "Disconnected"
+                                            }
+                                        }
+                                    ],
+                                    "emptyState": {
+                                        "title": "No connections",
+                                        "title_i18n": "view.v_connections.empty.title",
+                                        "subtitle": "Attach an existing connection",
+                                        "subtitle_i18n": "view.v_connections.empty.detail"
+                                    }
+                                },
+                                "actions": [
+                                    {
+                                        "id": "select-v_connections",
+                                        "on": "select",
+                                        "type": "updateState",
+                                        "params": {
+                                            "selected_connection_id": "$event.id"
+                                        }
+                                    },
+                                    {
+                                        "on": "select",
+                                        "type": "openModal",
+                                        "params": {
+                                            "modalId": "editor-e_attach_connection"
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        "version": "0.1.2",
+        "manifest": "webui.json"
+    }
+}

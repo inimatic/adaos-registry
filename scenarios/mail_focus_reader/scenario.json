@@ -1,0 +1,50 @@
+{
+    "id": "mail_focus_reader",
+    "name": "mail_focus_reader",
+    "version": "0.1.2",
+    "title": "Mail Focus Reader",
+    "title_i18n": {
+        "key": "scenario.mail_focus_reader.title",
+        "fallback": "Mail Focus Reader"
+    },
+    "description": "Empty AdaOS desktop canvas ready for Builder authoring.",
+    "type": "desktop",
+    "supported_locales": [
+        "en",
+        "ru"
+    ],
+    "depends": [
+        "gmail_cbs_cleanroom_skill"
+    ],
+    "runtime": {
+        "skills": {
+            "required": [
+                "gmail_cbs_cleanroom_skill"
+            ],
+            "optional": []
+        }
+    },
+    "ui": {
+        "manifest": "webui.json"
+    },
+    "trigger": "manual",
+    "vars": {},
+    "llm_hints": {
+        "description": "Create a new private application named \"Mail Focus Reader\". The exact technical Application id is mail_focus_reader.\n\nBuild the shortest complete viable mail reading and triage application, not a Gmail clone. Desktop-first UI: a compact folders/labels list on the left and a message list on the right. Selecting a message replaces the list region with the message detail; an explicit Back action restores the list and preserves the selected folder. Only support read/unread, star/unstar, and archive. Do not add compose/send, OAuth settings, label administration, a local mailbox copy, or dashboard widgets.\n\nThe Application must consume the existing portable capability mail.messages.manage ^1.0.0. It must not implement Gmail API or OAuth, and its semantic Application must not name a package, provider, or skill. Reuse the installed CBS Binding/PackageDelivery and an explicitly attachable reusable Gmail credential owned by the capability/provider plane. Use bounded message summaries and progressive next-page pagination for first paint. Fetch full message content only after selection. Mutations require an explicit user gesture. Show connection status and a clear way to attach an existing Gmail connection.\n\nAcceptance: labels load independently; the first message page performs no N+1 metadata fetch; empty, loading, and error states are visible; detail/back preserves the folder; the result can advance through beta, Trial, and workspace; Applications shows only required permissions. Prefer existing AdaOS components and the minimum number of owned artifacts.",
+        "aliases": [],
+        "primary_actions": [],
+        "examples": [],
+        "owner_hints": []
+    },
+    "nlu": {
+        "nlu_hints": {
+            "aliases": [],
+            "examples": [],
+            "slot_schemas": {},
+            "entities": []
+        }
+    },
+    "steps": [],
+    "prototype": "scenario_default",
+    "updated_at": "2026-09-25T04:04:44+00:00"
+}

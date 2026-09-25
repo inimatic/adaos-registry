@@ -6,7 +6,9 @@
     "adaos.binding.definition.v1|binding-definition:mail.messages.manage.google-gmail-local|1.0.0": "sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2",
     "adaos.binding.delivery.v1|binding-definition:mail.messages.manage.google-gmail-local@sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2|sha256:403e924b61e66ae9d04aa69a4594d3fe2873349f75904c5633e3e01212c0df19": "sha256:778e63e38aa078e0ee4e5e97026e6262ef7b89d699fae4bd67adc2750df80b4d",
     "adaos.capability.contract.v1|capability:application.ui.render|1.0.0": "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7",
-    "adaos.capability.contract.v1|capability:mail.messages.manage|1.0.0": "sha256:f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698"
+    "adaos.capability.contract.v1|capability:mail.messages.manage|1.0.0": "sha256:f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698",
+    "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:1a07e0d95b0100e48c3ce72cbe899e8a92f147548962b3a7aebbf3645f0f81e4": "sha256:201c93583f82c47b38554edf4b57a647f68399b7577edcb1509b8b48b1423f6d",
+    "adaos.binding.delivery.v1|binding-definition:mail.messages.manage.google-gmail-local@sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2|sha256:856b0d49468f44dcfc6b790136baa16420c685996d771e4866090383c11434c0": "sha256:33d9e7c0d3615a20b2dd02bccbdc838f1ede2782448a84af6e4f31855bb4f5c6"
   },
   "records": {
     "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1": {
@@ -15,6 +17,7 @@
       "revision": "1.0.0",
       "path": "semantic/records/sha256/39/39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1.json",
       "published_by_release_digests": [
+        "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
         "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
       ]
     },
@@ -33,6 +36,7 @@
       "revision": "1.0.0",
       "path": "semantic/records/sha256/53/5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2.json",
       "published_by_release_digests": [
+        "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
         "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
       ]
     },
@@ -51,6 +55,7 @@
       "revision": "1.0.0",
       "path": "semantic/records/sha256/80/80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7.json",
       "published_by_release_digests": [
+        "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
         "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
       ]
     },
@@ -60,7 +65,26 @@
       "revision": "1.0.0",
       "path": "semantic/records/sha256/f6/f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698.json",
       "published_by_release_digests": [
+        "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
         "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
+      ]
+    },
+    "sha256:201c93583f82c47b38554edf4b57a647f68399b7577edcb1509b8b48b1423f6d": {
+      "schema": "adaos.binding.delivery.v1",
+      "identity": "binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "revision": "sha256:1a07e0d95b0100e48c3ce72cbe899e8a92f147548962b3a7aebbf3645f0f81e4",
+      "path": "semantic/records/sha256/20/201c93583f82c47b38554edf4b57a647f68399b7577edcb1509b8b48b1423f6d.json",
+      "published_by_release_digests": [
+        "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387"
+      ]
+    },
+    "sha256:33d9e7c0d3615a20b2dd02bccbdc838f1ede2782448a84af6e4f31855bb4f5c6": {
+      "schema": "adaos.binding.delivery.v1",
+      "identity": "binding-definition:mail.messages.manage.google-gmail-local@sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2",
+      "revision": "sha256:856b0d49468f44dcfc6b790136baa16420c685996d771e4866090383c11434c0",
+      "path": "semantic/records/sha256/33/33d9e7c0d3615a20b2dd02bccbdc838f1ede2782448a84af6e4f31855bb4f5c6.json",
+      "published_by_release_digests": [
+        "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387"
       ]
     }
   },
@@ -73,7 +97,16 @@
       "semantic_revision_digest": "sha256:f9607679842eaca8cc15b5b50654d93bc46f6e6d13463e187c7ed5a05946e076",
       "path": "semantic/applications/gmail_cbs_cleanroom/f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83.json",
       "projection_digest": "sha256:27707575ddd3c42fd9d1d9676fbccfe9badc3d88b46f656f3135dd93ca16b90e"
+    },
+    "project:mail_focus_reader@sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387": {
+      "project_id": "mail_focus_reader",
+      "version": "0.1.2",
+      "application_ref": "scenario:mail_focus_reader",
+      "project_release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+      "semantic_revision_digest": "sha256:ad34ad99a011e59e39b0d24e810925b3f2393385f6e343a178af42b7a736c5fe",
+      "path": "semantic/applications/mail_focus_reader/7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387.json",
+      "projection_digest": "sha256:c2f4cb4f357dee4b0ae0e2f4815a0b2515db6f4fb5c0f2a2229b51e5c2b27f90"
     }
   },
-  "index_digest": "sha256:b3776e3419dd0574ce10b1ad7bca48ad9727847edfb61101befbd9a21e823a08"
+  "index_digest": "sha256:12edb951ebce67d8b2ba2f6adb7a85d362510cf9a7029bd987d9e0b39b6964c5"
 }

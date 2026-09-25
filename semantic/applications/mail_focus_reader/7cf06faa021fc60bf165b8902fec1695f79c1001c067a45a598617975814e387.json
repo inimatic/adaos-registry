@@ -1,0 +1,167 @@
+{
+  "schema": "adaos.semantic_registry.application_release.v1",
+  "project_id": "mail_focus_reader",
+  "version": "0.1.2",
+  "application_ref": "scenario:mail_focus_reader",
+  "project_release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+  "source_ref": {
+    "schema": "adaos.artifact.source_ref.v1",
+    "forge": "content-addressed-dev",
+    "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+    "revision": "sha256:7d11ce2ab800f87bc3344dda1256f27feb0e4c9144bcc98980ef520877a367a3",
+    "path_scope": [
+      "projects/mail_focus_reader/"
+    ]
+  },
+  "compilation_digest": "sha256:efd03b68a43b70ee3ebbecf30e914b0d1c73394fe194a9e5e829800ecdbd8328",
+  "semantic_revision_digest": "sha256:ad34ad99a011e59e39b0d24e810925b3f2393385f6e343a178af42b7a736c5fe",
+  "requirements": [
+    {
+      "requirement_ref": "requirement:scenario.mail_focus_reader.ui",
+      "capability_ref": "capability:application.ui.render",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "simulation",
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:7dbeb751c6b5957c65cf1d4a10753f50e29421437b3341c9531489b84fd388d9"
+    },
+    {
+      "requirement_ref": "requirement:scenario.mail_focus_reader.mail_messages_manage",
+      "capability_ref": "capability:mail.messages.manage",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "simulation",
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:169fef9420da59ec76610a3a2916e7d8454c3e7ba4d23733074ebf6abb5a5fa0"
+    }
+  ],
+  "portable_artifacts": {
+    "adaos.binding.definition.v1": [
+      "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2"
+    ],
+    "adaos.binding.delivery.v1": [
+      "sha256:201c93583f82c47b38554edf4b57a647f68399b7577edcb1509b8b48b1423f6d",
+      "sha256:33d9e7c0d3615a20b2dd02bccbdc838f1ede2782448a84af6e4f31855bb4f5c6"
+    ],
+    "adaos.capability.contract.v1": [
+      "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7",
+      "sha256:f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698"
+    ]
+  },
+  "distribution": {
+    "thin": {
+      "requirements_only": true,
+      "registry_required": true
+    },
+    "resolved": {
+      "project_release_digest": "sha256:7cf06faa021fc60bf165b8902fec1695f79c1001c067a45a598617975814e387",
+      "package_closure": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "mail_focus_reader",
+          "version": "0.1.2",
+          "digest": "sha256:1a07e0d95b0100e48c3ce72cbe899e8a92f147548962b3a7aebbf3645f0f81e4",
+          "manifest_digest": "sha256:664371801577cfb9b4a10ab53afcec3533c767a3007af7912da1989b8c19c4e1",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:7d11ce2ab800f87bc3344dda1256f27feb0e4c9144bcc98980ef520877a367a3",
+            "path_scope": [
+              "scenarios/mail_focus_reader/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/mail_focus_reader",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "gmail_cbs_cleanroom_skill",
+          "version": "0.1.7",
+          "digest": "sha256:856b0d49468f44dcfc6b790136baa16420c685996d771e4866090383c11434c0",
+          "manifest_digest": "sha256:8e604db5ed7b18bf9f812a3e5ee7210ac4c2f8f7bbca32e31325363ea1eab803",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:7931e9153afed1d74465fdefcb05e3a96f82c2c10e13f27726d05ec08ca53c4c",
+            "path_scope": [
+              "skills/gmail_cbs_cleanroom_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/gmail_cbs_cleanroom_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "mail_focus_reader_skill",
+          "version": "0.1.2",
+          "digest": "sha256:824a45a1bb3b15520260c0284151893f051f6079b3dfc14fb6a9d165067860ed",
+          "manifest_digest": "sha256:d5890b082f349f9b9c211352e945dd0ad3767f179e4366e374dfdbf02d134b88",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:7d11ce2ab800f87bc3344dda1256f27feb0e4c9144bcc98980ef520877a367a3",
+            "path_scope": [
+              "skills/mail_focus_reader_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/mail_focus_reader_skill",
+          "schema_locks": []
+        }
+      ],
+      "portable_artifact_digests": [
+        "sha256:201c93583f82c47b38554edf4b57a647f68399b7577edcb1509b8b48b1423f6d",
+        "sha256:33d9e7c0d3615a20b2dd02bccbdc838f1ede2782448a84af6e4f31855bb4f5c6",
+        "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+        "sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2",
+        "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7",
+        "sha256:f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698"
+      ]
+    }
+  },
+  "projection_digest": "sha256:c2f4cb4f357dee4b0ae0e2f4815a0b2515db6f4fb5c0f2a2229b51e5c2b27f90"
+}

@@ -1,0 +1,991 @@
+{
+  "schema": "adaos.webui.semantic.v2",
+  "document_id": "mail_focus_reader",
+  "brief_ref": "brief:e1f6b484fa4dbe897e998d63",
+  "brief_digest": "sha256:e1f6b484fa4dbe897e998d6389dba1fad0f3467114b50d0289835c103d596e97",
+  "title": {
+    "key": "prototype.mail_focus_reader.title",
+    "en": "Mail Focus Reader"
+  },
+  "layout": {
+    "pattern": "split"
+  },
+  "resources": [
+    {
+      "id": "connection",
+      "item_semantics": "External mail service connection reference required by the app",
+      "item_label": {
+        "key": "resource.connection.item",
+        "en": "Connection"
+      },
+      "fields": [
+        {
+          "id": "name",
+          "label": {
+            "key": "field.name.label",
+            "en": "Connection name"
+          },
+          "value_type": "short_text",
+          "required": true,
+          "editable": true
+        },
+        {
+          "id": "status",
+          "label": {
+            "key": "field.status.label",
+            "en": "Status"
+          },
+          "value_type": "choice",
+          "required": true,
+          "editable": false,
+          "options": [
+            {
+              "value": "connected",
+              "label": {
+                "key": "field.status.option.connected",
+                "en": "Connected"
+              }
+            },
+            {
+              "value": "disconnected",
+              "label": {
+                "key": "field.status.option.disconnected",
+                "en": "Disconnected"
+              }
+            }
+          ]
+        }
+      ],
+      "records": [
+        {
+          "name": "Primary Mail",
+          "status": "connected",
+          "id": "conn-1"
+        }
+      ],
+      "identity_field_refs": [
+        "id"
+      ]
+    },
+    {
+      "id": "mailbox",
+      "item_semantics": "A logical mailbox or label for grouping messages",
+      "item_label": {
+        "key": "resource.mailbox.item",
+        "en": "Mailbox"
+      },
+      "fields": [
+        {
+          "id": "title",
+          "label": {
+            "key": "field.title.label",
+            "en": "Title"
+          },
+          "value_type": "short_text",
+          "required": true,
+          "editable": false
+        }
+      ],
+      "records": [
+        {
+          "title": "Inbox",
+          "id": "inbox"
+        },
+        {
+          "title": "Starred",
+          "id": "starred"
+        },
+        {
+          "title": "Archive",
+          "id": "archive"
+        }
+      ],
+      "identity_field_refs": [
+        "id"
+      ]
+    },
+    {
+      "id": "message",
+      "item_semantics": "An email message header and metadata",
+      "item_label": {
+        "key": "resource.message.item",
+        "en": "Message"
+      },
+      "fields": [
+        {
+          "id": "mailbox_id",
+          "label": {
+            "key": "field.mailbox_id.label",
+            "en": "Mailbox"
+          },
+          "value_type": "choice",
+          "required": true,
+          "editable": true,
+          "options": [
+            {
+              "value": "inbox",
+              "label": {
+                "key": "relationship.rel_message_mailbox.option.inbox",
+                "en": "Inbox"
+              }
+            },
+            {
+              "value": "starred",
+              "label": {
+                "key": "relationship.rel_message_mailbox.option.starred",
+                "en": "Starred"
+              }
+            },
+            {
+              "value": "archive",
+              "label": {
+                "key": "relationship.rel_message_mailbox.option.archive",
+                "en": "Archive"
+              }
+            }
+          ]
+        },
+        {
+          "id": "from",
+          "label": {
+            "key": "field.from.label",
+            "en": "From"
+          },
+          "value_type": "short_text",
+          "required": true,
+          "editable": false
+        },
+        {
+          "id": "subject",
+          "label": {
+            "key": "field.subject.label",
+            "en": "Subject"
+          },
+          "value_type": "short_text",
+          "required": true,
+          "editable": false
+        },
+        {
+          "id": "snippet",
+          "label": {
+            "key": "field.snippet.label",
+            "en": "Snippet"
+          },
+          "value_type": "long_text",
+          "required": false,
+          "editable": false
+        },
+        {
+          "id": "date",
+          "label": {
+            "key": "field.date.label",
+            "en": "Date"
+          },
+          "value_type": "date",
+          "required": true,
+          "editable": false
+        },
+        {
+          "id": "is_read",
+          "label": {
+            "key": "field.is_read.label",
+            "en": "Read"
+          },
+          "value_type": "boolean",
+          "required": true,
+          "editable": true
+        },
+        {
+          "id": "is_starred",
+          "label": {
+            "key": "field.is_starred.label",
+            "en": "Starred"
+          },
+          "value_type": "boolean",
+          "required": true,
+          "editable": true
+        }
+      ],
+      "records": [
+        {
+          "mailbox_id": "inbox",
+          "from": "A. Sender",
+          "subject": "Welcome to Mail",
+          "snippet": "Thanks for trying the reader.",
+          "date": "2024-09-10",
+          "is_read": false,
+          "is_starred": false,
+          "id": "m1"
+        },
+        {
+          "mailbox_id": "inbox",
+          "from": "B. Team",
+          "subject": "Your receipt",
+          "snippet": "Order #12345 attached.",
+          "date": "2024-09-09",
+          "is_read": true,
+          "is_starred": true,
+          "id": "m2"
+        },
+        {
+          "mailbox_id": "starred",
+          "from": "C. Updates",
+          "subject": "Weekly update",
+          "snippet": "Here are highlights...",
+          "date": "2024-09-08",
+          "is_read": true,
+          "is_starred": true,
+          "id": "m3"
+        }
+      ],
+      "identity_field_refs": [
+        "id"
+      ]
+    },
+    {
+      "id": "message_body",
+      "item_semantics": "Lazily fetched full message content and attachments",
+      "item_label": {
+        "key": "resource.message_body.item",
+        "en": "Message Body"
+      },
+      "fields": [
+        {
+          "id": "message_id",
+          "label": {
+            "key": "field.message_id.label",
+            "en": "Message Id"
+          },
+          "value_type": "choice",
+          "required": true,
+          "editable": true,
+          "options": [
+            {
+              "value": "m1",
+              "label": {
+                "key": "relationship.rel_body_message.option.m1",
+                "en": "Welcome to Mail"
+              }
+            },
+            {
+              "value": "m2",
+              "label": {
+                "key": "relationship.rel_body_message.option.m2",
+                "en": "Your receipt"
+              }
+            },
+            {
+              "value": "m3",
+              "label": {
+                "key": "relationship.rel_body_message.option.m3",
+                "en": "Weekly update"
+              }
+            }
+          ]
+        },
+        {
+          "id": "body_markdown",
+          "label": {
+            "key": "field.body_markdown.label",
+            "en": "Body"
+          },
+          "value_type": "long_text",
+          "required": false,
+          "editable": false,
+          "display_format": "markdown"
+        },
+        {
+          "id": "attachments",
+          "label": {
+            "key": "field.attachments.label",
+            "en": "Attachments"
+          },
+          "value_type": "attachment",
+          "required": false,
+          "editable": false,
+          "multiple": true
+        },
+        {
+          "id": "load_state",
+          "label": {
+            "key": "field.load_state.label",
+            "en": "Load state"
+          },
+          "value_type": "choice",
+          "required": true,
+          "editable": true,
+          "options": [
+            {
+              "value": "idle",
+              "label": {
+                "key": "field.load_state.option.idle",
+                "en": "Idle"
+              }
+            },
+            {
+              "value": "loading",
+              "label": {
+                "key": "field.load_state.option.loading",
+                "en": "Loading"
+              }
+            },
+            {
+              "value": "error",
+              "label": {
+                "key": "field.load_state.option.error",
+                "en": "Error"
+              }
+            }
+          ]
+        },
+        {
+          "id": "error_message",
+          "label": {
+            "key": "field.error_message.label",
+            "en": "Error message"
+          },
+          "value_type": "short_text",
+          "required": false,
+          "editable": true
+        }
+      ],
+      "records": [
+        {
+          "message_id": "m1",
+          "body_markdown": "# Welcome\n\nThis is the full message body.",
+          "attachments": [
+            "sample://document"
+          ],
+          "load_state": "idle",
+          "error_message": "",
+          "id": "mb-m1"
+        },
+        {
+          "message_id": "m2",
+          "body_markdown": "Receipt details here.",
+          "attachments": [],
+          "load_state": "idle",
+          "error_message": "",
+          "id": "mb-m2"
+        },
+        {
+          "message_id": "m3",
+          "body_markdown": "Weekly update full text.",
+          "attachments": [],
+          "load_state": "idle",
+          "error_message": "",
+          "id": "mb-m3"
+        },
+        {
+          "message_id": "m1",
+          "body_markdown": "",
+          "attachments": [],
+          "load_state": "loading",
+          "error_message": "",
+          "id": "mb-loading"
+        },
+        {
+          "message_id": "m2",
+          "body_markdown": "",
+          "attachments": [],
+          "load_state": "error",
+          "error_message": "Network error",
+          "id": "mb-error"
+        }
+      ],
+      "identity_field_refs": [
+        "id"
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "rel_message_mailbox",
+      "from_resource_ref": "message",
+      "from_field_ref": "mailbox_id",
+      "to_resource_ref": "mailbox",
+      "to_field_ref": "id",
+      "label_field_refs": [
+        "title"
+      ],
+      "cardinality": "many_to_one"
+    },
+    {
+      "id": "rel_body_message",
+      "from_resource_ref": "message_body",
+      "from_field_ref": "message_id",
+      "to_resource_ref": "message",
+      "to_field_ref": "id",
+      "label_field_refs": [
+        "subject"
+      ],
+      "cardinality": "many_to_one"
+    }
+  ],
+  "views": [
+    {
+      "id": "v_connections",
+      "role": "collection",
+      "region_role": "supporting",
+      "presentation": "list",
+      "title": {
+        "key": "view.v_connections.title",
+        "en": "Connections"
+      },
+      "field_refs": [
+        "name",
+        "status"
+      ],
+      "empty_state": {
+        "title": {
+          "key": "view.v_connections.empty.title",
+          "en": "No connections"
+        },
+        "detail": {
+          "key": "view.v_connections.empty.detail",
+          "en": "Attach an existing connection"
+        }
+      },
+      "resource_ref": "connection",
+      "scope_filters": [],
+      "media": null,
+      "field_display": [],
+      "presentation_options": null,
+      "section": {
+        "id": "settings",
+        "kind": "settings",
+        "title": {
+          "key": "section.settings",
+          "en": "Settings"
+        }
+      },
+      "surface": "inline",
+      "selection_filter": null
+    },
+    {
+      "id": "e_attach_connection",
+      "role": "editor",
+      "region_role": "actions",
+      "title": {
+        "key": "view.e_attach_connection.title",
+        "en": "Attach Existing Connection"
+      },
+      "field_refs": [
+        "name"
+      ],
+      "resource_ref": "connection",
+      "scope_filters": [],
+      "media": null,
+      "field_display": [],
+      "presentation_options": null,
+      "section": {
+        "id": "settings",
+        "kind": "settings",
+        "title": {
+          "key": "section.settings",
+          "en": "Settings"
+        }
+      },
+      "surface": "modal",
+      "selection_filter": null
+    },
+    {
+      "id": "v_mailboxes",
+      "role": "collection",
+      "region_role": "supporting",
+      "presentation": "list",
+      "title": {
+        "key": "view.v_mailboxes.title",
+        "en": "Mailboxes"
+      },
+      "field_refs": [
+        "title"
+      ],
+      "empty_state": {
+        "title": {
+          "key": "view.v_mailboxes.empty.title",
+          "en": "No mailboxes"
+        },
+        "detail": {
+          "key": "view.v_mailboxes.empty.detail",
+          "en": "Add a connection to load folders"
+        }
+      },
+      "resource_ref": "mailbox",
+      "scope_filters": [],
+      "media": null,
+      "field_display": [],
+      "presentation_options": null,
+      "section": null,
+      "surface": "inline",
+      "selection_filter": null
+    },
+    {
+      "id": "v_messages",
+      "role": "collection",
+      "region_role": "primary",
+      "presentation": "list",
+      "title": {
+        "key": "view.v_messages.title",
+        "en": "Messages"
+      },
+      "field_refs": [
+        "is_starred",
+        "is_read",
+        "from",
+        "subject",
+        "snippet",
+        "date"
+      ],
+      "query_controls": [
+        {
+          "id": "q_search",
+          "kind": "search",
+          "label": {
+            "key": "query.q_search.label",
+            "en": "Search"
+          }
+        }
+      ],
+      "empty_state": {
+        "title": {
+          "key": "view.v_messages.empty.title",
+          "en": "No messages"
+        },
+        "detail": {
+          "key": "view.v_messages.empty.detail",
+          "en": "This folder is empty"
+        }
+      },
+      "resource_ref": "message",
+      "scope_filters": [],
+      "media": null,
+      "field_display": [
+        {
+          "field_ref": "snippet",
+          "overflow": "truncate",
+          "align": "start"
+        }
+      ],
+      "presentation_options": null,
+      "section": null,
+      "surface": "inline",
+      "selection_filter": {
+        "field_ref": "mailbox_id",
+        "source_view_ref": "v_mailboxes",
+        "source_field_ref": null
+      }
+    },
+    {
+      "id": "e_toggle_read",
+      "role": "editor",
+      "region_role": "actions",
+      "title": {
+        "key": "view.e_toggle_read.title",
+        "en": "Mark Read/Unread"
+      },
+      "field_refs": [
+        "is_read"
+      ],
+      "resource_ref": "message",
+      "scope_filters": [],
+      "media": null,
+      "field_display": [],
+      "presentation_options": null,
+      "section": null,
+      "surface": "modal",
+      "selection_filter": null
+    },
+    {
+      "id": "e_toggle_star",
+      "role": "editor",
+      "region_role": "actions",
+      "title": {
+        "key": "view.e_toggle_star.title",
+        "en": "Star/Unstar"
+      },
+      "field_refs": [
+        "is_starred"
+      ],
+      "resource_ref": "message",
+      "scope_filters": [],
+      "media": null,
+      "field_display": [],
+      "presentation_options": null,
+      "section": null,
+      "surface": "modal",
+      "selection_filter": null
+    },
+    {
+      "id": "e_archive",
+      "role": "editor",
+      "region_role": "actions",
+      "title": {
+        "key": "view.e_archive.title",
+        "en": "Archive Message"
+      },
+      "field_refs": [
+        "mailbox_id"
+      ],
+      "resource_ref": "message",
+      "scope_filters": [],
+      "media": null,
+      "field_display": [],
+      "presentation_options": null,
+      "section": null,
+      "surface": "modal",
+      "selection_filter": null
+    },
+    {
+      "id": "v_message_bodies",
+      "role": "collection",
+      "region_role": "supporting",
+      "presentation": "list",
+      "title": {
+        "key": "view.v_message_bodies.title",
+        "en": "Bodies (inspect)"
+      },
+      "field_refs": [
+        "message_id",
+        "load_state",
+        "error_message"
+      ],
+      "empty_state": {
+        "title": {
+          "key": "view.v_message_bodies.empty.title",
+          "en": "No bodies"
+        },
+        "detail": {
+          "key": "view.v_message_bodies.empty.detail",
+          "en": "Bodies are fetched lazily"
+        }
+      },
+      "resource_ref": "message_body",
+      "scope_filters": [],
+      "media": null,
+      "field_display": [],
+      "presentation_options": null,
+      "section": null,
+      "surface": "inline",
+      "selection_filter": null
+    },
+    {
+      "id": "v_message_detail",
+      "role": "details",
+      "region_role": "primary",
+      "title": {
+        "key": "view.v_message_detail.title",
+        "en": "Message"
+      },
+      "field_refs": [
+        "body_markdown",
+        "attachments",
+        "load_state",
+        "error_message"
+      ],
+      "resource_ref": "message_body",
+      "scope_filters": [],
+      "media": null,
+      "field_display": [],
+      "presentation_options": null,
+      "section": null,
+      "surface": "inline",
+      "selection_filter": null
+    }
+  ],
+  "commands": [
+    {
+      "id": "cmd_attach_connection",
+      "kind": "update",
+      "view_ref": "e_attach_connection",
+      "label": {
+        "key": "command.cmd_attach_connection.label",
+        "en": "Attach"
+      },
+      "input_field_refs": [
+        "name"
+      ]
+    },
+    {
+      "id": "cmd_toggle_read",
+      "kind": "update",
+      "view_ref": "e_toggle_read",
+      "label": {
+        "key": "command.cmd_toggle_read.label",
+        "en": "Save"
+      },
+      "input_field_refs": [
+        "is_read"
+      ]
+    },
+    {
+      "id": "cmd_toggle_star",
+      "kind": "update",
+      "view_ref": "e_toggle_star",
+      "label": {
+        "key": "command.cmd_toggle_star.label",
+        "en": "Save"
+      },
+      "input_field_refs": [
+        "is_starred"
+      ]
+    },
+    {
+      "id": "cmd_archive",
+      "kind": "update",
+      "view_ref": "e_archive",
+      "label": {
+        "key": "command.cmd_archive.label",
+        "en": "Move to Archive"
+      },
+      "confirmation": {
+        "key": "command.cmd_archive.confirmation",
+        "en": "Archive this message?"
+      },
+      "input_field_refs": [
+        "mailbox_id"
+      ],
+      "fixed_values": {
+        "mailbox_id": "archive"
+      }
+    }
+  ],
+  "representative_states": [
+    {
+      "id": "rs_empty_folder",
+      "label": {
+        "key": "state.rs_empty_folder.label",
+        "en": "Empty folder"
+      },
+      "view_ref": "v_messages",
+      "filters": [],
+      "min_items": 0,
+      "max_items": 0,
+      "proof": {
+        "kind": "collection_empty",
+        "visible_field_refs": []
+      }
+    },
+    {
+      "id": "rs_pagination",
+      "label": {
+        "key": "state.rs_pagination.label",
+        "en": "Next page available"
+      },
+      "view_ref": "v_messages",
+      "filters": [],
+      "min_items": 1,
+      "proof": {
+        "kind": "collection_items",
+        "visible_field_refs": [
+          "subject",
+          "date"
+        ]
+      }
+    },
+    {
+      "id": "rs_loading",
+      "label": {
+        "key": "state.rs_loading.label",
+        "en": "Loading message body"
+      },
+      "view_ref": "v_message_detail",
+      "filters": [
+        {
+          "field_ref": "load_state",
+          "operator": "eq",
+          "value": "loading"
+        }
+      ],
+      "min_items": 1,
+      "proof": {
+        "kind": "field_predicate",
+        "visible_field_refs": [
+          "load_state"
+        ]
+      }
+    },
+    {
+      "id": "rs_error_body",
+      "label": {
+        "key": "state.rs_error_body.label",
+        "en": "Body load error"
+      },
+      "view_ref": "v_message_detail",
+      "filters": [
+        {
+          "field_ref": "load_state",
+          "operator": "eq",
+          "value": "error"
+        }
+      ],
+      "min_items": 1,
+      "proof": {
+        "kind": "field_predicate",
+        "visible_field_refs": [
+          "load_state",
+          "error_message"
+        ]
+      }
+    }
+  ],
+  "requirement_bindings": [
+    {
+      "requirement_ref": "job:01",
+      "semantic_refs": [
+        "resource:message",
+        "resource:message_body",
+        "view:v_message_detail",
+        "view:v_messages"
+      ]
+    },
+    {
+      "requirement_ref": "job:02",
+      "semantic_refs": [
+        "resource:message",
+        "view:v_messages"
+      ]
+    },
+    {
+      "requirement_ref": "job:03",
+      "semantic_refs": [
+        "command:cmd_archive",
+        "command:cmd_toggle_read",
+        "command:cmd_toggle_star",
+        "resource:message",
+        "view:e_archive",
+        "view:e_toggle_read",
+        "view:e_toggle_star"
+      ]
+    },
+    {
+      "requirement_ref": "job:04",
+      "semantic_refs": [
+        "resource:connection",
+        "view:e_attach_connection"
+      ]
+    },
+    {
+      "requirement_ref": "residual:01",
+      "semantic_refs": [
+        "state:rs_loading"
+      ]
+    },
+    {
+      "requirement_ref": "residual:02",
+      "semantic_refs": [
+        "resource:connection"
+      ]
+    },
+    {
+      "requirement_ref": "residual:03",
+      "semantic_refs": [
+        "resource:connection",
+        "view:v_connections"
+      ]
+    },
+    {
+      "requirement_ref": "residual:04",
+      "semantic_refs": [
+        "resource:connection",
+        "view:v_connections"
+      ]
+    },
+    {
+      "requirement_ref": "residual:05",
+      "semantic_refs": [
+        "resource:mailbox",
+        "view:v_mailboxes"
+      ]
+    },
+    {
+      "requirement_ref": "residual:06",
+      "semantic_refs": [
+        "resource:message",
+        "view:v_messages"
+      ]
+    },
+    {
+      "requirement_ref": "operation:list",
+      "semantic_refs": [
+        "resource:message",
+        "view:v_messages"
+      ]
+    },
+    {
+      "requirement_ref": "operation:list:2",
+      "semantic_refs": [
+        "resource:message",
+        "view:v_messages"
+      ]
+    },
+    {
+      "requirement_ref": "operation:archive",
+      "semantic_refs": [
+        "command:cmd_archive",
+        "resource:message",
+        "view:e_archive"
+      ]
+    },
+    {
+      "requirement_ref": "operation:inspect",
+      "semantic_refs": [
+        "resource:message_body",
+        "view:v_message_detail"
+      ]
+    },
+    {
+      "requirement_ref": "representative_state:01",
+      "semantic_refs": [
+        "state:rs_loading"
+      ]
+    },
+    {
+      "requirement_ref": "representative_state:02",
+      "semantic_refs": [
+        "resource:connection",
+        "view:v_connections"
+      ]
+    },
+    {
+      "requirement_ref": "representative_state:03",
+      "semantic_refs": [
+        "state:rs_loading"
+      ]
+    },
+    {
+      "requirement_ref": "representative_state:04",
+      "semantic_refs": [
+        "state:rs_empty_folder"
+      ]
+    },
+    {
+      "requirement_ref": "representative_state:05",
+      "semantic_refs": [
+        "state:rs_error_body",
+        "state:rs_pagination"
+      ]
+    }
+  ],
+  "capability_gaps": [],
+  "automation_requirements": [
+    {
+      "requirement_ref": "job:03",
+      "reason": "business_rule",
+      "disclosure": {
+        "en": "Read/unread, star/unstar and archive are local prototype updates; external mailbox effects are not enforced here."
+      },
+      "acceptance": "When Automation runs, toggling read/star and archiving must update the remote mailbox via the required capability.",
+      "statement": "Support only read/unread, star/unstar, and archive, each from an explicit user gesture"
+    },
+    {
+      "requirement_ref": "residual:03",
+      "reason": "external_integration",
+      "disclosure": {
+        "en": "This app requires capability mail.messages.manage ^1.0.0 to list, inspect and archive messages. No provider is named."
+      },
+      "acceptance": "Capability is declared and bound by Automation without naming a specific provider.",
+      "statement": "The semantic Application must require the existing portable capability mail.messages.manage ^1"
+    }
+  ]
+}
