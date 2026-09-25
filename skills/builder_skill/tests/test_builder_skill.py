@@ -734,6 +734,88 @@ def test_change_intake_appends_followup_to_active_change_set(monkeypatch) -> Non
     assert transitions[0][1]["source_message_ids"] == ["message-followup"]
 
 
+def test_change_intake_compacts_issues_to_remaining_slots(monkeypatch) -> None:
+    skill = _load_module()
+    transitions: list[tuple[str, dict]] = []
+    generated = [
+        {
+            "issue_id": f"incoming:I{index:02d}",
+            "title": f"Requirement {index}",
+            "lane": "prototype",
+            "acceptance_criteria": [f"Criterion {index}"],
+        }
+        for index in range(1, 21)
+    ]
+    monkeypatch.setattr(skill, "_builder_change_issues", lambda *args, **kwargs: generated)
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *args: {
+            "change_set": {
+                "change_set_id": "CS-active",
+                "status": "in_progress",
+                "issues": [{"issue_id": f"existing:I{index:02d}"} for index in range(40)],
+            }
+        },
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "transition",
+        lambda *args, **kwargs: transitions.append((args[2], kwargs["metadata"]))
+        or {"ok": True},
+    )
+
+    result = skill._register_builder_change_set(
+        session={"artifact_kind": "scenario", "scenario_id": "recipes"},
+        patch={"id": "patch-dense"},
+        request_text="Twenty detailed requirements",
+        _meta=None,
+    )
+
+    assert result["ok"] is True
+    assert transitions[0][0] == "change_issues_added"
+    assert len(transitions[0][1]["issues"]) == 10
+    assert {
+        criterion
+        for issue in transitions[0][1]["issues"]
+        for criterion in issue["acceptance_criteria"]
+    } == {f"Criterion {index}" for index in range(1, 21)}
+
+
+def test_change_intake_supersedes_change_set_when_no_slots_remain(monkeypatch) -> None:
+    skill = _load_module()
+    transitions: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *args: {
+            "change_set": {
+                "change_set_id": "CS-full",
+                "status": "in_progress",
+                "issues": [{"issue_id": f"existing:I{index:02d}"} for index in range(50)],
+            }
+        },
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "transition",
+        lambda *args, **kwargs: transitions.append((args[2], kwargs["metadata"]))
+        or {"ok": True},
+    )
+
+    result = skill._register_builder_change_set(
+        session={"artifact_kind": "scenario", "scenario_id": "recipes"},
+        patch={"id": "patch-next"},
+        request_text="Replace the compact layout.",
+        _meta=None,
+    )
+
+    assert result["ok"] is True
+    assert transitions[0][0] == "plan_change_set"
+    assert transitions[0][1]["supersedes_change_set_id"] == "CS-full"
+    assert transitions[0][1]["issues"]
+
+
 def test_change_intake_does_not_duplicate_retried_request(monkeypatch) -> None:
     skill = _load_module()
     transitions: list[tuple[str, dict]] = []

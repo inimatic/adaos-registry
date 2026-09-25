@@ -10290,6 +10290,64 @@ def _builder_change_issues(
     return issues
 
 
+_BUILDER_CHANGE_SET_MAX_ISSUES = 50
+
+
+def _compact_builder_change_issues(
+    issues: list[dict[str, Any]], *, max_count: int, change_id: str
+) -> list[dict[str, Any]]:
+    """Fit intake into the bounded ChangeSet without dropping requirements."""
+
+    if max_count <= 0 or not issues:
+        return []
+    if len(issues) <= max_count:
+        return issues
+    by_lane: dict[str, list[dict[str, Any]]] = {}
+    for issue in issues:
+        by_lane.setdefault(str(issue.get("lane") or "prototype"), []).append(issue)
+    if max_count < len(by_lane):
+        return []
+
+    allocations = {lane: 1 for lane in by_lane}
+    remaining = max_count - len(allocations)
+    while remaining:
+        lane = max(
+            by_lane,
+            key=lambda item: len(by_lane[item]) / allocations[item],
+        )
+        allocations[lane] += 1
+        remaining -= 1
+
+    compacted: list[dict[str, Any]] = []
+    compact_index = 0
+    for lane, lane_issues in by_lane.items():
+        bucket_count = allocations[lane]
+        for bucket_index in range(bucket_count):
+            bucket = lane_issues[bucket_index::bucket_count]
+            if not bucket:
+                continue
+            compact_index += 1
+            criteria = [
+                str(criterion).strip()[:500]
+                for issue in bucket
+                for criterion in issue.get("acceptance_criteria") or []
+                if str(criterion).strip()
+            ][:20]
+            title = str(bucket[0].get("title") or "Builder change requirement").strip()
+            if len(bucket) > 1:
+                suffix = f" (+{len(bucket) - 1} related requirements)"
+                title = title[: 240 - len(suffix)].rstrip() + suffix
+            compacted.append(
+                {
+                    "issue_id": f"{change_id}:I{compact_index:02d}"[-80:],
+                    "title": title[:240],
+                    "lane": lane,
+                    "acceptance_criteria": criteria,
+                }
+            )
+    return compacted
+
+
 def _register_builder_change_set(
     *,
     session: Mapping[str, Any],
@@ -10341,19 +10399,44 @@ def _register_builder_change_set(
         if current_id and not terminal and normalized_request in known_requests:
             return {"ok": True, "action": "duplicate_request", "workflow": state}
         if current_id and not terminal:
-            result = sdk_builder_workflow.transition(
-                object_type,
-                object_id,
-                "change_issues_added",
-                actor="builder.prototype_intake",
-                metadata={
-                    "change_set_id": current_id,
-                    "change_id": change_id,
-                    "request": request_text,
-                    "issues": issues,
-                    "source_message_ids": source_message_ids,
-                },
+            current_issues = [
+                item
+                for item in current.get("issues") or []
+                if isinstance(item, Mapping)
+            ]
+            compacted = _compact_builder_change_issues(
+                issues,
+                max_count=_BUILDER_CHANGE_SET_MAX_ISSUES - len(current_issues),
+                change_id=change_id,
             )
+            if compacted:
+                result = sdk_builder_workflow.transition(
+                    object_type,
+                    object_id,
+                    "change_issues_added",
+                    actor="builder.prototype_intake",
+                    metadata={
+                        "change_set_id": current_id,
+                        "change_id": change_id,
+                        "request": request_text,
+                        "issues": compacted,
+                        "source_message_ids": source_message_ids,
+                    },
+                )
+            else:
+                result = sdk_builder_workflow.transition(
+                    object_type,
+                    object_id,
+                    "plan_change_set",
+                    actor="builder.prototype_intake",
+                    metadata={
+                        "change_set_id": change_id,
+                        "supersedes_change_set_id": current_id,
+                        "request": request_text,
+                        "issues": issues,
+                        "source_message_ids": source_message_ids,
+                    },
+                )
         else:
             result = sdk_builder_workflow.transition(
                 object_type,
