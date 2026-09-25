@@ -1,0 +1,407 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "gmail_cbs_cleanroom",
+    "legacy_project_id": "gmail_cbs_cleanroom",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "gmail_cbs_cleanroom",
+    "display": {
+      "title": "Gmail CBS Cleanroom",
+      "summary": "Create a new private AdaOS Application named \"Gmail CBS Cleanroom\" from\nscratch, with technical id gmail_cbs_cleanroom. It must be CBS-compatible. Its\nsemantic Application requires capability:mail.messages.manage version ^1.0.0\nwithout naming Gmail, a package, a skill, endpoints, account ids, or\ncredentials. For this first beta, realize that requirement with an\nApplication-local Gmail binding.\n\nThe user experience must include connection and setup status, inbox and label\nnavigation, search and u"
+    },
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "main",
+        "presentation_ref": "scenario:gmail_cbs_cleanroom"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 2,
+    "created_at": "2026-09-24T06:00:17+00:00",
+    "updated_at": "2026-09-25T12:32:45+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "gmail_cbs_cleanroom",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "gmail_cbs_cleanroom",
+    "version": "0.1.10",
+    "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "gmail_cbs_cleanroom",
+      "version": "0.1.10",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:417b4c8371db444d1f5e0b08fc80c80a5f7743c71cffa6712b7b69f640d643e6",
+        "path_scope": [
+          "projects/gmail_cbs_cleanroom/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "gmail_cbs_cleanroom",
+          "version": "0.1.6",
+          "digest": "sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86",
+          "manifest_digest": "sha256:2da3d532f935dae233677d5d6e6315c895e4b12c7030ce6be615a06181f6b0da",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:417b4c8371db444d1f5e0b08fc80c80a5f7743c71cffa6712b7b69f640d643e6",
+            "path_scope": [
+              "scenarios/gmail_cbs_cleanroom/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/gmail_cbs_cleanroom",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "gmail_cbs_cleanroom_skill",
+          "version": "0.1.7",
+          "digest": "sha256:403e924b61e66ae9d04aa69a4594d3fe2873349f75904c5633e3e01212c0df19",
+          "manifest_digest": "sha256:d1b0ffe60cbf7f21be6c6fb58d224a15bf15ccbcf23543a4c7b783ac226fa64f",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:417b4c8371db444d1f5e0b08fc80c80a5f7743c71cffa6712b7b69f640d643e6",
+            "path_scope": [
+              "skills/gmail_cbs_cleanroom_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/gmail_cbs_cleanroom_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [
+        "providers.google.gmail",
+        "storage.relational",
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:417b4c8371db444d1f5e0b08fc80c80a5f7743c71cffa6712b7b69f640d643e6",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:a17215304a09e4c9d04e0aa096d17a223d1c24c43727af6380341d01dbe7ac89"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:10e13a5e26fbb35d60dd8a4c38fa830b95ef1d2654e7575317804d2d2238a178",
+        "profiles": [],
+        "members": [
+          {
+            "ref": "scenario:gmail_cbs_cleanroom",
+            "package_digest": "sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          },
+          {
+            "ref": "skill:gmail_cbs_cleanroom_skill",
+            "package_digest": "sha256:403e924b61e66ae9d04aa69a4594d3fe2873349f75904c5633e3e01212c0df19",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes",
+              "uses"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "main",
+            "presentation": "scenario:gmail_cbs_cleanroom",
+            "default": true,
+            "bindings": {}
+          }
+        ],
+        "compatibility": {},
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "providers.google.gmail",
+              "purpose": "Use the connected Gmail account.",
+              "approval_policy": "explicit",
+              "sensitive": true
+            },
+            {
+              "id": "storage.relational",
+              "purpose": "Persist content-free send deduplication records.",
+              "approval_policy": "explicit"
+            },
+            {
+              "id": "workspace.read",
+              "purpose": "Read authorized mailbox projections and command state.",
+              "approval_policy": "explicit"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Execute explicitly requested mailbox changes and claim send commands.",
+              "approval_policy": "explicit",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "mail_content",
+              "mail_metadata",
+              "send_command_id"
+            ],
+            "sent_off_device": [
+              "mail_content",
+              "mail_query",
+              "mail_recipient"
+            ],
+            "linked_to_user": [
+              "mail_content",
+              "mail_metadata",
+              "send_command_id"
+            ],
+            "tracking": false,
+            "retention": "transient_mail_durable_send_command_ids"
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [
+            {
+              "id": "google.gmail",
+              "account_id": "google.gmail",
+              "title": "Gmail account",
+              "purpose": "Read, organize, trash and send mail requested by the user.",
+              "required": true,
+              "destination": "gmail.googleapis.com",
+              "account_modes": [
+                "delegated_user"
+              ],
+              "scopes": [
+                "https://www.googleapis.com/auth/gmail.modify"
+              ]
+            }
+          ],
+          "privacy_labels": {
+            "collected": [
+              "Mail content is transient; command IDs prevent duplicate sends."
+            ],
+            "linked_to_user": true,
+            "sent_off_device": true,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "Gmail CBS Cleanroom",
+        "description": "Create a new private AdaOS Application named \"Gmail CBS Cleanroom\" from\nscratch, with technical id gmail_cbs_cleanroom. It must be CBS-compatible. Its\nsemantic Application requires capability:mail.messages.manage version ^1.0.0\nwithout naming Gmail, a package, a skill, endpoints, account ids, or\ncredentials. For this first beta, realize that requirement with an\nApplication-local Gmail binding.\n\nThe user experience must include connection and setup status, inbox and label\nnavigation, search and unread/starred filters, message list and reading,\nlabels, archive, trash, read/unread, star/unstar, compose, and send. Include\nresponsive wide and compact layouts and deterministic loading, empty, offline,\nprovider-error, permission-denied, and authorization-required states. Explain\nleast-privilege access. OAuth secrets and tokens must never enter UI state,\nmanifests, fixtures, logs, errors, or telemetry. Keep shared provider reuse and\na global capability registry outside this first stage.\n\nBuild the executable Prototype now. Keep real external operations as explicit\npending Automation requirements; do not simulate successful authorization or\nuse live Gmail data in the Prototype.",
+        "categories": [],
+        "tags": []
+      },
+      "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
+    },
+    "accepted_candidate_id": "gmail_cbs_cleanroom-0-1-10-3e3f485e3d83",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "builder.release.preflight",
+        "checkpoint_package_digest": "sha256:db8c309f8f70bda88ec31fa7986320c4e9debbc0ab838a82c49c1f0a5f6b5b77",
+        "checkpoint_source_revision": "36dc654f840efad9f7144676c597abac2609edc6",
+        "automation_task_id": "task.01M3C98PK84NSXCS7H8JPZ6FN0",
+        "change_id": "CH-automation-bbf54477c27ed72e20d3",
+        "checkpoint_component_ref": "scenario:gmail_cbs_cleanroom"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "providers.google.gmail",
+          "purpose": "Use the connected Gmail account.",
+          "approval_policy": "explicit",
+          "sensitive": true
+        },
+        {
+          "id": "storage.relational",
+          "purpose": "Persist content-free send deduplication records.",
+          "approval_policy": "explicit"
+        },
+        {
+          "id": "workspace.read",
+          "purpose": "Read authorized mailbox projections and command state.",
+          "approval_policy": "explicit"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Execute explicitly requested mailbox changes and claim send commands.",
+          "approval_policy": "explicit",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "mail_content",
+          "mail_metadata",
+          "send_command_id"
+        ],
+        "sent_off_device": [
+          "mail_content",
+          "mail_query",
+          "mail_recipient"
+        ],
+        "linked_to_user": [
+          "mail_content",
+          "mail_metadata",
+          "send_command_id"
+        ],
+        "tracking": false,
+        "retention": "transient_mail_durable_send_command_ids"
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [
+        {
+          "id": "google.gmail",
+          "account_id": "google.gmail",
+          "title": "Gmail account",
+          "purpose": "Read, organize, trash and send mail requested by the user.",
+          "required": true,
+          "destination": "gmail.googleapis.com",
+          "account_modes": [
+            "delegated_user"
+          ],
+          "scopes": [
+            "https://www.googleapis.com/auth/gmail.modify"
+          ]
+        }
+      ],
+      "privacy_labels": {
+        "collected": [
+          "Mail content is transient; command IDs prevent duplicate sends."
+        ],
+        "linked_to_user": true,
+        "sent_off_device": true,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:2bccb6fe04035c43170a1824cfac5d5c05770459160a19dba161c599dc77ba94",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "gmail_cbs_cleanroom",
+      "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [
+        {
+          "id": "google.gmail",
+          "title": "Gmail account",
+          "purpose": "Read, organize, trash and send mail requested by the user.",
+          "required": true,
+          "scopes": [
+            "https://www.googleapis.com/auth/gmail.modify"
+          ]
+        }
+      ],
+      "permissions": [
+        {
+          "id": "providers.google.gmail",
+          "title": "Providers.Google.Gmail",
+          "purpose": "Use the connected Gmail account.",
+          "required": true
+        },
+        {
+          "id": "storage.relational",
+          "title": "Storage.Relational",
+          "purpose": "Persist content-free send deduplication records.",
+          "required": true
+        },
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Read authorized mailbox projections and command state.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Execute explicitly requested mailbox changes and claim send commands.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:2f4a9c2503e69a940707540894e0e28f6531afef064d60ffa80d8a95f4b648a4"
+  },
+  "channels": {
+    "stable": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
+  },
+  "semantic": {
+    "projection_digest": "sha256:27707575ddd3c42fd9d1d9676fbccfe9badc3d88b46f656f3135dd93ca16b90e",
+    "path": "semantic/applications/gmail_cbs_cleanroom/f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83.json"
+  },
+  "projection_digest": "sha256:7bdf8ccbadac567dc419cf012a93b66a0e3f61057c3b2083897b485fefa92eed"
+}

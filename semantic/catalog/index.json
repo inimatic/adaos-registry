@@ -1,0 +1,24 @@
+{
+  "schema": "adaos.semantic_registry.public_application_catalog.v1",
+  "applications": {
+    "gmail_cbs_cleanroom": {
+      "application_id": "gmail_cbs_cleanroom",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "application_revision": 2,
+      "stable_release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+      "release_key": "gmail_cbs_cleanroom@sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+      "projection_digest": "sha256:7bdf8ccbadac567dc419cf012a93b66a0e3f61057c3b2083897b485fefa92eed"
+    }
+  },
+  "releases": {
+    "gmail_cbs_cleanroom@sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83": {
+      "application_id": "gmail_cbs_cleanroom",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.10",
+      "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
+      "path": "semantic/catalog/releases/gmail_cbs_cleanroom/f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83.json",
+      "projection_digest": "sha256:7bdf8ccbadac567dc419cf012a93b66a0e3f61057c3b2083897b485fefa92eed"
+    }
+  },
+  "index_digest": "sha256:857e35930803bf5b3f45297c863ca5719028dc3cf106389c0df16aa3305cf630"
+}
