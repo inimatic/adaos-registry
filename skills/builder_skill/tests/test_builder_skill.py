@@ -6827,6 +6827,161 @@ def test_semantic_replay_uses_digest_bound_merged_candidate_not_scoped_reply(tmp
         assert result["replay"]["incremental_tokens"] == 0
 
 
+def test_semantic_replay_reapplies_retained_bounded_repair_without_model(
+    tmp_path, monkeypatch
+):
+    import hashlib
+
+    skill = _load_module()
+    from adaos.sdk.llm import llm_client
+
+    directory = tmp_path / "llm_jobs"
+    directory.mkdir()
+    primary = {
+        "schema": "adaos.builder.semantic_prototype_candidate.v2",
+        "title": {"en": "Items"},
+    }
+    repair = {
+        "schema": "adaos.builder.state_repair.v3",
+        "base_sha256": "candidate",
+        "states": [],
+        "views": [],
+    }
+
+    def write_candidate(name, stage, candidate):
+        raw = json.dumps(
+            {
+                "scenario_id": "example",
+                "source_ui_revision": "003",
+                "structured_candidate": candidate,
+            }
+        ).encode()
+        (directory / name).write_bytes(raw)
+        return {
+            "kind": "raw_model_output",
+            "path": name,
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "stage": stage,
+        }
+
+    refs = [
+        write_candidate("primary.raw.json", "primary-received", primary),
+        write_candidate(
+            "repair.raw.json", "semantic-repair-received", repair
+        ),
+    ]
+    request = {
+        "scenario_id": "example",
+        "job_id": "root-job",
+        "request_id": "request",
+        "generation": {"options": {"output_mode": "semantic_v2"}},
+        "messages": [
+            {
+                "content": json.dumps(
+                    {
+                        "builder_request": {
+                            "instruction": "Refine",
+                            "prototype_brief": {
+                                "brief_ref": "brief",
+                                "brief_digest": "digest",
+                            },
+                        }
+                    }
+                )
+            }
+        ],
+    }
+    raw_request = json.dumps(request).encode()
+    (directory / "request.json").write_bytes(raw_request)
+    terminal = {
+        "scenario_id": "example",
+        "status": "failed",
+        "request_id": "request",
+        "input_artifact": {
+            "path": "request.json",
+            "sha256": hashlib.sha256(raw_request).hexdigest(),
+        },
+        "diagnostic": {
+            "result": {
+                "attempts": [
+                    {
+                        "validation": {
+                            "findings": [
+                                {
+                                    "code": "semantic.state_query_unreachable",
+                                    "semantic_refs": ["state:empty"],
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "candidate_artifacts": refs,
+            }
+        },
+    }
+    (directory / "root-job.json").write_text(
+        json.dumps(terminal), encoding="utf-8"
+    )
+    session = {
+        "scenario_id": "example",
+        "artifact_root": str(tmp_path),
+        "ui_revision": "003",
+        "accepted_prototype_brief": {
+            "brief_id": "brief",
+            "digest": "digest",
+        },
+        "pending_llm_jobs": {
+            "root-job": {"status": "failed", "request_text": "Refine"}
+        },
+    }
+    applied = []
+
+    def apply(candidate, patch, findings):
+        applied.append((candidate, patch, findings))
+        return {**candidate, "layout": "flow"}
+
+    def parse(**kwargs):
+        candidate = json.loads(kwargs["output_text"])
+        assert candidate["layout"] == "flow"
+        return {"ok": True}
+
+    monkeypatch.setattr(skill.sdk_builder_prototype, "apply_state_repair", apply)
+    monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", parse)
+    monkeypatch.setattr(
+        skill, "_validate_llm_request_postconditions", lambda value, **_kw: value
+    )
+    monkeypatch.setattr(
+        llm_client,
+        "get_response_job",
+        lambda *_args, **_kwargs: pytest.fail("retained repair must avoid Root"),
+    )
+
+    result = skill._replay_failed_llm_webui_result(
+        session=session,
+        job_id="root-job",
+        request_text="Refine",
+        expected_ui_revision="003",
+        previous_preview={},
+        before_webui={},
+    )
+
+    assert result["ok"] is True
+    assert result["telemetry"]["source"] == "retained_bounded_repair"
+    assert result["replay"]["incremental_tokens"] == 0
+    assert applied == [
+        (
+            primary,
+            repair,
+            [
+                {
+                    "code": "semantic.state_query_unreachable",
+                    "semantic_refs": ["state:empty"],
+                }
+            ],
+        )
+    ]
+
+
 def test_complete_repair_retains_candidate_for_later_binding_scope(tmp_path, monkeypatch):
     skill = _load_module()
     import adaos.sdk.llm.llm_client as llm_client

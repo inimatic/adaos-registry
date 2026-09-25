@@ -21642,6 +21642,99 @@ def _replay_failed_llm_webui_result(
         if isinstance(diagnostic_result.get("candidate_artifacts"), list)
         else []
     )
+    # A failed bounded repair is still a durable checkpoint.  Re-apply its
+    # exact primary candidate and exact scoped patch through the current Core
+    # before considering any provider call.  This lets a platform/compiler fix
+    # resume the job with zero new model tokens while keeping both artifact
+    # digests, the source revision, and the original validation scope bound.
+    retained_raw: dict[str, tuple[dict[str, Any], Path]] = {}
+    if result is None and journal_dir is not None:
+        for candidate_ref in candidate_refs:
+            if (
+                not isinstance(candidate_ref, Mapping)
+                or candidate_ref.get("kind") != "raw_model_output"
+            ):
+                continue
+            candidate_path = journal_dir / Path(
+                str(candidate_ref.get("path") or "")
+            ).name
+            expected_digest = str(candidate_ref.get("sha256") or "").strip()
+            try:
+                raw = candidate_path.read_bytes()
+                if not expected_digest or hashlib.sha256(raw).hexdigest() != expected_digest:
+                    continue
+                candidate_artifact = json.loads(raw.decode("utf-8"))
+            except Exception:
+                continue
+            if (
+                not isinstance(candidate_artifact, Mapping)
+                or str(candidate_artifact.get("scenario_id") or "").strip()
+                != str(session.get("scenario_id") or "").strip()
+                or str(candidate_artifact.get("source_ui_revision") or "").strip()
+                != expected_revision
+                or not isinstance(candidate_artifact.get("structured_candidate"), Mapping)
+            ):
+                continue
+            retained_raw[str(candidate_ref.get("stage") or "")] = (
+                copy.deepcopy(dict(candidate_artifact["structured_candidate"])),
+                candidate_path,
+            )
+    primary_checkpoint = next(
+        (value for stage, value in retained_raw.items() if stage == "primary-received"),
+        None,
+    )
+    repair_checkpoint = next(
+        (
+            value
+            for stage, value in reversed(list(retained_raw.items()))
+            if stage.endswith("repair-received")
+        ),
+        None,
+    )
+    attempts = (
+        diagnostic_result.get("attempts")
+        if isinstance(diagnostic_result.get("attempts"), list)
+        else []
+    )
+    original_findings = next(
+        (
+            copy.deepcopy(list(validation.get("findings") or []))
+            for attempt in attempts
+            if isinstance(attempt, Mapping)
+            for validation in [attempt.get("validation")]
+            if isinstance(validation, Mapping) and validation.get("findings")
+        ),
+        [],
+    )
+    if primary_checkpoint and repair_checkpoint and original_findings:
+        primary_candidate, _primary_path = primary_checkpoint
+        repair_candidate, repair_path = repair_checkpoint
+        repair_schema = str(repair_candidate.get("schema") or "")
+        repair_kind = next(
+            (
+                kind
+                for kind in ("state", "binding", "reference")
+                if repair_schema.startswith(f"adaos.builder.{kind}_repair.")
+            ),
+            None,
+        )
+        if repair_kind:
+            try:
+                apply_repair = getattr(
+                    sdk_builder_prototype, f"apply_{repair_kind}_repair"
+                )
+                reapplied = apply_repair(
+                    primary_candidate, repair_candidate, original_findings
+                )
+                validate_output(
+                    _compact_json(reapplied), "retained_bounded_repair"
+                )
+                if result is not None:
+                    replay_candidate_path = repair_path
+            except Exception:
+                # The ordinary retained-candidate path below still provides a
+                # fail-closed result and precise diagnostics.
+                pass
     if result is None and journal_dir is not None:
         for candidate_ref in reversed(candidate_refs):
             if not isinstance(candidate_ref, Mapping):
