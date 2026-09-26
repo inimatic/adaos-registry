@@ -23,7 +23,8 @@ def test_manifest_declares_runtime_contracts() -> None:
 
     assert manifest["name"] == "media_indexer_skill"
     assert "requirements.txt" not in {path.name for path in SKILL_ROOT.iterdir()}
-    assert set(manifest.get("dependencies") or []) == {
+    assert manifest.get("dependencies") == []
+    assert set(manifest["service"].get("dependencies") or []) == {
         "shazamio",
         "easyocr",
         "faiss-cpu",
