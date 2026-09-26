@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-26T02:11:21+00:00",
+  "updated_at": "2026-09-26T02:12:09+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -322,8 +322,8 @@
       "kind": "skill",
       "id": "flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
       "name": "flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
-      "version": "0.1.7",
-      "updated_at": "2026-09-23T17:13:19+00:00",
+      "version": "0.1.8",
+      "updated_at": "2026-09-26T01:49:57+00:00",
       "path": "skills/flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
       "manifest": "skills/flowboard_lab_for_safely_prototyping_a_r_17528146_skill/skill.yaml",
       "source": {
@@ -338,14 +338,14 @@
       "description": "Project-owned typed resource provider for the accepted prototype. Implement accepted Flowboard prototype revision 007 exactly. Preserve the accepted three-lane text Kanban, six current accepted records, search, typed create/edit/delete, drag move, accessible lane selector, and successful-submit modal closing. Replace prototype.work_items with a durable project-owned Resource Workbench provider in the existing generated companion skill, declare every tool and data route, add focused tests, validate the owned project, and change only this DEV project.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 3,
       "activation": {
         "mode": "package_lock",
         "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.15",
-        "release_digest": "sha256:28fafe6223638bbfa62011d92073c73b4fb43317fd18b0ffb29e364a98919b72",
-        "package_digest": "sha256:c2e7608fbd91bfa562c5a98fdaabdce0382538f3af4da323220ce8f5f98017e6"
-      }
+        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.16",
+        "release_digest": "sha256:0411f2dd115611549d46e17b3a7b985ff949bab11ee763a333565f6bfaf87934",
+        "package_digest": "sha256:d6addc9e5205cf519f38fdf87a7a6d54f89610d44da59daa528984031eba4d94"
+      },
+      "tools_count": 7
     },
     {
       "kind": "skill",
@@ -1687,8 +1687,8 @@
       "kind": "scenario",
       "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
       "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-      "version": "0.1.22",
-      "updated_at": "2026-09-23T17:13:13+00:00",
+      "version": "0.1.23",
+      "updated_at": "2026-09-26T01:50:01+00:00",
       "path": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146",
       "manifest": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146/scenario.yaml",
       "source": {
@@ -1696,7 +1696,7 @@
         "manifest": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:ce57cfd11c0f465edc0c559ac9c033b0f086e26f79312ba4b452eb8a0d9489c2",
+        "revision": "sha256:4d0d8130a31022145764472cace9626ad99c89f5fdbdb00e2d7a1e2909bbcfb8",
         "path_scope": [
           "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/"
         ]
@@ -1712,6 +1712,11 @@
         "key": "scenario.flowboard_lab_for_safely_prototyping_a_r_17528146.title"
       },
       "description": "Builder-created rapid prototype scenario.",
+      "skills": {
+        "required": [
+          "flowboard_lab_for_safely_prototyping_a_r_17528146_skill"
+        ]
+      },
       "io": {
         "input": [
           "voice",
@@ -1726,17 +1731,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.15",
-        "release_digest": "sha256:28fafe6223638bbfa62011d92073c73b4fb43317fd18b0ffb29e364a98919b72",
-        "package_digest": "sha256:577456cb44e528fb340d34d828ccb2cd80c2a4486b9f13b2b745cf63f0d0b7a7"
+        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.16",
+        "release_digest": "sha256:0411f2dd115611549d46e17b3a7b985ff949bab11ee763a333565f6bfaf87934",
+        "package_digest": "sha256:48357cd12d95315a670b33850bf0d4c742ba162aa6703a29cfc9b4d4ebe204a2"
       },
       "channels": {
         "stable": {
-          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.15",
-          "release_digest": "sha256:28fafe6223638bbfa62011d92073c73b4fb43317fd18b0ffb29e364a98919b72",
-          "source_revision": "sha256:ce57cfd11c0f465edc0c559ac9c033b0f086e26f79312ba4b452eb8a0d9489c2",
-          "package_digest": "sha256:577456cb44e528fb340d34d828ccb2cd80c2a4486b9f13b2b745cf63f0d0b7a7",
-          "version": "0.1.22"
+          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.16",
+          "release_digest": "sha256:0411f2dd115611549d46e17b3a7b985ff949bab11ee763a333565f6bfaf87934",
+          "source_revision": "sha256:4d0d8130a31022145764472cace9626ad99c89f5fdbdb00e2d7a1e2909bbcfb8",
+          "package_digest": "sha256:48357cd12d95315a670b33850bf0d4c742ba162aa6703a29cfc9b4d4ebe204a2",
+          "version": "0.1.23"
         }
       }
     },
@@ -3033,8 +3038,8 @@
       "kind": "project",
       "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
       "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-      "version": "0.1.15",
-      "updated_at": "2026-09-23T17:14:43+00:00",
+      "version": "0.1.16",
+      "updated_at": "2026-09-26T02:12:09+00:00",
       "path": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146",
       "manifest": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/project.yaml",
       "source": {
@@ -3049,15 +3054,26 @@
       "title": "Flowboard Lab for safely prototyping a reusable kanban workbench",
       "description": "Create a new scenario project named Flowboard Lab for safely prototyping a reusable kanban workbench.",
       "publication": {
-        "stage": "alpha",
-        "visibility": "unlisted",
+        "stage": "beta",
+        "visibility": "listed",
         "channel": "stable"
       },
-      "stage": "alpha",
-      "visibility": "unlisted",
+      "stage": "beta",
+      "visibility": "listed",
       "channel": "stable",
       "install_default": false,
-      "features": [],
+      "features": [
+        {
+          "id": "board",
+          "title": "Workboard",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:flowboard_lab_for_safely_prototyping_a_r_17528146",
+            "skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill"
+          ]
+        }
+      ],
       "components": [
         "scenario:flowboard_lab_for_safely_prototyping_a_r_17528146",
         "skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill"
@@ -3067,18 +3083,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.15",
-        "release_digest": "sha256:28fafe6223638bbfa62011d92073c73b4fb43317fd18b0ffb29e364a98919b72",
+        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.16",
+        "release_digest": "sha256:0411f2dd115611549d46e17b3a7b985ff949bab11ee763a333565f6bfaf87934",
         "primary_component": "scenario:flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "package_digest": "sha256:577456cb44e528fb340d34d828ccb2cd80c2a4486b9f13b2b745cf63f0d0b7a7"
+        "package_digest": "sha256:48357cd12d95315a670b33850bf0d4c742ba162aa6703a29cfc9b4d4ebe204a2"
       },
       "channels": {
         "stable": {
-          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.15",
-          "release_digest": "sha256:28fafe6223638bbfa62011d92073c73b4fb43317fd18b0ffb29e364a98919b72",
-          "source_revision": "sha256:ce57cfd11c0f465edc0c559ac9c033b0f086e26f79312ba4b452eb8a0d9489c2",
-          "package_digest": "sha256:577456cb44e528fb340d34d828ccb2cd80c2a4486b9f13b2b745cf63f0d0b7a7",
-          "version": "0.1.15"
+          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.16",
+          "release_digest": "sha256:0411f2dd115611549d46e17b3a7b985ff949bab11ee763a333565f6bfaf87934",
+          "source_revision": "sha256:4d0d8130a31022145764472cace9626ad99c89f5fdbdb00e2d7a1e2909bbcfb8",
+          "package_digest": "sha256:48357cd12d95315a670b33850bf0d4c742ba162aa6703a29cfc9b4d4ebe204a2",
+          "version": "0.1.16"
         }
       }
     },

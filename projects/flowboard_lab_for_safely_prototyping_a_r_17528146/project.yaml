@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: flowboard_lab_for_safely_prototyping_a_r_17528146
-version: 0.1.14
+version: 0.1.16
 profiles: []
 components:
   owned:
@@ -31,12 +31,26 @@ catalog:
   categories: []
   tags: []
 publication:
-  stage: alpha
-  visibility: unlisted
+  stage: beta
+  visibility: listed
   channel: stable
 install:
   default: false
-  features: []
+  features:
+  - id: board
+    title: Workboard
+    default: true
+    optional: false
+    components:
+    - scenario:flowboard_lab_for_safely_prototyping_a_r_17528146
+    - skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill
+compatibility:
+  required_entrypoints:
+  - main
+  required_contracts:
+  - capability:workboard.items.manage@^1.0.0
+  validation_profiles:
+  - flowboard.local
 lifecycle:
   uninstall:
     components: remove_if_unreferenced

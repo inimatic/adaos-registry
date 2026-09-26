@@ -1,0 +1,144 @@
+{
+  "schema": "adaos.semantic_registry.application_release.v1",
+  "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+  "version": "0.1.16",
+  "application_ref": "scenario:flowboard_lab_for_safely_prototyping_a_r_17528146",
+  "project_release_digest": "sha256:0411f2dd115611549d46e17b3a7b985ff949bab11ee763a333565f6bfaf87934",
+  "source_ref": {
+    "schema": "adaos.artifact.source_ref.v1",
+    "forge": "content-addressed-dev",
+    "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+    "revision": "sha256:4d0d8130a31022145764472cace9626ad99c89f5fdbdb00e2d7a1e2909bbcfb8",
+    "path_scope": [
+      "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/"
+    ]
+  },
+  "compilation_digest": "sha256:464ca607a6e89f4ac629a00d8f45c6e4169d6e7604feb31931c49d6f85dbaa9a",
+  "semantic_revision_digest": "sha256:04b51b22c7434ebb2d58a0592bf4096ff43af14037c4ff7e44bf4f53843f27ae",
+  "requirements": [
+    {
+      "requirement_ref": "requirement:scenario.flowboard_lab_for_safely_prototyping_a_r_17528146.ui",
+      "capability_ref": "capability:application.ui.render",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:07e5fed666079945353a2d6f04e04a8a9baf9e46f07dd3bd9dd7bd68217445bb"
+    },
+    {
+      "requirement_ref": "requirement:scenario.flowboard_lab_for_safely_prototyping_a_r_17528146.workboard.items.manage",
+      "capability_ref": "capability:workboard.items.manage",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:6bd13a0364ab72a3000f6526cab1c1ce33f21dcaf4235969dc7e3cd3db15b573"
+    }
+  ],
+  "portable_artifacts": {
+    "adaos.binding.definition.v1": [
+      "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "sha256:4878e18d73b1137c384e3c99b49505c0e8dd5b5578f640ddb9cf259f2da37b85"
+    ],
+    "adaos.binding.delivery.v1": [
+      "sha256:7f5f4a7c6d7b796665423dadf7d00a54efadf7a07d55844e8eedd9366096d5f0",
+      "sha256:d6bb46114add2643194371aa928a249ce931430bad1c46ea3d84a77c6383bbcc"
+    ],
+    "adaos.capability.contract.v1": [
+      "sha256:69e0e7721cc9b73013f5d6257de94a77092ef4f7c71d475f5eecb8738d63dcbc",
+      "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7"
+    ]
+  },
+  "distribution": {
+    "thin": {
+      "requirements_only": true,
+      "registry_required": true
+    },
+    "resolved": {
+      "project_release_digest": "sha256:0411f2dd115611549d46e17b3a7b985ff949bab11ee763a333565f6bfaf87934",
+      "package_closure": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+          "version": "0.1.23",
+          "digest": "sha256:48357cd12d95315a670b33850bf0d4c742ba162aa6703a29cfc9b4d4ebe204a2",
+          "manifest_digest": "sha256:6a2d2365003e68a701506c79c9670e6f5ec8c8e730ac2e021c52dc120c049d86",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:4d0d8130a31022145764472cace9626ad99c89f5fdbdb00e2d7a1e2909bbcfb8",
+            "path_scope": [
+              "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
+          "version": "0.1.8",
+          "digest": "sha256:d6addc9e5205cf519f38fdf87a7a6d54f89610d44da59daa528984031eba4d94",
+          "manifest_digest": "sha256:ed47411c0502a8f02d73267014577895512efdbff6cdb53c573151af02a38c7c",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:4d0d8130a31022145764472cace9626ad99c89f5fdbdb00e2d7a1e2909bbcfb8",
+            "path_scope": [
+              "skills/flowboard_lab_for_safely_prototyping_a_r_17528146_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
+          "schema_locks": []
+        }
+      ],
+      "portable_artifact_digests": [
+        "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+        "sha256:4878e18d73b1137c384e3c99b49505c0e8dd5b5578f640ddb9cf259f2da37b85",
+        "sha256:69e0e7721cc9b73013f5d6257de94a77092ef4f7c71d475f5eecb8738d63dcbc",
+        "sha256:7f5f4a7c6d7b796665423dadf7d00a54efadf7a07d55844e8eedd9366096d5f0",
+        "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7",
+        "sha256:d6bb46114add2643194371aa928a249ce931430bad1c46ea3d84a77c6383bbcc"
+      ]
+    }
+  },
+  "projection_digest": "sha256:5de374c9f53a8193ed5ba7b9d29a975a3c9070212ef5535f83a5c407e75c96de"
+}

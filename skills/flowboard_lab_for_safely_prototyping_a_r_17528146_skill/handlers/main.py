@@ -8,6 +8,12 @@ from adaos.sdk import conversation as sdk_conversation
 from adaos.sdk import memory as sdk_memory
 from adaos.sdk.core.decorators import tool
 from adaos.sdk.data.i18n import _
+from adaos.services.resources import ResourceWorkbenchService
+
+
+WORK_ITEMS_RESOURCE = (
+    "skill.flowboard_lab_for_safely_prototyping_a_r_17528146_skill.work_items"
+)
 
 
 def lang_res() -> dict[str, str]:
@@ -210,3 +216,55 @@ def remember_preference(
         "dialog": dialog,
         "pending_action": proposal,
     }
+
+
+@tool(summary="Query typed Flowboard work items.", side_effects="read_only")
+def list_work_items(
+    filters: Mapping[str, Any] | None = None,
+    search: str = "",
+    limit: int = 100,
+    **_: Any,
+) -> dict[str, Any]:
+    return ResourceWorkbenchService().query(
+        {
+            "schema": "adaos.resource.query.v1",
+            "resource_type": WORK_ITEMS_RESOURCE,
+            "filters": dict(filters or {}),
+            "search": str(search or ""),
+            "limit": max(1, min(int(limit or 100), 500)),
+            "actor": {"id": "skill:flowboard", "role": "owner"},
+        }
+    )
+
+
+@tool(summary="Operate on one typed Flowboard work item.", side_effects="local_write")
+def operate_work_item(
+    operation_id: str,
+    record_id: str = "",
+    payload: Mapping[str, Any] | None = None,
+    expected_revision: int | str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    return ResourceWorkbenchService().operate(
+        {
+            "schema": "adaos.resource.operation.v1",
+            "resource_type": WORK_ITEMS_RESOURCE,
+            "operation_id": str(operation_id or ""),
+            "record_id": str(record_id or ""),
+            "payload": dict(payload or {}),
+            "expected_revision": expected_revision,
+            "actor": {"id": "skill:flowboard", "role": "owner"},
+            "context": {"surface": "flowboard"},
+        }
+    )
+
+
+@tool(summary="Quiesce the Flowboard resource provider.", side_effects="local_write")
+def flowboard_drain(**_: Any) -> dict[str, Any]:
+    return {"ok": True}
+
+
+@tool(summary="Verify the Flowboard resource projection.", side_effects="local_write")
+def flowboard_rehydrate(**_: Any) -> dict[str, Any]:
+    snapshot = list_work_items(limit=1)
+    return {"ok": bool(snapshot.get("ok")), "count": int(snapshot.get("count") or 0)}

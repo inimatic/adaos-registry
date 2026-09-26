@@ -1,5 +1,5 @@
 name: flowboard_lab_for_safely_prototyping_a_r_17528146_skill
-version: 0.1.6
+version: 0.1.8
 description: Project-owned typed resource provider for the accepted prototype. Implement
   accepted Flowboard prototype revision 007 exactly. Preserve the accepted three-lane
   text Kanban, six current accepted records, search, typed create/edit/delete, drag
@@ -14,7 +14,18 @@ entry: handlers/main.py
 default_tool: chat
 runtime:
   python: '3.11'
+  activation:
+    mode: on_demand
+    startup_allowed: false
+    background_refresh: false
 dependencies: []
+lifecycle:
+  drain: flowboard_drain
+  rehydrate: flowboard_rehydrate
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases: []
 events:
   subscribe: []
   publish:
@@ -25,6 +36,10 @@ exports:
   - chat
   - ask_for_details
   - remember_preference
+  - list_work_items
+  - operate_work_item
+  - flowboard_drain
+  - flowboard_rehydrate
 tools:
 - name: chat
   description: Handle a skill-owned dialog turn using the canonical conversation ledger.
@@ -91,6 +106,94 @@ tools:
     - message
     - dialog
     - pending_action
+- name: list_work_items
+  description: Query the typed Flowboard item resource.
+  entry: handlers.main:list_work_items
+  side_effects: read_only
+  side_effect_class: read_only
+  input_schema:
+    type: object
+    properties:
+      filters:
+        type: object
+      search:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 500
+  output_schema:
+    type: object
+    required:
+    - ok
+    - items
+    properties:
+      ok:
+        type: boolean
+      items:
+        type: array
+- name: operate_work_item
+  description: Create, update, move, or delete one typed Flowboard item.
+  entry: handlers.main:operate_work_item
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    required:
+    - operation_id
+    properties:
+      operation_id:
+        type: string
+        enum:
+        - create
+        - update
+        - delete
+      record_id:
+        type: string
+      payload:
+        type: object
+      expected_revision:
+        oneOf:
+        - type: integer
+        - type: string
+        - type: 'null'
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+- name: flowboard_drain
+  description: Quiesce the skill-owned workboard provider before a release switch.
+  entry: handlers.main:flowboard_drain
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties: {}
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+- name: flowboard_rehydrate
+  description: Verify the workboard resource projection after a release switch.
+  entry: handlers.main:flowboard_rehydrate
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties: {}
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
 data_routes:
 - surface: skill conversation memory
   route: skill-local
@@ -211,7 +314,7 @@ nlu_hints:
   slot_schemas: {}
   entities: []
 prototype: skill_default
-updated_at: '2026-09-04T20:04:02+00:00'
+updated_at: '2026-09-26T01:49:57+00:00'
 resource_runtime:
   declarations:
   - resources/work_items.resource.json

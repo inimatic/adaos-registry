@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:application.ui.render.webui-v1",
+  "binding_definition_digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+  "logical_entrypoint": "application.ui.render.webui-v1",
+  "package": {
+    "kind": "scenario",
+    "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+    "version": "0.1.23",
+    "digest": "sha256:48357cd12d95315a670b33850bf0d4c742ba162aa6703a29cfc9b4d4ebe204a2"
+  },
+  "physical_member": "webui.json",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:d6bb46114add2643194371aa928a249ce931430bad1c46ea3d84a77c6383bbcc"
+}

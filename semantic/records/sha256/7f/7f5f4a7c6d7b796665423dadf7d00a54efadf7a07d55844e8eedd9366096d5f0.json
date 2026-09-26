@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:workboard.items.manage.local-resource",
+  "binding_definition_digest": "sha256:4878e18d73b1137c384e3c99b49505c0e8dd5b5578f640ddb9cf259f2da37b85",
+  "logical_entrypoint": "workboard.items.local-resource",
+  "package": {
+    "kind": "skill",
+    "id": "flowboard_lab_for_safely_prototyping_a_r_17528146_skill",
+    "version": "0.1.8",
+    "digest": "sha256:d6addc9e5205cf519f38fdf87a7a6d54f89610d44da59daa528984031eba4d94"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:7f5f4a7c6d7b796665423dadf7d00a54efadf7a07d55844e8eedd9366096d5f0"
+}
