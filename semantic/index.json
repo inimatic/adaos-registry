@@ -116,7 +116,8 @@
     "adaos.binding.definition.v1|binding-definition:workspace.files.manage.adaos-drive-local|1.1.0": "sha256:f06d98df35801cb3c6e6bf4cacb82f019083a310a2be5996cf2bc9f5041f008f",
     "adaos.capability.contract.v1|capability:workspace.files.manage|1.1.0": "sha256:fa1371a762a3b8b6fdad71a8d1435029d73d2e45ebdba997bf623bd643b06b74",
     "adaos.binding.delivery.v1|binding-definition:vision.descriptors.manage.browser-local@sha256:9ccc80312d5f9cc134d4e5bba60d4edbd297aeb5810edd95f14252577d4f02f4|sha256:c4fb30b9c205fc9ff5daf053ca5a8027fe0f473f0d288b5cd0a99c964481b687": "sha256:2cf9f61bef9a74c0c6d9e59ca6a3ac54dd39146340a4b2fd4d4e0ad1b243cbab",
-    "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:ecf94620b3236f8bb7a9856d0eb30da6eec91e903771c1ad5509ae6d00b9f4f3": "sha256:19937cb778bd9bba79211cca0626f7cc9bdcb0804c6661952795749fb10920a1"
+    "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:ecf94620b3236f8bb7a9856d0eb30da6eec91e903771c1ad5509ae6d00b9f4f3": "sha256:19937cb778bd9bba79211cca0626f7cc9bdcb0804c6661952795749fb10920a1",
+    "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:27117073e71e940738fa7abb407e7fe2ae6b2ed1c0e17d1f80635f86029b7664": "sha256:df3c5500d0bfec3c34b01a4188a882f25b77c965a4ddae4e6d9f06388551be94"
   },
   "records": {
     "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1": {
@@ -143,6 +144,7 @@
         "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
         "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
         "sha256:758e6dac8a7bbf92b46400fd6de9680ce5f5277ae5c5a2ab3bf4eb20d08e40f7",
+        "sha256:77147de328b7a3720e2c345f379a59101f8d99cf3ad99a05a88bc6abe175b702",
         "sha256:789baa1b6caa74c67050854ebe35aafda9effdb2dbb73cfa87fa3de8371f5459",
         "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
         "sha256:89fae7a20012deff77bc74fa3bd24f4f56645c1c33165bec39501b4e6b605a27",
@@ -215,6 +217,7 @@
         "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
         "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
         "sha256:758e6dac8a7bbf92b46400fd6de9680ce5f5277ae5c5a2ab3bf4eb20d08e40f7",
+        "sha256:77147de328b7a3720e2c345f379a59101f8d99cf3ad99a05a88bc6abe175b702",
         "sha256:789baa1b6caa74c67050854ebe35aafda9effdb2dbb73cfa87fa3de8371f5459",
         "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
         "sha256:89fae7a20012deff77bc74fa3bd24f4f56645c1c33165bec39501b4e6b605a27",
@@ -735,6 +738,7 @@
         "sha256:30c99dbbd8ded08abc40b5c5ea2cdcdb7378678a831d59a2afaea18979a083eb",
         "sha256:35667691bd19bbe6f45b8f2ec74c90b1645efc401fe32b44eb617b88ca7d76a0",
         "sha256:641531165944c32c224c12fcecde6fceb53967fab816ce02f22bb8d48c06f88d",
+        "sha256:77147de328b7a3720e2c345f379a59101f8d99cf3ad99a05a88bc6abe175b702",
         "sha256:789baa1b6caa74c67050854ebe35aafda9effdb2dbb73cfa87fa3de8371f5459",
         "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
         "sha256:89fae7a20012deff77bc74fa3bd24f4f56645c1c33165bec39501b4e6b605a27",
@@ -752,6 +756,7 @@
         "sha256:30c99dbbd8ded08abc40b5c5ea2cdcdb7378678a831d59a2afaea18979a083eb",
         "sha256:35667691bd19bbe6f45b8f2ec74c90b1645efc401fe32b44eb617b88ca7d76a0",
         "sha256:641531165944c32c224c12fcecde6fceb53967fab816ce02f22bb8d48c06f88d",
+        "sha256:77147de328b7a3720e2c345f379a59101f8d99cf3ad99a05a88bc6abe175b702",
         "sha256:789baa1b6caa74c67050854ebe35aafda9effdb2dbb73cfa87fa3de8371f5459",
         "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
         "sha256:89fae7a20012deff77bc74fa3bd24f4f56645c1c33165bec39501b4e6b605a27",
@@ -1214,6 +1219,7 @@
       "published_by_release_digests": [
         "sha256:0b891e2da738e254317eb958eda533333ba2a5d17752ed3c75850f19e0dede55",
         "sha256:641531165944c32c224c12fcecde6fceb53967fab816ce02f22bb8d48c06f88d",
+        "sha256:77147de328b7a3720e2c345f379a59101f8d99cf3ad99a05a88bc6abe175b702",
         "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
         "sha256:9105ab0cf0d477edea3347adce777c5e7024734ff77f72fe03e4057fb3605033"
       ]
@@ -1342,6 +1348,15 @@
       "path": "semantic/records/sha256/19/19937cb778bd9bba79211cca0626f7cc9bdcb0804c6661952795749fb10920a1.json",
       "published_by_release_digests": [
         "sha256:9105ab0cf0d477edea3347adce777c5e7024734ff77f72fe03e4057fb3605033"
+      ]
+    },
+    "sha256:df3c5500d0bfec3c34b01a4188a882f25b77c965a4ddae4e6d9f06388551be94": {
+      "schema": "adaos.binding.delivery.v1",
+      "identity": "binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "revision": "sha256:27117073e71e940738fa7abb407e7fe2ae6b2ed1c0e17d1f80635f86029b7664",
+      "path": "semantic/records/sha256/df/df3c5500d0bfec3c34b01a4188a882f25b77c965a4ddae4e6d9f06388551be94.json",
+      "published_by_release_digests": [
+        "sha256:77147de328b7a3720e2c345f379a59101f8d99cf3ad99a05a88bc6abe175b702"
       ]
     }
   },
@@ -1831,7 +1846,16 @@
       "semantic_revision_digest": "sha256:7adf9d0da4e4fa4f00be21054e4f9900a6f4366c863c0fd05d5e9f33bac05467",
       "path": "semantic/applications/web_desktop/9105ab0cf0d477edea3347adce777c5e7024734ff77f72fe03e4057fb3605033.json",
       "projection_digest": "sha256:290fe21030c8a413ccb6c0977de4a74c1d359dbd2dc2939b9a00dd7999917fa8"
+    },
+    "project:web_desktop@sha256:77147de328b7a3720e2c345f379a59101f8d99cf3ad99a05a88bc6abe175b702": {
+      "project_id": "web_desktop",
+      "version": "0.3.56",
+      "application_ref": "scenario:web_desktop",
+      "project_release_digest": "sha256:77147de328b7a3720e2c345f379a59101f8d99cf3ad99a05a88bc6abe175b702",
+      "semantic_revision_digest": "sha256:7adf9d0da4e4fa4f00be21054e4f9900a6f4366c863c0fd05d5e9f33bac05467",
+      "path": "semantic/applications/web_desktop/77147de328b7a3720e2c345f379a59101f8d99cf3ad99a05a88bc6abe175b702.json",
+      "projection_digest": "sha256:f40dc433b5941b8f9f543a20ee39a57901a6822302fd313744a968192dd57af8"
     }
   },
-  "index_digest": "sha256:2f4ebf570486679c7b1a9376fa0b20a13455ad26a11dd19910d863a2c75b4612"
+  "index_digest": "sha256:4d0d975b859c2233e1dad43abeca11622a8fa8ae0e5899c54aab3e410f5eb51f"
 }
