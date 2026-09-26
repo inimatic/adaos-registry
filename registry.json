@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-26T05:37:27+00:00",
+  "updated_at": "2026-09-26T06:05:26+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -739,8 +739,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "research_tlp",
-        "release": "research_tlp@0.3.13",
-        "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
+        "release": "research_tlp@0.3.15",
+        "release_digest": "sha256:c0b55506ebdf32027bd2210c40a5593a8f14db2e188aeb78713ca7e3532f5db7",
         "package_digest": "sha256:9e2faaf5ba238042c99267c7bb7fe8d0e901c931676e46800a7dc887c720f356"
       },
       "tools_count": 5
@@ -1153,8 +1153,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "research_tlp",
-        "release": "research_tlp@0.3.13",
-        "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
+        "release": "research_tlp@0.3.15",
+        "release_digest": "sha256:c0b55506ebdf32027bd2210c40a5593a8f14db2e188aeb78713ca7e3532f5db7",
         "package_digest": "sha256:a4b9b92384565bec0cf0fdae3fecd81d4cd989b05fb4a9d6e1fa578a9ffafdc5"
       },
       "tools_count": 39
@@ -1435,9 +1435,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "research_tlp",
-        "release": "research_tlp@0.3.13",
-        "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
-        "package_digest": "sha256:3e17dfe53a66f508973e7b864808038794180a5c819257864ccd1aa15551e4f5"
+        "release": "research_tlp@0.3.15",
+        "release_digest": "sha256:c0b55506ebdf32027bd2210c40a5593a8f14db2e188aeb78713ca7e3532f5db7",
+        "package_digest": "sha256:cd22a99ca238802ef7090f0f654b3d54ed1318f4b61ff9433b891f9fc92ffe62"
       },
       "tools_count": 7
     },
@@ -1445,8 +1445,8 @@
       "kind": "skill",
       "id": "tlp_structured_proof_02",
       "name": "tlp_structured_proof_02",
-      "version": "0.2.1",
-      "updated_at": "2026-09-26T03:03:07+00:00",
+      "version": "0.2.3",
+      "updated_at": "2026-09-26T05:51:03+00:00",
       "path": "skills/tlp_structured_proof_02",
       "manifest": "skills/tlp_structured_proof_02/skill.yaml",
       "source": {
@@ -1466,9 +1466,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "research_tlp",
-        "release": "research_tlp@0.3.13",
-        "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
-        "package_digest": "sha256:f65f6b263ac11c2fa2041eb982433af6726754fa66e44cc32e1910fe475d56da"
+        "release": "research_tlp@0.3.15",
+        "release_digest": "sha256:c0b55506ebdf32027bd2210c40a5593a8f14db2e188aeb78713ca7e3532f5db7",
+        "package_digest": "sha256:0f57b02cb2a9d61784b1837c164304f4fe34792990d7bd0ba279b87e06e98ecd"
       }
     },
     {
@@ -2486,7 +2486,7 @@
         "manifest": "scenarios/tlp_research/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:d6b5a7653751cc3f66558ac0388fc660f59cca215364d7396f6cf74a78fcfd16",
+        "revision": "sha256:b2f19a9b23e42193934e550eb1e851c58c384adca24cb0e2796f2033387bfd35",
         "path_scope": [
           "projects/research_tlp/"
         ]
@@ -2509,16 +2509,16 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "research_tlp",
-        "release": "research_tlp@0.3.13",
-        "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
-        "package_digest": "sha256:1cf8275ce65617b2aa0c37220dfd8f8fa4a08546226590c56324d9af608424f7"
+        "release": "research_tlp@0.3.15",
+        "release_digest": "sha256:c0b55506ebdf32027bd2210c40a5593a8f14db2e188aeb78713ca7e3532f5db7",
+        "package_digest": "sha256:2c53ae33051b580826a4b0e8e5edb8e355005e9b2fcb50f906937836dc110f2e"
       },
       "channels": {
         "stable": {
-          "release": "research_tlp@0.3.13",
-          "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
-          "source_revision": "sha256:d6b5a7653751cc3f66558ac0388fc660f59cca215364d7396f6cf74a78fcfd16",
-          "package_digest": "sha256:1cf8275ce65617b2aa0c37220dfd8f8fa4a08546226590c56324d9af608424f7",
+          "release": "research_tlp@0.3.15",
+          "release_digest": "sha256:c0b55506ebdf32027bd2210c40a5593a8f14db2e188aeb78713ca7e3532f5db7",
+          "source_revision": "sha256:b2f19a9b23e42193934e550eb1e851c58c384adca24cb0e2796f2033387bfd35",
+          "package_digest": "sha256:2c53ae33051b580826a4b0e8e5edb8e355005e9b2fcb50f906937836dc110f2e",
           "version": "0.3.8"
         }
       }
@@ -4581,8 +4581,8 @@
       "kind": "project",
       "id": "research_tlp",
       "name": "research_tlp",
-      "version": "0.3.13",
-      "updated_at": "2026-09-26T04:53:30+00:00",
+      "version": "0.3.15",
+      "updated_at": "2026-09-26T06:05:26+00:00",
       "path": "projects/research_tlp",
       "manifest": "projects/research_tlp/project.yaml",
       "source": {
@@ -4651,18 +4651,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "research_tlp",
-        "release": "research_tlp@0.3.13",
-        "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
+        "release": "research_tlp@0.3.15",
+        "release_digest": "sha256:c0b55506ebdf32027bd2210c40a5593a8f14db2e188aeb78713ca7e3532f5db7",
         "primary_component": "scenario:tlp_research",
-        "package_digest": "sha256:1cf8275ce65617b2aa0c37220dfd8f8fa4a08546226590c56324d9af608424f7"
+        "package_digest": "sha256:2c53ae33051b580826a4b0e8e5edb8e355005e9b2fcb50f906937836dc110f2e"
       },
       "channels": {
         "stable": {
-          "release": "research_tlp@0.3.13",
-          "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
-          "source_revision": "sha256:d6b5a7653751cc3f66558ac0388fc660f59cca215364d7396f6cf74a78fcfd16",
-          "package_digest": "sha256:1cf8275ce65617b2aa0c37220dfd8f8fa4a08546226590c56324d9af608424f7",
-          "version": "0.3.13"
+          "release": "research_tlp@0.3.15",
+          "release_digest": "sha256:c0b55506ebdf32027bd2210c40a5593a8f14db2e188aeb78713ca7e3532f5db7",
+          "source_revision": "sha256:b2f19a9b23e42193934e550eb1e851c58c384adca24cb0e2796f2033387bfd35",
+          "package_digest": "sha256:2c53ae33051b580826a4b0e8e5edb8e355005e9b2fcb50f906937836dc110f2e",
+          "version": "0.3.15"
         }
       }
     },

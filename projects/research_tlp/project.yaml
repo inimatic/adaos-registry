@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: research_tlp
-version: 0.3.13
+version: 0.3.15
 profiles:
 - adaos.research.tlp.v1
 components:
