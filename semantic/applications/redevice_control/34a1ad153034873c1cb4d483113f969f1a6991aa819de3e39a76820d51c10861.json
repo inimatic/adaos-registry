@@ -1,0 +1,237 @@
+{
+  "schema": "adaos.semantic_registry.application_release.v1",
+  "project_id": "redevice_control",
+  "version": "0.1.20",
+  "application_ref": "scenario:redevice_user_face",
+  "project_release_digest": "sha256:34a1ad153034873c1cb4d483113f969f1a6991aa819de3e39a76820d51c10861",
+  "source_ref": {
+    "schema": "adaos.artifact.source_ref.v1",
+    "forge": "content-addressed-dev",
+    "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+    "revision": "sha256:b2518e615c26382758dda2f4009d1ecb2e4f8bbe38a75ac42f18a6b79665ad8b",
+    "path_scope": [
+      "projects/redevice_control/"
+    ]
+  },
+  "compilation_digest": "sha256:7bfbcd27d0d65499841a960565a1bd77194029bbb1e32ac78757a130d958a558",
+  "semantic_revision_digest": "sha256:43314f2bfb7c1b0253d44d0bfcbeb0f33ea00b14dd29d9f9299fe7614b92ff19",
+  "requirements": [
+    {
+      "requirement_ref": "requirement:scenario.redevice_user_face.ui",
+      "capability_ref": "capability:application.ui.render",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:3cf8c59c3881c58b0d0845ee691ceaea4065050aa28114576c668e21f5ce600a"
+    },
+    {
+      "requirement_ref": "requirement:scenario.redevice_user_face.devices.manage",
+      "capability_ref": "capability:devices.manage",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:5b546387999a31ce45a74acf2799fa0345669ecbd80725c52bcfdc70ef2b7473"
+    },
+    {
+      "requirement_ref": "requirement:scenario.redevice_user_face.media.slideshow.present",
+      "capability_ref": "capability:media.slideshow.present",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:cd7e97101e4e484b8ed293b298ce8517d5e5ada5274f2de817cee3097d08f00f"
+    }
+  ],
+  "portable_artifacts": {
+    "adaos.binding.definition.v1": [
+      "sha256:12cfcafa4d8c614c740dc4108ed11fb5d39b3c6f3c1aae59b1dcffc6e0ed35d7",
+      "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "sha256:f29437e67b25f72387b6298637e180c6b288d30154dd43797f897205e241d67f"
+    ],
+    "adaos.binding.delivery.v1": [
+      "sha256:3f196f112ef7f2d45b5d00413819dd0985a8b68be838734816d1dadc3006cbfb",
+      "sha256:82eed7e696d85478f97d71d1c293e88ae0b2f2dc643941d2b97ee535dd6a299f",
+      "sha256:e9d44d0153575f388bde7af466126f335e39b006a7f449bc5d6a1b687a5398e5"
+    ],
+    "adaos.capability.contract.v1": [
+      "sha256:1ffa518cb13a43d7f2b9c921b154445079fc1d1be5f3a3b879a6ed300df4a4f9",
+      "sha256:6fb30fa2863163ee13c26c0d8235798462fe26f6cbcdcb9b45a5e9b8cf82c4f1",
+      "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7"
+    ]
+  },
+  "distribution": {
+    "thin": {
+      "requirements_only": true,
+      "registry_required": true
+    },
+    "resolved": {
+      "project_release_digest": "sha256:34a1ad153034873c1cb4d483113f969f1a6991aa819de3e39a76820d51c10861",
+      "package_closure": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "redevice_user_face",
+          "version": "0.1.11",
+          "digest": "sha256:aec231b320ac9549d76c2f4a84168260329544ae800d503fc835eb6c630e4997",
+          "manifest_digest": "sha256:d60314056f4fae5b2da543598540b8f320b4928287dd57f10b0c83bcd6cd6bd5",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:b2518e615c26382758dda2f4009d1ecb2e4f8bbe38a75ac42f18a6b79665ad8b",
+            "path_scope": [
+              "scenarios/redevice_user_face/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/redevice_user_face",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "redevice_list",
+          "version": "0.2.2",
+          "digest": "sha256:7bdbd3106fb9fc614cee8ece7f6278a444f6ae22fa55955ca2fbed4913626da6",
+          "manifest_digest": "sha256:2d7322a621fcd8edb4a5ecabd362d706076bf22bdfe4ecf0187426b87a81990a",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:b2518e615c26382758dda2f4009d1ecb2e4f8bbe38a75ac42f18a6b79665ad8b",
+            "path_scope": [
+              "skills/redevice_list/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/redevice_list",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "redevice_settings",
+          "version": "0.2.2",
+          "digest": "sha256:100266d6a5922353b3010a6a7feab9c2b5a6cb0e74f9e72ec5bea763edc8c3b1",
+          "manifest_digest": "sha256:683274fd45d3649120dac3aa7da539ec35d75ba2e15b03be331c7b4e6285f0e5",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:b2518e615c26382758dda2f4009d1ecb2e4f8bbe38a75ac42f18a6b79665ad8b",
+            "path_scope": [
+              "skills/redevice_settings/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/redevice_settings",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "redevice_voice",
+          "version": "0.2.4",
+          "digest": "sha256:3481bbfb37af6916c28cd09d494f688c2f55d0ab6884cf19b4a6976f6602cc2a",
+          "manifest_digest": "sha256:c8348091a9e9610d49e6653f78cf068d3f279886c7cc300fd5c5a30805e37eae",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:b2518e615c26382758dda2f4009d1ecb2e4f8bbe38a75ac42f18a6b79665ad8b",
+            "path_scope": [
+              "skills/redevice_voice/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/redevice_voice",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "slideshow_skill",
+          "version": "0.2.4",
+          "digest": "sha256:e1bd222f953636097de969336b88dd71159e0967fbc3b46d8f69ac0ac8c9391e",
+          "manifest_digest": "sha256:424a425e82053580682996b3fbcbdffe760eac6aea43694160e32aa94920ea77",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:bba8b766d28c74b46d7b654b748075b5fc9045dc37c8f21b401a71df6b478005",
+            "path_scope": [
+              "skills/slideshow_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/slideshow_skill",
+          "schema_locks": []
+        }
+      ],
+      "portable_artifact_digests": [
+        "sha256:12cfcafa4d8c614c740dc4108ed11fb5d39b3c6f3c1aae59b1dcffc6e0ed35d7",
+        "sha256:1ffa518cb13a43d7f2b9c921b154445079fc1d1be5f3a3b879a6ed300df4a4f9",
+        "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+        "sha256:3f196f112ef7f2d45b5d00413819dd0985a8b68be838734816d1dadc3006cbfb",
+        "sha256:6fb30fa2863163ee13c26c0d8235798462fe26f6cbcdcb9b45a5e9b8cf82c4f1",
+        "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7",
+        "sha256:82eed7e696d85478f97d71d1c293e88ae0b2f2dc643941d2b97ee535dd6a299f",
+        "sha256:e9d44d0153575f388bde7af466126f335e39b006a7f449bc5d6a1b687a5398e5",
+        "sha256:f29437e67b25f72387b6298637e180c6b288d30154dd43797f897205e241d67f"
+      ]
+    }
+  },
+  "projection_digest": "sha256:e76dec982d0eafaa41be84a5a5f6a04dbafc0363079fa9002400722829436818"
+}

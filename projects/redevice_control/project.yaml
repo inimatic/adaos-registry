@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: redevice_control
-version: 0.1.19
+version: 0.1.20
 profiles:
 - adaos.redevice.control.v1
 components:
@@ -32,7 +32,7 @@ components:
     - uses
   dependencies:
   - ref: skill:slideshow_skill
-    version: ==0.2.1
+    version: ==0.2.4
     lifecycle: shared
     relations:
     - uses

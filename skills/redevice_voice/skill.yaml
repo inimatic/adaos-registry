@@ -1,5 +1,5 @@
 name: redevice_voice
-version: 0.2.3
+version: 0.2.4
 description: Debug ReDevice voice endpoint skill over EndpointAudioService with VAD
   or push-to-talk capture and member-side STT routing.
 runtime:
@@ -142,7 +142,7 @@ memory_budget:
     max_items: 1
     cleanup_hook: webio.stream.subscription.changed
   background_workers: []
-updated_at: '2026-09-26T04:13:07+00:00'
+updated_at: '2026-09-26T08:59:04+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.741+4835.a49f9166
