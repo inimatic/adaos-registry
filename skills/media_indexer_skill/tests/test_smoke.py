@@ -23,7 +23,16 @@ def test_manifest_declares_runtime_contracts() -> None:
 
     assert manifest["name"] == "media_indexer_skill"
     assert "requirements.txt" not in {path.name for path in SKILL_ROOT.iterdir()}
-    assert manifest.get("dependencies") == ["shazamio"]
+    assert set(manifest.get("dependencies") or []) == {
+        "shazamio",
+        "easyocr",
+        "faiss-cpu",
+        "opencv-python",
+        "sentence-transformers",
+        "torch",
+        "transformers",
+    }
+    assert manifest["runtime"]["env"]["allow_heavy_dependencies"] is True
     assert not (manifest.get("models") or {}).get("artifacts")
     assert "sys.ready" not in manifest["events"]["subscribe"]
     assert "webio.yjs.snapshot.requested" in manifest["events"]["subscribe"]
