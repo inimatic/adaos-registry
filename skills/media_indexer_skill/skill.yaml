@@ -13,8 +13,15 @@ runtime:
   env:
     mode: venv
     python: '3.11'
+    allow_heavy_dependencies: true
 dependencies:
 - shazamio
+- easyocr
+- faiss-cpu
+- opencv-python
+- sentence-transformers
+- torch
+- transformers
 events:
   subscribe:
   - media_indexer.action
