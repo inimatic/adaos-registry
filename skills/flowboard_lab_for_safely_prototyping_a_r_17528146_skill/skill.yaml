@@ -1,5 +1,5 @@
 name: flowboard_lab_for_safely_prototyping_a_r_17528146_skill
-version: 0.1.8
+version: 0.1.10
 description: Project-owned typed resource provider for the accepted prototype. Implement
   accepted Flowboard prototype revision 007 exactly. Preserve the accepted three-lane
   text Kanban, six current accepted records, search, typed create/edit/delete, drag
@@ -44,6 +44,7 @@ tools:
 - name: chat
   description: Handle a skill-owned dialog turn using the canonical conversation ledger.
   entry: handlers.main:chat
+  side_effects: runtime_write
   input_schema:
     type: object
     properties:
@@ -63,6 +64,7 @@ tools:
 - name: ask_for_details
   description: Ask a bounded follow-up question through adaos.sdk.chat.ask.
   entry: handlers.main:ask_for_details
+  side_effects: runtime_write
   input_schema:
     type: object
     properties:
@@ -84,6 +86,7 @@ tools:
 - name: remember_preference
   description: Propose a consent-gated skill preference memory write.
   entry: handlers.main:remember_preference
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -314,7 +317,7 @@ nlu_hints:
   slot_schemas: {}
   entities: []
 prototype: skill_default
-updated_at: '2026-09-26T01:49:57+00:00'
+updated_at: '2026-09-26T11:01:43+00:00'
 resource_runtime:
   declarations:
   - resources/work_items.resource.json

@@ -331,7 +331,7 @@
                 }
             }
         },
-        "version": "0.1.23",
+        "version": "0.1.24",
         "manifest": "webui.json"
     },
     "generated_by": "builder_skill"

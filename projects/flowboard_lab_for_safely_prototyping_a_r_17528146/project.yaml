@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: flowboard_lab_for_safely_prototyping_a_r_17528146
-version: 0.1.16
+version: 0.1.17
 profiles: []
 components:
   owned:
@@ -58,3 +58,24 @@ lifecycle:
     source_artifacts: retain
 created_at: '2026-09-04T04:03:46Z'
 created_by: builder.chat
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.read
+    purpose: Read the local workboard and conversation state.
+    approval_policy: grant_on_install
+  - id: workspace.write
+    purpose: Update board items and preferences requested by the user.
+    approval_policy: grant_on_install
+  optional: []
+  secrets: []
+  external_providers: []
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected: [workboard_item, user_preference]
+    linked_to_user: []
+    retention: Workboard state remains in the local workspace.
+    sent_off_device: []
+    tracking: false

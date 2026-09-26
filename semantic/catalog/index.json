@@ -77,9 +77,9 @@
       "application_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 2,
-      "stable_release_digest": "sha256:0411f2dd115611549d46e17b3a7b985ff949bab11ee763a333565f6bfaf87934",
-      "release_key": "flowboard_lab_for_safely_prototyping_a_r_17528146@sha256:0411f2dd115611549d46e17b3a7b985ff949bab11ee763a333565f6bfaf87934",
-      "projection_digest": "sha256:1b1c7cd1e50d7b7125512e071eaacb800e4913aa17e9739a25e148f7da6652a1"
+      "stable_release_digest": "sha256:9794e4f50c83b45d7772b4c7d5832c39b4fe89c6b0872d6b281acb03756080f4",
+      "release_key": "flowboard_lab_for_safely_prototyping_a_r_17528146@sha256:9794e4f50c83b45d7772b4c7d5832c39b4fe89c6b0872d6b281acb03756080f4",
+      "projection_digest": "sha256:243a2deda189e04d34a45ee37da9d03500570fa23d69368d5910377fd1a11e82"
     },
     "users_access": {
       "application_id": "users_access",
@@ -402,7 +402,15 @@
       "release_digest": "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
       "path": "semantic/catalog/releases/semantic_ui_demo/675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0.json",
       "projection_digest": "sha256:e54d56edbccbeba23396a623227a55e70508f08e18efba5ffd214b64da31de8a"
+    },
+    "flowboard_lab_for_safely_prototyping_a_r_17528146@sha256:9794e4f50c83b45d7772b4c7d5832c39b4fe89c6b0872d6b281acb03756080f4": {
+      "application_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.17",
+      "release_digest": "sha256:9794e4f50c83b45d7772b4c7d5832c39b4fe89c6b0872d6b281acb03756080f4",
+      "path": "semantic/catalog/releases/flowboard_lab_for_safely_prototyping_a_r_17528146/9794e4f50c83b45d7772b4c7d5832c39b4fe89c6b0872d6b281acb03756080f4.json",
+      "projection_digest": "sha256:243a2deda189e04d34a45ee37da9d03500570fa23d69368d5910377fd1a11e82"
     }
   },
-  "index_digest": "sha256:c96f46c37b74a037663376fcb4abe2868cc63aa0bfa11f85e28488e87c9cdf03"
+  "index_digest": "sha256:e66b46e20e5cbda153c7fbb4124b5d24b71c858a59f494e1496c09f42397a338"
 }

@@ -1,6 +1,6 @@
 {
     "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-    "version": "0.1.23",
+    "version": "0.1.24",
     "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
     "description": "Builder-created rapid prototype scenario.",
     "triggers": [],
@@ -72,7 +72,7 @@
     },
     "steps": [],
     "prototype": "builder_scenario",
-    "updated_at": "2026-09-26T01:50:01+00:00",
+    "updated_at": "2026-09-26T11:01:38+00:00",
     "type": "desktop",
     "title": "Flowboard Lab for safely prototyping a reusable kanban workbench",
     "title_i18n": {
