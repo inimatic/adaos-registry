@@ -7,9 +7,13 @@ sources.
 ## Current scope
 
 - Two independent file panels with a single active panel state.
-- Source selector per panel and an add-source form for local folders.
+- Source selector per panel and a dedicated source-management dialog for
+  adding, renaming, and removing local folders.
 - Connected local sources are shared across Drive webspaces; panel paths and
   selections remain webspace-local.
+- Every source projection carries its stable source reference and owning node
+  identity. The current provider enumerates local-node sources; these fields
+  are the compatibility rail for a later Root-coordinated multi-node view.
 - Lazy tree loading through `expand_tree`; folders are scanned only when a branch
   is requested.
 - File table columns: icon, name, extension, size, modified time.
@@ -20,7 +24,7 @@ sources.
 - Create a Root-mediated guest browser link for a selected file without copying
   the file into skill storage.
 - Download guest links through `/v1/drive/public-links/<public_token>/content`
-  with HTTP range streaming.
+  with HTTP range streaming and an explicit UTF-8 attachment filename.
 - Public Drive face with readonly navigation, preview/download actions,
   language/theme controls, route status, and a public owner display name.
 - New folder creation and refresh commands.

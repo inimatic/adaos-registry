@@ -358,6 +358,33 @@ def test_sources_are_shared_across_drive_webspaces(monkeypatch, tmp_path):
     assert latest_stream(streams, "adaos_drive.right")["selector"]["current"] == source_id
 
 
+def test_source_management_preserves_identity_and_rebinds_removed_panels(monkeypatch, tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    mod, streams = load_module(monkeypatch)
+    mod.reset_drive({"root": str(root), "webspace_id": "desktop"})
+    extra = tmp_path / "extra"
+    extra.mkdir()
+    added = mod.add_source({"label": "Extra", "path": str(extra), "panel": "right", "webspace_id": "desktop"})
+    source_id = added["source"]["id"]
+
+    renamed = mod.rename_source({"source_id": source_id, "label": "Archive", "webspace_id": "desktop"})
+    assert renamed["source"]["id"] == source_id
+    assert renamed["source"]["label"] == "Archive"
+    assert renamed["source"]["node_label"]
+
+    removed = mod.remove_source({"source_id": source_id, "webspace_id": "desktop"})
+    assert removed["removed_source_id"] == source_id
+    snapshot = mod.get_snapshot({"webspace_id": "desktop"})["snapshot"]
+    assert snapshot["selectors"]["right_source"]["current"] != source_id
+    assert all(item["id"] != source_id for item in snapshot["source_options"])
+    assert all("node_label" in item for item in snapshot["source_options"])
+
+    only_source = snapshot["source_options"][0]["id"]
+    with pytest.raises(ValueError, match="last source"):
+        mod.remove_source({"source_id": only_source, "webspace_id": "desktop"})
+
+
 def test_select_source_recovers_from_option_payload(monkeypatch, tmp_path):
     root = tmp_path / "root"
     external = tmp_path / "external"

@@ -1,5 +1,5 @@
 name: adaos_drive
-version: 0.1.16
+version: 0.1.17
 description: Two-panel browser file manager for explicitly connected local folders.
 capabilities:
 - workspace.read
@@ -203,6 +203,57 @@ tools:
     properties:
       ok:
         type: boolean
+- name: rename_source
+  entry: handlers.main:rename_source
+  description: Rename a connected source without changing its stable source identity.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    required:
+    - source_id
+    - label
+    properties:
+      source_id:
+        type: string
+      label:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - source
+    properties:
+      ok:
+        type: boolean
+      source:
+        type: object
+- name: remove_source
+  entry: handlers.main:remove_source
+  description: Remove a connected source while preserving at least one usable source.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    required:
+    - source_id
+    properties:
+      source_id:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - removed_source_id
+    properties:
+      ok:
+        type: boolean
+      removed_source_id:
+        type: string
 - name: set_active_panel
   entry: handlers.main:set_active_panel
   description: Mark one file panel as active.
@@ -707,12 +758,13 @@ nlu:
     - show files
     slot_schemas: {}
     entities: []
-updated_at: '2026-09-26T01:49:23+00:00'
+updated_at: '2026-09-26T19:32:23+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.852+5172.db034608
-    recorded_at: '2026-08-17T20:11:20+00:00'
+    min_version: 0.1.1087+7053.08c65ebe6
+    recorded_at: '2026-09-26T19:32:23+00:00'
     source: skill_push
-    min_commit: db034608c180a7a428dcaed50a4c977e0d2a8ea8
-    min_short_commit: db034608
-    build_date: '2026-08-17T22:47:28+03:00'
+    min_commit: 08c65ebe6d52a813e2568487f150a2b67501f029
+    min_short_commit: 08c65ebe
+    build_date: '2026-09-26T22:31:10+03:00'
+

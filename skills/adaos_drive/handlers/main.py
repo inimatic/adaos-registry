@@ -222,14 +222,35 @@ def _default_root() -> Path:
 
 def _source_payload(label: str, root: Path) -> dict[str, Any]:
     resolved = root.expanduser().resolve()
+    config = None
+    try:
+        config = get_ctx().config
+    except Exception:
+        config = None
+    node_id = str(
+        getattr(config, "node_id", "")
+        or os.getenv("ADAOS_NODE_ID")
+        or ""
+    ).strip()
+    node_label = _safe_label(
+        getattr(config, "node_label", "")
+        or getattr(config, "display_name", "")
+        or os.getenv("ADAOS_NODE_NAME")
+        or node_id,
+        node_id or "This node",
+    )
+    source_id = _source_id(label, resolved)
     return {
-        "id": _source_id(label, resolved),
+        "id": source_id,
+        "source_ref": f"{node_id}:{source_id}" if node_id else source_id,
         "kind": "local",
         "label": _safe_label(label, resolved.name or str(resolved)),
         "path": str(resolved),
         "root_path": str(resolved),
         "description": str(resolved),
         "connected": resolved.exists() and resolved.is_dir(),
+        "node_id": node_id,
+        "node_label": node_label,
     }
 
 
@@ -962,11 +983,14 @@ def _panel_snapshot(state: Mapping[str, Any], panel: str) -> dict[str, Any]:
         "source_id": str(source.get("id") or ""),
         "source": {
             "id": str(source.get("id") or ""),
+            "source_ref": str(source.get("source_ref") or source.get("id") or ""),
             "kind": str(source.get("kind") or "local"),
             "label": root_label,
             "path": str(source.get("path") or ""),
             "description": str(source.get("description") or source.get("path") or ""),
             "connected": bool(source.get("connected", True)),
+            "node_id": str(source.get("node_id") or ""),
+            "node_label": str(source.get("node_label") or source.get("node_id") or "This node"),
         },
         "path": _bounded_text(rel, 1024),
         "path_label": _bounded_text(path_label, 2304),
@@ -994,6 +1018,9 @@ def _source_options(state: Mapping[str, Any], webspace_id: str) -> list[dict[str
                 "kind": str(item.get("kind") or "local"),
                 "path": _bounded_text(item.get("path"), 2048),
                 "connected": bool(item.get("connected", True)),
+                "source_ref": str(item.get("source_ref") or item.get("id") or ""),
+                "node_id": str(item.get("node_id") or ""),
+                "node_label": _bounded_text(item.get("node_label") or item.get("node_id") or "This node", 256),
             }
         )
     return out
@@ -1949,6 +1976,52 @@ def add_source(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     state["active_panel"] = panel
     ack = _save_and_publish(state, ws, (_LEFT_RECEIVER, _RIGHT_RECEIVER), f"Added source {source['label']}.")
     return {**ack, "source": source}
+
+
+@tool("rename_source")
+def rename_source(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
+    data = _payload(evt, **kwargs)
+    ws = _webspace_id(data.get("webspace_id"))
+    state = _load_state(ws)
+    source_id = str(data.get("source_id") or data.get("id") or "").strip()
+    label = _safe_label(data.get("label") or data.get("new_label"), "")
+    if not source_id:
+        raise ValueError("source_id is required")
+    if not label:
+        raise ValueError("source label is required")
+    updated: dict[str, Any] | None = None
+    sources: list[dict[str, Any]] = []
+    for item in _normalize_sources(state.get("sources")):
+        current = dict(item)
+        if str(current.get("id") or "") == source_id:
+            current["label"] = label
+            updated = current
+        sources.append(current)
+    if updated is None:
+        raise ValueError("unknown source")
+    state["sources"] = sources
+    ack = _save_and_publish(state, ws, (_LEFT_RECEIVER, _RIGHT_RECEIVER), f"Renamed source to {label}.")
+    return {**ack, "source": updated}
+
+
+@tool("remove_source")
+def remove_source(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
+    data = _payload(evt, **kwargs)
+    ws = _webspace_id(data.get("webspace_id"))
+    state = _load_state(ws)
+    source_id = str(data.get("source_id") or data.get("id") or "").strip()
+    sources = _normalize_sources(state.get("sources"))
+    removed = next((dict(item) for item in sources if str(item.get("id") or "") == source_id), None)
+    if removed is None:
+        raise ValueError("unknown source")
+    remaining = [dict(item) for item in sources if str(item.get("id") or "") != source_id]
+    if not remaining:
+        raise ValueError("the last source cannot be removed")
+    state["sources"] = remaining
+    _ensure_panel_sources(state)
+    _invalidate_directory_cache(removed)
+    ack = _save_and_publish(state, ws, (_LEFT_RECEIVER, _RIGHT_RECEIVER), f"Removed source {removed.get('label') or source_id}.")
+    return {**ack, "removed_source_id": source_id}
 
 
 @tool("select_source")

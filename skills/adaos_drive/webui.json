@@ -618,67 +618,6 @@
               ]
             },
             {
-              "id": "adaos-drive-add-source",
-              "type": "ui.form",
-              "area": "bottom",
-              "title": "Add local source",
-              "inputs": {
-                "layout": "responsiveGrid",
-                "minFieldWidth": 220,
-                "submitLabel": "Add source",
-                "fields": [
-                  {
-                    "id": "label",
-                    "type": "shortText",
-                    "label": "Label",
-                    "placeholder": "Projects",
-                    "span": 3
-                  },
-                  {
-                    "id": "path",
-                    "type": "shortText",
-                    "label": "Local folder",
-                    "placeholder": "D:\\\\git\\\\inimatic",
-                    "required": true,
-                    "span": 7
-                  },
-                  {
-                    "id": "panel",
-                    "type": "dropdown",
-                    "label": "Open in",
-                    "defaultValue": "left",
-                    "options": [
-                      {
-                        "label": "Left",
-                        "value": "left"
-                      },
-                      {
-                        "label": "Right",
-                        "value": "right"
-                      }
-                    ],
-                    "span": 2
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "submit",
-                  "type": "callSkill",
-                  "target": "adaos_drive.add_source",
-                  "params": {
-                    "label": "$event.values.label",
-                    "path": "$event.values.path",
-                    "panel": "$event.values.panel",
-                    "side_effect_class": "local_write"
-                  },
-                  "invalidates": [
-                    "adaos_drive.snapshot"
-                  ]
-                }
-              ]
-            },
-            {
               "id": "adaos-drive-left-source",
               "type": "input.selector",
               "area": "left",
@@ -697,8 +636,13 @@
                 "optionDescriptionPath": "description",
                 "optionMetaPaths": [
                   "kind",
-                  "path"
-                ]
+                  "path",
+                  "node_label"
+                ],
+                "auxiliaryAction": {
+                  "id": "manage-sources",
+                  "label": "Manage sources"
+                }
               },
               "actions": [
                 {
@@ -717,6 +661,13 @@
                   "invalidates": [
                     "adaos_drive.snapshot"
                   ]
+                },
+                {
+                  "on": "click:manage-sources",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "adaos_drive_sources_modal"
+                  }
                 }
               ]
             },
@@ -1109,8 +1060,13 @@
                 "optionDescriptionPath": "description",
                 "optionMetaPaths": [
                   "kind",
-                  "path"
-                ]
+                  "path",
+                  "node_label"
+                ],
+                "auxiliaryAction": {
+                  "id": "manage-sources",
+                  "label": "Manage sources"
+                }
               },
               "actions": [
                 {
@@ -1129,6 +1085,13 @@
                   "invalidates": [
                     "adaos_drive.snapshot"
                   ]
+                },
+                {
+                  "on": "click:manage-sources",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "adaos_drive_sources_modal"
+                  }
                 }
               ]
             },
@@ -1536,6 +1499,7 @@
                 "detailsPath": "download_url",
                 "showDetails": true,
                 "itemAccordion": false,
+                "buttonsPlacement": "below",
                 "buttons": [
                   {
                     "id": "open",
@@ -1712,6 +1676,201 @@
                 ],
                 "emptyText": "No public download events"
               }
+            }
+          ]
+        }
+      },
+      "adaos_drive_sources_modal": {
+        "title": "Drive sources",
+        "presentation": {
+          "kind": "modal",
+          "size": "large",
+          "restoreFocus": true
+        },
+        "schema": {
+          "id": "adaos_drive_sources",
+          "title": "Drive sources",
+          "surfaceClass": "workspace",
+          "layout": {
+            "version": 2,
+            "pattern": "collection-detail",
+            "density": "comfortable",
+            "contentWidth": "fluid",
+            "scroll": "page",
+            "regions": [
+              {
+                "id": "main",
+                "role": "collection",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                }
+              }
+            ],
+            "interaction": {
+              "selection": "single",
+              "rowActivation": "select",
+              "filters": "inline",
+              "actions": "adaptive"
+            }
+          },
+          "widgets": [
+            {
+              "id": "adaos-drive-source-create",
+              "type": "ui.form",
+              "area": "main",
+              "title": "Add local source",
+              "inputs": {
+                "layout": "responsiveGrid",
+                "minFieldWidth": 220,
+                "submitLabel": "Add source",
+                "fields": [
+                  {
+                    "id": "label",
+                    "type": "shortText",
+                    "label": "Label",
+                    "placeholder": "Projects",
+                    "span": 3
+                  },
+                  {
+                    "id": "path",
+                    "type": "shortText",
+                    "label": "Local folder",
+                    "placeholder": "D:\\\\git\\\\inimatic",
+                    "required": true,
+                    "span": 7
+                  },
+                  {
+                    "id": "panel",
+                    "type": "dropdown",
+                    "label": "Open in",
+                    "defaultValue": "left",
+                    "options": [
+                      {
+                        "label": "Left",
+                        "value": "left"
+                      },
+                      {
+                        "label": "Right",
+                        "value": "right"
+                      }
+                    ],
+                    "span": 2
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "adaos_drive.add_source",
+                  "params": {
+                    "label": "$event.values.label",
+                    "path": "$event.values.path",
+                    "panel": "$event.values.panel",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-source-list",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Connected sources",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "adaos_drive.left",
+                "path": "selector"
+              },
+              "inputs": {
+                "collectionKey": "options",
+                "variant": "list",
+                "titleKey": "label",
+                "subtitleKey": "description",
+                "detailsPath": "node_label",
+                "showDetails": true,
+                "itemAccordion": false,
+                "buttons": [
+                  {
+                    "id": "remove",
+                    "label": "Remove",
+                    "icon": "trash-outline"
+                  }
+                ],
+                "emptyText": "No connected sources"
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "adaosDriveManagedSourceId": "$event.id",
+                    "adaosDriveManagedSourceLabel": "$event.label"
+                  }
+                },
+                {
+                  "on": "click:remove",
+                  "type": "callSkill",
+                  "target": "adaos_drive.remove_source",
+                  "params": {
+                    "source_id": "$event.id",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:remove",
+                  "type": "updateState",
+                  "params": {
+                    "adaosDriveManagedSourceId": "",
+                    "adaosDriveManagedSourceLabel": ""
+                  }
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-source-rename",
+              "type": "ui.form",
+              "area": "main",
+              "title": "Rename selected source",
+              "visibleIf": "$state.adaosDriveManagedSourceId",
+              "inputs": {
+                "layout": "responsiveGrid",
+                "submitLabel": "Rename source",
+                "fields": [
+                  {
+                    "id": "label",
+                    "type": "shortText",
+                    "label": "Label",
+                    "stateKey": "adaosDriveManagedSourceLabel",
+                    "required": true,
+                    "span": 12
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "adaos_drive.rename_source",
+                  "params": {
+                    "source_id": "$state.adaosDriveManagedSourceId",
+                    "label": "$event.values.label",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
             }
           ]
         }
