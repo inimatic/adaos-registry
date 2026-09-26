@@ -1,0 +1,226 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "slideshow",
+    "legacy_project_id": "slideshow",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "slideshow",
+    "display": {
+      "title": "Slideshow",
+      "summary": "Local media slideshow indexing and endpoint presentation controls."
+    },
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "slideshow",
+        "presentation_ref": "skill:slideshow_skill"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 2,
+    "created_at": "2026-09-26T03:53:11+00:00",
+    "updated_at": "2026-09-26T04:26:30+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "slideshow",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "slideshow",
+    "version": "0.1.3",
+    "release_digest": "sha256:f0698425343c58033e0c4a67ffa71796c4fa1350ab37b336b594d3a51f55c066",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "slideshow",
+      "version": "0.1.3",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:bba8b766d28c74b46d7b654b748075b5fc9045dc37c8f21b401a71df6b478005",
+        "path_scope": [
+          "projects/slideshow/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "slideshow_skill",
+          "version": "0.2.4",
+          "digest": "sha256:e1bd222f953636097de969336b88dd71159e0967fbc3b46d8f69ac0ac8c9391e",
+          "manifest_digest": "sha256:424a425e82053580682996b3fbcbdffe760eac6aea43694160e32aa94920ea77",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:bba8b766d28c74b46d7b654b748075b5fc9045dc37c8f21b401a71df6b478005",
+            "path_scope": [
+              "skills/slideshow_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/slideshow_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:bba8b766d28c74b46d7b654b748075b5fc9045dc37c8f21b401a71df6b478005",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:edef5756310f0d63e7d83339e51bba1f56913b1babdbc5ee969ca43f52537aa3"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:660cc3c80f0cc33b6c774db0c3a18bb4467cac5f3304959e0384374e4fec97e5",
+        "profiles": [
+          "adaos.builder.component_project.v1"
+        ],
+        "members": [
+          {
+            "ref": "skill:slideshow_skill",
+            "package_digest": "sha256:e1bd222f953636097de969336b88dd71159e0967fbc3b46d8f69ac0ac8c9391e",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "slideshow",
+            "presentation": "skill:slideshow_skill",
+            "default": true,
+            "bindings": {
+              "surface": "slideshow"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "slideshow"
+          ],
+          "required_contracts": [
+            "capability:media.slideshow.present@^1.0.0"
+          ],
+          "validation_profiles": [
+            "slideshow.local"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        }
+      },
+      "catalog": {
+        "title": "Slideshow",
+        "description": "Local media slideshow indexing and endpoint presentation controls.",
+        "categories": [
+          "media"
+        ],
+        "tags": [
+          "cbs-provider",
+          "redevice",
+          "slideshow"
+        ]
+      },
+      "release_digest": "sha256:f0698425343c58033e0c4a67ffa71796c4fa1350ab37b336b594d3a51f55c066"
+    },
+    "accepted_candidate_id": "slideshow-0-1-3-d3a51f55c066",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.project.preflight",
+        "tests": "qualified application and component tests passed",
+        "cbs": "exact native admission or explicit compatibility classification",
+        "checkpoint_source_revision": "f5e448040338bb536c8cf2a44398fcdd3a1d1f5c",
+        "checkpoint_component_ref": "skill:slideshow_skill"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:f0698425343c58033e0c4a67ffa71796c4fa1350ab37b336b594d3a51f55c066"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [],
+        "sent_off_device": [],
+        "linked_to_user": [],
+        "tracking": false,
+        "retention": null
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [],
+        "sent_off_device": false,
+        "linked_to_user": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:18575981247455ea0c36bc9c6be308128c3caf16028863989d05cccfea4f84e1",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "slideshow",
+      "release_digest": "sha256:f0698425343c58033e0c4a67ffa71796c4fa1350ab37b336b594d3a51f55c066",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:7b9d433349af860975ed5fc6aebbfb893c814aeb4b75b160a78a3cc0474a4f87"
+  },
+  "channels": {
+    "stable": "sha256:f0698425343c58033e0c4a67ffa71796c4fa1350ab37b336b594d3a51f55c066"
+  },
+  "semantic": {
+    "projection_digest": "sha256:6f56868f04b2c82c2ae09bc5aa73fb2c59a6a2e98c74ba2a28b24415ac83e987",
+    "path": "semantic/applications/slideshow/f0698425343c58033e0c4a67ffa71796c4fa1350ab37b336b594d3a51f55c066.json"
+  },
+  "projection_digest": "sha256:40074cb59704dfe97bd8051ee7443f2f46617c24167c57063ed6a1c71c9b5c64"
+}

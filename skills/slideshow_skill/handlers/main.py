@@ -284,16 +284,43 @@ def _source_dir(source_dir: str | None = None) -> Path:
 
 
 def _internal_data_dir() -> Path:
-    override = os.environ.get("SLIDESHOW_DATA_DIR")
-    if override:
-        base = Path(override)
+    module_path = Path(__file__).resolve()
+    runtime_bucket = next(
+        (
+            parent
+            for parent in module_path.parents
+            if parent.name.startswith("v")
+            and parent.parent.name == "slideshow_skill"
+            and parent.parent.parent.name == ".runtime"
+        ),
+        None,
+    )
+    if runtime_bucket is not None:
+        # The immutable runtime package path is stronger than ambient process
+        # context.  In-process callers must never redirect Slideshow state into
+        # their own skill bucket.
+        base = runtime_bucket / "data" / "internal" / "slideshow_skill"
     else:
-        try:
-            env_path = skill_env_path()
-            data_root = env_path.parents[1] if env_path.parent.name == "db" else env_path.parent
-            base = data_root / "internal" / "slideshow_skill"
-        except Exception:
-            base = Path(__file__).resolve().parents[1] / ".skill_state"
+        owner = _text(
+            os.environ.get("ADAOS_SERVICE_SKILL")
+            or os.environ.get("ADAOS_SKILL_NAME")
+        )
+        if owner and owner != "slideshow_skill":
+            raise RuntimeError("slideshow state owner differs from the active skill")
+        override = os.environ.get("SLIDESHOW_DATA_DIR")
+        internal_root = os.environ.get("ADAOS_SKILL_INTERNAL_DATA_ROOT")
+        if override:
+            base = Path(override)
+        elif internal_root:
+            root = Path(internal_root)
+            base = root if root.name == "slideshow_skill" else root / "slideshow_skill"
+        else:
+            try:
+                env_path = skill_env_path()
+                data_root = env_path.parents[1] if env_path.parent.name == "db" else env_path.parent
+                base = data_root / "internal" / "slideshow_skill"
+            except Exception:
+                base = module_path.parents[1] / ".skill_state"
     base.mkdir(parents=True, exist_ok=True)
     return base
 
