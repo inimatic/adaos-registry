@@ -3300,7 +3300,7 @@
                 }
             }
         },
-        "version": "0.3.45",
+        "version": "0.3.46",
         "manifest": "webui.json"
     },
     "locale_dictionaries": {
