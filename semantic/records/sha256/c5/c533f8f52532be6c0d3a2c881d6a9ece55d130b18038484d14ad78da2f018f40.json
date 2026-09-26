@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:subscriptions.status.inspect.adaos-root-local",
+  "binding_definition_digest": "sha256:cea5e4742a06b5c0242faae0261d4e0e8d773dcd09bc304660a7e965502f0b48",
+  "logical_entrypoint": "subscriptions.status.adaos-root",
+  "package": {
+    "kind": "skill",
+    "id": "subscription_status_skill",
+    "version": "0.1.29",
+    "digest": "sha256:3320e77c465a2977eb9847e40100caf9e63435fe9c73f10e280980d1f28c57fa"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:c533f8f52532be6c0d3a2c881d6a9ece55d130b18038484d14ad78da2f018f40"
+}

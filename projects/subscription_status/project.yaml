@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: subscription_status
-version: 0.1.16
+version: 0.1.17
 profiles:
 - adaos.builder.component_project.v1
 components:
@@ -57,3 +57,21 @@ lifecycle:
     source_artifacts: retain
 created_at: '2026-09-02T17:23:11.121480Z'
 created_by: builder:qualifier
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.write
+    purpose: Refresh and persist the local subscription projection and explicit plan-change requests.
+    approval_policy: grant_on_install
+  optional: []
+  secrets: []
+  external_providers: []
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected: [subscription_status, usage_summary, plan_change_request]
+    linked_to_user: [subscription_status, plan_change_request]
+    retention: The current local entitlement projection and explicit requests are retained.
+    sent_off_device: []
+    tracking: false

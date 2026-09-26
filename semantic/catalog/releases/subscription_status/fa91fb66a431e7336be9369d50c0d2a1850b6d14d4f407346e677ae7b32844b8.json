@@ -1,0 +1,297 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "subscription_status",
+    "legacy_project_id": "subscription_status",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "subscription_status",
+    "display": {
+      "title": "Subscriptions",
+      "summary": "User-facing AdaOS subscription status widget and modal backed by the local economic entitlement snapshot with explicit Root refresh."
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "subscriptions",
+        "presentation_ref": "skill:subscription_status_skill"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 2,
+    "created_at": "2026-09-25T22:07:53+00:00",
+    "updated_at": "2026-09-26T00:59:49+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "subscription_status",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "subscription_status",
+    "version": "0.1.17",
+    "release_digest": "sha256:fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "subscription_status",
+      "version": "0.1.17",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:665965cf91adfd35755ac353566a019b5b985b5235b710370b1843a038796ddc",
+        "path_scope": [
+          "projects/subscription_status/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "subscription_status_skill",
+          "version": "0.1.29",
+          "digest": "sha256:3320e77c465a2977eb9847e40100caf9e63435fe9c73f10e280980d1f28c57fa",
+          "manifest_digest": "sha256:3173796e9fefae01993b6c9349a03d1de6a53d55e60385a87f9f7b2592942aa7",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:665965cf91adfd35755ac353566a019b5b985b5235b710370b1843a038796ddc",
+            "path_scope": [
+              "skills/subscription_status_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/subscription_status_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:665965cf91adfd35755ac353566a019b5b985b5235b710370b1843a038796ddc",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:081663c39e496ed901d11110a7eab121f163e35894c4adb871963b00b05bb0ea"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:8d0fd8a169d120f977bf72ba7602a1643b3198a764001eceef7fdfd0cb28c90e",
+        "profiles": [
+          "adaos.builder.component_project.v1"
+        ],
+        "members": [
+          {
+            "ref": "skill:subscription_status_skill",
+            "package_digest": "sha256:3320e77c465a2977eb9847e40100caf9e63435fe9c73f10e280980d1f28c57fa",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "subscriptions",
+            "presentation": "skill:subscription_status_skill",
+            "default": true,
+            "bindings": {
+              "surface": "subscription_status"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "subscriptions"
+          ],
+          "required_contracts": [
+            "capability:subscriptions.status.inspect@^1.0.0"
+          ],
+          "validation_profiles": [
+            "subscriptions.local"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "workspace.write",
+              "purpose": "Refresh and persist the local subscription projection and explicit plan-change requests.",
+              "approval_policy": "grant_on_install",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "plan_change_request",
+              "subscription_status",
+              "usage_summary"
+            ],
+            "sent_off_device": [],
+            "linked_to_user": [
+              "plan_change_request",
+              "subscription_status"
+            ],
+            "tracking": false,
+            "retention": "The current local entitlement projection and explicit requests are retained."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [
+              "plan_change_request",
+              "subscription_status",
+              "usage_summary"
+            ],
+            "sent_off_device": false,
+            "linked_to_user": true,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "Subscriptions",
+        "description": "User-facing AdaOS subscription status widget and modal backed by the local economic entitlement snapshot with explicit Root refresh.",
+        "categories": [
+          "account",
+          "system"
+        ],
+        "tags": [
+          "cbs-provider",
+          "subscriptions",
+          "usage"
+        ]
+      },
+      "release_digest": "sha256:fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8"
+    },
+    "accepted_candidate_id": "subscription_status-0-1-17-7ae7b32844b8",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.project.preflight",
+        "tests": "qualified application and component tests passed",
+        "cbs": "exact native admission or explicit compatibility classification",
+        "checkpoint_source_revision": "4bb18294c38a061fffc369950c2a8f02d9f12973",
+        "checkpoint_component_ref": "skill:subscription_status_skill"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "workspace.write",
+          "purpose": "Refresh and persist the local subscription projection and explicit plan-change requests.",
+          "approval_policy": "grant_on_install",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "plan_change_request",
+          "subscription_status",
+          "usage_summary"
+        ],
+        "sent_off_device": [],
+        "linked_to_user": [
+          "plan_change_request",
+          "subscription_status"
+        ],
+        "tracking": false,
+        "retention": "The current local entitlement projection and explicit requests are retained."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [
+          "plan_change_request",
+          "subscription_status",
+          "usage_summary"
+        ],
+        "sent_off_device": false,
+        "linked_to_user": true,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:56904d259b45087b738e79bd9d421d2c4866e27ffabce86e23d7774c4e1472d0",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "subscription_status",
+      "release_digest": "sha256:fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Refresh and persist the local subscription projection and explicit plan-change requests.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:dfd084dc555757e5262fc3683b0254add12644baf2d5627d009edabf7f48e1e4"
+  },
+  "channels": {
+    "stable": "sha256:fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8"
+  },
+  "semantic": {
+    "projection_digest": "sha256:ea8dc07627376ea3de63439f4a9b9966b39e2516db8a0c7bc799f0f0faa4f376",
+    "path": "semantic/applications/subscription_status/fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8.json"
+  },
+  "projection_digest": "sha256:854fc817d137aa4b1936484ebf0447509602f5312fc05f49c2e0cedb25d0b9a1"
+}

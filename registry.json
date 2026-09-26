@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-26T11:14:22+00:00",
+  "updated_at": "2026-09-26T11:20:48+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1336,8 +1336,8 @@
       "kind": "skill",
       "id": "subscription_status_skill",
       "name": "subscription_status_skill",
-      "version": "0.1.28",
-      "updated_at": "2026-09-26T02:25:25+00:00",
+      "version": "0.1.29",
+      "updated_at": "2026-09-26T11:02:04+00:00",
       "path": "skills/subscription_status_skill",
       "manifest": "skills/subscription_status_skill/skill.yaml",
       "source": {
@@ -1345,7 +1345,7 @@
         "manifest": "skills/subscription_status_skill/skill.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:5ef173c3a8140de7e1468b36c890969503a69118268973bf41b8ade74472a9f4",
+        "revision": "sha256:665965cf91adfd35755ac353566a019b5b985b5235b710370b1843a038796ddc",
         "path_scope": [
           "projects/subscription_status/"
         ]
@@ -1360,18 +1360,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "subscription_status",
-        "release": "subscription_status@0.1.16",
-        "release_digest": "sha256:4a4af5e48b80efd486144486fae2800b423202f9d4bf83916ca698439be83ac1",
-        "package_digest": "sha256:5bd8a07f846cb0550f7a25854b854a4211a7e384fd8e6b861821bb7b0cf805db"
+        "release": "subscription_status@0.1.17",
+        "release_digest": "sha256:fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8",
+        "package_digest": "sha256:3320e77c465a2977eb9847e40100caf9e63435fe9c73f10e280980d1f28c57fa"
       },
       "tools_count": 7,
       "channels": {
         "stable": {
-          "release": "subscription_status@0.1.16",
-          "release_digest": "sha256:4a4af5e48b80efd486144486fae2800b423202f9d4bf83916ca698439be83ac1",
-          "source_revision": "sha256:5ef173c3a8140de7e1468b36c890969503a69118268973bf41b8ade74472a9f4",
-          "package_digest": "sha256:5bd8a07f846cb0550f7a25854b854a4211a7e384fd8e6b861821bb7b0cf805db",
-          "version": "0.1.28"
+          "release": "subscription_status@0.1.17",
+          "release_digest": "sha256:fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8",
+          "source_revision": "sha256:665965cf91adfd35755ac353566a019b5b985b5235b710370b1843a038796ddc",
+          "package_digest": "sha256:3320e77c465a2977eb9847e40100caf9e63435fe9c73f10e280980d1f28c57fa",
+          "version": "0.1.29"
         }
       }
     },
@@ -4912,8 +4912,8 @@
       "kind": "project",
       "id": "subscription_status",
       "name": "subscription_status",
-      "version": "0.1.16",
-      "updated_at": "2026-09-26T02:28:37+00:00",
+      "version": "0.1.17",
+      "updated_at": "2026-09-26T11:20:48+00:00",
       "path": "projects/subscription_status",
       "manifest": "projects/subscription_status/project.yaml",
       "source": {
@@ -4966,18 +4966,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "subscription_status",
-        "release": "subscription_status@0.1.16",
-        "release_digest": "sha256:4a4af5e48b80efd486144486fae2800b423202f9d4bf83916ca698439be83ac1",
+        "release": "subscription_status@0.1.17",
+        "release_digest": "sha256:fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8",
         "primary_component": "skill:subscription_status_skill",
-        "package_digest": "sha256:5bd8a07f846cb0550f7a25854b854a4211a7e384fd8e6b861821bb7b0cf805db"
+        "package_digest": "sha256:3320e77c465a2977eb9847e40100caf9e63435fe9c73f10e280980d1f28c57fa"
       },
       "channels": {
         "stable": {
-          "release": "subscription_status@0.1.16",
-          "release_digest": "sha256:4a4af5e48b80efd486144486fae2800b423202f9d4bf83916ca698439be83ac1",
-          "source_revision": "sha256:5ef173c3a8140de7e1468b36c890969503a69118268973bf41b8ade74472a9f4",
-          "package_digest": "sha256:5bd8a07f846cb0550f7a25854b854a4211a7e384fd8e6b861821bb7b0cf805db",
-          "version": "0.1.16"
+          "release": "subscription_status@0.1.17",
+          "release_digest": "sha256:fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8",
+          "source_revision": "sha256:665965cf91adfd35755ac353566a019b5b985b5235b710370b1843a038796ddc",
+          "package_digest": "sha256:3320e77c465a2977eb9847e40100caf9e63435fe9c73f10e280980d1f28c57fa",
+          "version": "0.1.17"
         }
       }
     },
