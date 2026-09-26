@@ -907,22 +907,11 @@ def test_global_ml_flag_does_not_enable_heavy_media_indexer_features(monkeypatch
 
 
 def _load_media_indexer_library():
-    module_path = next(
-        (
-            candidate / "src" / "adaos" / "services" / "media_indexer_library.py"
-            for candidate in [SKILL_ROOT, *SKILL_ROOT.parents, pathlib.Path("/root/adaos")]
-            if (candidate / "src" / "adaos" / "services" / "media_indexer_library.py").exists()
-        ),
-        None,
-    )
-    if module_path is not None:
-        spec = importlib.util.spec_from_file_location("media_indexer_library_under_test", module_path)
-        assert spec and spec.loader
-        library = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(library)
-    else:
-        library = importlib.import_module("adaos.services.media_indexer_library")
-    return library
+    # Candidate tests execute inside the core runtime that is evaluating the
+    # skill. Import its module through that runtime's sys.path; a fixed dev
+    # checkout (for example /root/adaos) can lag behind the active A/B slot and
+    # turn a compatible candidate into a false fail-closed result.
+    return importlib.import_module("adaos.services.media_indexer_library")
 
 
 def test_media_indexer_playback_resolver_uses_runtime_state_metadata_path(monkeypatch, tmp_path: pathlib.Path) -> None:
