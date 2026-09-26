@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-26T03:38:47+00:00",
+  "updated_at": "2026-09-26T05:37:27+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -2268,19 +2268,13 @@
       "kind": "scenario",
       "id": "research_workbench",
       "name": "research_workbench",
-      "version": "0.1.6",
-      "updated_at": "2026-09-26T02:37:53+00:00",
+      "version": "0.1.8",
+      "updated_at": "2026-09-26T05:37:27+00:00",
       "path": "scenarios/research_workbench",
       "manifest": "scenarios/research_workbench/scenario.yaml",
       "source": {
         "path": "scenarios/research_workbench",
-        "manifest": "scenarios/research_workbench/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:6a20a8f7eca7f44201a0732d59c3febe8bcee31a482e3a8821cd270838048a80",
-        "path_scope": [
-          "projects/research_platform/"
-        ]
+        "manifest": "scenarios/research_workbench/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -2294,22 +2288,6 @@
         "required": [
           "research_orchestrator_skill"
         ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "research_platform",
-        "release": "research_platform@0.1.12",
-        "release_digest": "sha256:578e81d97b47f38e2e2d9b42885f2e9156b927ab6e0a3d44ed97b86ea35045ae",
-        "package_digest": "sha256:f0cc964608bc37d546c315bde8aa71a11d7ef0a913a782d7f26a284d29cc6a21"
-      },
-      "channels": {
-        "stable": {
-          "release": "research_platform@0.1.12",
-          "release_digest": "sha256:578e81d97b47f38e2e2d9b42885f2e9156b927ab6e0a3d44ed97b86ea35045ae",
-          "source_revision": "sha256:6a20a8f7eca7f44201a0732d59c3febe8bcee31a482e3a8821cd270838048a80",
-          "package_digest": "sha256:f0cc964608bc37d546c315bde8aa71a11d7ef0a913a782d7f26a284d29cc6a21",
-          "version": "0.1.6"
-        }
       }
     },
     {

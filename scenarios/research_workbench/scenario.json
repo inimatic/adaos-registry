@@ -1,88 +1,51 @@
 {
     "id": "research_workbench",
     "name": "research_workbench",
-    "version": "0.1.0",
+    "version": "0.1.7",
     "title": "Research Workbench",
-    "description": "Empty AdaOS desktop canvas ready for Builder authoring.",
+    "description": "Shared portfolio and full-page Direction to Task to ImplementationTrack workbench with governed formulation, Builder handoff, and joined evidence lineage.",
     "type": "desktop",
     "supported_locales": [
         "en",
         "ru"
     ],
-    "depends": [],
+    "depends": [
+        "research_orchestrator_skill"
+    ],
     "runtime": {
         "skills": {
-            "required": [],
+            "required": [
+                "research_orchestrator_skill"
+            ],
             "optional": []
         }
     },
     "ui": {
-        "application": {
-            "desktop": {
-                "pageSchema": {
-                    "id": "research_workbench",
-                    "title": "Research Workbench",
-                    "layout": {
-                        "version": 2,
-                        "pattern": "task-flow",
-                        "density": "comfortable",
-                        "contentWidth": "fluid",
-                        "scroll": "page",
-                        "regions": [
-                            {
-                                "id": "main",
-                                "role": "main",
-                                "priority": 100,
-                                "scroll": "page",
-                                "presentation": {
-                                    "wide": "pane",
-                                    "compact": "stack"
-                                }
-                            }
-                        ],
-                        "interaction": {
-                            "selection": "none",
-                            "rowActivation": "none",
-                            "filters": "inline",
-                            "actions": "adaptive"
-                        }
-                    },
-                    "widgets": [
-                        {
-                            "id": "builder-empty-canvas",
-                            "type": "ui.form",
-                            "area": "main",
-                            "inputs": {
-                                "fields": [
-                                    {
-                                        "id": "builder-empty-canvas-message",
-                                        "type": "staticContent",
-                                        "title": "Empty prototype canvas",
-                                        "content": "Describe the interface in Builder to create the first prototype revision."
-                                    }
-                                ]
-                            }
-                        }
-                    ],
-                    "meta": {
-                        "builder": {
-                            "empty_canvas": true
-                        }
-                    }
-                }
-            }
-        },
-        "version": "0.1.0",
         "manifest": "webui.json"
     },
     "trigger": "manual",
     "vars": {},
     "llm_hints": {
-        "description": "Empty desktop scenario ready for Builder authoring.",
-        "aliases": [],
-        "primary_actions": [],
-        "examples": [],
-        "owner_hints": []
+        "description": "Shared AdaOS Research Workbench for pre-Codex direction formulation.",
+        "aliases": [
+            "Research Workbench",
+            "aResearcher"
+        ],
+        "primary_actions": [
+            {
+                "id": "research_workbench.next_steps",
+                "intent": "research_orchestrator_skill.next_steps",
+                "tool": "research_orchestrator_skill.next_steps",
+                "side_effect_class": "read_only"
+            }
+        ],
+        "examples": [
+            "Создай новое направление исследования",
+            "Покажи следующий шаг выбранного исследования"
+        ],
+        "owner_hints": [
+            "skill:research_orchestrator_skill"
+        ]
     },
     "nlu": {
         "nlu_hints": {
@@ -94,5 +57,39 @@
     },
     "steps": [],
     "prototype": "scenario_default",
-    "updated_at": "2026-08-11T09:34:07+00:00"
+    "updated_at": "2026-09-26T02:37:53+00:00",
+    "guidance": {
+        "schema": "adaos.scenario.guidance.v1",
+        "readme": "README.md",
+        "overview": {
+            "en": "Create research directions, attach source artifacts, formulate an exact task, and hand one implementation track to a scoped Project Builder session.",
+            "ru": "Создание исследовательских проектов, добавление исходных артефактов, формализация задачи и передача в ограниченную сессию Builder."
+        },
+        "presentation": {
+            "channels": [
+                "web",
+                "text",
+                "voice"
+            ],
+            "modal_id": "research_workbench_help"
+        },
+        "workflow": {
+            "state_source": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.get_direction",
+                "params": {
+                    "direction_id": "$state.selectedDirectionId"
+                }
+            },
+            "state_path": "direction.status",
+            "actions_path": "next_steps"
+        },
+        "conversational": {
+            "help_intent": "research_workbench.help",
+            "next_steps_intent": "research_workbench.next_steps"
+        }
+    },
+    "runtime_data_policy": {
+        "enforcement": "strict"
+    }
 }

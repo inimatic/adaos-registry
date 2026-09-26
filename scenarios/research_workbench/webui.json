@@ -1,2143 +1,1856 @@
 {
-  "schema": "adaos.webui.v1",
-  "generated_by": "research_workbench",
-  "ui": {
-    "application": {
-      "desktop": {
-        "pageSchema": {
-          "id": "research_workbench",
-          "title": "Research Workbench",
-          "surfaceClass": "workspace",
-          "initialState": {
-            "researchViewMode": "portfolio",
-            "activeResearchTab": "overview",
-            "activeCompilationFacet": "source_analysis",
-            "selectedDirectionId": null,
-            "selectedDirectionTitle": null,
-            "selectedResearchNodeId": null,
-            "selectedResearchSubjectRef": null,
-            "selectedResearchTaskId": null,
-            "selectedImplementationTrackId": null,
-            "activeResearchTaskId": null,
-            "researchConversationId": null,
-            "researchGeneration": 0,
-            "researchPrototypeDigest": null,
-            "researchAdmissionDecision": "needs_discussion",
-            "researchCanAccept": false,
-            "researchAutomationBriefDigest": null,
-            "builderUrl": null,
-            "implementationStatus": null,
-            "candidateReleaseDigest": null,
-            "projectReleaseRef": null,
-            "studyRealizationRef": null,
-            "researchExperimentId": null,
-            "selectedArtifactId": null,
-            "selectedArtifactGroupId": null,
-            "selectedArtifactTitle": null,
-            "selectedArtifactPreviewKind": null
-          },
-          "layout": {
-            "version": 2,
-            "pattern": "collection",
-            "density": "comfortable",
-            "contentWidth": "fluid",
-            "scroll": "regions",
-            "regions": [
-              {
-                "id": "portfolio",
-                "role": "collection",
-                "priority": 100,
-                "scroll": "page",
-                "presentation": {
-                  "wide": "pane",
-                  "compact": "stack"
-                },
-                "label": "Research directions"
-              }
-            ],
-            "interaction": {
-              "selection": "single",
-              "rowActivation": "select",
-              "filters": "inline",
-              "actions": "adaptive"
-            },
-            "variants": [
-              {
-                "pattern": "collection",
-                "density": "comfortable",
-                "contentWidth": "fluid",
-                "scroll": "regions",
-                "regions": [
-                  {
-                    "id": "workspace",
-                    "role": "collection",
-                    "priority": 100,
-                    "scroll": "page",
-                    "presentation": {
-                      "wide": "pane",
-                      "compact": "stack"
+    "schema": "adaos.webui.v1",
+    "generated_by": "research_workbench",
+    "ui": {
+        "application": {
+            "desktop": {
+                "pageSchema": {
+                    "id": "research_workbench",
+                    "title": "Research Workbench",
+                    "surfaceClass": "workspace",
+                    "initialState": {
+                        "researchViewMode": "portfolio",
+                        "activeResearchTab": "overview",
+                        "activeCompilationFacet": "source_analysis",
+                        "selectedDirectionId": null,
+                        "selectedDirectionTitle": null,
+                        "selectedResearchNodeId": null,
+                        "selectedResearchSubjectRef": null,
+                        "selectedResearchTaskId": null,
+                        "selectedImplementationTrackId": null,
+                        "activeResearchTaskId": null,
+                        "researchConversationId": null,
+                        "researchGeneration": 0,
+                        "researchPrototypeDigest": null,
+                        "researchAdmissionDecision": "needs_discussion",
+                        "researchCanAccept": false,
+                        "researchAutomationBriefDigest": null,
+                        "builderUrl": null,
+                        "selectedArtifactId": null,
+                        "selectedArtifactGroupId": null,
+                        "selectedArtifactTitle": null,
+                        "selectedArtifactPreviewKind": null
                     },
-                    "label": "Research compilation"
-                  }
-                ],
-                "interaction": {
-                  "selection": "single",
-                  "rowActivation": "select",
-                  "filters": "inline",
-                  "actions": "adaptive"
-                },
-                "id": "compilation",
-                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'"
-              },
-              {
-                "pattern": "collection",
-                "density": "comfortable",
-                "contentWidth": "fluid",
-                "scroll": "regions",
-                "regions": [
-                  {
-                    "id": "workspace",
-                    "role": "collection",
-                    "priority": 100,
-                    "scroll": "page",
-                    "presentation": {
-                      "wide": "pane",
-                      "compact": "stack"
+                    "layout": {
+                        "version": 2,
+                        "pattern": "collection",
+                        "density": "comfortable",
+                        "contentWidth": "fluid",
+                        "scroll": "regions",
+                        "regions": [
+                            {
+                                "id": "portfolio",
+                                "role": "collection",
+                                "priority": 100,
+                                "scroll": "page",
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "stack"
+                                },
+                                "label": "Research directions"
+                            }
+                        ],
+                        "interaction": {
+                            "selection": "single",
+                            "rowActivation": "select",
+                            "filters": "inline",
+                            "actions": "adaptive"
+                        },
+                        "variants": [
+                            {
+                                "pattern": "focus-detail",
+                                "density": "comfortable",
+                                "contentWidth": "fluid",
+                                "scroll": "regions",
+                                "regions": [
+                                    {
+                                        "id": "navigation",
+                                        "role": "navigation",
+                                        "priority": 80,
+                                        "scroll": "region",
+                                        "presentation": {
+                                            "wide": "pane",
+                                            "compact": "drawer"
+                                        },
+                                        "label": "Research structure",
+                                        "size": {
+                                            "minPx": 200,
+                                            "preferredPx": 340,
+                                            "maxPx": 480
+                                        }
+                                    },
+                                    {
+                                        "id": "workspace",
+                                        "role": "collection",
+                                        "priority": 100,
+                                        "scroll": "page",
+                                        "presentation": {
+                                            "wide": "pane",
+                                            "compact": "stack"
+                                        },
+                                        "label": "Selected research object"
+                                    }
+                                ],
+                                "interaction": {
+                                    "selection": "single",
+                                    "rowActivation": "select",
+                                    "filters": "inline",
+                                    "actions": "adaptive"
+                                },
+                                "id": "direction",
+                                "areas": [
+                                    {
+                                        "id": "workspace"
+                                    },
+                                    {
+                                        "id": "context"
+                                    }
+                                ],
+                                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null"
+                            },
+                            {
+                                "pattern": "collection",
+                                "density": "comfortable",
+                                "contentWidth": "fluid",
+                                "scroll": "regions",
+                                "regions": [
+                                    {
+                                        "id": "portfolio",
+                                        "role": "collection",
+                                        "priority": 100,
+                                        "scroll": "page",
+                                        "presentation": {
+                                            "wide": "pane",
+                                            "compact": "stack"
+                                        },
+                                        "label": "Research directions"
+                                    }
+                                ],
+                                "interaction": {
+                                    "selection": "single",
+                                    "rowActivation": "select",
+                                    "filters": "inline",
+                                    "actions": "adaptive"
+                                },
+                                "id": "portfolio",
+                                "areas": [
+                                    {
+                                        "id": "portfolio"
+                                    }
+                                ],
+                                "default": true
+                            },
+                            {
+                                "id": "compilation",
+                                "type": "single",
+                                "pattern": "single",
+                                "areas": [
+                                    {
+                                        "id": "workspace"
+                                    }
+                                ],
+                                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'"
+                            }
+                        ]
                     },
-                    "label": "Selected research object"
-                  },
-                  {
-                    "id": "context",
-                    "role": "navigation",
-                    "priority": 80,
-                    "scroll": "region",
-                    "presentation": {
-                      "wide": "pane",
-                      "compact": "drawer"
-                    },
-                    "label": "Research structure",
-                    "size": {
-                      "minPx": 200,
-                      "preferredPx": 340,
-                      "maxPx": 480
-                    }
-                  }
-                ],
-                "interaction": {
-                  "selection": "single",
-                  "rowActivation": "select",
-                  "filters": "inline",
-                  "actions": "adaptive"
-                },
-                "id": "direction",
-                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null"
-              },
-              {
-                "pattern": "collection",
-                "density": "comfortable",
-                "contentWidth": "fluid",
-                "scroll": "regions",
-                "regions": [
-                  {
-                    "id": "portfolio",
-                    "role": "collection",
-                    "priority": 100,
-                    "scroll": "page",
-                    "presentation": {
-                      "wide": "pane",
-                      "compact": "stack"
-                    },
-                    "label": "Research directions"
-                  }
-                ],
-                "interaction": {
-                  "selection": "single",
-                  "rowActivation": "select",
-                  "filters": "inline",
-                  "actions": "adaptive"
-                },
-                "id": "portfolio",
-                "default": true
-              }
-            ]
-          },
-          "widgets": [
-            {
-              "id": "portfolio-actions",
-              "type": "ui.actions",
-              "area": "portfolio",
-              "title": "Research portfolio",
-              "visibleIf": "$state.selectedDirectionId == null",
-              "inputs": {
-                "variant": "toolbar",
-                "size": "medium",
-                "stretch": true,
-                "buttons": [
-                  {
-                    "id": "new-research",
-                    "label": "New research",
-                    "icon": "add-circle-outline",
-                    "title": "Create a research direction and its isolated artifact-custodian skill."
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "click:new-research",
-                  "type": "openModal",
-                  "params": {
-                    "modalId": "research_new_direction"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "direction-navigation",
-              "type": "ui.actions",
-              "area": "workspace",
-              "title": "$state.selectedDirectionTitle",
-              "visibleIf": "$state.selectedDirectionId != null",
-              "inputs": {
-                "variant": "toolbar",
-                "size": "small",
-                "stretch": true,
-                "buttons": [
-                  {
-                    "id": "back",
-                    "label": "Research directions",
-                    "icon": "arrow-back-outline",
-                    "title": "Return to the research portfolio without changing this direction."
-                  },
-                  {
-                    "id": "current",
-                    "label": "$state.selectedDirectionTitle",
-                    "icon": "flask-outline",
-                    "title": "Open the searchable research-direction selector."
-                  },
-                  {
-                    "id": "details",
-                    "label": "Details",
-                    "icon": "information-circle-outline",
-                    "title": "Show direction identity, selected task, artifact custodian, source digest, and Development Session."
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "click:back",
-                  "type": "updateState",
-                  "params": {
-                    "researchViewMode": "portfolio",
-                    "selectedDirectionId": null,
-                    "selectedDirectionTitle": null,
-                    "selectedResearchNodeId": null,
-                    "selectedResearchSubjectRef": null,
-                    "selectedResearchTaskId": null,
-                    "selectedImplementationTrackId": null,
-                    "activeResearchTaskId": null,
-                    "researchConversationId": null,
-                    "researchGeneration": 0,
-                    "researchPrototypeDigest": null,
-                    "researchAdmissionDecision": "needs_discussion",
-                    "researchCanAccept": false,
-                    "builderUrl": null,
-                    "implementationStatus": null,
-                    "candidateReleaseDigest": null,
-                    "projectReleaseRef": null,
-                    "studyRealizationRef": null,
-                    "researchExperimentId": null,
-                    "activeResearchTab": "overview",
-                    "activeCompilationFacet": "source_analysis"
-                  }
-                },
-                {
-                  "on": "click:current",
-                  "type": "openModal",
-                  "params": {
-                    "modalId": "research_direction_selector"
-                  }
-                },
-                {
-                  "on": "click:details",
-                  "type": "openModal",
-                  "params": {
-                    "modalId": "research_direction_details"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "directions",
-              "type": "ui.list",
-              "area": "portfolio",
-              "title": "Research directions",
-              "visibleIf": "$state.selectedDirectionId == null",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.list_directions",
-                "params": {
-                  "limit": 500
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.portfolio",
-                  "research.formulation"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 2
-              },
-              "inputs": {
-                "variant": "cards",
-                "search": true,
-                "titleKey": "title",
-                "subtitleKey": "status",
-                "previewKey": "description",
-                "emptyText": "No research directions yet. Choose New research to create the first direction.",
-                "errorText": "Research directions are temporarily unavailable. Check the Hub connection or retry.",
-                "staleText": "Showing the last loaded research directions while the Hub reconnects."
-              },
-              "actions": [
-                {
-                  "on": "select",
-                  "type": "updateState",
-                  "params": {
-                    "researchViewMode": "direction",
-                    "selectedDirectionId": "$event.direction_id",
-                    "selectedDirectionTitle": "$event.title",
-                    "selectedResearchNodeId": null,
-                    "selectedResearchSubjectRef": null,
-                    "selectedResearchTaskId": null,
-                    "selectedImplementationTrackId": null,
-                    "activeResearchTaskId": null,
-                    "activeResearchTab": "overview",
-                    "activeCompilationFacet": "source_analysis",
-                    "researchConversationId": "conv.skill.research_orchestrator_skill.$event.direction_id.desktop",
-                    "researchGeneration": 0,
-                    "researchPrototypeDigest": null,
-                    "researchAdmissionDecision": "needs_discussion",
-                    "researchCanAccept": false,
-                    "builderUrl": null,
-                    "implementationStatus": null,
-                    "candidateReleaseDigest": null,
-                    "projectReleaseRef": null,
-                    "studyRealizationRef": null,
-                    "researchExperimentId": null
-                  }
-                }
-              ]
-            },
-            {
-              "id": "research-outline",
-              "type": "navigation.outline",
-              "area": "context",
-              "title": "Research structure",
-              "visibleIf": "$state.selectedDirectionId != null",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.get_outline",
-                "params": {
-                  "direction_id": "$state.selectedDirectionId"
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.artifacts",
-                  "research.formulation",
-                  "research.compilation",
-                  "research.activity",
-                  "research.automation_brief"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 2
-              },
-              "inputs": {
-                "stateKey": "selectedResearchNodeId",
-                "nodesKey": "nodes",
-                "idKey": "node_id",
-                "parentIdKey": "parent_id",
-                "titleKey": "title",
-                "subtitleKey": "subtitle",
-                "kindKey": "kind",
-                "iconKey": "icon",
-                "badgeKey": "badge",
-                "targetKey": "target",
-                "hideRoot": true,
-                "expandedByDefault": true,
-                "wrapTitles": true,
-                "maxNodes": 1000,
-                "emptyText": "The direction structure is temporarily unavailable."
-              },
-              "actions": [
-                {
-                  "on": "select",
-                  "type": "updateState",
-                  "params": {
-                    "selectedResearchNodeId": "$event.id",
-                    "selectedResearchSubjectRef": "$event.target.subject_ref",
-                    "selectedResearchTaskId": "$event.target.task_id",
-                    "selectedImplementationTrackId": "$event.target.implementation_track_id",
-                    "activeResearchTab": "$event.target.tab"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "direction-status",
-              "type": "item.details",
-              "area": "workspace",
-              "title": "Direction status",
-              "visibleIf": "$state.selectedDirectionId != null",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.get_direction",
-                "params": {
-                  "direction_id": "$state.selectedDirectionId",
-                  "task_id": "$state.selectedResearchTaskId",
-                  "implementation_track_id": "$state.selectedImplementationTrackId"
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.formulation",
-                  "research.activity",
-                  "research.automation_brief"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 2
-              },
-              "inputs": {
-                "stateOnly": true,
-                "compact": true,
-                "fields": [
-                  {
-                    "key": "direction.ref",
-                    "label": "Direction"
-                  },
-                  {
-                    "key": "direction.artifact_owner_ref",
-                    "label": "Artifact custodian"
-                  },
-                  {
-                    "key": "selected_task.ref",
-                    "label": "Selected task"
-                  },
-                  {
-                    "key": "selected_implementation_track.ref",
-                    "label": "Selected implementation track"
-                  },
-                  {
-                    "key": "direction.status",
-                    "label": "Stage"
-                  },
-                  {
-                    "key": "direction.generation",
-                    "label": "Generation"
-                  },
-                  {
-                    "key": "source_bundle.digest",
-                    "label": "Artifact set"
-                  },
-                  {
-                    "key": "current_prototype.revision",
-                    "label": "Prototype revision"
-                  },
-                  {
-                    "key": "development_session.session_id",
-                    "label": "Development Session"
-                  },
-                  {
-                    "key": "selected_implementation_track.status",
-                    "label": "Implementation state"
-                  },
-                  {
-                    "key": "selected_implementation_track.project_release_ref",
-                    "label": "ProjectRelease"
-                  },
-                  {
-                    "key": "selected_implementation_track.study_realization_ref",
-                    "label": "StudyRealization"
-                  },
-                  {
-                    "key": "selected_implementation_track.experiment_id",
-                    "label": "Experiment"
-                  }
-                ],
-                "stateBindings": {
-                  "researchGeneration": "direction.generation",
-                  "researchPrototypeDigest": "current_prototype.digest",
-                  "researchAdmissionDecision": "formulation.admission_decision",
-                  "researchCanAccept": "formulation.can_accept",
-                  "researchAutomationBriefDigest": "automation_brief.digest",
-                  "builderUrl": "builder_url",
-                  "implementationStatus": "selected_implementation_track.status",
-                  "candidateReleaseDigest": "selected_implementation_track.candidate_release_digest",
-                  "projectReleaseRef": "selected_implementation_track.project_release_ref",
-                  "studyRealizationRef": "selected_implementation_track.study_realization_ref",
-                  "researchExperimentId": "selected_implementation_track.experiment_id",
-                  "selectedDirectionTitle": "direction.title",
-                  "researchConversationId": "conversation_id",
-                  "activeResearchTaskId": "active_task.task_id"
-                }
-              }
-            },
-            {
-              "id": "direction-tabs",
-              "type": "ui.actions",
-              "area": "workspace",
-              "title": "Research workflow",
-              "visibleIf": "$state.selectedDirectionId != null",
-              "inputs": {
-                "variant": "segmented",
-                "size": "small",
-                "selectedStateKey": "activeResearchTab",
-                "buttons": [
-                  {
-                    "id": "overview",
-                    "label": "Overview",
-                    "icon": "information-circle-outline",
-                    "title": "Direction identity, selected task, current formulation, and admitted next steps."
-                  },
-                  {
-                    "id": "artifacts",
-                    "label": "Artifacts",
-                    "icon": "file-tray-stacked-outline",
-                    "title": "Source material physically held by the direction's artifact-custodian skill."
-                  },
-                  {
-                    "id": "inquiry",
-                    "label": "Inquiry",
-                    "icon": "search-outline",
-                    "title": "Discuss ideas while a typed scientific projection separates known work, research gaps, engineering problems, and intractable branches."
-                  },
-                  {
-                    "id": "formulation",
-                    "label": "Formulation",
-                    "icon": "flask-outline",
-                    "title": "Form bounded ResearchTasks and later ResearchPrototype revisions only from an accepted inquiry projection."
-                  },
-                  {
-                    "id": "compilation",
-                    "label": "Compilation",
-                    "icon": "git-network-outline",
-                    "title": "Inspect Source Analysis, Research Problem, Experimental Protocol, Engineering Contract, Experiment Plan, and traceability before acceptance."
-                  },
-                  {
-                    "id": "development",
-                    "label": "Development",
-                    "icon": "construct-outline",
-                    "title": "Exact acceptance, AutomationBrief, and least-write Builder session."
-                  },
-                  {
-                    "id": "activity",
-                    "label": "Activity",
-                    "icon": "pulse-outline",
-                    "title": "Durable stage journal for observable autonomous work."
-                  },
-                  {
-                    "id": "help",
-                    "label": "Help",
-                    "icon": "help-circle-outline",
-                    "title": "Capabilities, workflow, and milestone boundary."
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "click",
-                  "type": "updateState",
-                  "params": {
-                    "activeResearchTab": "$event.id"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "overview",
-              "type": "static.markdown",
-              "area": "workspace",
-              "title": "Research direction",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'overview'",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.get_direction",
-                "params": {
-                  "direction_id": "$state.selectedDirectionId",
-                  "task_id": "$state.selectedResearchTaskId",
-                  "implementation_track_id": "$state.selectedImplementationTrackId"
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.formulation",
-                  "research.activity",
-                  "research.automation_brief"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 2
-              },
-              "inputs": {
-                "bindField": "content"
-              }
-            },
-            {
-              "id": "artifact-upload",
-              "type": "input.fileUpload",
-              "area": "workspace",
-              "title": "Add source material to artifacts/part0",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts'",
-              "inputs": {
-                "label": "Upload notebook, Markdown, text, code, JSON, YAML, or PDF",
-                "accept": ".ipynb,.md,.txt,.py,.json,.yaml,.yml,.pdf",
-                "maxBytes": 134217728,
-                "target": "skill",
-                "skill": "research_orchestrator_skill",
-                "purpose": "research_direction_intake"
-              },
-              "actions": [
-                {
-                  "on": "uploaded",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.attach_source",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "group_id": "part0",
-                    "path": "$event.path",
-                    "name": "$event.file.name",
-                    "role": "research_source",
-                    "visibility_profile": "shared",
-                    "cleanup_staging": true,
-                    "replace_existing": true
-                  },
-                  "invalidates": [
-                    "research.artifacts",
-                    "research.formulation",
-                    "research.activity"
-                  ]
-                }
-              ]
-            },
-            {
-              "id": "artifact-list",
-              "type": "ui.list",
-              "area": "workspace",
-              "title": "Manifested artifacts",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts'",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.list_artifacts",
-                "params": {
-                  "direction_id": "$state.selectedDirectionId"
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.artifacts",
-                  "research.formulation"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 2
-              },
-              "inputs": {
-                "variant": "list",
-                "titleKey": "title",
-                "subtitleKey": "subtitle",
-                "previewKey": "preview",
-                "emptyText": "No artifacts in part0. Upload the original sources used to formulate the task."
-              },
-              "actions": [
-                {
-                  "on": "select",
-                  "type": "updateState",
-                  "params": {
-                    "selectedArtifactId": "$event.artifact_id",
-                    "selectedArtifactGroupId": "$event.group_id",
-                    "selectedArtifactTitle": "$event.title",
-                    "selectedArtifactPreviewKind": "$event.preview_kind"
-                  }
-                },
-                {
-                  "on": "select",
-                  "type": "openModal",
-                  "params": {
-                    "modalId": "research_artifact_preview"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "artifact-visibility",
-              "type": "ui.form",
-              "area": "workspace",
-              "title": "Stage visibility for $state.selectedArtifactTitle",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts' && $state.selectedArtifactId != null",
-              "inputs": {
-                "layout": "responsiveGrid",
-                "submitLabel": "Apply visibility",
-                "resetOnSuccess": false,
-                "fields": [
-                  {
-                    "id": "visibility_profile",
-                    "name": "visibility_profile",
-                    "type": "select",
-                    "label": "Visible to",
-                    "required": true,
-                    "default": "shared",
-                    "options": [
-                      {
-                        "label": "All research stages",
-                        "value": "shared"
-                      },
-                      {
-                        "label": "Evaluation only (hidden oracle)",
-                        "value": "evaluation_only"
-                      },
-                      {
-                        "label": "Formulation only",
-                        "value": "formulation_only"
-                      },
-                      {
-                        "label": "Implementation and evaluation",
-                        "value": "implementation_input"
-                      }
-                    ],
-                    "help": "The core materializes separate digest-bound filesystem views. Hidden files are absent from the coding agent's artifact root."
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "submit",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.set_source_visibility",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "group_id": "$state.selectedArtifactGroupId",
-                    "artifact_id": "$state.selectedArtifactId",
-                    "visibility_profile": "$event.values.visibility_profile"
-                  },
-                  "invalidates": [
-                    "research.artifacts",
-                    "research.formulation",
-                    "research.compilation",
-                    "research.activity"
-                  ]
-                }
-              ]
-            },
-            {
-              "id": "artifact-policy",
-              "type": "static.markdown",
-              "area": "workspace",
-              "title": "Artifact boundary",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts'",
-              "inputs": {
-                "content": "Files are copied into the direction's artifact-custodian skill under `artifacts/part0/` and recorded in its manifest. Each item has an explicit stage-visibility policy. AdaOS gives formulation, implementation, and evaluation separate digest-bound filesystem views; filtering a prompt is not treated as an isolation boundary. Mark expert reviews and legacy answers **evaluation only** for a clean from-raw arm."
-              }
-            },
-            {
-              "id": "inquiry-projection",
-              "type": "static.markdown",
-              "area": "workspace",
-              "title": "Scientific projection",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.get_inquiry_projection",
-                "params": {
-                  "direction_id": "$state.selectedDirectionId",
-                  "task_id": "$state.selectedResearchTaskId"
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.inquiry",
-                  "research.artifacts"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 2
-              },
-              "inputs": {
-                "bindField": "content"
-              }
-            },
-            {
-              "id": "inquiry-decision",
-              "type": "ui.form",
-              "area": "workspace",
-              "title": "Projection decision",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
-              "inputs": {
-                "layout": "responsiveGrid",
-                "submitLabel": "Apply exact decision",
-                "resetOnSuccess": true,
-                "fields": [
-                  {
-                    "id": "decision",
-                    "name": "decision",
-                    "type": "select",
-                    "label": "Decision",
-                    "required": true,
-                    "options": [
-                      {
-                        "label": "Form research task",
-                        "value": "accept_for_research_task"
-                      },
-                      {
-                        "label": "Form engineering task",
-                        "value": "accept_for_engineering_task"
-                      },
-                      {
-                        "label": "Reuse known solution",
-                        "value": "reuse_known_solution"
-                      },
-                      {
-                        "label": "Defer as intractable",
-                        "value": "defer_intractable"
-                      },
-                      {
-                        "label": "Stop this branch",
-                        "value": "stop"
-                      },
-                      {
-                        "label": "Request revision",
-                        "value": "request_revision"
-                      }
+                    "widgets": [
+                        {
+                            "id": "portfolio-actions",
+                            "type": "ui.actions",
+                            "area": "portfolio",
+                            "title": "Research portfolio",
+                            "visibleIf": "$state.selectedDirectionId == null",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "size": "medium",
+                                "stretch": true,
+                                "buttons": [
+                                    {
+                                        "id": "new-research",
+                                        "label": "New research",
+                                        "icon": "add-circle-outline",
+                                        "title": "Create a research direction and its isolated artifact-custodian skill."
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:new-research",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "research_new_direction"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "direction-navigation",
+                            "type": "ui.actions",
+                            "area": "workspace",
+                            "title": "$state.selectedDirectionTitle",
+                            "visibleIf": "$state.selectedDirectionId != null",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "size": "small",
+                                "stretch": true,
+                                "buttons": [
+                                    {
+                                        "id": "back",
+                                        "label": "Research directions",
+                                        "icon": "arrow-back-outline",
+                                        "title": "Return to the research portfolio without changing this direction."
+                                    },
+                                    {
+                                        "id": "current",
+                                        "label": "$state.selectedDirectionTitle",
+                                        "icon": "flask-outline",
+                                        "title": "Open the searchable research-direction selector."
+                                    },
+                                    {
+                                        "id": "details",
+                                        "label": "Details",
+                                        "icon": "information-circle-outline",
+                                        "title": "Show direction identity, selected task, artifact custodian, source digest, and Development Session."
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:back",
+                                    "type": "updateState",
+                                    "params": {
+                                        "researchViewMode": "portfolio",
+                                        "selectedDirectionId": null,
+                                        "selectedDirectionTitle": null,
+                                        "selectedResearchNodeId": null,
+                                        "selectedResearchSubjectRef": null,
+                                        "selectedResearchTaskId": null,
+                                        "selectedImplementationTrackId": null,
+                                        "activeResearchTaskId": null,
+                                        "researchConversationId": null,
+                                        "researchGeneration": 0,
+                                        "researchPrototypeDigest": null,
+                                        "researchAdmissionDecision": "needs_discussion",
+                                        "researchCanAccept": false,
+                                        "builderUrl": null,
+                                        "activeResearchTab": "overview",
+                                        "activeCompilationFacet": "source_analysis"
+                                    }
+                                },
+                                {
+                                    "on": "click:current",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "research_direction_selector"
+                                    }
+                                },
+                                {
+                                    "on": "click:details",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "research_direction_details"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "directions",
+                            "type": "ui.list",
+                            "area": "portfolio",
+                            "title": "Research directions",
+                            "visibleIf": "$state.selectedDirectionId == null",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.list_directions",
+                                "params": {
+                                    "limit": 500
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.portfolio",
+                                    "research.formulation"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 2
+                            },
+                            "inputs": {
+                                "variant": "cards",
+                                "search": true,
+                                "titleKey": "title",
+                                "subtitleKey": "status",
+                                "previewKey": "description",
+                                "emptyText": "No research directions yet. Choose New research to create the first direction.",
+                                "errorText": "Research directions are temporarily unavailable. Check the Hub connection or retry.",
+                                "staleText": "Showing the last loaded research directions while the Hub reconnects."
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "researchViewMode": "direction",
+                                        "selectedDirectionId": "$event.direction_id",
+                                        "selectedDirectionTitle": "$event.title",
+                                        "selectedResearchNodeId": null,
+                                        "selectedResearchSubjectRef": null,
+                                        "selectedResearchTaskId": null,
+                                        "selectedImplementationTrackId": null,
+                                        "activeResearchTaskId": null,
+                                        "activeResearchTab": "overview",
+                                        "activeCompilationFacet": "source_analysis",
+                                        "researchConversationId": "conv.skill.research_orchestrator_skill.$event.direction_id.desktop",
+                                        "researchGeneration": 0,
+                                        "researchPrototypeDigest": null,
+                                        "researchAdmissionDecision": "needs_discussion",
+                                        "researchCanAccept": false,
+                                        "builderUrl": null
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "research-outline",
+                            "type": "navigation.outline",
+                            "area": "navigation",
+                            "title": "Research structure",
+                            "visibleIf": "$state.selectedDirectionId != null",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_outline",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.artifacts",
+                                    "research.formulation",
+                                    "research.compilation",
+                                    "research.activity",
+                                    "research.automation_brief"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 2
+                            },
+                            "inputs": {
+                                "stateKey": "selectedResearchNodeId",
+                                "nodesKey": "nodes",
+                                "idKey": "node_id",
+                                "parentIdKey": "parent_id",
+                                "titleKey": "title",
+                                "subtitleKey": "subtitle",
+                                "kindKey": "kind",
+                                "iconKey": "icon",
+                                "badgeKey": "badge",
+                                "targetKey": "target",
+                                "hideRoot": true,
+                                "expandedByDefault": true,
+                                "wrapTitles": true,
+                                "maxNodes": 1000,
+                                "emptyText": "The direction structure is temporarily unavailable."
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedResearchNodeId": "$event.id",
+                                        "selectedResearchSubjectRef": "$event.target.subject_ref",
+                                        "selectedResearchTaskId": "$event.target.task_id",
+                                        "selectedImplementationTrackId": "$event.target.implementation_track_id",
+                                        "activeResearchTab": "$event.target.tab"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "direction-status",
+                            "type": "item.details",
+                            "area": "workspace",
+                            "title": "Direction status",
+                            "visibleIf": "$state.selectedDirectionId != null",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_direction",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId",
+                                    "task_id": "$state.selectedResearchTaskId",
+                                    "implementation_track_id": "$state.selectedImplementationTrackId"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.formulation",
+                                    "research.activity",
+                                    "research.automation_brief"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 2
+                            },
+                            "inputs": {
+                                "stateOnly": true,
+                                "compact": true,
+                                "fields": [
+                                    {
+                                        "key": "direction.ref",
+                                        "label": "Direction"
+                                    },
+                                    {
+                                        "key": "direction.artifact_owner_ref",
+                                        "label": "Artifact custodian"
+                                    },
+                                    {
+                                        "key": "selected_task.ref",
+                                        "label": "Selected task"
+                                    },
+                                    {
+                                        "key": "selected_implementation_track.ref",
+                                        "label": "Selected implementation track"
+                                    },
+                                    {
+                                        "key": "direction.status",
+                                        "label": "Stage"
+                                    },
+                                    {
+                                        "key": "direction.generation",
+                                        "label": "Generation"
+                                    },
+                                    {
+                                        "key": "source_bundle.digest",
+                                        "label": "Artifact set"
+                                    },
+                                    {
+                                        "key": "current_prototype.revision",
+                                        "label": "Prototype revision"
+                                    },
+                                    {
+                                        "key": "development_session.session_id",
+                                        "label": "Development Session"
+                                    }
+                                ],
+                                "stateBindings": {
+                                    "researchGeneration": "direction.generation",
+                                    "researchPrototypeDigest": "current_prototype.digest",
+                                    "researchAdmissionDecision": "formulation.admission_decision",
+                                    "researchCanAccept": "formulation.can_accept",
+                                    "researchAutomationBriefDigest": "automation_brief.digest",
+                                    "builderUrl": "builder_url",
+                                    "selectedDirectionTitle": "direction.title",
+                                    "researchConversationId": "conversation_id",
+                                    "activeResearchTaskId": "active_task.task_id"
+                                }
+                            }
+                        },
+                        {
+                            "id": "direction-tabs",
+                            "type": "ui.actions",
+                            "area": "workspace",
+                            "title": "Research workflow",
+                            "visibleIf": "$state.selectedDirectionId != null",
+                            "inputs": {
+                                "variant": "segmented",
+                                "size": "small",
+                                "selectedStateKey": "activeResearchTab",
+                                "buttons": [
+                                    {
+                                        "id": "overview",
+                                        "label": "Overview",
+                                        "icon": "information-circle-outline",
+                                        "title": "Direction identity, selected task, current formulation, and admitted next steps."
+                                    },
+                                    {
+                                        "id": "artifacts",
+                                        "label": "Artifacts",
+                                        "icon": "file-tray-stacked-outline",
+                                        "title": "Source material physically held by the direction's artifact-custodian skill."
+                                    },
+                                    {
+                                        "id": "inquiry",
+                                        "label": "Inquiry",
+                                        "icon": "telescope-outline",
+                                        "title": "Build a durable typed problem projection before committing to formulation or implementation."
+                                    },
+                                    {
+                                        "id": "formulation",
+                                        "label": "Discussion",
+                                        "icon": "chatbubbles-outline",
+                                        "title": "Discuss artifacts and decisions with the Researcher; accepted answers materialize typed ResearchPrototype revisions."
+                                    },
+                                    {
+                                        "id": "compilation",
+                                        "label": "Compilation",
+                                        "icon": "git-network-outline",
+                                        "title": "Inspect Source Analysis, Research Problem, Experimental Protocol, Engineering Contract, and traceability before acceptance."
+                                    },
+                                    {
+                                        "id": "development",
+                                        "label": "Development",
+                                        "icon": "construct-outline",
+                                        "title": "Exact acceptance, AutomationBrief, and least-write Builder session."
+                                    },
+                                    {
+                                        "id": "activity",
+                                        "label": "Activity",
+                                        "icon": "pulse-outline",
+                                        "title": "Durable stage journal for observable autonomous work."
+                                    },
+                                    {
+                                        "id": "help",
+                                        "label": "Help",
+                                        "icon": "help-circle-outline",
+                                        "title": "Capabilities, workflow, and milestone boundary."
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeResearchTab": "$event.id"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "overview",
+                            "type": "static.markdown",
+                            "area": "workspace",
+                            "title": "Research direction",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'overview'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_direction",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId",
+                                    "task_id": "$state.selectedResearchTaskId",
+                                    "implementation_track_id": "$state.selectedImplementationTrackId"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.formulation",
+                                    "research.activity",
+                                    "research.automation_brief"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 2
+                            },
+                            "inputs": {
+                                "bindField": "content"
+                            }
+                        },
+                        {
+                            "id": "artifact-upload",
+                            "type": "input.fileUpload",
+                            "area": "workspace",
+                            "title": "Add source material to artifacts/part0",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts'",
+                            "inputs": {
+                                "label": "Upload notebook, Markdown, text, code, JSON, YAML, or PDF",
+                                "accept": ".ipynb,.md,.txt,.py,.json,.yaml,.yml,.pdf",
+                                "maxBytes": 134217728,
+                                "target": "skill",
+                                "skill": "research_orchestrator_skill",
+                                "purpose": "research_direction_intake"
+                            },
+                            "actions": [
+                                {
+                                    "on": "uploaded",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.attach_source",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "group_id": "part0",
+                                        "path": "$event.path",
+                                        "name": "$event.file.name",
+                                        "role": "research_source",
+                                        "visibility_profile": "shared",
+                                        "cleanup_staging": true,
+                                        "replace_existing": true
+                                    },
+                                    "invalidates": [
+                                        "research.artifacts",
+                                        "research.formulation",
+                                        "research.activity"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "id": "artifact-list",
+                            "type": "ui.list",
+                            "area": "workspace",
+                            "title": "Manifested artifacts",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.list_artifacts",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.artifacts",
+                                    "research.formulation"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 2
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "titleKey": "title",
+                                "subtitleKey": "subtitle",
+                                "previewKey": "preview",
+                                "emptyText": "No artifacts in part0. Upload the original sources used to formulate the task."
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedArtifactId": "$event.artifact_id",
+                                        "selectedArtifactGroupId": "$event.group_id",
+                                        "selectedArtifactTitle": "$event.title",
+                                        "selectedArtifactPreviewKind": "$event.preview_kind"
+                                    }
+                                },
+                                {
+                                    "on": "select",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "research_artifact_preview"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "artifact-visibility",
+                            "type": "ui.form",
+                            "area": "workspace",
+                            "title": "Stage visibility for $state.selectedArtifactTitle",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts' && $state.selectedArtifactId != null",
+                            "inputs": {
+                                "layout": "responsiveGrid",
+                                "submitLabel": "Apply visibility",
+                                "resetOnSuccess": false,
+                                "fields": [
+                                    {
+                                        "id": "visibility_profile",
+                                        "name": "visibility_profile",
+                                        "type": "select",
+                                        "label": "Visible to",
+                                        "required": true,
+                                        "default": "shared",
+                                        "options": [
+                                            {
+                                                "label": "All research stages",
+                                                "value": "shared"
+                                            },
+                                            {
+                                                "label": "Evaluation only (hidden oracle)",
+                                                "value": "evaluation_only"
+                                            },
+                                            {
+                                                "label": "Formulation only",
+                                                "value": "formulation_only"
+                                            },
+                                            {
+                                                "label": "Implementation and evaluation",
+                                                "value": "implementation_input"
+                                            }
+                                        ],
+                                        "help": "The core materializes separate digest-bound filesystem views. Hidden files are absent from the coding agent's artifact root."
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.set_source_visibility",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "group_id": "$state.selectedArtifactGroupId",
+                                        "artifact_id": "$state.selectedArtifactId",
+                                        "visibility_profile": "$event.values.visibility_profile"
+                                    },
+                                    "invalidates": [
+                                        "research.artifacts",
+                                        "research.formulation",
+                                        "research.compilation",
+                                        "research.activity"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "id": "artifact-policy",
+                            "type": "static.markdown",
+                            "area": "workspace",
+                            "title": "Artifact boundary",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts'",
+                            "inputs": {
+                                "content": "Files are copied into the direction's artifact-custodian skill under `artifacts/part0/` and recorded in its manifest. Each item has an explicit stage-visibility policy. AdaOS gives formulation, implementation, and evaluation separate digest-bound filesystem views; filtering a prompt is not treated as an isolation boundary. Mark expert reviews and legacy answers **evaluation only** for a clean from-raw arm."
+                            }
+                        },
+                        {
+                            "id": "task-formulation-context",
+                            "type": "ui.actions",
+                            "area": "workspace",
+                            "title": "Task formulation authority",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'formulation' && $state.selectedResearchTaskId != null && $state.selectedResearchTaskId !== $state.activeResearchTaskId",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "size": "small",
+                                "buttons": [
+                                    {
+                                        "id": "activate-task",
+                                        "label": "Activate selected task",
+                                        "icon": "radio-button-on-outline",
+                                        "title": "Make this task the only writable formulation target. Selection alone is read-only and never changes scientific state."
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:activate-task",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.select_active_task",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId"
+                                    },
+                                    "invalidates": [
+                                        "research.portfolio",
+                                        "research.formulation",
+                                        "research.activity",
+                                        "research.compilation",
+                                        "research.automation_brief"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "id": "research-consensus",
+                            "type": "static.markdown",
+                            "area": "workspace",
+                            "title": "Current draft and AdaOS review",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'formulation'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_consensus",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId",
+                                    "task_id": "$state.selectedResearchTaskId"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.formulation",
+                                    "research.automation_brief"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 2
+                            },
+                            "inputs": {
+                                "bindField": "content"
+                            }
+                        },
+                        {
+                            "id": "inquiry-projection",
+                            "type": "static.markdown",
+                            "area": "workspace",
+                            "title": "Typed inquiry projection",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_inquiry_projection",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId",
+                                    "task_id": "$state.selectedResearchTaskId"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.inquiry"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 2
+                            },
+                            "inputs": {
+                                "bindField": "content"
+                            }
+                        },
+                        {
+                            "id": "inquiry-decision",
+                            "type": "ui.actions",
+                            "area": "workspace",
+                            "title": "Inquiry decision",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "size": "small",
+                                "buttons": [
+                                    {
+                                        "id": "request_revision",
+                                        "label": "Continue inquiry",
+                                        "icon": "refresh-outline"
+                                    },
+                                    {
+                                        "id": "accept_for_research_task",
+                                        "label": "Accept for research",
+                                        "icon": "checkmark-circle-outline"
+                                    },
+                                    {
+                                        "id": "accept_for_engineering_task",
+                                        "label": "Accept for engineering",
+                                        "icon": "construct-outline"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.decide_inquiry_projection",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId",
+                                        "decision": "$event.id",
+                                        "rationale": "Decision recorded from Research Workbench."
+                                    },
+                                    "invalidates": [
+                                        "research.inquiry"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "id": "inquiry-search",
+                            "type": "ui.actions",
+                            "area": "workspace",
+                            "title": "Source discovery",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "size": "small",
+                                "buttons": [
+                                    {
+                                        "id": "discover",
+                                        "label": "Discover sources",
+                                        "icon": "search-outline",
+                                        "title": "Search for bounded primary or authoritative source candidates. Results remain non-admitted until reviewed."
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:discover",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.discover_inquiry_sources",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId"
+                                    },
+                                    "invalidates": [
+                                        "research.inquiry"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "id": "activity-accounting-actions",
+                            "type": "ui.actions",
+                            "area": "workspace",
+                            "title": "Inquiry accounting",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "size": "small",
+                                "buttons": [
+                                    {
+                                        "id": "reconcile",
+                                        "label": "Reconcile model usage",
+                                        "icon": "calculator-outline"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:reconcile",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.reconcile_inquiry_usage",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId"
+                                    },
+                                    "invalidates": [
+                                        "research.inquiry"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "id": "research-chat",
+                            "type": "ui.chat",
+                            "area": "workspace",
+                            "title": "Research discussion",
+                            "visibleIf": "$state.selectedDirectionId != null && ($state.activeResearchTab === 'inquiry' || $state.activeResearchTab === 'formulation')",
+                            "dataSource": {
+                                "kind": "stream",
+                                "receiver": "voice_chat.messages",
+                                "scope": "shared",
+                                "transport": "hub",
+                                "params": {
+                                    "conversation_id": "$state.researchConversationId",
+                                    "conversation_topic_id": "research:$state.selectedDirectionId",
+                                    "dialog_channel_id": "research_orchestrator"
+                                }
+                            },
+                            "inputs": {
+                                "autoGrow": true,
+                                "compact": false,
+                                "enterToSend": true,
+                                "shiftEnterNewline": true,
+                                "showTimestamps": true,
+                                "placeholder": "Discuss the research question, falsifiable hypotheses, protocol, estimands, uncertainty, constraints, and unresolved decisions...",
+                                "sendCommand": "voice.chat.user",
+                                "receiver": "voice_chat.messages",
+                                "scope": "shared",
+                                "meta": {
+                                    "active_agent_id": "agent:research_orchestrator_skill:researcher",
+                                    "active_agent_label": "Researcher",
+                                    "conversation_id": "$state.researchConversationId",
+                                    "conversation_topic_id": "research:$state.selectedDirectionId",
+                                    "thread_id": "research:$state.selectedDirectionId",
+                                    "dialog_channel_id": "research_orchestrator",
+                                    "direction_id": "$state.selectedDirectionId",
+                                    "task_id": "$state.selectedResearchTaskId",
+                                    "research_phase": "$state.activeResearchTab",
+                                    "route_id": "voice_chat"
+                                }
+                            },
+                            "actions": []
+                        },
+                        {
+                            "id": "compilation-facets",
+                            "type": "ui.actions",
+                            "area": "workspace",
+                            "title": "Research Compilation",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'",
+                            "inputs": {
+                                "variant": "segmented",
+                                "size": "small",
+                                "selectedStateKey": "activeCompilationFacet",
+                                "buttons": [
+                                    {
+                                        "id": "source_analysis",
+                                        "label": "Source Analysis",
+                                        "icon": "documents-outline",
+                                        "title": "What the visible source snapshot contains, how it was extracted, and what remains missing."
+                                    },
+                                    {
+                                        "id": "research_problem",
+                                        "label": "Problem",
+                                        "icon": "help-circle-outline",
+                                        "title": "Primary question, falsifiable hypothesis, constraints, assumptions, and unresolved choices."
+                                    },
+                                    {
+                                        "id": "experimental_protocol",
+                                        "label": "Protocol",
+                                        "icon": "git-compare-outline",
+                                        "title": "Operational experiment, evidence classes, allocation, outcomes, and decision policy."
+                                    },
+                                    {
+                                        "id": "engineering_contract",
+                                        "label": "Engineering",
+                                        "icon": "construct-outline",
+                                        "title": "Bounded implementation obligations and independently checkable acceptance evidence."
+                                    },
+                                    {
+                                        "id": "experiment_plan",
+                                        "label": "Experiment Plan",
+                                        "icon": "flask-outline",
+                                        "title": "Execution-ready experimental stages, budgets, estimand, uncertainty and stopping policy."
+                                    },
+                                    {
+                                        "id": "traceability",
+                                        "label": "Traceability",
+                                        "icon": "git-network-outline",
+                                        "title": "Digest-bound source-to-acceptance paths and compilation blockers."
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeCompilationFacet": "$event.id"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "research-compilation",
+                            "type": "static.markdown",
+                            "area": "workspace",
+                            "title": "Compiled research contract",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_compilation",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId",
+                                    "task_id": "$state.selectedResearchTaskId",
+                                    "facet": "$state.activeCompilationFacet"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.formulation",
+                                    "research.compilation"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 1
+                            },
+                            "inputs": {
+                                "bindField": "content"
+                            }
+                        },
+                        {
+                            "id": "development-actions",
+                            "type": "ui.actions",
+                            "area": "workspace",
+                            "title": "Pre-Codex gate",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'development'",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "size": "small",
+                                "buttons": [
+                                    {
+                                        "id": "accept",
+                                        "label": "Accept exact prototype",
+                                        "icon": "shield-checkmark-outline",
+                                        "enabledIf": "$state.researchCanAccept === true && $state.researchAdmissionDecision === 'admitted'",
+                                        "title": "Enabled only for the active task after deterministic AdaOS admission passes. Checkpoint the exact Project implementation target and artifact set, then create the AutomationBrief and scoped Development Session. Codex is not started."
+                                    },
+                                    {
+                                        "id": "open-builder",
+                                        "label": "Open Builder session",
+                                        "icon": "open-outline",
+                                        "enabledIf": "$state.builderUrl != null",
+                                        "title": "Open a named Builder window and bind this exact Development Session. The target skill is read-write; Workbench, orchestrator, and artifact groups are read-only context."
+                                    },
+                                    {
+                                        "id": "help-modal",
+                                        "label": "How this works",
+                                        "icon": "help-circle-outline",
+                                        "title": "Open the Research Workbench help modal."
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:accept",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.accept_prototype",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "prototype_digest": "$state.researchPrototypeDigest",
+                                        "expected_generation": "$state.researchGeneration",
+                                        "idempotency_key": "workbench-accept-$state.selectedDirectionId-$state.researchGeneration"
+                                    },
+                                    "invalidates": [
+                                        "research.portfolio",
+                                        "research.formulation",
+                                        "research.compilation",
+                                        "research.activity",
+                                        "research.automation_brief"
+                                    ]
+                                },
+                                {
+                                    "on": "click:open-builder",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.open_builder_session",
+                                    "openResultUrl": true,
+                                    "resultUrlPath": "url",
+                                    "resultUrlTarget": "adaos-builder",
+                                    "feedback": {
+                                        "pending": {
+                                            "label": "Binding Builder session…",
+                                            "disable": true
+                                        }
+                                    },
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId",
+                                        "implementation_track_id": "$state.selectedImplementationTrackId",
+                                        "builder_webspace_id": "desktop-dev"
+                                    },
+                                    "invalidates": [
+                                        "builder.project.preview"
+                                    ]
+                                },
+                                {
+                                    "on": "click:help-modal",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "research_workbench_help"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "handoff-ready-receipt",
+                            "type": "ui.actions",
+                            "area": "workspace",
+                            "title": "Development handoff",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'development' && $state.researchAutomationBriefDigest != null",
+                            "inputs": {
+                                "variant": "stack",
+                                "buttons": [
+                                    {
+                                        "id": "handoff-ready",
+                                        "label": "Exact prototype accepted · AutomationBrief and Development Session are ready",
+                                        "icon": "checkmark-circle-outline",
+                                        "disabled": true,
+                                        "title": "Acceptance is durable and digest-bound. Open Builder to start Codex from this exact instruction."
+                                    }
+                                ]
+                            },
+                            "actions": []
+                        },
+                        {
+                            "id": "automation-brief",
+                            "type": "item.codeViewer",
+                            "area": "workspace",
+                            "title": "AutomationBrief",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'development'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_automation_brief",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId",
+                                    "task_id": "$state.selectedResearchTaskId",
+                                    "implementation_track_id": "$state.selectedImplementationTrackId"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.automation_brief"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 1
+                            },
+                            "inputs": {
+                                "bindField": "content",
+                                "languageField": "language",
+                                "copyButton": true
+                            }
+                        },
+                        {
+                            "id": "development-scope",
+                            "type": "item.details",
+                            "area": "workspace",
+                            "title": "Builder Development Session",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'development'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_direction",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId",
+                                    "task_id": "$state.selectedResearchTaskId",
+                                    "implementation_track_id": "$state.selectedImplementationTrackId"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.formulation",
+                                    "research.activity",
+                                    "research.automation_brief"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 2
+                            },
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "key": "development_session.session_id",
+                                        "label": "Session"
+                                    },
+                                    {
+                                        "key": "development_session.focus",
+                                        "label": "Focus"
+                                    },
+                                    {
+                                        "key": "development_session.write_scope",
+                                        "label": "Write scope"
+                                    },
+                                    {
+                                        "key": "development_session.read_scope",
+                                        "label": "Read-only context"
+                                    },
+                                    {
+                                        "key": "development_session.source_bundle_digest",
+                                        "label": "SourceBundle"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "activity",
+                            "type": "static.markdown",
+                            "area": "workspace",
+                            "title": "Durable activity journal",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'activity'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_activity",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId",
+                                    "task_id": "$state.selectedResearchTaskId",
+                                    "implementation_track_id": "$state.selectedImplementationTrackId",
+                                    "limit": 200
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.activity",
+                                    "research.formulation"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 2
+                            },
+                            "inputs": {
+                                "bindField": "content"
+                            }
+                        },
+                        {
+                            "id": "studies-placeholder",
+                            "type": "static.markdown",
+                            "area": "workspace",
+                            "title": "Studies",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'studies'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_studies",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId",
+                                    "task_id": "$state.selectedResearchTaskId"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.activity",
+                                    "research.evidence"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 1
+                            },
+                            "inputs": {
+                                "bindField": "content"
+                            }
+                        },
+                        {
+                            "id": "evidence-placeholder",
+                            "type": "static.markdown",
+                            "area": "workspace",
+                            "title": "Evidence",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'evidence'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_lineage",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId",
+                                    "task_id": "$state.selectedResearchTaskId",
+                                    "implementation_track_id": "$state.selectedImplementationTrackId"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.artifacts",
+                                    "research.compilation",
+                                    "research.activity",
+                                    "research.evidence"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 1
+                            },
+                            "inputs": {
+                                "bindField": "content"
+                            }
+                        },
+                        {
+                            "id": "releases-placeholder",
+                            "type": "static.markdown",
+                            "area": "workspace",
+                            "title": "Releases",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'releases'",
+                            "inputs": {
+                                "content": "## No research releases yet\n\nA portable release will freeze the direction snapshot and exact Project composition without making Project the owner of the scientific lifecycle."
+                            }
+                        },
+                        {
+                            "id": "help",
+                            "type": "static.markdown",
+                            "area": "workspace",
+                            "title": "Using Research Workbench",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'help'",
+                            "inputs": {
+                                "content": "# Research Workbench\n\n1. Add exact source artifacts.\n2. Select the active task and reach a human-readable consensus with the Researcher.\n3. Inspect the typed formulation, accepted compilation, and unresolved decisions.\n4. Accept an exact digest only when the formulation is ready.\n5. Open the named Builder window for the selected implementation track.\n\nThe Workbench owns direction, task, compilation, and implementation-track metadata. A dedicated skill is the physical custodian of source artifacts. Project is created for the implementation/distribution boundary and does not own the scientific lifecycle."
+                            }
+                        }
                     ]
-                  },
-                  {
-                    "id": "rationale",
-                    "name": "rationale",
-                    "type": "longText",
-                    "label": "Rationale",
-                    "required": true
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "submit",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.decide_inquiry_projection",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "task_id": "$state.selectedResearchTaskId",
-                    "decision": "$event.values.decision",
-                    "rationale": "$event.values.rationale"
-                  },
-                  "invalidates": [
-                    "research.inquiry",
-                    "research.activity",
-                    "research.portfolio"
-                  ]
                 }
-              ]
             },
-            {
-              "id": "inquiry-search",
-              "type": "ui.actions",
-              "area": "workspace",
-              "title": "Source discovery",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
-              "inputs": {
-                "variant": "toolbar",
-                "size": "small",
-                "buttons": [
-                  {
-                    "id": "discover",
-                    "label": "Search typed gaps",
-                    "icon": "search-outline",
-                    "title": "Search active SearchRequests. Results remain outside the evidence boundary."
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "click:discover",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.discover_inquiry_sources",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "task_id": "$state.selectedResearchTaskId"
-                  },
-                  "invalidates": [
-                    "research.inquiry",
-                    "research.activity"
-                  ]
-                }
-              ]
-            },
-            {
-              "id": "task-formulation-context",
-              "type": "ui.actions",
-              "area": "workspace",
-              "title": "Task formulation authority",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'formulation' && $state.selectedResearchTaskId != null && $state.selectedResearchTaskId !== $state.activeResearchTaskId",
-              "inputs": {
-                "variant": "toolbar",
-                "size": "small",
-                "buttons": [
-                  {
-                    "id": "activate-task",
-                    "label": "Activate selected task",
-                    "icon": "radio-button-on-outline",
-                    "title": "Make this task the only writable formulation target. Selection alone is read-only and never changes scientific state."
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "click:activate-task",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.select_active_task",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "task_id": "$state.selectedResearchTaskId"
-                  },
-                  "invalidates": [
-                    "research.portfolio",
-                    "research.formulation",
-                    "research.activity",
-                    "research.compilation",
-                    "research.automation_brief"
-                  ]
-                }
-              ]
-            },
-            {
-              "id": "research-consensus",
-              "type": "static.markdown",
-              "area": "workspace",
-              "title": "Current draft and AdaOS review",
-              "visibleIf": "$state.selectedDirectionId != null && ($state.activeResearchTab === 'inquiry' || $state.activeResearchTab === 'formulation')",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.get_consensus",
-                "params": {
-                  "direction_id": "$state.selectedDirectionId",
-                  "task_id": "$state.selectedResearchTaskId"
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.formulation",
-                  "research.automation_brief"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 2
-              },
-              "inputs": {
-                "bindField": "content"
-              }
-            },
-            {
-              "id": "research-chat",
-              "type": "ui.chat",
-              "area": "workspace",
-              "title": "Research discussion",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "voice_chat.messages",
-                "scope": "shared",
-                "transport": "hub",
-                "params": {
-                  "conversation_id": "$state.researchConversationId",
-                  "conversation_topic_id": "research:$state.selectedDirectionId",
-                  "dialog_channel_id": "research_orchestrator"
-                }
-              },
-              "inputs": {
-                "autoGrow": true,
-                "compact": false,
-                "enterToSend": true,
-                "shiftEnterNewline": true,
-                "showTimestamps": true,
-                "placeholder": "Discuss the idea, known work, scientific uncertainty, tractability, competing problem frames, and possible next tasks...",
-                "sendCommand": "voice.chat.user",
-                "receiver": "voice_chat.messages",
-                "scope": "shared",
-                "meta": {
-                  "active_agent_id": "agent:research_orchestrator_skill:researcher",
-                  "active_agent_label": "Researcher",
-                  "conversation_id": "$state.researchConversationId",
-                  "conversation_topic_id": "research:$state.selectedDirectionId",
-                  "thread_id": "research:$state.selectedDirectionId",
-                  "dialog_channel_id": "research_orchestrator",
-                  "direction_id": "$state.selectedDirectionId",
-                  "task_id": "$state.selectedResearchTaskId",
-                  "route_id": "voice_chat"
-                }
-              },
-              "actions": []
-            },
-            {
-              "id": "compilation-facets",
-              "type": "ui.actions",
-              "area": "workspace",
-              "title": "Research Compilation",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'",
-              "inputs": {
-                "variant": "segmented",
-                "size": "small",
-                "selectedStateKey": "activeCompilationFacet",
-                "buttons": [
-                  {
-                    "id": "source_analysis",
-                    "label": "Source Analysis",
-                    "icon": "documents-outline",
-                    "title": "What the visible source snapshot contains, how it was extracted, and what remains missing."
-                  },
-                  {
-                    "id": "research_problem",
-                    "label": "Problem",
-                    "icon": "help-circle-outline",
-                    "title": "Primary question, falsifiable hypothesis, constraints, assumptions, and unresolved choices."
-                  },
-                  {
-                    "id": "experimental_protocol",
-                    "label": "Protocol",
-                    "icon": "git-compare-outline",
-                    "title": "Operational experiment, evidence classes, allocation, outcomes, and decision policy."
-                  },
-                  {
-                    "id": "engineering_contract",
-                    "label": "Engineering",
-                    "icon": "construct-outline",
-                    "title": "Bounded implementation obligations and independently checkable acceptance evidence."
-                  },
-                  {
-                    "id": "experiment_plan",
-                    "label": "Execution plan",
-                    "icon": "options-outline",
-                    "title": "Provider-neutral dataset, arms, execution profiles, randomization, estimand, evidence policy, and runner ABI compiled for ResearchManager."
-                  },
-                  {
-                    "id": "traceability",
-                    "label": "Traceability",
-                    "icon": "git-network-outline",
-                    "title": "Digest-bound source-to-acceptance paths and compilation blockers."
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "click",
-                  "type": "updateState",
-                  "params": {
-                    "activeCompilationFacet": "$event.id"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "research-compilation",
-              "type": "static.markdown",
-              "area": "workspace",
-              "title": "Compiled research contract",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.get_compilation",
-                "params": {
-                  "direction_id": "$state.selectedDirectionId",
-                  "task_id": "$state.selectedResearchTaskId",
-                  "facet": "$state.activeCompilationFacet"
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.formulation",
-                  "research.compilation"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 1
-              },
-              "inputs": {
-                "bindField": "content"
-              }
-            },
-            {
-              "id": "development-actions",
-              "type": "ui.actions",
-              "area": "workspace",
-              "title": "Pre-Codex gate",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'development'",
-              "inputs": {
-                "variant": "toolbar",
-                "size": "small",
-                "buttons": [
-                  {
-                    "id": "accept",
-                    "label": "Accept exact prototype",
-                    "icon": "shield-checkmark-outline",
-                    "enabledIf": "$state.researchCanAccept === true && $state.researchAdmissionDecision === 'admitted'",
-                    "title": "Enabled only for the active task after deterministic AdaOS admission passes. Checkpoint the exact Project implementation target and artifact set, then create the AutomationBrief and scoped Development Session. Codex is not started."
-                  },
-                  {
-                    "id": "open-builder",
-                    "label": "Open Builder session",
-                    "icon": "open-outline",
-                    "enabledIf": "$state.builderUrl != null",
-                    "title": "Open a named Builder window and bind this exact Development Session. The target skill is read-write; Workbench, orchestrator, and artifact groups are read-only context."
-                  },
-                  {
-                    "id": "start-implementation",
-                    "label": "Start one-shot",
-                    "icon": "play-outline",
-                    "enabledIf": "$state.researchAutomationBriefDigest != null && $state.implementationStatus === 'development_ready'",
-                    "title": "Start one bounded Builder Automation from the accepted ResearchCompilation and AutomationBrief. No post-start human directives are added."
-                  },
-                  {
-                    "id": "sync-implementation",
-                    "label": "Sync Builder",
-                    "icon": "sync-outline",
-                    "enabledIf": "$state.researchAutomationBriefDigest != null && $state.projectReleaseRef == null",
-                    "title": "Read Builder Automation status and append an idempotent snapshot to the durable research activity journal."
-                  },
-                  {
-                    "id": "prepare-release",
-                    "label": "Prepare release",
-                    "icon": "cube-outline",
-                    "enabledIf": "$state.implementationStatus === 'implementation_complete' && $state.candidateReleaseDigest == null",
-                    "title": "Run the Builder Project trial and freeze an immutable candidate digest. This does not promote the release."
-                  },
-                  {
-                    "id": "publish-release",
-                    "label": "Publish reviewed release",
-                    "icon": "cloud-upload-outline",
-                    "enabledIf": "$state.candidateReleaseDigest != null && $state.projectReleaseRef == null",
-                    "title": "Promote exactly the reviewed candidate digest and bind it as the ProjectRelease for this implementation track."
-                  },
-                  {
-                    "id": "instantiate-study",
-                    "label": "Instantiate Study",
-                    "icon": "flask-outline",
-                    "enabledIf": "$state.projectReleaseRef != null && $state.studyRealizationRef == null",
-                    "title": "Ask the installed release for immutable dataset split identities, then bind compilation, release, runner, Study, and Experiment."
-                  },
-                  {
-                    "id": "start-smoke",
-                    "label": "Start CPU smoke",
-                    "icon": "hardware-chip-outline",
-                    "enabledIf": "$state.researchExperimentId != null",
-                    "title": "Lock the compiled protocol and start only its preregistered non-inferential workflow-smoke profile on the local CPU."
-                  },
-                  {
-                    "id": "sync-study",
-                    "label": "Sync Study",
-                    "icon": "refresh-circle-outline",
-                    "enabledIf": "$state.researchExperimentId != null",
-                    "title": "Reconcile runner attempts through ResearchManager and join the resulting state into the Workbench activity journal."
-                  },
-                  {
-                    "id": "help-modal",
-                    "label": "How this works",
-                    "icon": "help-circle-outline",
-                    "title": "Open the Research Workbench help modal."
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "click:accept",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.accept_prototype",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "prototype_digest": "$state.researchPrototypeDigest",
-                    "expected_generation": "$state.researchGeneration",
-                    "idempotency_key": "workbench-accept-$state.selectedDirectionId-$state.researchGeneration"
-                  },
-                  "invalidates": [
-                    "research.portfolio",
-                    "research.formulation",
-                    "research.compilation",
-                    "research.activity",
-                    "research.automation_brief"
-                  ]
-                },
-                {
-                  "on": "click:open-builder",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.open_builder_session",
-                  "openResultUrl": true,
-                  "resultUrlPath": "url",
-                  "resultUrlTarget": "adaos-builder",
-                  "feedback": {
-                    "pending": {
-                      "label": "Binding Builder session…",
-                      "disable": true
+            "modals": {
+                "research_direction_selector": {
+                    "title": "Choose research direction",
+                    "presentation": {
+                        "kind": "modal",
+                        "restoreFocus": true
+                    },
+                    "schema": {
+                        "id": "research_direction_selector",
+                        "title": "Choose research direction",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "collection",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "collection",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "selection": "single",
+                                "rowActivation": "select",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "direction-selector-list",
+                                "type": "ui.list",
+                                "area": "main",
+                                "title": "Research directions",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "research_orchestrator_skill.list_directions",
+                                    "params": {
+                                        "limit": 500
+                                    },
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "research.portfolio",
+                                        "research.formulation"
+                                    ],
+                                    "preserveLastValue": true,
+                                    "maxRequestHz": 2
+                                },
+                                "inputs": {
+                                    "variant": "cards",
+                                    "search": true,
+                                    "titleKey": "title",
+                                    "subtitleKey": "status",
+                                    "previewKey": "description",
+                                    "emptyText": "No research directions are available."
+                                },
+                                "actions": [
+                                    {
+                                        "on": "select",
+                                        "type": "updateState",
+                                        "params": {
+                                            "researchViewMode": "direction",
+                                            "selectedDirectionId": "$event.direction_id",
+                                            "selectedDirectionTitle": "$event.title",
+                                            "selectedResearchNodeId": null,
+                                            "selectedResearchSubjectRef": null,
+                                            "selectedResearchTaskId": null,
+                                            "selectedImplementationTrackId": null,
+                                            "activeResearchTaskId": null,
+                                            "activeResearchTab": "overview",
+                                            "activeCompilationFacet": "source_analysis",
+                                            "researchConversationId": "conv.skill.research_orchestrator_skill.$event.direction_id.desktop",
+                                            "researchGeneration": 0,
+                                            "researchPrototypeDigest": null,
+                                            "researchAdmissionDecision": "needs_discussion",
+                                            "researchCanAccept": false,
+                                            "builderUrl": null
+                                        }
+                                    },
+                                    {
+                                        "on": "select",
+                                        "type": "closeModal"
+                                    }
+                                ]
+                            }
+                        ]
                     }
-                  },
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "task_id": "$state.selectedResearchTaskId",
-                    "implementation_track_id": "$state.selectedImplementationTrackId",
-                    "builder_webspace_id": "desktop-dev"
-                  },
-                  "invalidates": [
-                    "builder.project.preview"
-                  ]
                 },
-                {
-                  "on": "click:start-implementation",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.start_implementation",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "task_id": "$state.selectedResearchTaskId",
-                    "implementation_track_id": "$state.selectedImplementationTrackId"
-                  },
-                  "invalidates": [
-                    "research.activity",
-                    "research.implementation"
-                  ]
+                "research_new_direction": {
+                    "title": "New research direction",
+                    "presentation": {
+                        "kind": "modal",
+                        "restoreFocus": true
+                    },
+                    "schema": {
+                        "id": "research_new_direction",
+                        "title": "New research direction",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "new-research-form",
+                                "type": "ui.form",
+                                "area": "main",
+                                "inputs": {
+                                    "layout": "stack",
+                                    "submitLabel": "Create research",
+                                    "resetOnSuccess": true,
+                                    "secondaryActions": [
+                                        {
+                                            "id": "cancel",
+                                            "label": "Cancel",
+                                            "variant": "secondary"
+                                        }
+                                    ],
+                                    "fields": [
+                                        {
+                                            "id": "project_id",
+                                            "type": "shortText",
+                                            "label": "Direction ID",
+                                            "required": true,
+                                            "placeholder": "my_research",
+                                            "help": "Stable lowercase ID: letters, digits, dot, underscore, or hyphen. The logical direction and its artifact-custodian skill are created together; an implementation Project is created only at accepted handoff."
+                                        },
+                                        {
+                                            "id": "title",
+                                            "type": "shortText",
+                                            "label": "Title",
+                                            "required": true,
+                                            "placeholder": "Human-readable research direction"
+                                        },
+                                        {
+                                            "id": "description",
+                                            "type": "longText",
+                                            "label": "Initial intent",
+                                            "required": true,
+                                            "placeholder": "What should be understood, reproduced, compared, or falsified?"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "submit",
+                                        "type": "callSkill",
+                                        "target": "research_orchestrator_skill.create_direction",
+                                        "params": {
+                                            "project_id": "$event.values.project_id",
+                                            "title": "$event.values.title",
+                                            "description": "$event.values.description"
+                                        },
+                                        "invalidates": [
+                                            "research.portfolio",
+                                            "research.formulation",
+                                            "research.activity"
+                                        ]
+                                    },
+                                    {
+                                        "on": "submit",
+                                        "type": "closeModal"
+                                    },
+                                    {
+                                        "on": "click:cancel",
+                                        "type": "closeModal"
+                                    }
+                                ]
+                            }
+                        ],
+                        "interaction": {
+                            "initialFocus": "widget:new-research-form"
+                        }
+                    }
                 },
-                {
-                  "on": "click:sync-implementation",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.sync_implementation",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "task_id": "$state.selectedResearchTaskId",
-                    "implementation_track_id": "$state.selectedImplementationTrackId"
-                  },
-                  "invalidates": [
-                    "research.activity",
-                    "research.implementation"
-                  ]
+                "research_direction_details": {
+                    "title": "Research direction details",
+                    "presentation": {
+                        "kind": "modal",
+                        "restoreFocus": true
+                    },
+                    "schema": {
+                        "id": "research_direction_details",
+                        "title": "Research direction details",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "research-direction-details-content",
+                                "type": "item.details",
+                                "area": "main",
+                                "title": "Direction details",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "research_orchestrator_skill.get_direction",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId",
+                                        "implementation_track_id": "$state.selectedImplementationTrackId"
+                                    },
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "research.formulation",
+                                        "research.activity",
+                                        "research.automation_brief"
+                                    ],
+                                    "preserveLastValue": true,
+                                    "maxRequestHz": 2
+                                },
+                                "inputs": {
+                                    "fields": [
+                                        {
+                                            "key": "direction.ref",
+                                            "label": "Direction"
+                                        },
+                                        {
+                                            "key": "direction.artifact_owner_ref",
+                                            "label": "Artifact custodian"
+                                        },
+                                        {
+                                            "key": "selected_task.ref",
+                                            "label": "Selected task"
+                                        },
+                                        {
+                                            "key": "selected_implementation_track.ref",
+                                            "label": "Implementation track"
+                                        },
+                                        {
+                                            "key": "project.ref",
+                                            "label": "Implementation Project"
+                                        },
+                                        {
+                                            "key": "direction.status",
+                                            "label": "Stage"
+                                        },
+                                        {
+                                            "key": "direction.generation",
+                                            "label": "Generation"
+                                        },
+                                        {
+                                            "key": "source_bundle.digest",
+                                            "label": "Artifact set"
+                                        },
+                                        {
+                                            "key": "current_prototype.revision",
+                                            "label": "Prototype revision"
+                                        },
+                                        {
+                                            "key": "development_session.session_id",
+                                            "label": "Development Session"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "research-direction-details-close",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "close",
+                                            "label": "Close",
+                                            "icon": "close-outline"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:close",
+                                        "type": "closeModal"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
                 },
-                {
-                  "on": "click:prepare-release",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.prepare_project_release",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "task_id": "$state.selectedResearchTaskId",
-                    "implementation_track_id": "$state.selectedImplementationTrackId",
-                    "confirmed": true,
-                    "bump": "patch"
-                  },
-                  "invalidates": [
-                    "research.activity",
-                    "research.implementation",
-                    "research.release"
-                  ]
+                "research_artifact_preview": {
+                    "title": "Artifact preview",
+                    "presentation": {
+                        "kind": "modal",
+                        "restoreFocus": true
+                    },
+                    "schema": {
+                        "id": "research_artifact_preview",
+                        "title": "Artifact preview",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "research-artifact-markdown-preview",
+                                "type": "static.markdown",
+                                "area": "main",
+                                "title": "Artifact preview",
+                                "visibleIf": "$state.selectedArtifactPreviewKind === 'markdown'",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "research_orchestrator_skill.preview_artifact",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "group_id": "$state.selectedArtifactGroupId",
+                                        "artifact_id": "$state.selectedArtifactId"
+                                    },
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "research.artifacts"
+                                    ],
+                                    "preserveLastValue": false,
+                                    "maxRequestHz": 2
+                                },
+                                "inputs": {
+                                    "bindField": "content"
+                                }
+                            },
+                            {
+                                "id": "research-artifact-text-preview",
+                                "type": "item.codeViewer",
+                                "area": "main",
+                                "title": "Artifact preview",
+                                "visibleIf": "$state.selectedArtifactPreviewKind === 'text'",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "research_orchestrator_skill.preview_artifact",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "group_id": "$state.selectedArtifactGroupId",
+                                        "artifact_id": "$state.selectedArtifactId"
+                                    },
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "research.artifacts"
+                                    ],
+                                    "preserveLastValue": false,
+                                    "maxRequestHz": 2
+                                },
+                                "inputs": {
+                                    "bindField": "content",
+                                    "languageField": "language",
+                                    "copyButton": true
+                                }
+                            },
+                            {
+                                "id": "research-artifact-pdf-preview",
+                                "type": "item.documentViewer",
+                                "area": "main",
+                                "title": "Artifact preview",
+                                "visibleIf": "$state.selectedArtifactPreviewKind === 'pdf'",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "research_orchestrator_skill.preview_artifact",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "group_id": "$state.selectedArtifactGroupId",
+                                        "artifact_id": "$state.selectedArtifactId"
+                                    },
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "research.artifacts"
+                                    ],
+                                    "preserveLastValue": false,
+                                    "maxRequestHz": 2
+                                },
+                                "inputs": {
+                                    "pathField": "content_path",
+                                    "mediaField": "media_type",
+                                    "minHeight": 760
+                                }
+                            },
+                            {
+                                "id": "research-artifact-unsupported-preview",
+                                "type": "static.markdown",
+                                "area": "main",
+                                "title": "Artifact preview",
+                                "visibleIf": "$state.selectedArtifactPreviewKind === 'unsupported'",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "research_orchestrator_skill.preview_artifact",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "group_id": "$state.selectedArtifactGroupId",
+                                        "artifact_id": "$state.selectedArtifactId"
+                                    },
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "research.artifacts"
+                                    ],
+                                    "preserveLastValue": false,
+                                    "maxRequestHz": 2
+                                },
+                                "inputs": {
+                                    "bindField": "content"
+                                }
+                            },
+                            {
+                                "id": "research-artifact-preview-close",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "close",
+                                            "label": "Close",
+                                            "icon": "close-outline"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:close",
+                                        "type": "closeModal"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
                 },
-                {
-                  "on": "click:publish-release",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.publish_project_release",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "task_id": "$state.selectedResearchTaskId",
-                    "implementation_track_id": "$state.selectedImplementationTrackId",
-                    "confirmed": true,
-                    "bump": "patch"
-                  },
-                  "invalidates": [
-                    "research.activity",
-                    "research.implementation",
-                    "research.release"
-                  ]
-                },
-                {
-                  "on": "click:instantiate-study",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.instantiate_study",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "task_id": "$state.selectedResearchTaskId",
-                    "implementation_track_id": "$state.selectedImplementationTrackId",
-                    "idempotency_key": "workbench-study-$state.selectedDirectionId-$state.selectedImplementationTrackId"
-                  },
-                  "invalidates": [
-                    "research.activity",
-                    "research.implementation",
-                    "research.study",
-                    "research.evidence"
-                  ]
-                },
-                {
-                  "on": "click:start-smoke",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.start_study_smoke",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "task_id": "$state.selectedResearchTaskId",
-                    "implementation_track_id": "$state.selectedImplementationTrackId",
-                    "confirmed": true,
-                    "idempotency_key": "workbench-smoke-$state.selectedDirectionId-$state.selectedImplementationTrackId"
-                  },
-                  "invalidates": [
-                    "research.activity",
-                    "research.study",
-                    "research.evidence"
-                  ]
-                },
-                {
-                  "on": "click:sync-study",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.sync_study",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "task_id": "$state.selectedResearchTaskId",
-                    "implementation_track_id": "$state.selectedImplementationTrackId"
-                  },
-                  "invalidates": [
-                    "research.activity",
-                    "research.study",
-                    "research.evidence"
-                  ]
-                },
-                {
-                  "on": "click:help-modal",
-                  "type": "openModal",
-                  "params": {
-                    "modalId": "research_workbench_help"
-                  }
+                "research_workbench_help": {
+                    "title": "Research Workbench — usage and capabilities",
+                    "presentation": {
+                        "kind": "modal",
+                        "restoreFocus": true
+                    },
+                    "schema": {
+                        "id": "research_workbench_help",
+                        "title": "Research Workbench — usage and capabilities",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "research-workbench-help-content",
+                                "type": "static.markdown",
+                                "area": "main",
+                                "inputs": {
+                                    "content": "# Research Workbench\n\nThis shared application manages many research directions; it does not create a scenario per direction.\n\n- A ResearchDirection and its ResearchTasks are scientific lifecycle records owned by Workbench.\n- A dedicated skill is the physical custodian of source artifacts; custody does not make the skill the direction identity.\n- LLM discussion proposes task-bound ResearchPrototype revisions.\n- Human acceptance binds an exact task, ResearchCompilation, implementation track, Project, artifact view, and AutomationBrief.\n- Builder receives the full Project envelope, one explicit read-write target, and digest-bound read-only context.\n- Selecting a task is read-only; formulation writes require explicit task activation.\n- Ray and article generation remain deferred."
+                                }
+                            },
+                            {
+                                "id": "research-workbench-help-close",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "close",
+                                            "label": "Close",
+                                            "icon": "close-outline"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:close",
+                                        "type": "closeModal"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
                 }
-              ]
-            },
-            {
-              "id": "handoff-ready-receipt",
-              "type": "ui.actions",
-              "area": "workspace",
-              "title": "Development handoff",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'development' && $state.researchAutomationBriefDigest != null",
-              "inputs": {
-                "variant": "stack",
-                "buttons": [
-                  {
-                    "id": "handoff-ready",
-                    "label": "Exact prototype accepted · AutomationBrief and Development Session are ready",
-                    "icon": "checkmark-circle-outline",
-                    "disabled": true,
-                    "title": "Acceptance is durable and digest-bound. Open Builder to start Codex from this exact instruction."
-                  }
-                ]
-              },
-              "actions": []
-            },
-            {
-              "id": "automation-brief",
-              "type": "item.codeViewer",
-              "area": "workspace",
-              "title": "AutomationBrief",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'development'",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.get_automation_brief",
-                "params": {
-                  "direction_id": "$state.selectedDirectionId",
-                  "task_id": "$state.selectedResearchTaskId",
-                  "implementation_track_id": "$state.selectedImplementationTrackId"
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.automation_brief"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 1
-              },
-              "inputs": {
-                "bindField": "content",
-                "languageField": "language",
-                "copyButton": true
-              }
-            },
-            {
-              "id": "development-scope",
-              "type": "item.details",
-              "area": "workspace",
-              "title": "Builder Development Session",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'development'",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.get_direction",
-                "params": {
-                  "direction_id": "$state.selectedDirectionId",
-                  "task_id": "$state.selectedResearchTaskId",
-                  "implementation_track_id": "$state.selectedImplementationTrackId"
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.formulation",
-                  "research.activity",
-                  "research.automation_brief"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 2
-              },
-              "inputs": {
-                "fields": [
-                  {
-                    "key": "development_session.session_id",
-                    "label": "Session"
-                  },
-                  {
-                    "key": "development_session.focus",
-                    "label": "Focus"
-                  },
-                  {
-                    "key": "development_session.write_scope",
-                    "label": "Write scope"
-                  },
-                  {
-                    "key": "development_session.read_scope",
-                    "label": "Read-only context"
-                  },
-                  {
-                    "key": "development_session.source_bundle_digest",
-                    "label": "SourceBundle"
-                  }
-                ]
-              }
-            },
-            {
-              "id": "activity",
-              "type": "static.markdown",
-              "area": "workspace",
-              "title": "Durable activity journal",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'activity'",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.get_activity",
-                "params": {
-                  "direction_id": "$state.selectedDirectionId",
-                  "task_id": "$state.selectedResearchTaskId",
-                  "implementation_track_id": "$state.selectedImplementationTrackId",
-                  "limit": 200
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.activity",
-                  "research.formulation"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 2
-              },
-              "inputs": {
-                "bindField": "content"
-              }
-            },
-            {
-              "id": "activity-accounting-actions",
-              "type": "ui.actions",
-              "area": "workspace",
-              "title": "Token accounting",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'activity'",
-              "inputs": {
-                "variant": "toolbar",
-                "size": "small",
-                "buttons": [
-                  {
-                    "id": "reconcile",
-                    "label": "Reconcile Researcher usage",
-                    "icon": "calculator-outline",
-                    "title": "Re-read durable Root jobs; interactive Codex remains excluded."
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "click:reconcile",
-                  "type": "callSkill",
-                  "target": "research_orchestrator_skill.reconcile_inquiry_usage",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "task_id": "$state.selectedResearchTaskId"
-                  },
-                  "invalidates": [
-                    "research.activity"
-                  ]
-                }
-              ]
-            },
-            {
-              "id": "studies-placeholder",
-              "type": "static.markdown",
-              "area": "workspace",
-              "title": "Studies",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'studies'",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.get_studies",
-                "params": {
-                  "direction_id": "$state.selectedDirectionId",
-                  "task_id": "$state.selectedResearchTaskId"
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.activity",
-                  "research.evidence"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 1
-              },
-              "inputs": {
-                "bindField": "content"
-              }
-            },
-            {
-              "id": "evidence-placeholder",
-              "type": "static.markdown",
-              "area": "workspace",
-              "title": "Evidence",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'evidence'",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.get_lineage",
-                "params": {
-                  "direction_id": "$state.selectedDirectionId",
-                  "task_id": "$state.selectedResearchTaskId",
-                  "implementation_track_id": "$state.selectedImplementationTrackId"
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.artifacts",
-                  "research.compilation",
-                  "research.activity",
-                  "research.evidence"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 1
-              },
-              "inputs": {
-                "bindField": "content"
-              }
-            },
-            {
-              "id": "releases-placeholder",
-              "type": "item.details",
-              "area": "workspace",
-              "title": "Implementation lineage",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'releases'",
-              "dataSource": {
-                "kind": "skill",
-                "name": "research_orchestrator_skill.get_direction",
-                "params": {
-                  "direction_id": "$state.selectedDirectionId",
-                  "task_id": "$state.selectedResearchTaskId",
-                  "implementation_track_id": "$state.selectedImplementationTrackId"
-                },
-                "cacheTtlMs": 0,
-                "invalidationTags": [
-                  "research.formulation",
-                  "research.activity",
-                  "research.automation_brief"
-                ],
-                "preserveLastValue": true,
-                "maxRequestHz": 2
-              },
-              "inputs": {
-                "emptyText": "No implementation track is selected.",
-                "fields": [
-                  {
-                    "key": "selected_implementation_track.ref",
-                    "label": "Implementation track"
-                  },
-                  {
-                    "key": "selected_implementation_track.status",
-                    "label": "State"
-                  },
-                  {
-                    "key": "development_session.session_id",
-                    "label": "Development Session"
-                  },
-                  {
-                    "key": "selected_implementation_track.candidate_release_digest",
-                    "label": "Reviewed candidate"
-                  },
-                  {
-                    "key": "selected_implementation_track.project_release_ref",
-                    "label": "ProjectRelease"
-                  },
-                  {
-                    "key": "selected_implementation_track.project_release_digest",
-                    "label": "Release digest"
-                  },
-                  {
-                    "key": "selected_implementation_track.runner_ref",
-                    "label": "Installed runner"
-                  },
-                  {
-                    "key": "selected_implementation_track.study_realization_ref",
-                    "label": "StudyRealization"
-                  },
-                  {
-                    "key": "selected_implementation_track.study_realization_digest",
-                    "label": "Realization digest"
-                  },
-                  {
-                    "key": "selected_implementation_track.experiment_id",
-                    "label": "ResearchManager Experiment"
-                  }
-                ]
-              }
-            },
-            {
-              "id": "help",
-              "type": "static.markdown",
-              "area": "workspace",
-              "title": "Using Research Workbench",
-              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'help'",
-              "inputs": {
-                "content": "# Research Workbench\n\n1. Discuss an idea while Inquiry maintains a typed scientific projection.\n2. Inspect ProblemDisposition before spending effort on formulation or implementation.\n3. Add exact source artifacts when a knowledge or novelty gap requires them.\n4. Record a human decision over the exact projection digest.\n5. Form ResearchTasks and later implementation tracks only through admitted transitions.\n\nThe Workbench owns the shared inquiry and research lifecycle. A direction skill is only the physical custodian of domain artifacts. Builder is not authorized by discussion or by an LLM readiness statement."
-              }
             }
-          ]
-        }
-      },
-      "modals": {
-        "research_direction_selector": {
-          "title": "Choose research direction",
-          "presentation": {
-            "kind": "modal",
-            "restoreFocus": true
-          },
-          "schema": {
-            "id": "research_direction_selector",
-            "title": "Choose research direction",
-            "layout": {
-              "version": 2,
-              "pattern": "collection",
-              "density": "comfortable",
-              "contentWidth": "fluid",
-              "scroll": "page",
-              "regions": [
-                {
-                  "id": "main",
-                  "role": "collection",
-                  "priority": 100,
-                  "scroll": "page",
-                  "presentation": {
-                    "wide": "pane",
-                    "compact": "stack"
-                  }
-                }
-              ],
-              "interaction": {
-                "selection": "single",
-                "rowActivation": "select",
-                "filters": "inline",
-                "actions": "adaptive"
-              }
-            },
-            "widgets": [
-              {
-                "id": "direction-selector-list",
-                "type": "ui.list",
-                "area": "main",
-                "title": "Research directions",
-                "dataSource": {
-                  "kind": "skill",
-                  "name": "research_orchestrator_skill.list_directions",
-                  "params": {
-                    "limit": 500
-                  },
-                  "cacheTtlMs": 0,
-                  "invalidationTags": [
-                    "research.portfolio",
-                    "research.formulation"
-                  ],
-                  "preserveLastValue": true,
-                  "maxRequestHz": 2
-                },
-                "inputs": {
-                  "variant": "cards",
-                  "search": true,
-                  "titleKey": "title",
-                  "subtitleKey": "status",
-                  "previewKey": "description",
-                  "emptyText": "No research directions are available."
-                },
-                "actions": [
-                  {
-                    "on": "select",
-                    "type": "updateState",
-                    "params": {
-                      "researchViewMode": "direction",
-                      "selectedDirectionId": "$event.direction_id",
-                      "selectedDirectionTitle": "$event.title",
-                      "selectedResearchNodeId": null,
-                      "selectedResearchSubjectRef": null,
-                      "selectedResearchTaskId": null,
-                      "selectedImplementationTrackId": null,
-                      "activeResearchTaskId": null,
-                      "activeResearchTab": "overview",
-                      "activeCompilationFacet": "source_analysis",
-                      "researchConversationId": "conv.skill.research_orchestrator_skill.$event.direction_id.desktop",
-                      "researchGeneration": 0,
-                      "researchPrototypeDigest": null,
-                      "researchAdmissionDecision": "needs_discussion",
-                      "researchCanAccept": false,
-                      "builderUrl": null
-                    }
-                  },
-                  {
-                    "on": "select",
-                    "type": "closeModal"
-                  }
-                ]
-              }
-            ]
-          }
         },
-        "research_new_direction": {
-          "title": "New research direction",
-          "presentation": {
-            "kind": "modal",
-            "restoreFocus": true
-          },
-          "schema": {
-            "id": "research_new_direction",
-            "title": "New research direction",
-            "layout": {
-              "version": 2,
-              "pattern": "task-flow",
-              "density": "comfortable",
-              "contentWidth": "fluid",
-              "scroll": "page",
-              "regions": [
-                {
-                  "id": "main",
-                  "role": "main",
-                  "priority": 100,
-                  "scroll": "page",
-                  "presentation": {
-                    "wide": "pane",
-                    "compact": "stack"
-                  }
-                }
-              ],
-              "interaction": {
-                "selection": "none",
-                "rowActivation": "none",
-                "filters": "inline",
-                "actions": "adaptive"
-              }
-            },
-            "widgets": [
-              {
-                "id": "new-research-form",
-                "type": "ui.form",
-                "area": "main",
-                "inputs": {
-                  "layout": "stack",
-                  "submitLabel": "Create research",
-                  "resetOnSuccess": true,
-                  "secondaryActions": [
-                    {
-                      "id": "cancel",
-                      "label": "Cancel",
-                      "variant": "secondary"
-                    }
-                  ],
-                  "fields": [
-                    {
-                      "id": "project_id",
-                      "type": "shortText",
-                      "label": "Direction ID",
-                      "required": true,
-                      "placeholder": "my_research",
-                      "help": "Stable lowercase ID: letters, digits, dot, underscore, or hyphen. The logical direction and its artifact-custodian skill are created together; an implementation Project is created only at accepted handoff."
-                    },
-                    {
-                      "id": "title",
-                      "type": "shortText",
-                      "label": "Title",
-                      "required": true,
-                      "placeholder": "Human-readable research direction"
-                    },
-                    {
-                      "id": "description",
-                      "type": "longText",
-                      "label": "Initial intent",
-                      "required": true,
-                      "placeholder": "What should be understood, reproduced, compared, or falsified?"
-                    }
-                  ]
-                },
-                "actions": [
-                  {
-                    "on": "submit",
-                    "type": "callSkill",
-                    "target": "research_orchestrator_skill.create_direction",
-                    "params": {
-                      "project_id": "$event.values.project_id",
-                      "title": "$event.values.title",
-                      "description": "$event.values.description"
-                    },
-                    "invalidates": [
-                      "research.portfolio",
-                      "research.formulation",
-                      "research.activity"
-                    ]
-                  },
-                  {
-                    "on": "submit",
-                    "type": "closeModal"
-                  },
-                  {
-                    "on": "click:cancel",
-                    "type": "closeModal"
-                  }
-                ]
-              }
-            ],
-            "interaction": {
-              "initialFocus": "widget:new-research-form"
-            }
-          }
-        },
-        "research_direction_details": {
-          "title": "Research direction details",
-          "presentation": {
-            "kind": "modal",
-            "restoreFocus": true
-          },
-          "schema": {
-            "id": "research_direction_details",
-            "title": "Research direction details",
-            "layout": {
-              "version": 2,
-              "pattern": "document",
-              "density": "comfortable",
-              "contentWidth": "fluid",
-              "scroll": "page",
-              "regions": [
-                {
-                  "id": "main",
-                  "role": "main",
-                  "priority": 100,
-                  "scroll": "page",
-                  "presentation": {
-                    "wide": "pane",
-                    "compact": "stack"
-                  }
-                }
-              ],
-              "interaction": {
-                "selection": "none",
-                "rowActivation": "none",
-                "filters": "inline",
-                "actions": "adaptive"
-              }
-            },
-            "widgets": [
-              {
-                "id": "research-direction-details-content",
-                "type": "item.details",
-                "area": "main",
-                "title": "Direction details",
-                "dataSource": {
-                  "kind": "skill",
-                  "name": "research_orchestrator_skill.get_direction",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "task_id": "$state.selectedResearchTaskId",
-                    "implementation_track_id": "$state.selectedImplementationTrackId"
-                  },
-                  "cacheTtlMs": 0,
-                  "invalidationTags": [
-                    "research.formulation",
-                    "research.activity",
-                    "research.automation_brief"
-                  ],
-                  "preserveLastValue": true,
-                  "maxRequestHz": 2
-                },
-                "inputs": {
-                  "fields": [
-                    {
-                      "key": "direction.ref",
-                      "label": "Direction"
-                    },
-                    {
-                      "key": "direction.artifact_owner_ref",
-                      "label": "Artifact custodian"
-                    },
-                    {
-                      "key": "selected_task.ref",
-                      "label": "Selected task"
-                    },
-                    {
-                      "key": "selected_implementation_track.ref",
-                      "label": "Implementation track"
-                    },
-                    {
-                      "key": "project.ref",
-                      "label": "Implementation Project"
-                    },
-                    {
-                      "key": "direction.status",
-                      "label": "Stage"
-                    },
-                    {
-                      "key": "direction.generation",
-                      "label": "Generation"
-                    },
-                    {
-                      "key": "source_bundle.digest",
-                      "label": "Artifact set"
-                    },
-                    {
-                      "key": "current_prototype.revision",
-                      "label": "Prototype revision"
-                    },
-                    {
-                      "key": "development_session.session_id",
-                      "label": "Development Session"
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "research-direction-details-close",
-                "type": "ui.actions",
-                "area": "main",
-                "inputs": {
-                  "buttons": [
-                    {
-                      "id": "close",
-                      "label": "Close",
-                      "icon": "close-outline"
-                    }
-                  ]
-                },
-                "actions": [
-                  {
-                    "on": "click:close",
-                    "type": "closeModal"
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        "research_artifact_preview": {
-          "title": "Artifact preview",
-          "presentation": {
-            "kind": "modal",
-            "restoreFocus": true
-          },
-          "schema": {
-            "id": "research_artifact_preview",
-            "title": "Artifact preview",
-            "layout": {
-              "version": 2,
-              "pattern": "document",
-              "density": "comfortable",
-              "contentWidth": "fluid",
-              "scroll": "page",
-              "regions": [
-                {
-                  "id": "main",
-                  "role": "main",
-                  "priority": 100,
-                  "scroll": "page",
-                  "presentation": {
-                    "wide": "pane",
-                    "compact": "stack"
-                  }
-                }
-              ],
-              "interaction": {
-                "selection": "none",
-                "rowActivation": "none",
-                "filters": "inline",
-                "actions": "adaptive"
-              }
-            },
-            "widgets": [
-              {
-                "id": "research-artifact-markdown-preview",
-                "type": "static.markdown",
-                "area": "main",
-                "title": "Artifact preview",
-                "visibleIf": "$state.selectedArtifactPreviewKind === 'markdown'",
-                "dataSource": {
-                  "kind": "skill",
-                  "name": "research_orchestrator_skill.preview_artifact",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "group_id": "$state.selectedArtifactGroupId",
-                    "artifact_id": "$state.selectedArtifactId"
-                  },
-                  "cacheTtlMs": 0,
-                  "invalidationTags": [
-                    "research.artifacts"
-                  ],
-                  "preserveLastValue": false,
-                  "maxRequestHz": 2
-                },
-                "inputs": {
-                  "bindField": "content"
-                }
-              },
-              {
-                "id": "research-artifact-text-preview",
-                "type": "item.codeViewer",
-                "area": "main",
-                "title": "Artifact preview",
-                "visibleIf": "$state.selectedArtifactPreviewKind === 'text'",
-                "dataSource": {
-                  "kind": "skill",
-                  "name": "research_orchestrator_skill.preview_artifact",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "group_id": "$state.selectedArtifactGroupId",
-                    "artifact_id": "$state.selectedArtifactId"
-                  },
-                  "cacheTtlMs": 0,
-                  "invalidationTags": [
-                    "research.artifacts"
-                  ],
-                  "preserveLastValue": false,
-                  "maxRequestHz": 2
-                },
-                "inputs": {
-                  "bindField": "content",
-                  "languageField": "language",
-                  "copyButton": true
-                }
-              },
-              {
-                "id": "research-artifact-pdf-preview",
-                "type": "item.documentViewer",
-                "area": "main",
-                "title": "Artifact preview",
-                "visibleIf": "$state.selectedArtifactPreviewKind === 'pdf'",
-                "dataSource": {
-                  "kind": "skill",
-                  "name": "research_orchestrator_skill.preview_artifact",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "group_id": "$state.selectedArtifactGroupId",
-                    "artifact_id": "$state.selectedArtifactId"
-                  },
-                  "cacheTtlMs": 0,
-                  "invalidationTags": [
-                    "research.artifacts"
-                  ],
-                  "preserveLastValue": false,
-                  "maxRequestHz": 2
-                },
-                "inputs": {
-                  "pathField": "content_path",
-                  "mediaField": "media_type",
-                  "minHeight": 760
-                }
-              },
-              {
-                "id": "research-artifact-unsupported-preview",
-                "type": "static.markdown",
-                "area": "main",
-                "title": "Artifact preview",
-                "visibleIf": "$state.selectedArtifactPreviewKind === 'unsupported'",
-                "dataSource": {
-                  "kind": "skill",
-                  "name": "research_orchestrator_skill.preview_artifact",
-                  "params": {
-                    "direction_id": "$state.selectedDirectionId",
-                    "group_id": "$state.selectedArtifactGroupId",
-                    "artifact_id": "$state.selectedArtifactId"
-                  },
-                  "cacheTtlMs": 0,
-                  "invalidationTags": [
-                    "research.artifacts"
-                  ],
-                  "preserveLastValue": false,
-                  "maxRequestHz": 2
-                },
-                "inputs": {
-                  "bindField": "content"
-                }
-              },
-              {
-                "id": "research-artifact-preview-close",
-                "type": "ui.actions",
-                "area": "main",
-                "inputs": {
-                  "buttons": [
-                    {
-                      "id": "close",
-                      "label": "Close",
-                      "icon": "close-outline"
-                    }
-                  ]
-                },
-                "actions": [
-                  {
-                    "on": "click:close",
-                    "type": "closeModal"
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        "research_workbench_help": {
-          "title": "Research Workbench — usage and capabilities",
-          "presentation": {
-            "kind": "modal",
-            "restoreFocus": true
-          },
-          "schema": {
-            "id": "research_workbench_help",
-            "title": "Research Workbench — usage and capabilities",
-            "layout": {
-              "version": 2,
-              "pattern": "document",
-              "density": "comfortable",
-              "contentWidth": "fluid",
-              "scroll": "page",
-              "regions": [
-                {
-                  "id": "main",
-                  "role": "main",
-                  "priority": 100,
-                  "scroll": "page",
-                  "presentation": {
-                    "wide": "pane",
-                    "compact": "stack"
-                  }
-                }
-              ],
-              "interaction": {
-                "selection": "none",
-                "rowActivation": "none",
-                "filters": "inline",
-                "actions": "adaptive"
-              }
-            },
-            "widgets": [
-              {
-                "id": "research-workbench-help-content",
-                "type": "static.markdown",
-                "area": "main",
-                "inputs": {
-                  "content": "# Research Workbench\n\nThis shared application manages many research directions; it does not create a scenario per direction.\n\n- A ResearchDirection and its ResearchTasks are scientific lifecycle records owned by Workbench.\n- A dedicated skill is the physical custodian of source artifacts; custody does not make the skill the direction identity.\n- LLM discussion proposes task-bound ResearchPrototype revisions.\n- Human acceptance binds an exact task, ResearchCompilation, implementation track, Project, artifact view, and AutomationBrief.\n- Builder receives the full Project envelope, one explicit read-write target, and digest-bound read-only context.\n- Selecting a task is read-only; formulation writes require explicit task activation.\n- Ray and article generation remain deferred."
-                }
-              },
-              {
-                "id": "research-workbench-help-close",
-                "type": "ui.actions",
-                "area": "main",
-                "inputs": {
-                  "buttons": [
-                    {
-                      "id": "close",
-                      "label": "Close",
-                      "icon": "close-outline"
-                    }
-                  ]
-                },
-                "actions": [
-                  {
-                    "on": "click:close",
-                    "type": "closeModal"
-                  }
-                ]
-              }
-            ]
-          }
-        }
-      }
+        "version": "0.1.6",
+        "manifest": "webui.json"
     }
-  }
 }
