@@ -1,5 +1,5 @@
 name: voice_chat_skill
-version: 0.7.5
+version: 0.7.7
 description: Voice chat bridge for web_desktop (text in -> materialize replies through
   the node conversation ledger; shared chat history is exposed as a bounded compatibility
   stream, with YJS kept as a compact status projection).
@@ -133,6 +133,7 @@ tools:
     and materialize chat through the conversation ledger plus TTS outputs (no direct
     Yjs writes).
   entry: handlers.main:handle_text
+  side_effects: runtime_write
   input_schema:
     type: object
     properties:
@@ -147,6 +148,7 @@ tools:
   description: Publish the bounded voice chat stream snapshot for the selected node/webspace
     and return a compact acknowledgement.
   entry: handlers.main:get_snapshot
+  side_effects: runtime_write
   input_schema:
     type: object
     additionalProperties: true
@@ -155,6 +157,7 @@ tools:
 - name: voice_chat_healthcheck
   description: Return compact Voice runtime counters without publishing state.
   entry: handlers.main:voice_chat_healthcheck
+  side_effects: read_only
   input_schema:
     type: object
     additionalProperties: true
@@ -163,6 +166,7 @@ tools:
 - name: voice_chat_runtime_drain
   description: Stop Voice background timers before runtime drain.
   entry: handlers.main:voice_chat_runtime_drain
+  side_effects: runtime_write
   input_schema:
     type: object
     additionalProperties: true
@@ -171,6 +175,7 @@ tools:
 - name: voice_chat_runtime_dispose
   description: Release Voice timers and bounded in-memory caches.
   entry: handlers.main:voice_chat_runtime_dispose
+  side_effects: runtime_write
   input_schema:
     type: object
     additionalProperties: true
@@ -179,6 +184,7 @@ tools:
 - name: voice_chat_runtime_before_deactivate
   description: Release Voice timers and bounded in-memory caches before deactivation.
   entry: handlers.main:voice_chat_runtime_before_deactivate
+  side_effects: runtime_write
   input_schema:
     type: object
     additionalProperties: true
@@ -187,6 +193,7 @@ tools:
 - name: on_quarantine
   description: Record compact Voice quarantine evidence and stop background timers.
   entry: handlers.main:on_quarantine
+  side_effects: runtime_write
   input_schema:
     type: object
     additionalProperties: true
@@ -201,7 +208,7 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
-updated_at: '2026-09-26T04:38:10+00:00'
+updated_at: '2026-09-26T11:05:54+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.741+4835.a49f9166

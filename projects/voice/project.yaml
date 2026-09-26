@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: voice
-version: 0.1.6
+version: 0.1.7
 profiles: [adaos.builder.component_project.v1]
 components:
   owned:
@@ -38,3 +38,24 @@ lifecycle:
   uninstall: {components: remove_if_unreferenced, runtime_data: retain, source_artifacts: retain}
 created_at: '2026-09-26T02:30:00Z'
 created_by: agent:codex
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.read
+    purpose: Inspect compact local voice runtime health and snapshots.
+    approval_policy: grant_on_install
+  - id: workspace.write
+    purpose: Materialize explicitly submitted chat, timer, and compact runtime state.
+    approval_policy: grant_on_install
+  optional: []
+  secrets: []
+  external_providers: []
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected: [conversation_tail, timer_state]
+    linked_to_user: [conversation_tail]
+    retention: A bounded local conversation tail and compact runtime state are retained.
+    sent_off_device: []
+    tracking: false

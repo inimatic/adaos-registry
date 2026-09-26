@@ -125,9 +125,9 @@
       "application_id": "voice",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 2,
-      "stable_release_digest": "sha256:35667691bd19bbe6f45b8f2ec74c90b1645efc401fe32b44eb617b88ca7d76a0",
-      "release_key": "voice@sha256:35667691bd19bbe6f45b8f2ec74c90b1645efc401fe32b44eb617b88ca7d76a0",
-      "projection_digest": "sha256:4c097c51f5a7603cc8db9736a1eccc2144b4b0c81010e1b36277defb0d6711a6"
+      "stable_release_digest": "sha256:0b891e2da738e254317eb958eda533333ba2a5d17752ed3c75850f19e0dede55",
+      "release_key": "voice@sha256:0b891e2da738e254317eb958eda533333ba2a5d17752ed3c75850f19e0dede55",
+      "projection_digest": "sha256:7c5f8e100637e2d2990a2479a2b2418e80632ce34ac86daff1153d76a46e6577"
     },
     "research_tlp": {
       "application_id": "research_tlp",
@@ -466,7 +466,15 @@
       "release_digest": "sha256:c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8",
       "path": "semantic/catalog/releases/redevice_control/c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8.json",
       "projection_digest": "sha256:41f0c83f79dab571d7608ed5dcc5b62cbf0b02b2129cd5f30889b6d868e9947d"
+    },
+    "voice@sha256:0b891e2da738e254317eb958eda533333ba2a5d17752ed3c75850f19e0dede55": {
+      "application_id": "voice",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.7",
+      "release_digest": "sha256:0b891e2da738e254317eb958eda533333ba2a5d17752ed3c75850f19e0dede55",
+      "path": "semantic/catalog/releases/voice/0b891e2da738e254317eb958eda533333ba2a5d17752ed3c75850f19e0dede55.json",
+      "projection_digest": "sha256:7c5f8e100637e2d2990a2479a2b2418e80632ce34ac86daff1153d76a46e6577"
     }
   },
-  "index_digest": "sha256:c1423197680df348e6ac2b8abc8f65accfd3bf0a946e219d3fbf3e7b92c44a90"
+  "index_digest": "sha256:6747fa8e7bc93a602b1567aed6e0c9ecde1276e766878b084da0914014e01eb7"
 }
