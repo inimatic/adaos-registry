@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: redevice_control
-version: 0.1.12
+version: 0.1.14
 profiles:
 - adaos.redevice.control.v1
 components:
@@ -64,7 +64,7 @@ catalog:
   - voice
   - alpha
 publication:
-  stage: alpha
+  stage: beta
   visibility: listed
   channel: stable
 install:
@@ -102,6 +102,8 @@ install:
 compatibility:
   required_entrypoints:
   - devices
+  required_contracts:
+  - capability:devices.manage@^1.0.0
   validation_profiles:
   - redevice.control.local
 lifecycle:

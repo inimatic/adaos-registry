@@ -1,0 +1,26 @@
+schema: adaos.cbs.provider_authoring.v1
+authorship: {origin: human_authored}
+capability:
+  ref: capability:media.slideshow.present
+  version: 1.0.0
+  title: Present a slideshow on an endpoint
+  operations:
+  - {operation_id: list_photos, tool: list_slideshow_photos, errors: []}
+  - {operation_id: set_source, tool: set_slideshow_source, errors: []}
+  - {operation_id: start, tool: start_redevice_slideshow, errors: []}
+  - {operation_id: control, tool: control_redevice_slideshow, errors: []}
+  invariants: [selected media source remains explicit]
+  effects: [indexes local media and controls a slideshow endpoint]
+  authority_requirements: []
+  conformance_refs: [scenario:media.slideshow.present.v1]
+binding:
+  ref: binding-definition:media.slideshow.present.redevice
+  version: 1.0.0
+  entry_protocol: adaos.skill.tools.v1
+  logical_entrypoint: media.slideshow.present.redevice
+  physical_member: handlers/main.py
+  modes: [production]
+  profile_classes: [local]
+  provider_features: [media_index, endpoint_control]
+  authority_requirements: []
+  conformance_obligations: [capability_conformance]

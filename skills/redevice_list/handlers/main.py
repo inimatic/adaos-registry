@@ -200,3 +200,13 @@ def on_webio_stream_subscription_changed(evt: Any) -> None:
     payload = _event_payload(evt)
     if _matches_receiver(payload):
         on_webio_stream_snapshot_requested(evt)
+
+
+@tool("application_data_drain")
+def application_data_drain(**_):
+    return {"ok": True, "status": "drained"}
+
+
+@tool("application_data_rehydrate")
+def application_data_rehydrate(**_):
+    return {"ok": True, "status": "rehydrated"}

@@ -1115,6 +1115,7 @@ def _cancel_index_job(webspace_id: str | None = None) -> dict[str, Any]:
     return _index_status()
 
 
+@tool("dispose")
 def dispose(reason: str | None = None, **_: Any) -> dict[str, Any]:
     _poll_stop.set()
     _index_stop.set()

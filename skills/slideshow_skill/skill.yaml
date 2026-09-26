@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.68
+version: 0.2.1
 description: Slideshow pilot skill that shows photos in the widget and can optionally
   project cached thumbnails to assigned ReDevice endpoints.
 supported_locales:
@@ -27,6 +27,7 @@ dependencies:
 lifecycle:
   after_activate: activate_slideshow_runtime
   rehydrate: activate_slideshow_runtime
+  drain: dispose
 events:
   subscribe:
   - sys.ready
@@ -465,6 +466,15 @@ tools:
         type: object
       updated_at:
         type: string
+- name: dispose
+  description: Provide a verified Application data lifecycle receipt.
+  entry: handlers.main:dispose
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
 data_routes:
 - surface: modal:slideshow_modal
   route: stream
@@ -609,7 +619,7 @@ memory_budget:
     max_threads: 1
     cleanup_hook: dispose
 redui: redui.json
-updated_at: '2026-09-16T13:34:22+00:00'
+updated_at: '2026-09-26T03:02:22+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.1018+6565.32860b035
@@ -618,4 +628,26 @@ compatibility:
     min_commit: 32860b035abed4e05958f5c83e6e5df28a7564b7
     min_short_commit: 32860b03
     build_date: '2026-09-16T14:27:12+03:00'
-
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases:
+  - path: internal/slideshow_skill/photos.sqlite3
+    migrations:
+    - version: 1
+      name: slideshow reconstructible photo index
+      statements:
+      - CREATE TABLE IF NOT EXISTS photos (content_ref TEXT PRIMARY KEY, source_path
+        TEXT UNIQUE NOT NULL, root_dir TEXT NOT NULL, rel_path TEXT NOT NULL, top_folder
+        TEXT NOT NULL, source_name TEXT NOT NULL, ext TEXT NOT NULL, size INTEGER
+        NOT NULL, mtime INTEGER NOT NULL, favorite INTEGER NOT NULL DEFAULT 0, hidden
+        INTEGER NOT NULL DEFAULT 0, indexed_at REAL NOT NULL)
+      - CREATE INDEX IF NOT EXISTS idx_photos_root_mtime ON photos(root_dir, mtime
+        DESC)
+      - CREATE INDEX IF NOT EXISTS idx_photos_root_folder ON photos(root_dir, top_folder,
+        mtime DESC)
+      - CREATE INDEX IF NOT EXISTS idx_photos_root_favorite ON photos(root_dir, favorite,
+        mtime DESC)
+      - CREATE TABLE IF NOT EXISTS roots (root_dir TEXT PRIMARY KEY, indexed_at REAL
+        NOT NULL, photo_count INTEGER NOT NULL)
+  coordination_files: []

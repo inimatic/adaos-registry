@@ -1,0 +1,26 @@
+schema: adaos.cbs.provider_authoring.v1
+authorship: {origin: human_authored}
+capability:
+  ref: capability:devices.manage
+  version: 1.0.0
+  title: Manage ReDevice endpoints
+  operations:
+  - {operation_id: refresh, tool: refresh_redevice_settings_state, errors: []}
+  - {operation_id: inspect, tool: inspect_redevice_settings_endpoint, errors: []}
+  - {operation_id: rename, tool: rename_redevice_settings_endpoint, errors: []}
+  - {operation_id: command, tool: send_redevice_settings_command, errors: []}
+  invariants: [endpoint identity remains stable across settings changes]
+  effects: [reads endpoint state and sends governed endpoint commands]
+  authority_requirements: []
+  conformance_refs: [scenario:devices.manage.v1]
+binding:
+  ref: binding-definition:devices.manage.redevice
+  version: 1.0.0
+  entry_protocol: adaos.skill.tools.v1
+  logical_entrypoint: devices.manage.redevice
+  physical_member: handlers/main.py
+  modes: [production]
+  profile_classes: [local]
+  provider_features: [endpoint_inventory, commands, revocation]
+  authority_requirements: []
+  conformance_obligations: [capability_conformance]

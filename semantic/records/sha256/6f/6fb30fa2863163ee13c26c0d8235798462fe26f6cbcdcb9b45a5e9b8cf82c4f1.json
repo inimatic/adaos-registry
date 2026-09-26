@@ -1,0 +1,260 @@
+{
+  "authority_requirements": [],
+  "capability_ref": "capability:devices.manage",
+  "compatibility": {},
+  "conformance_refs": [
+    "scenario:devices.manage.v1"
+  ],
+  "contract_digest": "sha256:6fb30fa2863163ee13c26c0d8235798462fe26f6cbcdcb9b45a5e9b8cf82c4f1",
+  "dependencies": [],
+  "effects": [
+    "reads endpoint state and sends governed endpoint commands"
+  ],
+  "invariants": [
+    "endpoint identity remains stable across settings changes"
+  ],
+  "operations": [
+    {
+      "errors": [],
+      "input_schema": {
+        "properties": {
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "refresh",
+      "output_schema": {
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "receiver": {
+            "type": "string"
+          },
+          "result": {
+            "type": "object"
+          },
+          "selected_code": {
+            "type": "string"
+          },
+          "selected_ref": {
+            "type": "string"
+          },
+          "selected_title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "status",
+          "receiver"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "device_ref": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "inspect",
+      "output_schema": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "contracts": {
+            "type": "object"
+          },
+          "device_ref": {
+            "type": "string"
+          },
+          "identity": {
+            "type": "object"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "schema_version": {
+            "type": "string"
+          },
+          "subnet": {
+            "type": "object"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "version_info": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "properties": {
+          "aliases": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "device_ref": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "rename",
+      "output_schema": {
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "receiver": {
+            "type": "string"
+          },
+          "result": {
+            "type": "object"
+          },
+          "selected_code": {
+            "type": "string"
+          },
+          "selected_ref": {
+            "type": "string"
+          },
+          "selected_title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "status",
+          "receiver"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "properties": {
+          "action": {
+            "enum": [
+              "open_wifi",
+              "open_bluetooth",
+              "bluetooth_reconnect",
+              "speaker_test",
+              "volume_up",
+              "volume_down",
+              "keep_awake",
+              "run_diagnostics",
+              "logout"
+            ],
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "device_ref": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "operation_id": "command",
+      "output_schema": {
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "receiver": {
+            "type": "string"
+          },
+          "result": {
+            "type": "object"
+          },
+          "selected_code": {
+            "type": "string"
+          },
+          "selected_ref": {
+            "type": "string"
+          },
+          "selected_title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "status",
+          "receiver"
+        ],
+        "type": "object"
+      }
+    }
+  ],
+  "schema": "adaos.capability.contract.v1",
+  "state_ports": [],
+  "title": "Manage ReDevice endpoints",
+  "version": "1.0.0"
+}

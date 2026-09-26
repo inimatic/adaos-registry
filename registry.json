@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-26T03:13:35+00:00",
+  "updated_at": "2026-09-26T03:21:49+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -949,8 +949,8 @@
       "kind": "skill",
       "id": "redevice_list",
       "name": "redevice_list",
-      "version": "0.1.5",
-      "updated_at": "2026-08-11T09:27:40+00:00",
+      "version": "0.2.1",
+      "updated_at": "2026-09-26T03:02:09+00:00",
       "path": "skills/redevice_list",
       "manifest": "skills/redevice_list/skill.yaml",
       "source": {
@@ -965,14 +965,21 @@
       "description": "Workspace dashboard for ReDevice endpoint inventory, diagnostics, manifest, policy, revoke, and retire operations.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 4
+      "tools_count": 6,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "redevice_control",
+        "release": "redevice_control@0.1.14",
+        "release_digest": "sha256:bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6",
+        "package_digest": "sha256:0ac651b2363153cfb80d7005514fc5a7e56c31c3f51ede4df8cbee62eab79e2c"
+      }
     },
     {
       "kind": "skill",
       "id": "redevice_settings",
       "name": "redevice_settings",
-      "version": "0.1.21",
-      "updated_at": "2026-08-11T09:28:10+00:00",
+      "version": "0.2.1",
+      "updated_at": "2026-09-26T03:02:03+00:00",
       "path": "skills/redevice_settings",
       "manifest": "skills/redevice_settings/skill.yaml",
       "source": {
@@ -987,14 +994,21 @@
       "description": "Service skill for ReDevice endpoint settings, assignment, status, and policy-bound device actions.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 8
+      "tools_count": 12,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "redevice_control",
+        "release": "redevice_control@0.1.14",
+        "release_digest": "sha256:bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6",
+        "package_digest": "sha256:4af722ef2d19ccb778bad3c490265c1c6ca885d0e8981af2d00b90eb85ecd1e1"
+      }
     },
     {
       "kind": "skill",
       "id": "redevice_voice",
       "name": "redevice_voice",
-      "version": "0.1.9",
-      "updated_at": "2026-08-11T09:28:32+00:00",
+      "version": "0.2.1",
+      "updated_at": "2026-09-26T03:02:15+00:00",
       "path": "skills/redevice_voice",
       "manifest": "skills/redevice_voice/skill.yaml",
       "source": {
@@ -1009,7 +1023,14 @@
       "description": "Debug ReDevice voice endpoint skill over EndpointAudioService with VAD or push-to-talk capture and member-side STT routing.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 4
+      "tools_count": 4,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "redevice_control",
+        "release": "redevice_control@0.1.14",
+        "release_digest": "sha256:bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6",
+        "package_digest": "sha256:c1181993842d058beac33b349ac7fbd387833381b86029c83b20068b14722c15"
+      }
     },
     {
       "kind": "skill",
@@ -1200,8 +1221,8 @@
       "kind": "skill",
       "id": "slideshow_skill",
       "name": "slideshow_skill",
-      "version": "0.1.68",
-      "updated_at": "2026-09-16T13:34:22+00:00",
+      "version": "0.2.1",
+      "updated_at": "2026-09-26T03:02:22+00:00",
       "path": "skills/slideshow_skill",
       "manifest": "skills/slideshow_skill/skill.yaml",
       "source": {
@@ -1214,7 +1235,14 @@
         "id": "slideshow_skill"
       },
       "description": "Slideshow pilot skill that shows photos in the widget and can optionally project cached thumbnails to assigned ReDevice endpoints.",
-      "tools_count": 15
+      "tools_count": 16,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "redevice_control",
+        "release": "redevice_control@0.1.14",
+        "release_digest": "sha256:bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6",
+        "package_digest": "sha256:93ebf2cb2cccbeb356ed01ba082c8200459bb753dfd0c53d8cc12619a817f2e0"
+      }
     },
     {
       "kind": "skill",
@@ -2131,13 +2159,19 @@
       "kind": "scenario",
       "id": "redevice_user_face",
       "name": "redevice_user_face",
-      "version": "0.1.7",
-      "updated_at": "2026-08-11T09:31:22+00:00",
+      "version": "0.1.10",
+      "updated_at": "2026-09-26T03:19:37+00:00",
       "path": "scenarios/redevice_user_face",
       "manifest": "scenarios/redevice_user_face/scenario.yaml",
       "source": {
         "path": "scenarios/redevice_user_face",
-        "manifest": "scenarios/redevice_user_face/scenario.yaml"
+        "manifest": "scenarios/redevice_user_face/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:8a0ade0f93495b212a933e070b3c53ade99dff939860f92dcec8f39156853850",
+        "path_scope": [
+          "projects/redevice_control/"
+        ]
       },
       "install": {
         "kind": "scenario",
@@ -2155,6 +2189,22 @@
         "optional": [
           "redevice_list"
         ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "redevice_control",
+        "release": "redevice_control@0.1.14",
+        "release_digest": "sha256:bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6",
+        "package_digest": "sha256:661f080360ef639c84ceebf4fec8f5b05b11e142380ff54e3f86cad6b962afff"
+      },
+      "channels": {
+        "stable": {
+          "release": "redevice_control@0.1.14",
+          "release_digest": "sha256:bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6",
+          "source_revision": "sha256:8a0ade0f93495b212a933e070b3c53ade99dff939860f92dcec8f39156853850",
+          "package_digest": "sha256:661f080360ef639c84ceebf4fec8f5b05b11e142380ff54e3f86cad6b962afff",
+          "version": "0.1.10"
+        }
       }
     },
     {
@@ -4169,8 +4219,8 @@
       "kind": "project",
       "id": "redevice_control",
       "name": "redevice_control",
-      "version": "0.1.8",
-      "updated_at": "2026-08-27T21:05:39+00:00",
+      "version": "0.1.14",
+      "updated_at": "2026-09-26T03:21:49+00:00",
       "path": "projects/redevice_control",
       "manifest": "projects/redevice_control/project.yaml",
       "source": {
@@ -4204,11 +4254,11 @@
         "alpha"
       ],
       "publication": {
-        "stage": "alpha",
+        "stage": "beta",
         "visibility": "listed",
         "channel": "stable"
       },
-      "stage": "alpha",
+      "stage": "beta",
       "visibility": "listed",
       "channel": "stable",
       "install_default": false,
@@ -4265,7 +4315,24 @@
       "components_count": 5,
       "profiles": [
         "adaos.redevice.control.v1"
-      ]
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "redevice_control",
+        "release": "redevice_control@0.1.14",
+        "release_digest": "sha256:bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6",
+        "primary_component": "scenario:redevice_user_face",
+        "package_digest": "sha256:661f080360ef639c84ceebf4fec8f5b05b11e142380ff54e3f86cad6b962afff"
+      },
+      "channels": {
+        "stable": {
+          "release": "redevice_control@0.1.14",
+          "release_digest": "sha256:bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6",
+          "source_revision": "sha256:8a0ade0f93495b212a933e070b3c53ade99dff939860f92dcec8f39156853850",
+          "package_digest": "sha256:661f080360ef639c84ceebf4fec8f5b05b11e142380ff54e3f86cad6b962afff",
+          "version": "0.1.14"
+        }
+      }
     },
     {
       "kind": "project",

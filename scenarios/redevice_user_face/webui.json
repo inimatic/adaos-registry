@@ -1,0 +1,446 @@
+{
+    "schema": "adaos.webui.v1",
+    "generated_by": "adaos.cbs-actualization",
+    "ui": {
+        "application": {
+            "version": "0.2",
+            "desktop": {
+                "topbar": [],
+                "iconTemplate": {
+                    "icon": "phone-portrait-outline"
+                },
+                "widgetTemplate": {
+                    "style": {
+                        "minWidth": 240
+                    }
+                },
+                "pinnedWidgets": [],
+                "pageSchema": {
+                    "id": "redevice_user_face",
+                    "title": "ReDevice User Face",
+                    "layout": {
+                        "version": 2,
+                        "pattern": "dashboard",
+                        "density": "comfortable",
+                        "contentWidth": "fluid",
+                        "scroll": "page",
+                        "regions": [
+                            {
+                                "id": "main",
+                                "role": "main",
+                                "priority": 100,
+                                "scroll": "page",
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "stack"
+                                }
+                            },
+                            {
+                                "id": "right",
+                                "role": "inspector",
+                                "priority": 60,
+                                "scroll": "region",
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "sheet"
+                                },
+                                "size": {
+                                    "minPx": 220,
+                                    "preferredPx": 360,
+                                    "maxPx": 600
+                                }
+                            }
+                        ],
+                        "interaction": {
+                            "selection": "none",
+                            "rowActivation": "none",
+                            "filters": "inline",
+                            "actions": "adaptive",
+                            "detail": "inline"
+                        }
+                    },
+                    "autoActions": [
+                        {
+                            "id": "redevice_user_face_refresh",
+                            "intervalMs": 15000,
+                            "action": {
+                                "on": "interval",
+                                "type": "callSkill",
+                                "target": "redevice_settings.refresh_redevice_settings_state",
+                                "params": {}
+                            }
+                        },
+                        {
+                            "id": "redevice_user_face_voice_refresh",
+                            "intervalMs": 20000,
+                            "action": {
+                                "on": "interval",
+                                "type": "callSkill",
+                                "target": "redevice_voice.refresh_redevice_voice_state",
+                                "params": {}
+                            }
+                        }
+                    ],
+                    "widgets": [
+                        {
+                            "id": "redevice-face-actions",
+                            "type": "ui.actions",
+                            "area": "main",
+                            "title": "Endpoint controls",
+                            "inputs": {
+                                "size": "small",
+                                "buttons": [
+                                    {
+                                        "id": "refresh",
+                                        "label": "Refresh",
+                                        "icon": "refresh-outline"
+                                    },
+                                    {
+                                        "id": "settings",
+                                        "label": "Settings",
+                                        "icon": "settings-outline"
+                                    },
+                                    {
+                                        "id": "slideshow",
+                                        "label": "Slideshow",
+                                        "icon": "image-outline"
+                                    },
+                                    {
+                                        "id": "voice",
+                                        "label": "Voice",
+                                        "icon": "mic-outline"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:refresh",
+                                    "type": "callSkill",
+                                    "target": "redevice_settings.refresh_redevice_settings_state",
+                                    "params": {}
+                                },
+                                {
+                                    "on": "click:settings",
+                                    "type": "navigate",
+                                    "params": {
+                                        "to": "redevice_settings.redevice_settings_modal",
+                                        "surface": "modal",
+                                        "modalId": "redevice_settings_modal"
+                                    }
+                                },
+                                {
+                                    "on": "click:slideshow",
+                                    "type": "navigate",
+                                    "params": {
+                                        "to": "slideshow_skill.slideshow_modal",
+                                        "surface": "modal",
+                                        "modalId": "slideshow_modal"
+                                    }
+                                },
+                                {
+                                    "on": "click:voice",
+                                    "type": "navigate",
+                                    "params": {
+                                        "to": "redevice_voice.redevice_voice_modal",
+                                        "surface": "modal",
+                                        "modalId": "redevice_voice_modal"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "redevice-face-fleet",
+                            "type": "visual.metricTile",
+                            "area": "main",
+                            "title": "Endpoint Registry",
+                            "dataSource": {
+                                "kind": "stream",
+                                "receiver": "redevice_settings.state",
+                                "path": "summary.fleet"
+                            },
+                            "inputs": {
+                                "valuePath": "value",
+                                "labelPath": "label",
+                                "subtitlePath": "subtitle",
+                                "descriptionPath": "description",
+                                "colorPath": "color",
+                                "emptyText": "0"
+                            }
+                        },
+                        {
+                            "id": "redevice-face-selected",
+                            "type": "visual.metricTile",
+                            "area": "main",
+                            "title": "Selected endpoint",
+                            "dataSource": {
+                                "kind": "stream",
+                                "receiver": "redevice_settings.state",
+                                "path": "summary.selected"
+                            },
+                            "inputs": {
+                                "valuePath": "value",
+                                "labelPath": "label",
+                                "subtitlePath": "subtitle",
+                                "descriptionPath": "description",
+                                "colorPath": "color",
+                                "emptyText": "-"
+                            }
+                        },
+                        {
+                            "id": "redevice-face-devices",
+                            "type": "ui.table",
+                            "area": "main",
+                            "title": "ReDevice endpoints",
+                            "dataSource": {
+                                "kind": "stream",
+                                "receiver": "redevice_settings.state",
+                                "path": "items"
+                            },
+                            "inputs": {
+                                "emptyText": "No ReDevice endpoints",
+                                "columns": [
+                                    {
+                                        "key": "selected_label",
+                                        "label": "Selected",
+                                        "width": "82px"
+                                    },
+                                    {
+                                        "key": "title",
+                                        "label": "Device"
+                                    },
+                                    {
+                                        "key": "online_state",
+                                        "label": "State",
+                                        "width": "90px"
+                                    },
+                                    {
+                                        "key": "last_seen",
+                                        "label": "Seen",
+                                        "width": "72px"
+                                    },
+                                    {
+                                        "key": "assignment",
+                                        "label": "Role",
+                                        "width": "116px"
+                                    },
+                                    {
+                                        "key": "_actions",
+                                        "label": "Actions",
+                                        "kind": "buttons",
+                                        "width": "250px",
+                                        "buttons": [
+                                            {
+                                                "id": "select",
+                                                "label": "Use"
+                                            },
+                                            {
+                                                "id": "slideshow",
+                                                "label": "Slideshow"
+                                            },
+                                            {
+                                                "id": "voice",
+                                                "label": "Voice"
+                                            },
+                                            {
+                                                "id": "settings",
+                                                "label": "Settings"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:select",
+                                    "type": "callSkill",
+                                    "target": "redevice_settings.select_redevice_settings_endpoint",
+                                    "params": {
+                                        "device_ref": "$event.ref"
+                                    }
+                                },
+                                {
+                                    "on": "click:slideshow",
+                                    "type": "callSkill",
+                                    "target": "slideshow_skill.select_redevice_endpoint",
+                                    "params": {
+                                        "code": "$event.code"
+                                    }
+                                },
+                                {
+                                    "on": "click:slideshow",
+                                    "type": "navigate",
+                                    "params": {
+                                        "to": "slideshow_skill.slideshow_modal",
+                                        "surface": "modal",
+                                        "modalId": "slideshow_modal"
+                                    }
+                                },
+                                {
+                                    "on": "click:voice",
+                                    "type": "callSkill",
+                                    "target": "redevice_voice.select_redevice_voice_endpoint",
+                                    "params": {
+                                        "code": "$event.code"
+                                    }
+                                },
+                                {
+                                    "on": "click:voice",
+                                    "type": "navigate",
+                                    "params": {
+                                        "to": "redevice_voice.redevice_voice_modal",
+                                        "surface": "modal",
+                                        "modalId": "redevice_voice_modal"
+                                    }
+                                },
+                                {
+                                    "on": "click:settings",
+                                    "type": "navigate",
+                                    "params": {
+                                        "to": "redevice_settings.redevice_settings_modal",
+                                        "surface": "modal",
+                                        "modalId": "redevice_settings_modal"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "redevice-face-slideshow",
+                            "type": "visual.frameViewer",
+                            "area": "right",
+                            "title": "Slideshow",
+                            "dataSource": {
+                                "kind": "stream",
+                                "receiver": "slideshow_skill.session"
+                            },
+                            "inputs": {
+                                "imageField": "image.src",
+                                "aspectRatio": "16 / 9",
+                                "fullscreenOnClick": true,
+                                "nativeFullscreen": true,
+                                "retainLastImageOnEmpty": true,
+                                "emptyText": "Start slideshow to show the current photo.",
+                                "headerActions": [
+                                    {
+                                        "id": "play",
+                                        "label": "Play",
+                                        "icon": "play-outline"
+                                    },
+                                    {
+                                        "id": "stop",
+                                        "label": "Stop",
+                                        "icon": "stop-outline"
+                                    },
+                                    {
+                                        "id": "prev",
+                                        "label": "Previous",
+                                        "icon": "chevron-back-outline"
+                                    },
+                                    {
+                                        "id": "next",
+                                        "label": "Next",
+                                        "icon": "chevron-forward-outline"
+                                    }
+                                ],
+                                "metrics": [
+                                    {
+                                        "label": "Endpoint",
+                                        "path": "label"
+                                    },
+                                    {
+                                        "label": "Frame",
+                                        "path": "frame.label"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:play",
+                                    "type": "callSkill",
+                                    "target": "slideshow_skill.control_redevice_slideshow",
+                                    "params": {
+                                        "action": "start"
+                                    }
+                                },
+                                {
+                                    "on": "click:stop",
+                                    "type": "callSkill",
+                                    "target": "slideshow_skill.control_redevice_slideshow",
+                                    "params": {
+                                        "action": "stop"
+                                    }
+                                },
+                                {
+                                    "on": "click:prev",
+                                    "type": "callSkill",
+                                    "target": "slideshow_skill.control_redevice_slideshow",
+                                    "params": {
+                                        "action": "prev"
+                                    }
+                                },
+                                {
+                                    "on": "click:next",
+                                    "type": "callSkill",
+                                    "target": "slideshow_skill.control_redevice_slideshow",
+                                    "params": {
+                                        "action": "next"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "redevice-face-voice",
+                            "type": "visual.metricTile",
+                            "area": "right",
+                            "title": "Voice endpoint",
+                            "dataSource": {
+                                "kind": "stream",
+                                "receiver": "redevice_voice.state"
+                            },
+                            "inputs": {
+                                "valuePath": "selected_code",
+                                "statusPath": "stt.state",
+                                "descriptionPath": "stt.detail",
+                                "emptyText": "No voice endpoint selected"
+                            },
+                            "actions": [
+                                {
+                                    "on": "click",
+                                    "type": "navigate",
+                                    "params": {
+                                        "to": "redevice_voice.redevice_voice_modal",
+                                        "surface": "modal",
+                                        "modalId": "redevice_voice_modal"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "redevice-face-selected-details",
+                            "type": "ui.list",
+                            "area": "right",
+                            "title": "Endpoint details",
+                            "dataSource": {
+                                "kind": "stream",
+                                "receiver": "redevice_settings.state",
+                                "path": "inspection"
+                            },
+                            "inputs": {
+                                "titleKey": "title",
+                                "descriptionKey": "description",
+                                "subtitleKey": "subtitle",
+                                "iconKey": "icon",
+                                "emptyText": "No selected endpoint"
+                            }
+                        }
+                    ]
+                }
+            },
+            "modals": {},
+            "interfaces": {
+                "redevice_user_face": {}
+            }
+        },
+        "version": "0.1.10",
+        "manifest": "webui.json"
+    }
+}

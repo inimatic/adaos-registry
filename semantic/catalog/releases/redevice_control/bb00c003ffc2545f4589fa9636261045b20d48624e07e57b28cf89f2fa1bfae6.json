@@ -1,0 +1,361 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "redevice_control",
+    "legacy_project_id": "redevice_control",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "redevice_control",
+    "display": {
+      "title": "ReDevice Control",
+      "summary": "Endpoint inventory, settings, slideshow projection, and voice endpoint controls."
+    },
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "devices",
+        "presentation_ref": "scenario:redevice_user_face"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 2,
+    "created_at": "2026-09-26T03:20:08+00:00",
+    "updated_at": "2026-09-26T03:22:12+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "redevice_control",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "redevice_control",
+    "version": "0.1.14",
+    "release_digest": "sha256:bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "redevice_control",
+      "version": "0.1.14",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:8a0ade0f93495b212a933e070b3c53ade99dff939860f92dcec8f39156853850",
+        "path_scope": [
+          "projects/redevice_control/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "redevice_user_face",
+          "version": "0.1.10",
+          "digest": "sha256:661f080360ef639c84ceebf4fec8f5b05b11e142380ff54e3f86cad6b962afff",
+          "manifest_digest": "sha256:85834a6f01a7dd535ef85fa273eb163a17799bfe863f886be4a004cd35e1b532",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:8a0ade0f93495b212a933e070b3c53ade99dff939860f92dcec8f39156853850",
+            "path_scope": [
+              "scenarios/redevice_user_face/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/redevice_user_face",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "redevice_list",
+          "version": "0.2.1",
+          "digest": "sha256:0ac651b2363153cfb80d7005514fc5a7e56c31c3f51ede4df8cbee62eab79e2c",
+          "manifest_digest": "sha256:eead8e9129b8b58e93d05efb8f30312ce22cb4439dec908e8b04db75ceab0d96",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:8a0ade0f93495b212a933e070b3c53ade99dff939860f92dcec8f39156853850",
+            "path_scope": [
+              "skills/redevice_list/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/redevice_list",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "redevice_settings",
+          "version": "0.2.1",
+          "digest": "sha256:4af722ef2d19ccb778bad3c490265c1c6ca885d0e8981af2d00b90eb85ecd1e1",
+          "manifest_digest": "sha256:0adf17469d13f03f590a4fc8d96dd2a7020504d5bf3a7243015a1b566cb5feb7",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:8a0ade0f93495b212a933e070b3c53ade99dff939860f92dcec8f39156853850",
+            "path_scope": [
+              "skills/redevice_settings/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/redevice_settings",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "redevice_voice",
+          "version": "0.2.1",
+          "digest": "sha256:c1181993842d058beac33b349ac7fbd387833381b86029c83b20068b14722c15",
+          "manifest_digest": "sha256:6f8550cdc01b89155041345b62cabcbd3f139f8ffba29f7c5a9fe63eef3b70c1",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:8a0ade0f93495b212a933e070b3c53ade99dff939860f92dcec8f39156853850",
+            "path_scope": [
+              "skills/redevice_voice/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/redevice_voice",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "slideshow_skill",
+          "version": "0.2.1",
+          "digest": "sha256:93ebf2cb2cccbeb356ed01ba082c8200459bb753dfd0c53d8cc12619a817f2e0",
+          "manifest_digest": "sha256:3d0e79ec7a538cc88c7490a3ee3df2b454e001ed076f250ec5f7ce7a4e753c61",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:8a0ade0f93495b212a933e070b3c53ade99dff939860f92dcec8f39156853850",
+            "path_scope": [
+              "skills/slideshow_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/slideshow_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:8a0ade0f93495b212a933e070b3c53ade99dff939860f92dcec8f39156853850",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:1b7db9bcc9cf00e8b7b2ee1d7c9cf921d2b868390938f2ca5ba242a16c616e64"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:5e98a3a537897c8f4d09b1b2d153146112bf6117369d885beec96e5be1b15e8c",
+        "profiles": [
+          "adaos.redevice.control.v1"
+        ],
+        "members": [
+          {
+            "ref": "scenario:redevice_user_face",
+            "package_digest": "sha256:661f080360ef639c84ceebf4fec8f5b05b11e142380ff54e3f86cad6b962afff",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "skill:redevice_list",
+            "package_digest": "sha256:0ac651b2363153cfb80d7005514fc5a7e56c31c3f51ede4df8cbee62eab79e2c",
+            "role": "supporting",
+            "exposure": "advanced",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          },
+          {
+            "ref": "skill:redevice_settings",
+            "package_digest": "sha256:4af722ef2d19ccb778bad3c490265c1c6ca885d0e8981af2d00b90eb85ecd1e1",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          },
+          {
+            "ref": "skill:redevice_voice",
+            "package_digest": "sha256:c1181993842d058beac33b349ac7fbd387833381b86029c83b20068b14722c15",
+            "role": "supporting",
+            "exposure": "advanced",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          },
+          {
+            "ref": "skill:slideshow_skill",
+            "package_digest": "sha256:93ebf2cb2cccbeb356ed01ba082c8200459bb753dfd0c53d8cc12619a817f2e0",
+            "role": "supporting",
+            "exposure": "advanced",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "devices",
+            "presentation": "scenario:redevice_user_face",
+            "default": true,
+            "bindings": {
+              "endpoint_registry": "redevice"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "devices"
+          ],
+          "required_contracts": [
+            "capability:devices.manage@^1.0.0"
+          ],
+          "validation_profiles": [
+            "redevice.control.local"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        }
+      },
+      "catalog": {
+        "title": "ReDevice Control",
+        "description": "Endpoint inventory, settings, slideshow projection, and voice endpoint controls.",
+        "categories": [
+          "devices",
+          "home"
+        ],
+        "tags": [
+          "alpha",
+          "endpoints",
+          "redevice",
+          "slideshow",
+          "voice"
+        ],
+        "title_i18n": {
+          "en": "ReDevice Control",
+          "ru": "Управление ReDevice"
+        },
+        "description_i18n": {
+          "en": "Endpoint inventory, settings, slideshow projection, and voice endpoint controls.",
+          "ru": "Инвентаризация endpoint, настройки, проекция слайдшоу и управление голосовыми endpoint."
+        }
+      },
+      "release_digest": "sha256:bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6"
+    },
+    "accepted_candidate_id": "redevice_control-0-1-14-89f2fa1bfae6",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.project.preflight",
+        "tests": "qualified application and component tests passed",
+        "cbs": "exact native admission or explicit compatibility classification",
+        "checkpoint_source_revision": "a34d127818d19eafa33892c8a7214093f6cfe71e",
+        "checkpoint_component_ref": "scenario:redevice_user_face"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [],
+        "sent_off_device": [],
+        "linked_to_user": [],
+        "tracking": false,
+        "retention": null
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [],
+        "sent_off_device": false,
+        "linked_to_user": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:18575981247455ea0c36bc9c6be308128c3caf16028863989d05cccfea4f84e1",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "redevice_control",
+      "release_digest": "sha256:bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:dbbcf23f407a9a19a40c0f4120ed0610e822227516750d6fd86e3f2c468f0f3d"
+  },
+  "channels": {
+    "stable": "sha256:bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6"
+  },
+  "semantic": {
+    "projection_digest": "sha256:c70167335319e4f7cfecbed2aefa9ef54e031915073ae38fa3af37e4e30df714",
+    "path": "semantic/applications/redevice_control/bb00c003ffc2545f4589fa9636261045b20d48624e07e57b28cf89f2fa1bfae6.json"
+  },
+  "projection_digest": "sha256:41cc48674808d3d7d902e9676bd016dc8583356ba4d6f403cc56f592f1120e6f"
+}
