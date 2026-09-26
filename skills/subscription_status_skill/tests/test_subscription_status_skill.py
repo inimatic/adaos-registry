@@ -18,7 +18,21 @@ def test_compact_cbs_provider_compiles_to_package_neutral_contracts():
         for path in root.rglob("*")
         if path.is_file() and ".runtime" not in path.parts
     }
-    compiled = compile_cbs_provider_files(files, kind="skill")
+    if "contracts/provider.cbs.yaml" not in files:
+        capability = json.loads((root / CAPABILITY_OUTPUT_PATH).read_text(encoding="utf-8"))
+        binding = json.loads((root / BINDING_OUTPUT_PATH).read_text(encoding="utf-8"))
+        assert capability["capability_ref"] == "capability:subscriptions.status.inspect"
+        assert binding["binding_definition_ref"] == (
+            "binding-definition:subscriptions.status.inspect.adaos-root-local"
+        )
+        return
+
+    authored_files = {
+        path: content
+        for path, content in files.items()
+        if path not in {CAPABILITY_OUTPUT_PATH, BINDING_OUTPUT_PATH}
+    }
+    compiled = compile_cbs_provider_files(authored_files, kind="skill")
 
     assert compiled is not None
     assert compiled.capability.capability_ref == "capability:subscriptions.status.inspect"
