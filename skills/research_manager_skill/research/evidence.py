@@ -3,22 +3,13 @@
 from __future__ import annotations
 
 import json
-import os
-from pathlib import Path
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from adaos.sdk.data.blob import store as blob_store
+
 from research.contracts import ResearchRecord, canonical_json, digest, identity, now
 from research.repository import ResearchRepository
-
-
-def _root() -> Path:
-    env_path = str(os.getenv("ADAOS_SKILL_ENV_PATH") or "").strip()
-    if not env_path:
-        raise RuntimeError("skill runtime data path is unavailable")
-    root = Path(env_path).resolve().parent.parent / "files" / "evidence"
-    root.mkdir(parents=True, exist_ok=True)
-    return root
 
 
 def _selected_records(
@@ -149,10 +140,11 @@ def export(
     existing = repository.get("evidence_bundle", bundle_id)
     if existing is not None:
         return existing.to_dict()
-    path = _root() / f"{bundle_id}.json"
-    temporary = path.with_suffix(".tmp")
-    temporary.write_bytes(payload)
-    os.replace(temporary, path)
+    stored = blob_store("evidence").put_bytes(
+        f"{bundle_id}.json",
+        payload,
+        media_type="application/vnd.adaos.research-evidence+json",
+    )
     record = repository.put(
         ResearchRecord(
             kind="evidence_bundle",
@@ -166,10 +158,10 @@ def export(
                 "assurances": manifest["assurances"],
                 "manifest_digest": manifest["manifest_digest"],
                 "content_ref": {
-                    "uri": f"skill-data:files/evidence/{bundle_id}.json",
-                    "digest": digest(payload),
-                    "size_bytes": len(payload),
-                    "media_type": "application/vnd.adaos.research-evidence+json",
+                    "uri": stored["ref"],
+                    "digest": stored["digest"],
+                    "size_bytes": stored["size_bytes"],
+                    "media_type": stored["media_type"],
                 },
                 "finalized_at": now(),
             },
@@ -182,9 +174,8 @@ def verify(repository: ResearchRepository, bundle_id: str) -> dict[str, Any]:
     bundle = repository.get("evidence_bundle", bundle_id)
     if bundle is None:
         raise KeyError(bundle_id)
-    path = _root() / f"{bundle_id}.json"
-    payload = path.read_bytes()
     content = dict(bundle.payload["content_ref"])
+    payload = blob_store("evidence").materialize_digest(str(content["digest"])).read_bytes()
     errors: list[str] = []
     if digest(payload) != content["digest"]:
         errors.append("bundle_content_digest_mismatch")

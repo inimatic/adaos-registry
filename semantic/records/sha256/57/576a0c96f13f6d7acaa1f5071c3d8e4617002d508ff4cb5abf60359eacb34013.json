@@ -1,0 +1,210 @@
+{
+  "authority_requirements": [],
+  "capability_ref": "capability:research.lifecycle.manage",
+  "compatibility": {},
+  "conformance_refs": [
+    "scenario:research.lifecycle.manage.v1"
+  ],
+  "contract_digest": "sha256:576a0c96f13f6d7acaa1f5071c3d8e4617002d508ff4cb5abf60359eacb34013",
+  "dependencies": [],
+  "effects": [
+    "creates and advances governed studies and experiments"
+  ],
+  "invariants": [
+    "research lineage",
+    "generations",
+    "and evidence remain explicit"
+  ],
+  "operations": [
+    {
+      "errors": [],
+      "input_schema": {
+        "properties": {
+          "analysis_plan": {
+            "type": "object"
+          },
+          "hypothesis": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "exploratory",
+              "confirmatory"
+            ]
+          },
+          "protocol": {
+            "type": "object"
+          },
+          "splits": {
+            "type": "object"
+          },
+          "study_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "hypothesis",
+          "protocol",
+          "analysis_plan",
+          "splits",
+          "idempotency_key"
+        ],
+        "type": "object"
+      },
+      "operation_id": "create_study",
+      "output_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "properties": {
+          "study_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "study_id"
+        ],
+        "type": "object"
+      },
+      "operation_id": "read_study",
+      "output_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "properties": {
+          "conditions": {
+            "type": "object"
+          },
+          "experiment_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "study_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "study_id",
+          "slug",
+          "title",
+          "purpose",
+          "conditions",
+          "idempotency_key"
+        ],
+        "type": "object"
+      },
+      "operation_id": "create_experiment",
+      "output_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "properties": {
+          "experiment_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "experiment_id"
+        ],
+        "type": "object"
+      },
+      "operation_id": "read_experiment",
+      "output_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "expected_generation": {
+            "type": "integer"
+          },
+          "experiment_id": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "profile": {
+            "enum": [
+              "preflight",
+              "confirmatory"
+            ]
+          }
+        },
+        "required": [
+          "experiment_id",
+          "profile",
+          "expected_generation"
+        ],
+        "type": "object"
+      },
+      "operation_id": "start_experiment",
+      "output_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "experiment_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "experiment_id"
+        ],
+        "type": "object"
+      },
+      "operation_id": "reconcile_experiment",
+      "output_schema": {
+        "type": "object"
+      }
+    }
+  ],
+  "schema": "adaos.capability.contract.v1",
+  "state_ports": [],
+  "title": "Manage governed research lifecycle",
+  "version": "1.0.0"
+}

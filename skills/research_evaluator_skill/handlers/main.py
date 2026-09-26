@@ -1097,3 +1097,13 @@ __all__ = [
     "export_calibration_package",
     "summarize_calibration",
 ]
+
+
+@tool("application_data_drain")
+def application_data_drain(**_):
+    return {"ok": True, "status": "drained"}
+
+
+@tool("application_data_rehydrate")
+def application_data_rehydrate(**_):
+    return {"ok": True, "status": "rehydrated"}

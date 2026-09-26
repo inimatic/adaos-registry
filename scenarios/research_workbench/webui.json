@@ -26,130 +26,71 @@
                         "researchCanAccept": false,
                         "researchAutomationBriefDigest": null,
                         "builderUrl": null,
+                        "implementationStatus": null,
+                        "candidateReleaseDigest": null,
+                        "projectReleaseRef": null,
+                        "studyRealizationRef": null,
+                        "researchExperimentId": null,
                         "selectedArtifactId": null,
                         "selectedArtifactGroupId": null,
                         "selectedArtifactTitle": null,
                         "selectedArtifactPreviewKind": null
                     },
                     "layout": {
-                        "version": 2,
-                        "pattern": "collection",
-                        "density": "comfortable",
-                        "contentWidth": "fluid",
-                        "scroll": "regions",
-                        "regions": [
+                        "type": "single",
+                        "pattern": "stack",
+                        "areas": [
                             {
                                 "id": "portfolio",
-                                "role": "collection",
-                                "priority": 100,
-                                "scroll": "page",
-                                "presentation": {
-                                    "wide": "pane",
-                                    "compact": "stack"
-                                },
+                                "role": "main",
                                 "label": "Research directions"
                             }
                         ],
-                        "interaction": {
-                            "selection": "single",
-                            "rowActivation": "select",
-                            "filters": "inline",
-                            "actions": "adaptive"
-                        },
                         "variants": [
                             {
-                                "pattern": "focus-detail",
-                                "density": "comfortable",
-                                "contentWidth": "fluid",
-                                "scroll": "regions",
-                                "regions": [
-                                    {
-                                        "id": "navigation",
-                                        "role": "navigation",
-                                        "priority": 80,
-                                        "scroll": "region",
-                                        "presentation": {
-                                            "wide": "pane",
-                                            "compact": "drawer"
-                                        },
-                                        "label": "Research structure",
-                                        "size": {
-                                            "minPx": 200,
-                                            "preferredPx": 340,
-                                            "maxPx": 480
-                                        }
-                                    },
+                                "id": "compilation",
+                                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'",
+                                "type": "single",
+                                "pattern": "stack",
+                                "areas": [
                                     {
                                         "id": "workspace",
-                                        "role": "collection",
-                                        "priority": 100,
-                                        "scroll": "page",
-                                        "presentation": {
-                                            "wide": "pane",
-                                            "compact": "stack"
-                                        },
-                                        "label": "Selected research object"
+                                        "role": "main",
+                                        "label": "Research compilation"
                                     }
-                                ],
-                                "interaction": {
-                                    "selection": "single",
-                                    "rowActivation": "select",
-                                    "filters": "inline",
-                                    "actions": "adaptive"
-                                },
+                                ]
+                            },
+                            {
                                 "id": "direction",
+                                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null",
+                                "type": "split",
+                                "pattern": "focus-detail",
+                                "sidebarWidth": 340,
                                 "areas": [
                                     {
-                                        "id": "workspace"
+                                        "id": "workspace",
+                                        "role": "main",
+                                        "label": "Selected research object"
                                     },
                                     {
-                                        "id": "context"
+                                        "id": "context",
+                                        "role": "sidebar",
+                                        "label": "Research structure"
                                     }
-                                ],
-                                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null"
+                                ]
                             },
                             {
-                                "pattern": "collection",
-                                "density": "comfortable",
-                                "contentWidth": "fluid",
-                                "scroll": "regions",
-                                "regions": [
+                                "id": "portfolio",
+                                "default": true,
+                                "type": "single",
+                                "pattern": "stack",
+                                "areas": [
                                     {
                                         "id": "portfolio",
-                                        "role": "collection",
-                                        "priority": 100,
-                                        "scroll": "page",
-                                        "presentation": {
-                                            "wide": "pane",
-                                            "compact": "stack"
-                                        },
+                                        "role": "main",
                                         "label": "Research directions"
                                     }
-                                ],
-                                "interaction": {
-                                    "selection": "single",
-                                    "rowActivation": "select",
-                                    "filters": "inline",
-                                    "actions": "adaptive"
-                                },
-                                "id": "portfolio",
-                                "areas": [
-                                    {
-                                        "id": "portfolio"
-                                    }
-                                ],
-                                "default": true
-                            },
-                            {
-                                "id": "compilation",
-                                "type": "single",
-                                "pattern": "single",
-                                "areas": [
-                                    {
-                                        "id": "workspace"
-                                    }
-                                ],
-                                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'"
+                                ]
                             }
                         ]
                     },
@@ -233,6 +174,11 @@
                                         "researchAdmissionDecision": "needs_discussion",
                                         "researchCanAccept": false,
                                         "builderUrl": null,
+                                        "implementationStatus": null,
+                                        "candidateReleaseDigest": null,
+                                        "projectReleaseRef": null,
+                                        "studyRealizationRef": null,
+                                        "researchExperimentId": null,
                                         "activeResearchTab": "overview",
                                         "activeCompilationFacet": "source_analysis"
                                     }
@@ -303,7 +249,12 @@
                                         "researchPrototypeDigest": null,
                                         "researchAdmissionDecision": "needs_discussion",
                                         "researchCanAccept": false,
-                                        "builderUrl": null
+                                        "builderUrl": null,
+                                        "implementationStatus": null,
+                                        "candidateReleaseDigest": null,
+                                        "projectReleaseRef": null,
+                                        "studyRealizationRef": null,
+                                        "researchExperimentId": null
                                     }
                                 }
                             ]
@@ -311,7 +262,7 @@
                         {
                             "id": "research-outline",
                             "type": "navigation.outline",
-                            "area": "navigation",
+                            "area": "context",
                             "title": "Research structure",
                             "visibleIf": "$state.selectedDirectionId != null",
                             "dataSource": {
@@ -424,6 +375,22 @@
                                     {
                                         "key": "development_session.session_id",
                                         "label": "Development Session"
+                                    },
+                                    {
+                                        "key": "selected_implementation_track.status",
+                                        "label": "Implementation state"
+                                    },
+                                    {
+                                        "key": "selected_implementation_track.project_release_ref",
+                                        "label": "ProjectRelease"
+                                    },
+                                    {
+                                        "key": "selected_implementation_track.study_realization_ref",
+                                        "label": "StudyRealization"
+                                    },
+                                    {
+                                        "key": "selected_implementation_track.experiment_id",
+                                        "label": "Experiment"
                                     }
                                 ],
                                 "stateBindings": {
@@ -433,6 +400,11 @@
                                     "researchCanAccept": "formulation.can_accept",
                                     "researchAutomationBriefDigest": "automation_brief.digest",
                                     "builderUrl": "builder_url",
+                                    "implementationStatus": "selected_implementation_track.status",
+                                    "candidateReleaseDigest": "selected_implementation_track.candidate_release_digest",
+                                    "projectReleaseRef": "selected_implementation_track.project_release_ref",
+                                    "studyRealizationRef": "selected_implementation_track.study_realization_ref",
+                                    "researchExperimentId": "selected_implementation_track.experiment_id",
                                     "selectedDirectionTitle": "direction.title",
                                     "researchConversationId": "conversation_id",
                                     "activeResearchTaskId": "active_task.task_id"
@@ -465,20 +437,20 @@
                                     {
                                         "id": "inquiry",
                                         "label": "Inquiry",
-                                        "icon": "telescope-outline",
-                                        "title": "Build a durable typed problem projection before committing to formulation or implementation."
+                                        "icon": "search-outline",
+                                        "title": "Discuss ideas while a typed scientific projection separates known work, research gaps, engineering problems, and intractable branches."
                                     },
                                     {
                                         "id": "formulation",
-                                        "label": "Discussion",
-                                        "icon": "chatbubbles-outline",
-                                        "title": "Discuss artifacts and decisions with the Researcher; accepted answers materialize typed ResearchPrototype revisions."
+                                        "label": "Formulation",
+                                        "icon": "flask-outline",
+                                        "title": "Form bounded ResearchTasks and later ResearchPrototype revisions only from an accepted inquiry projection."
                                     },
                                     {
                                         "id": "compilation",
                                         "label": "Compilation",
                                         "icon": "git-network-outline",
-                                        "title": "Inspect Source Analysis, Research Problem, Experimental Protocol, Engineering Contract, and traceability before acceptance."
+                                        "title": "Inspect Source Analysis, Research Problem, Experimental Protocol, Engineering Contract, Experiment Plan, and traceability before acceptance."
                                     },
                                     {
                                         "id": "development",
@@ -692,6 +664,137 @@
                             }
                         },
                         {
+                            "id": "inquiry-projection",
+                            "type": "static.markdown",
+                            "area": "workspace",
+                            "title": "Scientific projection",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_inquiry_projection",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId",
+                                    "task_id": "$state.selectedResearchTaskId"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.inquiry",
+                                    "research.artifacts"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 2
+                            },
+                            "inputs": {
+                                "bindField": "content"
+                            }
+                        },
+                        {
+                            "id": "inquiry-decision",
+                            "type": "ui.form",
+                            "area": "workspace",
+                            "title": "Projection decision",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
+                            "inputs": {
+                                "layout": "responsiveGrid",
+                                "submitLabel": "Apply exact decision",
+                                "resetOnSuccess": true,
+                                "fields": [
+                                    {
+                                        "id": "decision",
+                                        "name": "decision",
+                                        "type": "select",
+                                        "label": "Decision",
+                                        "required": true,
+                                        "options": [
+                                            {
+                                                "label": "Form research task",
+                                                "value": "accept_for_research_task"
+                                            },
+                                            {
+                                                "label": "Form engineering task",
+                                                "value": "accept_for_engineering_task"
+                                            },
+                                            {
+                                                "label": "Reuse known solution",
+                                                "value": "reuse_known_solution"
+                                            },
+                                            {
+                                                "label": "Defer as intractable",
+                                                "value": "defer_intractable"
+                                            },
+                                            {
+                                                "label": "Stop this branch",
+                                                "value": "stop"
+                                            },
+                                            {
+                                                "label": "Request revision",
+                                                "value": "request_revision"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "rationale",
+                                        "name": "rationale",
+                                        "type": "longText",
+                                        "label": "Rationale",
+                                        "required": true
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.decide_inquiry_projection",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId",
+                                        "decision": "$event.values.decision",
+                                        "rationale": "$event.values.rationale"
+                                    },
+                                    "invalidates": [
+                                        "research.inquiry",
+                                        "research.activity",
+                                        "research.portfolio"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "id": "inquiry-search",
+                            "type": "ui.actions",
+                            "area": "workspace",
+                            "title": "Source discovery",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "size": "small",
+                                "buttons": [
+                                    {
+                                        "id": "discover",
+                                        "label": "Search typed gaps",
+                                        "icon": "search-outline",
+                                        "title": "Search active SearchRequests. Results remain outside the evidence boundary."
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:discover",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.discover_inquiry_sources",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId"
+                                    },
+                                    "invalidates": [
+                                        "research.inquiry",
+                                        "research.activity"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
                             "id": "task-formulation-context",
                             "type": "ui.actions",
                             "area": "workspace",
@@ -733,7 +836,7 @@
                             "type": "static.markdown",
                             "area": "workspace",
                             "title": "Current draft and AdaOS review",
-                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'formulation'",
+                            "visibleIf": "$state.selectedDirectionId != null && ($state.activeResearchTab === 'inquiry' || $state.activeResearchTab === 'formulation')",
                             "dataSource": {
                                 "kind": "skill",
                                 "name": "research_orchestrator_skill.get_consensus",
@@ -754,143 +857,11 @@
                             }
                         },
                         {
-                            "id": "inquiry-projection",
-                            "type": "static.markdown",
-                            "area": "workspace",
-                            "title": "Typed inquiry projection",
-                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
-                            "dataSource": {
-                                "kind": "skill",
-                                "name": "research_orchestrator_skill.get_inquiry_projection",
-                                "params": {
-                                    "direction_id": "$state.selectedDirectionId",
-                                    "task_id": "$state.selectedResearchTaskId"
-                                },
-                                "cacheTtlMs": 0,
-                                "invalidationTags": [
-                                    "research.inquiry"
-                                ],
-                                "preserveLastValue": true,
-                                "maxRequestHz": 2
-                            },
-                            "inputs": {
-                                "bindField": "content"
-                            }
-                        },
-                        {
-                            "id": "inquiry-decision",
-                            "type": "ui.actions",
-                            "area": "workspace",
-                            "title": "Inquiry decision",
-                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
-                            "inputs": {
-                                "variant": "toolbar",
-                                "size": "small",
-                                "buttons": [
-                                    {
-                                        "id": "request_revision",
-                                        "label": "Continue inquiry",
-                                        "icon": "refresh-outline"
-                                    },
-                                    {
-                                        "id": "accept_for_research_task",
-                                        "label": "Accept for research",
-                                        "icon": "checkmark-circle-outline"
-                                    },
-                                    {
-                                        "id": "accept_for_engineering_task",
-                                        "label": "Accept for engineering",
-                                        "icon": "construct-outline"
-                                    }
-                                ]
-                            },
-                            "actions": [
-                                {
-                                    "on": "click",
-                                    "type": "callSkill",
-                                    "target": "research_orchestrator_skill.decide_inquiry_projection",
-                                    "params": {
-                                        "direction_id": "$state.selectedDirectionId",
-                                        "task_id": "$state.selectedResearchTaskId",
-                                        "decision": "$event.id",
-                                        "rationale": "Decision recorded from Research Workbench."
-                                    },
-                                    "invalidates": [
-                                        "research.inquiry"
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "id": "inquiry-search",
-                            "type": "ui.actions",
-                            "area": "workspace",
-                            "title": "Source discovery",
-                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
-                            "inputs": {
-                                "variant": "toolbar",
-                                "size": "small",
-                                "buttons": [
-                                    {
-                                        "id": "discover",
-                                        "label": "Discover sources",
-                                        "icon": "search-outline",
-                                        "title": "Search for bounded primary or authoritative source candidates. Results remain non-admitted until reviewed."
-                                    }
-                                ]
-                            },
-                            "actions": [
-                                {
-                                    "on": "click:discover",
-                                    "type": "callSkill",
-                                    "target": "research_orchestrator_skill.discover_inquiry_sources",
-                                    "params": {
-                                        "direction_id": "$state.selectedDirectionId",
-                                        "task_id": "$state.selectedResearchTaskId"
-                                    },
-                                    "invalidates": [
-                                        "research.inquiry"
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "id": "activity-accounting-actions",
-                            "type": "ui.actions",
-                            "area": "workspace",
-                            "title": "Inquiry accounting",
-                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
-                            "inputs": {
-                                "variant": "toolbar",
-                                "size": "small",
-                                "buttons": [
-                                    {
-                                        "id": "reconcile",
-                                        "label": "Reconcile model usage",
-                                        "icon": "calculator-outline"
-                                    }
-                                ]
-                            },
-                            "actions": [
-                                {
-                                    "on": "click:reconcile",
-                                    "type": "callSkill",
-                                    "target": "research_orchestrator_skill.reconcile_inquiry_usage",
-                                    "params": {
-                                        "direction_id": "$state.selectedDirectionId"
-                                    },
-                                    "invalidates": [
-                                        "research.inquiry"
-                                    ]
-                                }
-                            ]
-                        },
-                        {
                             "id": "research-chat",
                             "type": "ui.chat",
                             "area": "workspace",
                             "title": "Research discussion",
-                            "visibleIf": "$state.selectedDirectionId != null && ($state.activeResearchTab === 'inquiry' || $state.activeResearchTab === 'formulation')",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'inquiry'",
                             "dataSource": {
                                 "kind": "stream",
                                 "receiver": "voice_chat.messages",
@@ -908,7 +879,7 @@
                                 "enterToSend": true,
                                 "shiftEnterNewline": true,
                                 "showTimestamps": true,
-                                "placeholder": "Discuss the research question, falsifiable hypotheses, protocol, estimands, uncertainty, constraints, and unresolved decisions...",
+                                "placeholder": "Discuss the idea, known work, scientific uncertainty, tractability, competing problem frames, and possible next tasks...",
                                 "sendCommand": "voice.chat.user",
                                 "receiver": "voice_chat.messages",
                                 "scope": "shared",
@@ -921,7 +892,6 @@
                                     "dialog_channel_id": "research_orchestrator",
                                     "direction_id": "$state.selectedDirectionId",
                                     "task_id": "$state.selectedResearchTaskId",
-                                    "research_phase": "$state.activeResearchTab",
                                     "route_id": "voice_chat"
                                 }
                             },
@@ -964,9 +934,9 @@
                                     },
                                     {
                                         "id": "experiment_plan",
-                                        "label": "Experiment Plan",
-                                        "icon": "flask-outline",
-                                        "title": "Execution-ready experimental stages, budgets, estimand, uncertainty and stopping policy."
+                                        "label": "Execution plan",
+                                        "icon": "options-outline",
+                                        "title": "Provider-neutral dataset, arms, execution profiles, randomization, estimand, evidence policy, and runner ABI compiled for ResearchManager."
                                     },
                                     {
                                         "id": "traceability",
@@ -1037,6 +1007,55 @@
                                         "title": "Open a named Builder window and bind this exact Development Session. The target skill is read-write; Workbench, orchestrator, and artifact groups are read-only context."
                                     },
                                     {
+                                        "id": "start-implementation",
+                                        "label": "Start one-shot",
+                                        "icon": "play-outline",
+                                        "enabledIf": "$state.researchAutomationBriefDigest != null && $state.implementationStatus === 'development_ready'",
+                                        "title": "Start one bounded Builder Automation from the accepted ResearchCompilation and AutomationBrief. No post-start human directives are added."
+                                    },
+                                    {
+                                        "id": "sync-implementation",
+                                        "label": "Sync Builder",
+                                        "icon": "sync-outline",
+                                        "enabledIf": "$state.researchAutomationBriefDigest != null && $state.projectReleaseRef == null",
+                                        "title": "Read Builder Automation status and append an idempotent snapshot to the durable research activity journal."
+                                    },
+                                    {
+                                        "id": "prepare-release",
+                                        "label": "Prepare release",
+                                        "icon": "cube-outline",
+                                        "enabledIf": "$state.implementationStatus === 'implementation_complete' && $state.candidateReleaseDigest == null",
+                                        "title": "Run the Builder Project trial and freeze an immutable candidate digest. This does not promote the release."
+                                    },
+                                    {
+                                        "id": "publish-release",
+                                        "label": "Publish reviewed release",
+                                        "icon": "cloud-upload-outline",
+                                        "enabledIf": "$state.candidateReleaseDigest != null && $state.projectReleaseRef == null",
+                                        "title": "Promote exactly the reviewed candidate digest and bind it as the ProjectRelease for this implementation track."
+                                    },
+                                    {
+                                        "id": "instantiate-study",
+                                        "label": "Instantiate Study",
+                                        "icon": "flask-outline",
+                                        "enabledIf": "$state.projectReleaseRef != null && $state.studyRealizationRef == null",
+                                        "title": "Ask the installed release for immutable dataset split identities, then bind compilation, release, runner, Study, and Experiment."
+                                    },
+                                    {
+                                        "id": "start-smoke",
+                                        "label": "Start CPU smoke",
+                                        "icon": "hardware-chip-outline",
+                                        "enabledIf": "$state.researchExperimentId != null",
+                                        "title": "Lock the compiled protocol and start only its preregistered non-inferential workflow-smoke profile on the local CPU."
+                                    },
+                                    {
+                                        "id": "sync-study",
+                                        "label": "Sync Study",
+                                        "icon": "refresh-circle-outline",
+                                        "enabledIf": "$state.researchExperimentId != null",
+                                        "title": "Reconcile runner attempts through ResearchManager and join the resulting state into the Workbench activity journal."
+                                    },
+                                    {
                                         "id": "help-modal",
                                         "label": "How this works",
                                         "icon": "help-circle-outline",
@@ -1084,6 +1103,117 @@
                                     },
                                     "invalidates": [
                                         "builder.project.preview"
+                                    ]
+                                },
+                                {
+                                    "on": "click:start-implementation",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.start_implementation",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId",
+                                        "implementation_track_id": "$state.selectedImplementationTrackId"
+                                    },
+                                    "invalidates": [
+                                        "research.activity",
+                                        "research.implementation"
+                                    ]
+                                },
+                                {
+                                    "on": "click:sync-implementation",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.sync_implementation",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId",
+                                        "implementation_track_id": "$state.selectedImplementationTrackId"
+                                    },
+                                    "invalidates": [
+                                        "research.activity",
+                                        "research.implementation"
+                                    ]
+                                },
+                                {
+                                    "on": "click:prepare-release",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.prepare_project_release",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId",
+                                        "implementation_track_id": "$state.selectedImplementationTrackId",
+                                        "confirmed": true,
+                                        "bump": "patch"
+                                    },
+                                    "invalidates": [
+                                        "research.activity",
+                                        "research.implementation",
+                                        "research.release"
+                                    ]
+                                },
+                                {
+                                    "on": "click:publish-release",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.publish_project_release",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId",
+                                        "implementation_track_id": "$state.selectedImplementationTrackId",
+                                        "confirmed": true,
+                                        "bump": "patch"
+                                    },
+                                    "invalidates": [
+                                        "research.activity",
+                                        "research.implementation",
+                                        "research.release"
+                                    ]
+                                },
+                                {
+                                    "on": "click:instantiate-study",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.instantiate_study",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId",
+                                        "implementation_track_id": "$state.selectedImplementationTrackId",
+                                        "idempotency_key": "workbench-study-$state.selectedDirectionId-$state.selectedImplementationTrackId"
+                                    },
+                                    "invalidates": [
+                                        "research.activity",
+                                        "research.implementation",
+                                        "research.study",
+                                        "research.evidence"
+                                    ]
+                                },
+                                {
+                                    "on": "click:start-smoke",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.start_study_smoke",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId",
+                                        "implementation_track_id": "$state.selectedImplementationTrackId",
+                                        "confirmed": true,
+                                        "idempotency_key": "workbench-smoke-$state.selectedDirectionId-$state.selectedImplementationTrackId"
+                                    },
+                                    "invalidates": [
+                                        "research.activity",
+                                        "research.study",
+                                        "research.evidence"
+                                    ]
+                                },
+                                {
+                                    "on": "click:sync-study",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.sync_study",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId",
+                                        "implementation_track_id": "$state.selectedImplementationTrackId"
+                                    },
+                                    "invalidates": [
+                                        "research.activity",
+                                        "research.study",
+                                        "research.evidence"
                                     ]
                                 },
                                 {
@@ -1218,6 +1348,39 @@
                             }
                         },
                         {
+                            "id": "activity-accounting-actions",
+                            "type": "ui.actions",
+                            "area": "workspace",
+                            "title": "Token accounting",
+                            "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'activity'",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "size": "small",
+                                "buttons": [
+                                    {
+                                        "id": "reconcile",
+                                        "label": "Reconcile Researcher usage",
+                                        "icon": "calculator-outline",
+                                        "title": "Re-read durable Root jobs; interactive Codex remains excluded."
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:reconcile",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.reconcile_inquiry_usage",
+                                    "params": {
+                                        "direction_id": "$state.selectedDirectionId",
+                                        "task_id": "$state.selectedResearchTaskId"
+                                    },
+                                    "invalidates": [
+                                        "research.activity"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
                             "id": "studies-placeholder",
                             "type": "static.markdown",
                             "area": "workspace",
@@ -1272,12 +1435,71 @@
                         },
                         {
                             "id": "releases-placeholder",
-                            "type": "static.markdown",
+                            "type": "item.details",
                             "area": "workspace",
-                            "title": "Releases",
+                            "title": "Implementation lineage",
                             "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'releases'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_direction",
+                                "params": {
+                                    "direction_id": "$state.selectedDirectionId",
+                                    "task_id": "$state.selectedResearchTaskId",
+                                    "implementation_track_id": "$state.selectedImplementationTrackId"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "research.formulation",
+                                    "research.activity",
+                                    "research.automation_brief"
+                                ],
+                                "preserveLastValue": true,
+                                "maxRequestHz": 2
+                            },
                             "inputs": {
-                                "content": "## No research releases yet\n\nA portable release will freeze the direction snapshot and exact Project composition without making Project the owner of the scientific lifecycle."
+                                "emptyText": "No implementation track is selected.",
+                                "fields": [
+                                    {
+                                        "key": "selected_implementation_track.ref",
+                                        "label": "Implementation track"
+                                    },
+                                    {
+                                        "key": "selected_implementation_track.status",
+                                        "label": "State"
+                                    },
+                                    {
+                                        "key": "development_session.session_id",
+                                        "label": "Development Session"
+                                    },
+                                    {
+                                        "key": "selected_implementation_track.candidate_release_digest",
+                                        "label": "Reviewed candidate"
+                                    },
+                                    {
+                                        "key": "selected_implementation_track.project_release_ref",
+                                        "label": "ProjectRelease"
+                                    },
+                                    {
+                                        "key": "selected_implementation_track.project_release_digest",
+                                        "label": "Release digest"
+                                    },
+                                    {
+                                        "key": "selected_implementation_track.runner_ref",
+                                        "label": "Installed runner"
+                                    },
+                                    {
+                                        "key": "selected_implementation_track.study_realization_ref",
+                                        "label": "StudyRealization"
+                                    },
+                                    {
+                                        "key": "selected_implementation_track.study_realization_digest",
+                                        "label": "Realization digest"
+                                    },
+                                    {
+                                        "key": "selected_implementation_track.experiment_id",
+                                        "label": "ResearchManager Experiment"
+                                    }
+                                ]
                             }
                         },
                         {
@@ -1287,7 +1509,7 @@
                             "title": "Using Research Workbench",
                             "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'help'",
                             "inputs": {
-                                "content": "# Research Workbench\n\n1. Add exact source artifacts.\n2. Select the active task and reach a human-readable consensus with the Researcher.\n3. Inspect the typed formulation, accepted compilation, and unresolved decisions.\n4. Accept an exact digest only when the formulation is ready.\n5. Open the named Builder window for the selected implementation track.\n\nThe Workbench owns direction, task, compilation, and implementation-track metadata. A dedicated skill is the physical custodian of source artifacts. Project is created for the implementation/distribution boundary and does not own the scientific lifecycle."
+                                "content": "# Research Workbench\n\n1. Discuss an idea while Inquiry maintains a typed scientific projection.\n2. Inspect ProblemDisposition before spending effort on formulation or implementation.\n3. Add exact source artifacts when a knowledge or novelty gap requires them.\n4. Record a human decision over the exact projection digest.\n5. Form ResearchTasks and later implementation tracks only through admitted transitions.\n\nThe Workbench owns the shared inquiry and research lifecycle. A direction skill is only the physical custodian of domain artifacts. Builder is not authorized by discussion or by an LLM readiness statement."
                             }
                         }
                     ]
@@ -1304,29 +1526,13 @@
                         "id": "research_direction_selector",
                         "title": "Choose research direction",
                         "layout": {
-                            "version": 2,
-                            "pattern": "collection",
-                            "density": "comfortable",
-                            "contentWidth": "fluid",
-                            "scroll": "page",
-                            "regions": [
+                            "type": "stack",
+                            "areas": [
                                 {
                                     "id": "main",
-                                    "role": "collection",
-                                    "priority": 100,
-                                    "scroll": "page",
-                                    "presentation": {
-                                        "wide": "pane",
-                                        "compact": "stack"
-                                    }
+                                    "role": "main"
                                 }
-                            ],
-                            "interaction": {
-                                "selection": "single",
-                                "rowActivation": "select",
-                                "filters": "inline",
-                                "actions": "adaptive"
-                            }
+                            ]
                         },
                         "widgets": [
                             {
@@ -1398,29 +1604,13 @@
                         "id": "research_new_direction",
                         "title": "New research direction",
                         "layout": {
-                            "version": 2,
-                            "pattern": "task-flow",
-                            "density": "comfortable",
-                            "contentWidth": "fluid",
-                            "scroll": "page",
-                            "regions": [
+                            "type": "stack",
+                            "areas": [
                                 {
                                     "id": "main",
-                                    "role": "main",
-                                    "priority": 100,
-                                    "scroll": "page",
-                                    "presentation": {
-                                        "wide": "pane",
-                                        "compact": "stack"
-                                    }
+                                    "role": "main"
                                 }
-                            ],
-                            "interaction": {
-                                "selection": "none",
-                                "rowActivation": "none",
-                                "filters": "inline",
-                                "actions": "adaptive"
-                            }
+                            ]
                         },
                         "widgets": [
                             {
@@ -1505,29 +1695,13 @@
                         "id": "research_direction_details",
                         "title": "Research direction details",
                         "layout": {
-                            "version": 2,
-                            "pattern": "document",
-                            "density": "comfortable",
-                            "contentWidth": "fluid",
-                            "scroll": "page",
-                            "regions": [
+                            "type": "stack",
+                            "areas": [
                                 {
                                     "id": "main",
-                                    "role": "main",
-                                    "priority": 100,
-                                    "scroll": "page",
-                                    "presentation": {
-                                        "wide": "pane",
-                                        "compact": "stack"
-                                    }
+                                    "role": "main"
                                 }
-                            ],
-                            "interaction": {
-                                "selection": "none",
-                                "rowActivation": "none",
-                                "filters": "inline",
-                                "actions": "adaptive"
-                            }
+                            ]
                         },
                         "widgets": [
                             {
@@ -1630,29 +1804,13 @@
                         "id": "research_artifact_preview",
                         "title": "Artifact preview",
                         "layout": {
-                            "version": 2,
-                            "pattern": "document",
-                            "density": "comfortable",
-                            "contentWidth": "fluid",
-                            "scroll": "page",
-                            "regions": [
+                            "type": "stack",
+                            "areas": [
                                 {
                                     "id": "main",
-                                    "role": "main",
-                                    "priority": 100,
-                                    "scroll": "page",
-                                    "presentation": {
-                                        "wide": "pane",
-                                        "compact": "stack"
-                                    }
+                                    "role": "main"
                                 }
-                            ],
-                            "interaction": {
-                                "selection": "none",
-                                "rowActivation": "none",
-                                "filters": "inline",
-                                "actions": "adaptive"
-                            }
+                            ]
                         },
                         "widgets": [
                             {
@@ -1792,29 +1950,13 @@
                         "id": "research_workbench_help",
                         "title": "Research Workbench — usage and capabilities",
                         "layout": {
-                            "version": 2,
-                            "pattern": "document",
-                            "density": "comfortable",
-                            "contentWidth": "fluid",
-                            "scroll": "page",
-                            "regions": [
+                            "type": "stack",
+                            "areas": [
                                 {
                                     "id": "main",
-                                    "role": "main",
-                                    "priority": 100,
-                                    "scroll": "page",
-                                    "presentation": {
-                                        "wide": "pane",
-                                        "compact": "stack"
-                                    }
+                                    "role": "main"
                                 }
-                            ],
-                            "interaction": {
-                                "selection": "none",
-                                "rowActivation": "none",
-                                "filters": "inline",
-                                "actions": "adaptive"
-                            }
+                            ]
                         },
                         "widgets": [
                             {
@@ -1850,7 +1992,7 @@
                 }
             }
         },
-        "version": "0.1.6",
+        "version": "0.1.17",
         "manifest": "webui.json"
     }
 }

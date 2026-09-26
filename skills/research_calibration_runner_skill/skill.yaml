@@ -1,5 +1,5 @@
 name: research_calibration_runner_skill
-version: 0.1.17
+version: 0.2.8
 description: Contamination-aware execution bridge from frozen research calibration
   packets to native Builder Automation.
 supported_locales:
@@ -217,7 +217,7 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-21T11:48:46+00:00'
+updated_at: '2026-09-26T06:53:03+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.911+5548.415c0357
@@ -226,4 +226,8 @@ compatibility:
     min_commit: 415c0357ed326622e5e16f264487204bfefc8584
     min_short_commit: 415c0357
     build_date: '2026-08-21T14:48:29+03:00'
-
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases: []
+  coordination_files: []

@@ -1,0 +1,171 @@
+{
+  "authority_requirements": [],
+  "capability_ref": "capability:research.workbench.manage",
+  "compatibility": {},
+  "conformance_refs": [
+    "scenario:research.workbench.manage.v1"
+  ],
+  "contract_digest": "sha256:6a2632847f3a633953ad89b75d548ae050d36b6bbc7b9101db121f4865df42ed",
+  "dependencies": [],
+  "effects": [
+    "creates and updates research directions",
+    "tasks",
+    "and evidence"
+  ],
+  "invariants": [
+    "research lineage remains explicit and auditable"
+  ],
+  "operations": [
+    {
+      "errors": [],
+      "input_schema": {
+        "additionalProperties": true,
+        "properties": {
+          "limit": {
+            "maximum": 5000,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "list_directions",
+      "output_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "additionalProperties": true,
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "skill_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "title"
+        ],
+        "type": "object"
+      },
+      "operation_id": "create_direction",
+      "output_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "additionalProperties": true,
+        "properties": {
+          "activate": {
+            "default": false,
+            "type": "boolean"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "branch_of_task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dependency_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "direction_id": {
+            "type": "string"
+          },
+          "parent_task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "research_question": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "direction_id",
+          "title"
+        ],
+        "type": "object"
+      },
+      "operation_id": "create_task",
+      "output_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "additionalProperties": true,
+        "properties": {
+          "direction_id": {
+            "type": "string"
+          },
+          "implementation_track_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "direction_id"
+        ],
+        "type": "object"
+      },
+      "operation_id": "get_direction",
+      "output_schema": {
+        "type": "object"
+      }
+    }
+  ],
+  "schema": "adaos.capability.contract.v1",
+  "state_ports": [],
+  "title": "Manage governed research work",
+  "version": "1.0.0"
+}

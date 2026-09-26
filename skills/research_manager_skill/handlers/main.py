@@ -490,3 +490,8 @@ def decide_claim(
 @tool("get_study")
 def get_study(study_id: str) -> dict[str, Any]:
     return _manager().status(study_id)
+
+
+@tool("application_data_drain")
+def application_data_drain(**_):
+    return {"ok": True, "status": "drained"}

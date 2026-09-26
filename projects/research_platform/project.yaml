@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: research_platform
-version: 0.1.9
+version: 0.1.20
 profiles:
 - adaos.research.platform.v1
 components:
@@ -71,7 +71,7 @@ catalog:
   - evaluator
   - mlflow
 publication:
-  stage: alpha
+  stage: beta
   visibility: listed
   channel: stable
 install:
@@ -111,8 +111,9 @@ compatibility:
   required_entrypoints:
   - workbench
   required_contracts:
-  - adaos.research.direction.v1
-  - adaos.research.experiment.v1
+  - capability:research.workbench.manage@^1.0.0
+  - capability:research.lifecycle.manage@^1.0.0
+  - capability:research.tracking.manage@^1.0.0
   validation_profiles:
   - research.platform.local
 lifecycle:

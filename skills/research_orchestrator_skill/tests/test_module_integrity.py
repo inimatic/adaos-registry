@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import importlib.util
 import sys
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 import yaml
 
 from adaos.services.skill.validation import SkillValidationService
+from adaos.services.applications.data_lifecycle import declared_databases
 
 
 def test_skill_manifest_and_entrypoint_are_valid() -> None:
@@ -20,7 +22,11 @@ def test_skill_manifest_and_entrypoint_are_valid() -> None:
     }
     assert "accept_prototype" in manifest["exports"]["tools"]
     assert "get_formulation_run" in manifest["exports"]["tools"]
-    assert manifest["conversation"]["dialog_channel"]["default_tool"] == "research_orchestrator_skill.chat"
+    assert "get_inquiry_projection" in manifest["exports"]["tools"]
+    assert "inquiry_chat" in manifest["exports"]["tools"]
+    assert "discover_inquiry_sources" in manifest["exports"]["tools"]
+    assert "reconcile_inquiry_usage" in manifest["exports"]["tools"]
+    assert manifest["conversation"]["dialog_channel"]["default_tool"] == "research_orchestrator_skill.inquiry_chat"
 
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
@@ -28,8 +34,45 @@ def test_skill_manifest_and_entrypoint_are_valid() -> None:
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    assert callable(module.inquiry_chat)
+    assert callable(module.discover_inquiry_sources)
+    assert callable(module.reconcile_inquiry_usage)
     assert callable(module.chat)
     assert callable(module.get_formulation_run)
 
     report = SkillValidationService(None).validate_path(root, install_mode=True)  # type: ignore[arg-type]
     assert report.ok is True, [f"{item.code}: {item.message}" for item in report.issues]
+
+
+def test_manifest_migration_chain_matches_runtime_declaration() -> None:
+    root = Path(__file__).resolve().parents[1]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from research.repository import MIGRATIONS
+
+    manifest = yaml.safe_load((root / "skill.yaml").read_text(encoding="utf-8"))
+    declared = declared_databases(manifest)["db/research_orchestrator.db"]
+    assert [item.version for item in declared] == [item.version for item in MIGRATIONS]
+    assert [item.checksum for item in declared] == [item.checksum for item in MIGRATIONS]
+
+
+def test_acceptance_method_returns_through_atomic_idempotency_boundary() -> None:
+    root = Path(__file__).resolve().parents[1]
+    module = ast.parse(
+        (root / "research" / "orchestrator.py").read_text(encoding="utf-8")
+    )
+    orchestrator = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.ClassDef) and node.name == "ResearchOrchestrator"
+    )
+    method = next(
+        node
+        for node in orchestrator.body
+        if isinstance(node, ast.FunctionDef) and node.name == "accept"
+    )
+    final = method.body[-1]
+    assert isinstance(final, ast.Return)
+    assert isinstance(final.value, ast.Call)
+    assert isinstance(final.value.func, ast.Attribute)
+    assert final.value.func.attr == "once"

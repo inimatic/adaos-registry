@@ -1406,7 +1406,9 @@ def test_workflow_validation_evidence_is_scoped_verified_and_non_finalizing(
         experiment_id=experiment_id,
     )
     assert bundle["payload"]["scope"] == "workflow_validation"
-    manifest_path = evidence_module._root() / f"{bundle['record_id']}.json"
+    manifest_path = evidence_module.blob_store("evidence").materialize_digest(
+        bundle["payload"]["content_ref"]["digest"]
+    )
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     record_ids = {item["record_id"] for item in manifest["content_refs"]}
     assert experiment_id in record_ids

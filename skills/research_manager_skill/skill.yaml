@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.43.0
+version: 0.57.0
 description: Reusable provider-neutral research control plane for governed studies,
   experiments, runner providers, trackers and immutable evidence.
 entry: handlers/main.py
@@ -24,6 +24,7 @@ service:
     timeout_ms: 1000
 capabilities:
 - storage.relational
+- storage.blob
 - execution.jobs
 - execution.jobs.delegate_data_owner
 - secrets.read
@@ -37,6 +38,7 @@ data_migration:
 lifecycle:
   after_activate: ensure_schema
   rehydrate: rehydrate
+  drain: application_data_drain
 default_tool: get_study
 tools:
 - name: ensure_schema
@@ -856,6 +858,15 @@ tools:
         type: string
   output_schema:
     type: object
+- name: application_data_drain
+  description: Provide a verified Application data lifecycle receipt.
+  entry: handlers.main:application_data_drain
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
 data_routes:
 - surface: widget:research-study-status
   route: tool/details
@@ -987,7 +998,7 @@ data_routes:
     - research-experiment
     - research-tracking
     - research-evidence
-updated_at: '2026-08-21T21:22:21+00:00'
+updated_at: '2026-09-26T06:52:46+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.917+5567.3e20803a
@@ -996,4 +1007,81 @@ compatibility:
     min_commit: 3e20803ad5df3748161559081ba35bd05ef97a73
     min_short_commit: 3e20803a
     build_date: '2026-08-22T00:20:43+03:00'
-
+  legacy_cbs_rebinding:
+    package_digests:
+    - sha256:a4b9b92384565bec0cf0fdae3fecd81d4cd989b05fb4a9d6e1fa578a9ffafdc5
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases:
+  - path: db/research.db
+    migrations:
+    - version: 1
+      name: research immutable record store
+      statements:
+      - CREATE TABLE research_records (kind TEXT NOT NULL, record_id TEXT NOT NULL,
+        study_id TEXT NOT NULL, generation INTEGER NOT NULL, payload_json TEXT NOT
+        NULL, digest TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(kind, record_id))
+      - CREATE INDEX research_records_study_kind ON research_records(study_id, kind)
+      - CREATE TABLE research_events (event_id TEXT PRIMARY KEY, study_id TEXT NOT
+        NULL, event_type TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT
+        NOT NULL)
+      - CREATE INDEX research_events_study ON research_events(study_id, created_at)
+      - CREATE TABLE research_commands (idempotency_key TEXT PRIMARY KEY, command_name
+        TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL)
+      idempotent: true
+      dialects:
+      - sqlite
+      - postgresql
+    - version: 2
+      name: typed local tracker
+      statements:
+      - CREATE TABLE tracker_runs (run_id TEXT PRIMARY KEY, study_id TEXT NOT NULL,
+        trial_id TEXT NOT NULL, status TEXT NOT NULL, parameters_json TEXT NOT NULL,
+        tags_json TEXT NOT NULL, started_at TEXT NOT NULL, finalized_at TEXT)
+      - CREATE TABLE tracker_observations (observation_id TEXT PRIMARY KEY, run_id
+        TEXT NOT NULL, name TEXT NOT NULL, value_json TEXT NOT NULL, step INTEGER,
+        split_role TEXT NOT NULL, recorded_at TEXT NOT NULL)
+      - CREATE INDEX tracker_observations_run ON tracker_observations(run_id, name)
+      idempotent: true
+      dialects:
+      - sqlite
+      - postgresql
+    - version: 3
+      name: attempt-aware tracker contract journal
+      statements:
+      - CREATE TABLE tracker_sessions (session_id TEXT PRIMARY KEY, provider_id TEXT
+        NOT NULL, study_id TEXT NOT NULL, experiment_id TEXT NOT NULL, experiment_revision_id
+        TEXT NOT NULL, trial_id TEXT NOT NULL, run_id TEXT NOT NULL, attempt_id TEXT
+        NOT NULL, status TEXT NOT NULL, parameters_json TEXT NOT NULL, tags_json TEXT
+        NOT NULL, inputs_json TEXT NOT NULL, provider_binding_json TEXT NOT NULL,
+        completeness_json TEXT NOT NULL, opened_at TEXT NOT NULL, closed_at TEXT)
+      - CREATE UNIQUE INDEX tracker_sessions_attempt ON tracker_sessions(attempt_id)
+      - CREATE INDEX tracker_sessions_experiment ON tracker_sessions(experiment_id,
+        opened_at)
+      - CREATE TABLE tracker_events (event_id TEXT PRIMARY KEY, session_id TEXT NOT
+        NULL, event_kind TEXT NOT NULL, payload_json TEXT NOT NULL, payload_digest
+        TEXT NOT NULL, observed_at TEXT NOT NULL, ingested_at TEXT NOT NULL, delivery_state
+        TEXT NOT NULL, provider_receipt_json TEXT NOT NULL)
+      - CREATE INDEX tracker_events_session ON tracker_events(session_id, observed_at,
+        event_id)
+      - CREATE INDEX tracker_events_delivery ON tracker_events(delivery_state, ingested_at)
+      idempotent: true
+      dialects:
+      - sqlite
+      - postgresql
+    - version: 4
+      name: tracker provider links
+      statements:
+      - CREATE TABLE tracker_provider_links (session_id TEXT NOT NULL, provider_id
+        TEXT NOT NULL, link_json TEXT NOT NULL, state TEXT NOT NULL, updated_at TEXT
+        NOT NULL, PRIMARY KEY(session_id, provider_id))
+      - CREATE INDEX tracker_provider_links_state ON tracker_provider_links(provider_id,
+        state, updated_at)
+      idempotent: true
+      dialects:
+      - sqlite
+      - postgresql
+  coordination_files: []
+  reconstructible_directories:
+  - db/backups

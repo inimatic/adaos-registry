@@ -97,3 +97,8 @@ def get_tracking_ui() -> dict[str, Any]:
 @tool("rehydrate")
 def rehydrate() -> dict[str, Any]:
     return provider_health()
+
+
+@tool("application_data_drain")
+def application_data_drain(**_):
+    return {"ok": True, "status": "drained"}

@@ -1,5 +1,5 @@
 name: mlflow_tracker_skill
-version: 0.2.2
+version: 0.3.10
 description: Supervised MLflow tracking provider and native query UI for the AdaOS
   research tracker contract.
 entry: handlers/main.py
@@ -101,7 +101,16 @@ tools:
     additionalProperties: false
   output_schema:
     type: object
-updated_at: '2026-08-08T02:41:08+00:00'
+- name: application_data_drain
+  description: Provide a verified Application data lifecycle receipt.
+  entry: handlers.main:application_data_drain
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+updated_at: '2026-09-26T06:53:09+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.719+4732.37b30da3
@@ -110,4 +119,16 @@ compatibility:
     min_commit: 37b30da30c12d38eb01929493ba6eaf0e8ef8ef2
     min_short_commit: 37b30da3
     build_date: '2026-08-08T05:40:35+03:00'
-
+  legacy_cbs_rebinding:
+    package_digests:
+    - sha256:9e2faaf5ba238042c99267c7bb7fe8d0e901c931676e46800a7dc887c720f356
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases:
+  - path: db/mlflow.db
+    migrations: []
+  coordination_files: []
+lifecycle:
+  drain: application_data_drain
+  rehydrate: rehydrate

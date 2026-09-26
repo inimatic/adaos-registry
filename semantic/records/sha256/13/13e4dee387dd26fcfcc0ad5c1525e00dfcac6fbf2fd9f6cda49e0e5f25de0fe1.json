@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:research.lifecycle.manage.adaos",
+  "binding_definition_digest": "sha256:6b8d4d2ef02f8ae2d2c816d4a7c6f60ed378afcc9f9c739b498d3a377512ba40",
+  "logical_entrypoint": "research.lifecycle.manage.adaos",
+  "package": {
+    "kind": "skill",
+    "id": "research_manager_skill",
+    "version": "0.57.0",
+    "digest": "sha256:e744ce8e8e465ff4036f42d9a80dce02e9f6783eadd970f3fb0dfb61fb7c608f"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:13e4dee387dd26fcfcc0ad5c1525e00dfcac6fbf2fd9f6cda49e0e5f25de0fe1"
+}

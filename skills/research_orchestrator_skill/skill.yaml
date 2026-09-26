@@ -1,12 +1,12 @@
 name: research_orchestrator_skill
-version: 0.33.0
+version: 0.82.0
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
 - en
 - ru
 entry: handlers/main.py
-default_tool: chat
+default_tool: inquiry_chat
 runtime:
   python: '3.11'
 data_migration:
@@ -31,6 +31,7 @@ exports:
   - ensure_schema
   - project_execution_contracts
   - rehydrate
+  - application_data_drain
   - list_directions
   - resolve_focus
   - create_direction
@@ -48,15 +49,19 @@ exports:
   - list_artifacts
   - preview_artifact
   - get_consensus
-  - record_prototype
-  - chat
   - get_inquiry_projection
-  - decide_inquiry_projection
+  - inquiry_chat
   - discover_inquiry_sources
   - reconcile_inquiry_usage
+  - record_inquiry_turn
+  - decide_inquiry_projection
+  - record_prototype
+  - chat
   - accept_prototype
   - get_automation_brief
   - open_builder_session
+  - refresh_development_contract
+  - branch_implementation_track
   - get_activity
   - get_formulation_run
   - get_compilation
@@ -103,6 +108,15 @@ tools:
   input_schema:
     type: object
     additionalProperties: false
+  output_schema:
+    type: object
+- name: application_data_drain
+  description: Provide a verified Application data lifecycle receipt.
+  entry: handlers.main:application_data_drain
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    additionalProperties: true
   output_schema:
     type: object
 - name: list_directions
@@ -507,11 +521,29 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
-- name: chat
-  description: Discuss a research direction with the configured Root LLM and materialize
-    a provenance-grounded ResearchPrototype revision through bounded schema and semantic
-    repair.
-  entry: handlers.main:chat
+- name: get_inquiry_projection
+  description: Read the current typed scientific projection, ProblemDisposition, semantic
+    measures, and exact human decision.
+  entry: handlers.main:get_inquiry_projection
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: inquiry_chat
+  description: Update the typed scientific inquiry projection through a high-reasoning
+    Researcher LLM call without writing a paper or ResearchPrototype.
+  entry: handlers.main:inquiry_chat
   side_effects: local_write
   timeout_seconds: 1800
   input_schema:
@@ -533,87 +565,21 @@ tools:
         - string
         - 'null'
       actor:
-        description: Stable caller identity recorded in the durable directive trace.
         type:
         - string
         - 'null'
       invocation_origin:
-        description: Conversation, API, CLI, Codex, or another caller channel used
-          to decide whether the directive must also be projected into chat.
         type:
         - string
         - 'null'
-      research_phase:
-        description: Route chat through the durable inquiry projection or the formulation compiler.
-        type:
-        - string
-        - 'null'
-        enum:
-        - inquiry
-        - formulation
-        - null
-      webspace_id:
-        type:
-        - string
-        - 'null'
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: get_inquiry_projection
-  description: Read or initialize the durable typed pre-formulation inquiry projection.
-  entry: handlers.main:get_inquiry_projection
-  side_effects: none
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: decide_inquiry_projection
-  description: Record a human decision over one exact inquiry projection revision.
-  entry: handlers.main:decide_inquiry_projection
-  side_effects: local_write
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    - decision
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      decision:
-        type: string
-        enum:
-        - accept_for_research_task
-        - accept_for_engineering_task
-        - reuse_known_solution
-        - defer_intractable
-        - stop
-        - request_revision
-      rationale:
-        type: string
-      actor:
-        type: string
     additionalProperties: true
   output_schema:
     type: object
 - name: discover_inquiry_sources
-  description: Use bounded web search to discover non-admitted source candidates for active inquiry gaps.
+  description: Use Researcher web search for active typed SearchRequests and persist
+    non-admitted source candidate receipts with provider token usage.
   entry: handlers.main:discover_inquiry_sources
   side_effects: external_read
-  timeout_seconds: 300
   input_schema:
     type: object
     required:
@@ -629,13 +595,16 @@ tools:
         type:
         - string
         - 'null'
+      actor:
+        type: string
     additionalProperties: true
   output_schema:
     type: object
 - name: reconcile_inquiry_usage
-  description: Deduplicate provider jobs and report persisted inquiry token usage.
+  description: Re-read durable Root LLM jobs to backfill missing Researcher token
+    usage without changing scientific state.
   entry: handlers.main:reconcile_inquiry_usage
-  side_effects: none
+  side_effects: external_read
   input_schema:
     type: object
     required:
@@ -643,6 +612,135 @@ tools:
     properties:
       direction_id:
         type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: record_inquiry_turn
+  description: Persist one reviewed event and typed projection patch through deterministic
+    semantic gates.
+  entry: handlers.main:record_inquiry_turn
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - text
+    - patch
+    properties:
+      direction_id:
+        type: string
+      text:
+        type: string
+      patch:
+        type: object
+      task_id:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
+      patch_actor_kind:
+        enum:
+        - human
+        - llm
+        - deterministic_tool
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: decide_inquiry_projection
+  description: Record a human decision over the exact current inquiry projection digest.
+  entry: handlers.main:decide_inquiry_projection
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - decision
+    - rationale
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      decision:
+        enum:
+        - accept_for_research_task
+        - accept_for_engineering_task
+        - reuse_known_solution
+        - defer_intractable
+        - stop
+        - request_revision
+      rationale:
+        type: string
+      accepted_by:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: chat
+  description: Discuss a research direction with the configured Root LLM and materialize
+    a provenance-grounded ResearchPrototype revision through bounded schema and semantic
+    repair.
+  entry: handlers.main:chat
+  side_effects: local_write
+  timeout_seconds: 1800
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - text
+    properties:
+      direction_id:
+        type: string
+      text:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      workflow_smoke_policy_id:
+        description: Explicit engineering-smoke policy. Provider-compatible mode may
+          relax only non-inferential smoke isolation after capability discovery; it
+          never changes confirmatory scientific requirements.
+        enum:
+        - enforced_offline
+        - provider_compatible_noninferential
+        - null
+      formulation_inheritance_policy_id:
+        description: Explicit successor policy. Parent preservation binds immutable
+          accepted scientific fields while allowing a separately admitted engineering-smoke
+          adaptation.
+        enum:
+        - independent
+        - preserve_parent_scientific_contract
+        - null
+      model:
+        type:
+        - string
+        - 'null'
+      actor:
+        description: Stable caller identity recorded in the durable directive trace.
+        type:
+        - string
+        - 'null'
+      invocation_origin:
+        description: Conversation, API, CLI, Codex, or another caller channel used
+          to decide whether the directive must also be projected into chat.
+        type:
+        - string
+        - 'null'
+      webspace_id:
+        type:
+        - string
+        - 'null'
     additionalProperties: true
   output_schema:
     type: object
@@ -749,6 +847,346 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: refresh_development_contract
+  description: Supersede the exact Development Session when its admitted consumer
+    ABI has changed, preserving the accepted scientific and engineering instructions.
+  entry: handlers.main:refresh_development_contract
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: branch_implementation_track
+  description: Create an idempotent successor ImplementationTrack for a repaired realization
+    while preserving predecessor release, Study, and Experiment identity.
+  entry: handlers.main:branch_implementation_track
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      reason:
+        type: string
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: start_implementation
+  description: Start one-shot Builder Automation using only the exact digest-bound
+    Development Session inputs.
+  entry: handlers.main:start_implementation
+  side_effects: external_write
+  timeout_seconds: 240
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      builder_webspace_id:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: sync_implementation
+  description: Import a durable idempotent Builder Automation status snapshot into
+    research activity.
+  entry: handlers.main:sync_implementation
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      builder_webspace_id:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: prepare_project_release
+  description: Prepare a Builder candidate trial and bind its immutable release digest
+    to the implementation track.
+  entry: handlers.main:prepare_project_release
+  side_effects: external_write
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - confirmed
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      builder_webspace_id:
+        type:
+        - string
+        - 'null'
+      bump:
+        enum:
+        - major
+        - minor
+        - patch
+        default: patch
+      confirmed:
+        const: true
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: publish_project_release
+  description: Promote the exact reviewed Builder candidate and bind its ProjectRelease
+    identity.
+  entry: handlers.main:publish_project_release
+  side_effects: external_write
+  timeout_seconds: 360
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - confirmed
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      builder_webspace_id:
+        type:
+        - string
+        - 'null'
+      bump:
+        enum:
+        - major
+        - minor
+        - patch
+        default: patch
+      confirmed:
+        const: true
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: instantiate_study
+  description: Create an exact ResearchManager StudyRealization and draft Experiment
+    from the accepted ExperimentPlan.
+  entry: handlers.main:instantiate_study
+  side_effects: external_write
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - idempotency_key
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      idempotency_key:
+        type: string
+        minLength: 1
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: repeat_study_experiment
+  description: Create a fresh execution campaign for the same immutable StudyRealization,
+    preserving the terminal parent Experiment as lineage evidence.
+  entry: handlers.main:repeat_study_experiment
+  side_effects: external_write
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - idempotency_key
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      idempotency_key:
+        type: string
+        minLength: 1
+      reason:
+        type: string
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: start_study_smoke
+  description: Explicitly lock the compiled protocol and submit its non-inferential
+    CPU preflight through ResearchManager.
+  entry: handlers.main:start_study_smoke
+  side_effects: external_write
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - idempotency_key
+    - confirmed
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      idempotency_key:
+        type: string
+        minLength: 1
+      confirmed:
+        const: true
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: sync_study
+  description: Reconcile ResearchManager execution and import an idempotent Study
+    activity snapshot.
+  entry: handlers.main:sync_study
+  side_effects: local_write
+  timeout_seconds: 240
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: finalize_workflow_evidence
+  description: Finalize and independently verify a campaign-scoped operational Evidence
+    bundle without advancing the scientific claim lifecycle.
+  entry: handlers.main:finalize_workflow_evidence
+  side_effects: external_write
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - idempotency_key
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      idempotency_key:
+        type: string
+        minLength: 1
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: get_activity
   description: Read durable stage activity for chat and widget projections.
   entry: handlers.main:get_activity
@@ -820,7 +1258,6 @@ tools:
         - research_problem
         - experimental_protocol
         - engineering_contract
-        - experiment_plan
         - traceability
         default: traceability
     additionalProperties: true
@@ -840,21 +1277,12 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
-- name: application_data_drain
-  description: Provide a verified Application data lifecycle receipt.
-  entry: handlers.main:application_data_drain
-  side_effects: runtime_write
-  input_schema:
-    type: object
-    additionalProperties: true
-  output_schema:
-    type: object
 conversation:
   dialog_channel:
     id: research_orchestrator
     label: Исследователь
     owner: skill:research_orchestrator_skill
-    default_tool: research_orchestrator_skill.chat
+    default_tool: research_orchestrator_skill.inquiry_chat
     route_id: voice_chat
     history:
       store: node
@@ -894,7 +1322,7 @@ conversation:
     kind: skill_agent
     channel_id: research_orchestrator
     skill: research_orchestrator_skill
-    talk_tool: chat
+    talk_tool: inquiry_chat
     gender: neutral
     voice: default
     icon: flask-outline
@@ -903,26 +1331,6 @@ conversation:
     - aResearcher
     - research orchestrator
 data_routes:
-- surface: widget:inquiry-projection
-  route: tool/details
-  tool: get_inquiry_projection
-  owner: skill:research_orchestrator_skill
-  first_paint: empty or last durable typed inquiry projection
-  recovery: continue the inquiry discussion or refresh after targeted invalidation
-  guard_visibility: inquiry records, readiness, discovery candidates, and exact digests only
-  budget:
-    max_payload_bytes: 1048576
-  read_policy:
-    mode: explicit
-    triggers:
-    - mount
-    - explicit_refresh
-    - targeted_invalidation
-    cache_ttl_ms: 0
-    max_request_hz: 2
-    preserve_last_value: true
-    invalidation_tags:
-    - research.inquiry
 - surface: widget:research-focus
   route: tool/details
   tool: resolve_focus
@@ -1076,6 +1484,29 @@ data_routes:
     invalidation_tags:
     - research.formulation
     - research.automation_brief
+- surface: widget:inquiry-projection
+  route: tool/details
+  tool: get_inquiry_projection
+  owner: skill:research_orchestrator_skill
+  first_paint: empty typed scientific inquiry projection
+  recovery: preserve the last projection and retry after inquiry invalidation
+  guard_visibility: compact typed semantics, provenance refs, measures, and semantic
+    diff; raw source bytes excluded
+  budget:
+    max_payload_bytes: 1048576
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - research.inquiry
+    - research.artifacts
 - surface: widget:research-activity
   route: tool/details
   tool: get_activity
@@ -1205,13 +1636,13 @@ llm_hints:
   - research orchestrator
   - исследователь
   primary_actions:
-  - id: research_orchestrator_skill.chat
-    intent: research_orchestrator_skill.chat
-    tool: chat
+  - id: research_orchestrator_skill.inquiry_chat
+    intent: research_orchestrator_skill.inquiry_chat
+    tool: inquiry_chat
     side_effect_class: local_write
     examples:
-    - Обсуди постановку исследования
-    - Уточни гипотезы и план эксперимента
+    - Обсуди идею и обнови научную проекцию
+    - Определи, известна ли проблема, исследуема ли она или является инженерной
   - id: research_orchestrator_skill.next_steps
     intent: research_orchestrator_skill.next_steps
     tool: next_steps
@@ -1228,15 +1659,15 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-09-26T03:38:47+00:00'
+updated_at: '2026-09-26T06:52:35+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.863+5255.a81c7a26
-    recorded_at: '2026-08-18T15:04:30+00:00'
+    min_version: 0.1.904+5517.70d7d20b
+    recorded_at: '2026-08-21T07:40:04+00:00'
     source: skill_push
-    min_commit: a81c7a26c1e3516880555b7662f893509fbc4883
-    min_short_commit: a81c7a26
-    build_date: '2026-08-18T17:54:03+03:00'
+    min_commit: 70d7d20b24b646d8d84f404c5685a8e14418da8d
+    min_short_commit: 70d7d20b
+    build_date: '2026-08-21T07:36:48+00:00'
 data_lifecycle:
   schema: adaos.skill.data_lifecycle.v1
   execution: native_tools
@@ -1351,15 +1782,82 @@ data_lifecycle:
       - sqlite
       - postgresql
     - version: 4
-      name: durable pre-formulation inquiry
+      name: project release study realization and federated activity lineage
       statements:
-      - CREATE TABLE research_inquiry_projections (direction_id TEXT PRIMARY KEY, task_id TEXT, projection_digest TEXT NOT NULL, projection_json TEXT NOT NULL, acceptance_json TEXT, discovery_json TEXT, updated_at TEXT NOT NULL)
-      - CREATE TABLE research_inquiry_events (event_id TEXT PRIMARY KEY, direction_id TEXT NOT NULL, ordinal INTEGER NOT NULL, projected INTEGER NOT NULL, event_json TEXT NOT NULL, created_at TEXT NOT NULL)
-      - CREATE UNIQUE INDEX research_inquiry_event_ordinal ON research_inquiry_events(direction_id, ordinal)
-      - CREATE TABLE research_inquiry_usage (receipt_id TEXT PRIMARY KEY, direction_id TEXT NOT NULL, provider_job_id TEXT, operation_kind TEXT NOT NULL, usage_json TEXT NOT NULL, created_at TEXT NOT NULL)
-      - CREATE INDEX research_inquiry_usage_direction ON research_inquiry_usage(direction_id, created_at)
+      - ALTER TABLE research_implementation_tracks ADD COLUMN project_release_ref
+        TEXT
+      - ALTER TABLE research_implementation_tracks ADD COLUMN project_release_digest
+        TEXT
+      - ALTER TABLE research_implementation_tracks ADD COLUMN study_id TEXT
+      - ALTER TABLE research_implementation_tracks ADD COLUMN study_realization_ref
+        TEXT
+      - ALTER TABLE research_implementation_tracks ADD COLUMN study_realization_digest
+        TEXT
+      - ALTER TABLE research_implementation_tracks ADD COLUMN runner_ref TEXT
+      - ALTER TABLE research_implementation_tracks ADD COLUMN experiment_id TEXT
+      - ALTER TABLE research_activity ADD COLUMN source_event_id TEXT
+      - CREATE UNIQUE INDEX research_activity_external_event ON research_activity(origin,
+        source_event_id)
+      idempotent: true
+      dialects:
+      - sqlite
+      - postgresql
+    - version: 5
+      name: scope research prototype revisions to tasks
+      statements:
+      - DROP INDEX research_prototypes_revision
+      - CREATE UNIQUE INDEX research_prototypes_task_revision ON research_prototypes(task_id,
+        revision)
+      idempotent: true
+      dialects:
+      - sqlite
+      - postgresql
+    - version: 6
+      name: typed scientific inquiry projection ledger
+      statements:
+      - CREATE TABLE research_inquiries (inquiry_id TEXT PRIMARY KEY, direction_id
+        TEXT NOT NULL, task_id TEXT NOT NULL UNIQUE, current_projection_digest TEXT,
+        accepted_decision_digest TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT
+        NULL)
+      - CREATE INDEX research_inquiries_direction ON research_inquiries(direction_id,
+        updated_at)
+      - CREATE TABLE research_discussion_events (digest TEXT PRIMARY KEY, event_id
+        TEXT NOT NULL UNIQUE, inquiry_id TEXT NOT NULL, direction_id TEXT NOT NULL,
+        task_id TEXT NOT NULL, ordinal INTEGER NOT NULL, payload_json TEXT NOT NULL,
+        created_at TEXT NOT NULL)
+      - CREATE UNIQUE INDEX research_discussion_events_ordinal ON research_discussion_events(inquiry_id,
+        ordinal)
+      - CREATE TABLE research_projection_patches (digest TEXT PRIMARY KEY, patch_id
+        TEXT NOT NULL UNIQUE, inquiry_id TEXT NOT NULL, direction_id TEXT NOT NULL,
+        task_id TEXT NOT NULL, base_projection_digest TEXT NOT NULL, trigger_event_ref
+        TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)
+      - CREATE TABLE research_inquiry_projections (digest TEXT PRIMARY KEY, inquiry_id
+        TEXT NOT NULL, direction_id TEXT NOT NULL, task_id TEXT NOT NULL, revision
+        INTEGER NOT NULL, parent_digest TEXT, applied_patch_digest TEXT, payload_json
+        TEXT NOT NULL, created_at TEXT NOT NULL)
+      - CREATE UNIQUE INDEX research_inquiry_projection_revision ON research_inquiry_projections(inquiry_id,
+        revision)
+      - CREATE TABLE research_inquiry_acceptances (digest TEXT PRIMARY KEY, acceptance_id
+        TEXT NOT NULL UNIQUE, inquiry_id TEXT NOT NULL, direction_id TEXT NOT NULL,
+        task_id TEXT NOT NULL, projection_digest TEXT NOT NULL, decision TEXT NOT
+        NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)
+      idempotent: true
+      dialects:
+      - sqlite
+      - postgresql
+    - version: 7
+      name: typed source discovery receipts
+      statements:
+      - CREATE TABLE research_source_discoveries (digest TEXT PRIMARY KEY, discovery_id
+        TEXT NOT NULL UNIQUE, inquiry_id TEXT NOT NULL, direction_id TEXT NOT NULL,
+        task_id TEXT NOT NULL, projection_digest TEXT NOT NULL, provider_job_id TEXT
+        NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)
+      - CREATE INDEX research_source_discoveries_inquiry ON research_source_discoveries(inquiry_id,
+        created_at)
       idempotent: true
       dialects:
       - sqlite
       - postgresql
   coordination_files: []
+  reconstructible_directories:
+  - db/backups

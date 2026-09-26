@@ -1,0 +1,55 @@
+{
+  "authority_requirements": [],
+  "capability_ref": "capability:research.tracking.manage",
+  "compatibility": {},
+  "conformance_refs": [
+    "scenario:research.tracking.manage.v1"
+  ],
+  "contract_digest": "sha256:ddb415bc0add5333468ace2e346e4b26afaed725dae3bc8c314ac703bcbc305a",
+  "dependencies": [],
+  "effects": [
+    "reads provider status and exposes a governed tracking UI"
+  ],
+  "invariants": [
+    "tracking provider identity and health remain explicit"
+  ],
+  "operations": [
+    {
+      "errors": [],
+      "input_schema": {
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "operation_id": "describe_provider",
+      "output_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "operation_id": "check_provider",
+      "output_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "operation_id": "open_tracking_ui",
+      "output_schema": {
+        "type": "object"
+      }
+    }
+  ],
+  "schema": "adaos.capability.contract.v1",
+  "state_ports": [],
+  "title": "Manage governed research tracking",
+  "version": "1.0.0"
+}

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import copy
 from collections.abc import Mapping
 
-from research.formulation import STAGES, assemble_candidate, provider_schema, stage_quality_issues, stage_schema, validate_stage
+from research.formulation import STAGES, assemble_candidate, derive_inherited_formulation, provider_schema, resolve_workflow_smoke_policy, stage_digest, stage_quality_issues, stage_schema, validate_stage
 from research.compiler import build_compilation, project_execution_compilation
 
 
@@ -27,6 +28,30 @@ def _problem() -> dict:
             "coverage_limitations": ["Исторические outputs не являются подтверждением."],
             "unresolved_decisions": [],
         },
+        "experimental_signature": {
+            "subject": "Paired STL-10 pooling classifier",
+            "dataset": {
+                "id": "stl10_torchvision",
+                "label": "STL-10 version torchvision",
+                "specification": "Torchvision STL-10 with a fixed development split and sealed test split.",
+            },
+            "baseline": {
+                "id": "maxpool",
+                "label": "MaxPool",
+                "specification": "Ordinary MaxPool at the selected pooling boundary.",
+            },
+            "intervention": {
+                "id": "tlp",
+                "label": "TLP",
+                "specification": "Centered trainable max-plus pooling at the same boundary.",
+            },
+            "intervention_boundary": "Only the pool2 operator and its trainability may differ between arms.",
+            "primary_outcome": {
+                "name": "validation accuracy delta",
+                "measurement": "paired TLP minus MaxPool top-1 accuracy",
+                "unit": "proportion",
+            },
+        },
     }
 
 
@@ -37,6 +62,13 @@ def _protocol(*, unresolved: bool = False) -> dict:
         "assistant_message": "Предложен двухстадийный протокол.",
         "experimental_plan": {
             "comparators": ["MaxPool", "TLP"],
+            "comparison_design": {
+                "arms": [
+                    {"id": "maxpool", "label": "MaxPool", "role": "baseline", "specification": "Ordinary MaxPool at the selected pooling boundary."},
+                    {"id": "tlp", "label": "TLP", "role": "intervention", "specification": "Centered trainable max-plus pooling at the same boundary."},
+                ],
+                "primary_contrast": {"minuend": "tlp", "subtrahend": "maxpool"},
+            },
             "system_specification": {
                 "subject": "Paired STL-10 pooling classifier",
                 "components": [
@@ -65,11 +97,12 @@ def _protocol(*, unresolved: bool = False) -> dict:
                 "unresolved_choices": [],
             },
             "stages": [
-                {"id": "smoke", "purpose": "Проверить исполнимость и сбор evidence.", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current", "device": "cpu"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 30}, "inference_allowed": False, "stop_conditions": ["Остановить при нечисловом loss."]},
-                {"id": "confirmatory", "purpose": "Оценить заранее объявленный парный контраст.", "evidence_class": "confirmatory", "execution_profile": {"node": "member", "device": "cpu"}, "budget": {"epochs": 30, "seed_values": seed_values, "max_wall_time_minutes": 360}, "inference_allowed": True, "stop_conditions": ["Завершить фиксированный бюджет."]},
+                {"id": "smoke", "purpose": "Проверить исполнимость и сбор evidence.", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current", "device": "cpu", "network_mode": "offline"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 30, "workload": {"mode": "bounded", "limits": [{"name": "train_samples", "maximum": 128, "unit": "samples"}]}}, "input_policy": {"source": "deterministic_contract_fixture", "readiness": "required_before_execution", "sampling": "deterministic_seeded"}, "inference_allowed": False, "stop_conditions": ["Остановить при нечисловом loss."]},
+                {"id": "confirmatory", "purpose": "Оценить заранее объявленный парный контраст.", "evidence_class": "confirmatory", "execution_profile": {"node": "member", "device": "cpu", "network_mode": "offline"}, "budget": {"epochs": 30, "seed_values": seed_values, "max_wall_time_minutes": 360, "workload": {"mode": "full", "limits": []}}, "input_policy": {"source": "accepted_dataset", "readiness": "required_before_execution", "sampling": "full"}, "inference_allowed": True, "stop_conditions": ["Завершить фиксированный бюджет."]},
             ],
             "data_policy": {
                 "dataset": "STL-10 version torchvision",
+                "dataset_id": "stl10_torchvision",
                 "split_strategy": "Фиксированный train/validation split до запуска.",
                 "evaluation_seal": "Test labels не используются до финальной оценки.",
                 "leakage_controls": ["Не выбирать конфигурацию по test metric."],
@@ -113,7 +146,7 @@ def _protocol(*, unresolved: bool = False) -> dict:
     }
 
 
-def _implementation() -> dict:
+def _implementation(protocol: Mapping[str, object] | None = None) -> dict:
     requirement_categories = ("execution", "data", "reproducibility", "observability", "evidence", "recovery", "analysis", "security")
     check_categories = ("workflow", "data_integrity", "reproducibility", "evidence", "analysis", "failure_recovery", "security")
     requirements = {category: [] for category in requirement_categories}
@@ -122,7 +155,19 @@ def _implementation() -> dict:
         requirements[category] = [{"requirement": f"Implement a concrete {category} obligation.", "verification": f"Verify {category} with a deterministic report."}]
     for category in check_categories[:4]:
         checks[category] = [{"check": f"The {category} condition is observably satisfied.", "evidence": f"Stored {category} report"}]
-    return {"assistant_message": "Инженерный контракт скомпилирован.", "requirements_by_category": requirements, "checks_by_category": checks}
+    return {
+        "assistant_message": "Инженерный контракт скомпилирован.",
+        "scientific_bindings": {
+            "protocol_digest": stage_digest(protocol or _protocol()),
+            "dataset_id": "stl10_torchvision",
+            "baseline_arm_id": "maxpool",
+            "intervention_arm_id": "tlp",
+            "primary_outcome_name": "validation accuracy delta",
+            "runner_contract": "adaos.research.runner.v1",
+        },
+        "requirements_by_category": requirements,
+        "checks_by_category": checks,
+    }
 
 
 def _assert_strict_objects(value: object) -> None:
@@ -169,7 +214,7 @@ def test_candidate_assembly_canonicalizes_repeated_source_refs() -> None:
     assert candidate["source_grounding"][0]["source_refs"] == [EXACT_REF]
 
 
-def test_research_compiler_emits_four_facets_and_source_to_acceptance_traceability() -> None:
+def test_research_compiler_emits_execution_plan_and_source_to_acceptance_traceability() -> None:
     bundle = {
         "digest": "sha256:" + "9" * 64,
         "audience": "research.formulation",
@@ -221,6 +266,7 @@ def test_research_compiler_emits_four_facets_and_source_to_acceptance_traceabili
         "research_problem",
         "experimental_protocol",
         "engineering_contract",
+        "experiment_plan",
     ]
     assert package["context_receipt"]["excluded_count"] == 1
     assert package["traceability_coverage"]["valid"] is True
@@ -228,9 +274,30 @@ def test_research_compiler_emits_four_facets_and_source_to_acceptance_traceabili
     assert package["readiness"] == {"decision": "ready_for_acceptance", "blockers": []}
     assert package["digest"].startswith("sha256:")
     projection = project_execution_compilation(package)
+    assert projection["schema_version"] == "1.3.0"
     assert projection["compilation_digest"] == package["digest"]
     assert projection["traceability"]["protocol_digest"] == package["facets"]["experimental_protocol"]["digest"]
+    plan = projection["experiment_plan"]
+    assert plan["schema_version"] == "1.4.0"
+    assert plan["system"]["subject"] == "Paired STL-10 pooling classifier"
+    assert plan["system"]["components"][0]["settings"][0]["value"] == (
+        "conv32,pool1,conv64,pool2,conv128,pool3,fc256,fc10"
+    )
+    assert plan["system"]["intervention_boundary"] == (
+        "Only the pool2 operator and its trainability may differ between arms."
+    )
+    assert plan["system"]["digest"].startswith("sha256:")
+    assert plan["execution"]["smoke"]["network_mode"] == "offline"
+    assert plan["execution"]["smoke"]["workload"]["mode"] == "bounded"
+    assert plan["execution"]["smoke"]["input_policy"]["readiness"] == "required_before_execution"
+    assert [item["id"] for item in plan["operators"]["arms"]] == ["maxpool", "tlp"]
+    assert plan["analysis"]["primary_contrast"] == {"minuend": "tlp", "subtrahend": "maxpool"}
+    assert plan["execution"]["smoke"]["epochs"] == 3
+    assert plan["execution"]["confirmatory"]["seeds"] == [17, 23]
+    assert plan["runner_contract"]["dataset_binding"]["required_roles"] == ["validation", "robustness", "test"]
     assert "inventory" not in projection["source_analysis"]
+    assert "assistant_message" not in projection["experimental_protocol"]
+    assert "experimental_plan" not in projection["experimental_protocol"]
     assert all(node["kind"] != "acceptance_check" for node in projection["traceability"]["nodes"])
 
 
@@ -318,7 +385,8 @@ def test_provider_schema_removes_unsupported_keywords_without_weakening_local_va
 
 
 def test_unresolved_protocol_decision_is_a_deterministic_readiness_blocker() -> None:
-    candidate = assemble_candidate(_problem(), _protocol(unresolved=True), _implementation(), source_ref_map={REF: EXACT_REF})
+    protocol = _protocol(unresolved=True)
+    candidate = assemble_candidate(_problem(), protocol, _implementation(protocol), source_ref_map={REF: EXACT_REF})
     assert candidate["readiness"]["decision"] == "needs_discussion"
     assert "Какой confirmatory budget" in candidate["readiness"]["blocking_questions"][0]
 
@@ -360,8 +428,25 @@ def test_implementation_contract_rejects_per_epoch_final_test_observation() -> N
     )
 
     assert stage_quality_issues("implementation_contract", implementation) == [
-        "implementation contract must not observe final-test metrics per epoch"
+        "requirements_by_category.evidence.0.requirement must not require final-test metrics per epoch; "
+        "replace it with one sealed final-test evaluation after selection. Rejected text: "
+        "Store train, validation, and test metrics after every epoch."
     ]
+
+
+def test_implementation_contract_allows_explicit_per_epoch_final_test_prohibition() -> None:
+    implementation = _implementation()
+    implementation["requirements_by_category"]["evidence"][0]["requirement"] = (
+        "Never store final-test metrics per epoch; expose them only once after the evaluation seal."
+    )
+    implementation["checks_by_category"]["workflow"][0]["check"] = (
+        "Отклонить запуск, если test metrics вычислялись на каждой эпохе."
+    )
+    implementation["checks_by_category"]["workflow"][0]["evidence"] = (
+        "Audit shows test metrics per epoch are absent."
+    )
+
+    assert stage_quality_issues("implementation_contract", implementation) == []
 
 
 def test_hypothesis_and_decision_direction_must_match() -> None:
@@ -391,4 +476,312 @@ def test_two_sided_hypothesis_cannot_call_the_other_direction_falsification() ->
 
     assert stage_quality_issues("problem_frame", problem, allowed_source_refs={REF}) == [
         "a two-sided difference hypothesis cannot treat the opposite direction as falsification"
+    ]
+
+
+def test_cross_stage_gate_rejects_a_locally_valid_but_unrelated_protocol() -> None:
+    protocol = copy.deepcopy(_protocol())
+    plan = protocol["experimental_plan"]
+    plan["comparators"] = ["baseline_cnn", "intervention_cnn_aug"]
+    plan["comparison_design"] = {
+        "arms": [
+            {"id": "baseline_cnn", "label": "baseline_cnn", "role": "baseline", "specification": "CNN without data augmentation."},
+            {"id": "intervention_cnn_aug", "label": "intervention_cnn_aug", "role": "intervention", "specification": "CNN with rotation and flip augmentation."},
+        ],
+        "primary_contrast": {"minuend": "intervention_cnn_aug", "subtrahend": "baseline_cnn"},
+    }
+    plan["system_specification"]["subject"] = "CIFAR-10 augmentation classifier"
+    plan["system_specification"]["intervention_boundary"] = "Only random crop and flip augmentation differs between arms."
+    plan["data_policy"]["dataset_id"] = "cifar10"
+    plan["data_policy"]["dataset"] = "CIFAR-10"
+    plan["stages"][0]["execution_profile"]["device"] = "cuda"
+    plan["stages"][0]["budget"]["epochs"] = 1
+    plan["stages"][0]["budget"]["seed_values"] = [42]
+    protocol["evaluation_plan"]["outcomes"][0].update(
+        {
+            "name": "augmentation accuracy delta",
+            "measurement": "augmented minus baseline CIFAR-10 accuracy",
+            "unit": "percentage point",
+        }
+    )
+
+    issues = stage_quality_issues(
+        "protocol_design",
+        protocol,
+        expected_effect_direction="difference",
+        expected_experimental_signature=_problem()["experimental_signature"],
+        required_workflow_smoke={"device": "cpu", "epochs": 3, "seed_values": [17], "inference_allowed": False},
+    )
+
+    assert "comparison_design must exactly preserve baseline and intervention identity from experimental_signature" in issues
+    assert "data_policy.dataset_id must exactly preserve experimental_signature dataset id" in issues
+    assert "primary outcome must exactly preserve experimental_signature name, measurement, and unit" in issues
+    assert "workflow_smoke must exactly preserve the AdaOS execution policy" in issues
+    try:
+        assemble_candidate(_problem(), protocol, _implementation(protocol), source_ref_map={REF: EXACT_REF})
+    except ValueError as exc:
+        assert "cross-stage formulation contract" in str(exc)
+    else:
+        raise AssertionError("expected a semantically unrelated protocol to be rejected")
+
+
+def test_protocol_accepts_a_complete_ordered_comparator_id_projection() -> None:
+    protocol = _protocol()
+    protocol["experimental_plan"]["comparators"] = ["maxpool", "tlp"]
+
+    issues = stage_quality_issues(
+        "protocol_design",
+        protocol,
+        expected_effect_direction="difference",
+        expected_experimental_signature=_problem()["experimental_signature"],
+        required_workflow_smoke={"device": "cpu", "epochs": 3, "seed_values": [17], "inference_allowed": False},
+    )
+
+    assert issues == []
+
+
+def test_provider_compatible_smoke_policy_uses_capabilities_without_claiming_isolation() -> None:
+    status = {
+        "schema": "adaos.execution.provider_status.v1",
+        "provider": {
+            "provider_id": "local-process",
+            "features": ["process", "network_observation"],
+        },
+        "provider_digest": "sha256:" + "7" * 64,
+    }
+
+    binding = resolve_workflow_smoke_policy(
+        "provider_compatible_noninferential",
+        provider_status=status,
+    )
+
+    assert binding["requirements"]["network_mode"] == "unrestricted"
+    assert binding["requirements"]["input_source"] == "deterministic_contract_fixture"
+    assert binding["network_enforcement"] == "not_required"
+    assert binding["network_observation_required"] is True
+    protocol = _protocol()
+    protocol["experimental_plan"]["stages"][0]["execution_profile"][
+        "network_mode"
+    ] = "unrestricted"
+    candidate = assemble_candidate(
+        _problem(),
+        protocol,
+        _implementation(protocol),
+        source_ref_map={REF: EXACT_REF},
+        required_workflow_smoke=binding["requirements"],
+    )
+    assert candidate["experimental_plan"]["stages"][0]["execution_profile"][
+        "network_mode"
+    ] == "unrestricted"
+
+
+def test_provider_compatible_smoke_policy_requires_authoritative_snapshot() -> None:
+    try:
+        resolve_workflow_smoke_policy("provider_compatible_noninferential")
+    except ValueError as exc:
+        assert "authoritative" in str(exc)
+    else:
+        raise AssertionError("provider-compatible policy must not be inferred")
+
+
+def test_parent_scientific_contract_rejects_successor_drift_but_allows_smoke_policy_change() -> None:
+    parent_problem = _problem()
+    changed_problem = copy.deepcopy(parent_problem)
+    changed_problem["research_question"] = "Does an unrelated optimizer improve accuracy?"
+
+    assert (
+        "problem frame must exactly preserve parent research_question under the selected inheritance policy"
+        in stage_quality_issues(
+            "problem_frame",
+            changed_problem,
+            required_parent_problem=parent_problem,
+        )
+    )
+
+    parent_protocol = _protocol()
+    successor = copy.deepcopy(parent_protocol)
+    successor["experimental_plan"]["stages"][0]["execution_profile"][
+        "network_mode"
+    ] = "unrestricted"
+    policy = {
+        "device": "cpu",
+        "epochs": 3,
+        "seed_values": [17],
+        "inference_allowed": False,
+        "network_mode": "unrestricted",
+        "input_source": "deterministic_contract_fixture",
+        "input_readiness": "required_before_execution",
+        "workload_mode": "bounded",
+    }
+    assert stage_quality_issues(
+        "protocol_design",
+        successor,
+        required_workflow_smoke=policy,
+        required_parent_protocol=parent_protocol,
+    ) == []
+
+    successor["experimental_plan"]["stages"][1]["budget"]["epochs"] = 160
+    assert (
+        "protocol must exactly preserve parent confirmatory stages under the selected inheritance policy"
+        in stage_quality_issues(
+            "protocol_design",
+            successor,
+            required_workflow_smoke=policy,
+            required_parent_protocol=parent_protocol,
+        )
+    )
+
+
+def test_deterministic_successor_changes_only_engineering_smoke_contract() -> None:
+    problem = _problem()
+    problem["background"] += (
+        " The workflow smoke is bounded and offline; the confirmatory profile is offline too."
+    )
+    protocol = _protocol()
+    implementation = _implementation(protocol)
+    protocol["experimental_plan"]["stages"][0]["stop_conditions"].append(
+        "Any network attempt must fail because workflow_smoke is offline."
+    )
+    protocol["experimental_plan"]["system_specification"]["components"].append(
+        {
+            "id": "run_log",
+            "role": "measurement",
+            "specification": "Record counts. Network is disabled in workflow_smoke.",
+            "settings": [
+                {"key": "network_access", "value": "disabled in workflow_smoke"},
+                {"key": "format", "value": "json"},
+            ],
+            "decision_status": "policy_default",
+            "source_refs": [],
+        }
+    )
+    implementation["checks_by_category"]["workflow"].append(
+        {
+            "check": "Network is disabled in both workflow_smoke and confirmatory profiles.",
+            "evidence": "Network isolation log.",
+        }
+    )
+    binding = resolve_workflow_smoke_policy(
+        "provider_compatible_noninferential",
+        provider_status={
+            "schema": "adaos.execution.provider_status.v1",
+            "provider": {"provider_id": "local-process", "features": ["process"]},
+            "provider_digest": "sha256:" + "6" * 64,
+        },
+    )
+
+    derived = derive_inherited_formulation(
+        problem,
+        protocol,
+        implementation,
+        workflow_smoke_binding=binding,
+    )
+
+    assert derived["problem_frame"]["research_question"] == problem["research_question"]
+    assert derived["problem_frame"]["hypotheses"] == problem["hypotheses"]
+    assert derived["problem_frame"]["experimental_signature"] == problem[
+        "experimental_signature"
+    ]
+    assert "smoke is bounded and offline" not in derived["problem_frame"]["background"]
+    assert "network_mode=unrestricted" in derived["problem_frame"]["background"]
+    assert stage_quality_issues(
+        "problem_frame",
+        derived["problem_frame"],
+        required_workflow_smoke=binding["requirements"],
+        required_parent_problem=problem,
+    ) == []
+    old_confirmation = next(
+        item
+        for item in protocol["experimental_plan"]["stages"]
+        if item["evidence_class"] == "confirmatory"
+    )
+    new_confirmation = next(
+        item
+        for item in derived["protocol_design"]["experimental_plan"]["stages"]
+        if item["evidence_class"] == "confirmatory"
+    )
+    new_smoke = next(
+        item
+        for item in derived["protocol_design"]["experimental_plan"]["stages"]
+        if item["evidence_class"] == "workflow_smoke"
+    )
+    assert new_confirmation == old_confirmation
+    assert new_smoke["execution_profile"] == {
+        "node": "local-process",
+        "device": "cpu",
+        "network_mode": "unrestricted",
+    }
+    assert derived["implementation_contract"]["scientific_bindings"][
+        "protocol_digest"
+    ] == stage_digest(derived["protocol_design"])
+    assert "observation_not_isolation" in " ".join(new_smoke["stop_conditions"])
+    assert not any("must fail" in item for item in new_smoke["stop_conditions"])
+    run_log = next(
+        item
+        for item in derived["protocol_design"]["experimental_plan"][
+            "system_specification"
+        ]["components"]
+        if item["id"] == "run_log"
+    )
+    assert run_log["settings"] == [{"key": "format", "value": "json"}]
+    assert "disabled" not in run_log["specification"]
+    assert all(
+        "both workflow_smoke" not in str(item.get("check") or "")
+        for item in derived["implementation_contract"]["checks_by_category"][
+            "workflow"
+        ]
+    )
+
+
+def test_problem_frame_rejects_stale_offline_smoke_prose() -> None:
+    problem = _problem()
+    problem["background"] += " The workflow_smoke is offline."
+
+    issues = stage_quality_issues(
+        "problem_frame",
+        problem,
+        required_workflow_smoke={"network_mode": "unrestricted"},
+    )
+
+    assert issues == [
+        "problem frame must not retain offline-enforcement prose for unrestricted workflow_smoke"
+    ]
+
+
+def test_protocol_rejects_pair_labels_in_numeric_seed_values() -> None:
+    protocol = _protocol()
+    confirmatory = next(
+        item
+        for item in protocol["experimental_plan"]["stages"]
+        if item["evidence_class"] == "confirmatory"
+    )
+    confirmatory["budget"]["seed_values"] = ["S1", "S2"]
+    protocol["experimental_plan"]["reproducibility"]["pairing"]["allocation"][
+        "planned_units"
+    ] = ["S1", "S2"]
+
+    try:
+        validate_stage("protocol_design", protocol)
+    except ValueError as exc:
+        assert "not of type 'integer'" in str(exc)
+    else:
+        raise AssertionError("symbolic pair labels must not pass as RNG seeds")
+
+
+def test_engineering_contract_is_bound_to_exact_protocol_and_scientific_identity() -> None:
+    protocol = _protocol()
+    implementation = _implementation(protocol)
+    implementation["scientific_bindings"]["protocol_digest"] = "sha256:" + "0" * 64
+    implementation["scientific_bindings"]["intervention_arm_id"] = "other"
+
+    issues = stage_quality_issues(
+        "implementation_contract",
+        implementation,
+        expected_experimental_signature=_problem()["experimental_signature"],
+        expected_protocol_digest=stage_digest(protocol),
+    )
+
+    assert issues == [
+        "scientific_bindings.protocol_digest must bind the exact protocol_design artifact",
+        "scientific_bindings must exactly preserve the experimental_signature and runner contract",
     ]

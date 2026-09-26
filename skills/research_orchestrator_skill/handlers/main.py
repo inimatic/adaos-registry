@@ -57,6 +57,11 @@ def rehydrate() -> dict[str, Any]:
     return ensure_schema()
 
 
+@tool("application_data_drain")
+def application_data_drain(**_: Any) -> dict[str, Any]:
+    return {"ok": True, "status": "drained"}
+
+
 @tool(summary="List durable research directions from the authoritative research index.", side_effects="none")
 def list_directions(limit: int = 500, **_: Any) -> dict[str, Any]:
     return _orchestrator().list_directions(limit=limit)
@@ -409,6 +414,107 @@ def _markdown_lines(items: Any, *, empty: str = "—") -> str:
     return "\n".join(f"- {item}" for item in values) or empty
 
 
+@tool(summary="Read the live typed scientific inquiry projection and disposition gate.", side_effects="none")
+def get_inquiry_projection(
+    direction_id: str,
+    task_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    result = _orchestrator().get_inquiry_projection(direction_id, task_id=task_id)
+    projection = result["projection"]
+    records = projection["records"]
+    readiness = projection["readiness"]
+    measures = projection["measures"]
+
+    def active(collection: str) -> list[Mapping[str, Any]]:
+        return [
+            item
+            for item in records[collection]
+            if item.get("status") in {"proposed", "contested"}
+        ]
+
+    frames = [
+        f"**{item['id']}** — {item['statement']}  \n"
+        f"Scope: `{item['attributes'].get('scope', '—')}` · derivation: `{item['derivation']}`"
+        for item in active("problem_frames")
+    ]
+    dispositions = [
+        f"**{item['id']}** → `{item['attributes'].get('disposition', 'unresolved')}` "
+        f"(`{item['attributes'].get('assessment_status', 'provisional')}`)  \n"
+        f"{item['attributes'].get('rationale') or item['statement']}  \n"
+        f"Reconsider when: `{item['attributes'].get('reconsideration_conditions') or []}`"
+        for item in active("problem_dispositions")
+    ]
+    claims = [
+        f"**{item['id']}** `{item['attributes'].get('epistemic_status', item['derivation'])}` — "
+        f"{item['statement']}"
+        for item in active("knowledge_claims")
+    ]
+    questions = [
+        f"**{item['id']}** — {item['statement']}"
+        for item in [*active("research_questions"), *active("hypotheses")]
+    ]
+    tasks = [
+        f"**{item['id']}** `{item['attributes'].get('task_kind', 'unknown')}` — "
+        f"{item['attributes'].get('objective') or item['statement']}"
+        for item in active("task_candidates")
+    ]
+    searches = [
+        f"**{item['id']}** - `{item['attributes'].get('query', '')}`  \n"
+        f"Stop: {item['attributes'].get('stop_rule', '-')}"
+        for item in active("search_requests")
+    ]
+    discoveries = list(result.get("source_discoveries") or [])
+    latest_discovery = discoveries[-1] if discoveries else {}
+    candidates = [
+        f"**{item.get('title') or item.get('candidate_id')}** "
+        f"`{item.get('discovery_status')}`  \n"
+        f"{item.get('url')}  \n"
+        f"DOI: `{(item.get('identifiers') or {}).get('doi') or '-'}` - "
+        f"OA: `{(item.get('open_access') or {}).get('status') or 'unknown'}` - "
+        f"{item.get('relevance') or ''}"
+        for item in latest_discovery.get("candidates") or []
+    ]
+    latest_diff = None
+    for activity in reversed(OrchestratorRepository().activities(direction_id, limit=100)):
+        detail = activity.get("detail") if isinstance(activity.get("detail"), Mapping) else {}
+        if detail.get("semantic_diff"):
+            latest_diff = detail["semantic_diff"]
+            break
+    changes = [
+        f"`{item.get('action')}` {item.get('target_type')} **{item.get('target_id')}**"
+        for item in (latest_diff or {}).get("changes") or []
+    ]
+    content = (
+        f"## Scientific projection · revision {projection['revision']}\n\n"
+        f"**Disposition gate:** `{readiness['decision']}`  \n"
+        f"Allowed: `{readiness['admitted_transitions']}`  \n"
+        f"Digest: `{projection['digest']}`\n\n"
+        f"### Problem frames\n\n{_markdown_lines(frames)}\n\n"
+        f"### Problem disposition\n\n{_markdown_lines(dispositions)}\n\n"
+        f"### Known, inferred, and proposed claims\n\n{_markdown_lines(claims)}\n\n"
+        f"### Questions and hypotheses\n\n{_markdown_lines(questions)}\n\n"
+        f"### Candidate next tasks\n\n{_markdown_lines(tasks)}\n\n"
+        f"### Search requests\n\n{_markdown_lines(searches)}\n\n"
+        f"### Latest source candidates (not evidence)\n\n{_markdown_lines(candidates)}\n\n"
+        f"### Blockers\n\n{_markdown_lines(readiness['blockers'])}\n\n"
+        f"### Scientific measures\n\n"
+        f"Unclassified frames: `{measures['unclassified_problem_count']}` · "
+        f"untraceable: `{measures['untraceable_record_count']}` · "
+        f"unsupported source claims: `{measures['unsupported_source_claim_count']}` · "
+        f"incompatible tasks: `{measures['incompatible_task_count']}`\n\n"
+        f"### Latest semantic diff\n\n{_markdown_lines(changes)}"
+    )
+    return {
+        **result,
+        "readiness_decision": readiness["decision"],
+        "admitted_transitions": readiness["admitted_transitions"],
+        "blockers": readiness["blockers"],
+        "latest_semantic_diff": latest_diff,
+        "content": content,
+    }
+
+
 @tool(summary="Read the evolving human-readable research consensus.", side_effects="none")
 def get_consensus(direction_id: str, task_id: str | None = None, **_: Any) -> dict[str, Any]:
     state = _orchestrator().get(direction_id, task_id=task_id)
@@ -494,31 +600,27 @@ def chat(
     direction_id: str,
     text: str,
     task_id: str | None = None,
+    workflow_smoke_policy_id: str | None = None,
+    formulation_inheritance_policy_id: str | None = None,
     model: str | None = None,
     actor: str | None = None,
     invocation_origin: str | None = None,
-    research_phase: str | None = None,
     _meta: Mapping[str, Any] | None = None,
     **payload: Any,
 ) -> dict[str, Any]:
     dialog_payload = dict(payload)
     if task_id:
         dialog_payload["task_id"] = task_id
+    if workflow_smoke_policy_id:
+        dialog_payload["workflow_smoke_policy_id"] = workflow_smoke_policy_id
+    if formulation_inheritance_policy_id:
+        dialog_payload["formulation_inheritance_policy_id"] = (
+            formulation_inheritance_policy_id
+        )
     if invocation_origin:
         dialog_payload["invocation_origin"] = invocation_origin
-    if research_phase:
-        dialog_payload["research_phase"] = research_phase
     if _meta:
         dialog_payload["_meta"] = dict(_meta)
-    if str(research_phase or dialog_payload.get("research_phase") or "").strip() == "inquiry":
-        return _orchestrator().discuss_inquiry(
-            direction_id,
-            text,
-            task_id=task_id,
-            model=model,
-            actor=actor,
-            dialog_payload=dialog_payload,
-        )
     return _orchestrator().discuss(
         direction_id,
         text,
@@ -526,52 +628,6 @@ def chat(
         actor=actor,
         dialog_payload=dialog_payload,
     )
-
-
-@tool(summary="Read the durable typed pre-formulation inquiry projection.", side_effects="none")
-def get_inquiry_projection(
-    direction_id: str,
-    task_id: str | None = None,
-    **_: Any,
-) -> dict[str, Any]:
-    return _orchestrator().get_inquiry_projection(direction_id, task_id=task_id)
-
-
-@tool(summary="Record a human decision over the exact inquiry projection.", side_effects="local_write")
-def decide_inquiry_projection(
-    direction_id: str,
-    decision: str,
-    rationale: str = "",
-    task_id: str | None = None,
-    actor: str = "user:local",
-    **_: Any,
-) -> dict[str, Any]:
-    return _orchestrator().decide_inquiry_projection(
-        direction_id,
-        decision,
-        rationale=rationale,
-        task_id=task_id,
-        actor=actor,
-    )
-
-
-@tool(summary="Discover bounded primary source candidates for active inquiry gaps.", side_effects="external_read")
-def discover_inquiry_sources(
-    direction_id: str,
-    task_id: str | None = None,
-    model: str | None = None,
-    **_: Any,
-) -> dict[str, Any]:
-    return _orchestrator().discover_inquiry_sources(
-        direction_id,
-        task_id=task_id,
-        model=model,
-    )
-
-
-@tool(summary="Reconcile deduplicated model usage for one inquiry.", side_effects="none")
-def reconcile_inquiry_usage(direction_id: str, **_: Any) -> dict[str, Any]:
-    return _orchestrator().reconcile_inquiry_usage(direction_id)
 
 
 @tool(summary="Accept an exact ResearchPrototype and produce the pre-Codex AutomationBrief.", side_effects="external_write")
@@ -621,6 +677,101 @@ def get_automation_brief(
     }
 
 
+@tool(summary="Discuss an idea and update only its typed scientific projection.", side_effects="local_write")
+def inquiry_chat(
+    direction_id: str,
+    text: str,
+    task_id: str | None = None,
+    model: str | None = None,
+    actor: str | None = None,
+    invocation_origin: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+    **payload: Any,
+) -> dict[str, Any]:
+    dialog_payload = dict(payload)
+    if task_id:
+        dialog_payload["task_id"] = task_id
+    if invocation_origin:
+        dialog_payload["invocation_origin"] = invocation_origin
+    if _meta:
+        dialog_payload["_meta"] = dict(_meta)
+    return _orchestrator().discuss_inquiry(
+        direction_id,
+        text,
+        model=model,
+        actor=actor,
+        dialog_payload=dialog_payload,
+    )
+
+
+@tool(summary="Discover source candidates for active typed SearchRequests.", side_effects="external_read")
+def discover_inquiry_sources(
+    direction_id: str,
+    task_id: str | None = None,
+    model: str | None = None,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().discover_inquiry_sources(
+        direction_id,
+        task_id=task_id,
+        model=model,
+        actor=actor,
+    )
+
+
+@tool(summary="Reconcile missing Researcher LLM usage from durable Root jobs.", side_effects="external_read")
+def reconcile_inquiry_usage(
+    direction_id: str,
+    task_id: str | None = None,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().reconcile_inquiry_usage(
+        direction_id,
+        task_id=task_id,
+        actor=actor,
+    )
+
+
+@tool(summary="Record one externally reviewed inquiry projection patch.", side_effects="local_write")
+def record_inquiry_turn(
+    direction_id: str,
+    text: str,
+    patch: Mapping[str, Any],
+    task_id: str | None = None,
+    actor: str = "user:local",
+    patch_actor_kind: str = "human",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().record_inquiry_turn(
+        direction_id,
+        text,
+        patch,
+        actor=actor,
+        patch_actor_kind=patch_actor_kind,
+        dialog_payload={"task_id": task_id} if task_id else None,
+    )
+
+
+@tool(summary="Record a human decision over one exact inquiry projection.", side_effects="local_write")
+def decide_inquiry_projection(
+    direction_id: str,
+    decision: str,
+    rationale: str,
+    accepted_by: str = "user:local",
+    task_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().accept_inquiry(
+        direction_id,
+        decision=decision,
+        rationale=rationale,
+        accepted_by=accepted_by,
+        task_id=task_id,
+    )
+
+
 @tool(summary="Bind and open the exact pre-Codex Development Session in Builder.", side_effects="local_write")
 def open_builder_session(
     direction_id: str,
@@ -636,6 +787,212 @@ def open_builder_session(
         implementation_track_id=implementation_track_id,
         builder_webspace_id=builder_webspace_id,
         base_url=base_url,
+    )
+
+
+@tool(summary="Supersede a Development Session when the admitted consumer ABI changes.", side_effects="local_write")
+def refresh_development_contract(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    actor: str = "system:research_orchestrator",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().refresh_development_contract(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        actor=actor,
+    )
+
+
+@tool(summary="Branch an immutable research realization onto its current Development Session.", side_effects="local_write")
+def branch_implementation_track(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    reason: str = "realization_repair",
+    actor: str = "system:research_orchestrator",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().branch_implementation_track(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        reason=reason,
+        actor=actor,
+    )
+
+
+@tool(summary="Start one-shot Builder Automation from the exact bound Development Session.", side_effects="external_write")
+def start_implementation(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    builder_webspace_id: str | None = None,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().start_implementation(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        builder_webspace_id=builder_webspace_id,
+        actor=actor,
+    )
+
+
+@tool(summary="Synchronize Builder Automation into the durable research activity ledger.", side_effects="local_write")
+def sync_implementation(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    builder_webspace_id: str | None = None,
+    actor: str = "system:research_orchestrator",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().sync_implementation(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        builder_webspace_id=builder_webspace_id,
+        actor=actor,
+    )
+
+
+@tool(summary="Prepare an isolated reviewed ProjectRelease candidate through Builder.", side_effects="external_write")
+def prepare_project_release(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    builder_webspace_id: str | None = None,
+    bump: str = "patch",
+    confirmed: bool = False,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().prepare_project_release(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        builder_webspace_id=builder_webspace_id,
+        bump=bump,
+        confirmed=confirmed,
+        actor=actor,
+    )
+
+
+@tool(summary="Promote the exact reviewed ProjectRelease candidate through Builder.", side_effects="external_write")
+def publish_project_release(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    builder_webspace_id: str | None = None,
+    bump: str = "patch",
+    confirmed: bool = False,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().publish_project_release(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        builder_webspace_id=builder_webspace_id,
+        bump=bump,
+        confirmed=confirmed,
+        actor=actor,
+    )
+
+
+@tool(summary="Bind an exact ProjectRelease and runner to a ResearchManager Study and Experiment.", side_effects="external_write")
+def instantiate_study(
+    direction_id: str,
+    idempotency_key: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().instantiate_study(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        actor=actor,
+        idempotency_key=idempotency_key,
+    )
+
+
+@tool(summary="Create a fresh Experiment campaign for the same immutable StudyRealization.", side_effects="external_write")
+def repeat_study_experiment(
+    direction_id: str,
+    idempotency_key: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    reason: str = "execution_recovery",
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().repeat_study_experiment(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        reason=reason,
+        actor=actor,
+        idempotency_key=idempotency_key,
+    )
+
+
+@tool(summary="Lock the compiled protocol and submit its bounded CPU workflow smoke.", side_effects="external_write")
+def start_study_smoke(
+    direction_id: str,
+    idempotency_key: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    confirmed: bool = False,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().start_study_smoke(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        confirmed=confirmed,
+        actor=actor,
+        idempotency_key=idempotency_key,
+    )
+
+
+@tool(summary="Reconcile ResearchManager attempts into the durable research activity ledger.", side_effects="local_write")
+def sync_study(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    actor: str = "system:research_orchestrator",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().sync_study(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        actor=actor,
+    )
+
+
+@tool(summary="Finalize an independently verified, non-inferential workflow Evidence bundle.", side_effects="external_write")
+def finalize_workflow_evidence(
+    direction_id: str,
+    idempotency_key: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    actor: str = "system:research_orchestrator",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().finalize_workflow_evidence(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        actor=actor,
+        idempotency_key=idempotency_key,
     )
 
 
@@ -675,6 +1032,7 @@ def get_activity(
             "output_digest": item.get("output_digest"),
             "resolved_model": item["telemetry"].get("resolved_model"),
             "resolved_provider": item["telemetry"].get("resolved_provider"),
+            "provider_job_id": item["telemetry"].get("provider_job_id"),
             "structured_output": item["telemetry"].get("structured_output"),
             "repair_attempts": item["telemetry"].get("repair_attempts", 0),
             "aggregate_usage": item["telemetry"].get("aggregate_usage") or item["telemetry"].get("usage") or {},
@@ -682,6 +1040,9 @@ def get_activity(
         }
         for item in stages
     ]
+    usage_summary = _research_usage_summary(events, stage_summaries)
+    researcher = usage_summary["researcher_llm"]
+    builder = usage_summary["builder_codex"]
     stage_lines = "\n".join(
         f"- `{item['run_id']}` · **{item['stage_index']}/4 {item['stage_name']}** · `{item['status']}` · "
         f"model `{item.get('resolved_model') or 'unknown'}` · structured `{item.get('structured_output')}` · repairs `{item.get('repair_attempts', 0)}`"
@@ -690,10 +1051,102 @@ def get_activity(
     )
     event_lines = "\n".join(f"- `{item['seq']:03d}` **{item['stage']} / {item['status']}** — {item['message']}" for item in events)
     content = (
+        f"## Token accounting\n\n"
+        f"- Researcher LLM: `{researcher['total_tokens']}` known tokens across "
+        f"`{researcher['provider_reported_jobs']}` provider-reported jobs; "
+        f"unknown jobs `{researcher['unknown_usage_jobs']}`.\n"
+        f"- Builder Codex: `{builder['total_tokens']}` known tokens across "
+        f"`{builder['provider_reported_runs']}` Builder runs; "
+        f"unknown runs `{builder['unknown_usage_runs']}`.\n"
+        f"- Interactive Codex session tokens are excluded.\n\n"
         f"## Formulation stages\n\n{stage_lines or 'No staged formulation runs yet.'}\n\n"
         f"## Activity events\n\n{event_lines or 'No activity events yet.'}"
     )
-    return {"ok": True, "direction_id": direction_id, "events": events, "formulation_stages": stage_summaries, "content": content}
+    return {
+        "ok": True,
+        "direction_id": direction_id,
+        "events": events,
+        "formulation_stages": stage_summaries,
+        "usage_summary": usage_summary,
+        "content": content,
+    }
+
+
+def _research_usage_summary(
+    events: list[Mapping[str, Any]],
+    stages: list[Mapping[str, Any]],
+) -> dict[str, Any]:
+    researcher_jobs: dict[str, Mapping[str, Any]] = {}
+    builder_runs: dict[str, Mapping[str, Any]] = {}
+
+    for item in stages:
+        usage = item.get("aggregate_usage") if isinstance(item.get("aggregate_usage"), Mapping) else {}
+        if not usage or str(item.get("resolved_model") or "") == "not_invoked":
+            continue
+        key = str(item.get("provider_job_id") or f"stage:{item.get('run_id')}:{item.get('stage_name')}")
+        researcher_jobs[key] = usage
+    for event in events:
+        detail = event.get("detail") if isinstance(event.get("detail"), Mapping) else {}
+        usage = detail.get("usage") if isinstance(detail.get("usage"), Mapping) else None
+        provider_job_id = str(detail.get("provider_job_id") or "").strip()
+        if usage is not None and provider_job_id:
+            researcher_jobs[provider_job_id] = usage
+        accounting = (
+            detail.get("codex_usage_accounting")
+            if isinstance(detail.get("codex_usage_accounting"), Mapping)
+            else None
+        )
+        budget = detail.get("budget_usage") if isinstance(detail.get("budget_usage"), Mapping) else {}
+        observed = budget.get("observed") if isinstance(budget.get("observed"), Mapping) else {}
+        automation = detail.get("automation") if isinstance(detail.get("automation"), Mapping) else {}
+        run_id = str(
+            (accounting or {}).get("task_id")
+            or automation.get("task_id")
+            or ""
+        ).strip()
+        if run_id:
+            builder_runs[run_id] = accounting or (
+                {**observed, "accuracy": "provider_reported"}
+                if int(observed.get("model_tokens") or 0) > 0
+                else {"total_tokens": None, "accuracy": "unavailable"}
+            )
+
+    def aggregate(values: Mapping[str, Mapping[str, Any]], *, run_label: str) -> dict[str, Any]:
+        known = 0
+        unknown = 0
+        totals = {
+            "input_tokens": 0,
+            "cached_input_tokens": 0,
+            "output_tokens": 0,
+            "reasoning_tokens": 0,
+            "total_tokens": 0,
+        }
+        for usage in values.values():
+            total = usage.get("total_tokens")
+            if total is None and "model_tokens" in usage:
+                total = usage.get("model_tokens")
+            accuracy = str(usage.get("accuracy") or "")
+            if total is None or accuracy == "unavailable":
+                unknown += 1
+                continue
+            known += 1
+            totals["input_tokens"] += int(usage.get("input_tokens") or 0)
+            totals["cached_input_tokens"] += int(usage.get("cached_input_tokens") or 0)
+            totals["output_tokens"] += int(usage.get("output_tokens") or 0)
+            totals["reasoning_tokens"] += int(usage.get("reasoning_tokens") or 0)
+            totals["total_tokens"] += int(total or 0)
+        return {
+            **totals,
+            f"provider_reported_{run_label}": known,
+            f"unknown_usage_{run_label}": unknown,
+            "exact_total_available": unknown == 0,
+        }
+
+    return {
+        "researcher_llm": aggregate(researcher_jobs, run_label="jobs"),
+        "builder_codex": aggregate(builder_runs, run_label="runs"),
+        "interactive_codex_included": False,
+    }
 
 
 @tool(summary="Read the exact persisted artifacts and telemetry for one formulation run.", side_effects="none")
@@ -723,8 +1176,7 @@ def get_formulation_run(direction_id: str, run_id: str | None = None, **_: Any) 
 
 def _compilation_markdown(compilation: Mapping[str, Any], facet: str) -> str:
     facets = compilation.get("facets") if isinstance(compilation.get("facets"), Mapping) else {}
-    source_facet = "experimental_protocol" if facet == "experiment_plan" else facet
-    selected = facets.get(source_facet) if isinstance(facets.get(source_facet), Mapping) else {}
+    selected = facets.get(facet) if isinstance(facets.get(facet), Mapping) else {}
     payload = selected.get("payload") if isinstance(selected.get("payload"), Mapping) else {}
     if facet == "source_analysis":
         inventory = [
@@ -768,7 +1220,7 @@ def _compilation_markdown(compilation: Mapping[str, Any], facet: str) -> str:
             f"### Assumptions\n\n{_markdown_lines(payload.get('assumptions'))}\n\n"
             f"### Open questions\n\n{_markdown_lines(payload.get('open_questions'))}"
         )
-    if facet in {"experimental_protocol", "experiment_plan"}:
+    if facet == "experimental_protocol":
         plan = payload.get("experimental_plan") if isinstance(payload.get("experimental_plan"), Mapping) else {}
         evaluation = payload.get("evaluation_plan") if isinstance(payload.get("evaluation_plan"), Mapping) else {}
         stages = [
@@ -782,9 +1234,8 @@ def _compilation_markdown(compilation: Mapping[str, Any], facet: str) -> str:
             for area, item in (payload.get("decisions_by_area") or {}).items()
             if isinstance(item, Mapping)
         ]
-        heading = "Experiment Plan" if facet == "experiment_plan" else "Experimental Protocol"
         return (
-            f"## {heading}\n\n**Digest:** `{selected.get('digest')}`\n\n"
+            f"## Experimental Protocol\n\n**Digest:** `{selected.get('digest')}`\n\n"
             f"**Comparators:** {', '.join(f'`{item}`' for item in plan.get('comparators') or [])}\n\n"
             f"### Stages\n\n{_markdown_lines(stages)}\n\n"
             f"### Protocol decisions\n\n{_markdown_lines(decisions)}\n\n"
@@ -878,7 +1329,7 @@ def get_compilation(
         if isinstance(item, Mapping)
     ]
     selected_facet = str(facet or "traceability").strip()
-    if selected_facet not in {*facets, "experiment_plan", "traceability"}:
+    if selected_facet not in {*facets, "traceability"}:
         selected_facet = "traceability"
     content = _compilation_markdown(compilation, selected_facet)
     return {
@@ -903,8 +1354,3 @@ def next_steps(direction_id: str, **_: Any) -> dict[str, Any]:
     steps = list(state.get("next_steps") or [])
     message = " ".join(f"{index + 1}. {item['label']}: {item['reason']}" for index, item in enumerate(steps))
     return {"ok": True, "direction_id": direction_id, "message": message, "speech_text": message, "steps": steps}
-
-
-@tool("application_data_drain")
-def application_data_drain(**_):
-    return {"ok": True, "status": "drained"}
