@@ -1,5 +1,5 @@
 name: redevice_settings
-version: 0.2.3
+version: 0.2.5
 description: Service skill for ReDevice endpoint settings, assignment, status, and
   policy-bound device actions.
 runtime:
@@ -30,6 +30,7 @@ tools:
   description: Refresh ReDevice settings state from Endpoint Registry and live ReDevice
     snapshots.
   entry: handlers.main:refresh_redevice_settings_state
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -120,6 +121,7 @@ tools:
   description: Return full manifest, policy, diagnostics, and version details for
     one ReDevice endpoint without publishing them into the browser stream.
   entry: handlers.main:inspect_redevice_settings_endpoint
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -157,6 +159,7 @@ tools:
 - name: select_redevice_settings_endpoint
   description: Select the ReDevice endpoint controlled by the settings scenario.
   entry: handlers.main:select_redevice_settings_endpoint
+  side_effects: local_write
   input_schema:
     type: object
     properties:
@@ -170,6 +173,7 @@ tools:
 - name: rename_redevice_settings_endpoint
   description: Rename a ReDevice endpoint and update comma-separated aliases.
   entry: handlers.main:rename_redevice_settings_endpoint
+  side_effects: device_control
   input_schema:
     type: object
     properties:
@@ -187,6 +191,7 @@ tools:
 - name: set_redevice_assignment
   description: Set the scenario-level assignment for the selected ReDevice endpoint.
   entry: handlers.main:set_redevice_assignment
+  side_effects: device_control
   input_schema:
     type: object
     required:
@@ -211,6 +216,7 @@ tools:
 - name: send_redevice_settings_command
   description: Send a policy-bound settings command to the selected ReDevice endpoint.
   entry: handlers.main:send_redevice_settings_command
+  side_effects: device_control
   input_schema:
     type: object
     required:
@@ -238,6 +244,7 @@ tools:
 - name: revoke_redevice_settings_endpoint
   description: Revoke selected ReDevice endpoint admission.
   entry: handlers.main:revoke_redevice_settings_endpoint
+  side_effects: device_control
   input_schema:
     type: object
     properties:
@@ -251,6 +258,7 @@ tools:
 - name: retire_redevice_settings_endpoint
   description: Retire selected ReDevice endpoint from active use.
   entry: handlers.main:retire_redevice_settings_endpoint
+  side_effects: device_control
   input_schema:
     type: object
     properties:
@@ -356,7 +364,7 @@ memory_budget:
     max_items: 32
     cleanup_hook: webio.stream.subscription.changed
   background_workers: []
-updated_at: '2026-09-26T09:42:12+00:00'
+updated_at: '2026-09-26T11:04:22+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.741+4835.a49f9166

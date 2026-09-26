@@ -1,5 +1,5 @@
 name: redevice_list
-version: 0.2.3
+version: 0.2.5
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -17,6 +17,7 @@ tools:
 - name: refresh_redevices
   description: Refresh the ReDevice inventory stream from the AdaOS root API.
   entry: handlers.main:refresh_redevices
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -34,6 +35,7 @@ tools:
 - name: revoke_redevice
   description: Revoke a ReDevice admission or endpoint session.
   entry: handlers.main:revoke_redevice
+  side_effects: device_control
   input_schema:
     type: object
     properties:
@@ -51,6 +53,7 @@ tools:
 - name: retire_redevice
   description: Retire a ReDevice endpoint from active use.
   entry: handlers.main:retire_redevice
+  side_effects: device_control
   input_schema:
     type: object
     properties:
@@ -68,6 +71,7 @@ tools:
 - name: rename_redevice
   description: Rename a ReDevice endpoint and update comma-separated aliases.
   entry: handlers.main:rename_redevice
+  side_effects: device_control
   input_schema:
     type: object
     properties:
@@ -104,7 +108,7 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
-updated_at: '2026-09-26T09:42:18+00:00'
+updated_at: '2026-09-26T11:04:28+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.741+4835.a49f9166

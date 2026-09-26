@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: redevice_control
-version: 0.1.21
+version: 0.1.22
 profiles:
 - adaos.redevice.control.v1
 components:
@@ -32,7 +32,7 @@ components:
     - uses
   dependencies:
   - ref: skill:slideshow_skill
-    version: ==0.2.4
+    version: ==0.2.6
     lifecycle: shared
     relations:
     - uses
@@ -113,3 +113,29 @@ lifecycle:
     source_artifacts: retain
 created_at: '2026-08-27T00:00:00+00:00'
 created_by: AdaOS Project Composition
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.read
+    purpose: Inspect known ReDevice endpoints and their current local state.
+    approval_policy: grant_on_install
+  - id: workspace.write
+    purpose: Persist endpoint selections and execute explicit endpoint-management commands.
+    approval_policy: owner_only
+    sensitive: true
+  - id: devices.control
+    purpose: Execute explicitly requested commands on selected ReDevice endpoints.
+    approval_policy: owner_only
+    sensitive: true
+  optional: []
+  secrets: []
+  external_providers: []
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected: [device_metadata, device_command_state]
+    linked_to_user: []
+    retention: Endpoint metadata and command state remain local to the subnet.
+    sent_off_device: []
+    tracking: false

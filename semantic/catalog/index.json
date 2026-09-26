@@ -109,9 +109,9 @@
       "application_id": "redevice_control",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 2,
-      "stable_release_digest": "sha256:adb435e8ac5635edc8c6d4531dd7a07e7bdb6c2adb27df472d0a65a7fe3ac3a8",
-      "release_key": "redevice_control@sha256:adb435e8ac5635edc8c6d4531dd7a07e7bdb6c2adb27df472d0a65a7fe3ac3a8",
-      "projection_digest": "sha256:9aa37d7680715d8b3f751dc16663460ae732a73cc36a81496600e265e80a92db"
+      "stable_release_digest": "sha256:c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8",
+      "release_key": "redevice_control@sha256:c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8",
+      "projection_digest": "sha256:41f0c83f79dab571d7608ed5dcc5b62cbf0b02b2129cd5f30889b6d868e9947d"
     },
     "slideshow": {
       "application_id": "slideshow",
@@ -458,7 +458,15 @@
       "release_digest": "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275",
       "path": "semantic/catalog/releases/notebook/5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275.json",
       "projection_digest": "sha256:9e514e39a2b1c7b971701575a463fdfe5fa8ee4b9dd970b7b02a354013c72a5f"
+    },
+    "redevice_control@sha256:c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8": {
+      "application_id": "redevice_control",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.22",
+      "release_digest": "sha256:c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8",
+      "path": "semantic/catalog/releases/redevice_control/c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8.json",
+      "projection_digest": "sha256:41f0c83f79dab571d7608ed5dcc5b62cbf0b02b2129cd5f30889b6d868e9947d"
     }
   },
-  "index_digest": "sha256:26658f51d27af1886ad04a814d5d07f2379ffb91a1500caa260a9510f07461f8"
+  "index_digest": "sha256:c1423197680df348e6ac2b8abc8f65accfd3bf0a946e219d3fbf3e7b92c44a90"
 }
