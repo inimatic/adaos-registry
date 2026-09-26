@@ -34,6 +34,13 @@ def test_manifest_defers_projection_until_yjs_demand() -> None:
     assert "webio.yjs.subscription.changed" in manifest["events"]["subscribe"]
     assert manifest["runtime"]["activation"]["mode"] == "on_demand"
     assert manifest["runtime"]["activation"]["startup_allowed"] is False
+    assert manifest["data_lifecycle"]["state_files"] == [
+        {
+            "path": "state/state.json",
+            "format": "json",
+            "max_bytes": 67108864,
+        }
+    ]
 
 
 def test_state_defaults_to_versioned_skill_runtime(tmp_path: Path, monkeypatch) -> None:

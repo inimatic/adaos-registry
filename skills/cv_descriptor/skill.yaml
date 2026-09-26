@@ -17,6 +17,10 @@ data_lifecycle:
   schema: adaos.skill.data_lifecycle.v1
   execution: native_tools
   databases: []
+  state_files:
+  - path: state/state.json
+    format: json
+    max_bytes: 67108864
 tools:
 - name: cv_descriptor_drain
   description: Flush the descriptor JSON state before an Application release switch.
