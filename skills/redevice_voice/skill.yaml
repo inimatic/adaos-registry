@@ -1,5 +1,5 @@
 name: redevice_voice
-version: 0.2.1
+version: 0.2.3
 description: Debug ReDevice voice endpoint skill over EndpointAudioService with VAD
   or push-to-talk capture and member-side STT routing.
 runtime:
@@ -126,7 +126,23 @@ data_routes:
   - receiver: redevice_voice.state
     schema: redevice-voice-state.v1
     description: Debug ReDevice voice endpoint state stream.
-updated_at: '2026-09-26T03:02:15+00:00'
+memory_budget:
+  expected_rss_mb: 64
+  caches:
+  - name: redevice_voice.state
+    storage: skill_memory
+    max_items: 32
+    cleanup_hook: webio.stream.subscription.changed
+  - name: redevice_voice.snapshots
+    storage: skill_memory
+    max_items: 32
+    cleanup_hook: webio.stream.subscription.changed
+  - name: redevice_voice.last_event
+    storage: skill_memory
+    max_items: 1
+    cleanup_hook: webio.stream.subscription.changed
+  background_workers: []
+updated_at: '2026-09-26T04:13:07+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.741+4835.a49f9166

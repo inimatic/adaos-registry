@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:devices.manage.redevice",
+  "binding_definition_digest": "sha256:12cfcafa4d8c614c740dc4108ed11fb5d39b3c6f3c1aae59b1dcffc6e0ed35d7",
+  "logical_entrypoint": "devices.manage.redevice",
+  "package": {
+    "kind": "skill",
+    "id": "redevice_settings",
+    "version": "0.2.1",
+    "digest": "sha256:0ac3f2fa4a9cd308fb78e333ab84ed0cace55b0d728c5cb3dc6d564db1fc643f"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:54d07960e9485c86dd779264c9c87d2265726fa9e2ec4cdb62fdd7163a0fcfdc"
+}

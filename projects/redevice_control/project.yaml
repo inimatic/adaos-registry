@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: redevice_control
-version: 0.1.14
+version: 0.1.19
 profiles:
 - adaos.redevice.control.v1
 components:
@@ -30,13 +30,12 @@ components:
     lifecycle: bound
     relations:
     - uses
+  dependencies:
   - ref: skill:slideshow_skill
-    role: supporting
-    exposure: advanced
-    lifecycle: bound
+    version: ==0.2.1
+    lifecycle: shared
     relations:
     - uses
-  dependencies: []
 entrypoints:
 - id: devices
   presentation: scenario:redevice_user_face
@@ -98,12 +97,13 @@ install:
     default: false
     optional: true
     components:
-    - skill:slideshow_skill
+    - scenario:redevice_user_face
 compatibility:
   required_entrypoints:
   - devices
   required_contracts:
   - capability:devices.manage@^1.0.0
+  - capability:media.slideshow.present@^1.0.0
   validation_profiles:
   - redevice.control.local
 lifecycle:
