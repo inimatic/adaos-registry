@@ -1,10 +1,21 @@
 name: demo_metrics_skill
-version: 0.13.34
+version: 0.13.36
 description: Neutral demo skill for semantic Web UI migration with a metrics table,
   chart payload, Taiga tree, and live event stream.
 runtime:
   python: '3.11'
+  activation:
+    mode: on_demand
+    startup_allowed: false
+    background_refresh: true
 webui_owner: shared
+lifecycle:
+  drain: demo_metrics_drain
+  rehydrate: demo_metrics_rehydrate
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases: []
 data_projections:
 - scope: webspace
   slot: demo.metrics.summary
@@ -42,6 +53,42 @@ events:
   - webio.stream.subscription.changed
   - demo_metrics.host_action
 tools:
+- name: demo_metrics_drain
+  description: Quiesce transient demo event activity before an Application release
+    switch.
+  entry: handlers.main:demo_metrics_drain
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      reason:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+- name: demo_metrics_rehydrate
+  description: Rebuild the deterministic demo projection after an Application release
+    switch.
+  entry: handlers.main:demo_metrics_rehydrate
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
 - name: get_demo_snapshot
   description: Return the static demo metrics snapshot used by the browser demo surfaces.
   entry: handlers.main:get_demo_snapshot
@@ -232,7 +279,7 @@ tools:
     - ok
     - resource_type
     - operation_id
-updated_at: '2026-09-17T19:56:57+00:00'
+updated_at: '2026-09-26T02:09:22+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.952+5785.47a433874

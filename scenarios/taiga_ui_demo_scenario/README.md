@@ -13,6 +13,7 @@ The scenario exists to validate:
 - one shared selection model
 - one live event stream
 - one staged loading contract
+- one compact shared query toolbar with search, disclosed filters, and table state
 - one compatibility bridge from current `webui.v1` widgets to future semantic
   renderers
 
@@ -51,6 +52,7 @@ Stand verification checklist:
 - confirm the same demo state is visible when the paired skill opens its own
   modal/app surface
 - confirm the main table is rendered by the Taiga-backed semantic grid path
+- filter the metrics table through the shared query toolbar and reset its state
 - confirm the chart is rendered by the Taiga-backed semantic chart path
 - confirm the operator notes chat is rendered by the semantic chat path
 - click `Skill event` and confirm the event log receives a live update

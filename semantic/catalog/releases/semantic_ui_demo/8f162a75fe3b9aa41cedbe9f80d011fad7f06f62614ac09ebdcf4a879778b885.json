@@ -1,0 +1,275 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "semantic_ui_demo",
+    "legacy_project_id": "semantic_ui_demo",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "semantic_ui_demo",
+    "display": {
+      "title": "Semantic UI Demo",
+      "summary": "Semantic Web UI demo with table, chart payload, and live event stream."
+    },
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "demo",
+        "presentation_ref": "scenario:taiga_ui_demo_scenario"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 2,
+    "created_at": "2026-09-26T02:08:24+00:00",
+    "updated_at": "2026-09-26T02:11:26+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "semantic_ui_demo",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "semantic_ui_demo",
+    "version": "0.10.27",
+    "release_digest": "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "semantic_ui_demo",
+      "version": "0.10.27",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:a5d721d402de4259650c8c0de7f6966ddb0e39f836c5730f93a28a51dcd69cf5",
+        "path_scope": [
+          "projects/semantic_ui_demo/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "taiga_ui_demo_scenario",
+          "version": "0.11.12",
+          "digest": "sha256:37772c8a2a74834afee1249735d59989d74f130f39910c79abaa8e58ccc39e4e",
+          "manifest_digest": "sha256:2f5e67271bc3de4ede55b43629876e0698f2242f8f57655d404f14f4628ae1ae",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:a5d721d402de4259650c8c0de7f6966ddb0e39f836c5730f93a28a51dcd69cf5",
+            "path_scope": [
+              "scenarios/taiga_ui_demo_scenario/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/taiga_ui_demo_scenario",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "demo_metrics_skill",
+          "version": "0.13.36",
+          "digest": "sha256:28f866f05f48ba639673be29b2942897c1ee8139ce46a1420e5dd98e9b98cdf6",
+          "manifest_digest": "sha256:b3231e8234fc003a950969c34e8f64f90aa522b09a9e994e29ff49a9cf88ad87",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:a5d721d402de4259650c8c0de7f6966ddb0e39f836c5730f93a28a51dcd69cf5",
+            "path_scope": [
+              "skills/demo_metrics_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/demo_metrics_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [
+        {
+          "kind": "skill",
+          "artifact_id": "web_desktop_skill",
+          "version": "0.2.4",
+          "package_digest": "sha256:dc6b9e208019a45a30e2d155e310802559c21a7ff6262acfb9fd524ec4a543de",
+          "optional": false
+        }
+      ],
+      "permissions": [],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:a5d721d402de4259650c8c0de7f6966ddb0e39f836c5730f93a28a51dcd69cf5",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:41cf992ec8693a6edeee163cc4903dbbc149a8f02cb3fd0b2d89e08923a3900a"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:4d68cbfba2d6461a1292d5df37753e91090fdaa511338545ebb63e93694ac54f",
+        "profiles": [
+          "adaos.demo.semantic_ui.v1"
+        ],
+        "members": [
+          {
+            "ref": "scenario:taiga_ui_demo_scenario",
+            "package_digest": "sha256:37772c8a2a74834afee1249735d59989d74f130f39910c79abaa8e58ccc39e4e",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "skill:demo_metrics_skill",
+            "package_digest": "sha256:28f866f05f48ba639673be29b2942897c1ee8139ce46a1420e5dd98e9b98cdf6",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "demo",
+            "presentation": "scenario:taiga_ui_demo_scenario",
+            "default": true,
+            "bindings": {
+              "ui_demo": "semantic"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "demo"
+          ],
+          "required_contracts": [
+            "capability:demo.metrics.workbench@^1.0.0"
+          ],
+          "validation_profiles": [
+            "demo.semantic_ui"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "remove",
+            "source_artifacts": "retain"
+          }
+        }
+      },
+      "catalog": {
+        "title": "Semantic UI Demo",
+        "description": "Semantic Web UI demo with table, chart payload, and live event stream.",
+        "categories": [
+          "demo",
+          "development"
+        ],
+        "tags": [
+          "alpha",
+          "metrics",
+          "semantic-ui",
+          "taiga"
+        ],
+        "title_i18n": {
+          "en": "Semantic UI Demo",
+          "ru": "Демо Semantic UI"
+        },
+        "description_i18n": {
+          "en": "Semantic Web UI demo with table, chart payload, and live event stream.",
+          "ru": "Демо Semantic Web UI с таблицей, chart payload и live event stream."
+        }
+      },
+      "release_digest": "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885"
+    },
+    "accepted_candidate_id": "semantic_ui_demo-0-10-27-4a879778b885",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.project.preflight",
+        "tests": "scenario preflight; tests/test_resource_workbench.py (8 passed); native lifecycle hooks",
+        "cbs": "exact native admission or explicit compatibility classification",
+        "checkpoint_source_revision": "635244d5f7b53221425461f6d2e22d96378cc76c",
+        "checkpoint_component_ref": "scenario:taiga_ui_demo_scenario"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [],
+        "sent_off_device": [],
+        "linked_to_user": [],
+        "tracking": false,
+        "retention": null
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [],
+        "sent_off_device": false,
+        "linked_to_user": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:18575981247455ea0c36bc9c6be308128c3caf16028863989d05cccfea4f84e1",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "semantic_ui_demo",
+      "release_digest": "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:631fb04672f7e151b8d33d45e46fbfc2e9a70b0ef90528468fb81095bce9cb5a"
+  },
+  "channels": {
+    "stable": "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885"
+  },
+  "semantic": {
+    "projection_digest": "sha256:d56410c1a655a8310825e3b2a46b3cfd8df75b4dc876dc624cc21e99edc58f73",
+    "path": "semantic/applications/semantic_ui_demo/8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885.json"
+  },
+  "projection_digest": "sha256:90e080f2afa9cdbdc8edac100478bb4fd058de4431661e542984794490a78de3"
+}

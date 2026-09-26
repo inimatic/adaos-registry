@@ -494,6 +494,21 @@ def _snapshot() -> dict[str, Any]:
     }
 
 
+@tool("demo_metrics_drain")
+def demo_metrics_drain(**_: Any) -> dict[str, Any]:
+    """Acknowledge that transient stream activity is safe to replace."""
+
+    return {"ok": True}
+
+
+@tool("demo_metrics_rehydrate")
+def demo_metrics_rehydrate(**_: Any) -> dict[str, Any]:
+    """Verify that the deterministic projection can be rebuilt."""
+
+    snapshot = _snapshot()
+    return {"ok": True, "projection_items": len(snapshot.get("table", {}).get("items", ())) }
+
+
 @tool(
     "get_demo_snapshot",
     summary="Return the current static snapshot for the demo metrics browser surfaces.",

@@ -64,6 +64,14 @@
       "stable_release_digest": "sha256:989dc2ebfa7e128b95945618da6742d779406a28f6c045e728a0d594d482a47e",
       "release_key": "cv_descriptor_lab@sha256:989dc2ebfa7e128b95945618da6742d779406a28f6c045e728a0d594d482a47e",
       "projection_digest": "sha256:c18e407d51cf4d249c75b265892664efc357de853f2a5d879f887a47475d1007"
+    },
+    "semantic_ui_demo": {
+      "application_id": "semantic_ui_demo",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "application_revision": 2,
+      "stable_release_digest": "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
+      "release_key": "semantic_ui_demo@sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
+      "projection_digest": "sha256:90e080f2afa9cdbdc8edac100478bb4fd058de4431661e542984794490a78de3"
     }
   },
   "releases": {
@@ -154,7 +162,15 @@
       "release_digest": "sha256:989dc2ebfa7e128b95945618da6742d779406a28f6c045e728a0d594d482a47e",
       "path": "semantic/catalog/releases/cv_descriptor_lab/989dc2ebfa7e128b95945618da6742d779406a28f6c045e728a0d594d482a47e.json",
       "projection_digest": "sha256:c18e407d51cf4d249c75b265892664efc357de853f2a5d879f887a47475d1007"
+    },
+    "semantic_ui_demo@sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885": {
+      "application_id": "semantic_ui_demo",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.10.27",
+      "release_digest": "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
+      "path": "semantic/catalog/releases/semantic_ui_demo/8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885.json",
+      "projection_digest": "sha256:90e080f2afa9cdbdc8edac100478bb4fd058de4431661e542984794490a78de3"
     }
   },
-  "index_digest": "sha256:8d46d72f0219b73c7efef99b37e69ec42d9e2a16a76460eeb21c6cfd536b3170"
+  "index_digest": "sha256:c53b2191388fd7bbf6ee9552fb0867397a812fbdfd452cd08c63b88d9f08373c"
 }
