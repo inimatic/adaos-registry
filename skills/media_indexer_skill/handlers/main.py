@@ -271,8 +271,8 @@ def _read_persisted_index_metadata() -> Dict[str, Any]:
     if not isinstance(metadata, dict):
         return {}
     payload = {
-        **metadata,
         "indexed_directory": "",
+        **metadata,
         "indexed_count": int(metadata.get("total_count") or metadata.get("text_count") or 0),
         "index_dir": str(path),
         "restored_from": "skill_data",

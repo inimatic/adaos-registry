@@ -720,6 +720,7 @@ def test_rehydrate_restores_index_metadata_from_skill_data(monkeypatch, tmp_path
                 "text_count": 2,
                 "image_count": 1,
                 "total_count": 3,
+                "indexed_directory": "/media/library",
                 "index_dir": "/obsolete/core/state",
             }
         ),
@@ -733,6 +734,7 @@ def test_rehydrate_restores_index_metadata_from_skill_data(monkeypatch, tmp_path
 
     assert result["index"]["restored_from"] == "skill_data"
     assert result["index"]["total_count"] == 3
+    assert result["index"]["indexed_directory"] == "/media/library"
     assert result["index"]["index_dir"] == str(index_dir)
     stored = json.loads((tmp_path / "skill_env.json").read_text(encoding="utf-8"))
     assert stored["media_indexer.index"]["index_dir"] == str(index_dir)
