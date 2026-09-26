@@ -125,8 +125,12 @@ def _progress_publisher_loop() -> None:
 def _deliver_progress(payload: Mapping[str, Any], webspace_id: str) -> None:
     from adaos.sdk.io import stream_variable_publish
 
+    public_payload = dict(payload)
+    publish_catalog_change = bool(
+        public_payload.pop("_publish_catalog_change", True)
+    )
     meta = {"webspace_id": webspace_id} if webspace_id else None
-    job_type = text(payload.get("job_type"))
+    job_type = text(public_payload.get("job_type"))
     is_rendition = job_type == "rendition"
     is_storage_migration = job_type == "storage_migration"
     stream_variable_publish(
@@ -139,7 +143,7 @@ def _deliver_progress(payload: Mapping[str, Any], webspace_id: str) -> None:
                 else "media_library_agent.progress"
             )
         ),
-        dict(payload),
+        public_payload,
         var_id=(
             "media_library_agent.current_rendition"
             if is_rendition
@@ -152,18 +156,22 @@ def _deliver_progress(payload: Mapping[str, Any], webspace_id: str) -> None:
         ttl_ms=120000,
         _meta=meta,
     )
-    if text(payload.get("status")) in {"completed", "canceled", "failed"}:
+    if publish_catalog_change and text(public_payload.get("status")) in {
+        "completed",
+        "canceled",
+        "failed",
+    }:
         from adaos.sdk.data.events import publish as publish_event
 
         publish_event(
             "media_library_agent.catalog.changed",
             {
                 "schema": "adaos.media_library.catalog_changed.v1",
-                "agent_id": text(payload.get("agent_id")),
-                "node_id": text(payload.get("node_id")),
-                "root_id": text(payload.get("root_id")),
-                "job_id": text(payload.get("job_id")),
-                "status": text(payload.get("status")),
+                "agent_id": text(public_payload.get("agent_id")),
+                "node_id": text(public_payload.get("node_id")),
+                "root_id": text(public_payload.get("root_id")),
+                "job_id": text(public_payload.get("job_id")),
+                "status": text(public_payload.get("status")),
             },
             source="media_library_agent",
         )
@@ -369,6 +377,7 @@ def on_progress_snapshot_requested(event: Any) -> None:
                 "agent_id": repository.agent_id,
                 "node_id": repository.node_id,
                 "updated_at": now_iso(),
+                "_publish_catalog_change": False,
             },
             text(payload.get("webspace_id")),
         )
@@ -398,6 +407,7 @@ def on_progress_snapshot_requested(event: Any) -> None:
         "resource_pressure": worker.resource_pressure,
         "wait_reason": "",
         "updated_at": now_iso(),
+        "_publish_catalog_change": False,
     }
     if job.get("error"):
         snapshot["error"] = dict(job["error"])

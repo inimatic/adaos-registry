@@ -144,6 +144,41 @@ def test_progress_publication_is_nonblocking_bounded_and_coalesced(monkeypatch):
     assert [item[0]["sequence"] for item in delivered] == [1, 101]
 
 
+def test_terminal_snapshot_replay_does_not_reemit_catalog_change(monkeypatch):
+    streams = []
+    events = []
+    monkeypatch.setattr(
+        "adaos.sdk.io.stream_variable_publish",
+        lambda receiver, payload, **kwargs: streams.append(
+            (receiver, dict(payload), dict(kwargs))
+        ),
+    )
+    monkeypatch.setattr(
+        "adaos.sdk.data.events.publish",
+        lambda event_type, payload, **kwargs: events.append(
+            (event_type, dict(payload), dict(kwargs))
+        ),
+    )
+    terminal = {
+        "job_type": "rendition",
+        "job_id": "rendition-a",
+        "status": "completed",
+        "agent_id": "agent-a",
+        "node_id": "node-a",
+        "_publish_catalog_change": False,
+    }
+
+    main._deliver_progress(terminal, "desktop")
+
+    assert streams[0][0] == "media_library_agent.rendition_progress"
+    assert "_publish_catalog_change" not in streams[0][1]
+    assert events == []
+
+    main._deliver_progress({key: value for key, value in terminal.items() if not key.startswith("_")}, "desktop")
+
+    assert [item[0] for item in events] == ["media_library_agent.catalog.changed"]
+
+
 def test_terminal_scan_progress_keeps_durable_diagnostic(tmp_path):
     library = tmp_path / "library"
     library.mkdir()
