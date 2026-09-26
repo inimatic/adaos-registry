@@ -45,9 +45,9 @@
       "application_id": "media_center",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 2,
-      "stable_release_digest": "sha256:3c785122657992b29a9719da3aae4e984a5267c75537e01806c1443ca3d2aab0",
-      "release_key": "media_center@sha256:3c785122657992b29a9719da3aae4e984a5267c75537e01806c1443ca3d2aab0",
-      "projection_digest": "sha256:a333f618e3ca3b178a9bc7934184c72137603d8912a7e93c3b3d3f2fcaf0ba2f"
+      "stable_release_digest": "sha256:a9205da153f254dc02e0c29aaf6629233b0125605268d06990a1351816e6cf34",
+      "release_key": "media_center@sha256:a9205da153f254dc02e0c29aaf6629233b0125605268d06990a1351816e6cf34",
+      "projection_digest": "sha256:010ef7255e0212986166210bf6dbe8437ee1d5fc87eb58abb5a3ad5c2b00ac1f"
     },
     "adaos_drive": {
       "application_id": "adaos_drive",
@@ -498,7 +498,15 @@
       "release_digest": "sha256:3c785122657992b29a9719da3aae4e984a5267c75537e01806c1443ca3d2aab0",
       "path": "semantic/catalog/releases/media_center/3c785122657992b29a9719da3aae4e984a5267c75537e01806c1443ca3d2aab0.json",
       "projection_digest": "sha256:a333f618e3ca3b178a9bc7934184c72137603d8912a7e93c3b3d3f2fcaf0ba2f"
+    },
+    "media_center@sha256:a9205da153f254dc02e0c29aaf6629233b0125605268d06990a1351816e6cf34": {
+      "application_id": "media_center",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.6.111",
+      "release_digest": "sha256:a9205da153f254dc02e0c29aaf6629233b0125605268d06990a1351816e6cf34",
+      "path": "semantic/catalog/releases/media_center/a9205da153f254dc02e0c29aaf6629233b0125605268d06990a1351816e6cf34.json",
+      "projection_digest": "sha256:010ef7255e0212986166210bf6dbe8437ee1d5fc87eb58abb5a3ad5c2b00ac1f"
     }
   },
-  "index_digest": "sha256:fde094130e5bc99811405a780c323a755755308c11d4385ca1fbb95cd1f3faaa"
+  "index_digest": "sha256:2538d32b57e966aeddcf3a05a9c0f8ff13f645113fcb958687088ecda5bf1141"
 }
