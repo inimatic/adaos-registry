@@ -1,0 +1,100 @@
+schema: adaos.project.v1
+kind: project
+id: users_access
+version: 0.1.21
+profiles:
+- adaos.system.users_access.v1
+components:
+  owned:
+  - ref: scenario:users_access
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations:
+    - uses
+  dependencies: []
+entrypoints:
+- id: main
+  presentation: scenario:users_access
+  default: true
+  bindings: {}
+catalog:
+  title: Users & Access
+  icon: people-circle-outline
+  description: Manage people, invitations, roles, devices, sessions, and application
+    access from one protected system application.
+  categories:
+  - system
+  - security
+  tags:
+  - users
+  - access
+  - permissions
+publication:
+  stage: beta
+  visibility: listed
+  channel: stable
+install:
+  default: false
+  features:
+  - id: access-control
+    title: Users and access
+    default: true
+    optional: false
+    components:
+    - scenario:users_access
+compatibility:
+  required_entrypoints:
+  - main
+  required_contracts:
+  - capability:application.ui.render@^1.0.0
+  validation_profiles:
+  - users_access.local
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-09-16T20:46:31Z'
+created_by: adaos.dev.project.create
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: users_access.read
+    purpose: Read redacted user, role, invitation, device, session, and application
+      access metadata for the current subnet.
+  - id: users_access.manage
+    purpose: Grant platform roles and revoke invitations, devices, and sessions.
+    approval_policy: owner_only
+    sensitive: true
+  - id: users_access.invite
+    purpose: Create bounded invitations for the current subnet or workspace.
+    approval_policy: owner_only
+    sensitive: true
+  optional:
+  - id: applications.read
+    purpose: Resolve application titles and role metadata when available.
+  - id: applications.apply
+    purpose: Change or revoke an existing Application access grant selected by an
+      owner.
+    approval_policy: owner_only
+    sensitive: true
+  secrets: []
+  external_providers: []
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected:
+    - access_metadata
+    linked_to_user:
+    - access_metadata
+    retention: Retained with the subnet access-control history.
+    sent_off_device: []
+    tracking: false
+  privacy_labels:
+    collected:
+    - access_metadata
+    linked_to_user: true
+    sent_off_device: false
+    tracking: false

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-26T02:12:09+00:00",
+  "updated_at": "2026-09-26T02:18:08+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -2371,6 +2371,53 @@
     },
     {
       "kind": "scenario",
+      "id": "users_access",
+      "name": "users_access",
+      "version": "0.1.21",
+      "updated_at": "2026-09-26T02:17:32+00:00",
+      "path": "scenarios/users_access",
+      "manifest": "scenarios/users_access/scenario.yaml",
+      "source": {
+        "path": "scenarios/users_access",
+        "manifest": "scenarios/users_access/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:84f3dbe8333de9c8a8109cfc5f4210bfb63b4dde1252aca319f0c803f3e17a04",
+        "path_scope": [
+          "projects/users_access/"
+        ]
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "users_access",
+        "id": "users_access"
+      },
+      "title": "Users & Access",
+      "title_i18n": {
+        "key": "scenario.users_access.title",
+        "fallback": "Users & Access"
+      },
+      "description": "Manage people, invitations, roles, devices, sessions, and application access from one protected system application.",
+      "trigger": "manual",
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "users_access",
+        "release": "users_access@0.1.21",
+        "release_digest": "sha256:56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256",
+        "package_digest": "sha256:52687d368e4ec16da141e66d1daa98b65921c3700480d3f4557c413706336ef4"
+      },
+      "channels": {
+        "stable": {
+          "release": "users_access@0.1.21",
+          "release_digest": "sha256:56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256",
+          "source_revision": "sha256:84f3dbe8333de9c8a8109cfc5f4210bfb63b4dde1252aca319f0c803f3e17a04",
+          "package_digest": "sha256:52687d368e4ec16da141e66d1daa98b65921c3700480d3f4557c413706336ef4",
+          "version": "0.1.21"
+        }
+      }
+    },
+    {
+      "kind": "scenario",
       "id": "web_desktop",
       "name": "web_desktop",
       "version": "0.3.43",
@@ -4538,6 +4585,79 @@
           "source_revision": "sha256:de95b5633649ad04871799c0aed6d17cd5d9dcefeda257002efadf6a8da987aa",
           "package_digest": "sha256:20e9d148e33429441857faa70e1b873fdb694f30d72d96ee5cead238e3cac24a",
           "version": "0.1.15"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "users_access",
+      "name": "users_access",
+      "version": "0.1.21",
+      "updated_at": "2026-09-26T02:18:08+00:00",
+      "path": "projects/users_access",
+      "manifest": "projects/users_access/project.yaml",
+      "source": {
+        "path": "projects/users_access",
+        "manifest": "projects/users_access/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "users_access",
+        "id": "users_access"
+      },
+      "title": "Users & Access",
+      "description": "Manage people, invitations, roles, devices, sessions, and application access from one protected system application.",
+      "categories": [
+        "system",
+        "security"
+      ],
+      "tags": [
+        "users",
+        "access",
+        "permissions"
+      ],
+      "publication": {
+        "stage": "beta",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "beta",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "access-control",
+          "title": "Users and access",
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:users_access"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:users_access"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.system.users_access.v1"
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "users_access",
+        "release": "users_access@0.1.21",
+        "release_digest": "sha256:56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256",
+        "primary_component": "scenario:users_access",
+        "package_digest": "sha256:52687d368e4ec16da141e66d1daa98b65921c3700480d3f4557c413706336ef4"
+      },
+      "channels": {
+        "stable": {
+          "release": "users_access@0.1.21",
+          "release_digest": "sha256:56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256",
+          "source_revision": "sha256:84f3dbe8333de9c8a8109cfc5f4210bfb63b4dde1252aca319f0c803f3e17a04",
+          "package_digest": "sha256:52687d368e4ec16da141e66d1daa98b65921c3700480d3f4557c413706336ef4",
+          "version": "0.1.21"
         }
       }
     },

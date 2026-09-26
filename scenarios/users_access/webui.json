@@ -1,0 +1,2425 @@
+{
+    "schema": "adaos.webui.v1",
+    "generated_by": "builder.users_access.v1",
+    "ui": {
+        "application": {
+            "desktop": {
+                "pageSchema": {
+                    "id": "users_access",
+                    "title": "Users & Access",
+                    "title_i18n": {
+                        "key": "scenario.users_access.title",
+                        "fallback": "Users & Access"
+                    },
+                    "initialState": {
+                        "activeSection": "people",
+                        "selectedDeviceId": "",
+                        "selectedSessionId": "",
+                        "selectedInviteId": "",
+                        "selectedInvite": {},
+                        "lastInvitation": {},
+                        "lastDevicePairing": {},
+                        "selectedSubjectId": "",
+                        "expandedRoleGuide": "",
+                        "activityEventFilter": "",
+                        "activityActorFilter": "",
+                        "activityDecisionFilter": "",
+                        "activityDateFilter": "",
+                        "activitySourceFilter": "",
+                        "selectedPerson": {},
+                        "selectedPermission": {},
+                        "selectedPermissionId": "",
+                        "activeAccessModal": "",
+                        "grantScopeKind": "subnet",
+                        "inviteScopeKind": "subnet",
+                        "pairScopeKind": "subnet",
+                        "recoveryScopeKind": "subnet",
+                        "selectedPermissionApplication": {},
+                        "selectedPermissionApplicationId": "",
+                        "selectedPermissionApplicationAccessEnabled": false
+                    },
+                    "layout": {
+                        "version": 2,
+                        "pattern": "workbench",
+                        "density": "compact",
+                        "contentWidth": "fluid",
+                        "scroll": "regions",
+                        "regions": [
+                            {
+                                "id": "toolbar",
+                                "role": "toolbar",
+                                "priority": 100,
+                                "scroll": "none",
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "stack"
+                                }
+                            },
+                            {
+                                "id": "content",
+                                "role": "collection",
+                                "priority": 100,
+                                "scroll": "region",
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "stack"
+                                }
+                            },
+                            {
+                                "id": "inspector",
+                                "role": "detail",
+                                "priority": 70,
+                                "optional": true,
+                                "scroll": "region",
+                                "size": {
+                                    "minPx": 280,
+                                    "preferredPx": 360,
+                                    "maxPx": 520
+                                },
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "sheet"
+                                },
+                                "label": "Details",
+                                "label_i18n": {
+                                    "key": "detail.region.label",
+                                    "fallback": "Details"
+                                }
+                            }
+                        ],
+                        "interaction": {
+                            "selection": "single",
+                            "rowActivation": "open-detail",
+                            "detail": "sheet",
+                            "filters": "disclosure",
+                            "actions": "adaptive"
+                        }
+                    },
+                    "widgets": [
+                        {
+                            "id": "sections",
+                            "type": "navigation.tabs",
+                            "area": "toolbar",
+                            "inputs": {
+                                "selectedStateKey": "activeSection",
+                                "buttons": [
+                                    {
+                                        "id": "people",
+                                        "label": "People",
+                                        "label_i18n": "sections.people",
+                                        "icon": "person-outline"
+                                    },
+                                    {
+                                        "id": "invitations",
+                                        "label": "Invitations",
+                                        "label_i18n": "sections.invitations",
+                                        "icon": "mail-outline"
+                                    },
+                                    {
+                                        "id": "devices",
+                                        "label": "Devices",
+                                        "label_i18n": "sections.devices",
+                                        "icon": "phone-portrait-outline"
+                                    },
+                                    {
+                                        "id": "sessions",
+                                        "label": "Sessions",
+                                        "label_i18n": "sections.sessions",
+                                        "icon": "desktop-outline"
+                                    },
+                                    {
+                                        "id": "applications",
+                                        "label": "Application access",
+                                        "label_i18n": "sections.applications",
+                                        "icon": "apps-outline"
+                                    },
+                                    {
+                                        "id": "activity",
+                                        "label": "Activity",
+                                        "label_i18n": "sections.activity",
+                                        "icon": "pulse-outline"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeSection": "$event.id",
+                                        "activeAccessModal": ""
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "people",
+                            "type": "ui.list",
+                            "area": "content",
+                            "title": "People",
+                            "title_i18n": "sections.people",
+                            "visibleIf": "$state.activeSection == 'people'",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "users_access.summary",
+                                "arguments": {
+                                    "audit_limit": 20,
+                                    "sections": [
+                                        "people"
+                                    ],
+                                    "detail": "compact"
+                                },
+                                "resultPath": "response.result.users_access.people",
+                                "honestStates": {
+                                    "loading": "region",
+                                    "empty": "region",
+                                    "denied": "region",
+                                    "retry": "explicit"
+                                }
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "search": true,
+                                "searchPlaceholder": "Search people",
+                                "searchPlaceholder_i18n": "search.people",
+                                "pagination": true,
+                                "pageSize": 20,
+                                "pageSizeOptions": [
+                                    10,
+                                    25,
+                                    50
+                                ],
+                                "itemIdKey": "subject_ref",
+                                "titleKey": "display_label",
+                                "subtitleKey": "primary_role",
+                                "previewKey": "membership_summary",
+                                "emptyText": "No users are registered.",
+                                "emptyText_i18n": "empty.people",
+                                "selectedStateKey": "selectedSubjectId",
+                                "titleFallbackKeys": [
+                                    "display_name",
+                                    "profile.name",
+                                    "profile_hint"
+                                ],
+                                "subtitleFallbackKeys": [
+                                    "kind"
+                                ],
+                                "imageKey": "profile.avatar_url",
+                                "imageShape": "avatar",
+                                "initialsKey": "initials",
+                                "meta": [
+                                    {
+                                        "key": "subject_ref",
+                                        "label": "Subject ID",
+                                        "label_i18n": "fields.subject_id"
+                                    },
+                                    {
+                                        "key": "membership_summary",
+                                        "label": "Membership summary",
+                                        "label_i18n": "people.membership_summary"
+                                    },
+                                    {
+                                        "key": "membership_count",
+                                        "label": "Membership count",
+                                        "label_i18n": "people.membership_count"
+                                    },
+                                    {
+                                        "key": "application_access_count",
+                                        "label": "Application access count",
+                                        "label_i18n": "people.application_access_count"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedSubjectId": "$event.subject_ref",
+                                        "selectedPerson": "$event"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "guests",
+                            "type": "ui.list",
+                            "area": "content",
+                            "title": "Guests and pending joins",
+                            "title_i18n": "lists.guests.title",
+                            "visibleIf": "$state.activeSection == 'people'",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "users_access.summary",
+                                "arguments": {
+                                    "audit_limit": 10,
+                                    "sections": [
+                                        "people",
+                                        "guests",
+                                        "children"
+                                    ],
+                                    "detail": "compact"
+                                },
+                                "resultPath": "response.result.users_access.guests",
+                                "honestStates": {
+                                    "loading": "region",
+                                    "empty": "region",
+                                    "denied": "region",
+                                    "retry": "explicit"
+                                }
+                            },
+                            "inputs": {
+                                "search": true,
+                                "searchPlaceholder": "Search guests",
+                                "searchPlaceholder_i18n": "search.guests",
+                                "pagination": true,
+                                "pageSize": 10,
+                                "pageSizeOptions": [
+                                    10,
+                                    25,
+                                    50
+                                ],
+                                "itemIdKey": "subject_ref",
+                                "titleKey": "profile.display_name",
+                                "subtitleKey": "profile.email",
+                                "previewKey": "membership_summary",
+                                "emptyText": "No guests or pending joins.",
+                                "emptyText_i18n": "empty.guests",
+                                "selectedStateKey": "selectedSubjectId",
+                                "titleFallbackKeys": [
+                                    "display_name",
+                                    "profile.name",
+                                    "profile_hint"
+                                ],
+                                "subtitleFallbackKeys": [
+                                    "profile.handle",
+                                    "kind",
+                                    "role"
+                                ],
+                                "imageKey": "profile.avatar_url",
+                                "imageShape": "avatar",
+                                "initialsKey": "initials",
+                                "meta": [
+                                    {
+                                        "key": "subject_ref",
+                                        "label": "Subject ID",
+                                        "label_i18n": "fields.subject_id"
+                                    },
+                                    {
+                                        "key": "membership_summary",
+                                        "label": "Membership summary",
+                                        "label_i18n": "people.membership_summary"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedSubjectId": "$event.subject_ref",
+                                        "selectedPerson": "$event"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "children",
+                            "type": "ui.list",
+                            "area": "content",
+                            "title": "Child profiles",
+                            "title_i18n": "lists.children.title",
+                            "visibleIf": "$state.activeSection == 'people'",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "users_access.summary",
+                                "arguments": {
+                                    "audit_limit": 10,
+                                    "sections": [
+                                        "people",
+                                        "guests",
+                                        "children"
+                                    ],
+                                    "detail": "compact"
+                                },
+                                "resultPath": "response.result.users_access.children",
+                                "honestStates": {
+                                    "loading": "region",
+                                    "empty": "region",
+                                    "denied": "region",
+                                    "retry": "explicit"
+                                }
+                            },
+                            "inputs": {
+                                "search": true,
+                                "searchPlaceholder": "Search child profiles",
+                                "searchPlaceholder_i18n": "search.children",
+                                "pagination": true,
+                                "pageSize": 10,
+                                "pageSizeOptions": [
+                                    10,
+                                    25,
+                                    50
+                                ],
+                                "itemIdKey": "subject_ref",
+                                "titleKey": "profile.display_name",
+                                "subtitleKey": "profile.email",
+                                "previewKey": "membership_summary",
+                                "emptyText": "No child profiles.",
+                                "emptyText_i18n": "empty.children",
+                                "selectedStateKey": "selectedSubjectId",
+                                "titleFallbackKeys": [
+                                    "display_name",
+                                    "profile.name",
+                                    "profile_hint"
+                                ],
+                                "subtitleFallbackKeys": [
+                                    "profile.handle",
+                                    "kind",
+                                    "role"
+                                ],
+                                "imageKey": "profile.avatar_url",
+                                "imageShape": "avatar",
+                                "initialsKey": "initials",
+                                "meta": [
+                                    {
+                                        "key": "subject_ref",
+                                        "label": "Subject ID",
+                                        "label_i18n": "fields.subject_id"
+                                    },
+                                    {
+                                        "key": "membership_summary",
+                                        "label": "Membership summary",
+                                        "label_i18n": "people.membership_summary"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedSubjectId": "$event.subject_ref",
+                                        "selectedPerson": "$event"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "person-detail",
+                            "type": "item.details",
+                            "area": "inspector",
+                            "title": "Person details",
+                            "title_i18n": "people.detail.title",
+                            "visibleIf": "$state.activeSection == 'people' && $state.selectedSubjectId",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": "$state.selectedPerson"
+                            },
+                            "inputs": {
+                                "source": "$state.selectedPerson",
+                                "selectedStateKey": "selectedSubjectId",
+                                "primaryTitlePath": "display_label",
+                                "imageKey": "profile.avatar_url",
+                                "imageShape": "avatar",
+                                "initialsKey": "initials",
+                                "fields": [
+                                    {
+                                        "label": "Display label",
+                                        "label_i18n": "people.display_label",
+                                        "path": "display_label"
+                                    },
+                                    {
+                                        "label": "Kind",
+                                        "label_i18n": "people.kind",
+                                        "path": "kind"
+                                    },
+                                    {
+                                        "label": "Primary role",
+                                        "label_i18n": "people.primary_role",
+                                        "path": "primary_role"
+                                    },
+                                    {
+                                        "label": "Subject ID",
+                                        "label_i18n": "fields.subject_id",
+                                        "path": "subject_ref"
+                                    },
+                                    {
+                                        "label": "Membership summary",
+                                        "label_i18n": "people.membership_summary",
+                                        "path": "membership_summary"
+                                    },
+                                    {
+                                        "label": "Membership count",
+                                        "label_i18n": "people.membership_count",
+                                        "path": "membership_count"
+                                    },
+                                    {
+                                        "label": "Application access count",
+                                        "label_i18n": "people.application_access_count",
+                                        "path": "application_access_count"
+                                    },
+                                    {
+                                        "label": "Profile email",
+                                        "label_i18n": "people.profile_email",
+                                        "path": "profile.email"
+                                    },
+                                    {
+                                        "label": "Profile handle",
+                                        "label_i18n": "people.profile_handle",
+                                        "path": "profile.handle"
+                                    }
+                                ],
+                                "emptyText": "Select a person to inspect their access summary.",
+                                "emptyText_i18n": "people.detail.empty"
+                            },
+                            "role": "detail"
+                        },
+                        {
+                            "id": "person-actions",
+                            "type": "ui.actions",
+                            "area": "inspector",
+                            "title": "Person actions",
+                            "title_i18n": "people.actions.title",
+                            "visibleIf": "$state.activeSection == 'people' && $state.selectedSubjectId && !$state.activeAccessModal",
+                            "inputs": {
+                                "variant": "adaptiveToolbar",
+                                "buttons": [
+                                    {
+                                        "id": "grant_role",
+                                        "kind": "primary",
+                                        "label": "Grant role",
+                                        "label_i18n": "forms.grant.title",
+                                        "icon": "shield-checkmark-outline"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:grant_role",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeAccessModal": "grant-role"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "grant-role",
+                            "type": "ui.form",
+                            "area": "inspector",
+                            "title": "Grant platform role",
+                            "title_i18n": "forms.grant.title",
+                            "visibleIf": "$state.activeSection == 'people' && $state.selectedSubjectId && $state.activeAccessModal == 'grant-role'",
+                            "inputs": {
+                                "layout": "responsiveGrid",
+                                "minFieldWidth": 180,
+                                "showSubmit": true,
+                                "resetOnSuccess": true,
+                                "submitLabel": "Grant role",
+                                "fields": [
+                                    {
+                                        "id": "subject_id",
+                                        "type": "shortText",
+                                        "label": "Selected person",
+                                        "label_i18n": "people.selected_person",
+                                        "stateKey": "selectedSubjectId",
+                                        "required": true,
+                                        "readonly": true
+                                    },
+                                    {
+                                        "id": "role",
+                                        "type": "dropdown",
+                                        "label": "Role",
+                                        "label_i18n": "fields.role",
+                                        "required": true,
+                                        "options": [
+                                            {
+                                                "value": "co_owner",
+                                                "label": "Co-owner",
+                                                "label_i18n": "roles.co_owner"
+                                            },
+                                            {
+                                                "value": "admin",
+                                                "label": "Administrator",
+                                                "label_i18n": "roles.admin"
+                                            },
+                                            {
+                                                "value": "member",
+                                                "label": "Member",
+                                                "label_i18n": "roles.member"
+                                            },
+                                            {
+                                                "value": "child",
+                                                "label": "Child",
+                                                "label_i18n": "roles.child"
+                                            },
+                                            {
+                                                "value": "guest",
+                                                "label": "Guest",
+                                                "label_i18n": "roles.guest"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "scope_kind",
+                                        "type": "dropdown",
+                                        "label": "Scope",
+                                        "label_i18n": "fields.scope_kind",
+                                        "required": true,
+                                        "stateKey": "grantScopeKind",
+                                        "defaultValue": "subnet",
+                                        "options": [
+                                            {
+                                                "value": "subnet",
+                                                "label": "Subnet",
+                                                "label_i18n": "scopes.subnet"
+                                            },
+                                            {
+                                                "value": "workspace",
+                                                "label": "Workspace",
+                                                "label_i18n": "scopes.workspace"
+                                            },
+                                            {
+                                                "value": "webspace",
+                                                "label": "Webspace",
+                                                "label_i18n": "scopes.webspace"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "scope_id",
+                                        "type": "dropdown",
+                                        "label": "Scope ID",
+                                        "label_i18n": "fields.scope_id",
+                                        "required": true,
+                                        "optionsDataSource": {
+                                            "kind": "mcp",
+                                            "toolId": "users_access.scope_options",
+                                            "arguments": {
+                                                "scope_kind": "$state.grantScopeKind"
+                                            },
+                                            "resultPath": "response.result.items"
+                                        },
+                                        "optionValuePath": "id",
+                                        "optionLabelPaths": [
+                                            "label",
+                                            "id"
+                                        ]
+                                    },
+                                    {
+                                        "id": "expires_in_minutes",
+                                        "type": "integer",
+                                        "label": "Expires in minutes",
+                                        "label_i18n": "fields.expires_minutes",
+                                        "min": 1,
+                                        "max": 525600
+                                    }
+                                ],
+                                "closeOnSuccess": true
+                            },
+                            "actions": [
+                                {
+                                    "on": "change:scope_kind",
+                                    "type": "updateState",
+                                    "params": {
+                                        "grantScopeKind": "$event.value"
+                                    }
+                                },
+                                {
+                                    "on": "submit",
+                                    "type": "callMcp",
+                                    "target": "users_access.grant_role",
+                                    "idempotencyKey": "auto",
+                                    "resultStateKey": "lastAccessMutation",
+                                    "params": {
+                                        "subject_id": "$event.values.subject_id",
+                                        "role": "$event.values.role",
+                                        "scope_kind": "$event.values.scope_kind",
+                                        "scope_id": "$event.values.scope_id",
+                                        "expires_in_minutes": "$event.values.expires_in_minutes"
+                                    },
+                                    "invalidates": [
+                                        "users_access.summary"
+                                    ]
+                                },
+                                {
+                                    "on": "submit",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeAccessModal": ""
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "role-guide",
+                            "type": "disclosure.accordion",
+                            "area": "inspector",
+                            "title": "Role guide",
+                            "title_i18n": "guide.title",
+                            "visibleIf": "$state.activeSection == 'people' && $state.selectedSubjectId",
+                            "inputs": {
+                                "expandedStateKey": "expandedRoleGuide",
+                                "items": [
+                                    {
+                                        "id": "owners",
+                                        "title": "Owners and administrators",
+                                        "title_i18n": "guide.owners.title",
+                                        "content": "Use co-owner for durable administration and admin for delegated operations. The owner remains unique.",
+                                        "content_i18n": "guide.owners.content"
+                                    },
+                                    {
+                                        "id": "members",
+                                        "title": "Members",
+                                        "title_i18n": "guide.members.title",
+                                        "content": "Members receive only scope and application access explicitly granted to them.",
+                                        "content_i18n": "guide.members.content"
+                                    },
+                                    {
+                                        "id": "bounded",
+                                        "title": "Children and guests",
+                                        "title_i18n": "guide.bounded.title",
+                                        "content": "Child and guest access should be bounded by scope, expiry, or application role.",
+                                        "content_i18n": "guide.bounded.content"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "invitations",
+                            "type": "ui.list",
+                            "area": "content",
+                            "title": "Invitations",
+                            "title_i18n": "sections.invitations",
+                            "visibleIf": "$state.activeSection == 'invitations'",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "users_access.summary",
+                                "arguments": {
+                                    "audit_limit": 10,
+                                    "sections": [
+                                        "invites"
+                                    ],
+                                    "detail": "compact"
+                                },
+                                "resultPath": "response.result.administration.invites",
+                                "honestStates": {
+                                    "loading": "region",
+                                    "empty": "region",
+                                    "denied": "region",
+                                    "retry": "explicit"
+                                }
+                            },
+                            "inputs": {
+                                "search": true,
+                                "searchPlaceholder": "Search invitations",
+                                "searchPlaceholder_i18n": "search.invitations",
+                                "pagination": true,
+                                "pageSize": 25,
+                                "pageSizeOptions": [
+                                    10,
+                                    25,
+                                    50
+                                ],
+                                "itemIdKey": "invite_id",
+                                "titleKey": "profile_hint",
+                                "subtitleKey": "status",
+                                "previewKey": "invite_id",
+                                "detailsModal": true,
+                                "detailsModalTitleKey": "profile_hint",
+                                "detailsPresentation": "body",
+                                "meta": [
+                                    {
+                                        "key": "role",
+                                        "label": "Role",
+                                        "label_i18n": "fields.role"
+                                    },
+                                    {
+                                        "key": "scope_ref",
+                                        "label": "Scope",
+                                        "label_i18n": "activity.scope"
+                                    },
+                                    {
+                                        "key": "expires_at",
+                                        "label": "Expires",
+                                        "label_i18n": "sessions.expires",
+                                        "format": "datetime"
+                                    }
+                                ],
+                                "emptyText": "No invitations.",
+                                "emptyText_i18n": "empty.invitations",
+                                "buttons": [
+                                    {
+                                        "id": "show-invite-qr",
+                                        "label": "QR code",
+                                        "icon": "qr-code-outline"
+                                    },
+                                    {
+                                        "id": "copy-invite",
+                                        "label": "Copy link",
+                                        "icon": "copy-outline"
+                                    },
+                                    {
+                                        "id": "share-invite-telegram",
+                                        "label": "Send to Telegram",
+                                        "icon": "paper-plane-outline"
+                                    },
+                                    {
+                                        "id": "revoke-invite",
+                                        "label": "Revoke",
+                                        "label_i18n": "forms.revoke_invite.title"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedInviteId": "$event.invite_id",
+                                        "selectedInvite": "$event"
+                                    }
+                                },
+                                {
+                                    "on": "click:show-invite-qr",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedInviteId": "$event.invite_id",
+                                        "selectedInvite": "$event"
+                                    }
+                                },
+                                {
+                                    "on": "click:show-invite-qr",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "invite-qr"
+                                    }
+                                },
+                                {
+                                    "on": "click:copy-invite",
+                                    "type": "copyToClipboard",
+                                    "params": {
+                                        "text": "$event.claim_url",
+                                        "successMessage": "Invitation link copied."
+                                    }
+                                },
+                                {
+                                    "on": "click:share-invite-telegram",
+                                    "type": "openUrl",
+                                    "params": {
+                                        "url": "$event.telegram_share_url"
+                                    }
+                                },
+                                {
+                                    "on": "click:revoke-invite",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedInviteId": "$event.invite_id",
+                                        "selectedInvite": "$event",
+                                        "activeAccessModal": "revoke-invite"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "invite-actions",
+                            "type": "ui.actions",
+                            "area": "inspector",
+                            "title": "Invitation actions",
+                            "title_i18n": "invite.actions.title",
+                            "visibleIf": "$state.activeSection == 'invitations' && !$state.activeAccessModal",
+                            "inputs": {
+                                "variant": "adaptiveToolbar",
+                                "buttons": [
+                                    {
+                                        "id": "create_invite",
+                                        "kind": "primary",
+                                        "label": "Invite person or guest",
+                                        "icon": "person-add-outline"
+                                    },
+                                    {
+                                        "id": "admin_recovery",
+                                        "kind": "secondary",
+                                        "label": "Admin recovery",
+                                        "icon": "key-outline"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:create_invite",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeAccessModal": "create-invite"
+                                    }
+                                },
+                                {
+                                    "on": "click:admin_recovery",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeAccessModal": "admin-recovery"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "create-invite",
+                            "type": "ui.form",
+                            "area": "inspector",
+                            "title": "Create invitation",
+                            "title_i18n": "forms.invite.title",
+                            "visibleIf": "$state.activeSection == 'invitations' && $state.activeAccessModal == 'create-invite'",
+                            "inputs": {
+                                "layout": "responsiveGrid",
+                                "minFieldWidth": 170,
+                                "showSubmit": true,
+                                "resetOnSuccess": true,
+                                "submitLabel": "Create invitation",
+                                "fields": [
+                                    {
+                                        "id": "kind",
+                                        "type": "dropdown",
+                                        "label": "Invitation type",
+                                        "label_i18n": "fields.invite_kind",
+                                        "required": true,
+                                        "options": [
+                                            {
+                                                "value": "targeted",
+                                                "label": "Targeted",
+                                                "label_i18n": "invite.targeted"
+                                            },
+                                            {
+                                                "value": "guest",
+                                                "label": "Guest link",
+                                                "label_i18n": "invite.guest"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "role",
+                                        "type": "dropdown",
+                                        "label": "Role",
+                                        "label_i18n": "fields.role",
+                                        "required": true,
+                                        "options": [
+                                            {
+                                                "value": "admin",
+                                                "label": "Administrator",
+                                                "label_i18n": "roles.admin"
+                                            },
+                                            {
+                                                "value": "member",
+                                                "label": "Member",
+                                                "label_i18n": "roles.member"
+                                            },
+                                            {
+                                                "value": "child",
+                                                "label": "Child",
+                                                "label_i18n": "roles.child"
+                                            },
+                                            {
+                                                "value": "guest",
+                                                "label": "Guest",
+                                                "label_i18n": "roles.guest"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "profile_hint",
+                                        "type": "shortText",
+                                        "label": "Recipient hint",
+                                        "label_i18n": "fields.profile_hint"
+                                    },
+                                    {
+                                        "id": "scope_kind",
+                                        "type": "dropdown",
+                                        "label": "Scope",
+                                        "label_i18n": "fields.scope_kind",
+                                        "required": true,
+                                        "stateKey": "inviteScopeKind",
+                                        "defaultValue": "subnet",
+                                        "options": [
+                                            {
+                                                "value": "subnet",
+                                                "label": "Subnet",
+                                                "label_i18n": "scopes.subnet"
+                                            },
+                                            {
+                                                "value": "workspace",
+                                                "label": "Workspace",
+                                                "label_i18n": "scopes.workspace"
+                                            },
+                                            {
+                                                "value": "webspace",
+                                                "label": "Webspace",
+                                                "label_i18n": "scopes.webspace"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "scope_id",
+                                        "type": "dropdown",
+                                        "label": "Scope ID",
+                                        "label_i18n": "fields.scope_id",
+                                        "required": true,
+                                        "optionsDataSource": {
+                                            "kind": "mcp",
+                                            "toolId": "users_access.scope_options",
+                                            "arguments": {
+                                                "scope_kind": "$state.inviteScopeKind"
+                                            },
+                                            "resultPath": "response.result.items"
+                                        },
+                                        "optionValuePath": "id",
+                                        "optionLabelPaths": [
+                                            "label",
+                                            "id"
+                                        ]
+                                    },
+                                    {
+                                        "id": "expires_in_minutes",
+                                        "type": "integer",
+                                        "label": "Expires in minutes",
+                                        "label_i18n": "fields.expires_minutes",
+                                        "required": true,
+                                        "defaultValue": 1440,
+                                        "min": 1,
+                                        "max": 10080
+                                    },
+                                    {
+                                        "id": "max_sessions",
+                                        "type": "integer",
+                                        "label": "Maximum sessions",
+                                        "label_i18n": "fields.max_sessions",
+                                        "defaultValue": 1,
+                                        "min": 1,
+                                        "max": 100
+                                    }
+                                ],
+                                "closeOnSuccess": true
+                            },
+                            "actions": [
+                                {
+                                    "on": "change:scope_kind",
+                                    "type": "updateState",
+                                    "params": {
+                                        "inviteScopeKind": "$event.value"
+                                    }
+                                },
+                                {
+                                    "on": "submit",
+                                    "type": "callMcp",
+                                    "target": "users_access.create_invite",
+                                    "idempotencyKey": "auto",
+                                    "resultStateKey": "lastInvitation",
+                                    "params": {
+                                        "kind": "$event.values.kind",
+                                        "role": "$event.values.role",
+                                        "profile_hint": "$event.values.profile_hint",
+                                        "scope_kind": "$event.values.scope_kind",
+                                        "scope_id": "$event.values.scope_id",
+                                        "expires_in_minutes": "$event.values.expires_in_minutes",
+                                        "max_sessions": "$event.values.max_sessions"
+                                    },
+                                    "invalidates": [
+                                        "users_access.summary"
+                                    ]
+                                },
+                                {
+                                    "on": "submit",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeAccessModal": ""
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "pair-device",
+                            "type": "ui.form",
+                            "area": "inspector",
+                            "title": "Pair a personal device",
+                            "visibleIf": "$state.activeSection == 'devices' && $state.activeAccessModal == 'pair-device'",
+                            "inputs": {
+                                "layout": "responsiveGrid",
+                                "minFieldWidth": 170,
+                                "showSubmit": true,
+                                "resetOnSuccess": true,
+                                "submitLabel": "Create pairing link",
+                                "closeOnSuccess": true,
+                                "fields": [
+                                    {
+                                        "id": "subject_id",
+                                        "type": "dropdown",
+                                        "label": "User",
+                                        "required": true,
+                                        "optionsDataSource": {
+                                            "kind": "mcp",
+                                            "toolId": "users_access.summary",
+                                            "arguments": {
+                                                "sections": [
+                                                    "people"
+                                                ],
+                                                "detail": "compact"
+                                            },
+                                            "resultPath": "response.result.users_access.people"
+                                        },
+                                        "optionValuePath": "subject_ref",
+                                        "optionLabelPaths": [
+                                            "display_label",
+                                            "subject_ref"
+                                        ]
+                                    },
+                                    {
+                                        "id": "device_name",
+                                        "type": "shortText",
+                                        "label": "Expected device name"
+                                    },
+                                    {
+                                        "id": "role",
+                                        "type": "dropdown",
+                                        "label": "Role",
+                                        "required": true,
+                                        "defaultValue": "member",
+                                        "options": [
+                                            {
+                                                "value": "member",
+                                                "label": "Member"
+                                            },
+                                            {
+                                                "value": "child",
+                                                "label": "Child"
+                                            },
+                                            {
+                                                "value": "admin",
+                                                "label": "Administrator"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "scope_kind",
+                                        "type": "dropdown",
+                                        "label": "Scope",
+                                        "required": true,
+                                        "stateKey": "pairScopeKind",
+                                        "defaultValue": "subnet",
+                                        "options": [
+                                            {
+                                                "value": "subnet",
+                                                "label": "Subnet"
+                                            },
+                                            {
+                                                "value": "workspace",
+                                                "label": "Workspace"
+                                            },
+                                            {
+                                                "value": "webspace",
+                                                "label": "Webspace"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "scope_id",
+                                        "type": "dropdown",
+                                        "label": "Scope target",
+                                        "required": true,
+                                        "optionsDataSource": {
+                                            "kind": "mcp",
+                                            "toolId": "users_access.scope_options",
+                                            "arguments": {
+                                                "scope_kind": "$state.pairScopeKind"
+                                            },
+                                            "resultPath": "response.result.items"
+                                        },
+                                        "optionValuePath": "id",
+                                        "optionLabelPaths": [
+                                            "label",
+                                            "id"
+                                        ]
+                                    },
+                                    {
+                                        "id": "expires_in_minutes",
+                                        "type": "integer",
+                                        "label": "Expires in minutes",
+                                        "required": true,
+                                        "defaultValue": 15,
+                                        "min": 1,
+                                        "max": 10080
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "change:scope_kind",
+                                    "type": "updateState",
+                                    "params": {
+                                        "pairScopeKind": "$event.value"
+                                    }
+                                },
+                                {
+                                    "on": "submit",
+                                    "type": "callMcp",
+                                    "target": "users_access.create_device_pairing",
+                                    "idempotencyKey": "auto",
+                                    "resultStateKey": "lastDevicePairing",
+                                    "params": {
+                                        "subject_id": "$event.values.subject_id",
+                                        "device_name": "$event.values.device_name",
+                                        "role": "$event.values.role",
+                                        "scope_kind": "$event.values.scope_kind",
+                                        "scope_id": "$event.values.scope_id",
+                                        "expires_in_minutes": "$event.values.expires_in_minutes"
+                                    },
+                                    "invalidates": [
+                                        "users_access.summary"
+                                    ]
+                                },
+                                {
+                                    "on": "submit",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeAccessModal": ""
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "admin-recovery",
+                            "type": "ui.form",
+                            "area": "inspector",
+                            "title": "Administrator recovery",
+                            "visibleIf": "$state.activeSection == 'invitations' && $state.activeAccessModal == 'admin-recovery'",
+                            "inputs": {
+                                "layout": "responsiveGrid",
+                                "minFieldWidth": 170,
+                                "showSubmit": true,
+                                "resetOnSuccess": true,
+                                "submitLabel": "Create recovery link",
+                                "closeOnSuccess": true,
+                                "fields": [
+                                    {
+                                        "id": "subject_id",
+                                        "type": "dropdown",
+                                        "label": "User",
+                                        "required": true,
+                                        "optionsDataSource": {
+                                            "kind": "mcp",
+                                            "toolId": "users_access.summary",
+                                            "arguments": {
+                                                "sections": [
+                                                    "people"
+                                                ],
+                                                "detail": "compact"
+                                            },
+                                            "resultPath": "response.result.users_access.people"
+                                        },
+                                        "optionValuePath": "subject_ref",
+                                        "optionLabelPaths": [
+                                            "display_label",
+                                            "subject_ref"
+                                        ]
+                                    },
+                                    {
+                                        "id": "replacement_device_id",
+                                        "type": "shortText",
+                                        "label": "Replacement device ID"
+                                    },
+                                    {
+                                        "id": "reason",
+                                        "type": "longText",
+                                        "label": "Reason"
+                                    },
+                                    {
+                                        "id": "scope_kind",
+                                        "type": "dropdown",
+                                        "label": "Scope",
+                                        "required": true,
+                                        "stateKey": "recoveryScopeKind",
+                                        "defaultValue": "subnet",
+                                        "options": [
+                                            {
+                                                "value": "subnet",
+                                                "label": "Subnet"
+                                            },
+                                            {
+                                                "value": "workspace",
+                                                "label": "Workspace"
+                                            },
+                                            {
+                                                "value": "webspace",
+                                                "label": "Webspace"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "scope_id",
+                                        "type": "dropdown",
+                                        "label": "Scope target",
+                                        "required": true,
+                                        "optionsDataSource": {
+                                            "kind": "mcp",
+                                            "toolId": "users_access.scope_options",
+                                            "arguments": {
+                                                "scope_kind": "$state.recoveryScopeKind"
+                                            },
+                                            "resultPath": "response.result.items"
+                                        },
+                                        "optionValuePath": "id",
+                                        "optionLabelPaths": [
+                                            "label",
+                                            "id"
+                                        ]
+                                    },
+                                    {
+                                        "id": "expires_in_minutes",
+                                        "type": "integer",
+                                        "label": "Expires in minutes",
+                                        "required": true,
+                                        "defaultValue": 30,
+                                        "min": 1,
+                                        "max": 10080
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "change:scope_kind",
+                                    "type": "updateState",
+                                    "params": {
+                                        "recoveryScopeKind": "$event.value"
+                                    }
+                                },
+                                {
+                                    "on": "submit",
+                                    "type": "callMcp",
+                                    "target": "users_access.create_admin_recovery",
+                                    "idempotencyKey": "auto",
+                                    "resultStateKey": "lastInvitation",
+                                    "params": {
+                                        "subject_id": "$event.values.subject_id",
+                                        "replacement_device_id": "$event.values.replacement_device_id",
+                                        "reason": "$event.values.reason",
+                                        "scope_kind": "$event.values.scope_kind",
+                                        "scope_id": "$event.values.scope_id",
+                                        "expires_in_minutes": "$event.values.expires_in_minutes"
+                                    },
+                                    "invalidates": [
+                                        "users_access.summary"
+                                    ]
+                                },
+                                {
+                                    "on": "submit",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeAccessModal": ""
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "invitation-result",
+                            "type": "item.details",
+                            "area": "inspector",
+                            "title": "Invitation result",
+                            "title_i18n": "results.invitation.title",
+                            "visibleIf": "$state.activeSection == 'invitations' && $state.lastInvitation.invite.invite_id",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": "$state.lastInvitation.invite"
+                            },
+                            "inputs": {
+                                "source": "$state.lastInvitation.invite",
+                                "fields": [
+                                    {
+                                        "label": "Invitation ID",
+                                        "label_i18n": "fields.invite_id",
+                                        "path": "invite_id"
+                                    },
+                                    {
+                                        "label": "Claim link",
+                                        "label_i18n": "fields.claim_url",
+                                        "path": "claim_url"
+                                    },
+                                    {
+                                        "label": "Status",
+                                        "label_i18n": "fields.status",
+                                        "path": "status"
+                                    }
+                                ],
+                                "emptyText": "No details available."
+                            }
+                        },
+                        {
+                            "id": "invitation-result-actions",
+                            "type": "ui.actions",
+                            "area": "inspector",
+                            "visibleIf": "$state.activeSection == 'invitations' && $state.lastInvitation.invite.invite_id && !$state.activeAccessModal",
+                            "inputs": {
+                                "variant": "adaptiveToolbar",
+                                "buttons": [
+                                    {
+                                        "id": "show_qr",
+                                        "kind": "primary",
+                                        "label": "Show QR",
+                                        "icon": "qr-code-outline"
+                                    },
+                                    {
+                                        "id": "copy_link",
+                                        "kind": "secondary",
+                                        "label": "Copy link",
+                                        "icon": "copy-outline"
+                                    },
+                                    {
+                                        "id": "share_telegram",
+                                        "kind": "secondary",
+                                        "label": "Send to Telegram",
+                                        "icon": "paper-plane-outline"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:show_qr",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedInviteId": "$state.lastInvitation.invite.invite_id",
+                                        "selectedInvite": "$state.lastInvitation.invite"
+                                    }
+                                },
+                                {
+                                    "on": "click:show_qr",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "invite-qr"
+                                    }
+                                },
+                                {
+                                    "on": "click:copy_link",
+                                    "type": "copyToClipboard",
+                                    "params": {
+                                        "text": "$state.lastInvitation.invite.claim_url",
+                                        "successMessage": "Invitation link copied."
+                                    }
+                                },
+                                {
+                                    "on": "click:share_telegram",
+                                    "type": "openUrl",
+                                    "params": {
+                                        "url": "$state.lastInvitation.invite.telegram_share_url"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "revoke-invite",
+                            "type": "ui.form",
+                            "area": "inspector",
+                            "title": "Revoke selected invitation",
+                            "title_i18n": "forms.revoke_invite.title",
+                            "visibleIf": "$state.activeSection == 'invitations' && $state.selectedInviteId && $state.activeAccessModal == 'revoke-invite'",
+                            "inputs": {
+                                "showSubmit": true,
+                                "submitLabel": "Revoke invitation",
+                                "fields": [
+                                    {
+                                        "id": "invite_id",
+                                        "type": "shortText",
+                                        "label": "Invitation ID",
+                                        "label_i18n": "fields.invite_id",
+                                        "stateKey": "selectedInviteId",
+                                        "readonly": true
+                                    },
+                                    {
+                                        "id": "reason",
+                                        "type": "longText",
+                                        "label": "Reason",
+                                        "label_i18n": "fields.reason"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "submit",
+                                    "type": "callMcp",
+                                    "target": "users_access.revoke_invite",
+                                    "idempotencyKey": "auto",
+                                    "resultStateKey": "lastAccessMutation",
+                                    "params": {
+                                        "invite_id": "$state.selectedInviteId",
+                                        "reason": "$event.values.reason"
+                                    },
+                                    "invalidates": [
+                                        "users_access.summary"
+                                    ],
+                                    "confirm": true
+                                },
+                                {
+                                    "on": "submit",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeAccessModal": ""
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "device-actions",
+                            "type": "ui.actions",
+                            "area": "content",
+                            "title": "Device actions",
+                            "visibleIf": "$state.activeSection == 'devices' && !$state.activeAccessModal",
+                            "inputs": {
+                                "variant": "adaptiveToolbar",
+                                "buttons": [
+                                    {
+                                        "id": "pair_device",
+                                        "kind": "primary",
+                                        "label": "Pair device",
+                                        "icon": "phone-portrait-outline"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:pair_device",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeAccessModal": "pair-device"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "devices",
+                            "type": "ui.list",
+                            "area": "content",
+                            "title": "Devices",
+                            "title_i18n": "sections.devices",
+                            "visibleIf": "$state.activeSection == 'devices'",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "users_access.summary",
+                                "arguments": {
+                                    "audit_limit": 10,
+                                    "sections": [
+                                        "devices"
+                                    ],
+                                    "detail": "compact"
+                                },
+                                "resultPath": "response.result.users_access.devices",
+                                "honestStates": {
+                                    "loading": "region",
+                                    "empty": "region",
+                                    "denied": "region",
+                                    "retry": "explicit"
+                                }
+                            },
+                            "inputs": {
+                                "search": true,
+                                "searchPlaceholder": "Search devices",
+                                "searchPlaceholder_i18n": "search.devices",
+                                "pagination": true,
+                                "pageSize": 25,
+                                "pageSizeOptions": [
+                                    10,
+                                    25,
+                                    50
+                                ],
+                                "itemIdKey": "device_id",
+                                "titleKey": "display_name",
+                                "subtitleKey": "browser_name",
+                                "previewKey": "last_seen_at",
+                                "emptyText": "No devices.",
+                                "emptyText_i18n": "empty.devices",
+                                "buttons": [
+                                    {
+                                        "id": "revoke-device",
+                                        "label": "Revoke",
+                                        "label_i18n": "forms.revoke_device.title"
+                                    }
+                                ],
+                                "selectedStateKey": "selectedDeviceId",
+                                "titleFallbackKeys": [
+                                    "label",
+                                    "browser_name",
+                                    "platform",
+                                    "device_id"
+                                ],
+                                "subtitleFallbackKeys": [
+                                    "platform",
+                                    "status"
+                                ],
+                                "meta": [
+                                    {
+                                        "key": "device_id",
+                                        "label": "Device ID",
+                                        "label_i18n": "devices.device_id"
+                                    },
+                                    {
+                                        "key": "status",
+                                        "label": "Status",
+                                        "label_i18n": "fields.status"
+                                    },
+                                    {
+                                        "key": "last_seen_at",
+                                        "label": "Last seen",
+                                        "label_i18n": "devices.last_seen",
+                                        "format": "datetime"
+                                    },
+                                    {
+                                        "key": "location",
+                                        "label": "Location or channel",
+                                        "label_i18n": "sessions.location"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedDeviceId": "$event.device_id"
+                                    }
+                                },
+                                {
+                                    "on": "click:revoke-device",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedDeviceId": "$event.device_id",
+                                        "activeAccessModal": "revoke-device"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "device-pairing-result",
+                            "type": "item.details",
+                            "area": "inspector",
+                            "title": "Pairing result",
+                            "visibleIf": "$state.activeSection == 'devices' && $state.lastDevicePairing.invite.invite_id && !$state.activeAccessModal",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": "$state.lastDevicePairing.invite"
+                            },
+                            "inputs": {
+                                "source": "$state.lastDevicePairing.invite",
+                                "fields": [
+                                    {
+                                        "label": "Invitation ID",
+                                        "path": "invite_id"
+                                    },
+                                    {
+                                        "label": "Claim link",
+                                        "path": "claim_url",
+                                        "wide": true
+                                    },
+                                    {
+                                        "label": "Status",
+                                        "path": "status"
+                                    }
+                                ],
+                                "emptyText": "No pairing link available."
+                            }
+                        },
+                        {
+                            "id": "device-pairing-result-actions",
+                            "type": "ui.actions",
+                            "area": "inspector",
+                            "visibleIf": "$state.activeSection == 'devices' && $state.lastDevicePairing.invite.invite_id && !$state.activeAccessModal",
+                            "inputs": {
+                                "variant": "adaptiveToolbar",
+                                "buttons": [
+                                    {
+                                        "id": "show_pairing_qr",
+                                        "kind": "primary",
+                                        "label": "Show QR",
+                                        "icon": "qr-code-outline"
+                                    },
+                                    {
+                                        "id": "copy_pairing_link",
+                                        "kind": "secondary",
+                                        "label": "Copy link",
+                                        "icon": "copy-outline"
+                                    },
+                                    {
+                                        "id": "share_pairing_telegram",
+                                        "kind": "secondary",
+                                        "label": "Send to Telegram",
+                                        "icon": "paper-plane-outline"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:show_pairing_qr",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedInviteId": "$state.lastDevicePairing.invite.invite_id",
+                                        "selectedInvite": "$state.lastDevicePairing.invite"
+                                    }
+                                },
+                                {
+                                    "on": "click:show_pairing_qr",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "invite-qr"
+                                    }
+                                },
+                                {
+                                    "on": "click:copy_pairing_link",
+                                    "type": "copyToClipboard",
+                                    "params": {
+                                        "text": "$state.lastDevicePairing.invite.claim_url",
+                                        "successMessage": "Pairing link copied."
+                                    }
+                                },
+                                {
+                                    "on": "click:share_pairing_telegram",
+                                    "type": "openUrl",
+                                    "params": {
+                                        "url": "$state.lastDevicePairing.invite.telegram_share_url"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "devices-help",
+                            "type": "ui.form",
+                            "area": "inspector",
+                            "visibleIf": "$state.activeSection == 'devices' && !$state.selectedDeviceId && !$state.lastDevicePairing.invite.invite_id && !$state.activeAccessModal",
+                            "inputs": {
+                                "showSubmit": false,
+                                "fields": [
+                                    {
+                                        "id": "devices-help-message",
+                                        "type": "staticContent",
+                                        "title": "Registered credentials",
+                                        "title_i18n": "devices.help.title",
+                                        "content": "Only device credentials registered with Users & Access are shown here. Browser endpoints and subnet members are managed on their own system surfaces.",
+                                        "content_i18n": "devices.help.content"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "revoke-device",
+                            "type": "ui.form",
+                            "area": "inspector",
+                            "title": "Revoke selected device",
+                            "title_i18n": "forms.revoke_device.title",
+                            "visibleIf": "$state.activeSection == 'devices' && $state.selectedDeviceId && $state.activeAccessModal == 'revoke-device'",
+                            "inputs": {
+                                "showSubmit": true,
+                                "submitLabel": "Revoke device",
+                                "fields": [
+                                    {
+                                        "id": "reason",
+                                        "type": "longText",
+                                        "label": "Reason",
+                                        "label_i18n": "fields.reason"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "submit",
+                                    "type": "callMcp",
+                                    "target": "users_access.revoke_device",
+                                    "idempotencyKey": "auto",
+                                    "resultStateKey": "lastAccessMutation",
+                                    "params": {
+                                        "device_id": "$state.selectedDeviceId",
+                                        "reason": "$event.values.reason"
+                                    },
+                                    "invalidates": [
+                                        "users_access.summary"
+                                    ],
+                                    "confirm": true
+                                },
+                                {
+                                    "on": "submit",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeAccessModal": ""
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "sessions",
+                            "type": "ui.list",
+                            "area": "content",
+                            "title": "Sessions",
+                            "title_i18n": "sections.sessions",
+                            "visibleIf": "$state.activeSection == 'sessions'",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "users_access.summary",
+                                "arguments": {
+                                    "audit_limit": 10,
+                                    "sections": [
+                                        "sessions"
+                                    ],
+                                    "detail": "compact"
+                                },
+                                "resultPath": "response.result.users_access.sessions",
+                                "honestStates": {
+                                    "loading": "region",
+                                    "empty": "region",
+                                    "denied": "region",
+                                    "retry": "explicit"
+                                }
+                            },
+                            "inputs": {
+                                "search": true,
+                                "searchPlaceholder": "Search sessions",
+                                "searchPlaceholder_i18n": "search.sessions",
+                                "pagination": true,
+                                "pageSize": 25,
+                                "pageSizeOptions": [
+                                    10,
+                                    25,
+                                    50
+                                ],
+                                "itemIdKey": "session_id",
+                                "titleKey": "device_name",
+                                "subtitleKey": "subject_display_name",
+                                "previewKey": "location",
+                                "meta": [
+                                    {
+                                        "key": "session_id",
+                                        "label": "Session ID",
+                                        "label_i18n": "sessions.session_id"
+                                    },
+                                    {
+                                        "key": "device_name",
+                                        "label": "Device",
+                                        "label_i18n": "sessions.device"
+                                    },
+                                    {
+                                        "key": "opened_at",
+                                        "label": "Opened",
+                                        "label_i18n": "sessions.opened",
+                                        "format": "datetime"
+                                    },
+                                    {
+                                        "key": "expires_at",
+                                        "label": "Expires",
+                                        "label_i18n": "sessions.expires",
+                                        "format": "datetime"
+                                    },
+                                    {
+                                        "key": "authentication_source",
+                                        "label": "Authentication",
+                                        "label_i18n": "sessions.authentication"
+                                    },
+                                    {
+                                        "key": "location",
+                                        "label": "Location or channel",
+                                        "label_i18n": "sessions.location"
+                                    }
+                                ],
+                                "emptyText": "No sessions.",
+                                "emptyText_i18n": "empty.sessions",
+                                "buttons": [
+                                    {
+                                        "id": "revoke-session",
+                                        "label": "Revoke",
+                                        "label_i18n": "forms.revoke_session.title"
+                                    }
+                                ],
+                                "selectedStateKey": "selectedSessionId",
+                                "titleFallbackKeys": [
+                                    "browser_name",
+                                    "user_agent_name",
+                                    "subject_ref",
+                                    "session_id"
+                                ],
+                                "subtitleFallbackKeys": [
+                                    "subject_ref",
+                                    "status"
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedSessionId": "$event.session_id"
+                                    }
+                                },
+                                {
+                                    "on": "click:revoke-session",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedSessionId": "$event.session_id",
+                                        "activeAccessModal": "revoke-session"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "revoke-session",
+                            "type": "ui.form",
+                            "area": "inspector",
+                            "title": "Revoke selected session",
+                            "title_i18n": "forms.revoke_session.title",
+                            "visibleIf": "$state.activeSection == 'sessions' && $state.selectedSessionId && $state.activeAccessModal == 'revoke-session'",
+                            "inputs": {
+                                "showSubmit": true,
+                                "submitLabel": "Revoke session",
+                                "fields": [
+                                    {
+                                        "id": "revoke-session-warning",
+                                        "type": "staticContent",
+                                        "title": "What revocation does",
+                                        "title_i18n": "sessions.revoke.title",
+                                        "content": "Revoke immediately disables this session credential. It does not remove the user or their other sessions.",
+                                        "content_i18n": "sessions.revoke.content"
+                                    },
+                                    {
+                                        "id": "reason",
+                                        "type": "longText",
+                                        "label": "Reason",
+                                        "label_i18n": "fields.reason"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "submit",
+                                    "type": "callMcp",
+                                    "target": "users_access.revoke_session",
+                                    "idempotencyKey": "auto",
+                                    "resultStateKey": "lastAccessMutation",
+                                    "params": {
+                                        "session_id": "$state.selectedSessionId",
+                                        "reason": "$event.values.reason"
+                                    },
+                                    "invalidates": [
+                                        "users_access.summary"
+                                    ],
+                                    "confirm": true
+                                },
+                                {
+                                    "on": "submit",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeAccessModal": ""
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "application-access",
+                            "type": "ui.list",
+                            "area": "content",
+                            "title": "Application permissions",
+                            "title_i18n": "sections.applications",
+                            "visibleIf": "$state.activeSection == 'applications'",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "users_access.summary",
+                                "arguments": {
+                                    "audit_limit": 10,
+                                    "sections": [
+                                        "permissions"
+                                    ],
+                                    "detail": "full"
+                                },
+                                "resultPath": "response.result.users_access.permissions",
+                                "honestStates": {
+                                    "loading": "region",
+                                    "empty": "region",
+                                    "denied": "region",
+                                    "retry": "explicit"
+                                }
+                            },
+                            "inputs": {
+                                "search": true,
+                                "searchPlaceholder": "Search permissions",
+                                "searchPlaceholder_i18n": "search.applications",
+                                "pagination": true,
+                                "pageSize": 25,
+                                "pageSizeOptions": [
+                                    10,
+                                    25,
+                                    50
+                                ],
+                                "itemIdKey": "permission_id",
+                                "titleKey": "permission_id",
+                                "subtitleKey": "applications_summary",
+                                "previewKey": "application_count",
+                                "detailsModal": true,
+                                "detailsModalTitleKey": "permission_id",
+                                "meta": [
+                                    {
+                                        "key": "active_grant_count",
+                                        "label": "Active grants",
+                                        "label_i18n": "permissions.active_grants"
+                                    },
+                                    {
+                                        "key": "explicit_deny_count",
+                                        "label": "Explicit denies",
+                                        "label_i18n": "permissions.explicit_denies"
+                                    }
+                                ],
+                                "emptyText": "No declared application permissions.",
+                                "emptyText_i18n": "empty.applications",
+                                "selectedStateKey": "selectedPermissionId"
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedPermissionId": "$event.permission_id",
+                                        "selectedPermission": "$event",
+                                        "selectedPermissionApplicationId": "",
+                                        "selectedPermissionApplication": {},
+                                        "selectedPermissionApplicationAccessEnabled": false
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "application-access-help",
+                            "type": "ui.form",
+                            "area": "inspector",
+                            "visibleIf": "$state.activeSection == 'applications' && !$state.selectedPermissionId",
+                            "inputs": {
+                                "showSubmit": false,
+                                "fields": [
+                                    {
+                                        "id": "application-access-message",
+                                        "type": "staticContent",
+                                        "title": "Permission-centric application access",
+                                        "title_i18n": "application_access.help.title",
+                                        "content": "Select a permission to see every immutable Application release that declares it. Effective access is summarized from subject grants; declarations cannot be changed from this inventory.",
+                                        "content_i18n": "application_access.help.content"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "permission-detail",
+                            "type": "item.details",
+                            "area": "inspector",
+                            "title": "Permission detail",
+                            "title_i18n": "permissions.detail.title",
+                            "visibleIf": "$state.activeSection == 'applications' && $state.selectedPermissionId",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": "$state.selectedPermission"
+                            },
+                            "inputs": {
+                                "source": "$state.selectedPermission",
+                                "fields": [
+                                    {
+                                        "label": "Permission",
+                                        "label_i18n": "permissions.permission",
+                                        "path": "permission_id"
+                                    },
+                                    {
+                                        "label": "Applications",
+                                        "path": "application_count"
+                                    },
+                                    {
+                                        "label": "Active grants",
+                                        "label_i18n": "permissions.active_grants",
+                                        "path": "active_grant_count"
+                                    },
+                                    {
+                                        "label": "Explicit denies",
+                                        "label_i18n": "permissions.explicit_denies",
+                                        "path": "explicit_deny_count"
+                                    },
+                                    {
+                                        "label": "Applications",
+                                        "path": "applications_summary"
+                                    }
+                                ],
+                                "emptyText": "Select a permission to inspect the Applications that declare it.",
+                                "emptyText_i18n": "permissions.detail.empty"
+                            },
+                            "role": "detail"
+                        },
+                        {
+                            "id": "permission-applications",
+                            "type": "ui.list",
+                            "area": "inspector",
+                            "title": "Applications declaring this permission",
+                            "visibleIf": "$state.activeSection == 'applications' && $state.selectedPermissionId",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": "$state.selectedPermission.applications"
+                            },
+                            "inputs": {
+                                "itemIdKey": "application_id",
+                                "titleKey": "title",
+                                "subtitleKey": "requirement",
+                                "previewKey": "purpose",
+                                "badgeKey": "approval_policy",
+                                "selectedStateKey": "selectedPermissionApplicationId",
+                                "meta": [
+                                    {
+                                        "key": "access_enabled",
+                                        "label": "Access",
+                                        "label_i18n": "permissions.access",
+                                        "kind": "boolean",
+                                        "trueLabel": "In use",
+                                        "falseLabel": "Not granted"
+                                    },
+                                    {
+                                        "key": "active_grant_count",
+                                        "label": "Active grants",
+                                        "label_i18n": "permissions.active_grants"
+                                    },
+                                    {
+                                        "key": "explicit_deny_count",
+                                        "label": "Explicit denies",
+                                        "label_i18n": "permissions.explicit_denies"
+                                    }
+                                ],
+                                "emptyText": "No Applications declare this permission."
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedPermissionApplicationId": "$event.application_id",
+                                        "selectedPermissionApplication": "$event",
+                                        "selectedPermissionApplicationAccessEnabled": "$event.access_enabled"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "permission-application-access-state",
+                            "type": "input.toggle",
+                            "area": "inspector",
+                            "title": "Effective access",
+                            "visibleIf": "$state.activeSection == 'applications' && $state.selectedPermissionApplicationId",
+                            "inputs": {
+                                "label": "Effective access from current subject grants",
+                                "description": "Read-only: the release declaration is immutable. Change individual subject grants from the selected Application's access editor.",
+                                "value": "$state.selectedPermissionApplicationAccessEnabled",
+                                "disabled": true
+                            }
+                        },
+                        {
+                            "id": "activity-filters",
+                            "type": "ui.queryToolbar",
+                            "area": "content",
+                            "title": "Filter access activity",
+                            "title_i18n": "activity.filters.title",
+                            "visibleIf": "$state.activeSection == 'activity'",
+                            "inputs": {
+                                "controls": [
+                                    {
+                                        "id": "event",
+                                        "kind": "search",
+                                        "label": "Event",
+                                        "label_i18n": "activity.event",
+                                        "stateKey": "activityEventFilter",
+                                        "inputType": "search"
+                                    },
+                                    {
+                                        "id": "actor",
+                                        "kind": "filter",
+                                        "label": "Actor",
+                                        "label_i18n": "activity.actor",
+                                        "stateKey": "activityActorFilter",
+                                        "inputType": "text"
+                                    },
+                                    {
+                                        "id": "decision",
+                                        "kind": "filter",
+                                        "label": "Decision",
+                                        "label_i18n": "activity.decision",
+                                        "stateKey": "activityDecisionFilter",
+                                        "inputType": "select",
+                                        "options": [
+                                            {
+                                                "value": "",
+                                                "label": "All",
+                                                "label_i18n": "activity.decision.all"
+                                            },
+                                            {
+                                                "value": "allow",
+                                                "label": "Allowed",
+                                                "label_i18n": "activity.decision.allow"
+                                            },
+                                            {
+                                                "value": "deny",
+                                                "label": "Denied",
+                                                "label_i18n": "activity.decision.deny"
+                                            },
+                                            {
+                                                "value": "approval_required",
+                                                "label": "Approval required",
+                                                "label_i18n": "activity.decision.approval_required"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "date",
+                                        "kind": "filter",
+                                        "label": "Date",
+                                        "label_i18n": "activity.date",
+                                        "stateKey": "activityDateFilter",
+                                        "inputType": "date"
+                                    },
+                                    {
+                                        "id": "source",
+                                        "kind": "filter",
+                                        "label": "Source",
+                                        "label_i18n": "activity.source",
+                                        "stateKey": "activitySourceFilter",
+                                        "inputType": "text"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "activity",
+                            "type": "ui.list",
+                            "area": "content",
+                            "title": "Access activity",
+                            "title_i18n": "sections.activity",
+                            "visibleIf": "$state.activeSection == 'activity'",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "users_access.summary",
+                                "arguments": {
+                                    "audit_limit": 100,
+                                    "sections": [
+                                        "audit"
+                                    ],
+                                    "detail": "compact"
+                                },
+                                "resultPath": "response.result.administration.audit",
+                                "honestStates": {
+                                    "loading": "region",
+                                    "empty": "region",
+                                    "denied": "region",
+                                    "retry": "explicit"
+                                }
+                            },
+                            "inputs": {
+                                "search": true,
+                                "searchPlaceholder": "Search access activity",
+                                "searchPlaceholder_i18n": "search.activity",
+                                "pagination": true,
+                                "pageSize": 25,
+                                "pageSizeOptions": [
+                                    10,
+                                    25,
+                                    50,
+                                    100
+                                ],
+                                "filters": [
+                                    {
+                                        "key": "event_type",
+                                        "stateKey": "activityEventFilter",
+                                        "operator": "contains"
+                                    },
+                                    {
+                                        "key": "actor_ref",
+                                        "stateKey": "activityActorFilter",
+                                        "operator": "contains"
+                                    },
+                                    {
+                                        "key": "decision.decision",
+                                        "stateKey": "activityDecisionFilter"
+                                    },
+                                    {
+                                        "key": "occurred_at",
+                                        "stateKey": "activityDateFilter",
+                                        "operator": "contains"
+                                    },
+                                    {
+                                        "key": "source",
+                                        "stateKey": "activitySourceFilter",
+                                        "operator": "contains"
+                                    }
+                                ],
+                                "itemIdKey": "audit_id",
+                                "titleKey": "event_type",
+                                "subtitleKey": "actor.id",
+                                "previewKey": "decision.reason_code",
+                                "detailsModal": true,
+                                "detailsModalTitleKey": "event_type",
+                                "detailsPresentation": "body",
+                                "meta": [
+                                    {
+                                        "key": "occurred_at",
+                                        "label": "Time",
+                                        "label_i18n": "activity.time",
+                                        "format": "datetime"
+                                    },
+                                    {
+                                        "key": "decision.decision",
+                                        "label": "Decision",
+                                        "label_i18n": "activity.decision"
+                                    },
+                                    {
+                                        "key": "scope_ref",
+                                        "label": "Scope",
+                                        "label_i18n": "activity.scope"
+                                    },
+                                    {
+                                        "key": "resource",
+                                        "label": "Resource",
+                                        "label_i18n": "activity.resource"
+                                    },
+                                    {
+                                        "key": "source",
+                                        "label": "Source",
+                                        "label_i18n": "activity.source"
+                                    }
+                                ],
+                                "emptyText": "No access activity.",
+                                "emptyText_i18n": "empty.activity",
+                                "bounded": {
+                                    "pageSize": 25,
+                                    "maxPageSize": 100
+                                }
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeSection": "people",
+                                        "selectedSubjectId": "$event.actor_ref",
+                                        "selectedPerson": "$event.actor"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "last-mutation",
+                            "type": "item.details",
+                            "area": "inspector",
+                            "title": "Last operation",
+                            "title_i18n": "results.last_operation",
+                            "visibleIf": "$state.lastAccessMutation",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": "$state.lastAccessMutation"
+                            },
+                            "inputs": {
+                                "source": "$state.lastAccessMutation"
+                            }
+                        }
+                    ],
+                    "meta": {
+                        "builder": {
+                            "proto": "001",
+                            "ui_revision": "001",
+                            "scenario_id": "users_access"
+                        }
+                    }
+                }
+            },
+            "resources": {
+                "users_access.i18n.en": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "en",
+                    "path": "assets/i18n/en.json",
+                    "mime": "application/json",
+                    "delivery": "core"
+                },
+                "users_access.i18n.ru": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "ru",
+                    "path": "assets/i18n/ru.json",
+                    "mime": "application/json",
+                    "delivery": "core"
+                }
+            },
+            "modals": {
+                "invite-qr": {
+                    "title": "Invitation QR code",
+                    "presentation": {
+                        "kind": "modal",
+                        "size": {
+                            "width": 42,
+                            "height": 58
+                        }
+                    },
+                    "schema": {
+                        "id": "invite-qr-schema",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "dashboard",
+                            "contentWidth": "fluid",
+                            "density": "comfortable",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "modal-main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "compact": "stack",
+                                        "wide": "pane"
+                                    }
+                                }
+                            ]
+                        },
+                        "widgets": [
+                            {
+                                "id": "invite-qr-code",
+                                "area": "modal-main",
+                                "type": "visual.qrCode",
+                                "title": "Scan to accept",
+                                "inputs": {
+                                    "bindField": "qr_text",
+                                    "captionField": "profile_hint",
+                                    "width": 240,
+                                    "emptyText": "This invitation does not have a claim link."
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.selectedInvite"
+                                }
+                            },
+                            {
+                                "id": "invite-qr-details",
+                                "area": "modal-main",
+                                "type": "item.details",
+                                "inputs": {
+                                    "source": "$state.selectedInvite",
+                                    "fields": [
+                                        {
+                                            "label": "Role",
+                                            "path": "role"
+                                        },
+                                        {
+                                            "label": "Status",
+                                            "path": "status"
+                                        },
+                                        {
+                                            "label": "Claim link",
+                                            "path": "claim_url",
+                                            "wide": true
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        "version": "0.1.21",
+        "manifest": "webui.json"
+    }
+}

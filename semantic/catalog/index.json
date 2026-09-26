@@ -80,6 +80,14 @@
       "stable_release_digest": "sha256:0411f2dd115611549d46e17b3a7b985ff949bab11ee763a333565f6bfaf87934",
       "release_key": "flowboard_lab_for_safely_prototyping_a_r_17528146@sha256:0411f2dd115611549d46e17b3a7b985ff949bab11ee763a333565f6bfaf87934",
       "projection_digest": "sha256:1b1c7cd1e50d7b7125512e071eaacb800e4913aa17e9739a25e148f7da6652a1"
+    },
+    "users_access": {
+      "application_id": "users_access",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "application_revision": 2,
+      "stable_release_digest": "sha256:56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256",
+      "release_key": "users_access@sha256:56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256",
+      "projection_digest": "sha256:933b98d7da1f3628776b3576b94d5c8bcaa394e5767b4ac3f5512f4758d3860d"
     }
   },
   "releases": {
@@ -186,7 +194,15 @@
       "release_digest": "sha256:0411f2dd115611549d46e17b3a7b985ff949bab11ee763a333565f6bfaf87934",
       "path": "semantic/catalog/releases/flowboard_lab_for_safely_prototyping_a_r_17528146/0411f2dd115611549d46e17b3a7b985ff949bab11ee763a333565f6bfaf87934.json",
       "projection_digest": "sha256:1b1c7cd1e50d7b7125512e071eaacb800e4913aa17e9739a25e148f7da6652a1"
+    },
+    "users_access@sha256:56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256": {
+      "application_id": "users_access",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.21",
+      "release_digest": "sha256:56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256",
+      "path": "semantic/catalog/releases/users_access/56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256.json",
+      "projection_digest": "sha256:933b98d7da1f3628776b3576b94d5c8bcaa394e5767b4ac3f5512f4758d3860d"
     }
   },
-  "index_digest": "sha256:9444944f878a19044de3e443fa2920857e7c65c02bc63abdfd69976e33bbad14"
+  "index_digest": "sha256:2c86ecd2bb0994800c138be143d7152be500a6da1e943b93d46fae1acaa8dc19"
 }

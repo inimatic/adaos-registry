@@ -1,0 +1,81 @@
+{
+    "id": "users_access",
+    "name": "users_access",
+    "version": "0.1.21",
+    "title": "Users & Access",
+    "title_i18n": {
+        "key": "scenario.users_access.title",
+        "fallback": "Users & Access"
+    },
+    "description": "Manage people, invitations, roles, devices, sessions, and application access from one protected system application.",
+    "type": "desktop",
+    "supported_locales": [
+        "en",
+        "ru"
+    ],
+    "depends": [],
+    "runtime": {
+        "skills": {
+            "required": [],
+            "optional": []
+        }
+    },
+    "ui": {
+        "manifest": "webui.json"
+    },
+    "trigger": "manual",
+    "vars": {},
+    "llm_hints": {
+        "description": "Owner-governed system surface for people, invitations, platform roles, devices, sessions, and cross-application access metadata.",
+        "aliases": [
+            "users",
+            "access",
+            "permissions",
+            "пользователи",
+            "доступ"
+        ],
+        "primary_actions": [
+            {
+                "id": "users_access.review",
+                "label": "Review access",
+                "intent": "users_access.review",
+                "tool": "users_access.summary",
+                "side_effect_class": "read_only"
+            },
+            {
+                "id": "users_access.invite",
+                "label": "Invite user",
+                "intent": "users_access.invite",
+                "tool": "users_access.create_invite",
+                "side_effect_class": "external_io"
+            },
+            {
+                "id": "users_access.revoke",
+                "label": "Revoke device or session",
+                "intent": "users_access.revoke",
+                "tool": "users_access.revoke_device",
+                "side_effect_class": "destructive"
+            }
+        ],
+        "examples": [
+            "Show active sessions and devices.",
+            "Invite a member to this subnet.",
+            "Покажи доступ пользователей к приложениям."
+        ],
+        "owner_hints": [
+            "Platform roles are distinct from application roles.",
+            "Application-specific mutations remain in Applications."
+        ]
+    },
+    "nlu": {
+        "nlu_hints": {
+            "aliases": [],
+            "examples": [],
+            "slot_schemas": {},
+            "entities": []
+        }
+    },
+    "steps": [],
+    "prototype": "users_access",
+    "updated_at": "2026-09-26T02:17:32+00:00"
+}
