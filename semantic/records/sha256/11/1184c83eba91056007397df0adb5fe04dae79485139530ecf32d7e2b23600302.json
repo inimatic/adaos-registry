@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:applications.build.adaos-builder",
+  "binding_definition_digest": "sha256:613bb1124a84ee62606a69f5afe084451829c75bc1a3db789f98b7c375a6a487",
+  "logical_entrypoint": "applications.build.adaos-builder",
+  "package": {
+    "kind": "skill",
+    "id": "builder_skill",
+    "version": "0.4.2",
+    "digest": "sha256:975f43330938d589d741e56de0cc3eacfd7122db0c786f776eacda9d4b842136"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:1184c83eba91056007397df0adb5fe04dae79485139530ecf32d7e2b23600302"
+}
