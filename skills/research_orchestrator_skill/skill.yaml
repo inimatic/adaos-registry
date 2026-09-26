@@ -1,12 +1,12 @@
 name: research_orchestrator_skill
-version: 0.79.4
+version: 0.33.0
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
 - en
 - ru
 entry: handlers/main.py
-default_tool: inquiry_chat
+default_tool: chat
 runtime:
   python: '3.11'
 data_migration:
@@ -25,6 +25,7 @@ events:
 lifecycle:
   after_activate: ensure_schema
   rehydrate: rehydrate
+  drain: application_data_drain
 exports:
   tools:
   - ensure_schema
@@ -47,19 +48,15 @@ exports:
   - list_artifacts
   - preview_artifact
   - get_consensus
-  - get_inquiry_projection
-  - inquiry_chat
-  - discover_inquiry_sources
-  - reconcile_inquiry_usage
-  - record_inquiry_turn
-  - decide_inquiry_projection
   - record_prototype
   - chat
+  - get_inquiry_projection
+  - decide_inquiry_projection
+  - discover_inquiry_sources
+  - reconcile_inquiry_usage
   - accept_prototype
   - get_automation_brief
   - open_builder_session
-  - refresh_development_contract
-  - branch_implementation_track
   - get_activity
   - get_formulation_run
   - get_compilation
@@ -510,165 +507,6 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
-- name: get_inquiry_projection
-  description: Read the current typed scientific projection, ProblemDisposition, semantic measures, and exact human decision.
-  entry: handlers.main:get_inquiry_projection
-  side_effects: none
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: inquiry_chat
-  description: Update the typed scientific inquiry projection through a high-reasoning Researcher LLM call without writing a paper or ResearchPrototype.
-  entry: handlers.main:inquiry_chat
-  side_effects: local_write
-  timeout_seconds: 1800
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    - text
-    properties:
-      direction_id:
-        type: string
-      text:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      model:
-        type:
-        - string
-        - 'null'
-      actor:
-        type:
-        - string
-        - 'null'
-      invocation_origin:
-        type:
-        - string
-        - 'null'
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: discover_inquiry_sources
-  description: Use Researcher web search for active typed SearchRequests and persist non-admitted source candidate receipts with provider token usage.
-  entry: handlers.main:discover_inquiry_sources
-  side_effects: external_read
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      model:
-        type:
-        - string
-        - 'null'
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: reconcile_inquiry_usage
-  description: Re-read durable Root LLM jobs to backfill missing Researcher token usage without changing scientific state.
-  entry: handlers.main:reconcile_inquiry_usage
-  side_effects: external_read
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: record_inquiry_turn
-  description: Persist one reviewed event and typed projection patch through deterministic semantic gates.
-  entry: handlers.main:record_inquiry_turn
-  side_effects: local_write
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    - text
-    - patch
-    properties:
-      direction_id:
-        type: string
-      text:
-        type: string
-      patch:
-        type: object
-      task_id:
-        type:
-        - string
-        - 'null'
-      actor:
-        type: string
-      patch_actor_kind:
-        enum:
-        - human
-        - llm
-        - deterministic_tool
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: decide_inquiry_projection
-  description: Record a human decision over the exact current inquiry projection digest.
-  entry: handlers.main:decide_inquiry_projection
-  side_effects: local_write
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    - decision
-    - rationale
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      decision:
-        enum:
-        - accept_for_research_task
-        - accept_for_engineering_task
-        - reuse_known_solution
-        - defer_intractable
-        - stop
-        - request_revision
-      rationale:
-        type: string
-      accepted_by:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
 - name: chat
   description: Discuss a research direction with the configured Root LLM and materialize
     a provenance-grounded ResearchPrototype revision through bounded schema and semantic
@@ -690,22 +528,6 @@ tools:
         type:
         - string
         - 'null'
-      workflow_smoke_policy_id:
-        description: Explicit engineering-smoke policy. Provider-compatible mode may
-          relax only non-inferential smoke isolation after capability discovery; it
-          never changes confirmatory scientific requirements.
-        enum:
-        - enforced_offline
-        - provider_compatible_noninferential
-        - null
-      formulation_inheritance_policy_id:
-        description: Explicit successor policy. Parent preservation binds immutable
-          accepted scientific fields while allowing a separately admitted engineering-smoke
-          adaptation.
-        enum:
-        - independent
-        - preserve_parent_scientific_contract
-        - null
       model:
         type:
         - string
@@ -721,10 +543,106 @@ tools:
         type:
         - string
         - 'null'
+      research_phase:
+        description: Route chat through the durable inquiry projection or the formulation compiler.
+        type:
+        - string
+        - 'null'
+        enum:
+        - inquiry
+        - formulation
+        - null
       webspace_id:
         type:
         - string
         - 'null'
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: get_inquiry_projection
+  description: Read or initialize the durable typed pre-formulation inquiry projection.
+  entry: handlers.main:get_inquiry_projection
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: decide_inquiry_projection
+  description: Record a human decision over one exact inquiry projection revision.
+  entry: handlers.main:decide_inquiry_projection
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - decision
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      decision:
+        type: string
+        enum:
+        - accept_for_research_task
+        - accept_for_engineering_task
+        - reuse_known_solution
+        - defer_intractable
+        - stop
+        - request_revision
+      rationale:
+        type: string
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: discover_inquiry_sources
+  description: Use bounded web search to discover non-admitted source candidates for active inquiry gaps.
+  entry: handlers.main:discover_inquiry_sources
+  side_effects: external_read
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      model:
+        type:
+        - string
+        - 'null'
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: reconcile_inquiry_usage
+  description: Deduplicate provider jobs and report persisted inquiry token usage.
+  entry: handlers.main:reconcile_inquiry_usage
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
     additionalProperties: true
   output_schema:
     type: object
@@ -831,346 +749,6 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
-- name: refresh_development_contract
-  description: Supersede the exact Development Session when its admitted consumer
-    ABI has changed, preserving the accepted scientific and engineering instructions.
-  entry: handlers.main:refresh_development_contract
-  side_effects: local_write
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      implementation_track_id:
-        type:
-        - string
-        - 'null'
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: branch_implementation_track
-  description: Create an idempotent successor ImplementationTrack for a repaired realization
-    while preserving predecessor release, Study, and Experiment identity.
-  entry: handlers.main:branch_implementation_track
-  side_effects: local_write
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      implementation_track_id:
-        type:
-        - string
-        - 'null'
-      reason:
-        type: string
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: start_implementation
-  description: Start one-shot Builder Automation using only the exact digest-bound
-    Development Session inputs.
-  entry: handlers.main:start_implementation
-  side_effects: external_write
-  timeout_seconds: 240
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      implementation_track_id:
-        type:
-        - string
-        - 'null'
-      builder_webspace_id:
-        type:
-        - string
-        - 'null'
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: sync_implementation
-  description: Import a durable idempotent Builder Automation status snapshot into
-    research activity.
-  entry: handlers.main:sync_implementation
-  side_effects: local_write
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      implementation_track_id:
-        type:
-        - string
-        - 'null'
-      builder_webspace_id:
-        type:
-        - string
-        - 'null'
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: prepare_project_release
-  description: Prepare a Builder candidate trial and bind its immutable release digest
-    to the implementation track.
-  entry: handlers.main:prepare_project_release
-  side_effects: external_write
-  timeout_seconds: 300
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    - confirmed
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      implementation_track_id:
-        type:
-        - string
-        - 'null'
-      builder_webspace_id:
-        type:
-        - string
-        - 'null'
-      bump:
-        enum:
-        - major
-        - minor
-        - patch
-        default: patch
-      confirmed:
-        const: true
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: publish_project_release
-  description: Promote the exact reviewed Builder candidate and bind its ProjectRelease
-    identity.
-  entry: handlers.main:publish_project_release
-  side_effects: external_write
-  timeout_seconds: 360
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    - confirmed
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      implementation_track_id:
-        type:
-        - string
-        - 'null'
-      builder_webspace_id:
-        type:
-        - string
-        - 'null'
-      bump:
-        enum:
-        - major
-        - minor
-        - patch
-        default: patch
-      confirmed:
-        const: true
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: instantiate_study
-  description: Create an exact ResearchManager StudyRealization and draft Experiment
-    from the accepted ExperimentPlan.
-  entry: handlers.main:instantiate_study
-  side_effects: external_write
-  timeout_seconds: 300
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    - idempotency_key
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      implementation_track_id:
-        type:
-        - string
-        - 'null'
-      idempotency_key:
-        type: string
-        minLength: 1
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: repeat_study_experiment
-  description: Create a fresh execution campaign for the same immutable StudyRealization,
-    preserving the terminal parent Experiment as lineage evidence.
-  entry: handlers.main:repeat_study_experiment
-  side_effects: external_write
-  timeout_seconds: 300
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    - idempotency_key
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      implementation_track_id:
-        type:
-        - string
-        - 'null'
-      idempotency_key:
-        type: string
-        minLength: 1
-      reason:
-        type: string
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: start_study_smoke
-  description: Explicitly lock the compiled protocol and submit its non-inferential
-    CPU preflight through ResearchManager.
-  entry: handlers.main:start_study_smoke
-  side_effects: external_write
-  timeout_seconds: 300
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    - idempotency_key
-    - confirmed
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      implementation_track_id:
-        type:
-        - string
-        - 'null'
-      idempotency_key:
-        type: string
-        minLength: 1
-      confirmed:
-        const: true
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: sync_study
-  description: Reconcile ResearchManager execution and import an idempotent Study
-    activity snapshot.
-  entry: handlers.main:sync_study
-  side_effects: local_write
-  timeout_seconds: 240
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      implementation_track_id:
-        type:
-        - string
-        - 'null'
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-- name: finalize_workflow_evidence
-  description: Finalize and independently verify a campaign-scoped operational Evidence
-    bundle without advancing the scientific claim lifecycle.
-  entry: handlers.main:finalize_workflow_evidence
-  side_effects: external_write
-  timeout_seconds: 300
-  input_schema:
-    type: object
-    required:
-    - direction_id
-    - idempotency_key
-    properties:
-      direction_id:
-        type: string
-      task_id:
-        type:
-        - string
-        - 'null'
-      implementation_track_id:
-        type:
-        - string
-        - 'null'
-      idempotency_key:
-        type: string
-        minLength: 1
-      actor:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
 - name: get_activity
   description: Read durable stage activity for chat and widget projections.
   entry: handlers.main:get_activity
@@ -1242,6 +820,7 @@ tools:
         - research_problem
         - experimental_protocol
         - engineering_contract
+        - experiment_plan
         - traceability
         default: traceability
     additionalProperties: true
@@ -1261,12 +840,21 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: application_data_drain
+  description: Provide a verified Application data lifecycle receipt.
+  entry: handlers.main:application_data_drain
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
 conversation:
   dialog_channel:
     id: research_orchestrator
     label: Исследователь
     owner: skill:research_orchestrator_skill
-    default_tool: research_orchestrator_skill.inquiry_chat
+    default_tool: research_orchestrator_skill.chat
     route_id: voice_chat
     history:
       store: node
@@ -1306,7 +894,7 @@ conversation:
     kind: skill_agent
     channel_id: research_orchestrator
     skill: research_orchestrator_skill
-    talk_tool: inquiry_chat
+    talk_tool: chat
     gender: neutral
     voice: default
     icon: flask-outline
@@ -1315,6 +903,26 @@ conversation:
     - aResearcher
     - research orchestrator
 data_routes:
+- surface: widget:inquiry-projection
+  route: tool/details
+  tool: get_inquiry_projection
+  owner: skill:research_orchestrator_skill
+  first_paint: empty or last durable typed inquiry projection
+  recovery: continue the inquiry discussion or refresh after targeted invalidation
+  guard_visibility: inquiry records, readiness, discovery candidates, and exact digests only
+  budget:
+    max_payload_bytes: 1048576
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - research.inquiry
 - surface: widget:research-focus
   route: tool/details
   tool: resolve_focus
@@ -1468,28 +1076,6 @@ data_routes:
     invalidation_tags:
     - research.formulation
     - research.automation_brief
-- surface: widget:inquiry-projection
-  route: tool/details
-  tool: get_inquiry_projection
-  owner: skill:research_orchestrator_skill
-  first_paint: empty typed scientific inquiry projection
-  recovery: preserve the last projection and retry after inquiry invalidation
-  guard_visibility: compact typed semantics, provenance refs, measures, and semantic diff; raw source bytes excluded
-  budget:
-    max_payload_bytes: 1048576
-  read_policy:
-    mode: explicit
-    triggers:
-    - mount
-    - explicit_refresh
-    - targeted_invalidation
-    - state_dependency_changed
-    cache_ttl_ms: 0
-    max_request_hz: 2
-    preserve_last_value: true
-    invalidation_tags:
-    - research.inquiry
-    - research.artifacts
 - surface: widget:research-activity
   route: tool/details
   tool: get_activity
@@ -1619,13 +1205,13 @@ llm_hints:
   - research orchestrator
   - исследователь
   primary_actions:
-  - id: research_orchestrator_skill.inquiry_chat
-    intent: research_orchestrator_skill.inquiry_chat
-    tool: inquiry_chat
+  - id: research_orchestrator_skill.chat
+    intent: research_orchestrator_skill.chat
+    tool: chat
     side_effect_class: local_write
     examples:
-    - Обсуди идею и обнови научную проекцию
-    - Определи, известна ли проблема, исследуема ли она или является инженерной
+    - Обсуди постановку исследования
+    - Уточни гипотезы и план эксперимента
   - id: research_orchestrator_skill.next_steps
     intent: research_orchestrator_skill.next_steps
     tool: next_steps
@@ -1642,12 +1228,138 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-21T07:40:04+00:00'
+updated_at: '2026-09-26T03:38:47+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.904+5517.70d7d20b
-    recorded_at: '2026-08-21T07:40:04+00:00'
+    min_version: 0.1.863+5255.a81c7a26
+    recorded_at: '2026-08-18T15:04:30+00:00'
     source: skill_push
-    min_commit: 70d7d20b24b646d8d84f404c5685a8e14418da8d
-    min_short_commit: 70d7d20b
-    build_date: '2026-08-21T07:36:48+00:00'
+    min_commit: a81c7a26c1e3516880555b7662f893509fbc4883
+    min_short_commit: a81c7a26
+    build_date: '2026-08-18T17:54:03+03:00'
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases:
+  - path: db/research_orchestrator.db
+    migrations:
+    - version: 1
+      name: research direction formulation ledger
+      statements:
+      - CREATE TABLE research_directions (direction_id TEXT PRIMARY KEY, title TEXT
+        NOT NULL, project_kind TEXT NOT NULL, status TEXT NOT NULL, generation INTEGER
+        NOT NULL, current_bundle_digest TEXT, current_prototype_digest TEXT, accepted_prototype_digest
+        TEXT, automation_brief_digest TEXT, created_at TEXT NOT NULL, updated_at TEXT
+        NOT NULL)
+      - CREATE TABLE research_prototypes (digest TEXT PRIMARY KEY, direction_id TEXT
+        NOT NULL, revision INTEGER NOT NULL, parent_digest TEXT, source_bundle_digest
+        TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)
+      - CREATE UNIQUE INDEX research_prototypes_revision ON research_prototypes(direction_id,
+        revision)
+      - CREATE TABLE research_automation_briefs (digest TEXT PRIMARY KEY, direction_id
+        TEXT NOT NULL, prototype_digest TEXT NOT NULL, source_bundle_digest TEXT NOT
+        NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)
+      - CREATE TABLE research_activity (event_id TEXT PRIMARY KEY, direction_id TEXT
+        NOT NULL, seq INTEGER NOT NULL, stage TEXT NOT NULL, status TEXT NOT NULL,
+        message TEXT NOT NULL, detail_json TEXT NOT NULL, created_at TEXT NOT NULL)
+      - CREATE UNIQUE INDEX research_activity_seq ON research_activity(direction_id,
+        seq)
+      - CREATE TABLE research_commands (idempotency_key TEXT PRIMARY KEY, command_name
+        TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL)
+      idempotent: true
+      dialects:
+      - sqlite
+      - postgresql
+    - version: 2
+      name: durable staged formulation artifacts
+      statements:
+      - CREATE TABLE research_formulation_stages (run_id TEXT NOT NULL, direction_id
+        TEXT NOT NULL, stage_index INTEGER NOT NULL, stage_name TEXT NOT NULL, status
+        TEXT NOT NULL, input_digest TEXT NOT NULL, output_digest TEXT, payload_json
+        TEXT NOT NULL, telemetry_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY
+        KEY(run_id, stage_name))
+      - CREATE INDEX research_formulation_direction ON research_formulation_stages(direction_id,
+        created_at)
+      idempotent: true
+      dialects:
+      - sqlite
+      - postgresql
+    - version: 3
+      name: research direction task and implementation lineage
+      statements:
+      - ALTER TABLE research_directions ADD COLUMN description TEXT NOT NULL DEFAULT
+        ''
+      - ALTER TABLE research_directions ADD COLUMN tags_json TEXT NOT NULL DEFAULT
+        '[]'
+      - ALTER TABLE research_directions ADD COLUMN artifact_owner_skill_id TEXT
+      - ALTER TABLE research_directions ADD COLUMN legacy_project_ref TEXT
+      - ALTER TABLE research_directions ADD COLUMN active_task_id TEXT
+      - ALTER TABLE research_prototypes ADD COLUMN task_id TEXT
+      - ALTER TABLE research_automation_briefs ADD COLUMN task_id TEXT
+      - ALTER TABLE research_automation_briefs ADD COLUMN implementation_track_id
+        TEXT
+      - ALTER TABLE research_formulation_stages ADD COLUMN task_id TEXT
+      - ALTER TABLE research_activity ADD COLUMN actor TEXT NOT NULL DEFAULT 'system:legacy'
+      - ALTER TABLE research_activity ADD COLUMN origin TEXT NOT NULL DEFAULT 'research_orchestrator'
+      - ALTER TABLE research_activity ADD COLUMN subject_ref TEXT
+      - CREATE TABLE research_tasks (task_id TEXT PRIMARY KEY, direction_id TEXT NOT
+        NULL, revision INTEGER NOT NULL, title TEXT NOT NULL, research_question TEXT
+        NOT NULL, status TEXT NOT NULL, parent_task_id TEXT, branch_of_task_id TEXT,
+        dependency_refs_json TEXT NOT NULL, metadata_json TEXT NOT NULL, source_bundle_digest
+        TEXT, current_prototype_digest TEXT, accepted_compilation_digest TEXT, created_at
+        TEXT NOT NULL, updated_at TEXT NOT NULL)
+      - CREATE INDEX research_tasks_direction ON research_tasks(direction_id, updated_at)
+      - CREATE TABLE research_compilations (digest TEXT PRIMARY KEY, compilation_id
+        TEXT NOT NULL, direction_id TEXT NOT NULL, task_id TEXT NOT NULL, revision
+        INTEGER NOT NULL, parent_digest TEXT, prototype_digest TEXT NOT NULL, source_bundle_digest
+        TEXT NOT NULL, payload_json TEXT NOT NULL, accepted_at TEXT NOT NULL, accepted_by
+        TEXT NOT NULL)
+      - CREATE UNIQUE INDEX research_compilations_revision ON research_compilations(task_id,
+        revision)
+      - CREATE TABLE research_implementation_tracks (track_id TEXT PRIMARY KEY, direction_id
+        TEXT NOT NULL, task_id TEXT NOT NULL, revision INTEGER NOT NULL, title TEXT
+        NOT NULL, status TEXT NOT NULL, condition_id TEXT, parent_track_id TEXT, project_ref
+        TEXT, primary_target_ref TEXT, development_session_id TEXT, candidate_release_digest
+        TEXT, metadata_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT
+        NOT NULL)
+      - CREATE INDEX research_tracks_task ON research_implementation_tracks(task_id,
+        updated_at)
+      - CREATE TABLE research_aliases (alias_ref TEXT PRIMARY KEY, canonical_ref TEXT
+        NOT NULL, provenance_json TEXT NOT NULL, created_at TEXT NOT NULL)
+      - UPDATE research_directions SET artifact_owner_skill_id=direction_id WHERE
+        artifact_owner_skill_id IS NULL
+      - INSERT INTO research_tasks(task_id, direction_id, revision, title, research_question,
+        status, parent_task_id, branch_of_task_id, dependency_refs_json, metadata_json,
+        source_bundle_digest, current_prototype_digest, accepted_compilation_digest,
+        created_at, updated_at) SELECT direction_id || '.task-001', direction_id,
+        1, title || ' — primary task', '', CASE WHEN accepted_prototype_digest IS
+        NOT NULL THEN 'accepted' ELSE 'draft' END, NULL, NULL, '[]', '{}', current_bundle_digest,
+        current_prototype_digest, NULL, created_at, updated_at FROM research_directions
+      - UPDATE research_directions SET active_task_id=direction_id || '.task-001'
+        WHERE active_task_id IS NULL
+      - UPDATE research_prototypes SET task_id=(SELECT active_task_id FROM research_directions
+        WHERE research_directions.direction_id=research_prototypes.direction_id) WHERE
+        task_id IS NULL
+      - UPDATE research_automation_briefs SET task_id=(SELECT active_task_id FROM
+        research_directions WHERE research_directions.direction_id=research_automation_briefs.direction_id)
+        WHERE task_id IS NULL
+      - UPDATE research_formulation_stages SET task_id=(SELECT active_task_id FROM
+        research_directions WHERE research_directions.direction_id=research_formulation_stages.direction_id)
+        WHERE task_id IS NULL
+      idempotent: true
+      dialects:
+      - sqlite
+      - postgresql
+    - version: 4
+      name: durable pre-formulation inquiry
+      statements:
+      - CREATE TABLE research_inquiry_projections (direction_id TEXT PRIMARY KEY, task_id TEXT, projection_digest TEXT NOT NULL, projection_json TEXT NOT NULL, acceptance_json TEXT, discovery_json TEXT, updated_at TEXT NOT NULL)
+      - CREATE TABLE research_inquiry_events (event_id TEXT PRIMARY KEY, direction_id TEXT NOT NULL, ordinal INTEGER NOT NULL, projected INTEGER NOT NULL, event_json TEXT NOT NULL, created_at TEXT NOT NULL)
+      - CREATE UNIQUE INDEX research_inquiry_event_ordinal ON research_inquiry_events(direction_id, ordinal)
+      - CREATE TABLE research_inquiry_usage (receipt_id TEXT PRIMARY KEY, direction_id TEXT NOT NULL, provider_job_id TEXT, operation_kind TEXT NOT NULL, usage_json TEXT NOT NULL, created_at TEXT NOT NULL)
+      - CREATE INDEX research_inquiry_usage_direction ON research_inquiry_usage(direction_id, created_at)
+      idempotent: true
+      dialects:
+      - sqlite
+      - postgresql
+  coordination_files: []

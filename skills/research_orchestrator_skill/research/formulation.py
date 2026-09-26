@@ -11,19 +11,7 @@ from jsonschema import Draft202012Validator
 from research.contracts import prototype_candidate_schema
 
 
-STAGE_SCHEMA_VERSION = "1.4.0"
-DEFAULT_WORKFLOW_SMOKE_POLICY_ID = "enforced_offline"
-PROVIDER_COMPATIBLE_WORKFLOW_SMOKE_POLICY_ID = "provider_compatible_noninferential"
-DEFAULT_WORKFLOW_SMOKE_POLICY = {
-    "device": "cpu",
-    "epochs": 3,
-    "seed_values": [17],
-    "inference_allowed": False,
-    "network_mode": "offline",
-    "input_source": "deterministic_contract_fixture",
-    "input_readiness": "required_before_execution",
-    "workload_mode": "bounded",
-}
+STAGE_SCHEMA_VERSION = "1.0.0"
 REQUIREMENT_CATEGORIES = ("execution", "data", "reproducibility", "observability", "evidence", "recovery", "analysis", "security")
 CHECK_CATEGORIES = ("workflow", "data_integrity", "reproducibility", "evidence", "analysis", "failure_recovery", "security")
 PROTOCOL_DECISION_AREAS = (
@@ -37,113 +25,6 @@ PROTOCOL_DECISION_AREAS = (
     "multiplicity",
     "practical_significance",
 )
-
-
-_NETWORK_POLICY_RE = re.compile(r"(?i)network|offline|\u0441\u0435\u0442\w*|\u043e\u0444\u043b\u0430\u0439\u043d")
-_OFFLINE_ENFORCEMENT_RE = re.compile(
-    r"(?i)offline|network[_ .-]?(?:disabled|denied|blocked)|"
-    r"(?:disable|deny|block|prohibit)\w*.{0,30}network|"
-    r"\u043e\u0444\u043b\u0430\u0439\u043d|\u043e\u0442\u043a\u043b\u044e\u0447\w*.{0,30}\u0441\u0435\u0442|"
-    r"\u0437\u0430\u043f\u0440\u0435\u0442\w*.{0,30}\u0441\u0435\u0442|\u043f\u043e\u043f\u044b\u0442\w*.{0,30}\u0441\u0435\u0442\w*.{0,30}\u043e\u0448\u0438\u0431"
-)
-_SMOKE_SCOPE_RE = re.compile(
-    r"(?i)workflow[_ -]?smoke|\bsmoke\b|\u0441\u043c\u043e\u0443\u043a|"
-    r"both profiles|all profiles|\u043e\u0431\u043e\u0438\w*\s+\u043f\u0440\u043e\u0444\u0438\u043b"
-)
-
-
-def _is_smoke_network_policy(value: Any) -> bool:
-    text = json.dumps(value, ensure_ascii=False, sort_keys=True)
-    return bool(_NETWORK_POLICY_RE.search(text) and _SMOKE_SCOPE_RE.search(text))
-
-
-def _is_stale_offline_smoke_policy(value: Any) -> bool:
-    text = json.dumps(value, ensure_ascii=False, sort_keys=True)
-    return bool(_OFFLINE_ENFORCEMENT_RE.search(text) and _SMOKE_SCOPE_RE.search(text))
-
-
-def _text_without_stale_smoke_network_sentences(value: Any) -> str:
-    """Remove obsolete isolation prose instead of merely superseding it."""
-
-    sentences = re.split(r"(?<=[.!?])\s+|[\r\n]+", str(value or ""))
-    return " ".join(
-        sentence.strip()
-        for sentence in sentences
-        if sentence.strip() and not _is_stale_offline_smoke_policy(sentence)
-    ).strip()
-
-
-def _components_without_smoke_network_policy(
-    components: list[Mapping[str, Any]],
-) -> list[dict[str, Any]]:
-    result = copy.deepcopy([dict(item) for item in components])
-    for component in result:
-        component["settings"] = [
-            item
-            for item in component.get("settings") or []
-            if not _is_smoke_network_policy(item)
-        ]
-        clauses = re.split(r"(?<=[.;])\s+", str(component.get("specification") or ""))
-        kept = [item for item in clauses if item and not _is_smoke_network_policy(item)]
-        component["specification"] = " ".join(kept).strip()
-    return result
-
-
-def resolve_workflow_smoke_policy(
-    policy_id: str | None,
-    *,
-    provider_status: Mapping[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Resolve one explicit workflow-smoke policy against a provider snapshot.
-
-    Scientific confirmation is deliberately outside this choice.  The compatible
-    variant may relax network *enforcement* only for the non-inferential bounded
-    workflow smoke; it never interprets observed network silence as isolation.
-    """
-
-    selected = str(policy_id or DEFAULT_WORKFLOW_SMOKE_POLICY_ID).strip().lower()
-    if selected == DEFAULT_WORKFLOW_SMOKE_POLICY_ID:
-        return {
-            "schema": "adaos.research.workflow_smoke_policy_binding.v1",
-            "policy_id": selected,
-            "requirements": copy.deepcopy(DEFAULT_WORKFLOW_SMOKE_POLICY),
-            "provider": None,
-            "provider_digest": None,
-            "network_enforcement": "required",
-            "network_observation_required": True,
-        }
-    if selected != PROVIDER_COMPATIBLE_WORKFLOW_SMOKE_POLICY_ID:
-        raise ValueError(
-            "workflow_smoke_policy_id must be enforced_offline or "
-            "provider_compatible_noninferential"
-        )
-    status = dict(provider_status or {})
-    if status.get("schema") != "adaos.execution.provider_status.v1":
-        raise ValueError(
-            "provider_compatible_noninferential requires an authoritative "
-            "adaos.execution.provider_status.v1 snapshot"
-        )
-    provider = dict(status.get("provider") or {})
-    provider_id = str(provider.get("provider_id") or "").strip()
-    provider_digest = str(status.get("provider_digest") or "").strip()
-    if not provider_id or not re.fullmatch(r"sha256:[0-9a-f]{64}", provider_digest):
-        raise ValueError("execution provider status is missing a valid identity or digest")
-    features = {str(item) for item in provider.get("features") or ()}
-    offline_available = "network_offline" in features
-    requirements = copy.deepcopy(DEFAULT_WORKFLOW_SMOKE_POLICY)
-    requirements["network_mode"] = "offline" if offline_available else "unrestricted"
-    return {
-        "schema": "adaos.research.workflow_smoke_policy_binding.v1",
-        "policy_id": selected,
-        "requirements": requirements,
-        "provider": {
-            "provider_id": provider_id,
-            "features": sorted(features),
-        },
-        "provider_digest": provider_digest,
-        "network_enforcement": "available" if offline_available else "not_required",
-        "network_observation_required": True,
-    }
 
 
 def _object(properties: Mapping[str, Any], required: list[str]) -> dict[str, Any]:
@@ -228,32 +109,6 @@ def problem_frame_schema() -> dict[str, Any]:
         },
         ["sufficiency", "observed_facts", "author_interpretations", "coverage_limitations", "unresolved_decisions"],
     )
-    scientific_entity = _object(
-        {
-            "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
-            "label": {"type": "string", "minLength": 2},
-            "specification": {"type": "string", "minLength": 10},
-        },
-        ["id", "label", "specification"],
-    )
-    selected["experimental_signature"] = _object(
-        {
-            "subject": {"type": "string", "minLength": 10},
-            "dataset": scientific_entity,
-            "baseline": scientific_entity,
-            "intervention": scientific_entity,
-            "intervention_boundary": {"type": "string", "minLength": 10},
-            "primary_outcome": _object(
-                {
-                    "name": {"type": "string", "minLength": 2},
-                    "measurement": {"type": "string", "minLength": 10},
-                    "unit": {"type": "string", "minLength": 1},
-                },
-                ["name", "measurement", "unit"],
-            ),
-        },
-        ["subject", "dataset", "baseline", "intervention", "intervention_boundary", "primary_outcome"],
-    )
     return _object(selected, list(selected))
 
 
@@ -270,17 +125,8 @@ def protocol_design_schema() -> dict[str, Any]:
         {
             "node": {"type": "string", "minLength": 2},
             "device": {"enum": ["cpu", "cuda", "mps"]},
-            "network_mode": {"enum": ["offline", "unrestricted"]},
         },
-        ["node", "device", "network_mode"],
-    )
-    workload_limit = _object(
-        {
-            "name": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
-            "maximum": {"type": "integer", "minimum": 1},
-            "unit": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
-        },
-        ["name", "maximum", "unit"],
+        ["node", "device"],
     )
     budget = _object(
         {
@@ -292,39 +138,12 @@ def protocol_design_schema() -> dict[str, Any]:
                 "items": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "integer"}]},
             },
             "max_wall_time_minutes": {"type": "integer", "minimum": 1},
-            "workload": _object(
-                {
-                    "mode": {"enum": ["bounded", "full"]},
-                    "limits": {
-                        "type": "array",
-                        "uniqueItems": True,
-                        "items": workload_limit,
-                    },
-                },
-                ["mode", "limits"],
-            ),
         },
-        ["epochs", "seed_values", "max_wall_time_minutes", "workload"],
-    )
-    input_policy = _object(
-        {
-            "source": {"enum": ["accepted_dataset", "deterministic_contract_fixture"]},
-            "readiness": {
-                "enum": ["required_before_execution", "may_prepare_during_execution"],
-            },
-            "sampling": {
-                "enum": ["deterministic_prefix", "deterministic_seeded", "full"],
-            },
-        },
-        ["source", "readiness", "sampling"],
+        ["epochs", "seed_values", "max_wall_time_minutes"],
     )
     data_policy_properties = copy.deepcopy(
         properties["experimental_plan"]["properties"]["data_policy"]["properties"]
     )
-    data_policy_properties["dataset_id"] = {
-        "type": "string",
-        "pattern": "^[a-z][a-z0-9_.-]*$",
-    }
     data_policy_properties["evaluation_access"] = _object(
         {
             "development_split": {"type": "string", "minLength": 10},
@@ -346,31 +165,6 @@ def protocol_design_schema() -> dict[str, Any]:
     experimental_plan = _object(
         {
             "comparators": properties["experimental_plan"]["properties"]["comparators"],
-            "comparison_design": _object(
-                {
-                    "arms": {
-                        "type": "array",
-                        "minItems": 2,
-                        "items": _object(
-                            {
-                                "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
-                                "label": {"type": "string", "minLength": 2},
-                                "role": {"enum": ["baseline", "intervention", "diagnostic"]},
-                                "specification": {"type": "string", "minLength": 10},
-                            },
-                            ["id", "label", "role", "specification"],
-                        ),
-                    },
-                    "primary_contrast": _object(
-                        {
-                            "minuend": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
-                            "subtrahend": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
-                        },
-                        ["minuend", "subtrahend"],
-                    ),
-                },
-                ["arms", "primary_contrast"],
-            ),
             "system_specification": system_specification,
             "stages": {
                 "type": "array",
@@ -382,20 +176,19 @@ def protocol_design_schema() -> dict[str, Any]:
                         "evidence_class": {"enum": ["workflow_smoke", "exploratory", "confirmatory"]},
                         "execution_profile": execution_profile,
                         "budget": budget,
-                        "input_policy": input_policy,
                         "inference_allowed": {"type": "boolean"},
                         "stop_conditions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 5}},
                     },
-                    ["id", "purpose", "evidence_class", "execution_profile", "budget", "input_policy", "inference_allowed", "stop_conditions"],
+                    ["id", "purpose", "evidence_class", "execution_profile", "budget", "inference_allowed", "stop_conditions"],
                 ),
             },
             "data_policy": _object(
                 data_policy_properties,
-                ["dataset", "dataset_id", "split_strategy", "evaluation_seal", "leakage_controls", "evaluation_access"],
+                ["dataset", "split_strategy", "evaluation_seal", "leakage_controls", "evaluation_access"],
             ),
             "reproducibility": properties["experimental_plan"]["properties"]["reproducibility"],
         },
-        ["comparators", "comparison_design", "system_specification", "stages", "data_policy", "reproducibility"],
+        ["comparators", "system_specification", "stages", "data_policy", "reproducibility"],
     )
     experimental_plan["properties"]["reproducibility"]["properties"]["environment"]["additionalProperties"] = False
     decision = _object(
@@ -459,24 +252,6 @@ def implementation_contract_schema() -> dict[str, Any]:
     return _object(
         {
             "assistant_message": {"type": "string"},
-            "scientific_bindings": _object(
-                {
-                    "protocol_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
-                    "dataset_id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
-                    "baseline_arm_id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
-                    "intervention_arm_id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
-                    "primary_outcome_name": {"type": "string", "minLength": 2},
-                    "runner_contract": {"const": "adaos.research.runner.v1"},
-                },
-                [
-                    "protocol_digest",
-                    "dataset_id",
-                    "baseline_arm_id",
-                    "intervention_arm_id",
-                    "primary_outcome_name",
-                    "runner_contract",
-                ],
-            ),
             "requirements_by_category": _object(
                 {
                     category: {"type": "array", "minItems": 1 if category in required_requirements else 0, "items": requirement}
@@ -492,7 +267,7 @@ def implementation_contract_schema() -> dict[str, Any]:
                 list(CHECK_CATEGORIES),
             ),
         },
-        ["assistant_message", "scientific_bindings", "requirements_by_category", "checks_by_category"],
+        ["assistant_message", "requirements_by_category", "checks_by_category"],
     )
 
 
@@ -546,11 +321,6 @@ def stage_quality_issues(
     *,
     allowed_source_refs: set[str] | None = None,
     expected_effect_direction: str | None = None,
-    expected_experimental_signature: Mapping[str, Any] | None = None,
-    required_workflow_smoke: Mapping[str, Any] | None = None,
-    required_parent_problem: Mapping[str, Any] | None = None,
-    required_parent_protocol: Mapping[str, Any] | None = None,
-    expected_protocol_digest: str | None = None,
 ) -> list[str]:
     payload = validate_stage(stage, value)
     issues: list[str] = []
@@ -575,48 +345,8 @@ def stage_quality_issues(
             str(primary.get("falsification") or ""),
         ):
             issues.append("a two-sided difference hypothesis cannot treat the opposite direction as falsification")
-        signature = payload["experimental_signature"]
-        if signature["baseline"]["id"] == signature["intervention"]["id"]:
-            issues.append("experimental_signature baseline and intervention ids must be distinct")
-        if required_parent_problem is not None:
-            parent = validate_stage("problem_frame", required_parent_problem)
-            for field in ("research_question", "hypotheses", "experimental_signature"):
-                if payload.get(field) != parent.get(field):
-                    issues.append(
-                        f"problem frame must exactly preserve parent {field} under the selected inheritance policy"
-                    )
-        smoke_policy = dict(required_workflow_smoke or {})
-        if str(smoke_policy.get("network_mode") or "") == "unrestricted":
-            prose = [
-                payload.get("background"),
-                payload.get("constraints"),
-                payload.get("assumptions"),
-                payload.get("open_questions"),
-            ]
-            if any(_is_stale_offline_smoke_policy(item) for item in prose):
-                issues.append(
-                    "problem frame must not retain offline-enforcement prose for unrestricted workflow_smoke"
-                )
     elif stage == "protocol_design":
         plan = payload["experimental_plan"]
-        comparison = plan["comparison_design"]
-        arms = [dict(item) for item in comparison["arms"]]
-        arm_ids = [str(item["id"]) for item in arms]
-        arm_labels = [str(item["label"]) for item in arms]
-        if len(arm_ids) != len(set(arm_ids)):
-            issues.append("comparison_design arm ids must be unique")
-        comparator_values = [str(item) for item in plan["comparators"]]
-        if comparator_values not in (arm_labels, arm_ids):
-            issues.append("comparators must be either the exact ordered arm ids or exact ordered arm labels")
-        contrast = comparison["primary_contrast"]
-        if contrast["minuend"] == contrast["subtrahend"]:
-            issues.append("primary contrast must reference two distinct arms")
-        if not {str(contrast["minuend"]), str(contrast["subtrahend"])}.issubset(set(arm_ids)):
-            issues.append("primary contrast must reference declared comparison arms")
-        if sum(1 for item in arms if item["role"] == "baseline") != 1:
-            issues.append("comparison_design must declare exactly one baseline arm")
-        if not any(item["role"] == "intervention" for item in arms):
-            issues.append("comparison_design must declare at least one intervention arm")
         system_spec = plan["system_specification"]
         component_ids = [str(item["id"]) for item in system_spec["components"]]
         if len(component_ids) != len(set(component_ids)):
@@ -636,34 +366,6 @@ def stage_quality_issues(
         if system_spec.get("unresolved_choices"):
             issues.append("system_specification unresolved_choices must be empty before automation")
         stages = [item for item in plan["stages"] if isinstance(item, Mapping)]
-        stage_ids = [str(item.get("id") or "") for item in stages]
-        if len(stage_ids) != len(set(stage_ids)):
-            issues.append("experimental stages must have unique ids")
-        for item in stages:
-            seed_values = list(dict(item.get("budget") or {}).get("seed_values") or [])
-            if not seed_values or any(
-                isinstance(seed, bool) or not isinstance(seed, int)
-                for seed in seed_values
-            ):
-                issues.append(
-                    f"stage {item.get('id')} budget.seed_values must contain "
-                    "non-empty integer RNG seeds, not pairing-unit labels"
-                )
-            elif len(seed_values) != len(set(seed_values)):
-                issues.append(
-                    f"stage {item.get('id')} budget.seed_values must be unique"
-                )
-            workload = dict(dict(item.get("budget") or {}).get("workload") or {})
-            limits = [
-                dict(limit)
-                for limit in workload.get("limits") or []
-                if isinstance(limit, Mapping)
-            ]
-            names = [str(limit.get("name") or "") for limit in limits]
-            if workload.get("mode") == "bounded" and not limits:
-                issues.append(f"stage {item.get('id')} bounded workload requires explicit limits")
-            if len(names) != len(set(names)):
-                issues.append(f"stage {item.get('id')} workload limit names must be unique")
         smoke = [item for item in stages if item.get("evidence_class") == "workflow_smoke"]
         confirmation = [item for item in stages if item.get("evidence_class") == "confirmatory"]
         if not smoke or not all(item.get("inference_allowed") is False for item in smoke):
@@ -681,16 +383,6 @@ def stage_quality_issues(
         allocation = pairing["allocation"]
         if int(allocation["sample_size"]) != len(allocation["planned_units"]):
             issues.append("pairing allocation sample_size must equal planned_units length")
-        confirmatory_seed_values = [
-            seed
-            for item in confirmation
-            for seed in dict(item.get("budget") or {}).get("seed_values") or []
-        ]
-        if list(allocation["planned_units"]) != confirmatory_seed_values:
-            issues.append(
-                "pairing allocation planned_units must exactly equal the ordered "
-                "confirmatory budget.seed_values; unit labels and RNG seeds must not be conflated"
-            )
         outcome_dependent_stop = re.compile(
             r"(?i)(?:statistically significant|significant (?:result|difference|improvement)|"
             r"target (?:accuracy|metric|score)|desired (?:accuracy|metric|score))"
@@ -718,213 +410,24 @@ def stage_quality_issues(
                 "decision_spec.effect_direction must match the primary hypothesis "
                 f"({expected_effect_direction})"
             )
-        signature = dict(expected_experimental_signature or {})
-        if signature:
-            baseline = dict(signature.get("baseline") or {})
-            intervention = dict(signature.get("intervention") or {})
-            dataset = dict(signature.get("dataset") or {})
-            outcome = dict(signature.get("primary_outcome") or {})
-            expected_arms = [
-                (str(baseline.get("id") or ""), str(baseline.get("label") or ""), "baseline"),
-                (str(intervention.get("id") or ""), str(intervention.get("label") or ""), "intervention"),
-            ]
-            actual_primary_arms = [(str(item["id"]), str(item["label"]), str(item["role"])) for item in arms]
-            if actual_primary_arms != expected_arms:
-                issues.append("comparison_design must exactly preserve baseline and intervention identity from experimental_signature")
-            expected_ids = [item[0] for item in expected_arms]
-            expected_labels = [item[1] for item in expected_arms]
-            if comparator_values not in (expected_ids, expected_labels):
-                issues.append("comparators must exactly preserve ordered ids or labels from experimental_signature")
-            if contrast != {"minuend": expected_arms[1][0], "subtrahend": expected_arms[0][0]}:
-                issues.append("primary contrast must be intervention minus baseline from experimental_signature")
-            data_policy = plan["data_policy"]
-            if str(data_policy.get("dataset_id") or "") != str(dataset.get("id") or ""):
-                issues.append("data_policy.dataset_id must exactly preserve experimental_signature dataset id")
-            if str(data_policy.get("dataset") or "") != str(dataset.get("label") or ""):
-                issues.append("data_policy.dataset must exactly preserve experimental_signature dataset label")
-            if str(system_spec.get("subject") or "") != str(signature.get("subject") or ""):
-                issues.append("system_specification.subject must exactly preserve experimental_signature subject")
-            if str(system_spec.get("intervention_boundary") or "") != str(signature.get("intervention_boundary") or ""):
-                issues.append("system_specification.intervention_boundary must exactly preserve experimental_signature boundary")
-            primary_outcomes = [item for item in outcomes if item.get("role") == "primary"]
-            expected_outcome = {
-                "name": str(outcome.get("name") or ""),
-                "measurement": str(outcome.get("measurement") or ""),
-                "unit": str(outcome.get("unit") or ""),
-            }
-            if len(primary_outcomes) != 1 or {
-                key: str(primary_outcomes[0].get(key) or "") for key in expected_outcome
-            } != expected_outcome:
-                issues.append("primary outcome must exactly preserve experimental_signature name, measurement, and unit")
-        smoke_policy = dict(required_workflow_smoke or {})
-        if smoke_policy:
-            if len(smoke) != 1:
-                issues.append("protocol must contain exactly one workflow_smoke stage")
-            elif (
-                str(smoke[0]["execution_profile"]["device"]) != str(smoke_policy.get("device"))
-                or int(smoke[0]["budget"]["epochs"]) != int(smoke_policy.get("epochs") or 0)
-                or list(smoke[0]["budget"]["seed_values"]) != list(smoke_policy.get("seed_values") or [])
-                or bool(smoke[0]["inference_allowed"]) is not bool(smoke_policy.get("inference_allowed"))
-                or (
-                    "network_mode" in smoke_policy
-                    and str(smoke[0]["execution_profile"]["network_mode"])
-                    != str(smoke_policy["network_mode"])
-                )
-                or (
-                    "input_source" in smoke_policy
-                    and str(smoke[0]["input_policy"]["source"])
-                    != str(smoke_policy["input_source"])
-                )
-                or (
-                    "input_readiness" in smoke_policy
-                    and str(smoke[0]["input_policy"]["readiness"])
-                    != str(smoke_policy["input_readiness"])
-                )
-                or (
-                    "workload_mode" in smoke_policy
-                    and str(smoke[0]["budget"]["workload"]["mode"])
-                    != str(smoke_policy["workload_mode"])
-                )
-            ):
-                issues.append("workflow_smoke must exactly preserve the AdaOS execution policy")
-            if str(smoke_policy.get("network_mode") or "") == "unrestricted":
-                stale_smoke_conditions = any(
-                    _OFFLINE_ENFORCEMENT_RE.search(str(item))
-                    for item in (smoke[0].get("stop_conditions") or [])
-                ) if smoke else False
-                stale_system_policy = any(
-                    _is_stale_offline_smoke_policy(item)
-                    for item in (
-                        list(system_spec.get("locked_invariants") or [])
-                        + list(system_spec.get("components") or [])
-                    )
-                )
-                stale_decision_policy = any(
-                    _is_stale_offline_smoke_policy(item)
-                    for item in payload.get("decisions_by_area", {}).values()
-                )
-                if stale_smoke_conditions or stale_system_policy or stale_decision_policy:
-                    issues.append(
-                        "unrestricted workflow_smoke must not retain offline-enforcement assertions"
-                    )
-        if required_parent_protocol is not None:
-            parent = validate_stage("protocol_design", required_parent_protocol)
-            parent_plan = parent["experimental_plan"]
-            preserved = (
-                "comparators",
-                "comparison_design",
-                "data_policy",
-                "reproducibility",
-            )
-            for field in preserved:
-                if plan.get(field) != parent_plan.get(field):
-                    issues.append(
-                        f"protocol must exactly preserve parent experimental_plan.{field} under the selected inheritance policy"
-                    )
-            parent_system = parent_plan["system_specification"]
-            for field in ("subject", "intervention_boundary"):
-                if system_spec.get(field) != parent_system.get(field):
-                    issues.append(
-                        f"protocol must exactly preserve parent system_specification.{field} under the selected inheritance policy"
-                    )
-            if _components_without_smoke_network_policy(
-                list(system_spec.get("components") or [])
-            ) != _components_without_smoke_network_policy(
-                list(parent_system.get("components") or [])
-            ):
-                issues.append(
-                    "protocol must exactly preserve parent scientific system components under the selected inheritance policy"
-                )
-            parent_invariants = {
-                str(item)
-                for item in parent_system.get("locked_invariants") or []
-                if not re.search(r"(?i)network|offline|\u0441\u0435\u0442\w*", str(item))
-            }
-            if not parent_invariants.issubset(
-                {str(item) for item in system_spec.get("locked_invariants") or []}
-            ):
-                issues.append(
-                    "protocol must preserve every non-network parent locked invariant"
-                )
-            parent_confirmation = [
-                item
-                for item in parent_plan["stages"]
-                if item.get("evidence_class") == "confirmatory"
-            ]
-            if confirmation != parent_confirmation:
-                issues.append(
-                    "protocol must exactly preserve parent confirmatory stages under the selected inheritance policy"
-                )
-            for field in ("evaluation_plan", "decision_spec"):
-                if payload.get(field) != parent.get(field):
-                    issues.append(
-                        f"protocol must exactly preserve parent {field} under the selected inheritance policy"
-                    )
     elif stage == "implementation_contract":
         obligations = [
-            (f"{group_name}.{category}.{index}.{field}", str(value))
-            for group_name in ("requirements_by_category", "checks_by_category")
-            for category, items in (payload.get(group_name) or {}).items()
-            for index, item in enumerate(items or [])
+            str(value)
+            for grouped in (
+                payload.get("requirements_by_category") or {},
+                payload.get("checks_by_category") or {},
+            )
+            for items in grouped.values()
+            for item in items or []
             if isinstance(item, Mapping)
-            for field, value in item.items()
+            for value in item.values()
         ]
-        smoke_policy = dict(required_workflow_smoke or {})
-        if str(smoke_policy.get("network_mode") or "") == "unrestricted":
-            stale_obligations = [
-                value
-                for group_name in ("requirements_by_category", "checks_by_category")
-                for items in (payload.get(group_name) or {}).values()
-                for value in items or []
-                if isinstance(value, Mapping)
-                and _is_stale_offline_smoke_policy(value)
-            ]
-            if stale_obligations:
-                issues.append(
-                    "implementation contract must not claim offline enforcement for unrestricted workflow_smoke"
-                )
         per_epoch_test = re.compile(
             r"(?i)(?:test.{0,40}(?:per[- ]?epoch|every epoch|each epoch|\u043a\u0430\u0436\u0434\w*\s+\u044d\u043f\u043e\u0445)|"
             r"(?:per[- ]?epoch|every epoch|each epoch|\u043a\u0430\u0436\u0434\w*\s+\u044d\u043f\u043e\u0445).{0,40}test)"
         )
-        prohibition = re.compile(
-            r"(?i)(?:must\s+not|never|do\s+not|\bnot\b|\bno\b|prohibit\w*|forbid\w*|prevent\w*|"
-            r"reject\w*|fail\w*|without|only\s+once|"
-            r"absen\w*|disabled|zero\s+occurrences|"
-            r"\u043d\u0435\s+\w{0,20}|\u0437\u0430\u043f\u0440\u0435\u0449\w*|\u043d\u0435\u043b\u044c\u0437\u044f|\u0438\u0441\u043a\u043b\u044e\u0447\w*|\u043f\u0440\u0435\u0434\u043e\u0442\u0432\u0440\u0430\u0449\w*|"
-            r"\u043e\u0442\u043a\u043b\u043e\u043d\w*|\u043e\u0448\u0438\u0431\w*|\u043e\u0442\u0441\u0443\u0442\u0441\u0442\u0432\w*|\u043d\u043e\u043b\u044c\w*)"
-        )
-
-        def requires_per_epoch_final_test(text: str) -> bool:
-            """Reject affirmative test-per-epoch obligations, not prohibitions quoting them."""
-
-            match = per_epoch_test.search(text)
-            if match is None:
-                return False
-            context = text[max(0, match.start() - 80) : min(len(text), match.end() + 80)]
-            return prohibition.search(context) is None
-
-        for path, text in obligations:
-            if requires_per_epoch_final_test(text):
-                excerpt = re.sub(r"\s+", " ", text).strip()[:240]
-                issues.append(
-                    f"{path} must not require final-test metrics per epoch; replace it with one sealed "
-                    f"final-test evaluation after selection. Rejected text: {excerpt}"
-                )
-        signature = dict(expected_experimental_signature or {})
-        bindings = dict(payload.get("scientific_bindings") or {})
-        if expected_protocol_digest and bindings.get("protocol_digest") != expected_protocol_digest:
-            issues.append("scientific_bindings.protocol_digest must bind the exact protocol_design artifact")
-        if signature:
-            expected_bindings = {
-                "dataset_id": str((signature.get("dataset") or {}).get("id") or ""),
-                "baseline_arm_id": str((signature.get("baseline") or {}).get("id") or ""),
-                "intervention_arm_id": str((signature.get("intervention") or {}).get("id") or ""),
-                "primary_outcome_name": str((signature.get("primary_outcome") or {}).get("name") or ""),
-                "runner_contract": "adaos.research.runner.v1",
-            }
-            if any(str(bindings.get(key) or "") != value for key, value in expected_bindings.items()):
-                issues.append("scientific_bindings must exactly preserve the experimental_signature and runner contract")
+        if any(per_epoch_test.search(item) for item in obligations):
+            issues.append("implementation contract must not observe final-test metrics per epoch")
     return list(dict.fromkeys(issues))
 
 
@@ -992,164 +495,6 @@ def _json_type(value: Any) -> str:
 def stage_digest(value: Mapping[str, Any]) -> str:
     payload = json.dumps(dict(value), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
-def derive_inherited_formulation(
-    parent_problem: Mapping[str, Any],
-    parent_protocol: Mapping[str, Any],
-    parent_implementation: Mapping[str, Any],
-    *,
-    workflow_smoke_binding: Mapping[str, Any],
-) -> dict[str, dict[str, Any]]:
-    """Derive an engineering-only successor without re-inferring parent science."""
-
-    problem = validate_stage("problem_frame", parent_problem)
-    protocol = validate_stage("protocol_design", parent_protocol)
-    implementation = validate_stage("implementation_contract", parent_implementation)
-    binding = dict(workflow_smoke_binding or {})
-    policy = dict(binding.get("requirements") or {})
-    if binding.get("schema") != "adaos.research.workflow_smoke_policy_binding.v1":
-        raise ValueError("workflow smoke binding is not authoritative")
-
-    smoke_network = str(policy.get("network_mode") or "")
-    def is_obsolete_smoke_network(value: Any) -> bool:
-        return _is_smoke_network_policy(value)
-
-    def is_network_policy(value: Any) -> bool:
-        return bool(_NETWORK_POLICY_RE.search(str(value)))
-
-    problem["constraints"] = [
-        item
-        for item in problem.get("constraints") or []
-        if not is_obsolete_smoke_network(item)
-    ]
-    problem["constraints"].append(
-        "workflow_smoke использует явно связанную AdaOS policy "
-        f"network_mode={smoke_network}; эта неинференциальная стадия не изменяет "
-        "confirmatory scientific contract."
-    )
-    problem["assistant_message"] = (
-        "Научная постановка унаследована без повторного inference; изменена только "
-        "типизированная политика неинференциального workflow_smoke."
-    )
-    clean_background = _text_without_stale_smoke_network_sentences(
-        problem["background"]
-    )
-    problem["background"] = (
-        clean_background
-        + " This successor binds workflow_smoke to the capability-bound requested "
-        f"network_mode={smoke_network}; the accepted confirmatory network policy is unchanged."
-    ).strip()
-
-    plan = protocol["experimental_plan"]
-    smoke = [
-        item for item in plan["stages"] if item.get("evidence_class") == "workflow_smoke"
-    ]
-    if len(smoke) != 1:
-        raise ValueError("parent protocol must contain exactly one workflow_smoke stage")
-    stage = smoke[0]
-    stage["execution_profile"]["device"] = str(policy["device"])
-    stage["execution_profile"]["network_mode"] = smoke_network
-    provider = dict(binding.get("provider") or {})
-    if provider.get("provider_id"):
-        stage["execution_profile"]["node"] = str(provider["provider_id"])
-    stage["budget"]["epochs"] = int(policy["epochs"])
-    stage["budget"]["seed_values"] = copy.deepcopy(list(policy["seed_values"]))
-    stage["budget"]["workload"]["mode"] = str(policy["workload_mode"])
-    stage["input_policy"]["source"] = str(policy["input_source"])
-    stage["input_policy"]["readiness"] = str(policy["input_readiness"])
-    stage["inference_allowed"] = bool(policy["inference_allowed"])
-    stage["purpose"] = (
-        "Bounded engineering conformance only; it cannot support a scientific claim. "
-        f"Requested network mode is {smoke_network}."
-    )
-    stage["stop_conditions"] = [
-        item
-        for item in stage.get("stop_conditions") or []
-        if not is_network_policy(item)
-    ]
-    stage["stop_conditions"].extend(
-        [
-            f"adaos.network.requested_mode={smoke_network}",
-            "adaos.network.access_observation_required=true",
-            "adaos.network.accessed=false_is_observation_not_isolation=true",
-        ]
-    )
-    system = plan["system_specification"]
-    system["components"] = _components_without_smoke_network_policy(
-        list(system.get("components") or [])
-    )
-    system["locked_invariants"] = [
-        item
-        for item in system.get("locked_invariants") or []
-        if not is_obsolete_smoke_network(item)
-    ]
-    system["locked_invariants"].append(
-        f"workflow_smoke network_mode={smoke_network} is engineering-only and cannot alter confirmatory inference."
-    )
-    protocol["assistant_message"] = (
-        "Parent scientific protocol is preserved exactly; only the bounded "
-        f"workflow_smoke network policy is bound to {smoke_network}."
-    )
-
-    for groups in (
-        implementation["requirements_by_category"],
-        implementation["checks_by_category"],
-    ):
-        for category, items in groups.items():
-            groups[category] = [
-                item for item in items if not is_obsolete_smoke_network(item)
-            ]
-    implementation["requirements_by_category"]["execution"].append(
-        {
-            "requirement": (
-                "Execute workflow_smoke with the exact AdaOS-bound requested network "
-                f"mode {smoke_network}; never promote it to confirmatory evidence."
-            ),
-            "verification": (
-                "Run evidence records the requested mode, evidence_class=workflow_smoke, "
-                "and inference_allowed=false."
-            ),
-        }
-    )
-    implementation["requirements_by_category"]["observability"].append(
-        {
-            "requirement": (
-                "Record requested network mode, provider enforcement status, and observed "
-                "network access as three separate fields."
-            ),
-            "verification": (
-                "The run log contains network.requested_mode, network.enforcement, and "
-                "network.accessed; accessed=false is labelled observation_not_isolation."
-            ),
-        }
-    )
-    implementation["checks_by_category"]["workflow"].append(
-        {
-            "check": "The workflow smoke uses the exact capability-bound execution policy and remains non-inferential.",
-            "evidence": "Execution admission receipt and content-addressed run log.",
-        }
-    )
-    implementation["checks_by_category"]["evidence"].append(
-        {
-            "check": "Network enforcement and network observation are represented separately in portable evidence.",
-            "evidence": "Run-log fields requested_mode, enforcement, accessed, and observation_not_isolation.",
-        }
-    )
-    implementation["scientific_bindings"]["protocol_digest"] = stage_digest(protocol)
-    implementation["assistant_message"] = (
-        "Engineering obligations were deterministically adapted to the capability-bound "
-        "workflow smoke; parent scientific bindings remain unchanged."
-    )
-
-    problem = validate_stage("problem_frame", problem)
-    protocol = validate_stage("protocol_design", protocol)
-    implementation = validate_stage("implementation_contract", implementation)
-    return {
-        "problem_frame": problem,
-        "protocol_design": protocol,
-        "implementation_contract": implementation,
-    }
 
 
 def _flatten_requirements(grouped: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -1239,37 +584,12 @@ def assemble_candidate(
     implementation_contract: Mapping[str, Any],
     *,
     source_ref_map: Mapping[str, str] | None = None,
-    required_workflow_smoke: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compile validated stage artifacts into the LLM-owned prototype subset."""
 
     problem = validate_stage("problem_frame", problem_frame)
     protocol = validate_stage("protocol_design", protocol_design)
     implementation = validate_stage("implementation_contract", implementation_contract)
-    protocol_issues = stage_quality_issues(
-        "protocol_design",
-        protocol,
-        expected_effect_direction=str(problem["hypotheses"][0]["effect_direction"]),
-        expected_experimental_signature=problem["experimental_signature"],
-        required_workflow_smoke=(
-            required_workflow_smoke
-            if required_workflow_smoke is not None
-            else DEFAULT_WORKFLOW_SMOKE_POLICY
-        ),
-    )
-    implementation_issues = stage_quality_issues(
-        "implementation_contract",
-        implementation,
-        required_workflow_smoke=(
-            required_workflow_smoke
-            if required_workflow_smoke is not None
-            else DEFAULT_WORKFLOW_SMOKE_POLICY
-        ),
-        expected_experimental_signature=problem["experimental_signature"],
-        expected_protocol_digest=stage_digest(protocol),
-    )
-    if protocol_issues or implementation_issues:
-        raise ValueError("cross-stage formulation contract: " + "; ".join(protocol_issues + implementation_issues))
     hypothesis_direction = str(problem["hypotheses"][0]["effect_direction"])
     decision_spec = protocol["decision_spec"]
     if str(decision_spec["effect_direction"]) != hypothesis_direction:
@@ -1324,10 +644,6 @@ def assemble_candidate(
                 }
             )
     experimental_plan = copy.deepcopy(protocol["experimental_plan"])
-    # Machine arm identities belong to the compiled ExperimentPlan.  The
-    # ResearchPrototype retains the human-facing comparator descriptions and
-    # remains backward compatible with the established scientific schema.
-    experimental_plan.pop("comparison_design", None)
     for component in experimental_plan["system_specification"]["components"]:
         component["source_refs"] = resolve_refs(component)
     evaluation_access = experimental_plan["data_policy"]["evaluation_access"]
@@ -1379,19 +695,14 @@ def assemble_candidate(
 
 __all__ = [
     "CHECK_CATEGORIES",
-    "DEFAULT_WORKFLOW_SMOKE_POLICY_ID",
-    "DEFAULT_WORKFLOW_SMOKE_POLICY",
-    "PROVIDER_COMPATIBLE_WORKFLOW_SMOKE_POLICY_ID",
     "PROTOCOL_DECISION_AREAS",
     "REQUIREMENT_CATEGORIES",
     "STAGES",
     "STAGE_SCHEMA_VERSION",
     "assemble_candidate",
-    "derive_inherited_formulation",
     "implementation_contract_schema",
     "problem_frame_schema",
     "provider_schema",
-    "resolve_workflow_smoke_policy",
     "protocol_design_schema",
     "schema_text_format",
     "stage_schema",

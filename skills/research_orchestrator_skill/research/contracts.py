@@ -499,7 +499,7 @@ def materialize_automation_brief(
                 "role": "provider",
                 "consumer_ref": "skill:research_manager_skill",
                 "operations": ["prepare_attempt", "collect_attempt", "verify_artifact", "dataset_status"],
-                "boundary": "The direction skill prepares an ExecutionSpec-compatible command and returns normalized observations and portable artifact refs; dataset_status returns immutable validation, robustness, and sealed-test split bindings with digest, dataset_digest, and portable locator. research_manager_skill owns attempt submission, tracker sessions, ingestion, and finalization.",
+                "boundary": "The direction skill prepares an ExecutionSpec-compatible command and returns normalized observations and portable artifact refs; research_manager_skill owns attempt submission, tracker sessions, ingestion, and finalization.",
             },
             {
                 "id": "research.tracker.indirect",
@@ -515,7 +515,6 @@ def materialize_automation_brief(
             {"id": "adaos.direction_boundary", "check": "Preserve the Project-owned direction-skill boundary; do not create a direction-specific scenario.", "evidence": "Project manifest and package inventory"},
             {"id": "adaos.data_ownership", "check": "Keep primary experimental data in this direction skill's scoped runtime data bucket.", "evidence": "Resolved capability bindings and runtime paths"},
             {"id": "adaos.runner_contract", "check": "Provide adaos.research.runner.v1 through prepare_attempt, collect_attempt, verify_artifact, and dataset_status; let research_manager_skill orchestrate attempts and tracking.", "evidence": "Consumer-driven runner conformance, installation, and bounded smoke reports"},
-            {"id": "adaos.dataset_binding", "check": "Return distinct immutable validation, robustness, and sealed-test identities from dataset_status without exposing sealed test labels or host-private paths.", "evidence": "ResearchManager Study admission and dataset binding conformance"},
             {"id": "adaos.tracker_boundary", "check": "Return normalized observations and portable ContentRefs without creating a direction-owned Tracker implementation.", "evidence": "ResearchManager ingestion conformance and absence of direct tracker-session calls"},
             {"id": "adaos.content_identity", "check": "Bind experiment inputs, code, environment, metrics and evidence by digest.", "evidence": "ContentRef and tracker records"},
             {"id": "adaos.historical_evidence", "check": "Treat imported notebook outputs as untrusted exploratory source material.", "evidence": "Evidence classification in produced records"},
@@ -584,18 +583,12 @@ def project_execution_automation_brief(
     compilation_projection_digest: str,
     protocol_digest: str,
 ) -> dict[str, Any]:
-    """Compile a compact engineering handoff without weakening obligations.
-
-    The exact scientific protocol lives in the paired ResearchCompilation.
-    This projection keeps the bridge to AdaOS contracts and every requirement
-    identity, but removes prose verification recipes duplicated by acceptance
-    checks and by the consumer-owned conformance fixture.
-    """
+    """Remove audit-only duplication while preserving the executable obligations."""
 
     portable = project_portable_automation_brief(value)
     projected = copy.deepcopy(portable)
     predecessor_digest = str(projected.pop("digest"))
-    projected["schema_version"] = "1.6.0"
+    projected["schema_version"] = "1.4.0"
     projected["predecessor_digest"] = predecessor_digest
     execution_digest = str(compilation_projection_digest or "").strip()
     accepted_protocol_digest = str(protocol_digest or "").strip()
@@ -611,24 +604,6 @@ def project_execution_automation_brief(
     projected.pop("research_prototype", None)
     projected.pop("source_inventory", None)
     projected.pop("builder_checkpoint", None)
-    projected["implementation_requirements"] = [
-        {
-            key: copy.deepcopy(item[key])
-            for key in ("id", "category", "requirement")
-            if key in item
-        }
-        for item in projected.get("implementation_requirements") or []
-        if isinstance(item, Mapping)
-    ]
-    projected["acceptance_checks"] = [
-        {
-            key: copy.deepcopy(item[key])
-            for key in ("id", "check")
-            if key in item
-        }
-        for item in projected.get("acceptance_checks") or []
-        if isinstance(item, Mapping)
-    ]
     projected["digest"] = digest(projected)
     return validate("research.automation_brief.v1.schema.json", projected)
 

@@ -27,7 +27,7 @@ experimental data or post-handoff scientific governance records.
    outputs remain explicitly exploratory/untrusted. Every supplied fragment has
    an exact `artifact://...#cell/lines` reference.
 4. Inspect `get_compilation`: Source Analysis, Research Problem, Experimental
-   Protocol, Engineering Contract, and the deterministic Experiment Plan have independent digests and a
+   Protocol, and Engineering Contract have independent digests and a
    source-to-acceptance traceability report. Resolve blocking questions.
 5. Call `accept_prototype` with the exact prototype digest, current generation,
    and an idempotency key. The command creates an ImplementationTrack, its
@@ -36,20 +36,7 @@ experimental data or post-handoff scientific governance records.
    Project-scoped Builder Development Session. It uploads neither the direction
    source nor its intake artifacts.
 6. Inspect the brief and use `open_builder_session`. Codex is deliberately not
-   started by acceptance. `start_implementation` is the explicit one-shot
-   transition; it can only use the exact Development Session instruction. If
-   the same implementation Project already has a published predecessor, the
-   successor Development Session starts a new Builder Change instead of
-   mutating or iterating the published Change.
-7. Use `sync_implementation`, then explicitly prepare and promote the normal
-   Builder candidate with `prepare_project_release` and
-   `publish_project_release`. The track stores both the candidate digest and
-   the exact promoted `ProjectRelease` identity.
-8. `instantiate_study` asks the installed runner for immutable validation,
-   robustness, and sealed-test split bindings, creates a manager-owned
-   `StudyRealization` and Experiment, and binds both back to the track.
-   `start_study_smoke` is the separate confirmed transition that locks the
-   compiled protocol and submits the non-inferential CPU preflight.
+   started by acceptance.
 
 `get_activity` exposes compact durable stages used by grouped chat progress and
 future Research Workbench widgets. `get_formulation_run` exposes the exact stage
@@ -67,35 +54,9 @@ Callers outside chat should pass stable `actor` and `invocation_origin` values.
 ## Hard formulation boundary
 
 The default path uses three bounded LLM stages: `problem_frame`,
-`protocol_design`, and `implementation_contract`. AdaOS then compiles five
+`protocol_design`, and `implementation_contract`. AdaOS then compiles four
 stable facets: `source_analysis`, `research_problem`,
-`experimental_protocol`, `engineering_contract`, and the provider-neutral
-`experiment_plan`. ExperimentPlan v1.4 retains a digest-bound `system` object
-with the scientific subject, component settings, intervention boundary, and
-locked invariants. A bounded execution profile may reduce workload, but cannot
-silently replace that system with a surrogate. The protocol stage must assign
-stable arm ids and one exact primary minuend/subtrahend. Since formulation
-stage contract v1.2, `problem_frame.experimental_signature` freezes only the
-cross-stage scientific identity: subject, dataset, baseline, intervention,
-intervention boundary, and primary outcome. Protocol admission requires exact
-machine identities and exact outcome/boundary copies from that signature.
-The legacy comparator array may use either the complete ordered ids or the
-complete ordered labels; mixed or foreign identities fail closed;
-`implementation_contract.scientific_bindings` then binds the exact protocol
-digest, those identities, and `adaos.research.runner.v1`. This narrow typed
-spine prevents a locally schema-valid protocol for a different experiment
-from being assembled with the original question while leaving rationale,
-method detail, and implementation strategy open to the model. Repairs always
-receive the original directive and upstream typed artifacts as immutable
-authority; a rejected candidate is never their only context. The deterministic
-plan then carries exact execution profiles and integer RNG seeds. Pairing
-allocation units must be the same ordered integer values; symbolic labels such
-as `S1` cannot masquerade as executable seeds. It also carries evidence
-classes, data policy, RNG streams, estimand and the public
-runner/split-binding ABI without selecting a runtime provider. Runner results
-use the domain-neutral canonical fields `primary_metric`, `step`,
-`pairing_identity_digest`, `arm_id`, `seed`, and `evidence_class`; scientific
-metric names remain plan data rather than framework code. It also creates a
+`experimental_protocol`, and `engineering_contract`. It also creates a
 digest-bound traceability graph and fails the compilation gate when required
 source-to-acceptance paths are absent. The Root LLM proposes only each bounded
 stage artifact. AdaOS materializes and
@@ -117,12 +78,7 @@ The deterministic review rejects or downgrades a handoff unless it has:
   hypothesis, with hypothesis claims forbidden from masquerading as observed
   source facts;
 - separate workflow-smoke and confirmatory stages with correct evidence
-  classes, including exactly one AdaOS-policy CPU smoke with three epochs and
-  seed 17;
-- non-empty unique integer `budget.seed_values`, with the confirmatory values
-  exactly mirrored by `pairing.allocation.planned_units`;
-- exact cross-stage preservation of experimental identity and an engineering
-  binding to the accepted protocol digest;
+  classes;
 - explicit comparators, paired invariants/varied factors, a predeclared
   allocation of paired units, named RNG streams, data sealing, and leakage
   controls;
@@ -171,20 +127,3 @@ are not present under Codex's read-only artifact roots.
   authority transition required before formulation may write that task.
 - `research_manager_skill` remains the deterministic governance truth after
   Automation.
-
-Builder, manager, and later evaluator status snapshots are federated into the
-orchestrator journal with `(origin, source_event_id)` replay identity. The
-Workbench therefore observes one durable lifecycle without copying another
-component's private database or making UI connectivity part of execution.
-
-The Codex-facing AutomationBrief v1.6 is an executable projection rather than
-a second prose specification. It preserves every implementation requirement
-and acceptance identity plus the exact runner/provider boundary, while
-removing verification prose already carried by the scientific compilation and
-the consumer-owned conformance fixture. Its predecessor digest keeps the full
-accepted brief auditable.
-
-ResearchCompilation execution projection v1.2 likewise carries the normalized
-`experiment_plan` exactly once. The full formulation protocol and its digest
-remain in the accepted audit package, while assistant prose and the duplicated
-embedded plan are excluded from Codex's bounded attention budget.

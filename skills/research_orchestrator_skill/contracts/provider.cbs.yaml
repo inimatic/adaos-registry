@@ -1,0 +1,26 @@
+schema: adaos.cbs.provider_authoring.v1
+authorship: {origin: human_authored}
+capability:
+  ref: capability:research.workbench.manage
+  version: 1.0.0
+  title: Manage governed research work
+  operations:
+  - {operation_id: list_directions, tool: list_directions, errors: []}
+  - {operation_id: create_direction, tool: create_direction, errors: []}
+  - {operation_id: create_task, tool: create_task, errors: []}
+  - {operation_id: get_direction, tool: get_direction, errors: []}
+  invariants: [research lineage remains explicit and auditable]
+  effects: [creates and updates research directions, tasks, and evidence]
+  authority_requirements: []
+  conformance_refs: [scenario:research.workbench.manage.v1]
+binding:
+  ref: binding-definition:research.workbench.manage.adaos
+  version: 1.0.0
+  entry_protocol: adaos.skill.tools.v1
+  logical_entrypoint: research.workbench.manage.adaos
+  physical_member: handlers/main.py
+  modes: [production]
+  profile_classes: [local]
+  provider_features: [lineage, tasks, evidence]
+  authority_requirements: []
+  conformance_obligations: [capability_conformance]
