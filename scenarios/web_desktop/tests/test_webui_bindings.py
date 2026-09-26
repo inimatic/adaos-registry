@@ -288,7 +288,9 @@ def test_chat_uses_registered_state_bound_general_channel() -> None:
     assert chat["dataSource"]["params"]["active_agent_id"] == "$state.chatAgentId"
     assert chat["inputs"]["meta"]["dialog_channel_id"] == "$state.chatChannel"
     assert chat["inputs"]["meta"]["active_agent_id"] == "$state.chatAgentId"
-    assert agent_selector["visibleIf"].endswith("$state.chatChannel === 'family'")
+    assert agent_selector["visibleIf"].endswith("$state.chatChannel === 'conversational'")
+    assert _actions(selector, "click:family")[0]["params"]["chatChannel"] == "conversational"
+    assert _actions(selector, "click:family")[1]["params"]["channel_id"] == "conversational"
     assert {item["id"] for item in agent_selector["inputs"]["buttons"]} == {
         "agent:conversation_companions:arseni",
         "agent:conversation_companions:nika",

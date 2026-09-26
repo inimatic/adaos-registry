@@ -1948,7 +1948,7 @@
                                     "on": "click:family",
                                     "type": "updateState",
                                     "params": {
-                                        "chatChannel": "family",
+                                        "chatChannel": "conversational",
                                         "chatAgentId": "agent:conversation_companions:nika"
                                     }
                                 },
@@ -1957,7 +1957,7 @@
                                     "type": "callHost",
                                     "target": "dialog.channel.select",
                                     "params": {
-                                        "channel_id": "family",
+                                        "channel_id": "conversational",
                                         "webspace_id": "$client.webspaceId"
                                     }
                                 }
@@ -1969,7 +1969,7 @@
                             "id": "chat-agent-selector",
                             "title": "Agent",
                             "type": "navigation.tabs",
-                            "visibleIf": "$state.activeTab === 'chat' && $state.chatChannel === 'family'",
+                            "visibleIf": "$state.activeTab === 'chat' && $state.chatChannel === 'conversational'",
                             "inputs": {
                                 "variant": "segmented",
                                 "selectedStateKey": "chatAgentId",
@@ -3300,7 +3300,7 @@
                 }
             }
         },
-        "version": "0.3.43",
+        "version": "0.3.44",
         "manifest": "webui.json"
     },
     "locale_dictionaries": {
