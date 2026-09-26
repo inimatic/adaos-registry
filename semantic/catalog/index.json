@@ -96,6 +96,14 @@
       "stable_release_digest": "sha256:3efefa4f60c4ce898b5f961ba75020e4bf6105d4fe2268db3f7f4f122d4a7b75",
       "release_key": "adaos_builder@sha256:3efefa4f60c4ce898b5f961ba75020e4bf6105d4fe2268db3f7f4f122d4a7b75",
       "projection_digest": "sha256:1989c78f0e3ecca4e64207d19c73fd48cd8d2f0488ffaa83b77d73bc0c0e70e5"
+    },
+    "notebook": {
+      "application_id": "notebook",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "application_revision": 2,
+      "stable_release_digest": "sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16",
+      "release_key": "notebook@sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16",
+      "projection_digest": "sha256:7eeaa4539ac5a5a44e289cc37db016106e6d62d70a1073f97648e62db965a2c6"
     }
   },
   "releases": {
@@ -226,7 +234,15 @@
       "release_digest": "sha256:3efefa4f60c4ce898b5f961ba75020e4bf6105d4fe2268db3f7f4f122d4a7b75",
       "path": "semantic/catalog/releases/adaos_builder/3efefa4f60c4ce898b5f961ba75020e4bf6105d4fe2268db3f7f4f122d4a7b75.json",
       "projection_digest": "sha256:1989c78f0e3ecca4e64207d19c73fd48cd8d2f0488ffaa83b77d73bc0c0e70e5"
+    },
+    "notebook@sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16": {
+      "application_id": "notebook",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.0",
+      "release_digest": "sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16",
+      "path": "semantic/catalog/releases/notebook/a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16.json",
+      "projection_digest": "sha256:7eeaa4539ac5a5a44e289cc37db016106e6d62d70a1073f97648e62db965a2c6"
     }
   },
-  "index_digest": "sha256:ca995d3bc06ff5d52777a4f95f01f6887be2c6dca185478ab97bd21a32ba1105"
+  "index_digest": "sha256:c1c6e50ad6e8e1f62d935f6827ec61b57e8ef467206c30a22cbbdeb74aef5640"
 }

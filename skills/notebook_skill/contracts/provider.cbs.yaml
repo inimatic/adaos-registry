@@ -1,0 +1,26 @@
+schema: adaos.cbs.provider_authoring.v1
+authorship: {origin: human_authored}
+capability:
+  ref: capability:notes.manage
+  version: 1.0.0
+  title: Manage personal notes
+  operations:
+  - {operation_id: get_snapshot, tool: get_notebook_snapshot, errors: []}
+  - {operation_id: create, tool: create_note, errors: []}
+  - {operation_id: save, tool: save_note, errors: []}
+  - {operation_id: delete, tool: delete_note, errors: []}
+  invariants: [note identity remains stable across projection refresh]
+  effects: [reads and writes user-owned note state]
+  authority_requirements: []
+  conformance_refs: [scenario:notes.manage.v1]
+binding:
+  ref: binding-definition:notes.manage.adaos-notebook
+  version: 1.0.0
+  entry_protocol: adaos.skill.tools.v1
+  logical_entrypoint: notes.manage.adaos-notebook
+  physical_member: handlers/main.py
+  modes: [production]
+  profile_classes: [local]
+  provider_features: [durable_notes, attachments]
+  authority_requirements: []
+  conformance_obligations: [capability_conformance]

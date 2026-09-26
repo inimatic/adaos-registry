@@ -1,0 +1,225 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "notebook",
+    "legacy_project_id": "notebook",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "notebook",
+    "display": {
+      "title": "Notebook",
+      "summary": "Personal notes, attachments, and durable local note state."
+    },
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "notebook",
+        "presentation_ref": "skill:notebook_skill"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 2,
+    "created_at": "2026-09-26T03:13:14+00:00",
+    "updated_at": "2026-09-26T03:13:41+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "notebook",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "notebook",
+    "version": "0.1.0",
+    "release_digest": "sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "notebook",
+      "version": "0.1.0",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:12983c0265339d25bdda084f4217df56ab4fd8a8d030b8019a63bd4d1094e573",
+        "path_scope": [
+          "projects/notebook/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "notebook_skill",
+          "version": "0.2.1",
+          "digest": "sha256:ceee939e9880d31406a01e15339805325aa66907cc0fb0052f46ecf52cbd5c31",
+          "manifest_digest": "sha256:7adf2ea3483da71f9ca26bedcbe0e430f3a3e03400be3791c47d45140306f2a8",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:12983c0265339d25bdda084f4217df56ab4fd8a8d030b8019a63bd4d1094e573",
+            "path_scope": [
+              "skills/notebook_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/notebook_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:12983c0265339d25bdda084f4217df56ab4fd8a8d030b8019a63bd4d1094e573",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:ab9a2a7503b1fe0dd5c3f0cfa8c67b726e567474e0636fcc1d96a79e3a40ef25"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:5196dbf32500a61bf5ec35b818a227474695871627076e2f9b9693c07026fb6a",
+        "profiles": [
+          "adaos.builder.component_project.v1"
+        ],
+        "members": [
+          {
+            "ref": "skill:notebook_skill",
+            "package_digest": "sha256:ceee939e9880d31406a01e15339805325aa66907cc0fb0052f46ecf52cbd5c31",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "notebook",
+            "presentation": "skill:notebook_skill",
+            "default": true,
+            "bindings": {
+              "surface": "notebook"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "notebook"
+          ],
+          "required_contracts": [
+            "capability:notes.manage@^1.0.0"
+          ],
+          "validation_profiles": [
+            "notebook.local"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        }
+      },
+      "catalog": {
+        "title": "Notebook",
+        "description": "Personal notes, attachments, and durable local note state.",
+        "categories": [
+          "productivity"
+        ],
+        "tags": [
+          "cbs-provider",
+          "notes"
+        ]
+      },
+      "release_digest": "sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16"
+    },
+    "accepted_candidate_id": "notebook-0-1-0-ac1a0e34ce16",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.project.preflight",
+        "tests": "qualified application and component tests passed",
+        "cbs": "exact native admission or explicit compatibility classification",
+        "checkpoint_source_revision": "a7a3caa8649c0acc0e1a95b3494b2343732e4958",
+        "checkpoint_component_ref": "skill:notebook_skill"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [],
+        "sent_off_device": [],
+        "linked_to_user": [],
+        "tracking": false,
+        "retention": null
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [],
+        "sent_off_device": false,
+        "linked_to_user": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:18575981247455ea0c36bc9c6be308128c3caf16028863989d05cccfea4f84e1",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "notebook",
+      "release_digest": "sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:6065d99bc680d433a22431f485cf990dc31f726166197126ffd8e0e7262236cf"
+  },
+  "channels": {
+    "stable": "sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16"
+  },
+  "semantic": {
+    "projection_digest": "sha256:8bc48e01a00348e43f8f73b1f36624217239e17a8cc0fbdc2f6caba5a09c6a02",
+    "path": "semantic/applications/notebook/a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16.json"
+  },
+  "projection_digest": "sha256:7eeaa4539ac5a5a44e289cc37db016106e6d62d70a1073f97648e62db965a2c6"
+}

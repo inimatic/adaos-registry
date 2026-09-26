@@ -1,0 +1,27 @@
+{
+  "authority_requirements": [],
+  "binding_definition_ref": "binding-definition:notes.manage.adaos-notebook",
+  "capability_ref": "capability:notes.manage",
+  "capability_version": "1.0.0",
+  "conformance_obligations": [
+    "capability_conformance"
+  ],
+  "definition_digest": "sha256:3ce043cd16b788cf470e2a2ee4eb29bc2278cc5f1112b5f7c6bd2075f66216de",
+  "entry_protocol": "adaos.skill.tools.v1",
+  "environment_constraints": {
+    "profile_classes": [
+      "local"
+    ],
+    "provider_features": [
+      "durable_notes",
+      "attachments"
+    ]
+  },
+  "implementation_entrypoint": "notes.manage.adaos-notebook",
+  "modes": [
+    "production"
+  ],
+  "schema": "adaos.binding.definition.v1",
+  "state_support": [],
+  "version": "1.0.0"
+}

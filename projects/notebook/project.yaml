@@ -1,0 +1,40 @@
+schema: adaos.project.v1
+kind: project
+id: notebook
+version: 0.1.0
+profiles: [adaos.builder.component_project.v1]
+components:
+  owned:
+  - ref: skill:notebook_skill
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [realizes]
+  dependencies: []
+entrypoints:
+- id: notebook
+  presentation: skill:notebook_skill
+  default: true
+  bindings: {surface: notebook}
+catalog:
+  title: Notebook
+  description: Personal notes, attachments, and durable local note state.
+  categories: [productivity]
+  tags: [notes, cbs-provider]
+publication: {stage: beta, visibility: listed, channel: stable}
+install:
+  default: false
+  features:
+  - id: default
+    title: Notebook
+    default: true
+    optional: false
+    components: [skill:notebook_skill]
+compatibility:
+  required_entrypoints: [notebook]
+  required_contracts: [capability:notes.manage@^1.0.0]
+  validation_profiles: [notebook.local]
+lifecycle:
+  uninstall: {components: remove_if_unreferenced, runtime_data: retain, source_artifacts: retain}
+created_at: '2026-09-26T02:30:00Z'
+created_by: agent:codex

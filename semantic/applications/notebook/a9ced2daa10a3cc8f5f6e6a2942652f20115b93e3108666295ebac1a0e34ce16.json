@@ -1,0 +1,93 @@
+{
+  "schema": "adaos.semantic_registry.application_release.v1",
+  "project_id": "notebook",
+  "version": "0.1.0",
+  "application_ref": "skill:notebook_skill",
+  "project_release_digest": "sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16",
+  "source_ref": {
+    "schema": "adaos.artifact.source_ref.v1",
+    "forge": "content-addressed-dev",
+    "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+    "revision": "sha256:12983c0265339d25bdda084f4217df56ab4fd8a8d030b8019a63bd4d1094e573",
+    "path_scope": [
+      "projects/notebook/"
+    ]
+  },
+  "compilation_digest": "sha256:98fdefc21b32dc37d9f6f6c4a214253f4a1cd5df88d08ce20b12ccbc55a355a1",
+  "semantic_revision_digest": "sha256:afbe3280dc9913b9bd30eae7f645d8603a68c26e57c6d66b8eff120e5596e55d",
+  "requirements": [
+    {
+      "requirement_ref": "requirement:skill.notebook_skill.notes.manage",
+      "capability_ref": "capability:notes.manage",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:ade4f1863b4c232322a660ebd40fd3144a09f5c5e0ad221e1931dfa3121cb7d9"
+    }
+  ],
+  "portable_artifacts": {
+    "adaos.binding.definition.v1": [
+      "sha256:3ce043cd16b788cf470e2a2ee4eb29bc2278cc5f1112b5f7c6bd2075f66216de"
+    ],
+    "adaos.binding.delivery.v1": [
+      "sha256:5f8072cc4176f23531af4ad8586ba8ad038318dd7380055b348277faf3b59315"
+    ],
+    "adaos.capability.contract.v1": [
+      "sha256:ab0f375c6ea452f701c328537450bb6e3b81e5ab8bc6956e5e9349d4df18f903"
+    ]
+  },
+  "distribution": {
+    "thin": {
+      "requirements_only": true,
+      "registry_required": true
+    },
+    "resolved": {
+      "project_release_digest": "sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16",
+      "package_closure": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "notebook_skill",
+          "version": "0.2.1",
+          "digest": "sha256:ceee939e9880d31406a01e15339805325aa66907cc0fb0052f46ecf52cbd5c31",
+          "manifest_digest": "sha256:7adf2ea3483da71f9ca26bedcbe0e430f3a3e03400be3791c47d45140306f2a8",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:12983c0265339d25bdda084f4217df56ab4fd8a8d030b8019a63bd4d1094e573",
+            "path_scope": [
+              "skills/notebook_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/notebook_skill",
+          "schema_locks": []
+        }
+      ],
+      "portable_artifact_digests": [
+        "sha256:3ce043cd16b788cf470e2a2ee4eb29bc2278cc5f1112b5f7c6bd2075f66216de",
+        "sha256:5f8072cc4176f23531af4ad8586ba8ad038318dd7380055b348277faf3b59315",
+        "sha256:ab0f375c6ea452f701c328537450bb6e3b81e5ab8bc6956e5e9349d4df18f903"
+      ]
+    }
+  },
+  "projection_digest": "sha256:8bc48e01a00348e43f8f73b1f36624217239e17a8cc0fbdc2f6caba5a09c6a02"
+}
