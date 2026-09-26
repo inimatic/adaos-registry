@@ -41,6 +41,7 @@ from adaos.sdk.developer import prompt_context as developer_prompt_context
 from adaos.sdk.developer import projects as developer_projects
 from adaos.sdk.developer import prototypes as developer_prototypes
 from adaos.sdk.developer import ui as developer_ui
+from adaos.sdk.web import ui_contract as sdk_ui_contract
 from adaos.sdk.web import webspace as sdk_webspace
 
 
@@ -7172,12 +7173,20 @@ def _repo_root() -> Path:
 
 
 def _load_webui_schema() -> dict[str, Any]:
-    path = _repo_root() / "src" / "adaos" / "abi" / "webui.v1.schema.json"
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8-sig"))
-        return raw if isinstance(raw, dict) else {}
-    except Exception:
-        return {}
+    candidates = [
+        _repo_root() / "src" / "adaos" / "abi" / "webui.v1.schema.json",
+        Path(sdk_ui_contract.__file__).resolve().parents[2]
+        / "abi"
+        / "webui.v1.schema.json",
+    ]
+    for path in candidates:
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8-sig"))
+        except Exception:
+            continue
+        if isinstance(raw, dict):
+            return raw
+    return {}
 
 
 def _builder_llm_primary_enabled(_meta: Mapping[str, Any] | None = None) -> bool:

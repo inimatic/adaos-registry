@@ -14,24 +14,27 @@ from pathlib import Path
 
 import yaml
 import pytest
+import adaos.services as adaos_services
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _find_repo_root() -> Path:
+def _find_repo_root() -> Path | None:
     marker = Path("src") / "adaos" / "services"
     candidates = [Path.cwd(), *SKILL_ROOT.parents]
     for root in candidates:
         if (root / marker).exists():
             return root
-    raise FileNotFoundError(f"Cannot find AdaOS repo root containing {marker}")
+    return None
 
 
 REPO_ROOT = _find_repo_root()
-SRC_ROOT = REPO_ROOT / "src"
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
+ADAOS_PACKAGE_ROOT = Path(adaos_services.__file__).resolve().parent.parent
+if REPO_ROOT is not None:
+    SRC_ROOT = REPO_ROOT / "src"
+    if str(SRC_ROOT) not in sys.path:
+        sys.path.insert(0, str(SRC_ROOT))
 
 # Packaged validation disables bytecode writes. Reuse code, never module state,
 # so each test gets isolation without recompiling the large handler 306 times.
@@ -7580,7 +7583,14 @@ def test_new_native_chat_uses_same_contract_and_budget_as_semantic_e2e(monkeypat
     import adaos.sdk.llm.llm_client as llm_client
     for name in ("ADAOS_BUILDER_SEMANTIC_COMPILER", "ADAOS_BUILDER_LLM_OUTPUT_MODE", "ADAOS_BUILDER_LLM_MAX_TOKENS"):
         monkeypatch.delenv(name, raising=False)
-    payload = json.loads((REPO_ROOT / "src/adaos/scenario_templates/scenario_default/webui.json").read_text(encoding="utf-8"))
+    payload = json.loads(
+        (
+            ADAOS_PACKAGE_ROOT
+            / "scenario_templates"
+            / "scenario_default"
+            / "webui.json"
+        ).read_text(encoding="utf-8")
+    )
     monkeypatch.setattr(skill, "_current_webui_payload", lambda *_args: payload)
     monkeypatch.setattr(skill, "_builder_llm_model_for_session", lambda *_args: "gpt-5")
     request = skill._builder_llm_webui_transform_request(

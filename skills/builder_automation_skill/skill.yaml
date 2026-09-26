@@ -1,5 +1,5 @@
 name: builder_automation_skill
-version: 0.2.2
+version: 0.2.3
 description: System adapter for the Builder Automation stage and its local Codex implementation
   loop.
 entry: handlers/main.py
@@ -136,7 +136,7 @@ llm_hints:
     intent: builder.automation.chat
     tool: chat
     side_effect_class: local_write
-updated_at: '2026-09-26T08:58:30+00:00'
+updated_at: '2026-09-26T09:34:39+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.0+3734.11eaf26a
