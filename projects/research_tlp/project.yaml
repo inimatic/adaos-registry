@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: research_tlp
-version: 0.3.15
+version: 0.3.16
 profiles:
 - adaos.research.tlp.v1
 components:
@@ -79,6 +79,8 @@ compatibility:
   - tlp
   required_contracts:
   - capability:research.tlp.evaluate@^1.0.0
+  - capability:research.lifecycle.manage@^1.0.0
+  - capability:research.tracking.manage@^1.0.0
   validation_profiles:
   - research.tlp.local
 lifecycle:
