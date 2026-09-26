@@ -6,7 +6,7 @@
             "desktop": {
                 "pageSchema": {
                     "id": "desktop",
-                    "title": "Рабочий стол",
+                    "title": "Управление",
                     "layout": {
                         "version": 2,
                         "pattern": "dashboard",
@@ -2860,7 +2860,7 @@
                     ],
                     "title_i18n": {
                         "key": "scenario.web_desktop.title",
-                        "fallback": "Рабочий стол"
+                        "fallback": "Управление"
                     },
                     "initialState": {
                         "activeTab": "home",
@@ -3300,12 +3300,12 @@
                 }
             }
         },
-        "version": "0.3.44",
+        "version": "0.3.46",
         "manifest": "webui.json"
     },
     "locale_dictionaries": {
         "en": {
-            "scenario.web_desktop.title": "Desktop",
+            "scenario.web_desktop.title": "Management",
             "web_desktop.search.title": "Search",
             "web_desktop.search.placeholder": "Search and commands",
             "web_desktop.nav.title": "Navigation",
@@ -3395,7 +3395,7 @@
             "web_desktop.widgets.empty": "No pinned widgets are available."
         },
         "ru": {
-            "scenario.web_desktop.title": "Рабочий стол",
+            "scenario.web_desktop.title": "Управление",
             "web_desktop.search.title": "Поиск",
             "web_desktop.search.placeholder": "Поиск и команды",
             "web_desktop.nav.title": "Навигация",
