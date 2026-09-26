@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: applications
-version: 0.1.38
+version: 0.1.39
 profiles:
 - adaos.system.applications.v1
 components:
@@ -30,8 +30,8 @@ catalog:
   - marketplace
   - permissions
 publication:
-  stage: alpha
-  visibility: unlisted
+  stage: beta
+  visibility: listed
   channel: stable
 install:
   default: false
