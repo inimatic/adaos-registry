@@ -379,6 +379,49 @@ def test_active_subscription_with_plan_disabled_resources_is_warning(monkeypatch
     payload = module.get_status(webspace_id="desktop")
 
     assert payload["current"]["color"] == "warning"
+    media = next(row for row in payload["resources"]["items"] if row["resource"] == "media.indexing")
+    assert media["state"] == "disabled_observed"
+    assert media["advisory"] is True
+
+
+def test_observe_mode_quota_exhaustion_is_advisory_not_disabled(monkeypatch) -> None:
+    module = _load_module()
+    projection = _Projection()
+    monkeypatch.setattr(module, "ctx_current_user", projection)
+    monkeypatch.setattr(
+        module,
+        "current_subnet_economic_status",
+        lambda: {
+            "generated_at": "2026-09-26T02:20:36Z",
+            "subscription_state": "active",
+            "plan_id": "builder",
+            "entitlement_state": "limited_observed",
+            "enforcement_mode": "observe",
+            "enforcement_active": False,
+            "disabled_resource_count": 1,
+            "disabled_resources": [
+                {"resource": "codex.api.tokens", "reason_code": "quota_exhausted"}
+            ],
+            "usage": {
+                "codex.api.tokens": {
+                    "used_24h": 10_882_030,
+                    "used_30d": 177_881_218,
+                    "quota_limit": 20_000_000,
+                    "quota_remaining": 0,
+                    "quota_exhausted": True,
+                }
+            },
+        },
+    )
+
+    payload = module.get_status(webspace_id="desktop")
+
+    codex = next(row for row in payload["resources"]["items"] if row["resource"] == "codex.api.tokens")
+    assert codex["state"] == "exhausted_observed"
+    assert codex["advisory"] is True
+    assert payload["current"]["color"] == "warning"
+    assert payload["current"]["advisory_observation_count"] == 1
+    assert "unavailable: 0" in payload["current"]["description"]
 
 
 def test_list_resources_returns_table_items(monkeypatch) -> None:

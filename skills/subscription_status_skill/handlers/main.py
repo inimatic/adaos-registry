@@ -127,11 +127,19 @@ def _disabled_by_resource(status: Mapping[str, Any]) -> dict[str, Mapping[str, A
     return out
 
 
-def _quota_state(resource_usage: Mapping[str, Any], disabled: Mapping[str, Any] | None) -> str:
+def _quota_state(
+    resource_usage: Mapping[str, Any],
+    disabled: Mapping[str, Any] | None,
+    *,
+    enforcement_active: bool,
+) -> str:
     if disabled:
+        reason = _text(disabled.get("reason_code"))
+        if not enforcement_active:
+            return "exhausted_observed" if reason == "quota_exhausted" else "disabled_observed"
         return "disabled"
     if resource_usage.get("quota_exhausted"):
-        return "exhausted"
+        return "exhausted" if enforcement_active else "exhausted_observed"
     if resource_usage.get("quota_warn"):
         return "warn"
     if resource_usage:
@@ -142,6 +150,7 @@ def _quota_state(resource_usage: Mapping[str, Any], disabled: Mapping[str, Any] 
 def _resource_rows(status: Mapping[str, Any]) -> list[dict[str, Any]]:
     usage = _as_mapping(status.get("usage"))
     disabled_map = _disabled_by_resource(status)
+    enforcement_active = status.get("enforcement_active") is True
     rows: list[dict[str, Any]] = []
     for resource in ROOT_GOVERNED_RESOURCES:
         item = _as_mapping(usage.get(resource))
@@ -156,8 +165,14 @@ def _resource_rows(status: Mapping[str, Any]) -> list[dict[str, Any]]:
         rows.append(
             {
                 "resource": resource,
-                "state": _quota_state(item, disabled),
+                "state": _quota_state(
+                    item,
+                    disabled,
+                    enforcement_active=enforcement_active,
+                ),
                 "reason": _text(disabled.get("reason_code") if isinstance(disabled, Mapping) else ""),
+                "enforcement_active": enforcement_active,
+                "advisory": not enforcement_active,
                 "used_24h": _int_value(item.get("used_24h")),
                 "used_30d": _int_value(item.get("used_30d")),
                 "quota_limit": "" if item.get("quota_limit") is None else _int_value(item.get("quota_limit")),
@@ -187,7 +202,13 @@ def _resource_rows(status: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def _current_tile(status: Mapping[str, Any], rows: list[Mapping[str, Any]]) -> dict[str, Any]:
-    disabled = _int_value(status.get("disabled_resource_count"))
+    enforcement_active = status.get("enforcement_active") is True
+    disabled = sum(1 for row in rows if row.get("state") == "disabled")
+    observed = sum(
+        1
+        for row in rows
+        if row.get("state") in {"disabled_observed", "exhausted_observed"}
+    )
     exhausted = sum(1 for row in rows if row.get("state") == "exhausted")
     warn = sum(1 for row in rows if row.get("state") == "warn")
     subscription_state = _text(status.get("subscription_state")) or "unknown"
@@ -219,9 +240,18 @@ def _current_tile(status: Mapping[str, Any], rows: list[Mapping[str, Any]]) -> d
             f"Usage in the last 24h: LLM {_int_value(llm.get('used_24h'))}{llm_quota}{llm_remaining}; "
             f"Codex quota {codex_used_24h}; "
             f"fresh + output {codex_effective_24h}; cached input {codex_cached_24h}; "
-            f"features needing attention: {warn + exhausted}; unavailable: {disabled}{codex_suffix}"
+            f"features needing attention: {warn + exhausted + observed}; unavailable: {disabled}; "
+            f"advisory observations: {observed}{codex_suffix}"
         ),
-        "color": "danger" if exhausted or inactive else "warning" if warn or disabled else "success",
+        "color": (
+            "danger"
+            if exhausted or inactive
+            else "warning"
+            if warn or disabled or observed
+            else "success"
+        ),
+        "enforcement_active": enforcement_active,
+        "advisory_observation_count": observed,
         "generated_at": status.get("generated_at"),
     }
 

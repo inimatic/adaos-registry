@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: subscription_status
-version: 0.1.15
+version: 0.1.16
 profiles:
 - adaos.builder.component_project.v1
 components:
@@ -31,8 +31,8 @@ catalog:
   - usage
   - cbs-provider
 publication:
-  stage: alpha
-  visibility: unlisted
+  stage: beta
+  visibility: listed
   channel: stable
 install:
   default: false
