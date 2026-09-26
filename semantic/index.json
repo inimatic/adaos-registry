@@ -51,7 +51,10 @@
     "adaos.binding.definition.v1|binding-definition:media.slideshow.present.redevice|1.0.0": "sha256:f29437e67b25f72387b6298637e180c6b288d30154dd43797f897205e241d67f",
     "adaos.binding.delivery.v1|binding-definition:devices.manage.redevice@sha256:12cfcafa4d8c614c740dc4108ed11fb5d39b3c6f3c1aae59b1dcffc6e0ed35d7|sha256:0ac3f2fa4a9cd308fb78e333ab84ed0cace55b0d728c5cb3dc6d564db1fc643f": "sha256:54d07960e9485c86dd779264c9c87d2265726fa9e2ec4cdb62fdd7163a0fcfdc",
     "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:ec85a334ee453a7b524cd90e037619324dd550fd2ed38fc7f9490d3cba190264": "sha256:b18e0ac4b2f758ca3ef4f842905f340bf4d7bf7d796ddaaeab223a1889384ba0",
-    "adaos.binding.delivery.v1|binding-definition:media.slideshow.present.redevice@sha256:f29437e67b25f72387b6298637e180c6b288d30154dd43797f897205e241d67f|sha256:e1bd222f953636097de969336b88dd71159e0967fbc3b46d8f69ac0ac8c9391e": "sha256:3f196f112ef7f2d45b5d00413819dd0985a8b68be838734816d1dadc3006cbfb"
+    "adaos.binding.delivery.v1|binding-definition:media.slideshow.present.redevice@sha256:f29437e67b25f72387b6298637e180c6b288d30154dd43797f897205e241d67f|sha256:e1bd222f953636097de969336b88dd71159e0967fbc3b46d8f69ac0ac8c9391e": "sha256:3f196f112ef7f2d45b5d00413819dd0985a8b68be838734816d1dadc3006cbfb",
+    "adaos.binding.delivery.v1|binding-definition:voice.conversation.run.adaos@sha256:b1c43acc9b83ee92afb193cffedc3364d34d72d25d95abfbe5e6ca9f63e84bea|sha256:3245cff07be6d57072714e56b026d3fce485cf559e5b9368815fe7e128a1e54c": "sha256:39e2b0cace19721b73df8ba3e5166d84c84e616e25b8b07af05c794c76b919f0",
+    "adaos.binding.definition.v1|binding-definition:voice.conversation.run.adaos|1.0.0": "sha256:b1c43acc9b83ee92afb193cffedc3364d34d72d25d95abfbe5e6ca9f63e84bea",
+    "adaos.capability.contract.v1|capability:voice.conversation.run|1.0.0": "sha256:bb413af827bcbb801ac8fb7640957b04d1f120a5f2da9f32c8d2a99aa97901a0"
   },
   "records": {
     "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1": {
@@ -557,6 +560,33 @@
       "published_by_release_digests": [
         "sha256:f0698425343c58033e0c4a67ffa71796c4fa1350ab37b336b594d3a51f55c066"
       ]
+    },
+    "sha256:39e2b0cace19721b73df8ba3e5166d84c84e616e25b8b07af05c794c76b919f0": {
+      "schema": "adaos.binding.delivery.v1",
+      "identity": "binding-definition:voice.conversation.run.adaos@sha256:b1c43acc9b83ee92afb193cffedc3364d34d72d25d95abfbe5e6ca9f63e84bea",
+      "revision": "sha256:3245cff07be6d57072714e56b026d3fce485cf559e5b9368815fe7e128a1e54c",
+      "path": "semantic/records/sha256/39/39e2b0cace19721b73df8ba3e5166d84c84e616e25b8b07af05c794c76b919f0.json",
+      "published_by_release_digests": [
+        "sha256:35667691bd19bbe6f45b8f2ec74c90b1645efc401fe32b44eb617b88ca7d76a0"
+      ]
+    },
+    "sha256:b1c43acc9b83ee92afb193cffedc3364d34d72d25d95abfbe5e6ca9f63e84bea": {
+      "schema": "adaos.binding.definition.v1",
+      "identity": "binding-definition:voice.conversation.run.adaos",
+      "revision": "1.0.0",
+      "path": "semantic/records/sha256/b1/b1c43acc9b83ee92afb193cffedc3364d34d72d25d95abfbe5e6ca9f63e84bea.json",
+      "published_by_release_digests": [
+        "sha256:35667691bd19bbe6f45b8f2ec74c90b1645efc401fe32b44eb617b88ca7d76a0"
+      ]
+    },
+    "sha256:bb413af827bcbb801ac8fb7640957b04d1f120a5f2da9f32c8d2a99aa97901a0": {
+      "schema": "adaos.capability.contract.v1",
+      "identity": "capability:voice.conversation.run",
+      "revision": "1.0.0",
+      "path": "semantic/records/sha256/bb/bb413af827bcbb801ac8fb7640957b04d1f120a5f2da9f32c8d2a99aa97901a0.json",
+      "published_by_release_digests": [
+        "sha256:35667691bd19bbe6f45b8f2ec74c90b1645efc401fe32b44eb617b88ca7d76a0"
+      ]
     }
   },
   "application_releases": {
@@ -748,7 +778,16 @@
       "semantic_revision_digest": "sha256:005701604bcf3b85f00335e35b8e54b948bb8629bf12249a94c7d1943fd877c4",
       "path": "semantic/applications/slideshow/f0698425343c58033e0c4a67ffa71796c4fa1350ab37b336b594d3a51f55c066.json",
       "projection_digest": "sha256:6f56868f04b2c82c2ae09bc5aa73fb2c59a6a2e98c74ba2a28b24415ac83e987"
+    },
+    "project:voice@sha256:35667691bd19bbe6f45b8f2ec74c90b1645efc401fe32b44eb617b88ca7d76a0": {
+      "project_id": "voice",
+      "version": "0.1.6",
+      "application_ref": "skill:voice_chat_skill",
+      "project_release_digest": "sha256:35667691bd19bbe6f45b8f2ec74c90b1645efc401fe32b44eb617b88ca7d76a0",
+      "semantic_revision_digest": "sha256:0af149b9c8293c459e2703ad05b7b8e6773644bbbd3153c0e1177fed9e4a3a90",
+      "path": "semantic/applications/voice/35667691bd19bbe6f45b8f2ec74c90b1645efc401fe32b44eb617b88ca7d76a0.json",
+      "projection_digest": "sha256:8cb3c5ec968ebf73eda61a4cdfb27842ea60d9847f097e9467a656f1e0483e3a"
     }
   },
-  "index_digest": "sha256:3918857b609c193ab981c26deb1d80a7562e664b336381eb1be6aae28f611d44"
+  "index_digest": "sha256:b1f9834b685e379e20a390c20834c7deb950dac168d530590a0f895b03dedb49"
 }

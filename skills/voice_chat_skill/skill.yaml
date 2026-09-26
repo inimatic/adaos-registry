@@ -1,5 +1,5 @@
 name: voice_chat_skill
-version: 0.6.19
+version: 0.7.5
 description: Voice chat bridge for web_desktop (text in -> materialize replies through
   the node conversation ledger; shared chat history is exposed as a bounded compatibility
   stream, with YJS kept as a compact status projection).
@@ -72,6 +72,7 @@ memory_budget:
   caches:
   - name: voice_chat.state_by_key
     route: skill-local
+    storage: skill_memory
     max_items: 32
     ttl_seconds: 3600
     cleanup_hook: voice_chat_runtime_dispose
@@ -81,6 +82,7 @@ memory_budget:
     cleanup_hook: voice_chat_runtime_dispose
   - name: voice_chat.quarantine_incidents
     route: skill-local
+    storage: skill_memory
     max_items: 16
     cleanup_hook: voice_chat_runtime_dispose
   background_workers:
@@ -91,6 +93,7 @@ lifecycle:
   drain: voice_chat_runtime_drain
   dispose: voice_chat_runtime_dispose
   before_deactivate: voice_chat_runtime_before_deactivate
+  rehydrate: voice_chat_runtime_rehydrate
 conversation:
   dialog_channel:
     id: general
@@ -138,6 +141,8 @@ tools:
         minLength: 1
       _meta:
         type: object
+  output_schema:
+    type: object
 - name: get_snapshot
   description: Publish the bounded voice chat stream snapshot for the selected node/webspace
     and return a compact acknowledgement.
@@ -187,7 +192,16 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
-updated_at: '2026-08-11T09:29:46+00:00'
+- name: voice_chat_runtime_rehydrate
+  description: Provide a verified Application data lifecycle receipt.
+  entry: handlers.main:voice_chat_runtime_rehydrate
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+updated_at: '2026-09-26T04:38:10+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.741+4835.a49f9166
@@ -196,3 +210,12 @@ compatibility:
     min_commit: a49f9166fd42df8b3d371f22dc81239ebb000a10
     min_short_commit: a49f9166
     build_date: '2026-08-11T12:26:21+03:00'
+  legacy_cbs_rebinding:
+    package_digests:
+    - sha256:53310d271a7db31246955d09030c2ddef07619f37dd28dae74613848be3f207f
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  legacy_adoption: core_managed_only
+  databases: []
+  coordination_files: []

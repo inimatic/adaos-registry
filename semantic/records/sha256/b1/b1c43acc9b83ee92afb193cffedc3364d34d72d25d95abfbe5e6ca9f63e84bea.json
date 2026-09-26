@@ -1,0 +1,28 @@
+{
+  "authority_requirements": [],
+  "binding_definition_ref": "binding-definition:voice.conversation.run.adaos",
+  "capability_ref": "capability:voice.conversation.run",
+  "capability_version": "1.0.0",
+  "conformance_obligations": [
+    "capability_conformance"
+  ],
+  "definition_digest": "sha256:b1c43acc9b83ee92afb193cffedc3364d34d72d25d95abfbe5e6ca9f63e84bea",
+  "entry_protocol": "adaos.skill.tools.v1",
+  "environment_constraints": {
+    "profile_classes": [
+      "local"
+    ],
+    "provider_features": [
+      "text_input",
+      "voice_runtime",
+      "bounded_snapshot"
+    ]
+  },
+  "implementation_entrypoint": "voice.conversation.run.adaos",
+  "modes": [
+    "production"
+  ],
+  "schema": "adaos.binding.definition.v1",
+  "state_support": [],
+  "version": "1.0.0"
+}

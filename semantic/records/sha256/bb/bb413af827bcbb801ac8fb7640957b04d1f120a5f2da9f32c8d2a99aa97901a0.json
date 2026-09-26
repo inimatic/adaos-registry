@@ -1,0 +1,63 @@
+{
+  "authority_requirements": [],
+  "capability_ref": "capability:voice.conversation.run",
+  "compatibility": {},
+  "conformance_refs": [
+    "scenario:voice.conversation.run.v1"
+  ],
+  "contract_digest": "sha256:bb413af827bcbb801ac8fb7640957b04d1f120a5f2da9f32c8d2a99aa97901a0",
+  "dependencies": [],
+  "effects": [
+    "processes conversational input and projects bounded session state"
+  ],
+  "invariants": [
+    "conversation scope remains bound to its webspace"
+  ],
+  "operations": [
+    {
+      "errors": [],
+      "input_schema": {
+        "properties": {
+          "_meta": {
+            "type": "object"
+          },
+          "text": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "handle_text",
+      "output_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "operation_id": "get_snapshot",
+      "output_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "operation_id": "healthcheck",
+      "output_schema": {
+        "type": "object"
+      }
+    }
+  ],
+  "schema": "adaos.capability.contract.v1",
+  "state_ports": [],
+  "title": "Run a voice conversation",
+  "version": "1.0.0"
+}

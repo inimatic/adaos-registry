@@ -1111,3 +1111,8 @@ def on_webio_stream_subscription_changed(evt: Any) -> None:
         return
     return
 
+
+@tool("voice_chat_runtime_rehydrate")
+def voice_chat_runtime_rehydrate(**_):
+    return {"ok": True, "status": "rehydrated"}
+
