@@ -1,5 +1,5 @@
 name: cv_descriptor
-version: 0.1.8
+version: 0.1.10
 description: Browser-side CV descriptor pilot. Stores visual-object embeddings, model
   signatures, thumbnails, and text descriptions while the AdaOS client CV runtime
   is being built.
@@ -232,6 +232,7 @@ tools:
 - name: cv_descriptor_runtime_command
   description: Write a desired browser CV runtime command into projected state.
   entry: handlers.main:cv_descriptor_runtime_command
+  side_effects: runtime_write
   input_schema:
     type: object
     properties:
@@ -246,6 +247,7 @@ tools:
 - name: cv_descriptor_record_runtime_event
   description: Record browser CV runtime events, matches, and diagnostics.
   entry: handlers.main:cv_descriptor_record_runtime_event
+  side_effects: runtime_write
   input_schema:
     type: object
     properties:
@@ -375,7 +377,7 @@ data_projections:
   targets:
   - backend: yjs
     path: data/cv_descriptor/runtime
-updated_at: '2026-09-26T01:49:35+00:00'
+updated_at: '2026-09-26T11:01:15+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.950+5767.4e1aaf98b

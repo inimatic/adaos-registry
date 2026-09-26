@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-26T11:00:24+00:00",
+  "updated_at": "2026-09-26T11:10:41+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -258,8 +258,8 @@
       "kind": "skill",
       "id": "cv_descriptor",
       "name": "cv_descriptor",
-      "version": "0.1.8",
-      "updated_at": "2026-09-26T01:49:35+00:00",
+      "version": "0.1.10",
+      "updated_at": "2026-09-26T11:01:15+00:00",
       "path": "skills/cv_descriptor",
       "manifest": "skills/cv_descriptor/skill.yaml",
       "source": {
@@ -267,7 +267,7 @@
         "manifest": "skills/cv_descriptor/skill.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:df6b4d1c2015136672f7be8e043da53dfd6d07705a33222ce2d68c1433a75a4a",
+        "revision": "sha256:d8add1c4a1b5956f61839a40e7a3afb97db08b8a1c7bd930cc42f601ad3b558a",
         "path_scope": [
           "projects/cv_descriptor_lab/"
         ]
@@ -282,18 +282,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "cv_descriptor_lab",
-        "release": "cv_descriptor_lab@0.1.18",
-        "release_digest": "sha256:989dc2ebfa7e128b95945618da6742d779406a28f6c045e728a0d594d482a47e",
-        "package_digest": "sha256:8140e610d8453375c38f36f32101e4e2ee0126694d431efba4cb77fea3e871c5"
+        "release": "cv_descriptor_lab@0.1.19",
+        "release_digest": "sha256:c1ce20e76249515da99dd3e24cc37e5b5fb4592496fc1b481319e09de7788396",
+        "package_digest": "sha256:a01416e969b6c75797f7b744f3362499324a4dd07fc4f3700c8feb3f7a6144fc"
       },
       "tools_count": 11,
       "channels": {
         "stable": {
-          "release": "cv_descriptor_lab@0.1.18",
-          "release_digest": "sha256:989dc2ebfa7e128b95945618da6742d779406a28f6c045e728a0d594d482a47e",
-          "source_revision": "sha256:df6b4d1c2015136672f7be8e043da53dfd6d07705a33222ce2d68c1433a75a4a",
-          "package_digest": "sha256:8140e610d8453375c38f36f32101e4e2ee0126694d431efba4cb77fea3e871c5",
-          "version": "0.1.8"
+          "release": "cv_descriptor_lab@0.1.19",
+          "release_digest": "sha256:c1ce20e76249515da99dd3e24cc37e5b5fb4592496fc1b481319e09de7788396",
+          "source_revision": "sha256:d8add1c4a1b5956f61839a40e7a3afb97db08b8a1c7bd930cc42f601ad3b558a",
+          "package_digest": "sha256:a01416e969b6c75797f7b744f3362499324a4dd07fc4f3700c8feb3f7a6144fc",
+          "version": "0.1.10"
         }
       }
     },
@@ -3103,8 +3103,8 @@
       "kind": "project",
       "id": "cv_descriptor_lab",
       "name": "cv_descriptor_lab",
-      "version": "0.1.18",
-      "updated_at": "2026-09-26T02:05:41+00:00",
+      "version": "0.1.19",
+      "updated_at": "2026-09-26T11:10:41+00:00",
       "path": "projects/cv_descriptor_lab",
       "manifest": "projects/cv_descriptor_lab/project.yaml",
       "source": {
@@ -3166,18 +3166,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "cv_descriptor_lab",
-        "release": "cv_descriptor_lab@0.1.18",
-        "release_digest": "sha256:989dc2ebfa7e128b95945618da6742d779406a28f6c045e728a0d594d482a47e",
+        "release": "cv_descriptor_lab@0.1.19",
+        "release_digest": "sha256:c1ce20e76249515da99dd3e24cc37e5b5fb4592496fc1b481319e09de7788396",
         "primary_component": "skill:cv_descriptor",
-        "package_digest": "sha256:8140e610d8453375c38f36f32101e4e2ee0126694d431efba4cb77fea3e871c5"
+        "package_digest": "sha256:a01416e969b6c75797f7b744f3362499324a4dd07fc4f3700c8feb3f7a6144fc"
       },
       "channels": {
         "stable": {
-          "release": "cv_descriptor_lab@0.1.18",
-          "release_digest": "sha256:989dc2ebfa7e128b95945618da6742d779406a28f6c045e728a0d594d482a47e",
-          "source_revision": "sha256:df6b4d1c2015136672f7be8e043da53dfd6d07705a33222ce2d68c1433a75a4a",
-          "package_digest": "sha256:8140e610d8453375c38f36f32101e4e2ee0126694d431efba4cb77fea3e871c5",
-          "version": "0.1.18"
+          "release": "cv_descriptor_lab@0.1.19",
+          "release_digest": "sha256:c1ce20e76249515da99dd3e24cc37e5b5fb4592496fc1b481319e09de7788396",
+          "source_revision": "sha256:d8add1c4a1b5956f61839a40e7a3afb97db08b8a1c7bd930cc42f601ad3b558a",
+          "package_digest": "sha256:a01416e969b6c75797f7b744f3362499324a4dd07fc4f3700c8feb3f7a6144fc",
+          "version": "0.1.19"
         }
       }
     },
