@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: adaos_drive
-version: 0.1.17
+version: 0.1.18
 profiles:
 - adaos.drive.v1
 components:
@@ -43,7 +43,7 @@ catalog:
   - file-manager
   - local-folders
 publication:
-  stage: alpha
+  stage: beta
   visibility: listed
   channel: stable
 install:
@@ -62,6 +62,8 @@ install:
 compatibility:
   required_entrypoints:
   - drive
+  required_contracts:
+  - capability:workspace.files.manage@^1.0.0
   validation_profiles:
   - drive.local
 lifecycle:

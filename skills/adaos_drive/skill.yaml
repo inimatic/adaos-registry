@@ -1,5 +1,5 @@
 name: adaos_drive
-version: 0.1.15
+version: 0.1.16
 description: Two-panel browser file manager for explicitly connected local folders.
 capabilities:
 - workspace.read
@@ -707,7 +707,7 @@ nlu:
     - show files
     slot_schemas: {}
     entities: []
-updated_at: '2026-09-24T01:43:14+00:00'
+updated_at: '2026-09-26T01:49:23+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.852+5172.db034608

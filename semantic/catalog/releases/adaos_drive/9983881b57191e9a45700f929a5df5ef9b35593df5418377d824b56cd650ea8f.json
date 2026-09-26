@@ -1,0 +1,343 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "adaos_drive",
+    "legacy_project_id": "adaos_drive",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "adaos_drive",
+    "display": {
+      "title": "AdaOS Drive",
+      "summary": "Two-panel browser file manager for explicitly connected local folders."
+    },
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "main",
+        "presentation_ref": "scenario:adaos_drive"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 2,
+    "created_at": "2026-09-23T11:19:21+00:00",
+    "updated_at": "2026-09-26T01:53:31+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "adaos_drive",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "adaos_drive",
+    "version": "0.1.18",
+    "release_digest": "sha256:9983881b57191e9a45700f929a5df5ef9b35593df5418377d824b56cd650ea8f",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "adaos_drive",
+      "version": "0.1.18",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:a83c19ade32c08fc7e8c09d39cd610843c5e94e39131407fd5d72d4fba6368a4",
+        "path_scope": [
+          "projects/adaos_drive/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "adaos_drive",
+          "version": "0.1.11",
+          "digest": "sha256:2aead07d6b8591cb25afa9a188f36392e0e6c6be212a1fe860e195bb4dd16cdf",
+          "manifest_digest": "sha256:65322c80bf72051046ed90ebf823a945bbf4c52ab09f8498190ad1fbd82921b8",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:a83c19ade32c08fc7e8c09d39cd610843c5e94e39131407fd5d72d4fba6368a4",
+            "path_scope": [
+              "scenarios/adaos_drive/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/adaos_drive",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "adaos_drive",
+          "version": "0.1.16",
+          "digest": "sha256:89fbf9a5d27f4c01805144b0eb4dd6775b7a31aea7f9f4bb45e6acdf71133fe1",
+          "manifest_digest": "sha256:8292fe7b13e44e4780b96a142a2a54c03aa0db53ace164ddb527a0b5fe2ce93a",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:a83c19ade32c08fc7e8c09d39cd610843c5e94e39131407fd5d72d4fba6368a4",
+            "path_scope": [
+              "skills/adaos_drive/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/adaos_drive",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:a83c19ade32c08fc7e8c09d39cd610843c5e94e39131407fd5d72d4fba6368a4",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:83197e75f88b41d226fa86e644159f3bc58b114a1d75f225716190c467d54d66"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:326080ac7f0e39ecf4f4712b7e62de6a26b3e9648b87347cf20c55093363e61d",
+        "profiles": [
+          "adaos.drive.v1"
+        ],
+        "members": [
+          {
+            "ref": "scenario:adaos_drive",
+            "package_digest": "sha256:2aead07d6b8591cb25afa9a188f36392e0e6c6be212a1fe860e195bb4dd16cdf",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "skill:adaos_drive",
+            "package_digest": "sha256:89fbf9a5d27f4c01805144b0eb4dd6775b7a31aea7f9f4bb45e6acdf71133fe1",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "drive",
+            "presentation": "scenario:adaos_drive",
+            "default": true,
+            "bindings": {
+              "surface": "files"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "drive"
+          ],
+          "required_contracts": [
+            "capability:workspace.files.manage@^1.0.0"
+          ],
+          "validation_profiles": [
+            "drive.local"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "workspace.read",
+              "purpose": "Browse connected local folders and inspect bounded file metadata and previews.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Persist panel state and perform explicitly requested file operations in connected folders.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "local_file_content",
+              "local_file_metadata"
+            ],
+            "sent_off_device": [],
+            "linked_to_user": [],
+            "tracking": false,
+            "retention": "File content remains in user-selected folders; bounded navigation state is retained in local skill memory."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [
+              "local_file_metadata",
+              "local_file_content"
+            ],
+            "linked_to_user": false,
+            "sent_off_device": false,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "AdaOS Drive",
+        "description": "Two-panel browser file manager for explicitly connected local folders.",
+        "categories": [
+          "files",
+          "productivity"
+        ],
+        "tags": [
+          "drive",
+          "file-manager",
+          "local-folders"
+        ],
+        "icon": "folder-open-outline",
+        "title_i18n": {
+          "en": "AdaOS Drive",
+          "ru": "Диск AdaOS"
+        },
+        "description_i18n": {
+          "en": "Two-panel browser file manager for explicitly connected local folders.",
+          "ru": "Двухпанельный файловый менеджер браузера для явно подключённых локальных папок."
+        }
+      },
+      "release_digest": "sha256:9983881b57191e9a45700f929a5df5ef9b35593df5418377d824b56cd650ea8f"
+    },
+    "accepted_candidate_id": "adaos_drive-0-1-18-b56cd650ea8f",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.project.preflight",
+        "tests": "AdaOS Drive skill, public-link, access and CBS provider tests passed",
+        "cbs": "exact native admission or explicit compatibility classification",
+        "checkpoint_source_revision": "eba576e907b970edb4d2f8ef84e241f6cd7ae4be",
+        "checkpoint_component_ref": "skill:adaos_drive"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:9983881b57191e9a45700f929a5df5ef9b35593df5418377d824b56cd650ea8f"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "workspace.read",
+          "purpose": "Browse connected local folders and inspect bounded file metadata and previews.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Persist panel state and perform explicitly requested file operations in connected folders.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "local_file_content",
+          "local_file_metadata"
+        ],
+        "sent_off_device": [],
+        "linked_to_user": [],
+        "tracking": false,
+        "retention": "File content remains in user-selected folders; bounded navigation state is retained in local skill memory."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [
+          "local_file_metadata",
+          "local_file_content"
+        ],
+        "linked_to_user": false,
+        "sent_off_device": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:74ebf6e7fb0215f9c70e422118e367f046cfb3c1b52e741bd298e2c0dd68373b",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "adaos_drive",
+      "release_digest": "sha256:9983881b57191e9a45700f929a5df5ef9b35593df5418377d824b56cd650ea8f",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Browse connected local folders and inspect bounded file metadata and previews.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Persist panel state and perform explicitly requested file operations in connected folders.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:4e255260b9476ae64615d25d1a4dea1363d5a2d17b06dcc966ef933ea190687b"
+  },
+  "channels": {
+    "stable": "sha256:9983881b57191e9a45700f929a5df5ef9b35593df5418377d824b56cd650ea8f"
+  },
+  "semantic": {
+    "projection_digest": "sha256:bb0b54bb9b076b83dc3bb8660288905f2df93aeb29166e2bec37e58cb0556bed",
+    "path": "semantic/applications/adaos_drive/9983881b57191e9a45700f929a5df5ef9b35593df5418377d824b56cd650ea8f.json"
+  },
+  "projection_digest": "sha256:f4fb8866066cf6ac749376493cb4b0f4d1fc5aeb460f2eb433d26ba40e144101"
+}
