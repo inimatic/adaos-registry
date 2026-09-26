@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: media_center
-version: 0.6.107
+version: 0.6.108
 profiles:
 - adaos.media_center.v1
 - adaos.media_center.tv.v1
@@ -131,3 +131,33 @@ lifecycle:
     source_artifacts: retain
 created_at: '2026-08-19T00:00:00+00:00'
 created_by: AdaOS Media Center
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.read
+    purpose: Inspect configured media roots, catalog metadata, and playback state.
+    approval_policy: grant_on_install
+  - id: workspace.write
+    purpose: Maintain the local media catalog, playlists, and playback state.
+    approval_policy: owner_only
+    sensitive: true
+  - id: devices.control
+    purpose: Control explicitly selected household playback endpoints.
+    approval_policy: owner_only
+    sensitive: true
+  - id: network.egress
+    purpose: Coordinate explicitly requested deployment and topology operations with configured subnet services.
+    approval_policy: owner_only
+    sensitive: true
+  optional: []
+  secrets: []
+  external_providers: []
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected: [media_metadata, playback_state, playlist]
+    linked_to_user: [playback_state, playlist]
+    retention: Media remains at its configured source; local catalog and preferences are retained.
+    sent_off_device: []
+    tracking: false
