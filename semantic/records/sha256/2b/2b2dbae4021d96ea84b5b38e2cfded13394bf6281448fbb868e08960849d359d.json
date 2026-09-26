@@ -1,0 +1,203 @@
+{
+  "authority_requirements": [
+    "workspace.write",
+    "applications.publish"
+  ],
+  "capability_ref": "capability:applications.build",
+  "compatibility": {},
+  "conformance_refs": [
+    "scenario:applications.build.v1"
+  ],
+  "contract_digest": "sha256:2b2dbae4021d96ea84b5b38e2cfded13394bf6281448fbb868e08960849d359d",
+  "dependencies": [],
+  "effects": [
+    "creates development artifacts and governed application candidates"
+  ],
+  "invariants": [
+    "candidates remain immutable between review and activation",
+    "publication requires governed trial evidence"
+  ],
+  "operations": [
+    {
+      "errors": [],
+      "input_schema": {
+        "additionalProperties": true,
+        "properties": {
+          "conversation_context": {
+            "additionalProperties": true,
+            "description": "When supplied for prototype generation, this must be a canonical adaos.context.packet.v1 packet. Routing metadata belongs in _meta.",
+            "properties": {
+              "schema": {
+                "const": "adaos.context.packet.v1",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "text": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "start",
+      "output_schema": {
+        "required": [
+          "ok",
+          "message",
+          "dialog"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "additionalProperties": true,
+        "properties": {
+          "auto_apply": {
+            "type": "boolean"
+          },
+          "conversation_context": {
+            "additionalProperties": true,
+            "description": "When supplied for prototype generation, this must be a canonical adaos.context.packet.v1 packet. Routing metadata belongs in _meta.",
+            "properties": {
+              "schema": {
+                "const": "adaos.context.packet.v1",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "expected_ui_revision": {
+            "description": "Current UI revision required for a safe failed-result replay.",
+            "type": "string"
+          },
+          "retry_job_id": {
+            "description": "Replay one failed LLM result for the exact same request without another model call.",
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "chat",
+      "output_schema": {
+        "required": [
+          "ok",
+          "message",
+          "dialog"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "additionalProperties": true,
+        "properties": {
+          "application_id": {
+            "type": "string"
+          },
+          "idea": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "idea"
+        ],
+        "type": "object"
+      },
+      "operation_id": "create_application_draft",
+      "output_schema": {
+        "required": [
+          "ok",
+          "application_id",
+          "application_status"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [],
+      "input_schema": {
+        "additionalProperties": true,
+        "properties": {
+          "idempotency_key": {
+            "type": "string"
+          },
+          "permission_decision": {
+            "additionalProperties": true,
+            "description": "Explicit audited owner decision for permissions introduced by the Trial activation.",
+            "properties": {
+              "actor": {
+                "type": "string"
+              },
+              "actor_type": {
+                "const": "user",
+                "type": "string"
+              },
+              "approval_id": {
+                "type": "string"
+              },
+              "approved": {
+                "const": true,
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "approved",
+              "actor",
+              "actor_type",
+              "approval_id"
+            ],
+            "type": "object"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "verification_evidence": {
+            "additionalProperties": true,
+            "description": "Optional additive evidence. It cannot replace the accepted source commit, Trial scope, or authoritative permission contract.",
+            "type": "object"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotency_key"
+        ],
+        "type": "object"
+      },
+      "operation_id": "create_application_trial",
+      "output_schema": {
+        "required": [
+          "ok",
+          "status",
+          "candidate_id",
+          "operation"
+        ],
+        "type": "object"
+      }
+    }
+  ],
+  "schema": "adaos.capability.contract.v1",
+  "state_ports": [],
+  "title": "Build and qualify AdaOS applications",
+  "version": "1.0.0"
+}

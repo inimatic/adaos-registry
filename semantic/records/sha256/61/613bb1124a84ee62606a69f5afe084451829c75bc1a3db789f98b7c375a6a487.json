@@ -1,0 +1,32 @@
+{
+  "authority_requirements": [
+    "workspace.write",
+    "applications.publish"
+  ],
+  "binding_definition_ref": "binding-definition:applications.build.adaos-builder",
+  "capability_ref": "capability:applications.build",
+  "capability_version": "1.0.0",
+  "conformance_obligations": [
+    "capability_conformance",
+    "evidence_freshness"
+  ],
+  "definition_digest": "sha256:613bb1124a84ee62606a69f5afe084451829c75bc1a3db789f98b7c375a6a487",
+  "entry_protocol": "adaos.skill.tools.v1",
+  "environment_constraints": {
+    "profile_classes": [
+      "local"
+    ],
+    "provider_features": [
+      "chat_orchestration",
+      "governed_trial",
+      "registry_publication"
+    ]
+  },
+  "implementation_entrypoint": "applications.build.adaos-builder",
+  "modes": [
+    "production"
+  ],
+  "schema": "adaos.binding.definition.v1",
+  "state_support": [],
+  "version": "1.0.0"
+}

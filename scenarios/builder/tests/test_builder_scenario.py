@@ -103,6 +103,47 @@ def test_ui_preserves_accepted_two_area_surface_and_operational_modals() -> None
     assert page["meta"]["builder"]["binding_mode"] == "skill"
 
 
+def test_automation_diagnostics_use_managed_search_instead_of_local_paths() -> None:
+    webui = _load("webui.json")
+    widgets = _by_id(webui)
+    search = widgets["automation-diagnostics-search"]
+    results = widgets["automation-diagnostics-results"]
+    next_page = widgets["automation-diagnostics-next"]
+
+    action = search["actions"][0]
+    assert action["target"] == (
+        "builder_sdk_control_skill.get_automation_diagnostics"
+    )
+    assert action["resultStateKey"] == "automationDiagnostics"
+    assert {field["id"] for field in search["inputs"]["fields"]} == {
+        "stream",
+        "query",
+        "page_size",
+    }
+    assert results["dataSource"]["value"] == "$state.automationDiagnostics.items"
+    assert next_page["actions"][0]["params"]["cursor"] == (
+        "$state.automationDiagnostics.next_cursor"
+    )
+
+    automation_fields = {
+        field["key"]
+        for node in _walk(webui)
+        if node.get("id") in {"automation-state", "design-result-automation"}
+        for field in node.get("inputs", {}).get("fields", [])
+    }
+    assert {"events_path", "stderr_path", "result_path"}.isdisjoint(
+        automation_fields
+    )
+
+    for locale in ("en", "ru"):
+        strings = _load(f"assets/i18n/{locale}.json")
+        assert {
+            "builder.diagnostics.title",
+            "builder.diagnostics.search",
+            "builder.diagnostics.next",
+        } <= set(strings)
+
+
 def test_prototype_approval_collects_evidence_and_uses_canonical_acceptance() -> None:
     webui = _load("webui.json")
     widgets = _by_id(webui)
@@ -568,12 +609,16 @@ def test_all_localized_payloads_are_valid_utf8_without_replacement_characters() 
 
 
 def test_open_preview_uses_selected_application_not_unselected_global_binding() -> None:
-    for name in ("webui.json", "scenario.json"):
-        action = next(item for item in _walk(_load(name)) if item.get("target") == "builder_sdk_control_skill.open_preview")
-        assert action["target"] == "builder_sdk_control_skill.open_preview"
-        assert action["params"]["object_type"] == "$state.selectedProjectKind"
-        assert action["params"]["object_id"] == "$state.selectedProjectId"
-        assert action["openResultUrl"] is True
+    action = next(
+        item
+        for item in _walk(_load("webui.json"))
+        if item.get("target") == "builder_sdk_control_skill.open_preview"
+    )
+    assert action["target"] == "builder_sdk_control_skill.open_preview"
+    assert action["params"]["object_type"] == "$state.selectedProjectKind"
+    assert action["params"]["object_id"] == "$state.selectedProjectId"
+    assert action["openResultUrl"] is True
+    assert _load("scenario.json")["ui"]["manifest"] == "webui.json"
 
 
 def test_creation_retains_template_flow_and_forwards_application_name() -> None:

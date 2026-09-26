@@ -1,5 +1,5 @@
 name: prompt_engineer_skill
-version: 0.6.8
+version: 0.7.1
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -16,7 +16,7 @@ data_routes:
 - surface: scenario:prompt_engineer.project_selector
   route: tool/details
   owner: skill:prompt_engineer_skill
-  path: prompt_list_dev_objects
+  tool: prompt_list_dev_objects
   first_paint: project selector calls the bounded tool when opened
   recovery: tool call can be repeated; no project list is stored in YJS
   update_source:
@@ -34,7 +34,7 @@ data_routes:
 - surface: scenario:prompt_engineer.project_tree
   route: tool/details
   owner: skill:prompt_engineer_skill
-  path: prompt_list_project_objects
+  tool: prompt_list_project_objects
   first_paint: project tree is loaded on explicit project selection
   recovery: tool call can be repeated for the selected project
   update_source:
@@ -51,7 +51,7 @@ data_routes:
 - surface: scenario:prompt_engineer.file_list
   route: tool/details
   owner: skill:prompt_engineer_skill
-  path: prompt_list_project_files
+  tool: prompt_list_project_files
   first_paint: file list is loaded for the selected project via a bounded tool call
   recovery: tool call can be repeated; file list is not stored in YJS
   update_source:
@@ -68,7 +68,7 @@ data_routes:
 - surface: scenario:prompt_engineer.file_content
   route: tool/details
   owner: skill:prompt_engineer_skill
-  path: prompt_read_project_file
+  tool: prompt_read_project_file
   first_paint: code viewer loads only the active file
   recovery: file content is re-read on demand and capped by max_bytes
   update_source:
@@ -85,7 +85,7 @@ data_routes:
 - surface: scenario:prompt_engineer.git_log
   route: tool/details
   owner: skill:prompt_engineer_skill
-  path: prompt_get_git_log
+  tool: prompt_get_git_log
   first_paint: git log is loaded from bounded project history on demand
   recovery: tool call can be repeated; persisted log is capped by item count
   update_source:
@@ -854,7 +854,7 @@ tools:
     type: object
     properties: {}
 exports: {}
-updated_at: '2026-07-18T11:08:15+00:00'
+updated_at: '2026-09-26T03:01:48+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.0+3734.11eaf26a
@@ -863,4 +863,8 @@ compatibility:
     min_commit: 11eaf26a57917d94e97b3850d667f1c98d7364d8
     min_short_commit: 11eaf26a
     build_date: '2026-07-18T14:06:08+03:00'
-
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases: []
+  coordination_files: []

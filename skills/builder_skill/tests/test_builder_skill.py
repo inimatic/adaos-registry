@@ -272,6 +272,7 @@ def test_manifest_declares_builder_dialog_agent() -> None:
         "get_application_development_state",
         "update_application_metadata",
         "materialize_application",
+        "accept_application_automation_checkpoint",
         "create_application_trial",
         "decide_application_trial",
         "publish_application_trial",
@@ -280,7 +281,7 @@ def test_manifest_declares_builder_dialog_agent() -> None:
         "update_current_scenario",
         "get_preview_state",
     }.issubset(tools)
-    assert tools_by_name["chat"]["timeout_seconds"] >= 120
+    assert tools_by_name["chat"]["timeout_seconds"] >= 600
     assert tools_by_name["update_current_scenario"]["timeout_seconds"] >= 120
     for tool_name in ("start", "chat", "update_current_scenario"):
         context_schema = tools_by_name[tool_name]["input_schema"]["properties"][
@@ -418,6 +419,42 @@ def test_application_development_context_uses_primary_scenario_source(
     assert calls == [("scenario", "applications")]
 
 
+def test_detailed_change_request_is_bounded_after_issue_decomposition(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    transitions: list[dict] = []
+    detailed = "\n".join(
+        f"Requirement {index}: provide a professional responsive section with clear state and actions."
+        for index in range(1, 81)
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *_args, **_kwargs: {"change_set": None},
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "transition",
+        lambda *_args, **kwargs: transitions.append(kwargs["metadata"])
+        or {"ok": True, "workflow": {"change_set": {"status": "planned"}}},
+    )
+
+    result = skill._register_builder_change_set(
+        session={"id": "scenario.desktop", "scenario_id": "desktop"},
+        patch={"id": "patch-desktop"},
+        request_text=detailed,
+        _meta={"message_id": "message-detailed"},
+    )
+
+    assert result["ok"] is True
+    assert len(transitions[0]["request"]) <= 4000
+    assert "Detailed source:" in transitions[0]["request"]
+    assert transitions[0]["source_message_ids"] == ["message-detailed"]
+    assert len(transitions[0]["issues"]) == 20
+    assert transitions[0]["issues"][0]["title"].startswith("Requirement 1:")
+
+
 def test_builder_llm_request_carries_bounded_development_context() -> None:
     skill = _load_module()
     session = {
@@ -499,6 +536,292 @@ def test_builder_llm_request_carries_bounded_development_context() -> None:
     )
     assert "selected_ui_capabilities" not in request["dynamic_request"]
     assert "untrusted evidence" in request["system_prompt"]
+
+
+def test_builder_development_context_bounds_large_change_evidence() -> None:
+    skill = _load_module()
+    packet = {
+        "project": {"object_type": "scenario", "object_id": "desktop"},
+        "change": {
+            "change_id": "CH-large",
+            "intent": "Initial project intent " + ("x" * 20_000),
+            "issues": [
+                {
+                    "id": f"issue-{index}",
+                    "status": "open",
+                    "title": f"Prior issue {index} " + ("y" * 2_000),
+                }
+                for index in range(20)
+            ],
+        },
+        "facets": {
+            f"facet-{index}": {"status": "present", "schema": "test.v1"}
+            for index in range(30)
+        },
+        "allowed_paths": ["/" + ("z" * 500) for _ in range(50)],
+        "digest": "sha256:" + ("a" * 64),
+    }
+
+    context = skill._builder_llm_development_context(
+        packet,
+        current_instruction="Correct only the current visibility guard.",
+    )
+
+    encoded = json.dumps(context, ensure_ascii=False)
+    assert len(encoded.encode("utf-8")) < 5_000
+    assert len(context["change"]["intent"]) <= 400
+    assert len(context["change"]["issue_refs"]) == 6
+    assert all(
+        len(item.get("title", "")) <= 160
+        for item in context["change"]["issue_refs"]
+    )
+    assert len(context["facet_index"]) == 12
+    assert len(context["allowed_paths"]) == 12
+
+
+def test_targeted_widget_correction_uses_scoped_model_context(monkeypatch) -> None:
+    skill = _load_module()
+    large_unrelated_copy = "UNRELATED-CONTENT-" + ("x" * 80_000)
+    current = {
+        "schema": "adaos.webui.v1",
+        "generated_by": "builder_skill",
+        "locale_dictionaries": {
+            "en": {"target.title": "Target"},
+            "ru": {"target.title": "Target RU"},
+        },
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "desktop",
+                        "title": "Desktop",
+                        "initialState": {"activeTab": "home"},
+                        "layout": {
+                            **_layout("main"),
+                            "variants": [
+                                {
+                                    "id": "development-variant",
+                                    "when": "$state.activeTab === 'dev'",
+                                    "pattern": "collection-detail",
+                                    "regions": [
+                                        {
+                                            "id": "development-detail",
+                                            "role": "detail",
+                                        }
+                                    ],
+                                }
+                            ],
+                        },
+                        "widgets": [
+                            {
+                                "id": "primary-nav",
+                                "type": "navigation.tabs",
+                                "area": "main",
+                                "inputs": {"buttons": [{"id": "dev", "label": "Development"}]},
+                                "actions": [
+                                    {
+                                        "on": "click:dev",
+                                        "type": "updateState",
+                                        "params": {"activeTab": "dev"},
+                                    }
+                                ],
+                            },
+                            {
+                                "id": "development-details",
+                                "type": "item.details",
+                                "area": "development-detail",
+                                "visibleIf": "$state.activeTab === 'development'",
+                                "inputs": {
+                                    "title": "Target",
+                                    "title_i18n": {
+                                        "key": "target.title",
+                                        "translations": {"en": "Target", "ru": "Target RU"},
+                                    },
+                                    "fields": [],
+                                },
+                            },
+                            {
+                                "id": "unrelated-large-widget",
+                                "type": "item.details",
+                                "area": "main",
+                                "inputs": {
+                                    "title": "Unrelated",
+                                    "description": large_unrelated_copy,
+                                    "fields": [],
+                                },
+                            },
+                        ],
+                    }
+                },
+                "modals": {},
+            }
+        },
+    }
+    monkeypatch.setattr(
+        skill,
+        "_current_webui_payload",
+        lambda *_args, **_kwargs: copy.deepcopy(current),
+    )
+    monkeypatch.setattr(
+        skill,
+        "_read_scenario_locale_dictionaries",
+        lambda *_args, **_kwargs: copy.deepcopy(current["locale_dictionaries"]),
+    )
+    request = skill._builder_llm_webui_transform_request(
+        session={
+            "id": "session",
+            "scenario_id": "desktop",
+            "patches": [
+                {
+                    "operation": "prior",
+                    "summary": "old summary " + ("s" * 10_000),
+                    "status": "accepted",
+                    "revision": "001",
+                }
+            ],
+        },
+        instruction=(
+            "Correct only `development-details`: replace only activeTab value "
+            "`development` with `dev`. Preserve every other value exactly."
+        ),
+        preview_state={},
+        _meta={
+            "builder_context_packet": {
+                "project": {"object_type": "scenario", "object_id": "desktop"},
+                "change": {"change_id": "CH-target"},
+                "digest": "sha256:" + ("b" * 64),
+            }
+        },
+    )
+
+    dynamic = json.loads(request["user_prompt"])["builder_request"]
+    scoped = dynamic["current_webui_context"]
+    assert "current_webui_json" not in dynamic
+    assert scoped["target_widget_ids"] == ["development-details"]
+    assert scoped["dependency_widget_ids"] == ["primary-nav"]
+    assert {
+        item["id"]
+        for item in scoped["document_fragment"]["ui"]["application"]["desktop"][
+            "pageSchema"
+        ]["widgets"]
+    } == {"development-details", "primary-nav"}
+    assert scoped["omitted_widget_inventory"] == [
+        {
+            "id": "unrelated-large-widget",
+            "type": "item.details",
+            "area": "main",
+        }
+    ]
+    assert large_unrelated_copy not in request["user_prompt"]
+    assert request["base_request"]["current_webui_json"] == current
+    assert "prototype_brief_context" not in dynamic
+    assert "development_context" not in dynamic
+    assert dynamic["development_context_ref"]["full_context_digest"].endswith("b" * 64)
+    assert dynamic["recent_patch_history"]["authority"].startswith("reference_only")
+    assert len(dynamic["recent_patch_history"]["items"][0]["summary"]) <= 500
+    assert dynamic["active_turn"]["instruction"].startswith(
+        "Correct only `development-details`"
+    )
+    messages, purposes = skill._builder_llm_messages(request, request["user_prompt"])
+    assert purposes[-1] == "active_turn_recap"
+    assert json.loads(messages[-1]["content"])["active_turn"] == dynamic["active_turn"]
+    assert (
+        json.loads(request["stable_user_prompt"])["stable_builder_context"][
+            "scenario_locale_output"
+        ]["required"]
+        is False
+    )
+    assert {
+        item["id"]
+        for item in json.loads(request["capability_user_prompt"])[
+            "selected_ui_capabilities"
+        ]["items"]
+    } == {"item.details"}
+    assert len(request["user_prompt"].encode("utf-8")) < 15_000
+
+
+def test_builder_keeps_current_layout_contract_in_capability_context() -> None:
+    skill = _load_module()
+    current = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "desktop",
+                        "layout": _layout("main", pattern="dashboard"),
+                        "widgets": [
+                            {
+                                "id": "actions",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "buttons": [{"id": "refresh", "label": "Refresh"}]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:refresh",
+                                        "type": "updateState",
+                                        "params": {"refreshing": True},
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    selection = {
+        "status": "present",
+        "root_item_ids": ["ui.list"],
+        "items": [skill.developer_ui.get("ui.list")],
+    }
+
+    result = skill._include_current_layout_capabilities(selection, current)
+
+    assert result["root_item_ids"] == ["ui.list", "layout.dashboard"]
+    dashboard = next(
+        item for item in result["items"] if item.get("id") == "layout.dashboard"
+    )
+    assert "separate layout.regions" in dashboard["manifest"]["composition"]
+
+
+def test_structural_replacement_uses_full_model_context() -> None:
+    skill = _load_module()
+    current = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "desktop",
+                        "layout": {
+                            **_layout("system-health", pattern="dashboard"),
+                            "variants": [],
+                        },
+                        "widgets": [
+                            {
+                                "id": "system-health-summary",
+                                "type": "item.details",
+                                "area": "system-health",
+                                "inputs": {"fields": []},
+                            }
+                        ],
+                    }
+                },
+                "modals": {},
+            }
+        },
+    }
+
+    scoped = skill._targeted_webui_patch_context(
+        "Correct only System. Replace `system-health-summary` with four compact "
+        "status informers in four distinct dashboard regions.",
+        current,
+    )
+
+    assert scoped is None
 
 
 def test_chat_forwards_router_conversation_context_to_prototype(monkeypatch) -> None:
@@ -1094,6 +1417,60 @@ def test_builder_explicit_scenario_routing_is_structured_and_fail_closed() -> No
             "flowboard",
             {"conversation_topic_id": "prompt-project:scenario:recipes"},
         )
+
+
+def test_chat_fails_closed_when_prompt_topic_cannot_select_target(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    stale_session = {
+        "id": "session-builder",
+        "scenario_id": "builder",
+        "artifact_kind": "scenario",
+    }
+    stale_binding = {
+        "dev_webspace_id": "desktop-dev",
+        "runtime_scenario_id": "builder",
+    }
+    monkeypatch.setattr(
+        skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        skill, "_target_session", lambda _ws: (stale_session, stale_binding)
+    )
+    monkeypatch.setattr(
+        skill,
+        "_builder_topic_ref",
+        lambda *_args, **_kwargs: {
+            "thread_id": "prompt-project:scenario:gmail_mail_client"
+        },
+    )
+    monkeypatch.setattr(skill, "_dialog_state", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        skill,
+        "_project_external_user_turn",
+        lambda *_args, **_kwargs: pytest.fail("mismatched turn was persisted"),
+    )
+    monkeypatch.setattr(
+        skill,
+        "update_current_scenario",
+        lambda **_kwargs: pytest.fail("mismatched turn reached the model path"),
+    )
+
+    result = skill.chat(
+        "Build the Gmail client.",
+        webspace_id="desktop",
+        _meta={
+            "conversation_topic_id": (
+                "prompt-project:scenario:gmail_mail_client"
+            )
+        },
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "builder_target_mismatch"
+    assert result["requested_scenario_id"] == "gmail_mail_client"
+    assert result["resolved_scenario_ids"] == ["builder"]
 
 
 def test_save_session_batches_sessions_and_current_pointer(monkeypatch) -> None:
@@ -2377,15 +2754,21 @@ def test_builder_configures_fast_complete_json_for_gpt5(monkeypatch) -> None:
     skill = _load_module()
 
     monkeypatch.delenv("ADAOS_BUILDER_LLM_MAX_TOKENS", raising=False)
+    monkeypatch.delenv("ADAOS_BUILDER_LLM_TIMEOUT_S", raising=False)
+    assert skill._builder_llm_timeout_s() == 600.0
     assert skill._builder_llm_reasoning_for_model("gpt-5") == {"effort": "low"}
-    assert skill._builder_llm_max_tokens_for_model("gpt-5") == 5000
+    assert skill._builder_llm_max_tokens_for_model("gpt-5") == 64000
     assert (
         skill._builder_llm_max_tokens_for_model("gpt-5", output_mode="semantic_v2")
         == 128000
     )
     assert skill._builder_llm_reasoning_for_model("gpt-5-pro") is None
     assert skill._builder_llm_reasoning_for_model("gpt-4.1") is None
-    assert skill._builder_llm_max_tokens_for_model("gpt-4.1") == 5000
+    assert skill._builder_llm_max_tokens_for_model("gpt-4.1") == 32000
+    assert skill._builder_llm_max_tokens_for_model("root-default") == 64000
+    assert skill._builder_llm_max_tokens_for_model("gpt-4.1", output_mode="semantic_v2") == 32000
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_TIMEOUT_S", "1801")
+    assert skill._builder_llm_timeout_s() == 1800.0
 
 
 def test_builder_llm_prompt_profile_tracks_reasoning_override() -> None:
@@ -2542,7 +2925,7 @@ def test_empty_canvas_does_not_treat_collection_binding_as_form_field() -> None:
     assert [item["id"] for item in page["widgets"]] == ["builder-empty-canvas"]
 
 
-def test_initial_empty_canvas_uses_atomic_patch_batch_default(monkeypatch) -> None:
+def test_initial_empty_canvas_uses_semantic_compiler_default(monkeypatch) -> None:
     skill = _load_module()
     preview = skill._preview_state(
         session={
@@ -2572,10 +2955,10 @@ def test_initial_empty_canvas_uses_atomic_patch_batch_default(monkeypatch) -> No
         preview_state=preview,
     )
 
-    assert request["output_mode"] == "json_patch_batch_v1"
+    assert request["output_mode"] == "semantic_v2"
     assert (
-        request["base_request"]["requested_output_contract"]["schema"]
-        == "adaos.builder.webui_patch_batch.v1"
+        request["base_request"]["output_contract"]["schema"]
+        == "adaos.builder.semantic_prototype_candidate.v2"
     )
     assert (
         skill._builder_llm_webui_transform_request(
@@ -2790,6 +3173,7 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
     system_content = submit_calls[0]["messages"][0]["content"]
     assert "selected_ui_capabilities" in system_content
     assert "do not invent unsupported widgets" in system_content
+    assert "never stop after only the first coherent subset" in system_content
     assert "selected_ui_capabilities" not in submit_calls[0]["messages"][1]["content"]
     assert "selected_ui_capabilities" in submit_calls[0]["messages"][2]["content"]
     assert "current_webui_json" in submit_calls[0]["messages"][3]["content"]
@@ -2805,7 +3189,7 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
     assert attribution["profile"] == "generic"
     assert attribution["capabilities"]["domain_packs"] == []
     assert attribution["stable_prefix"]["message_indexes"] == [0, 1, 2]
-    assert attribution["dynamic_suffix"]["message_indexes"] == [3]
+    assert attribution["dynamic_suffix"]["message_indexes"] == [3, 4]
     assert (
         input_journal["generation"]["options"]["request_id"]
         == submit_calls[0]["kwargs"]["request_id"]
@@ -3142,12 +3526,16 @@ def test_llm_candidate_journal_preserves_normalized_result(tmp_path) -> None:
                         "id": "candidate",
                         "layout": _layout('main'),
                         "widgets": [
-                            {
-                                "id": "content",
-                                "type": "item.details",
-                                "area": "main",
-                                "inputs": {"fields": []},
-                            }
+                                {
+                                    "id": "content",
+                                    "type": "item.details",
+                                    "area": "main",
+                                    "inputs": {"fields": []},
+                                    "dataSource": {
+                                        "kind": "static",
+                                        "value": {"title": "Before"},
+                                    },
+                                }
                         ],
                     }
                 }
@@ -3318,6 +3706,54 @@ def test_local_ui_edit_rejects_new_capability_debt(monkeypatch) -> None:
                 ],
             },
             "postconditions": [],
+            "capability_gaps": [],
+        },
+        before_webui=webui,
+        after_webui=webui,
+    )
+
+    assert result["ok"] is False
+    assert "validation_mode" not in result["capability_validation"]
+
+
+@pytest.mark.parametrize(
+    "finding_code",
+    [
+        "ui.component.structural_input_misplaced",
+        "ui.desktop_widgets.source_invalid",
+    ],
+)
+def test_local_ui_edit_rejects_preexisting_rendering_critical_debt(
+    monkeypatch, finding_code: str
+) -> None:
+    skill = _load_module()
+    webui = {
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "widgets": [{"id": "home", "type": "desktop.widgets"}]
+                    }
+                }
+            }
+        }
+    }
+    finding = {
+        "code": finding_code,
+        "severity": "error",
+        "path": "ui.application.desktop.pageSchema.widgets[0]",
+    }
+    monkeypatch.setattr(
+        skill.developer_ui,
+        "validate",
+        lambda _webui: {"ok": False, "findings": [finding]},
+    )
+
+    result = skill._accept_preexisting_capability_findings(
+        {
+            "ok": False,
+            "capability_validation": {"ok": False, "findings": [finding]},
+            "postconditions": [{"id": "home", "ok": True}],
             "capability_gaps": [],
         },
         before_webui=webui,
@@ -3874,6 +4310,26 @@ def test_submit_llm_webui_transform_job_does_not_retry_request_id_conflict(
     assert journal["input_attribution"]["request_id"] == calls[0]
 
 
+def test_llm_job_request_id_covers_composed_request_context() -> None:
+    skill = _load_module()
+    kwargs = {
+        "session": {"id": "session", "scenario_id": "scenario", "version": "001"},
+        "instruction": "Update the prototype",
+        "current_payload": {"schema": "adaos.webui.v1"},
+        "attempt": 1,
+        "job_nonce": "change-1",
+    }
+
+    first = skill._builder_llm_job_request_id(
+        **kwargs, request_context={"qualification": {"prototype_resource": True}}
+    )
+    second = skill._builder_llm_job_request_id(
+        **kwargs, request_context={"qualification": {"prototype_resource": False}}
+    )
+
+    assert first != second
+
+
 def test_semantic_job_submission_uses_strict_provider_schema(
     monkeypatch, tmp_path
 ) -> None:
@@ -4122,7 +4578,12 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(
     assert removed_by_id["add-comment-action"]["opens_modals"] == ["comment_modal"]
     assert "Always prefer conference vocabulary" in request["system_prompt"]
     assert "declarative UI prototype designer" in request["system_prompt"]
-    assert "smallest visible coherent change" in request["system_prompt"]
+    assert "every explicit acceptance condition define completion" in request[
+        "system_prompt"
+    ]
+    assert "never stop after only the first coherent subset" in request[
+        "system_prompt"
+    ]
     assert (
         "selected capability manifests and postconditions are authoritative"
         in request["system_prompt"]
@@ -4726,6 +5187,128 @@ def test_repair_uses_partially_transformed_candidate_as_current_webui(
     assert "Never replace initialState with a partial object" in repair_request["task"]
 
 
+def test_repair_retries_layered_validation_against_latest_candidate(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    import adaos.sdk.llm.llm_client as llm_client
+
+    candidate = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "inbox",
+                        "layout": _layout("main"),
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    second_candidate = copy.deepcopy(candidate)
+    second_candidate["generated_by"] = "first-repair"
+    final_candidate = copy.deepcopy(second_candidate)
+    final_candidate["generated_by"] = "second-repair"
+    captured_messages: list[list[dict]] = []
+
+    monkeypatch.setattr(
+        skill,
+        "_builder_llm_webui_transform_request",
+        lambda **_kwargs: {
+            "current_payload": copy.deepcopy(candidate),
+            "system_prompt": "system",
+            "stable_user_prompt": "stable",
+            "dynamic_request": {"current_webui_json": copy.deepcopy(candidate)},
+        },
+    )
+
+    def fake_submit(messages, **_kwargs):
+        captured_messages.append(copy.deepcopy(messages))
+        index = len(captured_messages)
+        return {
+            "job_id": f"repair-job-{index}",
+            "status": "succeeded",
+            "output_text": json.dumps({"repair": index}),
+        }
+
+    monkeypatch.setattr(llm_client, "submit_response_job", fake_submit)
+    parse_results = [
+        {
+            "ok": False,
+            "error": "component_contract_invalid",
+            "detail": "a second independent finding became visible",
+            "validation": {
+                "ok": False,
+                "error": "component_contract_invalid",
+                "detail": "a second independent finding became visible",
+            },
+            "payload": second_candidate,
+            "attempts": [],
+        },
+        {"ok": True, "payload": final_candidate, "attempts": []},
+    ]
+    monkeypatch.setattr(
+        skill,
+        "_parse_llm_webui_transform_output",
+        lambda **_kwargs: parse_results.pop(0),
+    )
+
+    result = skill._repair_llm_webui_transform_output(
+        session={"id": "session", "scenario_id": "inbox"},
+        instruction="repair all layered findings",
+        previous_preview={},
+        output_text="invalid primary candidate",
+        validation_error={
+            "ok": False,
+            "error": "component_contract_invalid",
+            "detail": "the first finding",
+        },
+        candidate_payload=candidate,
+    )
+
+    assert result["ok"] is True
+    assert result["payload"]["generated_by"] == "second-repair"
+    assert len(captured_messages) == 2
+    second_request = json.loads(captured_messages[1][-1]["content"])
+    assert (
+        second_request["repair_context"]["current_webui_json"]["generated_by"]
+        == "first-repair"
+    )
+    assert (
+        second_request["validation_error"]["detail"]
+        == "a second independent finding became visible"
+    )
+    assert len(result["repair_history"]) == 1
+    assert [item["attempt"] for item in result["attempts"]] == [1, 2, 3]
+
+
+def test_repair_validation_summary_includes_nested_capability_findings() -> None:
+    skill = _load_module()
+    finding = {
+        "code": "ui.component.structural_input_misplaced",
+        "severity": "error",
+        "path": "ui.application.desktop.pageSchema.widgets[0].inputs",
+        "message": "visibleIf belongs on the widget",
+    }
+
+    summary = skill._repair_validation_summary(
+        {
+            "request_evaluation": {
+                "capability_validation": {
+                    "ok": False,
+                    "findings": [finding, copy.deepcopy(finding)],
+                }
+            }
+        }
+    )
+
+    assert summary["findings"] == [finding]
+    assert summary["finding_count"] == 1
+    assert "request_evaluation" not in summary
+
+
 def test_localization_repair_uses_candidate_dictionary_delta(monkeypatch) -> None:
     skill = _load_module()
     import adaos.sdk.llm.llm_client as llm_client
@@ -5158,6 +5741,17 @@ def test_builder_system_prompt_requires_local_i18n_descriptors() -> None:
     assert "a direct {en,ru} map" in prompt
 
 
+def test_builder_system_prompt_describes_modal_map_and_page_schema() -> None:
+    skill = _load_module()
+
+    prompt = skill._builder_llm_system_prompt(output_mode="jsonl_patch_v1")
+
+    assert "ui.application.modals is an object keyed by the literal modal id" in prompt
+    assert "modal.schema.widgets" in prompt
+    assert "including version:2" in prompt
+    assert "Open a modal with params.modalId" in prompt
+
+
 def test_semantic_v2_prompt_distinguishes_read_only_reveal_from_mutation() -> None:
     skill = _load_module()
 
@@ -5333,6 +5927,746 @@ def test_complete_manifest_canonicalizes_single_area_modal_layout() -> None:
             "target": "edit-item:edit-form",
         },
     ]
+
+
+def test_complete_manifest_completes_partial_modal_layout_defaults() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "modals": {
+                    "compose": {
+                        "id": "compose",
+                        "schema": {
+                            "id": "compose",
+                            "layout": {
+                                "version": 2,
+                                "pattern": "document",
+                                "regions": [
+                                    {
+                                        "id": "main",
+                                        "role": "main",
+                                        "priority": 100,
+                                        "presentation": {
+                                            "wide": "pane",
+                                            "compact": "stack",
+                                        },
+                                    }
+                                ],
+                            },
+                            "widgets": [{"id": "body", "type": "input.text"}],
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_complete_manifest_modal_keys(payload)
+
+    schema = payload["ui"]["application"]["modals"]["compose"]["schema"]
+    assert schema["layout"]["density"] == "comfortable"
+    assert schema["layout"]["contentWidth"] == "bounded"
+    assert schema["layout"]["scroll"] == "page"
+    assert schema["widgets"][0]["area"] == "main"
+    assert [item["target"] for item in normalizations] == [
+        "compose:layout.density",
+        "compose:layout.contentWidth",
+        "compose:layout.scroll",
+        "compose:body",
+    ]
+
+
+def test_complete_manifest_flattens_authored_desktop_widget_container() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "widgets": [
+                            {
+                                "id": "mail-surface",
+                                "type": "desktop.widgets",
+                                "area": "main",
+                                "widgets": [
+                                    {
+                                        "id": "connection",
+                                        "type": "desktop.widgets",
+                                        "inputs": {"buttons": [{"id": "connect"}]},
+                                        "actions": [],
+                                    },
+                                    {"id": "messages", "type": "ui.list"},
+                                ],
+                            },
+                            {"id": "guards", "type": "ui.actions", "area": "main"},
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_authored_desktop_widget_containers(payload)
+
+    widgets = payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
+    assert [(item["id"], item["type"], item["area"]) for item in widgets] == [
+        ("connection", "ui.actions", "main"),
+        ("messages", "ui.list", "main"),
+        ("guards", "ui.actions", "main"),
+    ]
+    assert [item["kind"] for item in normalizations] == [
+        "authored_desktop_widget_toolbar",
+        "authored_desktop_widget_container",
+    ]
+
+
+def test_full_manifest_normalizes_model_only_container_and_layout_debt() -> None:
+    skill = _load_module()
+    webui = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "mail",
+                        "layout": _layout("main"),
+                        "widgets": [
+                            {
+                                "id": "mail-surface",
+                                "type": "desktop.widgets",
+                                "area": "main",
+                                "widgets": [
+                                    {
+                                        "id": "messages",
+                                        "type": "ui.jsonViewer",
+                                        "inputs": {"value": {"status": "ready"}},
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                },
+                "modals": {
+                    "compose": {
+                        "id": "compose",
+                        "schema": {
+                            "id": "compose",
+                            "layout": {
+                                "version": 2,
+                                "pattern": "document",
+                                "regions": [
+                                    {
+                                        "id": "main",
+                                        "role": "main",
+                                        "priority": 100,
+                                        "presentation": {
+                                            "wide": "pane",
+                                            "compact": "stack",
+                                        },
+                                    }
+                                ],
+                            },
+                            "widgets": [
+                                {"id": "body", "type": "input.text", "inputs": {}}
+                            ],
+                        },
+                    }
+                },
+            }
+        },
+    }
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=json.dumps(webui),
+        previous_preview={},
+    )
+
+    assert result["ok"] is True
+    application = result["payload"]["ui"]["application"]
+    assert application["desktop"]["pageSchema"]["widgets"][0]["id"] == "messages"
+    assert application["desktop"]["pageSchema"]["widgets"][0]["area"] == "main"
+    assert application["modals"]["compose"]["schema"]["layout"]["density"] == (
+        "comfortable"
+    )
+
+
+def test_complete_manifest_canonicalizes_boolean_filter_option_aliases() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "widgets": [
+                            {
+                                "id": "filters",
+                                "type": "ui.queryToolbar",
+                                "inputs": {
+                                    "controls": [
+                                        {
+                                            "id": "unread",
+                                            "stateKey": "onlyUnread",
+                                            "options": [
+                                                {"value": "all", "label": "All"},
+                                                {"value": "unread", "label": "Unread"},
+                                            ],
+                                        }
+                                    ]
+                                },
+                            },
+                            {
+                                "id": "messages",
+                                "type": "ui.list",
+                                "inputs": {
+                                    "filters": [
+                                        {
+                                            "key": "isUnread",
+                                            "stateKey": "onlyUnread",
+                                            "operator": "equals",
+                                        }
+                                    ]
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": [
+                                        {"id": "one", "isUnread": True},
+                                        {"id": "two", "isUnread": False},
+                                    ],
+                                },
+                            },
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_boolean_filter_option_aliases(payload)
+
+    options = payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0][
+        "inputs"
+    ]["controls"][0]["options"]
+    assert [item["value"] for item in options] == ["", True]
+    assert [item["from"] for item in normalizations] == ["all", "unread"]
+
+
+def test_complete_manifest_canonicalizes_static_filter_all_sentinel() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "initialState": {"selectedLabel": "all"},
+                        "widgets": [
+                            {
+                                "id": "labels",
+                                "type": "input.selector",
+                                "inputs": {
+                                    "options": [
+                                        {"value": "all", "label": "All labels"},
+                                        {"value": "work", "label": "Work"},
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "change",
+                                        "type": "updateState",
+                                        "params": {"selectedLabel": "$event.value"},
+                                    }
+                                ],
+                            },
+                            {
+                                "id": "messages",
+                                "type": "ui.list",
+                                "inputs": {
+                                    "filters": [
+                                        {
+                                            "key": "label",
+                                            "stateKey": "selectedLabel",
+                                            "operator": "equals",
+                                        }
+                                    ]
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": [
+                                        {"id": "one", "label": "work"},
+                                        {"id": "two", "label": "personal"},
+                                    ],
+                                },
+                            },
+                        ],
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_static_filter_all_aliases(payload)
+
+    schema = payload["ui"]["application"]["desktop"]["pageSchema"]
+    assert schema["initialState"]["selectedLabel"] == ""
+    assert schema["widgets"][0]["inputs"]["options"][0]["value"] == ""
+    assert len(normalizations) == 2
+
+
+def test_complete_manifest_removes_redundant_static_collection_controls() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "widgets": [
+                            {
+                                "id": "query",
+                                "type": "ui.queryToolbar",
+                                "inputs": {
+                                    "controls": [
+                                        {
+                                            "id": "q",
+                                            "kind": "search",
+                                            "inputType": "search",
+                                            "stateKey": "q",
+                                        }
+                                    ]
+                                },
+                            },
+                            {
+                                "id": "messages",
+                                "type": "ui.list",
+                                "inputs": {
+                                    "search": True,
+                                    "filters": [
+                                        {
+                                            "key": "subject",
+                                            "stateKey": "q",
+                                            "operator": "contains",
+                                        }
+                                    ],
+                                    "pagination": True,
+                                    "pageSize": 20,
+                                    "pageSizeOptions": [10, 20, 50],
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": [
+                                        {"id": "one", "subject": "One"},
+                                        {"id": "two", "subject": "Two"},
+                                    ],
+                                },
+                            },
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_redundant_static_collection_controls(payload)
+
+    inputs = payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"][1][
+        "inputs"
+    ]
+    assert "search" not in inputs
+    assert "pagination" not in inputs
+    assert "pageSize" not in inputs
+    assert "pageSizeOptions" not in inputs
+    assert {item["kind"] for item in normalizations} == {
+        "redundant_collection_search",
+        "redundant_static_pagination",
+    }
+
+
+def test_complete_manifest_keeps_meaningful_static_pagination() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "widgets": [
+                            {
+                                "id": "messages",
+                                "type": "ui.list",
+                                "inputs": {
+                                    "pagination": True,
+                                    "pageSize": 2,
+                                    "pageSizeOptions": [2, 5],
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": [
+                                        {"id": "one"},
+                                        {"id": "two"},
+                                        {"id": "three"},
+                                    ],
+                                },
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_redundant_static_collection_controls(payload)
+
+    inputs = payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0][
+        "inputs"
+    ]
+    assert inputs["pagination"] is True
+    assert normalizations == []
+
+
+def test_complete_manifest_repairs_only_terminal_replacement_character() -> None:
+    skill = _load_module()
+    payload = {"value": "Notes\ufffd", "ambiguous": "A\ufffdB"}
+
+    normalizations = skill._canonicalize_terminal_replacement_characters(payload)
+
+    assert payload == {"value": "Notes…", "ambiguous": "A\ufffdB"}
+    assert len(normalizations) == 1
+
+
+def test_explicit_cbs_intent_is_package_neutral_and_human_attributed() -> None:
+    skill = _load_module()
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "mail",
+                        "layout": {"version": 2, "pattern": "document", "regions": []},
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+
+    normalizations = skill._apply_explicit_cbs_intent(
+        payload,
+        "The semantic application requires capability:mail.messages.manage version ^1.0.0 without naming Gmail or a package.",
+    )
+
+    intent = payload["ui"]["application"]["desktop"]["pageSchema"]["meta"]["builder"]["cbs_intent"]
+    assert intent == {
+        "schema": "adaos.builder.cbs_intent.v1",
+        "requirements": [
+            {
+                "id": "mail_messages_manage",
+                "capability_ref": "capability:mail.messages.manage",
+                "contract_range": "^1.0.0",
+                "origin": "human_explicit",
+            }
+        ],
+    }
+    assert len(normalizations) == 1
+    assert "gmail" not in str(intent).lower()
+    assert "package" not in str(intent).lower()
+
+
+def test_cbs_intent_is_not_inferred_without_an_explicit_versioned_reference() -> None:
+    skill = _load_module()
+    payload = {"ui": {"application": {"desktop": {"pageSchema": {"widgets": []}}}}}
+
+    assert skill._apply_explicit_cbs_intent(payload, "Build a Gmail client") == []
+    assert "meta" not in payload["ui"]["application"]["desktop"]["pageSchema"]
+
+
+def test_explicit_cbs_intent_accepts_compact_human_authoring_syntax() -> None:
+    skill = _load_module()
+    payload = {"ui": {"application": {"desktop": {"pageSchema": {"widgets": []}}}}}
+
+    normalizations = skill._apply_explicit_cbs_intent(
+        payload,
+        "The Application consumes capability mail.messages.manage ^1.0.0.",
+    )
+
+    intent = payload["ui"]["application"]["desktop"]["pageSchema"]["meta"]["builder"]["cbs_intent"]
+    assert intent["requirements"] == [
+        {
+            "id": "mail_messages_manage",
+            "capability_ref": "capability:mail.messages.manage",
+            "contract_range": "^1.0.0",
+            "origin": "human_explicit",
+        }
+    ]
+    assert len(normalizations) == 1
+    assert skill._webui_has_cbs_intent(payload) is True
+
+
+def test_webui_without_cbs_requirements_does_not_require_strict_acceptance() -> None:
+    skill = _load_module()
+    payload = {"ui": {"application": {"desktop": {"pageSchema": {"meta": {"builder": {"cbs_intent": {"schema": "adaos.builder.cbs_intent.v1", "requirements": []}}}}}}}}
+
+    assert skill._webui_has_cbs_intent(payload) is False
+
+
+def test_canonical_maintenance_can_add_explicit_cbs_intent_without_model() -> None:
+    skill = _load_module()
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "mail",
+                        "title": "Mail",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "bounded",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {"compact": "stack", "wide": "pane"},
+                                }
+                            ],
+                        },
+                        "widgets": [
+                            {
+                                "id": "actions",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "buttons": [{"id": "refresh", "label": "Refresh"}]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:refresh",
+                                        "type": "updateState",
+                                        "params": {"refreshing": True},
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+
+    result = skill._deterministic_local_webui_transform(
+        instruction="Canonicalize current prototype against Builder contracts",
+        before_webui=payload,
+        previous_preview={},
+        cbs_source_text="Require capability:mail.messages.manage version ^1.0.0.",
+    )
+
+    assert result is not None and result["ok"] is True
+    assert result["execution"]["model_calls"] == 0
+    assert result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["meta"]["builder"]["cbs_intent"]["requirements"][0]["capability_ref"] == "capability:mail.messages.manage"
+
+    already_canonical = skill._deterministic_local_webui_transform(
+        instruction="Canonicalize current prototype against Builder contracts",
+        before_webui=result["payload"],
+        previous_preview=result["preview_state"],
+        cbs_source_text="Require capability:mail.messages.manage version ^1.0.0.",
+    )
+
+    assert already_canonical is not None and already_canonical["ok"] is True
+    assert already_canonical["execution"]["model_calls"] == 0
+    assert already_canonical["normalizations"] == []
+    assert "already conforms" in already_canonical["comment"]
+
+
+def test_complete_manifest_lifts_item_details_path_value() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "widgets": [
+                            {
+                                "id": "details",
+                                "type": "item.details",
+                                "inputs": {
+                                    "fields": [
+                                        {
+                                            "id": "sender",
+                                            "label": "From",
+                                            "value": {"path": "from"},
+                                        }
+                                    ]
+                                },
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_item_details_path_values(payload)
+
+    field = payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0][
+        "inputs"
+    ]["fields"][0]
+    assert field["path"] == "from"
+    assert "value" not in field
+    assert normalizations[0]["kind"] == "item_details_path_value"
+
+
+def test_deterministic_canonical_maintenance_uses_no_model() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "mail",
+                        "layout": _layout("main"),
+                        "widgets": [
+                            {
+                                "id": "details",
+                                "type": "item.details",
+                                "area": "main",
+                                "inputs": {
+                                    "fields": [
+                                        {
+                                            "id": "preview",
+                                            "label": "Preview",
+                                            "value": "Notes\ufffd",
+                                        }
+                                    ]
+                                },
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+
+    result = skill._deterministic_local_webui_transform(
+        instruction="Canonicalize current prototype against Builder contracts",
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert result["ok"] is True
+    assert result["execution"]["model_calls"] == 0
+    value = result["payload"]["ui"]["application"]["desktop"]["pageSchema"][
+        "widgets"
+    ][0]["inputs"]["fields"][0]["value"]
+    assert value == "Notes…"
+
+
+def test_complete_manifest_moves_unambiguous_widget_structural_inputs() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "widgets": [
+                            {
+                                "id": "items",
+                                "type": "ui.list",
+                                "inputs": {
+                                    "visibleIf": "$state.activeTab === 'home'",
+                                    "area": "main",
+                                    "dataSource": {"kind": "local", "items": []},
+                                    "variant": "list",
+                                },
+                            },
+                            {
+                                "id": "ambiguous",
+                                "type": "item.details",
+                                "visibleIf": "$state.activeTab === 'details'",
+                                "inputs": {"visibleIf": "$state.activeTab === 'home'"},
+                            },
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_widget_structural_inputs(payload)
+
+    widgets = payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
+    assert widgets[0]["visibleIf"] == "$state.activeTab === 'home'"
+    assert widgets[0]["area"] == "main"
+    assert widgets[0]["dataSource"] == {"kind": "local", "items": []}
+    assert widgets[0]["inputs"] == {"variant": "list"}
+    assert widgets[1]["inputs"]["visibleIf"] == "$state.activeTab === 'home'"
+    assert normalizations == [
+        {
+            "kind": "widget_structural_input_location",
+            "from": "inputs.area",
+            "to": "area",
+            "target": "items",
+        },
+        {
+            "kind": "widget_structural_input_location",
+            "from": "inputs.dataSource",
+            "to": "dataSource",
+            "target": "items",
+        },
+        {
+            "kind": "widget_structural_input_location",
+            "from": "inputs.visibleIf",
+            "to": "visibleIf",
+            "target": "items",
+        },
+    ]
+
+
+def test_complete_manifest_canonicalizes_unambiguous_static_widget_fixtures() -> None:
+    skill = _load_module()
+    payload = {
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "widgets": [
+                            {
+                                "id": "items",
+                                "type": "ui.list",
+                                "inputs": {
+                                    "variant": "cards",
+                                    "rows": [{"id": "one", "title": "One"}],
+                                },
+                            },
+                            {
+                                "id": "summary",
+                                "type": "item.details",
+                                "inputs": {
+                                    "fields": [
+                                        {"id": "status", "label": "Status", "value": "Ready"}
+                                    ]
+                                },
+                            },
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    normalizations = skill._canonicalize_widget_static_fixture_aliases(payload)
+
+    widgets = payload["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
+    assert widgets[0]["dataSource"] == {
+        "kind": "static",
+        "value": [{"id": "one", "title": "One"}],
+    }
+    assert "rows" not in widgets[0]["inputs"]
+    assert widgets[1]["dataSource"] == {"kind": "static", "value": {}}
+    assert [item["target"] for item in normalizations] == ["items", "summary"]
 
 
 def test_complete_manifest_canonicalizes_unambiguous_form_layout_alias() -> None:
@@ -6020,6 +7354,10 @@ def test_failed_llm_result_replay_uses_normalized_candidate_without_root(
                                 "type": "item.details",
                                 "area": "main",
                                 "inputs": {"fields": []},
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": {"title": "Before"},
+                                },
                             }
                         ],
                     }
@@ -6082,6 +7420,18 @@ def test_failed_llm_result_replay_uses_normalized_candidate_without_root(
         raise AssertionError("a valid local candidate must not query Root")
 
     monkeypatch.setattr(llm_client, "get_response_job", fail_root_call)
+    canonicalized: list[str] = []
+    canonicalize = skill._canonicalize_llm_webui_payload
+
+    def record_canonicalization(payload):
+        canonicalized.append(
+            payload["ui"]["application"]["desktop"]["pageSchema"]["title"]
+        )
+        return canonicalize(payload)
+
+    monkeypatch.setattr(
+        skill, "_canonicalize_llm_webui_payload", record_canonicalization
+    )
 
     replay = skill._replay_failed_llm_webui_result(
         session=session,
@@ -6097,6 +7447,7 @@ def test_failed_llm_result_replay_uses_normalized_candidate_without_root(
     assert replay["telemetry"]["source"] == "normalized_candidate"
     assert replay["telemetry"]["usage"]["total_tokens"] == 0
     assert replay["replay"]["candidate_artifact"].endswith(".candidate.primary.json")
+    assert canonicalized == ["After"]
     assert root_calls == []
 
 
@@ -6206,6 +7557,8 @@ def test_generic_brief_stays_dynamic_while_equal_capability_bundles_cache(
 @pytest.mark.parametrize("authorship,marker,expected", [
     ("scenario_default", {"empty_canvas": True}, True),
     ("scenario_default", {"empty_canvas": False}, False),
+    ("builder_skill", {"empty_canvas": True}, True),
+    ("builder_skill", {"empty_canvas": False}, False),
     ("builder.semantic_compiler.v2", {"semantic_source": "adaos.webui.semantic.v2"}, True),
     ("manual", {}, False),
 ])
@@ -6514,7 +7867,7 @@ def test_semantic_gpt5_budget_honors_explicit_limits_without_legacy_clamping(mon
     skill = _load_module()
     monkeypatch.setenv("ADAOS_BUILDER_LLM_MAX_TOKENS", "32000")
     assert skill._builder_llm_max_tokens_for_model("gpt-5", output_mode="semantic_v2") == 32000
-    assert skill._builder_llm_max_tokens_for_model("gpt-4.1", output_mode="semantic_v2") == 12000
+    assert skill._builder_llm_max_tokens_for_model("gpt-4.1", output_mode="semantic_v2") == 32000
     monkeypatch.setenv("ADAOS_BUILDER_LLM_MAX_TOKENS", "128001")
     with pytest.raises(ValueError, match="ADAOS_BUILDER_LLM_MAX_TOKENS"):
         skill._builder_llm_max_tokens_for_model("gpt-5", output_mode="semantic_v2")
@@ -9209,7 +10562,7 @@ def test_builder_patch_stream_allows_one_noop_to_reach_qualification() -> None:
     assert result["semantic_patch_stream"]["no_op_count"] == 1
 
 
-def test_builder_patch_stream_rejects_a_mostly_noop_delta() -> None:
+def test_builder_patch_stream_allows_a_small_delta_with_redundant_operations() -> None:
     skill = _load_module()
     before = {
         "schema": "adaos.webui.v1",
@@ -9282,7 +10635,44 @@ def test_builder_patch_stream_rejects_a_mostly_noop_delta() -> None:
         ]
     )
 
-    with pytest.raises(ValueError, match="mostly no-op"):
+    result = skill._parse_llm_webui_patch_stream(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["title"] == "Updated summary"
+    assert result["semantic_patch_stream"]["operation_count"] == 4
+    assert result["semantic_patch_stream"]["no_op_count"] == 3
+
+
+def test_builder_patch_stream_rejects_a_complete_noop_delta() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": {
+            "id": "demo",
+            "layout": _layout('main'),
+            "widgets": [],
+        }}}},
+    }
+    output = "\n".join([
+        json.dumps({
+            "type": "meta",
+            "schema": "adaos.builder.webui_patch_stream.v1",
+            "base_hash": skill._webui_source_fingerprint(before),
+        }),
+        json.dumps({
+            "type": "patch",
+            "seq": 1,
+            "op": "replace",
+            "path": "/ui/application/desktop/pageSchema/id",
+            "value": "demo",
+        }),
+        json.dumps({"type": "complete", "comment": "No effective change."}),
+    ])
+
+    with pytest.raises(ValueError, match="is a no-op"):
         skill._parse_llm_webui_patch_stream(
             output_text=output,
             before_webui=before,
@@ -9581,12 +10971,13 @@ def test_builder_patch_stream_repairs_only_missing_outer_line_closer() -> None:
             "seq": 1,
             "op": "add",
             "path": "/ui/application/desktop/pageSchema/widgets/-",
-            "value": {
-                "id": "cards",
-                "type": "ui.list",
-                "area": "main",
-                "inputs": {"variant": "cards"},
-            },
+                "value": {
+                    "id": "cards",
+                    "type": "ui.list",
+                    "area": "main",
+                    "inputs": {"variant": "cards"},
+                    "dataSource": {"kind": "static", "value": []},
+                },
         }
     )[:-1]
     output = "\n".join(
@@ -9832,6 +11223,10 @@ def test_builder_patch_stream_stable_id_path_survives_prior_array_remove() -> No
                                 "type": "item.details",
                                 "area": "main",
                                 "inputs": {"fields": [{"label": "Old", "path": "old"}]},
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": {"old": "Before", "title": "After"},
+                                },
                             },
                         ],
                     }
@@ -9927,7 +11322,7 @@ def test_builder_patch_stream_stable_id_add_rejects_mismatched_value() -> None:
         )
 
 
-def test_builder_patch_stream_reports_missing_intermediate_parent() -> None:
+def test_builder_patch_stream_creates_optional_modal_map_parent() -> None:
     skill = _load_module()
     before = {
         "schema": "adaos.webui.v1",
@@ -9973,17 +11368,86 @@ def test_builder_patch_stream_reports_missing_intermediate_parent() -> None:
         ]
     )
 
-    try:
-        skill._parse_llm_webui_transform_output(
-            output_text=output,
-            before_webui=before,
-            previous_preview={},
-        )
-    except KeyError as exc:
-        assert "JSON Patch parent path missing: /ui/application/modals" in str(exc)
-        assert "add that parent container" in str(exc)
-    else:
-        raise AssertionError("missing intermediate JSON Patch parent must be rejected")
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert result["payload"]["ui"]["application"]["modals"]["detail"]["title"] == "Details"
+    assert result["semantic_patch_stream"]["patches"][0]["normalized_parent"] == (
+        "/ui/application/modals"
+    )
+
+
+def test_builder_repair_structural_anchors_cover_widgets_variants_and_modals() -> None:
+    skill = _load_module()
+    output = json.dumps(
+        {
+            "schema": "adaos.builder.webui_patch_batch.v1",
+            "patches": [
+                {
+                    "seq": 1,
+                    "op": "add",
+                    "path": "/ui/application/desktop/pageSchema/layout/variants/@access-variant",
+                    "value": {"id": "access-variant"},
+                },
+                {
+                    "seq": 2,
+                    "op": "add",
+                    "path": "/ui/application/desktop/pageSchema/widgets/@access-members",
+                    "value": {"id": "access-members"},
+                },
+                {
+                    "seq": 3,
+                    "op": "add",
+                    "path": "/ui/application/modals/invite-person",
+                    "value": {},
+                },
+                {
+                    "seq": 4,
+                    "op": "replace",
+                    "path": "/ui/application/desktop/pageSchema/widgets/@builder-empty-canvas",
+                    "value": {"id": "inbox-toolbar"},
+                },
+                {
+                    "seq": 5,
+                    "op": "add",
+                    "path": "/ui/application/desktop/pageSchema/widgets/-",
+                    "value": {"id": "mail-list"},
+                },
+            ],
+        }
+    )
+
+    anchors = skill._llm_patch_structural_anchors(output)
+    assert anchors == [
+        {"kind": "layout_variant", "id": "access-variant"},
+        {"kind": "widget", "id": "access-members"},
+        {"kind": "modal", "id": "invite-person"},
+        {"kind": "widget", "id": "inbox-toolbar"},
+        {"kind": "widget", "id": "mail-list"},
+    ]
+    assert skill._missing_structural_anchors(
+        {
+            "ui": {
+                "application": {
+                    "desktop": {
+                        "pageSchema": {
+                            "layout": {"variants": [{"id": "access-variant"}]},
+                            "widgets": [],
+                        }
+                    },
+                    "modals": {"invite-person": {}},
+                }
+            }
+        },
+        anchors,
+    ) == [
+        {"kind": "widget", "id": "access-members"},
+        {"kind": "widget", "id": "inbox-toolbar"},
+        {"kind": "widget", "id": "mail-list"},
+    ]
 
 
 def test_builder_component_contract_rejects_data_source_nested_in_inputs() -> None:
@@ -10054,7 +11518,12 @@ def test_builder_component_contract_accepts_visible_detail_and_form_actions_but_
                         "id": "recipes",
                         "layout": _layout("main"),
                         "widgets": [
-                            {"id": "catalog", "type": "ui.list", "area": "main"}
+                            {
+                                "id": "catalog",
+                                "type": "ui.list",
+                                "area": "main",
+                                "dataSource": {"kind": "static", "value": []},
+                            }
                         ],
                     }
                 },
@@ -10147,7 +11616,12 @@ def test_builder_canonical_payload_migrates_legacy_dotted_widget_properties() ->
                         "id": "recipes",
                         "layout": _layout("main"),
                         "widgets": [
-                            {"id": "catalog", "type": "ui.list", "area": "main"}
+                            {
+                                "id": "catalog",
+                                "type": "ui.list",
+                                "area": "main",
+                                "dataSource": {"kind": "static", "value": []},
+                            }
                         ],
                     }
                 },
@@ -11048,7 +12522,17 @@ def test_builder_webui_validation_rejects_undeclared_modal_action() -> None:
             "schema": {
                 "id": "request_detail_modal_schema",
                 "layout": _layout("modal"),
-                "widgets": [{"id": "details", "type": "item.details", "area": "modal"}],
+                "widgets": [
+                    {
+                        "id": "details",
+                        "type": "item.details",
+                        "area": "modal",
+                        "dataSource": {
+                            "kind": "static",
+                            "value": {"title": "Request detail"},
+                        },
+                    }
+                ],
             },
         }
     }
@@ -11059,6 +12543,42 @@ def test_builder_webui_validation_rejects_undeclared_modal_action() -> None:
         )["ok"]
         is True
     )
+
+
+def test_builder_webui_validation_accepts_platform_owned_modal_action() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "desktop",
+        "title": "Desktop",
+        "layout": _layout("main"),
+        "widgets": [
+            {
+                "id": "home-actions",
+                "type": "ui.actions",
+                "area": "main",
+                "actions": [
+                    {
+                        "on": "click:customize",
+                        "type": "openModal",
+                        "params": {"modalId": "settings"},
+                    }
+                ],
+                "inputs": {
+                    "buttons": [{"id": "customize", "label": "Customize"}]
+                },
+            }
+        ],
+    }
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+    }
+
+    validation = skill._validate_builder_webui_payload(
+        payload, {"page_schema": page_schema}
+    )
+
+    assert validation["ok"] is True
 
 
 def test_builder_webui_validation_rejects_root_level_modals() -> None:
@@ -11091,6 +12611,51 @@ def test_builder_webui_validation_rejects_root_level_modals() -> None:
     assert validation["ok"] is False
     assert validation["error"] == "component_contract_invalid"
     assert "ui.application.modals" in validation["detail"]
+
+
+def test_builder_webui_validation_rejects_conflicting_state_writes() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "system_status",
+        "title": "System status",
+        "layout": _layout("main"),
+        "widgets": [
+            {
+                "id": "attention-actions",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {"buttons": [{"id": "open", "label": "Open"}]},
+                "actions": [
+                    {
+                        "id": "open-first",
+                        "on": "click:open",
+                        "type": "updateState",
+                        "params": {"lastAction": "first"},
+                    },
+                    {
+                        "id": "open-second",
+                        "on": "click:open",
+                        "type": "updateState",
+                        "params": {"lastAction": "second"},
+                    },
+                ],
+            }
+        ],
+    }
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+    }
+
+    validation = skill._validate_builder_webui_payload(
+        payload, {"page_schema": page_schema}
+    )
+
+    assert validation["ok"] is False
+    assert any(
+        item.get("code") == "ui.action.conflicting_state_writes"
+        for item in validation.get("findings") or []
+    )
 
 
 def test_builder_webui_validation_rejects_question_mark_encoding_loss() -> None:
@@ -12167,6 +13732,10 @@ def test_set_ui_revision_current_migrates_legacy_root_modals(
                 "type": "item.details",
                 "area": "main",
                 "title": "Details",
+                "dataSource": {
+                    "kind": "static",
+                    "value": {"title": "Details"},
+                },
             }
         ],
     }
@@ -13797,6 +15366,21 @@ def test_conflicting_confirmed_technical_application_id_fails_before_creation(
     assert "requested_mail_app" in result["message"]
 
 
+def test_long_russian_create_request_with_exact_technical_id_cannot_edit_selected_project() -> None:
+    skill = _load_module()
+    text = (
+        "\u0421\u043e\u0437\u0434\u0430\u0439 \u0441\u0430\u043c\u043e\u0435 \u043a\u043e\u0440\u043e\u0442\u043a\u043e\u0435, \u043d\u043e \u043f\u043e\u043b\u043d\u043e\u0446\u0435\u043d\u043d\u043e\u0435 \u0438 \u0436\u0438\u0437\u043d\u0435\u0441\u043f\u043e\u0441\u043e\u0431\u043d\u043e\u0435 "
+        "private-\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 Mail Focus Reader. "
+        "\u0422\u043e\u0447\u043d\u044b\u0439 technical Application id: mail_focus_reader."
+    )
+
+    parsed = skill._parse_builder_command(text, has_session=True)
+
+    assert parsed["intent"] == "project.create"
+    assert skill._is_application_create_request(text) is True
+    assert skill._application_id_from_idea(text) == "mail_focus_reader"
+
+
 def test_builder_command_parser_prioritises_project_commands() -> None:
     skill = _load_module()
 
@@ -14055,6 +15639,90 @@ def test_resume_application_registration_reuses_recoverable_session(
     assert session["application_error"] is None
 
 
+def test_application_lifecycle_adopts_registered_legacy_scenario_session(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    session = {
+        "id": "scenario.web_desktop",
+        "scenario_id": "web_desktop",
+        "ui_revision": "006",
+    }
+    model = {
+        "application": {
+            "application_id": "web_desktop",
+            "publisher_ref": "subnet:home",
+            "revision": 4,
+            "entrypoints": [
+                {
+                    "entrypoint_id": "desktop",
+                    "presentation_ref": "scenario:web_desktop",
+                }
+            ],
+        },
+        "channels": {},
+    }
+    saved: list[dict] = []
+    monkeypatch.setattr(skill, "_load_session", lambda *_args, **_kwargs: session)
+    monkeypatch.setattr(
+        skill, "_save_session", lambda _ws, value: saved.append(dict(value))
+    )
+    monkeypatch.setattr(
+        skill.sdk_applications,
+        "get_application",
+        lambda application_id: copy.deepcopy(model)
+        if application_id == "web_desktop"
+        else (_ for _ in ()).throw(FileNotFoundError(application_id)),
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_applications,
+        "publisher_context",
+        lambda: {"publisher_ref": "subnet:home"},
+    )
+
+    _ws, adopted, application_id, _model, revision, publisher = (
+        skill._application_lifecycle_target(
+            session_id=session["id"],
+            webspace_id="desktop",
+            _meta=None,
+        )
+    )
+
+    assert application_id == "web_desktop"
+    assert revision == 4
+    assert publisher == "subnet:home"
+    assert adopted["artifact_kind"] == "application"
+    assert adopted["application_id"] == "web_desktop"
+    assert saved[-1]["application_status"] == "registered"
+
+
+def test_application_lifecycle_does_not_adopt_unrelated_application(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    session = {"id": "scenario.notes", "scenario_id": "notes"}
+    monkeypatch.setattr(skill, "_load_session", lambda *_args, **_kwargs: session)
+    monkeypatch.setattr(
+        skill.sdk_applications,
+        "get_application",
+        lambda _application_id: {
+            "application": {
+                "application_id": "notes",
+                "entrypoints": [
+                    {"presentation_ref": "scenario:different_notes"}
+                ],
+            }
+        },
+    )
+
+    with pytest.raises(ValueError, match="not an Application"):
+        skill._application_lifecycle_target(
+            session_id=session["id"],
+            webspace_id="desktop",
+            _meta=None,
+        )
+
+
 def test_application_lifecycle_tools_derive_publisher_revision_and_candidate(
     monkeypatch,
 ) -> None:
@@ -14106,6 +15774,15 @@ def test_application_lifecycle_tools_derive_publisher_revision_and_candidate(
         skill.sdk_builder_applications,
         "list_development_operations",
         lambda application_id: [{"application_id": application_id}],
+    )
+    monkeypatch.setattr(
+        skill,
+        "_application_trial_verification_evidence",
+        lambda **_kwargs: {
+            "source_commit": "e" * 40,
+            "release_scope": "trial",
+            "regression_evidence": ["test:applications"],
+        },
     )
 
     def operation(name: str, **result):
@@ -14161,6 +15838,13 @@ def test_application_lifecycle_tools_derive_publisher_revision_and_candidate(
     )
     trial = skill.create_application_trial(
         idempotency_key="trial-005",
+        permission_decision={
+            "approved": True,
+            "actor": "user:owner",
+            "actor_type": "user",
+            "approval_id": "approval:trial-005",
+        },
+        verification_evidence={"status": "passed", "refs": ["test:applications"]},
         session_id=session["id"],
         webspace_id="desktop",
     )
@@ -14236,6 +15920,18 @@ def test_application_lifecycle_tools_derive_publisher_revision_and_candidate(
         "expected_revision": 7,
         "idempotency_key": "materialize-005",
     }
+    trial_call = next(item for item in calls if item[0] == "create_trial")
+    assert trial_call[2]["permission_decision"] == {
+        "approved": True,
+        "actor": "user:owner",
+        "actor_type": "user",
+        "approval_id": "approval:trial-005",
+    }
+    assert trial_call[2]["verification_evidence"] == {
+        "source_commit": "e" * 40,
+        "release_scope": "trial",
+        "regression_evidence": ["test:applications"],
+    }
     prerelease_call = next(item for item in calls if item[0] == "publish_prerelease")
     assert (
         prerelease_call[2]["expected_prerelease_digest"]
@@ -14245,6 +15941,332 @@ def test_application_lifecycle_tools_derive_publisher_revision_and_candidate(
     assert stable_call[2]["expected_stable_digest"] == model["channels"]["stable"]
     assert all(item[2]["expected_revision"] == 7 for item in calls)
     assert all(item[2]["subnet_ref"] == "subnet:home" for item in calls)
+
+
+def test_accept_application_automation_checkpoint_records_exact_owned_project(monkeypatch) -> None:
+    skill = _load_module()
+    session = {
+        "id": "scenario.web_desktop",
+        "artifact_kind": "application",
+        "application_id": "web_desktop",
+        "scenario_id": "web_desktop",
+    }
+    workflow = {
+        "generation": 12,
+        "automation": {"status": "completed", "head_task_id": "task.desktop"},
+        "change": {
+            "change_set_id": "change.desktop",
+            "status": "reconciliation_required",
+        },
+        "delivery": {"status": "unknown"},
+        "governed": {"state": "reconciliation_required"},
+        "workflow_description": {
+            "allowed_commands": [{"command": "reconcile_verification"}]
+        },
+    }
+    pushed: list[tuple[str, str, dict]] = []
+    commands: list[tuple[tuple, dict]] = []
+
+    monkeypatch.setattr(skill, "_load_session", lambda *_args, **_kwargs: session)
+    monkeypatch.setattr(skill, "_save_session", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        skill,
+        "_application_lifecycle_target",
+        lambda **_kwargs: (
+            "desktop",
+            session,
+            "web_desktop",
+            {
+                "application": {
+                    "application_id": "web_desktop",
+                    "legacy_project_id": "web_desktop",
+                }
+            },
+            3,
+            "subnet:home",
+        ),
+    )
+    monkeypatch.setattr(skill.sdk_builder_workflow, "get_state", lambda *_args: workflow)
+    monkeypatch.setattr(
+        skill.developer_compositions,
+        "get",
+        lambda _project_id: {
+            "components": {
+                "owned": [
+                    {"ref": "scenario:web_desktop"},
+                    {"ref": "skill:web_desktop_runtime_skill"},
+                ]
+            }
+        },
+    )
+
+    def checkpoint(*, kind, artifact_id, **kwargs):
+        pushed.append((kind, artifact_id, kwargs))
+        suffix = "a" if kind == "scenario" else "b"
+        return {
+            "ok": True,
+            "kind": kind,
+            "name": artifact_id,
+            "version": "0.3.35" if kind == "scenario" else "0.1.11",
+            "package_digest": "sha256:" + suffix * 64,
+            "source_revision": suffix * 40,
+        }
+
+    monkeypatch.setattr(skill.builder_artifacts, "checkpoint", checkpoint)
+    def invoke_command(*args, **kwargs):
+        commands.append((args, kwargs))
+        if args[2] == "reconcile_verification":
+            return {
+                "workflow": {
+                    **workflow,
+                    "generation": 13,
+                    "change": {
+                        "change_set_id": "change.desktop",
+                        "status": "implemented",
+                    },
+                    "delivery": {"status": "idle"},
+                }
+            }
+        return {"workflow": {**workflow, "generation": 14, "delivery": {"status": "checkpoint"}}}
+
+    monkeypatch.setattr(skill.sdk_builder_workflow, "invoke_command", invoke_command)
+
+    result = skill.accept_application_automation_checkpoint(
+        True,
+        "accept-checkpoint-1",
+        ["browser-report:desktop", "test:web-desktop-runtime"],
+        session_id=session["id"],
+        webspace_id="desktop",
+    )
+
+    assert result["status"] == "automation_checkpoint_accepted"
+    assert [item[:2] for item in pushed] == [
+        ("scenario", "web_desktop"),
+        ("skill", "web_desktop_runtime_skill"),
+    ]
+    assert [item[0][2] for item in commands] == [
+        "reconcile_verification",
+        "accept_verification",
+    ]
+    assert commands[1][1]["metadata"]["package_digest"] == "sha256:" + "a" * 64
+    assert commands[1][1]["metadata"]["source_revision"] == "a" * 40
+    assert session["application_checkpoint_acceptance"]["idempotency_key"] == "accept-checkpoint-1"
+    assert session["application_checkpoint_acceptance"]["source_commit"] == "a" * 40
+
+
+def test_application_trial_evidence_binds_accepted_checkpoint(monkeypatch) -> None:
+    skill = _load_module()
+    source_commit = "a" * 40
+    package_digest = "sha256:" + "b" * 64
+    session = {
+        "application_checkpoint_acceptance": {
+            "status": "automation_checkpoint_accepted",
+            "checkpoint_ref": "scenario:web_desktop",
+            "source_revision": source_commit,
+            "package_digest": package_digest,
+            "verification_refs": ["pytest:web-desktop:passed"],
+        }
+    }
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *_args, **_kwargs: {
+            "delivery": {
+                "source_revision": source_commit,
+                "package_digest": package_digest,
+            }
+        },
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_automation,
+        "trial_verification_evidence",
+        lambda **_kwargs: {
+            "ok": True,
+            "status": "ready",
+            "task_id": "task.desktop",
+            "source_commit": "c" * 40,
+            "release_scope": "trial",
+            "regression_evidence": ["suite:checkpoint:test-report"],
+            "access_matrix_evidence": ["suite:access-matrix:contract"],
+            "audit_evidence": ["provenance:automation"],
+        },
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_applications,
+        "project_access_contract",
+        lambda *_args, **_kwargs: {
+            "status": "present",
+            "declaration_status": "present",
+            "authority_status": "valid",
+            "undeclared_inferred": [],
+            "statically_inferred": ["workspace.read", "workspace.write"],
+            "manifest_ref": "projects/web_desktop/project.yaml",
+            "manifest_digest": "sha256:" + "d" * 64,
+        },
+    )
+
+    evidence = skill._application_trial_verification_evidence(
+        webspace_id="desktop",
+        session=session,
+        scenario_id="web_desktop",
+        project_id="web_desktop",
+        supplied={"audit_evidence": ["browser:desktop"]},
+    )
+
+    assert evidence["source_commit"] == source_commit
+    assert evidence["source_commit"] != "c" * 40
+    assert evidence["release_scope"] == "trial"
+    assert evidence["observed_capabilities"] == ["workspace.read", "workspace.write"]
+    assert evidence["regression_evidence"] == [
+        "suite:checkpoint:test-report",
+        "pytest:web-desktop:passed",
+    ]
+    assert evidence["audit_evidence"] == [
+        "provenance:automation",
+        f"checkpoint:scenario:web_desktop@{source_commit}",
+        "browser:desktop",
+    ]
+    assert evidence["disclosure_evidence"]
+    assert evidence["redaction_evidence"]
+
+
+def test_application_trial_evidence_rejects_source_override(monkeypatch) -> None:
+    skill = _load_module()
+    source_commit = "a" * 40
+    package_digest = "sha256:" + "b" * 64
+    session = {
+        "application_checkpoint_acceptance": {
+            "status": "automation_checkpoint_accepted",
+            "checkpoint_ref": "scenario:web_desktop",
+            "source_revision": source_commit,
+            "package_digest": package_digest,
+            "verification_refs": ["pytest:web-desktop:passed"],
+        }
+    }
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *_args, **_kwargs: {
+            "delivery": {
+                "source_revision": source_commit,
+                "package_digest": package_digest,
+            }
+        },
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_automation,
+        "trial_verification_evidence",
+        lambda **_kwargs: {
+            "status": "ready",
+            "source_commit": "c" * 40,
+            "regression_evidence": ["suite:checkpoint:test-report"],
+            "access_matrix_evidence": ["suite:access-matrix:contract"],
+            "audit_evidence": ["provenance:automation"],
+        },
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_applications,
+        "project_access_contract",
+        lambda *_args, **_kwargs: {
+            "status": "present",
+            "declaration_status": "present",
+            "authority_status": "valid",
+            "undeclared_inferred": [],
+            "statically_inferred": ["workspace.read"],
+            "manifest_ref": "projects/web_desktop/project.yaml",
+            "manifest_digest": "sha256:" + "d" * 64,
+        },
+    )
+
+    with pytest.raises(ValueError, match="does not match"):
+        skill._application_trial_verification_evidence(
+            webspace_id="desktop",
+            session=session,
+            scenario_id="web_desktop",
+            project_id="web_desktop",
+            supplied={"source_commit": "e" * 40},
+        )
+
+
+def test_accept_application_automation_checkpoint_requires_evidence() -> None:
+    skill = _load_module()
+
+    with pytest.raises(ValueError, match="verification evidence"):
+        skill.accept_application_automation_checkpoint(
+            True,
+            "accept-checkpoint-2",
+            [],
+            session_id="scenario.web_desktop",
+            webspace_id="desktop",
+        )
+
+
+def test_accept_application_automation_checkpoint_checks_transition_before_push(
+    monkeypatch,
+) -> None:
+    skill = _load_module()
+    session = {
+        "id": "scenario.web_desktop",
+        "artifact_kind": "application",
+        "application_id": "web_desktop",
+        "scenario_id": "web_desktop",
+    }
+    monkeypatch.setattr(
+        skill,
+        "_application_lifecycle_target",
+        lambda **_kwargs: (
+            "desktop",
+            session,
+            "web_desktop",
+            {
+                "application": {
+                    "application_id": "web_desktop",
+                    "legacy_project_id": "web_desktop",
+                }
+            },
+            3,
+            "subnet:home",
+        ),
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *_args, **_kwargs: {
+            "automation": {"status": "completed", "head_task_id": "task.desktop"},
+            "change": {"change_set_id": "change.desktop", "status": "checkpointed"},
+            "delivery": {"status": "checkpoint"},
+            "governed": {"state": "trial_ready"},
+            "workflow_description": {
+                "allowed_commands": [{"command": "start_trial"}]
+            },
+        },
+    )
+    monkeypatch.setattr(
+        skill.developer_compositions,
+        "get",
+        lambda _project_id: {
+            "components": {
+                "owned": [{"ref": "scenario:web_desktop", "role": "primary"}]
+            }
+        },
+    )
+    pushed: list[str] = []
+    monkeypatch.setattr(
+        skill.builder_artifacts,
+        "checkpoint",
+        lambda **kwargs: pushed.append(kwargs["artifact_id"]),
+    )
+
+    with pytest.raises(ValueError, match="before source mutation"):
+        skill.accept_application_automation_checkpoint(
+            True,
+            "replace-checkpoint",
+            ["pytest:web-desktop:passed"],
+            session_id=session["id"],
+            webspace_id="desktop",
+        )
+
+    assert pushed == []
 
 
 def test_builder_command_parser_does_not_capture_ui_copy_about_project_lists() -> None:

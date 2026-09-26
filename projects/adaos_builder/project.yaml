@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: adaos_builder
-version: 0.3.6
+version: 0.3.10
 profiles:
 - adaos.builder.v1
 - adaos.development.workbench.v1
@@ -85,7 +85,7 @@ catalog:
   - project
   - devspace
 publication:
-  stage: alpha
+  stage: beta
   visibility: listed
   channel: stable
 install:
@@ -134,8 +134,7 @@ compatibility:
   required_entrypoints:
   - builder
   required_contracts:
-  - adaos.project.v1
-  - adaos.builder.development_session.v1
+  - capability:applications.build@^1.0.0
   validation_profiles:
   - builder.local
 lifecycle:

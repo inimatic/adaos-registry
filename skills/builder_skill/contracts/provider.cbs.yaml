@@ -1,0 +1,29 @@
+schema: adaos.cbs.provider_authoring.v1
+authorship: {origin: human_authored}
+capability:
+  ref: capability:applications.build
+  version: 1.0.0
+  title: Build and qualify AdaOS applications
+  operations:
+  - {operation_id: start, tool: start, errors: []}
+  - {operation_id: chat, tool: chat, errors: []}
+  - {operation_id: create_application_draft, tool: create_application_draft, errors: []}
+  - {operation_id: create_application_trial, tool: create_application_trial, errors: []}
+  invariants:
+  - candidates remain immutable between review and activation
+  - publication requires governed trial evidence
+  effects:
+  - creates development artifacts and governed application candidates
+  authority_requirements: [workspace.write, applications.publish]
+  conformance_refs: [scenario:applications.build.v1]
+binding:
+  ref: binding-definition:applications.build.adaos-builder
+  version: 1.0.0
+  entry_protocol: adaos.skill.tools.v1
+  logical_entrypoint: applications.build.adaos-builder
+  physical_member: handlers/main.py
+  modes: [production]
+  profile_classes: [local]
+  provider_features: [chat_orchestration, governed_trial, registry_publication]
+  authority_requirements: [workspace.write, applications.publish]
+  conformance_obligations: [capability_conformance, evidence_freshness]

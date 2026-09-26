@@ -207,8 +207,32 @@ def _execution_identity(kind: str, project_id: str) -> tuple[str, str]:
     return resolved
 
 
-def _execution_scope(kind: str, project_id: str) -> dict[str, Any]:
-    execution_kind, execution_id = _execution_identity(kind, project_id)
+def _publication_context_identity(kind: str, object_id: str) -> tuple[str, str]:
+    if kind == "project":
+        return kind, object_id
+    owner = compositions.project_for_component(f"{kind}:{object_id}")
+    if not isinstance(owner, Mapping):
+        return kind, object_id
+    owner_id = str(owner.get("id") or owner.get("project_id") or "").strip()
+    if not owner_id:
+        owner_ref = str(owner.get("ref") or "").strip()
+        owner_kind, separator, owner_id = owner_ref.partition(":")
+        if separator != ":" or owner_kind != "project" or not owner_id:
+            raise ValueError(
+                f"Project owning {kind}:{object_id} has no usable identity"
+            )
+    return "project", owner_id
+
+
+def _execution_scope(
+    kind: str,
+    project_id: str,
+    *,
+    execution_identity: tuple[str, str] | None = None,
+) -> dict[str, Any]:
+    execution_kind, execution_id = execution_identity or _execution_identity(
+        kind, project_id
+    )
     return {
         "context_ref": f"{kind}:{project_id}",
         "execution_ref": f"{execution_kind}:{execution_id}",
@@ -3694,11 +3718,6 @@ def get_automation(
         if isinstance(projection.get("progress"), Mapping)
         else {}
     )
-    evidence = (
-        projection.get("evidence")
-        if isinstance(projection.get("evidence"), Mapping)
-        else {}
-    )
     return {
         "ok": bool(result.get("ok")),
         "session_present": bool(result.get("session_present", result.get("ok"))),
@@ -3715,10 +3734,57 @@ def get_automation(
         "source_prototype_version": projection.get("source_prototype_version"),
         "retryable": projection.get("retryable"),
         "diagnostic_hint": projection.get("diagnostic_hint"),
-        "events_path": evidence.get("events_path"),
-        "stderr_path": evidence.get("stderr_path"),
-        "result_path": evidence.get("result_path"),
+        "diagnostics_available": bool(projection.get("task_id")),
         "execution_scope": _execution_scope(kind, project_id),
+    }
+
+
+@tool(
+    "get_automation_diagnostics",
+    summary="Search the current Builder Automation logs without exposing local paths.",
+    side_effects="none",
+)
+def get_automation_diagnostics(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    stream: str = "events",
+    query: str = "",
+    cursor: str | None = None,
+    page_size: int = 50,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    result = automation.get_diagnostics(
+        object_type=kind,
+        object_id=project_id,
+        stream=stream,
+        query=query,
+        cursor=cursor,
+        page_size=page_size,
+    )
+    search = (
+        result.get("content_search")
+        if isinstance(result.get("content_search"), Mapping)
+        else {}
+    )
+    return {
+        "ok": True,
+        "available": bool(result.get("available")),
+        "task_id": result.get("task_id"),
+        "stream": result.get("stream"),
+        "query": search.get("query"),
+        "items": [
+            {
+                **dict(item),
+                "id": f"{item.get('file')}:{item.get('line_from_end')}",
+            }
+            for item in search.get("matches") or []
+            if isinstance(item, Mapping)
+        ],
+        "next_cursor": search.get("next_cursor"),
+        "has_more": bool(search.get("has_more")),
+        "scanned_files": search.get("scanned_files"),
+        "scanned_bytes": search.get("scanned_bytes"),
+        "truncated": bool(search.get("truncated")),
     }
 
 
@@ -4564,21 +4630,37 @@ def start_automation(
             if isinstance(workflow_state.get("change_set"), Mapping)
             else {}
         )
-    result = dict(
-        automation.start(
-            object_type=kind,
-            object_id=project_id,
-            implementation_brief=implementation_brief,
-            webspace_id=source,
-            conversation_id=bound_conversation_id,
-            brief_path=brief_path,
-            change_set_id=str(change_set.get("change_set_id") or "").strip() or None,
-            execution_budget=execution_budget,
-            agent_profile=agent_profile or prompt_context.get(workflow_kind, workflow_id).get("builder_codex_profile"),
-            mcp=mcp,
-        )
-        or {}
+    admitted_prototype = workflow.require_current_prototype_acceptance(
+        workflow_kind, workflow_id
     )
+    try:
+        result = dict(
+            automation.start(
+                object_type=kind,
+                object_id=project_id,
+                implementation_brief=implementation_brief,
+                webspace_id=source,
+                conversation_id=bound_conversation_id,
+                brief_path=brief_path,
+                change_set_id=str(change_set.get("change_set_id") or "").strip()
+                or None,
+                execution_budget=execution_budget,
+                agent_profile=agent_profile
+                or prompt_context.get(workflow_kind, workflow_id).get(
+                    "builder_codex_profile"
+                ),
+                mcp=mcp,
+            )
+            or {}
+        )
+    except Exception as exc:
+        accepted_revision = str(
+            (admitted_prototype or {}).get("revision") or ""
+        ).strip()
+        raise RuntimeError(
+            "Builder Automation rejected an already admitted Prototype "
+            f"revision {accepted_revision or 'unknown'}: {exc}"
+        ) from exc
     result["execution_scope"] = _execution_scope(kind, project_id)
     return result
 
@@ -4594,6 +4676,7 @@ def submit_automation(
     object_id: str = DEFAULT_PROJECT_ID,
     webspace_id: str | None = None,
     conversation_id: str | None = None,
+    execution_budget: Mapping[str, Any] | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     _require_transport_integrity(text)
@@ -4611,6 +4694,7 @@ def submit_automation(
                 conversation_id or topic.get("conversation_id") or ""
             ).strip()
             or None,
+            execution_budget=execution_budget,
             agent_profile=prompt_context.get(workflow_kind, workflow_id).get("builder_codex_profile"),
         )
         or {}
@@ -4633,6 +4717,7 @@ def retry_failed_automation(
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
+    workflow_kind, workflow_id = _execution_identity(kind, project_id)
     source = _webspace_id(webspace_id, _meta)
     topic = _project_topic(kind, project_id, webspace_id=source)
     result = dict(
@@ -4645,6 +4730,9 @@ def retry_failed_automation(
             ).strip()
             or None,
             execution_budget=execution_budget,
+            agent_profile=prompt_context.get(workflow_kind, workflow_id).get(
+                "builder_codex_profile"
+            ),
         )
         or {}
     )
@@ -5238,6 +5326,18 @@ def _checkpoint_candidate_id(
     return f"{project_id}-{version.replace('.', '-')}-{package_digest[-12:]}"
 
 
+def _project_candidate_idempotency_key(
+    project_id: str,
+    delivery: Mapping[str, Any],
+    *,
+    stale_candidate_id: str = "",
+) -> str:
+    source_revision = str(delivery.get("source_revision") or "").strip()
+    package_digest = str(delivery.get("package_digest") or "").strip()
+    replacement = str(stale_candidate_id or "").strip() or "initial"
+    return f"project:{project_id}:{source_revision}:{package_digest}:{replacement}"
+
+
 def _recover_running_checkpoint_candidate(
     project_id: str,
     delivery: Mapping[str, Any],
@@ -5741,8 +5841,14 @@ def publish_project(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    kind, project_id = _identity(object_type, object_id)
-    workflow_kind, workflow_id = _execution_identity(kind, project_id)
+    requested_kind, requested_id = _identity(object_type, object_id)
+    workflow_kind, workflow_id = _execution_identity(requested_kind, requested_id)
+    kind, project_id = _publication_context_identity(requested_kind, requested_id)
+    execution_scope = _execution_scope(
+        kind,
+        project_id,
+        execution_identity=(workflow_kind, workflow_id),
+    )
     if bump not in {"major", "minor", "patch"}:
         raise ValueError("bump must be major, minor, or patch")
     workflow_before = workflow.get_state(workflow_kind, workflow_id)
@@ -5845,7 +5951,7 @@ def publish_project(
             "stable_materialization": stable_materialization,
             "application_verification": access_verification,
             "workflow": published_workflow,
-            "execution_scope": _execution_scope(kind, project_id),
+            "execution_scope": execution_scope,
         }
     if dry_run:
         source_webspace_id = _preview_source_webspace_id(webspace_id, _meta)
@@ -5885,6 +5991,20 @@ def publish_project(
                 raise ValueError(
                     "Active Builder trial identity differs from its candidate"
                 )
+            candidate_access_evidence, access_preflight = _preflight_candidate_access(
+                kind,
+                project_id,
+                delivery=delivery,
+                automation_task_id=str(automation_workflow.get("head_task_id") or ""),
+                approve_permissions=approve_permissions,
+                verification_evidence=verification_evidence,
+            )
+            access_verification = builder_applications.verify_candidate_access(
+                project_id,
+                candidate_id,
+                evidence=candidate_access_evidence,
+                actor_ref="builder.user",
+            )
             trial_workflow = _ensure_trial_placement(
                 workflow_kind,
                 workflow_id,
@@ -5902,8 +6022,10 @@ def publish_project(
                 "trial_ready": True,
                 "recovered": True,
                 "recovery_reason": "active_trial_projection_reconciled",
+                "access_preflight": access_preflight,
+                "application_verification": access_verification,
                 "workflow": trial_workflow,
-                "execution_scope": _execution_scope(kind, project_id),
+                "execution_scope": execution_scope,
             }
         if not bool(capabilities.get("can_prepare_candidate")):
             raise ValueError(
@@ -5984,8 +6106,10 @@ def publish_project(
                             else {}
                         ),
                     },
-                    idempotency_key=(
-                        f"project:{project_id}:{delivery.get('source_revision')}:{stale_candidate_id or 'initial'}"
+                    idempotency_key=_project_candidate_idempotency_key(
+                        project_id,
+                        delivery,
+                        stale_candidate_id=stale_candidate_id,
                     ),
                     target_webspace_id=trial_webspace_id,
                     target_space_kind="workspace",
@@ -6039,7 +6163,7 @@ def publish_project(
                 "dry_run": True,
                 "trial_ready": False,
                 "workflow": failed.get("workflow"),
-                "execution_scope": _execution_scope(kind, project_id),
+                "execution_scope": execution_scope,
             }
         candidate = (
             result.get("candidate")
@@ -6155,7 +6279,7 @@ def publish_project(
             "dry_run": True,
             "trial_ready": True,
             "workflow": trial_workflow,
-            "execution_scope": _execution_scope(kind, project_id),
+            "execution_scope": execution_scope,
         }
 
     candidate_id = str(delivery.get("candidate_id") or "").strip()
@@ -6371,7 +6495,7 @@ def publish_project(
             **result,
             "requires_reapply": True,
             "workflow": stale_workflow,
-            "execution_scope": _execution_scope(kind, project_id),
+            "execution_scope": execution_scope,
         }
     if not bool(result.get("ok", True)) or result.get("error"):
         failed = workflow.transition(
@@ -6389,7 +6513,7 @@ def publish_project(
         return {
             **result,
             "workflow": failed.get("workflow"),
-            "execution_scope": _execution_scope(kind, project_id),
+            "execution_scope": execution_scope,
         }
     successful_promotion_statuses = {
         "completed",
@@ -6415,7 +6539,7 @@ def publish_project(
             "ok": False,
             "error": f"Candidate is not promotable (status: {promotion_status})",
             "workflow": failed.get("workflow"),
-            "execution_scope": _execution_scope(kind, project_id),
+            "execution_scope": execution_scope,
         }
     release = (
         str(
@@ -6953,6 +7077,7 @@ __all__ = [
     "create_project",
     "delete_project",
     "get_automation",
+    "get_automation_diagnostics",
     "get_lifecycle",
     "get_llm_options",
     "get_workflow",

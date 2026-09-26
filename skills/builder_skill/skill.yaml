@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.3.175
+version: 0.4.1
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -11,6 +11,7 @@ runtime:
 capabilities:
 - applications.develop
 - applications.publish
+- workspace.write
 - storage.relational
 default_tool: chat
 dependencies: []
@@ -32,6 +33,7 @@ exports:
   - get_application_development_state
   - update_application_metadata
   - materialize_application
+  - accept_application_automation_checkpoint
   - create_application_trial
   - decide_application_trial
   - publish_application_trial
@@ -80,7 +82,7 @@ tools:
   description: Handle a Builder dialog turn and create or patch a scenario prototype.
   side_effects: local_write
   entry: handlers.main:chat
-  timeout_seconds: 120
+  timeout_seconds: 900
   input_schema:
     type: object
     properties:
@@ -285,11 +287,47 @@ tools:
     - ok
     - status
     - operation
+- name: accept_application_automation_checkpoint
+  description: Checkpoint every owned Application Project component and accept the
+    exact verified Automation identities in the canonical Builder workflow.
+  side_effects: local_write
+  entry: handlers.main:accept_application_automation_checkpoint
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - confirmed
+    - idempotency_key
+    - verification_refs
+    properties:
+      confirmed:
+        type: boolean
+      idempotency_key:
+        type: string
+      verification_refs:
+        type: array
+        items:
+          type: string
+      session_id:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - status
+    - package_digest
+    - source_revision
+    - workflow
 - name: create_application_trial
   description: Prepare one immutable Trial candidate from the selected Application
-    and activate it in isolated Trial storage.
+    and activate it in isolated Trial storage. Builder binds the accepted checkpoint,
+    permission contract, and sealed Automation evidence automatically.
   side_effects: local_write
   entry: handlers.main:create_application_trial
+  timeout_seconds: 300
   input_schema:
     type: object
     required:
@@ -297,6 +335,34 @@ tools:
     properties:
       idempotency_key:
         type: string
+      permission_decision:
+        type: object
+        description: Explicit audited owner decision for permissions introduced by
+          the Trial activation.
+        required:
+        - approved
+        - actor
+        - actor_type
+        - approval_id
+        properties:
+          approved:
+            type: boolean
+            const: true
+          actor:
+            type: string
+          actor_type:
+            type: string
+            const: user
+          approval_id:
+            type: string
+          reason:
+            type: string
+        additionalProperties: true
+      verification_evidence:
+        type: object
+        description: Optional additive evidence. It cannot replace the accepted source
+          commit, Trial scope, or authoritative permission contract.
+        additionalProperties: true
       session_id:
         type: string
       webspace_id:
@@ -641,6 +707,24 @@ tools:
     type: object
     required:
     - ok
+- name: application_data_drain
+  description: Provide a verified Application data lifecycle receipt.
+  entry: handlers.main:application_data_drain
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: application_data_rehydrate
+  description: Provide a verified Application data lifecycle receipt.
+  entry: handlers.main:application_data_rehydrate
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
 data_routes:
 - surface: builder rapid prototype preview
   route: skill-local
@@ -736,7 +820,7 @@ conversation:
     - builder
     - buikder
     - билдер
-updated_at: '2026-09-17T19:40:26+00:00'
+updated_at: '2026-09-26T03:03:53+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.1001+6134.0c3bea8cd
@@ -748,3 +832,18 @@ compatibility:
 prototype: builder_skill
 conversational:
   manifest: conversational/manifest.yaml
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases:
+  - path: db/builder_state.db
+    migrations:
+    - version: 1
+      name: partition Builder runtime state
+      statements:
+      - CREATE TABLE builder_state (state_key TEXT PRIMARY KEY, payload_json TEXT
+        NOT NULL, updated_at TEXT NOT NULL)
+  coordination_files: []
+lifecycle:
+  drain: application_data_drain
+  rehydrate: application_data_rehydrate

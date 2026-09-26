@@ -25,8 +25,10 @@ def _module():
 @pytest.fixture(autouse=True)
 def local_trial_sdk(monkeypatch):
     from adaos.sdk.builder import applications
+    from adaos.sdk.developer import compositions
 
     calls = []
+    monkeypatch.setattr(compositions, "project_for_component", lambda _ref: None)
     monkeypatch.setattr(applications, "production_webspace_id", lambda value: "desktop")
     monkeypatch.setattr(
         applications,
@@ -318,6 +320,33 @@ def test_codex_preferences_resolve_aggregate_primary_without_changing_prototype(
     monkeypatch.setattr(module.model_settings, "set_codex_profile", lambda *args, **kwargs: calls.append((args, kwargs)) or {"ok": True})
     module.set_codex_profile("gpt-5.5", "high", "project", "aggregate")
     assert calls == [(("scenario", "primary"), {"model": "gpt-5.5", "reasoning_effort": "high"})]
+
+
+def test_retry_automation_uses_current_primary_codex_profile(monkeypatch) -> None:
+    module = _module()
+    calls = []
+    profile = {
+        "provider": "openai-codex-cli",
+        "model": "gpt-5.5",
+        "reasoning_effort": "high",
+    }
+    monkeypatch.setattr(
+        module, "_execution_identity", lambda *args: ("scenario", "primary")
+    )
+    monkeypatch.setattr(
+        module.prompt_context,
+        "get",
+        lambda *args: {"builder_codex_profile": profile},
+    )
+    monkeypatch.setattr(
+        module.automation,
+        "retry_failed",
+        lambda **kwargs: calls.append(kwargs) or {"ok": True},
+    )
+
+    module.retry_failed_automation("project", "aggregate", "desktop-dev")
+
+    assert calls[0]["agent_profile"] == profile
 
 
 def test_requirement_editor_saves_delta_with_exact_generation(monkeypatch) -> None:
@@ -1008,6 +1037,11 @@ def test_project_automation_uses_primary_workflow_and_aggregate_worker_scope(
     monkeypatch,
 ) -> None:
     module = _module()
+    monkeypatch.setattr(
+        module.workflow,
+        "require_current_prototype_acceptance",
+        lambda *_args: {"revision": "001"},
+    )
     monkeypatch.setattr(module.prompt_context, "get", lambda *args: {"builder_codex_profile": {"model": "gpt-5.5", "provider": "openai-codex-cli"}})
     workflow_reads: list[tuple[str, str]] = []
     automation_calls: list[dict] = []
@@ -1058,8 +1092,15 @@ def test_project_automation_uses_primary_workflow_and_aggregate_worker_scope(
     assert result["execution_scope"]["execution_ref"] == "scenario:root_mgmnt_ops"
 
 
-def test_project_trial_uses_composition_candidate_and_primary_checkpoint(
-    monkeypatch,
+@pytest.mark.parametrize(
+    ("object_type", "object_id"),
+    [
+        ("project", "root_mgmnt"),
+        ("scenario", "root_mgmnt_ops"),
+    ],
+)
+def test_project_trial_uses_composition_candidate_and_component_checkpoint(
+    monkeypatch, object_type: str, object_id: str
 ) -> None:
     module = _module()
     from adaos.sdk.builder import applications as builder_applications
@@ -1088,6 +1129,13 @@ def test_project_trial_uses_composition_candidate_and_primary_checkpoint(
         },
     }
     monkeypatch.setattr(module.compositions, "get", lambda _project_id: dict(project))
+    monkeypatch.setattr(
+        module.compositions,
+        "project_for_component",
+        lambda component_ref: (
+            dict(project) if component_ref == "scenario:root_mgmnt_ops" else None
+        ),
+    )
     monkeypatch.setattr(
         module.workflow, "get_state", lambda *_args: dict(workflow_state)
     )
@@ -1155,8 +1203,8 @@ def test_project_trial_uses_composition_candidate_and_primary_checkpoint(
     )
 
     result = module.publish_project(
-        "project",
-        "root_mgmnt",
+        object_type,
+        object_id,
         dry_run=True,
         confirmed=True,
         approve_permissions=True,
@@ -1258,6 +1306,7 @@ def test_project_trial_replay_restores_missing_placement(monkeypatch) -> None:
     module = _module()
     project = _root_mgmnt_project()
     placements: list[tuple[str, str, dict, int]] = []
+    verification_calls: list[tuple[tuple, dict]] = []
     workflow_state = {
         "generation": 17,
         "capabilities": {"can_prepare_candidate": False},
@@ -1321,12 +1370,29 @@ def test_project_trial_replay_restores_missing_placement(monkeypatch) -> None:
         "prepare_candidate",
         lambda *_args, **_kwargs: pytest.fail("candidate must not be rebuilt"),
     )
+    from adaos.sdk.builder import applications as builder_applications
+
+    monkeypatch.setattr(
+        module,
+        "_preflight_candidate_access",
+        lambda *_args, **_kwargs: (
+            {"source_commit": "sealed"},
+            {"required": True, "status": "passed"},
+        ),
+    )
+    monkeypatch.setattr(
+        builder_applications,
+        "verify_candidate_access",
+        lambda *args, **kwargs: verification_calls.append((args, kwargs))
+        or {"required": True, "status": "passed"},
+    )
 
     result = module.publish_project(
         "project",
         "root_mgmnt",
         dry_run=True,
         confirmed=True,
+        approve_permissions=True,
         webspace_id="desktop",
     )
 
@@ -1339,6 +1405,13 @@ def test_project_trial_replay_restores_missing_placement(monkeypatch) -> None:
     assert placements[0][2]["result_ref"]["id"] == "candidate-root"
     assert placements[0][2]["target"]["webspace_id"] == "desktop"
     assert placements[0][3] == 17
+    assert verification_calls == [
+        (
+            ("root_mgmnt", "candidate-root"),
+            {"evidence": {"source_commit": "sealed"}, "actor_ref": "builder.user"},
+        )
+    ]
+    assert result["application_verification"]["status"] == "passed"
 
 
 def _dependency_link_setup(
@@ -1550,6 +1623,11 @@ def test_get_state_keeps_capability_failures_separate(monkeypatch) -> None:
 
 def test_file_and_automation_tools_forward_stable_project_identity(monkeypatch) -> None:
     module = _module()
+    monkeypatch.setattr(
+        module.workflow,
+        "require_current_prototype_acceptance",
+        lambda *_args: {"revision": "001"},
+    )
     monkeypatch.setattr(module.prompt_context, "get", lambda *args: {})
     calls: list[tuple[str, tuple, dict]] = []
     run_calls: list[dict] = []
@@ -1794,6 +1872,11 @@ def test_get_automation_exposes_source_prototype_metadata(monkeypatch) -> None:
                 "version": "0.4.0",
                 "source_prototype_version": "UI 037",
                 "updated_at": 1784790000,
+                "task_id": "task-42",
+                "evidence": {
+                    "events_path": "C:/private/codex-live.jsonl",
+                    "stderr_path": "C:/private/codex-live.stderr.log",
+                },
             },
         },
     )
@@ -1805,6 +1888,57 @@ def test_get_automation_exposes_source_prototype_metadata(monkeypatch) -> None:
     assert result["source_prototype_version"] == "UI 037"
     assert result["updated_at"].endswith("Z")
     assert "session" not in result
+    assert result["diagnostics_available"] is True
+    assert "events_path" not in result
+    assert "stderr_path" not in result
+
+
+def test_get_automation_diagnostics_projects_managed_search_page(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        module.automation,
+        "get_diagnostics",
+        lambda **kwargs: {
+            "available": True,
+            "task_id": "task-42",
+            "stream": kwargs["stream"],
+            "content_search": {
+                "query": kwargs["query"],
+                "matches": [
+                    {
+                        "file": "codex-live.stderr.log",
+                        "line_from_end": 3,
+                        "text": "validation failed",
+                    }
+                ],
+                "next_cursor": "cursor-2",
+                "has_more": True,
+                "scanned_files": 1,
+                "scanned_bytes": 128,
+                "truncated": False,
+            },
+        },
+    )
+
+    result = module.get_automation_diagnostics(
+        object_type="scenario",
+        object_id="builder",
+        stream="stderr",
+        query="failed",
+        page_size=25,
+    )
+
+    assert result["ok"] is True
+    assert result["items"] == [
+        {
+            "id": "codex-live.stderr.log:3",
+            "file": "codex-live.stderr.log",
+            "line_from_end": 3,
+            "text": "validation failed",
+        }
+    ]
+    assert result["next_cursor"] == "cursor-2"
+    assert not any("path" in key for key in result["items"][0])
 
 
 def test_lifecycle_exposes_bounded_automation_result_children(monkeypatch) -> None:
@@ -2213,6 +2347,11 @@ def test_transport_guard_accepts_russian_unchanged_and_rejects_lossy_text(
 
 def test_transport_guard_preserves_russian_launch_arguments(monkeypatch) -> None:
     module = _module()
+    monkeypatch.setattr(
+        module.workflow,
+        "require_current_prototype_acceptance",
+        lambda *_args: {"revision": "001"},
+    )
     profile = {"model": "gpt-5.5", "reasoning_effort": "medium"}
     monkeypatch.setattr(module.prompt_context, "get", lambda *args: {"builder_codex_profile": profile})
     brief = "Реализовать карточки: имя, цена, описание — всё на русском."
@@ -2238,12 +2377,19 @@ def test_transport_guard_preserves_russian_launch_arguments(monkeypatch) -> None
     )
 
     module.start_automation(brief, object_type="scenario", object_id="recipes")
-    module.submit_automation(submitted, object_type="scenario", object_id="recipes")
+    budget = {"max_context_tokens": 48_000, "max_model_tokens": 96_000}
+    module.submit_automation(
+        submitted,
+        object_type="scenario",
+        object_id="recipes",
+        execution_budget=budget,
+    )
 
     assert launched[0]["implementation_brief"] == brief
     assert launched[0]["agent_profile"] == profile
     assert followups[0][0] == submitted
     assert followups[0][1]["agent_profile"] == profile
+    assert followups[0][1]["execution_budget"] == budget
     with pytest.raises(ValueError, match="transport integrity"):
         module.start_automation(
             "Сломано ???", object_type="scenario", object_id="recipes"
@@ -3961,6 +4107,25 @@ def test_project_lifecycle_tools_stay_behind_sdk(monkeypatch) -> None:
     assert len(pushed["checkpoint_artifacts"]) == 2
     assert captured_change["artifact_refs"] == [{"kind": "scenario", "id": "builder"}]
     assert result["trial_ready"] is True
+
+
+def test_project_candidate_idempotency_tracks_composed_package_digest() -> None:
+    module = _module()
+    source_revision = "a" * 40
+    first = {
+        "source_revision": source_revision,
+        "package_digest": "sha256:" + "1" * 64,
+    }
+    second = {
+        "source_revision": source_revision,
+        "package_digest": "sha256:" + "2" * 64,
+    }
+
+    first_key = module._project_candidate_idempotency_key("builder", first)
+
+    assert module._project_candidate_idempotency_key("builder", first) == first_key
+    assert module._project_candidate_idempotency_key("builder", second) != first_key
+    assert first_key.endswith(f":sha256:{'1' * 64}:initial")
 
 
 def test_prompt_ide_compatibility_projections_are_browser_ready(monkeypatch) -> None:
