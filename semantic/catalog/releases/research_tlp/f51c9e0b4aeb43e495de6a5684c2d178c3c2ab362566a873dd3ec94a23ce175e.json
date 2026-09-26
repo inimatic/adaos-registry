@@ -1,0 +1,336 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "research_tlp",
+    "legacy_project_id": "research_tlp",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "research_tlp",
+    "display": {
+      "title": "TLP Mechanistic Research",
+      "summary": "Governed TLP research instance with STL-10 proof runner and experiment provider."
+    },
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "tlp",
+        "presentation_ref": "scenario:tlp_research"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 2,
+    "created_at": "2026-09-26T04:44:40+00:00",
+    "updated_at": "2026-09-26T04:53:39+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "research_tlp",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "research_tlp",
+    "version": "0.3.13",
+    "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "research_tlp",
+      "version": "0.3.13",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:d6b5a7653751cc3f66558ac0388fc660f59cca215364d7396f6cf74a78fcfd16",
+        "path_scope": [
+          "projects/research_tlp/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "tlp_research",
+          "version": "0.3.8",
+          "digest": "sha256:1cf8275ce65617b2aa0c37220dfd8f8fa4a08546226590c56324d9af608424f7",
+          "manifest_digest": "sha256:e8551369e7517bc1efadf0af1b3f6cfcd90489c261a6020d5b8edf6159300e22",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:d6b5a7653751cc3f66558ac0388fc660f59cca215364d7396f6cf74a78fcfd16",
+            "path_scope": [
+              "scenarios/tlp_research/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/tlp_research",
+          "schema_locks": [],
+          "conversational_lock": {
+            "lock_id": "conversational:scenario:tlp_research@0.3.8",
+            "digest": "sha256:b4ab6dea6ab6cf8ebf360dd451cfff0f982e6bc2c210776ba9f80aabeed8695e"
+          }
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "tlp_experiment_skill",
+          "version": "0.2.1",
+          "digest": "sha256:3e17dfe53a66f508973e7b864808038794180a5c819257864ccd1aa15551e4f5",
+          "manifest_digest": "sha256:02015631b1e4d0e6c50dcfd128b1496729864fb8a7038c90a472e1294223aac3",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:d6b5a7653751cc3f66558ac0388fc660f59cca215364d7396f6cf74a78fcfd16",
+            "path_scope": [
+              "skills/tlp_experiment_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/tlp_experiment_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "tlp_structured_proof_02",
+          "version": "0.2.1",
+          "digest": "sha256:f65f6b263ac11c2fa2041eb982433af6726754fa66e44cc32e1910fe475d56da",
+          "manifest_digest": "sha256:c5fcf00a5c65e1fbd288bfd1b35aebac1e747b5a5cb4b1e5ef5dd5d8de90ff95",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:d6b5a7653751cc3f66558ac0388fc660f59cca215364d7396f6cf74a78fcfd16",
+            "path_scope": [
+              "skills/tlp_structured_proof_02/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/tlp_structured_proof_02",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [
+        {
+          "kind": "skill",
+          "artifact_id": "mlflow_tracker_skill",
+          "version": "0.3.1",
+          "package_digest": "sha256:9e2faaf5ba238042c99267c7bb7fe8d0e901c931676e46800a7dc887c720f356",
+          "optional": false
+        },
+        {
+          "kind": "skill",
+          "artifact_id": "research_manager_skill",
+          "version": "0.48.0",
+          "package_digest": "sha256:a4b9b92384565bec0cf0fdae3fecd81d4cd989b05fb4a9d6e1fa578a9ffafdc5",
+          "optional": false
+        }
+      ],
+      "permissions": [],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:d6b5a7653751cc3f66558ac0388fc660f59cca215364d7396f6cf74a78fcfd16",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [
+        {
+          "lock_id": "skill:research_manager_skill:schemas/evidence.manifest.v1.schema.json",
+          "digest": "sha256:caa2a97fc3395261ca882b5f64dc893e160d209edcdea622f3c4afde1dd4a4f4"
+        },
+        {
+          "lock_id": "skill:research_manager_skill:schemas/research.contracts.v1.schema.json",
+          "digest": "sha256:638fa81661b298a15912914f166b4a281cdac9389ed3f7f473480b860da38f56"
+        },
+        {
+          "lock_id": "skill:research_manager_skill:schemas/tracker.contract.v1.schema.json",
+          "digest": "sha256:785cbd8e3eece8df16b29796be60820504d54f9e0d68974120ab44128b9a85c8"
+        }
+      ],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:13b894d0d2099bca0d37436565b7396917982b06ce47b1dba76454844fa1b3bb"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:db7fe6ae684863b43507d81e0ce7c891660bea217d04fd7fd9c0c143b642ffe2",
+        "profiles": [
+          "adaos.research.tlp.v1"
+        ],
+        "members": [
+          {
+            "ref": "scenario:tlp_research",
+            "package_digest": "sha256:1cf8275ce65617b2aa0c37220dfd8f8fa4a08546226590c56324d9af608424f7",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "skill:tlp_experiment_skill",
+            "package_digest": "sha256:3e17dfe53a66f508973e7b864808038794180a5c819257864ccd1aa15551e4f5",
+            "role": "supporting",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "evaluates",
+              "uses"
+            ]
+          },
+          {
+            "ref": "skill:tlp_structured_proof_02",
+            "package_digest": "sha256:f65f6b263ac11c2fa2041eb982433af6726754fa66e44cc32e1910fe475d56da",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          }
+        ],
+        "project_dependencies": [
+          {
+            "project_ref": "project:research_platform",
+            "version_spec": "^0.1",
+            "release_digest": "sha256:578e81d97b47f38e2e2d9b42885f2e9156b927ab6e0a3d44ed97b86ea35045ae"
+          }
+        ],
+        "entrypoints": [
+          {
+            "id": "tlp",
+            "presentation": "scenario:tlp_research",
+            "default": true,
+            "bindings": {
+              "research_category": "tlp"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "tlp"
+          ],
+          "required_contracts": [
+            "capability:research.tlp.evaluate@^1.0.0"
+          ],
+          "validation_profiles": [
+            "research.tlp.local"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        }
+      },
+      "catalog": {
+        "title": "TLP Mechanistic Research",
+        "description": "Governed TLP research instance with STL-10 proof runner and experiment provider.",
+        "categories": [
+          "research"
+        ],
+        "tags": [
+          "alpha",
+          "max-plus",
+          "pooling",
+          "tlp"
+        ],
+        "title_i18n": {
+          "en": "TLP Mechanistic Research",
+          "ru": "Механистическое исследование TLP"
+        },
+        "description_i18n": {
+          "en": "Governed TLP research instance with STL-10 proof runner and experiment provider.",
+          "ru": "Управляемый экземпляр исследования TLP со STL-10 proof runner и experiment provider."
+        }
+      },
+      "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e"
+    },
+    "accepted_candidate_id": "research_tlp-0-3-13-c94a23ce175e",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.project.preflight",
+        "tests": "qualified application and component tests passed",
+        "cbs": "exact native admission or explicit compatibility classification",
+        "checkpoint_source_revision": "385197fc459cb64785a884871a04134560c8ae6b",
+        "checkpoint_component_ref": "scenario:tlp_research"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [],
+        "sent_off_device": [],
+        "linked_to_user": [],
+        "tracking": false,
+        "retention": null
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [],
+        "sent_off_device": false,
+        "linked_to_user": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:18575981247455ea0c36bc9c6be308128c3caf16028863989d05cccfea4f84e1",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "research_tlp",
+      "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:78f384f2718a957b7ee028f4263f32dd28e23918e909d65fb553c8c6a2b72fb6"
+  },
+  "channels": {
+    "stable": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e"
+  },
+  "semantic": {
+    "projection_digest": "sha256:0b178b54110ae7658b553a34967af1951b6da8eba5c04b6f5701178e8fafd381",
+    "path": "semantic/applications/research_tlp/f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e.json"
+  },
+  "projection_digest": "sha256:7389351b69d7d5f6e6720df9c73d638baf51de6890799e1dea0921ad51efd682"
+}

@@ -59,10 +59,11 @@ def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -
     assert editor["actions"][0]["target"] == "research_manager_skill.revise_experiment_json"
     assert views["area"] == "main"
     assert actions["area"] == "commands"
-    assert next(area for area in page["layout"]["areas"] if area["id"] == "commands") == {
-        "id": "commands",
-        "role": "footer",
-    }
+    assert next(
+        region
+        for region in page["layout"]["regions"]
+        if region["id"] == "commands"
+    )["role"] == "commands"
     assert all(button.get("title") for button in views["inputs"]["buttons"])
     assert all(button.get("title") for button in actions["inputs"]["buttons"])
     available_actions = manifest["guidance"]["workflow"]["state_source"]["params"][
@@ -156,7 +157,7 @@ def test_conversational_guidance_package_compiles_without_an_llm() -> None:
 
 
 def test_package_preserves_research_gates_and_seals_test_access() -> None:
-    workflow = _json("workflow.json")
+    workflow = _json("fixtures/workflow-model.v1.json")
     transitions = {item["transition_id"]: item for item in workflow["transitions"]}
 
     assert [state["id"] for state in workflow["states"]] == [

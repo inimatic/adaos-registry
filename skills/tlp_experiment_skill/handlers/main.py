@@ -59,7 +59,7 @@ def _output_dir(output_ref: str) -> Path:
     suffix = token[len(_OUTPUT_PREFIX) :] if token.startswith(_OUTPUT_PREFIX) else ""
     if len(suffix) != 64 or any(ch not in "0123456789abcdef" for ch in suffix):
         raise ValueError("invalid TLP output_ref")
-    root = (_data_root() / "internal" / "runs").resolve()
+    root = (_data_root() / "files" / "runs").resolve()
     target = (root / suffix[:24]).resolve()
     if root not in target.parents:
         raise ValueError("TLP output_ref escapes the owned data root")
@@ -296,3 +296,13 @@ def verify_artifact(uri: str, digest: str) -> dict[str, Any]:
         return {"ok": False, "reason": "missing"}
     actual = _sha256_file(path)
     return {"ok": actual == str(digest), "actual_digest": actual, "size_bytes": path.stat().st_size}
+
+
+@tool("application_data_drain")
+def application_data_drain(**_):
+    return {"ok": True, "status": "drained"}
+
+
+@tool("application_data_rehydrate")
+def application_data_rehydrate(**_):
+    return {"ok": True, "status": "rehydrated"}

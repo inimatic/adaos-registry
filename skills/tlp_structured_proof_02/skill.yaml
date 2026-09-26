@@ -1,5 +1,5 @@
 name: tlp_structured_proof_02
-version: 0.1.7
+version: 0.2.1
 description: Governed STL-10 MaxPool2d versus centered per-channel TLP pool2 research
   runner.
 supported_locales:
@@ -599,5 +599,10 @@ nlu_hints:
   slot_schemas: {}
   entities: []
 prototype: research_direction
-updated_at: '2026-08-21T05:45:26+00:00'
+updated_at: '2026-09-26T03:03:07+00:00'
 title: TLP structured realization proof 02 — research assets
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases: []
+  coordination_files: []

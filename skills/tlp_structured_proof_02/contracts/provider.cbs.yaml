@@ -1,0 +1,26 @@
+schema: adaos.cbs.provider_authoring.v1
+authorship: {origin: human_authored}
+capability:
+  ref: capability:research.tlp.evaluate
+  version: 1.0.0
+  title: Evaluate a TLP structured proof
+  operations:
+  - {operation_id: describe, tool: describe_direction, errors: []}
+  - {operation_id: validate, tool: validate_research_prototype, errors: []}
+  - {operation_id: prepare, tool: prepare_attempt, errors: []}
+  - {operation_id: verify, tool: verify_artifact, errors: []}
+  invariants: [verification evidence identifies the exact attempt and artifact]
+  effects: [prepares and evaluates bounded TLP research attempts]
+  authority_requirements: []
+  conformance_refs: [scenario:research.tlp.evaluate.v1]
+binding:
+  ref: binding-definition:research.tlp.evaluate.structured-proof-02
+  version: 1.0.0
+  entry_protocol: adaos.skill.tools.v1
+  logical_entrypoint: research.tlp.evaluate.structured-proof-02
+  physical_member: handlers/main.py
+  modes: [production]
+  profile_classes: [local]
+  provider_features: [structured_proof, artifact_verification]
+  authority_requirements: []
+  conformance_obligations: [capability_conformance]

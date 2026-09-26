@@ -143,6 +143,7 @@
   ],
   "subworkflows": [],
   "metadata": {
+    "artifact_role": "reference_model",
     "owner_skill": "research_manager_skill",
     "fixture_package": "fixtures/",
     "policy": "package-bound; protocol amendments create a new version and reset to protocol review"

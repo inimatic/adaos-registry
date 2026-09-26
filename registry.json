@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-26T04:39:49+00:00",
+  "updated_at": "2026-09-26T04:53:30+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -738,9 +738,9 @@
       "entry": "handlers/main.py",
       "activation": {
         "mode": "package_lock",
-        "project_id": "research_platform",
-        "release": "research_platform@0.1.12",
-        "release_digest": "sha256:578e81d97b47f38e2e2d9b42885f2e9156b927ab6e0a3d44ed97b86ea35045ae",
+        "project_id": "research_tlp",
+        "release": "research_tlp@0.3.13",
+        "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
         "package_digest": "sha256:9e2faaf5ba238042c99267c7bb7fe8d0e901c931676e46800a7dc887c720f356"
       },
       "tools_count": 5
@@ -1152,9 +1152,9 @@
       "entry": "handlers/main.py",
       "activation": {
         "mode": "package_lock",
-        "project_id": "research_platform",
-        "release": "research_platform@0.1.12",
-        "release_digest": "sha256:578e81d97b47f38e2e2d9b42885f2e9156b927ab6e0a3d44ed97b86ea35045ae",
+        "project_id": "research_tlp",
+        "release": "research_tlp@0.3.13",
+        "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
         "package_digest": "sha256:a4b9b92384565bec0cf0fdae3fecd81d4cd989b05fb4a9d6e1fa578a9ffafdc5"
       },
       "tools_count": 39
@@ -1423,8 +1423,8 @@
       "kind": "skill",
       "id": "tlp_experiment_skill",
       "name": "tlp_experiment_skill",
-      "version": "0.1.1",
-      "updated_at": "2026-08-10T05:53:56+00:00",
+      "version": "0.2.1",
+      "updated_at": "2026-09-26T03:03:14+00:00",
       "path": "skills/tlp_experiment_skill",
       "manifest": "skills/tlp_experiment_skill/skill.yaml",
       "source": {
@@ -1440,23 +1440,20 @@
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
       "activation": {
-        "mode": "lazy",
-        "when": {
-          "scenarios_active": [
-            "tlp_research"
-          ]
-        },
-        "startup_allowed": true,
-        "background_refresh": false
+        "mode": "package_lock",
+        "project_id": "research_tlp",
+        "release": "research_tlp@0.3.13",
+        "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
+        "package_digest": "sha256:3e17dfe53a66f508973e7b864808038794180a5c819257864ccd1aa15551e4f5"
       },
-      "tools_count": 5
+      "tools_count": 7
     },
     {
       "kind": "skill",
       "id": "tlp_structured_proof_02",
       "name": "tlp_structured_proof_02",
-      "version": "0.1.7",
-      "updated_at": "2026-08-21T05:45:26+00:00",
+      "version": "0.2.1",
+      "updated_at": "2026-09-26T03:03:07+00:00",
       "path": "skills/tlp_structured_proof_02",
       "manifest": "skills/tlp_structured_proof_02/skill.yaml",
       "source": {
@@ -1472,7 +1469,14 @@
       "description": "Governed STL-10 MaxPool2d versus centered per-channel TLP pool2 research runner.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 7
+      "tools_count": 7,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "research_tlp",
+        "release": "research_tlp@0.3.13",
+        "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
+        "package_digest": "sha256:f65f6b263ac11c2fa2041eb982433af6726754fa66e44cc32e1910fe475d56da"
+      }
     },
     {
       "kind": "skill",
@@ -2517,13 +2521,19 @@
       "kind": "scenario",
       "id": "tlp_research",
       "name": "tlp_research",
-      "version": "0.3.6",
-      "updated_at": "2026-08-13T18:24:45+00:00",
+      "version": "0.3.8",
+      "updated_at": "2026-09-26T04:44:19+00:00",
       "path": "scenarios/tlp_research",
       "manifest": "scenarios/tlp_research/scenario.yaml",
       "source": {
         "path": "scenarios/tlp_research",
-        "manifest": "scenarios/tlp_research/scenario.yaml"
+        "manifest": "scenarios/tlp_research/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:d6b5a7653751cc3f66558ac0388fc660f59cca215364d7396f6cf74a78fcfd16",
+        "path_scope": [
+          "projects/research_tlp/"
+        ]
       },
       "install": {
         "kind": "scenario",
@@ -2539,6 +2549,22 @@
           "mlflow_tracker_skill",
           "tlp_experiment_skill"
         ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "research_tlp",
+        "release": "research_tlp@0.3.13",
+        "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
+        "package_digest": "sha256:1cf8275ce65617b2aa0c37220dfd8f8fa4a08546226590c56324d9af608424f7"
+      },
+      "channels": {
+        "stable": {
+          "release": "research_tlp@0.3.13",
+          "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
+          "source_revision": "sha256:d6b5a7653751cc3f66558ac0388fc660f59cca215364d7396f6cf74a78fcfd16",
+          "package_digest": "sha256:1cf8275ce65617b2aa0c37220dfd8f8fa4a08546226590c56324d9af608424f7",
+          "version": "0.3.8"
+        }
       }
     },
     {
@@ -4599,8 +4625,8 @@
       "kind": "project",
       "id": "research_tlp",
       "name": "research_tlp",
-      "version": "0.3.7",
-      "updated_at": "2026-08-27T21:05:39+00:00",
+      "version": "0.3.13",
+      "updated_at": "2026-09-26T04:53:30+00:00",
       "path": "projects/research_tlp",
       "manifest": "projects/research_tlp/project.yaml",
       "source": {
@@ -4632,11 +4658,11 @@
         "pooling"
       ],
       "publication": {
-        "stage": "alpha",
+        "stage": "beta",
         "visibility": "listed",
         "channel": "stable"
       },
-      "stage": "alpha",
+      "stage": "beta",
       "visibility": "listed",
       "channel": "stable",
       "install_default": false,
@@ -4665,7 +4691,24 @@
       "components_count": 3,
       "profiles": [
         "adaos.research.tlp.v1"
-      ]
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "research_tlp",
+        "release": "research_tlp@0.3.13",
+        "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
+        "primary_component": "scenario:tlp_research",
+        "package_digest": "sha256:1cf8275ce65617b2aa0c37220dfd8f8fa4a08546226590c56324d9af608424f7"
+      },
+      "channels": {
+        "stable": {
+          "release": "research_tlp@0.3.13",
+          "release_digest": "sha256:f51c9e0b4aeb43e495de6a5684c2d178c3c2ab362566a873dd3ec94a23ce175e",
+          "source_revision": "sha256:d6b5a7653751cc3f66558ac0388fc660f59cca215364d7396f6cf74a78fcfd16",
+          "package_digest": "sha256:1cf8275ce65617b2aa0c37220dfd8f8fa4a08546226590c56324d9af608424f7",
+          "version": "0.3.13"
+        }
+      }
     },
     {
       "kind": "project",

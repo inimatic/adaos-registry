@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: research_tlp
-version: 0.3.11
+version: 0.3.13
 profiles:
 - adaos.research.tlp.v1
 components:
@@ -57,7 +57,7 @@ catalog:
   - max-plus
   - pooling
 publication:
-  stage: alpha
+  stage: beta
   visibility: listed
   channel: stable
 install:
@@ -77,6 +77,8 @@ install:
 compatibility:
   required_entrypoints:
   - tlp
+  required_contracts:
+  - capability:research.tlp.evaluate@^1.0.0
   validation_profiles:
   - research.tlp.local
 lifecycle:

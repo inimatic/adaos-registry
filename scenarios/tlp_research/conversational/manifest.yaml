@@ -4,12 +4,8 @@ package_kind: scenario
 owner_ref:
   kind: scenario
   id: tlp_research
-version: 0.3.6
-workflow_refs:
-- workflow_type: research.study
-  definition_ref: ../workflow.json
-  definition_version: 1.0.0
-  definition_digest: null
+version: 0.3.8
+workflow_refs: []
 files:
   input: input.yaml
   entities: entities.yaml
@@ -37,4 +33,4 @@ compatibility_aliases: []
 metadata:
   guidance_schema: adaos.scenario.guidance.v1
   deterministic_without_llm: true
-
+  workflow_model_ref: ../fixtures/workflow-model.v1.json
