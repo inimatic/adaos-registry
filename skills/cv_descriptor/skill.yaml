@@ -1,5 +1,5 @@
 name: cv_descriptor
-version: 0.1.10
+version: 0.1.11
 description: Browser-side CV descriptor pilot. Stores visual-object embeddings, model
   signatures, thumbnails, and text descriptions while the AdaOS client CV runtime
   is being built.

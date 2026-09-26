@@ -36,6 +36,15 @@ def test_manifest_defers_projection_until_yjs_demand() -> None:
     assert manifest["runtime"]["activation"]["startup_allowed"] is False
 
 
+def test_state_defaults_to_versioned_skill_runtime(tmp_path: Path, monkeypatch) -> None:
+    mod = _load_module(tmp_path, monkeypatch)
+    runtime_state = tmp_path / "runtime-state"
+    monkeypatch.delenv("CV_DESCRIPTOR_STATE_DIR")
+    monkeypatch.setattr(mod, "skill_state_dir", lambda: runtime_state)
+
+    assert mod._state_dir() == runtime_state
+
+
 def test_yjs_demand_projects_only_cv_descriptor_slots(tmp_path: Path, monkeypatch) -> None:
     mod = _load_module(tmp_path, monkeypatch)
     projected: list[str | None] = []
