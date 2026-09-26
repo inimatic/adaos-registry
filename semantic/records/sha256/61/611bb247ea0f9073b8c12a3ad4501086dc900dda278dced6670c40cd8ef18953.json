@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:media.slideshow.present.redevice",
+  "binding_definition_digest": "sha256:f29437e67b25f72387b6298637e180c6b288d30154dd43797f897205e241d67f",
+  "logical_entrypoint": "media.slideshow.present.redevice",
+  "package": {
+    "kind": "skill",
+    "id": "slideshow_skill",
+    "version": "0.2.6",
+    "digest": "sha256:979a828174e01eb4cc1b7c0d06da58ca709adbd30487e417c9a4d09015d7e2a8"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:611bb247ea0f9073b8c12a3ad4501086dc900dda278dced6670c40cd8ef18953"
+}

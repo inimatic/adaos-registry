@@ -117,9 +117,9 @@
       "application_id": "slideshow",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 2,
-      "stable_release_digest": "sha256:f0698425343c58033e0c4a67ffa71796c4fa1350ab37b336b594d3a51f55c066",
-      "release_key": "slideshow@sha256:f0698425343c58033e0c4a67ffa71796c4fa1350ab37b336b594d3a51f55c066",
-      "projection_digest": "sha256:40074cb59704dfe97bd8051ee7443f2f46617c24167c57063ed6a1c71c9b5c64"
+      "stable_release_digest": "sha256:f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410",
+      "release_key": "slideshow@sha256:f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410",
+      "projection_digest": "sha256:66858eb3a00c19405d64ff3ea88fab20142460276c003653df4c63987a6b4234"
     },
     "voice": {
       "application_id": "voice",
@@ -378,7 +378,15 @@
       "release_digest": "sha256:adb435e8ac5635edc8c6d4531dd7a07e7bdb6c2adb27df472d0a65a7fe3ac3a8",
       "path": "semantic/catalog/releases/redevice_control/adb435e8ac5635edc8c6d4531dd7a07e7bdb6c2adb27df472d0a65a7fe3ac3a8.json",
       "projection_digest": "sha256:9aa37d7680715d8b3f751dc16663460ae732a73cc36a81496600e265e80a92db"
+    },
+    "slideshow@sha256:f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410": {
+      "application_id": "slideshow",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.5",
+      "release_digest": "sha256:f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410",
+      "path": "semantic/catalog/releases/slideshow/f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410.json",
+      "projection_digest": "sha256:66858eb3a00c19405d64ff3ea88fab20142460276c003653df4c63987a6b4234"
     }
   },
-  "index_digest": "sha256:0c871cbcfc04dfbcd65f2ac58e31a678802f86de750d1e1ac45d5565904e4f9c"
+  "index_digest": "sha256:7e5dcb497be3a8ea2d59728500e4c1a48f838f436f9c921990a1d2ff06b29203"
 }

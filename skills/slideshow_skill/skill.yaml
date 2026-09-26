@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.2.4
+version: 0.2.6
 description: Slideshow pilot skill that shows photos in the widget and can optionally
   project cached thumbnails to assigned ReDevice endpoints.
 supported_locales:
@@ -37,6 +37,7 @@ tools:
 - name: activate_slideshow_runtime
   description: Rehydrate slideshow background polling after skill activation.
   entry: handlers.main:activate_slideshow_runtime
+  side_effects: runtime_write
   input_schema:
     type: object
     properties:
@@ -93,6 +94,7 @@ tools:
   description: Persist the slideshow source folder in skill memory and refresh visible
     session/index state without starting a scan.
   entry: handlers.main:set_slideshow_source
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -173,6 +175,7 @@ tools:
   description: Start slideshow playback in the widget and queue a display.render_surface
     command when a ReDevice endpoint is selected.
   entry: handlers.main:start_redevice_slideshow
+  side_effects: device_control
   input_schema:
     type: object
     properties:
@@ -213,6 +216,7 @@ tools:
   description: Select a ReDevice endpoint for the slideshow modal and publish visible
     selection state.
   entry: handlers.main:select_redevice_endpoint
+  side_effects: local_write
   input_schema:
     type: object
     properties:
@@ -244,6 +248,7 @@ tools:
   description: Start or resume a background photo index refresh for the selected root
     folder while preserving favorites until a full scan succeeds.
   entry: handlers.main:refresh_slideshow_photo_index
+  side_effects: local_write
   input_schema:
     type: object
     properties:
@@ -267,6 +272,7 @@ tools:
 - name: cancel_slideshow_photo_index
   description: Ask the background photo indexer to stop after the current batch.
   entry: handlers.main:cancel_slideshow_photo_index
+  side_effects: local_write
   input_schema:
     type: object
     properties:
@@ -284,6 +290,7 @@ tools:
 - name: select_slideshow_folder
   description: Select a top-level indexed folder as the current slideshow scope.
   entry: handlers.main:select_slideshow_folder
+  side_effects: local_write
   input_schema:
     type: object
     properties:
@@ -305,6 +312,7 @@ tools:
 - name: toggle_redevice_endpoint
   description: Add or remove a ReDevice endpoint from the slideshow sync group.
   entry: handlers.main:toggle_redevice_endpoint
+  side_effects: device_control
   input_schema:
     type: object
     properties:
@@ -329,6 +337,7 @@ tools:
   description: Control the shared slideshow state for the widget and broadcast it
     to selected ReDevice endpoints when present.
   entry: handlers.main:control_redevice_slideshow
+  side_effects: device_control
   input_schema:
     type: object
     required:
@@ -386,6 +395,7 @@ tools:
   description: Resolve a spoken ReDevice name and limited slideshow command, then
     apply it through the normal slideshow control path.
   entry: handlers.main:voice_control_redevice_slideshow
+  side_effects: device_control
   input_schema:
     type: object
     properties:
@@ -421,6 +431,7 @@ tools:
 - name: rename_redevice_endpoint
   description: Rename a ReDevice endpoint and set comma-separated aliases.
   entry: handlers.main:rename_redevice_endpoint
+  side_effects: device_control
   input_schema:
     type: object
     required:
@@ -444,6 +455,7 @@ tools:
 - name: refresh_redevice_slideshow_state
   description: Read the latest ReDevice registry state and last surface event.
   entry: handlers.main:refresh_redevice_slideshow_state
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -619,7 +631,7 @@ memory_budget:
     max_threads: 1
     cleanup_hook: dispose
 redui: redui.json
-updated_at: '2026-09-26T04:24:54+00:00'
+updated_at: '2026-09-26T10:58:12+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.1018+6565.32860b035

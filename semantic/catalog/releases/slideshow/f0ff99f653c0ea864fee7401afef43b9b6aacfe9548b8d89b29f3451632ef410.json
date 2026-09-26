@@ -1,0 +1,322 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "slideshow",
+    "legacy_project_id": "slideshow",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "slideshow",
+    "display": {
+      "title": "Slideshow",
+      "summary": "Local media slideshow indexing and endpoint presentation controls."
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "slideshow",
+        "presentation_ref": "skill:slideshow_skill"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 2,
+    "created_at": "2026-09-26T03:53:11+00:00",
+    "updated_at": "2026-09-26T04:26:30+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "slideshow",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "slideshow",
+    "version": "0.1.5",
+    "release_digest": "sha256:f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "slideshow",
+      "version": "0.1.5",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:58b503e9d83ab9c1b1b328779b7315d58e1f0054c410a12e2a8be905b290460e",
+        "path_scope": [
+          "projects/slideshow/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "slideshow_skill",
+          "version": "0.2.6",
+          "digest": "sha256:979a828174e01eb4cc1b7c0d06da58ca709adbd30487e417c9a4d09015d7e2a8",
+          "manifest_digest": "sha256:c1a6297f853bd2a9f760ebc989c5ee0a6a3883b87e9a2ba5523a6b73659ec65c",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:58b503e9d83ab9c1b1b328779b7315d58e1f0054c410a12e2a8be905b290460e",
+            "path_scope": [
+              "skills/slideshow_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/slideshow_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [
+        "devices.control",
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:58b503e9d83ab9c1b1b328779b7315d58e1f0054c410a12e2a8be905b290460e",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:360f4dadbdef3f9298a59269d6f8e836ad5f48273ff5bb81c05ba85709ef163c"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:6658e0e85147b20da351babb799ba62603e5e5404a9837ebc73cc4808f01db72",
+        "profiles": [
+          "adaos.builder.component_project.v1"
+        ],
+        "members": [
+          {
+            "ref": "skill:slideshow_skill",
+            "package_digest": "sha256:979a828174e01eb4cc1b7c0d06da58ca709adbd30487e417c9a4d09015d7e2a8",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "slideshow",
+            "presentation": "skill:slideshow_skill",
+            "default": true,
+            "bindings": {
+              "surface": "slideshow"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "slideshow"
+          ],
+          "required_contracts": [
+            "capability:media.slideshow.present@^1.0.0"
+          ],
+          "validation_profiles": [
+            "slideshow.local"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "devices.control",
+              "purpose": "Present and control a slideshow on explicitly selected ReDevice endpoints.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "workspace.read",
+              "purpose": "Read selected photo folders and endpoint state.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Persist slideshow selections and execute explicit playback commands.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "photo_metadata",
+              "slideshow_state"
+            ],
+            "sent_off_device": [],
+            "linked_to_user": [],
+            "tracking": false,
+            "retention": "Photos remain at their source; slideshow state remains local."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [
+              "photo_metadata",
+              "slideshow_state"
+            ],
+            "sent_off_device": false,
+            "linked_to_user": false,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "Slideshow",
+        "description": "Local media slideshow indexing and endpoint presentation controls.",
+        "categories": [
+          "media"
+        ],
+        "tags": [
+          "cbs-provider",
+          "redevice",
+          "slideshow"
+        ]
+      },
+      "release_digest": "sha256:f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410"
+    },
+    "accepted_candidate_id": "slideshow-0-1-5-3451632ef410",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.project.preflight",
+        "tests": "qualified application and component tests passed",
+        "cbs": "exact native admission or explicit compatibility classification",
+        "checkpoint_source_revision": "7ca9c3945c6d1cd80863a7fe9a546bf2300b96d8",
+        "checkpoint_component_ref": "skill:slideshow_skill"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "devices.control",
+          "purpose": "Present and control a slideshow on explicitly selected ReDevice endpoints.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "workspace.read",
+          "purpose": "Read selected photo folders and endpoint state.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Persist slideshow selections and execute explicit playback commands.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "photo_metadata",
+          "slideshow_state"
+        ],
+        "sent_off_device": [],
+        "linked_to_user": [],
+        "tracking": false,
+        "retention": "Photos remain at their source; slideshow state remains local."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [
+          "photo_metadata",
+          "slideshow_state"
+        ],
+        "sent_off_device": false,
+        "linked_to_user": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:4ef1590e66558af951a4d8c971c2a62895405d33a9b34cc215181f36683c7c3b",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "slideshow",
+      "release_digest": "sha256:f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [
+        {
+          "id": "devices.control",
+          "title": "Devices.Control",
+          "purpose": "Present and control a slideshow on explicitly selected ReDevice endpoints.",
+          "required": true
+        },
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Read selected photo folders and endpoint state.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Persist slideshow selections and execute explicit playback commands.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:6dbeafaa141d8d3fc2f8d151b5a98a8df241d21899a7ae3059ef2239015ee409"
+  },
+  "channels": {
+    "stable": "sha256:f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410"
+  },
+  "semantic": {
+    "projection_digest": "sha256:f468e9430114c92e1729ab062285e91f40ab5d60f311371829f5384e1f298ad0",
+    "path": "semantic/applications/slideshow/f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410.json"
+  },
+  "projection_digest": "sha256:66858eb3a00c19405d64ff3ea88fab20142460276c003653df4c63987a6b4234"
+}
