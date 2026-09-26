@@ -1,0 +1,55 @@
+schema: adaos.cbs.provider_authoring.v1
+authorship:
+  origin: human_authored
+capability:
+  ref: capability:vision.descriptors.manage
+  version: 1.0.0
+  title: Manage browser-produced visual object descriptors
+  operations:
+  - operation_id: inspect
+    tool: cv_descriptor_status
+    errors:
+    - descriptor_state_unavailable
+  - operation_id: configure_model
+    tool: cv_descriptor_configure_model
+    errors:
+    - missing_model
+  - operation_id: save
+    tool: cv_descriptor_save_descriptor
+    errors:
+    - invalid_vector
+  - operation_id: update
+    tool: cv_descriptor_update_descriptor
+    errors:
+    - descriptor_not_found
+  - operation_id: delete
+    tool: cv_descriptor_delete_descriptor
+    errors:
+    - descriptor_not_found
+  - operation_id: targets
+    tool: cv_descriptor_get_targets
+    errors:
+    - descriptor_state_unavailable
+  invariants:
+  - raw image capture and embedding generation remain in the browser runtime
+  - descriptor vectors are not projected on public UI data routes
+  effects:
+  - persists owner-local descriptor metadata and embeddings
+  - publishes bounded browser runtime commands and descriptor projections
+  conformance_refs:
+  - scenario:vision.descriptors.manage.v1
+binding:
+  ref: binding-definition:vision.descriptors.manage.browser-local
+  version: 1.0.0
+  entry_protocol: adaos.skill.tools.v1
+  logical_entrypoint: vision.descriptors.browser-local
+  physical_member: handlers/main.py
+  modes:
+  - production
+  profile_classes:
+  - local
+  provider_features:
+  - browser_cv_runtime
+  - local_descriptor_store
+  conformance_obligations:
+  - capability_conformance

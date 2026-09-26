@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: cv_descriptor_lab
-version: 0.1.14
+version: 0.1.18
 profiles:
 - adaos.cv.descriptor_lab.v1
 components:
@@ -13,7 +13,12 @@ components:
     relations:
     - realizes
   dependencies: []
-entrypoints: []
+entrypoints:
+- id: descriptors
+  presentation: skill:cv_descriptor
+  default: true
+  bindings:
+    descriptor_store: local
 catalog:
   title: CV Descriptor Lab
   title_i18n:
@@ -34,12 +39,23 @@ catalog:
   - lab
   - alpha
 publication:
-  stage: alpha
-  visibility: unlisted
+  stage: beta
+  visibility: listed
   channel: stable
 install:
   default: false
+  features:
+  - id: descriptors
+    title: Visual descriptors
+    default: true
+    optional: false
+    components:
+    - skill:cv_descriptor
 compatibility:
+  required_entrypoints:
+  - descriptors
+  required_contracts:
+  - capability:vision.descriptors.manage@^1.0.0
   validation_profiles:
   - cv.descriptor.local
 lifecycle:

@@ -1,0 +1,93 @@
+{
+  "schema": "adaos.semantic_registry.application_release.v1",
+  "project_id": "cv_descriptor_lab",
+  "version": "0.1.18",
+  "application_ref": "skill:cv_descriptor",
+  "project_release_digest": "sha256:989dc2ebfa7e128b95945618da6742d779406a28f6c045e728a0d594d482a47e",
+  "source_ref": {
+    "schema": "adaos.artifact.source_ref.v1",
+    "forge": "content-addressed-dev",
+    "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+    "revision": "sha256:df6b4d1c2015136672f7be8e043da53dfd6d07705a33222ce2d68c1433a75a4a",
+    "path_scope": [
+      "projects/cv_descriptor_lab/"
+    ]
+  },
+  "compilation_digest": "sha256:5bd02f24d28448e7f9da5f6e28270494b6ef2229b988b123455e20f2e77fbbe8",
+  "semantic_revision_digest": "sha256:c60714b9e8af4aaa566326cde6fd81c052c395f55757ca342462f6c6356feedc",
+  "requirements": [
+    {
+      "requirement_ref": "requirement:skill.cv_descriptor.vision.descriptors.manage",
+      "capability_ref": "capability:vision.descriptors.manage",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:9ec24f0d72669c67e54045008e9640a05145dc46711fce84181277e6fbeaa6d5"
+    }
+  ],
+  "portable_artifacts": {
+    "adaos.binding.definition.v1": [
+      "sha256:9ccc80312d5f9cc134d4e5bba60d4edbd297aeb5810edd95f14252577d4f02f4"
+    ],
+    "adaos.binding.delivery.v1": [
+      "sha256:90cd33638987aee035aec45a875fb49c29536661122f699161750313fd26da97"
+    ],
+    "adaos.capability.contract.v1": [
+      "sha256:337f999e64acd01e28717708c66d5d23429995da3164020c8fa7c85d19ad25d1"
+    ]
+  },
+  "distribution": {
+    "thin": {
+      "requirements_only": true,
+      "registry_required": true
+    },
+    "resolved": {
+      "project_release_digest": "sha256:989dc2ebfa7e128b95945618da6742d779406a28f6c045e728a0d594d482a47e",
+      "package_closure": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "cv_descriptor",
+          "version": "0.1.8",
+          "digest": "sha256:8140e610d8453375c38f36f32101e4e2ee0126694d431efba4cb77fea3e871c5",
+          "manifest_digest": "sha256:898a0bb5c7755bbdb0116e56637330314d9da17d28f0d98fd6712b53be855328",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:df6b4d1c2015136672f7be8e043da53dfd6d07705a33222ce2d68c1433a75a4a",
+            "path_scope": [
+              "skills/cv_descriptor/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/cv_descriptor",
+          "schema_locks": []
+        }
+      ],
+      "portable_artifact_digests": [
+        "sha256:337f999e64acd01e28717708c66d5d23429995da3164020c8fa7c85d19ad25d1",
+        "sha256:90cd33638987aee035aec45a875fb49c29536661122f699161750313fd26da97",
+        "sha256:9ccc80312d5f9cc134d4e5bba60d4edbd297aeb5810edd95f14252577d4f02f4"
+      ]
+    }
+  },
+  "projection_digest": "sha256:cc822db140e68f00d48ced58424c5a77d63aaa3f594c38e4aac12b2be58badac"
+}

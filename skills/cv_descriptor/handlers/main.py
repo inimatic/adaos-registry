@@ -560,6 +560,24 @@ def _result(state: Mapping[str, Any], *, webspace_id: str | None = None, extra: 
     return out
 
 
+@tool("cv_descriptor_drain")
+def cv_descriptor_drain(**_: Any) -> dict[str, Any]:
+    """Materialize one complete JSON snapshot before runtime authority moves."""
+
+    _write_state(_read_state())
+    return {"ok": True}
+
+
+@tool("cv_descriptor_rehydrate")
+def cv_descriptor_rehydrate(
+    webspace_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    """Reload durable state and rebuild the bounded browser projections."""
+
+    return _result(_read_state(), webspace_id=webspace_id)
+
+
 @tool("cv_descriptor_status")
 def cv_descriptor_status(
     webspace_id: str | None = None,

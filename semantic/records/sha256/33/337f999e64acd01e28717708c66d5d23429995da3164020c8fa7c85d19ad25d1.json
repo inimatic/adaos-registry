@@ -1,0 +1,255 @@
+{
+  "authority_requirements": [],
+  "capability_ref": "capability:vision.descriptors.manage",
+  "compatibility": {},
+  "conformance_refs": [
+    "scenario:vision.descriptors.manage.v1"
+  ],
+  "contract_digest": "sha256:337f999e64acd01e28717708c66d5d23429995da3164020c8fa7c85d19ad25d1",
+  "dependencies": [],
+  "effects": [
+    "persists owner-local descriptor metadata and embeddings",
+    "publishes bounded browser runtime commands and descriptor projections"
+  ],
+  "invariants": [
+    "raw image capture and embedding generation remain in the browser runtime",
+    "descriptor vectors are not projected on public UI data routes"
+  ],
+  "operations": [
+    {
+      "errors": [
+        "descriptor_state_unavailable"
+      ],
+      "input_schema": {
+        "properties": {
+          "include_vectors": {
+            "type": "boolean"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "inspect",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "missing_model"
+      ],
+      "input_schema": {
+        "properties": {
+          "model": {
+            "type": "object"
+          },
+          "model_id": {
+            "type": "string"
+          },
+          "threshold": {
+            "type": "number"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "configure_model",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "invalid_vector"
+      ],
+      "input_schema": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "descriptor": {
+            "type": "object"
+          },
+          "embedding": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "model_signature": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "threshold": {
+            "type": "number"
+          },
+          "thumbnail": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "vector": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "save",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "descriptor_not_found"
+      ],
+      "input_schema": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "descriptor_id": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "threshold": {
+            "type": "number"
+          },
+          "thumbnail": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "update",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "descriptor_not_found"
+      ],
+      "input_schema": {
+        "properties": {
+          "descriptor_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "delete",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "descriptor_state_unavailable"
+      ],
+      "input_schema": {
+        "properties": {
+          "include_disabled": {
+            "type": "boolean"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "targets",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    }
+  ],
+  "schema": "adaos.capability.contract.v1",
+  "state_ports": [],
+  "title": "Manage browser-produced visual object descriptors",
+  "version": "1.0.0"
+}

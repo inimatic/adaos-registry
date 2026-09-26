@@ -1,5 +1,5 @@
 name: cv_descriptor
-version: 0.1.7
+version: 0.1.8
 description: Browser-side CV descriptor pilot. Stores visual-object embeddings, model
   signatures, thumbnails, and text descriptions while the AdaOS client CV runtime
   is being built.
@@ -10,7 +10,49 @@ runtime:
     startup_allowed: false
     background_refresh: true
 webui_owner: shared
+lifecycle:
+  drain: cv_descriptor_drain
+  rehydrate: cv_descriptor_rehydrate
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases: []
 tools:
+- name: cv_descriptor_drain
+  description: Flush the descriptor JSON state before an Application release switch.
+  entry: handlers.main:cv_descriptor_drain
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      reason:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+- name: cv_descriptor_rehydrate
+  description: Reload and republish descriptor projections after an Application release
+    switch.
+  entry: handlers.main:cv_descriptor_rehydrate
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
 - name: cv_descriptor_status
   description: Return current CV Descriptor state, public descriptor list, and browser
     runtime command state.
@@ -21,6 +63,15 @@ tools:
       webspace_id:
         type: string
       include_vectors:
+        type: boolean
+  side_effects: read_only
+  side_effect_class: read_only
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
         type: boolean
 - name: cv_descriptor_configure_model
   description: Select or set the browser CV model descriptor used for new embeddings
@@ -37,6 +88,15 @@ tools:
         type: number
       webspace_id:
         type: string
+  side_effects: local_write
+  side_effect_class: local_write
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
 - name: cv_descriptor_save_descriptor
   description: Persist one browser-captured embedding with thumbnail, title, description,
     and model signature.
@@ -70,6 +130,15 @@ tools:
         type: object
       webspace_id:
         type: string
+  side_effects: local_write
+  side_effect_class: local_write
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
 - name: cv_descriptor_update_descriptor
   description: Update descriptor title, description, threshold, enabled flag, or thumbnail.
   entry: handlers.main:cv_descriptor_update_descriptor
@@ -94,6 +163,15 @@ tools:
         type: number
       webspace_id:
         type: string
+  side_effects: local_write
+  side_effect_class: local_write
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
 - name: cv_descriptor_delete_descriptor
   description: Delete one descriptor by id.
   entry: handlers.main:cv_descriptor_delete_descriptor
@@ -106,6 +184,15 @@ tools:
         type: string
       webspace_id:
         type: string
+  side_effects: local_write
+  side_effect_class: local_write
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
 - name: cv_descriptor_clear
   description: Remove all saved descriptors.
   entry: handlers.main:cv_descriptor_clear
@@ -114,6 +201,15 @@ tools:
     properties:
       webspace_id:
         type: string
+  side_effects: local_write
+  side_effect_class: local_write
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
 - name: cv_descriptor_get_targets
   description: Return enabled descriptor vectors for browser-side small-list identification.
   entry: handlers.main:cv_descriptor_get_targets
@@ -124,6 +220,15 @@ tools:
         type: boolean
       webspace_id:
         type: string
+  side_effects: read_only
+  side_effect_class: read_only
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
 - name: cv_descriptor_runtime_command
   description: Write a desired browser CV runtime command into projected state.
   entry: handlers.main:cv_descriptor_runtime_command
@@ -270,7 +375,7 @@ data_projections:
   targets:
   - backend: yjs
     path: data/cv_descriptor/runtime
-updated_at: '2026-09-03T00:20:10+00:00'
+updated_at: '2026-09-26T01:49:35+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.950+5767.4e1aaf98b
