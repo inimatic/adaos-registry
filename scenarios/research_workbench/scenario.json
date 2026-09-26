@@ -1,7 +1,7 @@
 {
     "id": "research_workbench",
     "name": "research_workbench",
-    "version": "0.1.17",
+    "version": "0.1.18",
     "title": "Research Workbench",
     "description": "Shared portfolio and full-page Direction to Task to ImplementationTrack workbench with governed formulation, Builder handoff, and joined evidence lineage.",
     "type": "desktop",
@@ -57,7 +57,7 @@
     },
     "steps": [],
     "prototype": "scenario_default",
-    "updated_at": "2026-09-26T06:52:26+00:00",
+    "updated_at": "2026-09-26T11:04:42+00:00",
     "runtime_data_policy": {
         "enforcement": "strict"
     },

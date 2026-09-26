@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.82.0
+version: 0.83.0
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
@@ -579,7 +579,7 @@ tools:
   description: Use Researcher web search for active typed SearchRequests and persist
     non-admitted source candidate receipts with provider token usage.
   entry: handlers.main:discover_inquiry_sources
-  side_effects: external_read
+  side_effects: external_io
   input_schema:
     type: object
     required:
@@ -604,7 +604,7 @@ tools:
   description: Re-read durable Root LLM jobs to backfill missing Researcher token
     usage without changing scientific state.
   entry: handlers.main:reconcile_inquiry_usage
-  side_effects: external_read
+  side_effects: external_io
   input_schema:
     type: object
     required:
@@ -1659,7 +1659,7 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-09-26T06:52:35+00:00'
+updated_at: '2026-09-26T11:04:50+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.904+5517.70d7d20b

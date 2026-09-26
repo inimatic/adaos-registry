@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.57.0
+version: 0.58.0
 description: Reusable provider-neutral research control plane for governed studies,
   experiments, runner providers, trackers and immutable evidence.
 entry: handlers/main.py
@@ -45,6 +45,7 @@ tools:
   description: Apply checksum-pinned research repository migrations and report the
     redacted binding.
   entry: handlers.main:ensure_schema
+  side_effects: local_write
   input_schema:
     type: object
     additionalProperties: false
@@ -54,6 +55,7 @@ tools:
   description: Return the exact ResearchManager runtime identity used by consumer-side
     candidate evaluation.
   entry: handlers.main:environment_identity
+  side_effects: read_only
   input_schema:
     type: object
     additionalProperties: false
@@ -67,6 +69,7 @@ tools:
     compilation and ResearchManager consumer contract without starting scientific
     execution.
   entry: handlers.main:validate_development_candidate
+  side_effects: read_only
   timeout_seconds: 300
   input_schema:
     type: object
@@ -88,6 +91,7 @@ tools:
   description: Exercise one active DEV runner through the exact ResearchManager consumer
     ABI, a bounded workflow smoke, collection, and artifact verification.
   entry: handlers.main:evaluate_development_candidate
+  side_effects: local_write
   timeout_seconds: 3600
   input_schema:
     type: object
@@ -110,6 +114,7 @@ tools:
     ABI used by Builder and direction skills, optionally materializing a trusted operation
     sequence from an accepted ExperimentPlan.
   entry: handlers.main:get_runner_contract
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -135,6 +140,7 @@ tools:
 - name: rehydrate
   description: Re-open the durable repository after activation or restart.
   entry: handlers.main:rehydrate
+  side_effects: runtime_write
   input_schema:
     type: object
     additionalProperties: false
@@ -144,6 +150,7 @@ tools:
   description: Create an immutable study, hypothesis, protocol, plan, and isolated
     split bindings.
   entry: handlers.main:create_study
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -180,6 +187,7 @@ tools:
   description: Create an immutable Study and bind it to one exact accepted compilation,
     ProjectRelease, DevelopmentSession and installed runner provider.
   entry: handlers.main:create_compiled_study
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -218,6 +226,7 @@ tools:
 - name: advance_workflow
   description: Apply one generation-checked governed research lifecycle command.
   entry: handlers.main:advance_workflow
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -246,6 +255,7 @@ tools:
   description: Create a lineage-linked protocol version and explicitly retain or invalidate
     prior trials.
   entry: handlers.main:amend_protocol
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -278,6 +288,7 @@ tools:
   description: Materialize paired immutable trial groups from a locked protocol and
     analysis plan.
   entry: handlers.main:materialize_trials
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -299,6 +310,7 @@ tools:
   description: Run the deterministic no-training fixture while preserving run and
     physical attempt identities.
   entry: handlers.main:run_fixture
+  side_effects: local_write
   timeout_seconds: 30
   input_schema:
     type: object
@@ -454,6 +466,7 @@ tools:
   description: Read-only admission of an immutable execution profile against the active
     executor before protocol lock or Run materialization.
   entry: handlers.main:assess_experiment_execution
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -751,6 +764,7 @@ tools:
 - name: unblind_test
   description: Auditably unblind the sealed test binding after the QC gate.
   entry: handlers.main:unblind_test
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -781,6 +795,7 @@ tools:
   description: Finalize a portable content-addressed claim or workflow-validation
     evidence manifest without promoting smoke output to scientific evidence.
   entry: handlers.main:export_evidence
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -804,6 +819,7 @@ tools:
   description: Deterministically verify an evidence manifest and every research-record
     reference.
   entry: handlers.main:verify_evidence
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -816,6 +832,7 @@ tools:
 - name: decide_claim
   description: Record a claim review decision over a verified evidence bundle.
   entry: handlers.main:decide_claim
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -998,7 +1015,7 @@ data_routes:
     - research-experiment
     - research-tracking
     - research-evidence
-updated_at: '2026-09-26T06:52:46+00:00'
+updated_at: '2026-09-26T11:05:01+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.917+5567.3e20803a

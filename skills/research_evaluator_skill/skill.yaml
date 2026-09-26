@@ -1,5 +1,5 @@
 name: research_evaluator_skill
-version: 0.2.9
+version: 0.2.11
 description: Independent, contamination-aware evaluator for AdaOS research-compilation
   calibrations.
 supported_locales:
@@ -40,6 +40,7 @@ tools:
     counterbalanced v1.9 C0/C3 calibration with bounded workload, a frozen consumer
     ABI, source-bound paired execution, and a hidden scientific implementation probe.
   entry: handlers.main:derive_compact_calibration
+  side_effects: local_write
   side_effect_class: local_write
   input_schema:
     type: object
@@ -140,6 +141,7 @@ tools:
   description: Ensure the owner-scoped independent evaluation ledger and report its
     binding.
   entry: handlers.main:ensure_schema
+  side_effects: local_write
   side_effect_class: local_write
   input_schema:
     type: object
@@ -154,6 +156,7 @@ tools:
   description: Validate and freeze an immutable C0-C4 calibration task with visible
     and hidden inputs.
   entry: handlers.main:freeze_calibration
+  side_effects: local_write
   side_effect_class: local_write
   input_schema:
     type: object
@@ -175,6 +178,7 @@ tools:
   description: Read the public projection of a frozen calibration task without hidden
     evaluator paths.
   entry: handlers.main:get_task
+  side_effects: read_only
   side_effect_class: none
   input_schema:
     type: object
@@ -194,6 +198,7 @@ tools:
   description: Return a path-free immutable task, packet, candidate, result, and summary
     lineage for an authorized research-domain importer.
   entry: handlers.main:get_calibration_lineage
+  side_effects: read_only
   side_effect_class: none
   input_schema:
     type: object
@@ -221,6 +226,7 @@ tools:
   description: Materialize a digest-bound, contamination-checked input packet for
     one paired attempt.
   entry: handlers.main:prepare_calibration_arm
+  side_effects: local_write
   side_effect_class: local_write
   input_schema:
     type: object
@@ -256,6 +262,7 @@ tools:
   description: Materialize all paired C0-C4 packets for one preregistered budget view
     and return their immutable identities.
   entry: handlers.main:prepare_calibration_suite
+  side_effects: local_write
   side_effect_class: local_write
   input_schema:
     type: object
@@ -283,6 +290,7 @@ tools:
   description: Independently score and persist a candidate against every frozen mandatory
     check.
   entry: handlers.main:record_calibration_result
+  side_effects: local_write
   side_effect_class: local_write
   input_schema:
     type: object
@@ -305,6 +313,7 @@ tools:
   description: Run the hidden deterministic judge over one terminal isolated Builder
     candidate.
   entry: handlers.main:evaluate_builder_attempt
+  side_effects: local_write
   side_effect_class: local_write
   timeout_seconds: 3600
   input_schema:
@@ -350,6 +359,7 @@ tools:
   description: Report per-arm evidence-valid completion, uncertainty, cost, and failure
     attribution.
   entry: handlers.main:summarize_calibration
+  side_effects: read_only
   side_effect_class: none
   input_schema:
     type: object
@@ -374,6 +384,7 @@ tools:
   description: Export the frozen task, packets, immutable results, and recomputed
     summary as one content-addressed package.
   entry: handlers.main:export_calibration_package
+  side_effects: local_write
   side_effect_class: local_write
   input_schema:
     type: object
@@ -438,7 +449,7 @@ data_routes:
     into candidate context
   budget:
     max_payload_bytes: 4194304
-updated_at: '2026-09-26T06:52:56+00:00'
+updated_at: '2026-09-26T11:05:10+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.916+5561.e4c91d2f
