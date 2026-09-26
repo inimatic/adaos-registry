@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import ctx_current_user
+from adaos.sdk.skill_env import skill_state_dir
 from adaos.sdk.subscriptions import project_codex_usage_window
 
 ROOT_GOVERNED_RESOURCES: tuple[str, ...] = (
@@ -82,12 +83,7 @@ def _timestamp_s(value: Any) -> float | None:
 
 
 def _skill_state_dir() -> Path:
-    try:
-        from adaos.services.runtime_paths import current_state_dir
-
-        return (current_state_dir() / "skills" / "subscription_status_skill").resolve()
-    except Exception:
-        return (Path(__file__).resolve().parents[1] / ".state").resolve()
+    return skill_state_dir()
 
 
 def _plan_change_request_path() -> Path:

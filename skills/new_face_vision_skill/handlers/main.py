@@ -18,6 +18,7 @@ from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import ctx_subnet
 from adaos.sdk.data.context import clear_current_skill, set_current_skill
 from adaos.sdk.data.events import publish
+from adaos.sdk.skill_env import skill_state_dir
 from adaos.sdk.io import stream_publish
 from adaos.services.agent_context import get_ctx
 from adaos.services.yjs.webspace import default_webspace_id
@@ -60,11 +61,7 @@ _playback_thread: threading.Thread | None = None
 
 
 def _state_dir() -> Path:
-    try:
-        ctx = get_ctx()
-        return Path(ctx.paths.state_dir()) / "skills" / SKILL_NAME
-    except Exception:
-        return Path(__file__).resolve().parents[1] / ".state"
+    return skill_state_dir()
 
 
 def _uploads_dir() -> Path | None:

@@ -13,6 +13,7 @@ from typing import Any, Mapping
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data.context import clear_current_skill, set_current_skill
 from adaos.sdk.data.events import publish
+from adaos.sdk.skill_env import skill_state_dir
 from adaos.sdk.io import stream_publish
 from adaos.services.agent_context import get_ctx
 
@@ -124,15 +125,7 @@ def _state_dir() -> Path:
         path = Path(raw)
         path.mkdir(parents=True, exist_ok=True)
         return path
-    try:
-        ctx = get_ctx()
-        path = Path(ctx.paths.state_dir()) / "skills" / SKILL_NAME
-        path.mkdir(parents=True, exist_ok=True)
-        return path
-    except Exception:
-        path = Path(__file__).resolve().parents[1] / ".state"
-        path.mkdir(parents=True, exist_ok=True)
-        return path
+    return skill_state_dir()
 
 
 def _state_path() -> Path:
