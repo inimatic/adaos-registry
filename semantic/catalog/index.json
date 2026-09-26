@@ -109,9 +109,9 @@
       "application_id": "redevice_control",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 2,
-      "stable_release_digest": "sha256:b6ec208fcb49350b5d2eae228c8a0bd0b903f42925043c5de044bddaa4121bd9",
-      "release_key": "redevice_control@sha256:b6ec208fcb49350b5d2eae228c8a0bd0b903f42925043c5de044bddaa4121bd9",
-      "projection_digest": "sha256:e2124ceb75348d675e756731f89d1629f10938d01919757f6501896cbf01f9a3"
+      "stable_release_digest": "sha256:adb435e8ac5635edc8c6d4531dd7a07e7bdb6c2adb27df472d0a65a7fe3ac3a8",
+      "release_key": "redevice_control@sha256:adb435e8ac5635edc8c6d4531dd7a07e7bdb6c2adb27df472d0a65a7fe3ac3a8",
+      "projection_digest": "sha256:9aa37d7680715d8b3f751dc16663460ae732a73cc36a81496600e265e80a92db"
     },
     "slideshow": {
       "application_id": "slideshow",
@@ -370,7 +370,15 @@
       "release_digest": "sha256:30c99dbbd8ded08abc40b5c5ea2cdcdb7378678a831d59a2afaea18979a083eb",
       "path": "semantic/catalog/releases/adaos_builder/30c99dbbd8ded08abc40b5c5ea2cdcdb7378678a831d59a2afaea18979a083eb.json",
       "projection_digest": "sha256:aeff49f1d66ec1e60b9ef3b8ed3d2bfda587dd30157dbc46c41bdf94219c4ee8"
+    },
+    "redevice_control@sha256:adb435e8ac5635edc8c6d4531dd7a07e7bdb6c2adb27df472d0a65a7fe3ac3a8": {
+      "application_id": "redevice_control",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.21",
+      "release_digest": "sha256:adb435e8ac5635edc8c6d4531dd7a07e7bdb6c2adb27df472d0a65a7fe3ac3a8",
+      "path": "semantic/catalog/releases/redevice_control/adb435e8ac5635edc8c6d4531dd7a07e7bdb6c2adb27df472d0a65a7fe3ac3a8.json",
+      "projection_digest": "sha256:9aa37d7680715d8b3f751dc16663460ae732a73cc36a81496600e265e80a92db"
     }
   },
-  "index_digest": "sha256:64b011aba4c1b407e82680b938229bf5bcfc2abd3022362c25341085933088fa"
+  "index_digest": "sha256:0c871cbcfc04dfbcd65f2ac58e31a678802f86de750d1e1ac45d5565904e4f9c"
 }

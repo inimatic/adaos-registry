@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: redevice_control
-version: 0.1.20
+version: 0.1.21
 profiles:
 - adaos.redevice.control.v1
 components:

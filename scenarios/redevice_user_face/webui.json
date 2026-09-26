@@ -440,7 +440,7 @@
                 "redevice_user_face": {}
             }
         },
-        "version": "0.1.11",
+        "version": "0.1.12",
         "manifest": "webui.json"
     }
 }

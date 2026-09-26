@@ -1,5 +1,5 @@
 id: redevice_user_face
-version: 0.1.11
+version: 0.1.12
 title: ReDevice User Face
 description: Scenario that groups ReDevice endpoint settings, slideshow, and voice
   endpoint skills around the Endpoint Registry model.
@@ -16,7 +16,7 @@ runtime:
     - redevice_voice
     optional:
     - redevice_list
-updated_at: '2026-09-26T08:58:47+00:00'
+updated_at: '2026-09-26T09:42:06+00:00'
 name: redevice_user_face
 ui:
   manifest: webui.json
