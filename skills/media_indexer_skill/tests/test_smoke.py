@@ -53,7 +53,7 @@ def test_webui_declares_compact_yjs_and_stream_receiver() -> None:
     assert receiver["mode"] == "replace"
     assert receiver["snapshotPolicy"] == "on_subscribe"
     schema = webui["registry"]["modals"]["media_indexer_modal"]["schema"]
-    assert schema["layout"]["pattern"] == "split"
+    assert schema["layout"]["pattern"] == "workbench"
     library_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-library")
     assert library_widget["type"] == "ui.table"
     assert [button["id"] for button in library_widget["inputs"]["buttons"]] == ["play"]
@@ -137,32 +137,22 @@ def test_handler_import_is_passive_and_search_without_index_does_not_load_models
 
 def test_internal_data_dir_defaults_to_stable_skill_state(monkeypatch, tmp_path: pathlib.Path) -> None:
     monkeypatch.delenv("MEDIA_INDEXER_DATA_DIR", raising=False)
-    monkeypatch.setenv("ADAOS_BASE_DIR", str(tmp_path / "adaos"))
+    monkeypatch.setenv("ADAOS_SKILL_STATE_DIR", str(tmp_path / "runtime" / "data" / "state"))
 
     main = importlib.import_module("handlers.main")
 
-    assert main._internal_data_dir() == tmp_path / "adaos" / "state" / "media_indexer_skill" / "internal"
+    assert main._internal_data_dir() == tmp_path / "runtime" / "data" / "state" / "internal"
 
 
-def test_internal_data_dir_ignores_relative_context_base(monkeypatch, tmp_path: pathlib.Path) -> None:
+def test_internal_data_dir_does_not_fall_back_to_core_state(monkeypatch, tmp_path: pathlib.Path) -> None:
     monkeypatch.delenv("MEDIA_INDEXER_DATA_DIR", raising=False)
-    monkeypatch.delenv("ADAOS_BASE_DIR", raising=False)
-
-    home = tmp_path / "home"
-    index_dir = home / ".adaos" / "state" / "media_indexer_skill" / "internal" / "faiss"
-    index_dir.mkdir(parents=True)
-    (index_dir / "metadata.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("ADAOS_BASE_DIR", str(tmp_path / "adaos"))
+    monkeypatch.setenv("ADAOS_SKILL_STATE_DIR", str(tmp_path / "owned" / "state"))
 
     main = importlib.import_module("handlers.main")
 
-    monkeypatch.setattr(main.pathlib.Path, "home", classmethod(lambda cls: home))
-    monkeypatch.setattr(
-        main,
-        "get_ctx",
-        lambda: SimpleNamespace(paths=SimpleNamespace(base_dir=lambda: "state")),
-    )
-
-    assert main._internal_data_dir() == home / ".adaos" / "state" / "media_indexer_skill" / "internal"
+    assert main._internal_data_dir() == tmp_path / "owned" / "state" / "internal"
+    assert not (tmp_path / "adaos" / "state" / "media_indexer_skill").exists()
 
 
 def test_scan_action_uses_webspace_form_directory_when_payload_omits_directory(
@@ -914,37 +904,48 @@ def _load_media_indexer_library():
     return library
 
 
-def test_media_indexer_playback_resolver_uses_state_metadata_path(monkeypatch, tmp_path: pathlib.Path) -> None:
+def test_media_indexer_playback_resolver_uses_runtime_state_metadata_path(monkeypatch, tmp_path: pathlib.Path) -> None:
     library = _load_media_indexer_library()
-    base_dir = tmp_path / "adaos"
     skills_dir = tmp_path / "skills"
+    metadata = (
+        skills_dir
+        / ".runtime"
+        / "media_indexer_skill"
+        / "v0.1"
+        / "data"
+        / "state"
+        / "internal"
+        / "faiss"
+        / "metadata.json"
+    )
+    metadata.parent.mkdir(parents=True)
+    metadata.write_text("{}", encoding="utf-8")
     monkeypatch.delenv("MEDIA_INDEXER_DATA_DIR", raising=False)
     monkeypatch.setattr(
         library,
         "get_ctx",
         lambda: SimpleNamespace(
             paths=SimpleNamespace(
-                base_dir=lambda: base_dir,
                 skills_workspace_dir=lambda: skills_dir,
             )
         ),
     )
 
-    assert base_dir / "state" / "media_indexer_skill" / "internal" / "faiss" / "metadata.json" in library._metadata_candidates()
+    assert metadata in library._metadata_candidates()
 
 
-def test_media_indexer_playback_resolver_uses_base_dir_env_without_context(monkeypatch, tmp_path: pathlib.Path) -> None:
+def test_media_indexer_playback_resolver_uses_explicit_skill_state(monkeypatch, tmp_path: pathlib.Path) -> None:
     library = _load_media_indexer_library()
-    base_dir = tmp_path / "adaos"
+    state_dir = tmp_path / "runtime" / "data" / "state"
     monkeypatch.delenv("MEDIA_INDEXER_DATA_DIR", raising=False)
-    monkeypatch.setenv("ADAOS_BASE_DIR", str(base_dir))
+    monkeypatch.setenv("ADAOS_SKILL_STATE_DIR", str(state_dir))
     monkeypatch.setattr(
         library,
         "get_ctx",
         lambda: (_ for _ in ()).throw(RuntimeError("context unavailable")),
     )
 
-    assert base_dir / "state" / "media_indexer_skill" / "internal" / "faiss" / "metadata.json" in library._metadata_candidates()
+    assert state_dir / "internal" / "faiss" / "metadata.json" in library._metadata_candidates()
 
 
 def test_media_indexer_playback_resolver_requires_indexed_root(monkeypatch, tmp_path: pathlib.Path) -> None:

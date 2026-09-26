@@ -26,6 +26,7 @@ from adaos.sdk.data import skill_memory
 from adaos.sdk.data.context import clear_current_skill, set_current_skill
 from adaos.sdk.data.skill_env import skill_env_path
 from adaos.sdk.io.out import stream_publish
+from adaos.sdk.skill_env import skill_state_dir
 from adaos.services.agent_context import get_ctx
 
 _SKILL_ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -227,36 +228,7 @@ def _internal_data_dir() -> pathlib.Path:
     if override:
         path = pathlib.Path(override)
     else:
-        def absolute_base(value: Any) -> pathlib.Path | None:
-            raw = str(value or "").strip()
-            if not raw:
-                return None
-            candidate = pathlib.Path(raw).expanduser()
-            return candidate if candidate.is_absolute() else None
-
-        env_base = absolute_base(os.getenv("ADAOS_BASE_DIR"))
-        if env_base is not None:
-            path = env_base / "state" / "media_indexer_skill" / "internal"
-        else:
-            candidates: List[pathlib.Path] = []
-            try:
-                ctx = get_ctx()
-                base_dir_value = ctx.paths.base_dir()
-                ctx_base = absolute_base(base_dir_value() if callable(base_dir_value) else base_dir_value)
-                if ctx_base is not None:
-                    candidates.append(ctx_base)
-            except Exception:
-                pass
-            home_base = pathlib.Path.home().expanduser() / ".adaos"
-            if home_base not in candidates:
-                candidates.append(home_base)
-            selected = candidates[0]
-            for candidate in candidates:
-                candidate_path = candidate / "state" / "media_indexer_skill" / "internal"
-                if (candidate_path / "faiss" / "metadata.json").exists():
-                    selected = candidate
-                    break
-            path = selected / "state" / "media_indexer_skill" / "internal"
+        path = skill_state_dir() / "internal"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
