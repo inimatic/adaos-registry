@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: web_desktop
-version: 0.3.54
+version: 0.3.55
 profiles:
 - adaos.desktop.shell.v1
 - adaos.default_install.v1
@@ -52,11 +52,11 @@ entrypoints:
   bindings:
     shell: web_desktop
 catalog:
-  title: Web Desktop
+  title: Management
   icon: desktop-outline
   title_i18n:
-    en: Web Desktop
-    ru: Веб-рабочий стол
+    en: Management
+    ru: Управление
   description: Default AdaOS desktop shell with project-owned connection flows, voice
     bridge, and browser surface support.
   description_i18n:

@@ -1,6 +1,6 @@
 id: web_desktop
-version: 0.3.44
-title: Рабочий стол
+version: 0.3.45
+title: Управление
 description: Desktop shell scenario that defines the main UI layout, registry and
   base catalog.
 type: desktop
@@ -13,7 +13,7 @@ depends:
 - greet_on_boot_skill
 - pair_new_device_skill
 - voice_chat_skill
-updated_at: '2026-09-26T04:54:11+00:00'
+updated_at: '2026-09-26T21:46:00+00:00'
 data_projections:
 - scope: current_user
   slot: profile.settings
@@ -34,7 +34,7 @@ data_projections:
 name: web_desktop
 title_i18n:
   key: scenario.web_desktop.title
-  fallback: Рабочий стол
+  fallback: Управление
 runtime:
   skills:
     required: []
@@ -43,6 +43,8 @@ ui:
 llm_hints:
   aliases:
   - desktop
+  - management
+  - управление
   - home
   - рабочий стол
   - главная
