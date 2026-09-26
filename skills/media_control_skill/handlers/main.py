@@ -436,6 +436,26 @@ def rehydrate(webspace_id: str = "", **_: Any) -> dict[str, Any]:
     return repository.diagnostics()
 
 
+@tool(
+    summary="Quiesce request-scoped Media Center control state before cutover.",
+    side_effects="local_write",
+)
+def drain_runtime(**_: Any) -> dict[str, Any]:
+    """Return a verified drain receipt for the connection-per-request runtime.
+
+    The control plane owns no process worker or retained SQLite connection. Tool
+    invocations commit or roll back before returning, so reaching this hook
+    through the fenced lifecycle executor is the quiescence boundary.
+    """
+
+    return {
+        "ok": True,
+        "schema": SCHEMA_VERSION,
+        "drained": True,
+        "mode": "request_scoped_connections",
+    }
+
+
 @tool(summary="Register a browser, TV, phone, speaker, or native playback target.", side_effects="local_write")
 def register_target(
     endpoint_id: str = "",

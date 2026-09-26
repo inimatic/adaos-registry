@@ -1,5 +1,5 @@
 name: media_control_skill
-version: 0.2.20
+version: 0.2.23
 description: Persistent Media Center control plane for playback targets, sessions,
   queues, commands, checkpoints, and settings.
 supported_locales:
@@ -12,6 +12,7 @@ runtime:
   python: '3.11'
 capabilities:
 - media.playback_planning
+- storage.relational
 dependencies: []
 events:
   subscribe:
@@ -25,11 +26,19 @@ events:
 lifecycle:
   after_activate: ensure_schema
   rehydrate: rehydrate
+  drain: drain_runtime
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases:
+  - path: db/media_control.sqlite3
+    migrations: []
 default_tool: now_playing
 exports:
   tools:
   - ensure_schema
   - rehydrate
+  - drain_runtime
   - register_target
   - endpoint_inbox
   - list_targets
@@ -68,6 +77,16 @@ tools:
     properties:
       webspace_id:
         type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: drain_runtime
+  entry: handlers.main:drain_runtime
+  description: Quiesce the request-scoped control plane before an Application data
+    cutover.
+  side_effects: local_write
+  input_schema:
+    type: object
     additionalProperties: true
   output_schema:
     type: object
@@ -800,7 +819,7 @@ llm_hints:
     intent: media.playback.control
     tool: voice_command
     side_effect_class: local_write
-updated_at: '2026-08-29T07:19:14+00:00'
+updated_at: '2026-09-26T01:25:04+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.950+5768.9e817addc
@@ -809,4 +828,3 @@ compatibility:
     min_commit: 9e817addce5a7f81a7361e1e89b405e6fa9330a9
     min_short_commit: 9e817add
     build_date: '2026-08-29T08:57:28+03:00'
-

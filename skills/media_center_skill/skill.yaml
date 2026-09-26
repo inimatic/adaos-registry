@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.92
+version: 0.8.95
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -49,7 +49,14 @@ events:
 lifecycle:
   after_activate: ensure_schema
   rehydrate: rehydrate
+  drain: dispose
   dispose: dispose
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases:
+  - path: db/media_center.sqlite3
+    migrations: []
 memory_budget:
   expected_rss_mb: 192
   caches:
@@ -2476,7 +2483,7 @@ nlu_hints:
           type: object
       additionalProperties: true
   entities: []
-updated_at: '2026-08-28T07:59:32+00:00'
+updated_at: '2026-09-26T01:24:44+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.947+5749.575b2f508

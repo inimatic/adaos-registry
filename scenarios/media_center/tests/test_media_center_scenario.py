@@ -61,7 +61,11 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     page = webui["ui"]["application"]["desktop"]["pageSchema"]
     widgets = {widget["id"]: widget for widget in page["widgets"]}
 
-    assert page["layout"]["type"] == "single"
+    assert page["layout"]["version"] == 2
+    assert page["layout"]["pattern"] == "collection"
+    assert {
+        area["id"]: area["role"] for area in page["layout"]["regions"]
+    } == {"main": "collection"}
     assert page["interaction"]["initialFocus"] == "widget:media-search"
     assert page["playbackEndpoint"] == {
         "schema": "adaos.playback.endpoint_provider.v1",
@@ -404,10 +408,11 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     player_schema = modals["media_center_player"]["schema"]
     player_widgets = {widget["id"]: widget for widget in player_schema["widgets"]}
     assert modals["media_center_player"]["presentation"]["kind"] == "modal"
-    assert player_schema["layout"]["type"] == "split"
+    assert player_schema["layout"]["version"] == 2
+    assert player_schema["layout"]["pattern"] == "workbench"
     assert {
-        area["id"]: area["role"] for area in player_schema["layout"]["areas"]
-    } == {"main": "main", "transport": "aux"}
+        area["id"]: area["role"] for area in player_schema["layout"]["regions"]
+    } == {"main": "main", "transport": "inspector"}
     player = player_widgets["media-center-player"]
     assert player["type"] == "media.videoBrowser"
     assert player["dataSource"]["name"] == "media_center_skill.build_playback_queue"

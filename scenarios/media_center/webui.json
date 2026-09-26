@@ -135,7 +135,8 @@
                   "wide": "pane",
                   "compact": "stack"
                 },
-                "label": "Media Center"
+          "label": "Media Center",
+          "label_i18n": {"key": "runtime.media_center.ui.media_center", "fallback": "Media Center"}
               }
             ],
             "interaction": {
@@ -161,7 +162,8 @@
                       "wide": "pane",
                       "compact": "stack"
                     },
-                    "label": "Media Center TV"
+              "label": "Media Center TV",
+              "label_i18n": {"key": "runtime.media_center.ui.media_center_tv", "fallback": "Media Center TV"}
                   }
                 ],
                 "interaction": {
@@ -189,7 +191,8 @@
                       "wide": "pane",
                       "compact": "stack"
                     },
-                    "label": "Media Center Remote"
+              "label": "Media Center Remote",
+              "label_i18n": {"key": "runtime.media_center.ui.media_center_remote", "fallback": "Media Center Remote"}
                   }
                 ],
                 "interaction": {
@@ -217,7 +220,8 @@
                       "wide": "pane",
                       "compact": "stack"
                     },
-                    "label": "Media Center Embedded"
+              "label": "Media Center Embedded",
+              "label_i18n": {"key": "runtime.media_center.ui.media_center_embedded", "fallback": "Media Center Embedded"}
                   }
                 ],
                 "interaction": {
@@ -245,7 +249,8 @@
                       "wide": "pane",
                       "compact": "stack"
                     },
-                    "label": "Media Center"
+              "label": "Media Center",
+              "label_i18n": {"key": "runtime.media_center.ui.media_center", "fallback": "Media Center"}
                   }
                 ],
                 "interaction": {

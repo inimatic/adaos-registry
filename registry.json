@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-26T01:07:19+00:00",
+  "updated_at": "2026-09-26T01:37:40+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -558,8 +558,8 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.8.92",
-      "updated_at": "2026-08-28T07:59:32+00:00",
+      "version": "0.8.95",
+      "updated_at": "2026-09-26T01:24:44+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
       "source": {
@@ -574,14 +574,21 @@
       "description": "Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 74
+      "tools_count": 74,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "media_center",
+        "release": "media_center@0.6.105",
+        "release_digest": "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
+        "package_digest": "sha256:7790ffe5ef3aea6c93478335c4b5f871152a70ea7b8b96122982293a21db993a"
+      }
     },
     {
       "kind": "skill",
       "id": "media_control_skill",
       "name": "media_control_skill",
-      "version": "0.2.20",
-      "updated_at": "2026-08-29T07:19:14+00:00",
+      "version": "0.2.23",
+      "updated_at": "2026-09-26T01:25:04+00:00",
       "path": "skills/media_control_skill",
       "manifest": "skills/media_control_skill/skill.yaml",
       "source": {
@@ -596,7 +603,14 @@
       "description": "Persistent Media Center control plane for playback targets, sessions, queues, commands, checkpoints, and settings.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 21
+      "tools_count": 22,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "media_center",
+        "release": "media_center@0.6.105",
+        "release_digest": "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
+        "package_digest": "sha256:049e260f8e34cc3bfa4132f842649376a2523bb6550b333a78881e903021cc1c"
+      }
     },
     {
       "kind": "skill",
@@ -628,8 +642,8 @@
       "kind": "skill",
       "id": "media_library_agent",
       "name": "media_library_agent",
-      "version": "0.6.43",
-      "updated_at": "2026-08-26T04:30:33+00:00",
+      "version": "0.6.46",
+      "updated_at": "2026-09-26T01:24:56+00:00",
       "path": "skills/media_library_agent",
       "manifest": "skills/media_library_agent/skill.yaml",
       "source": {
@@ -643,7 +657,14 @@
       },
       "description": "Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.",
       "runtime_python": "3.11",
-      "tools_count": 31
+      "tools_count": 31,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "media_center",
+        "release": "media_center@0.6.105",
+        "release_digest": "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
+        "package_digest": "sha256:410d73e5680f1fa2dbc50c915668d4b362fdba4bfb88a96e5ff4c8dfb2ca821e"
+      }
     },
     {
       "kind": "skill",
@@ -1956,13 +1977,19 @@
       "kind": "scenario",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.6.39",
-      "updated_at": "2026-08-29T07:19:31+00:00",
+      "version": "0.6.41",
+      "updated_at": "2026-09-26T01:25:11+00:00",
       "path": "scenarios/media_center",
       "manifest": "scenarios/media_center/scenario.yaml",
       "source": {
         "path": "scenarios/media_center",
-        "manifest": "scenarios/media_center/scenario.yaml"
+        "manifest": "scenarios/media_center/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:957f6d53a7adc49793d6a81810e46e3f908eb1ef88029b08eb4718afdb09202f",
+        "path_scope": [
+          "projects/media_center/"
+        ]
       },
       "install": {
         "kind": "scenario",
@@ -1982,6 +2009,22 @@
           "media_library_agent",
           "media_control_skill"
         ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "media_center",
+        "release": "media_center@0.6.105",
+        "release_digest": "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
+        "package_digest": "sha256:657f9ac27645dbf18942a168706f2184dfe7df9772b07ef2eb28ea92434d0748"
+      },
+      "channels": {
+        "stable": {
+          "release": "media_center@0.6.105",
+          "release_digest": "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
+          "source_revision": "sha256:957f6d53a7adc49793d6a81810e46e3f908eb1ef88029b08eb4718afdb09202f",
+          "package_digest": "sha256:657f9ac27645dbf18942a168706f2184dfe7df9772b07ef2eb28ea92434d0748",
+          "version": "0.6.41"
+        }
       }
     },
     {
@@ -3436,8 +3479,8 @@
       "kind": "project",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.6.90",
-      "updated_at": "2026-08-27T21:05:39+00:00",
+      "version": "0.6.105",
+      "updated_at": "2026-09-26T01:37:40+00:00",
       "path": "projects/media_center",
       "manifest": "projects/media_center/project.yaml",
       "source": {
@@ -3522,7 +3565,24 @@
         "adaos.media_center.desktop.v1",
         "adaos.media_center.mobile_control.v1",
         "adaos.media_center.embedded.v1"
-      ]
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "media_center",
+        "release": "media_center@0.6.105",
+        "release_digest": "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
+        "primary_component": "scenario:media_center",
+        "package_digest": "sha256:657f9ac27645dbf18942a168706f2184dfe7df9772b07ef2eb28ea92434d0748"
+      },
+      "channels": {
+        "stable": {
+          "release": "media_center@0.6.105",
+          "release_digest": "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
+          "source_revision": "sha256:957f6d53a7adc49793d6a81810e46e3f908eb1ef88029b08eb4718afdb09202f",
+          "package_digest": "sha256:657f9ac27645dbf18942a168706f2184dfe7df9772b07ef2eb28ea92434d0748",
+          "version": "0.6.105"
+        }
+      }
     },
     {
       "kind": "project",

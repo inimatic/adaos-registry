@@ -1,0 +1,271 @@
+{
+  "schema": "adaos.semantic_registry.application_release.v1",
+  "project_id": "media_center",
+  "version": "0.6.105",
+  "application_ref": "scenario:media_center",
+  "project_release_digest": "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
+  "source_ref": {
+    "schema": "adaos.artifact.source_ref.v1",
+    "forge": "content-addressed-dev",
+    "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+    "revision": "sha256:957f6d53a7adc49793d6a81810e46e3f908eb1ef88029b08eb4718afdb09202f",
+    "path_scope": [
+      "projects/media_center/"
+    ]
+  },
+  "compilation_digest": "sha256:9236122d0ef1bd11c7914bd4f08c6cbece6d12bf66e0b7eb7d2bc4b628be9d3a",
+  "semantic_revision_digest": "sha256:d93de0532c7276e9d5ea6f64dd75f51e7ae4e2cf2e4143ede5311787eab7a815",
+  "requirements": [
+    {
+      "requirement_ref": "requirement:scenario.media_center.ui",
+      "capability_ref": "capability:application.ui.render",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:f0abc7855fa8a42effb946fa0174c20ec47d1dc7fb206fcf8c8bf2ccfb5956ae"
+    }
+  ],
+  "portable_artifacts": {
+    "adaos.binding.definition.v1": [
+      "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1"
+    ],
+    "adaos.binding.delivery.v1": [
+      "sha256:1ab2b3c8169d0f4eff70eb8e5ed5a7a4bc1b241dc75bf05596a20f0c3d5b61b1"
+    ],
+    "adaos.capability.contract.v1": [
+      "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7"
+    ]
+  },
+  "distribution": {
+    "thin": {
+      "requirements_only": true,
+      "registry_required": true
+    },
+    "resolved": {
+      "project_release_digest": "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
+      "package_closure": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "media_center",
+          "version": "0.6.41",
+          "digest": "sha256:657f9ac27645dbf18942a168706f2184dfe7df9772b07ef2eb28ea92434d0748",
+          "manifest_digest": "sha256:1b8da73014545934219fdbc991f7b6096789dea45dcfbfdd33e4afb6c5e548ca",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:957f6d53a7adc49793d6a81810e46e3f908eb1ef88029b08eb4718afdb09202f",
+            "path_scope": [
+              "scenarios/media_center/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/media_center",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "media_center_skill",
+          "version": "0.8.95",
+          "digest": "sha256:7790ffe5ef3aea6c93478335c4b5f871152a70ea7b8b96122982293a21db993a",
+          "manifest_digest": "sha256:8aee068e1b46c02aad3d3b4d944c3d4ded55a0d244611b149de86eb077ee5746",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:957f6d53a7adc49793d6a81810e46e3f908eb1ef88029b08eb4718afdb09202f",
+            "path_scope": [
+              "skills/media_center_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/media_center_skill",
+          "schema_locks": [
+            {
+              "lock_id": "skill:media_center_skill:schemas/catalog-correction.v1.schema.json",
+              "digest": "sha256:bc4a21966202e5a61152319d67cf1b7e3884c78b784a9a5deaeccdf0dc3ed773"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/collection-membership.v1.schema.json",
+              "digest": "sha256:8434092eb7db1c8e1288a5dc199d47662fdfeb822f071e526a1e52345ed39270"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/folder-node.v1.schema.json",
+              "digest": "sha256:519254c3d08a0d52b12145b1922a18e4107f27a364ad70fe98f5bcc032a56018"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/media-collection.v1.schema.json",
+              "digest": "sha256:d3a982d56ae8ed31e384794865ee86ece66be3992f830b5572dd9375fd40eb34"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/media-source.v1.schema.json",
+              "digest": "sha256:e100b430a04d07d4ec9e6c8acb740f5eacbc0a22851dff6e3d6f3393da65d3bd"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/media-variant.v1.schema.json",
+              "digest": "sha256:cfc7deff2354a3464e576161f423f46b261b514286b90c3ae8d5bf7857a2d600"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/media-work.v1.schema.json",
+              "digest": "sha256:f250d05a90a4ff40b5c03801d2356094129f1b1febd3a14ae4718b1534c87d29"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/metadata-claim.v1.schema.json",
+              "digest": "sha256:3a66ef10b385a8df8ff57d0ffef580ff448c0320cc80782dd1fd3a590ec60ae8"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/playback-plan.v2.schema.json",
+              "digest": "sha256:2e4b95fd59758849982ec3f304b484b41d561c906f8e62a9de5353d6f7c26f03"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/playback-route.v1.schema.json",
+              "digest": "sha256:9cf5f4b94ab66cf53cb0b1b022a28c95b9464c5163252c33384c6f3ddbc742df"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/playlist.v1.schema.json",
+              "digest": "sha256:7de59c37f56cf1e9a7323b60860469ddd89622eb3c373c4fe6a633cb9dbdb991"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/profile.v1.schema.json",
+              "digest": "sha256:4227072c05af5d6f89ee683a54fc16aede46813e01b27422d56d7a568c2e50aa"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/queue-source.v1.schema.json",
+              "digest": "sha256:eb56f22092f27f2431e60b5660d3a517fc2764d918cfbac88be67e8655402632"
+            }
+          ]
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "media_control_skill",
+          "version": "0.2.23",
+          "digest": "sha256:049e260f8e34cc3bfa4132f842649376a2523bb6550b333a78881e903021cc1c",
+          "manifest_digest": "sha256:751c9d74cd00760737af5d94be5458695afa41f801d34953032edf187e90bb27",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:957f6d53a7adc49793d6a81810e46e3f908eb1ef88029b08eb4718afdb09202f",
+            "path_scope": [
+              "skills/media_control_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/media_control_skill",
+          "schema_locks": [
+            {
+              "lock_id": "skill:media_control_skill:schemas/endpoint-reconciliation.v1.schema.json",
+              "digest": "sha256:815c721b8d3846d28ec71a0b809e91b264fc56640f4b427e991f3ecab128c56b"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-checkpoint.v1.schema.json",
+              "digest": "sha256:c635f8ae1d717cd03f6c0c7625352dab85279360fc841a519b26ac545ab3950e"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-command.v1.schema.json",
+              "digest": "sha256:ffdc91fbb200c9c1d3f9cf81153c2b115310ef62d58d6022631f3136a065144a"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-queue.v1.schema.json",
+              "digest": "sha256:677f38e90e5c3b3854f4d542a36ef42575d27bd94d3f431f824838ef111e4fe4"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-session.v1.schema.json",
+              "digest": "sha256:708928fc7f7591b856086f529aeac1a4d4a6570a782ba88bcc67d60f5acee415"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-target.v1.schema.json",
+              "digest": "sha256:2aa66631cadba05cb55e9bdd329c5af1cad4c8f61515fe95d2f3cc5a895a84dc"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/qoe-summary.v1.schema.json",
+              "digest": "sha256:827264b2105c8e2ceeda986a5954f1c3bc17ea5e17275cd52bc091e7432caa94"
+            }
+          ]
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "media_library_agent",
+          "version": "0.6.46",
+          "digest": "sha256:410d73e5680f1fa2dbc50c915668d4b362fdba4bfb88a96e5ff4c8dfb2ca821e",
+          "manifest_digest": "sha256:2d0d667e63ecb84487ada2d68958e39dbc79cc2a978b40019a0cbdfc43cd2167",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:957f6d53a7adc49793d6a81810e46e3f908eb1ef88029b08eb4718afdb09202f",
+            "path_scope": [
+              "skills/media_library_agent/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/media_library_agent",
+          "schema_locks": [
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-artwork-plan.v1.schema.json",
+              "digest": "sha256:64e9b387a68f0c2f32f3a547d8183497fa2a0b3d84aaff0edd0724cde4bdfe28"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-folder-node.v1.schema.json",
+              "digest": "sha256:f4fb70aa800ef0af396f67ba8727d7f3f8a040806ea6233a090cb8a0bf9c0147"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-rendition-job.v1.schema.json",
+              "digest": "sha256:1451419b221a3051ffa6c2194f902a340008055f8ff85b51674bc6518a59c1c3"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-rendition-plan.v2.schema.json",
+              "digest": "sha256:294a734b9942017f5c18ae67923be58b911dcd8c425e52aebc97fe0dacaa8208"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-root.v1.schema.json",
+              "digest": "sha256:2270e95bf115a336d391f31a2c202424ad295aca7e67a0f30e3bca62bff37d9e"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-scan-job.v1.schema.json",
+              "digest": "sha256:033c9914f2788f4c06a1f68972713578b25af92864c4b1bc0faa477d15807708"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-scan-progress.v1.schema.json",
+              "digest": "sha256:9d143c5b309c50c1f942cfbb52ddf284954388e67ea3fad0524e9df9efc7c8fa"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-source-delta.v1.schema.json",
+              "digest": "sha256:53e12d519eb580aa3ba86e2ad5a863ac69aeeb3d3c299b3eceedc7c192b25d28"
+            }
+          ]
+        }
+      ],
+      "portable_artifact_digests": [
+        "sha256:1ab2b3c8169d0f4eff70eb8e5ed5a7a4bc1b241dc75bf05596a20f0c3d5b61b1",
+        "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+        "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7"
+      ]
+    }
+  },
+  "projection_digest": "sha256:b2f1d23c595350f6385129952c221222bc6b04302e6df2ba0ef124dd61693894"
+}

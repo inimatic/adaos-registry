@@ -15,7 +15,8 @@
     "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:f4b30dae01ded31468698ffefdeb83706f3e6cb11daf763bb5ebba304985d97e": "sha256:c1be5a15255ef62d385f4f299c4e78ffaf38f0cc8efaeb7c94d3603d046b45bf",
     "adaos.capability.contract.v1|capability:subscriptions.status.inspect|1.0.0": "sha256:3e6dce93023e64c1d700ca9728d492ad1d28d316f61b68a4824a35b5649c0266",
     "adaos.binding.delivery.v1|binding-definition:subscriptions.status.inspect.adaos-root-local@sha256:cea5e4742a06b5c0242faae0261d4e0e8d773dcd09bc304660a7e965502f0b48|sha256:20e9d148e33429441857faa70e1b873fdb694f30d72d96ee5cead238e3cac24a": "sha256:930672d127f9c17c07336c6f279b5bb1ca764d6e08bfaf5512a4a38e975719cf",
-    "adaos.binding.definition.v1|binding-definition:subscriptions.status.inspect.adaos-root-local|1.0.0": "sha256:cea5e4742a06b5c0242faae0261d4e0e8d773dcd09bc304660a7e965502f0b48"
+    "adaos.binding.definition.v1|binding-definition:subscriptions.status.inspect.adaos-root-local|1.0.0": "sha256:cea5e4742a06b5c0242faae0261d4e0e8d773dcd09bc304660a7e965502f0b48",
+    "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:657f9ac27645dbf18942a168706f2184dfe7df9772b07ef2eb28ea92434d0748": "sha256:1ab2b3c8169d0f4eff70eb8e5ed5a7a4bc1b241dc75bf05596a20f0c3d5b61b1"
   },
   "records": {
     "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1": {
@@ -25,6 +26,7 @@
       "path": "semantic/records/sha256/39/39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1.json",
       "published_by_release_digests": [
         "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
+        "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
         "sha256:8aea0cbbc0acf317974d389a5e517d391abdec1a87e1bdea103f427c6e4d750d",
         "sha256:92e3d0c12b8dbec064d609fee711f3aec682ce6d3592a5201fbbf4b61750959a",
         "sha256:bb70fc2dcd1d61c30e63666d79b5372d3207400d89b5077208fd3f21f1ca6916",
@@ -62,6 +64,7 @@
       "path": "semantic/records/sha256/80/80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7.json",
       "published_by_release_digests": [
         "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
+        "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
         "sha256:8aea0cbbc0acf317974d389a5e517d391abdec1a87e1bdea103f427c6e4d750d",
         "sha256:92e3d0c12b8dbec064d609fee711f3aec682ce6d3592a5201fbbf4b61750959a",
         "sha256:bb70fc2dcd1d61c30e63666d79b5372d3207400d89b5077208fd3f21f1ca6916",
@@ -170,6 +173,15 @@
       "published_by_release_digests": [
         "sha256:7f5d353a3d2a04a5dcfb4aa2909e6def60a978a40dd191b77fdfeabcc329d798"
       ]
+    },
+    "sha256:1ab2b3c8169d0f4eff70eb8e5ed5a7a4bc1b241dc75bf05596a20f0c3d5b61b1": {
+      "schema": "adaos.binding.delivery.v1",
+      "identity": "binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "revision": "sha256:657f9ac27645dbf18942a168706f2184dfe7df9772b07ef2eb28ea92434d0748",
+      "path": "semantic/records/sha256/1a/1ab2b3c8169d0f4eff70eb8e5ed5a7a4bc1b241dc75bf05596a20f0c3d5b61b1.json",
+      "published_by_release_digests": [
+        "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289"
+      ]
     }
   },
   "application_releases": {
@@ -244,7 +256,16 @@
       "semantic_revision_digest": "sha256:fb32edef8af61a7241b99ae0da0254bff05a38f74d9eab928443c58414da5237",
       "path": "semantic/applications/subscription_status/7f5d353a3d2a04a5dcfb4aa2909e6def60a978a40dd191b77fdfeabcc329d798.json",
       "projection_digest": "sha256:3830b084edeef7b4003b476649ce87793c4f4bd288679b6712ac70a4ee62618a"
+    },
+    "project:media_center@sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289": {
+      "project_id": "media_center",
+      "version": "0.6.105",
+      "application_ref": "scenario:media_center",
+      "project_release_digest": "sha256:66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289",
+      "semantic_revision_digest": "sha256:d93de0532c7276e9d5ea6f64dd75f51e7ae4e2cf2e4143ede5311787eab7a815",
+      "path": "semantic/applications/media_center/66f6de1e41d7c28db9ee037fb887d68136724f7946e8844aec16ddfbff649289.json",
+      "projection_digest": "sha256:b2f1d23c595350f6385129952c221222bc6b04302e6df2ba0ef124dd61693894"
     }
   },
-  "index_digest": "sha256:d0fc9f095a68b7403fba0f3f84616e417e39834942459c4b2cc50451d9973389"
+  "index_digest": "sha256:4956183868703d6653e1c67cfafd92859b7b9997fbe6dddfd093689dd02a6bce"
 }

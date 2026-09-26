@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.43
+version: 0.6.46
 description: Distributed node-local media discovery and bounded rendition agent with
   durable jobs and ordered catalog deltas.
 supported_locales:
@@ -36,6 +36,7 @@ service:
 capabilities:
 - media.catalog
 - media.rendition
+- storage.relational
 dependencies:
 - pillow>=10.0.0
 - mutagen>=1.47.0
@@ -51,7 +52,14 @@ events:
 lifecycle:
   after_activate: ensure_schema
   rehydrate: rehydrate
+  drain: dispose
   dispose: dispose
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases:
+  - path: db/media_library_agent.sqlite3
+    migrations: []
 default_tool: status
 exports:
   tools:
@@ -881,7 +889,7 @@ llm_hints:
     intent: media_center.scan
     tool: start_scan
     side_effect_class: local_write
-updated_at: '2026-08-26T04:30:33+00:00'
+updated_at: '2026-09-26T01:24:56+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.939+5685.a8e1dfd0
