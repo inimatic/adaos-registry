@@ -24,13 +24,19 @@ def test_manifest_declares_runtime_contracts() -> None:
     assert manifest["name"] == "media_indexer_skill"
     assert "requirements.txt" not in {path.name for path in SKILL_ROOT.iterdir()}
     assert manifest.get("dependencies") == []
-    assert set(manifest["service"].get("dependencies") or []) == {
+    dependencies = manifest["service"].get("dependencies") or []
+    assert dependencies[:2] == [
+        "--extra-index-url",
+        "https://download.pytorch.org/whl/cpu",
+    ]
+    assert set(dependencies[2:]) == {
         "shazamio",
         "easyocr",
         "faiss-cpu",
         "opencv-python",
         "sentence-transformers",
-        "torch",
+        "torch==2.10.0+cpu",
+        "torchvision==0.25.0+cpu",
         "transformers",
     }
     assert manifest["runtime"]["env"]["allow_heavy_dependencies"] is True

@@ -1,5 +1,5 @@
 name: media_indexer_skill
-version: 0.1.41
+version: 0.1.42
 description: Semantic indexing and multimodal search for local media files (video,
   audio, images) using NER, FAISS and CLIP.
 runtime:
@@ -103,12 +103,15 @@ service:
   host: 127.0.0.1
   port: 18105
   dependencies:
+  - --extra-index-url
+  - https://download.pytorch.org/whl/cpu
   - shazamio
   - easyocr
   - faiss-cpu
   - opencv-python
   - sentence-transformers
-  - torch
+  - torch==2.10.0+cpu
+  - torchvision==0.25.0+cpu
   - transformers
   command:
   - -m
