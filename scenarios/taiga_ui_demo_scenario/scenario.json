@@ -1,7 +1,7 @@
 {
     "$schema": "../../../../src/adaos/abi/scenario.schema.json",
     "id": "taiga_ui_demo_scenario",
-    "version": "0.11.12",
+    "version": "0.11.13",
     "name": "taiga_ui_demo_scenario",
     "type": "desktop",
     "title": "Taiga UI Demo Scenario",
@@ -13,7 +13,7 @@
     "ui": {
         "manifest": "webui.json"
     },
-    "updated_at": "2026-09-26T02:08:07+00:00",
+    "updated_at": "2026-09-26T11:01:24+00:00",
     "data_projections": [
         {
             "scope": "webspace",

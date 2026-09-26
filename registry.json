@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-26T11:10:41+00:00",
+  "updated_at": "2026-09-26T11:13:18+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -301,8 +301,8 @@
       "kind": "skill",
       "id": "demo_metrics_skill",
       "name": "demo_metrics_skill",
-      "version": "0.13.36",
-      "updated_at": "2026-09-26T02:09:22+00:00",
+      "version": "0.13.37",
+      "updated_at": "2026-09-26T11:01:29+00:00",
       "path": "skills/demo_metrics_skill",
       "manifest": "skills/demo_metrics_skill/skill.yaml",
       "source": {
@@ -319,9 +319,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "semantic_ui_demo",
-        "release": "semantic_ui_demo@0.10.27",
-        "release_digest": "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
-        "package_digest": "sha256:28f866f05f48ba639673be29b2942897c1ee8139ce46a1420e5dd98e9b98cdf6"
+        "release": "semantic_ui_demo@0.10.28",
+        "release_digest": "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
+        "package_digest": "sha256:103c3d8b55ad917fdb130015121034c517f279f6b4c405069e2f4e776fd0472e"
       },
       "tools_count": 9
     },
@@ -1579,9 +1579,9 @@
       "tools_count": 0,
       "activation": {
         "mode": "package_lock",
-        "project_id": "web_desktop",
-        "release": "web_desktop@0.3.53",
-        "release_digest": "sha256:114744b66ecff8cae6042249ba5c1b4407aed34b3adba7d08e99501566352c64",
+        "project_id": "semantic_ui_demo",
+        "release": "semantic_ui_demo@0.10.28",
+        "release_digest": "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
         "package_digest": "sha256:dc6b9e208019a45a30e2d155e310802559c21a7ff6262acfb9fd524ec4a543de"
       }
     },
@@ -2428,8 +2428,8 @@
       "kind": "scenario",
       "id": "taiga_ui_demo_scenario",
       "name": "taiga_ui_demo_scenario",
-      "version": "0.11.12",
-      "updated_at": "2026-09-26T02:08:07+00:00",
+      "version": "0.11.13",
+      "updated_at": "2026-09-26T11:01:24+00:00",
       "path": "scenarios/taiga_ui_demo_scenario",
       "manifest": "scenarios/taiga_ui_demo_scenario/scenario.yaml",
       "source": {
@@ -2437,7 +2437,7 @@
         "manifest": "scenarios/taiga_ui_demo_scenario/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:a5d721d402de4259650c8c0de7f6966ddb0e39f836c5730f93a28a51dcd69cf5",
+        "revision": "sha256:8fff1ddac0a9b64a430835e6a0e7602a3b69c0dd95d0ce71c433d3a46803e091",
         "path_scope": [
           "projects/semantic_ui_demo/"
         ]
@@ -2458,17 +2458,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "semantic_ui_demo",
-        "release": "semantic_ui_demo@0.10.27",
-        "release_digest": "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
-        "package_digest": "sha256:37772c8a2a74834afee1249735d59989d74f130f39910c79abaa8e58ccc39e4e"
+        "release": "semantic_ui_demo@0.10.28",
+        "release_digest": "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
+        "package_digest": "sha256:86ed65adf32f0850dd12ac94e4f7c5b01bd942815b7950d67a496a6cb06baeb5"
       },
       "channels": {
         "stable": {
-          "release": "semantic_ui_demo@0.10.27",
-          "release_digest": "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
-          "source_revision": "sha256:a5d721d402de4259650c8c0de7f6966ddb0e39f836c5730f93a28a51dcd69cf5",
-          "package_digest": "sha256:37772c8a2a74834afee1249735d59989d74f130f39910c79abaa8e58ccc39e4e",
-          "version": "0.11.12"
+          "release": "semantic_ui_demo@0.10.28",
+          "release_digest": "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
+          "source_revision": "sha256:8fff1ddac0a9b64a430835e6a0e7602a3b69c0dd95d0ce71c433d3a46803e091",
+          "package_digest": "sha256:86ed65adf32f0850dd12ac94e4f7c5b01bd942815b7950d67a496a6cb06baeb5",
+          "version": "0.11.13"
         }
       }
     },
@@ -4699,8 +4699,8 @@
       "kind": "project",
       "id": "semantic_ui_demo",
       "name": "semantic_ui_demo",
-      "version": "0.10.27",
-      "updated_at": "2026-09-26T02:11:21+00:00",
+      "version": "0.10.28",
+      "updated_at": "2026-09-26T11:13:18+00:00",
       "path": "projects/semantic_ui_demo",
       "manifest": "projects/semantic_ui_demo/project.yaml",
       "source": {
@@ -4768,18 +4768,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "semantic_ui_demo",
-        "release": "semantic_ui_demo@0.10.27",
-        "release_digest": "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
+        "release": "semantic_ui_demo@0.10.28",
+        "release_digest": "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
         "primary_component": "scenario:taiga_ui_demo_scenario",
-        "package_digest": "sha256:37772c8a2a74834afee1249735d59989d74f130f39910c79abaa8e58ccc39e4e"
+        "package_digest": "sha256:86ed65adf32f0850dd12ac94e4f7c5b01bd942815b7950d67a496a6cb06baeb5"
       },
       "channels": {
         "stable": {
-          "release": "semantic_ui_demo@0.10.27",
-          "release_digest": "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
-          "source_revision": "sha256:a5d721d402de4259650c8c0de7f6966ddb0e39f836c5730f93a28a51dcd69cf5",
-          "package_digest": "sha256:37772c8a2a74834afee1249735d59989d74f130f39910c79abaa8e58ccc39e4e",
-          "version": "0.10.27"
+          "release": "semantic_ui_demo@0.10.28",
+          "release_digest": "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
+          "source_revision": "sha256:8fff1ddac0a9b64a430835e6a0e7602a3b69c0dd95d0ce71c433d3a46803e091",
+          "package_digest": "sha256:86ed65adf32f0850dd12ac94e4f7c5b01bd942815b7950d67a496a6cb06baeb5",
+          "version": "0.10.28"
         }
       }
     },

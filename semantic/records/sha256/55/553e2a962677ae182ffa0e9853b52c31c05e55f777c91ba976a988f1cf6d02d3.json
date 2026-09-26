@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:application.ui.render.webui-v1",
+  "binding_definition_digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+  "logical_entrypoint": "application.ui.render.webui-v1",
+  "package": {
+    "kind": "scenario",
+    "id": "taiga_ui_demo_scenario",
+    "version": "0.11.13",
+    "digest": "sha256:86ed65adf32f0850dd12ac94e4f7c5b01bd942815b7950d67a496a6cb06baeb5"
+  },
+  "physical_member": "webui.json",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:553e2a962677ae182ffa0e9853b52c31c05e55f777c91ba976a988f1cf6d02d3"
+}

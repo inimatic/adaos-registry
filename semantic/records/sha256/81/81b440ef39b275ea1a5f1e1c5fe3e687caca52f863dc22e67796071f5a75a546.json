@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:demo.metrics.workbench.local",
+  "binding_definition_digest": "sha256:60b254fa7dad433d22ee947aa532ab7a81ba4b6e74c754360d3336cc9fdb3bc1",
+  "logical_entrypoint": "demo.metrics.workbench.local",
+  "package": {
+    "kind": "skill",
+    "id": "demo_metrics_skill",
+    "version": "0.13.37",
+    "digest": "sha256:103c3d8b55ad917fdb130015121034c517f279f6b4c405069e2f4e776fd0472e"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:81b440ef39b275ea1a5f1e1c5fe3e687caca52f863dc22e67796071f5a75a546"
+}

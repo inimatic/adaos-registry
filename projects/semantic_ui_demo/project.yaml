@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: semantic_ui_demo
-version: 0.10.27
+version: 0.10.28
 profiles:
 - adaos.demo.semantic_ui.v1
 components:
@@ -73,3 +73,24 @@ lifecycle:
     source_artifacts: retain
 created_at: '2026-08-27T00:00:00+00:00'
 created_by: AdaOS Project Composition
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.read
+    purpose: Read the local demo metrics snapshot.
+    approval_policy: grant_on_install
+  - id: workspace.write
+    purpose: Update explicitly requested local demo metrics and projections.
+    approval_policy: grant_on_install
+  optional: []
+  secrets: []
+  external_providers: []
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected: [synthetic_demo_metric]
+    linked_to_user: []
+    retention: Demo-only local state.
+    sent_off_device: []
+    tracking: false

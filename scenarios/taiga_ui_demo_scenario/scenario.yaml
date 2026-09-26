@@ -1,5 +1,5 @@
 id: taiga_ui_demo_scenario
-version: 0.11.12
+version: 0.11.13
 title: Taiga UI Demo Scenario
 description: Desktop demo scenario for reusable semantic navigation, disclosure, typed
   input, adaptive commands, tables, charts, and live event streams.
@@ -7,7 +7,7 @@ type: desktop
 depends:
 - web_desktop_skill
 - demo_metrics_skill
-updated_at: '2026-09-26T02:08:07+00:00'
+updated_at: '2026-09-26T11:01:24+00:00'
 data_projections:
 - scope: webspace
   slot: demo.metrics.summary

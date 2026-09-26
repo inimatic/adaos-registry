@@ -1730,7 +1730,7 @@
                 "taiga_ui_demo_scenario": {}
             }
         },
-        "version": "0.11.12",
+        "version": "0.11.13",
         "manifest": "webui.json"
     }
 }
