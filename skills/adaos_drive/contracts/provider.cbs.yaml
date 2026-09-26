@@ -15,6 +15,16 @@ capability:
     errors:
     - source_invalid
     - access_denied
+  - operation_id: rename_source
+    tool: rename_source
+    errors:
+    - source_invalid
+    - source_unavailable
+  - operation_id: remove_source
+    tool: remove_source
+    errors:
+    - source_unavailable
+    - last_source_protected
   - operation_id: open_folder
     tool: open_folder
     errors:
