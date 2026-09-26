@@ -1,5 +1,5 @@
 name: notebook_skill
-version: 0.2.1
+version: 0.2.4
 description: Shared plain-text notebook with one active editable note, a live note
   list stream, and Telegram export.
 supported_locales:
@@ -7,6 +7,10 @@ supported_locales:
 - ru
 runtime:
   python: '3.11'
+capabilities:
+- storage.blob
+- workspace.read
+- workspace.write
 webui_owner: shared
 events:
   subscribe:
@@ -121,6 +125,7 @@ tools:
         type: string
 - name: create_note
   entry: handlers.main:create_note
+  side_effects: local_write
   description: Create a plain-text note and select it for editing.
   input_schema:
     type: object
@@ -141,6 +146,7 @@ tools:
         type: object
 - name: select_note
   entry: handlers.main:select_note
+  side_effects: local_write
   description: Select one note as the active editor note.
   input_schema:
     type: object
@@ -164,6 +170,7 @@ tools:
         type: object
 - name: save_note
   entry: handlers.main:save_note
+  side_effects: local_write
   description: Save the active note content and publish bounded stream state.
   side_effect_class: local_write
   input_schema:
@@ -188,21 +195,77 @@ tools:
         type: boolean
       note:
         type: object
-- name: attach_note_file
-  entry: handlers.main:attach_note_file
-  description: Attach an uploaded photo or file to the selected note.
+- name: upload_attachment
+  entry: handlers.main:upload_attachment
+  side_effects: local_write
+  description: Persist one authenticated Notebook attachment in the owned blob store.
+  permissions:
+  - storage.blob
+  - workspace.write
+  application_access:
+    permission: workspace.write
   input_schema:
     type: object
+    required:
+    - filename
+    - field_id
+    - media_type
+    - size_bytes
+    - digest
+    additionalProperties: false
     properties:
-      note_id:
+      filename:
         type: string
-      kind:
+      field_id:
         type: string
-      artifact_ref:
-        type: object
-      file:
-        type: object
-      path:
+      media_type:
+        type: string
+      size_bytes:
+        type: integer
+        minimum: 1
+        maximum: 10485760
+      digest:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - schema
+    - binding_id
+    - provider_id
+    - owner_ref
+    - ref
+    - key
+    - digest
+    - size_bytes
+    - media_type
+    - logical_name
+    - field_id
+    - filename
+    properties:
+      schema:
+        const: adaos.storage.blob.object.v1
+- name: read_attachment
+  entry: handlers.main:read_attachment
+  side_effects: read_only
+  description: Authorize an authenticated Notebook reader to retrieve one owned blob.
+  permissions:
+  - storage.blob
+  - workspace.read
+  application_access:
+    permission: workspace.read
+  input_schema:
+    type: object
+    required:
+    - ref
+    additionalProperties: false
+    properties:
+      ref:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+      field_id:
         type: string
       webspace_id:
         type: string
@@ -210,16 +273,21 @@ tools:
     type: object
     required:
     - ok
+    - ref
     properties:
       ok:
-        type: boolean
-      attachment:
-        type: object
-      note:
-        type: object
+        const: true
+      ref:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
 - name: attach_note_upload
   entry: handlers.main:attach_note_upload
+  side_effects: local_write
   description: Attach uploaded media metadata to the selected note.
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   input_schema:
     type: object
     properties:
@@ -246,6 +314,7 @@ tools:
         type: object
 - name: delete_note
   entry: handlers.main:delete_note
+  side_effects: destructive
   description: Delete a note from the notebook.
   input_schema:
     type: object
@@ -265,6 +334,7 @@ tools:
         type: boolean
 - name: send_note_to_telegram
   entry: handlers.main:send_note_to_telegram
+  side_effects: external_io
   description: Send the selected note text to the configured Telegram outbox.
   input_schema:
     type: object
@@ -288,6 +358,7 @@ tools:
         type: object
 - name: reset_notebook
   entry: handlers.main:reset_notebook
+  side_effects: destructive
   description: Reset the notebook state to the default note.
   input_schema:
     type: object
@@ -303,6 +374,7 @@ tools:
         type: boolean
 - name: notebook_persist_state
   entry: handlers.main:notebook_persist_state
+  side_effects: runtime_write
   description: Persist the current notebook state for runtime handoff.
   input_schema:
     type: object
@@ -318,6 +390,7 @@ tools:
         type: boolean
 - name: notebook_rehydrate
   entry: handlers.main:notebook_rehydrate
+  side_effects: runtime_write
   description: Restore notebook state from durable skill memory and republish it.
   input_schema:
     type: object
@@ -331,7 +404,7 @@ tools:
     properties:
       ok:
         type: boolean
-updated_at: '2026-09-26T03:01:55+00:00'
+updated_at: '2026-09-26T11:52:18+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.741+4835.a49f9166

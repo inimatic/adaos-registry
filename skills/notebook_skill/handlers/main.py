@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
+import re
 import time
 from copy import deepcopy
 from typing import Any, Mapping
 from urllib.parse import quote, urlencode
 
+from adaos.sdk import access
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import skill_memory_get, skill_memory_set
+from adaos.sdk.data.blob import put_upload
 from adaos.sdk.io.out import stream_publish
 from adaos.services.agent_context import get_ctx
 from adaos.services.node_config import load_config
@@ -31,6 +33,11 @@ _LOG = logging.getLogger(_SKILL_NAME)
 _LIST_PREVIEW_CHARS = 420
 _LIST_TITLE_CHARS = 160
 _WIDGET_PREVIEW_CHARS = 1200
+_MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+_ATTACHMENT_FIELD_IDS = {"notebook-photo-upload", "notebook-file-upload"}
+_BLOB_READ_PREFIX = f"/api/tools/{_SKILL_NAME}/read_attachment/attachments/attachments/"
+_SHA256_REF_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+_SAFE_FILENAME_RE = re.compile(r"^[^/\\:\x00-\x1f\x7f]{1,200}$")
 
 
 def _now() -> float:
@@ -51,6 +58,20 @@ def _default_note() -> dict[str, Any]:
         "updated_at": now,
         "version": 0,
     }
+
+
+def _production_attachment_url(value: Mapping[str, Any]) -> str:
+    artifact = value.get("artifact_ref") if isinstance(value.get("artifact_ref"), Mapping) else {}
+    for candidate in (
+        artifact.get("ref"),
+        value.get("url"),
+        value.get("download_url"),
+        value.get("path"),
+    ):
+        token = str(candidate or "").strip()
+        if token.startswith(_BLOB_READ_PREFIX):
+            return token
+    return ""
 
 
 _STATE: dict[str, Any] = {
@@ -112,7 +133,11 @@ def _coerce_note(note_id: str, value: Any) -> dict[str, Any] | None:
     return {
         "id": token,
         "content": _clean_content(value.get("content") or ""),
-        "attachments": [dict(item) for item in attachments if isinstance(item, Mapping)] if isinstance(attachments, list) else [],
+        "attachments": [
+            dict(item)
+            for item in attachments
+            if isinstance(item, Mapping) and _production_attachment_url(item)
+        ] if isinstance(attachments, list) else [],
         "created_at": created_at,
         "updated_at": updated_at,
         "version": int(value.get("version") or 0),
@@ -920,6 +945,8 @@ def _browser_safe_url(raw_url: Any) -> str:
     lowered = raw.lower()
     if lowered.startswith("file:") or "\\" in raw:
         return ""
+    if raw.startswith("/api/"):
+        return _append_token_query(f"{_local_api_base_url()}{raw}")
     content_path = f"/api/skills/{_SKILL_NAME}/files/content/"
     if raw.startswith(content_path):
         return _append_token_query(f"{_local_api_base_url()}{raw}")
@@ -972,6 +999,12 @@ def _compact_artifact_ref(
     size_bytes: Any,
 ) -> dict[str, Any]:
     out: dict[str, Any] = {}
+    browser_ref = str(artifact.get("ref") or "").strip()
+    blob_ref = str(artifact.get("blob_ref") or "").strip()
+    if browser_ref.startswith(_BLOB_READ_PREFIX):
+        out["ref"] = browser_ref
+    if blob_ref.startswith("adaos-blob:"):
+        out["blob_ref"] = blob_ref
     artifact_id = _bounded_text(artifact.get("artifact_id") or artifact.get("id"), limit=256).strip()
     sha256 = _bounded_text(artifact.get("sha256"), limit=64).strip()
     if not artifact_id and sha256:
@@ -1002,11 +1035,16 @@ def _project_attachment(value: Mapping[str, Any]) -> dict[str, Any]:
     mime = _bounded_text(raw.get("mime") or artifact.get("mime"), limit=128).strip() or None
     size_bytes = raw.get("size_bytes") or artifact.get("size_bytes")
     purpose = _bounded_text(artifact.get("purpose") or _default_attachment_purpose(kind), limit=64).strip()
+    blob_url = _production_attachment_url(raw)
     relative_path = _clean_upload_relative_path(raw.get("relative_path") or artifact.get("relative_path"))
-    if not relative_path:
+    if not blob_url and not relative_path:
         relative_path = _fallback_upload_relative_path(purpose=purpose, name=name)
-    url = _skill_file_url(relative_path) or _browser_safe_url(raw.get("url"))
-    download_url = _skill_file_url(relative_path, download=True) or _browser_safe_url(raw.get("download_url"))
+    url = _browser_safe_url(blob_url) if blob_url else (
+        _skill_file_url(relative_path) or _browser_safe_url(raw.get("url"))
+    )
+    download_url = _browser_safe_url(blob_url) if blob_url else (
+        _skill_file_url(relative_path, download=True) or _browser_safe_url(raw.get("download_url"))
+    )
     attachment_id = _bounded_text(raw.get("id") or artifact.get("artifact_id") or artifact.get("id"), limit=256).strip()
     out: dict[str, Any] = {
         "id": attachment_id or None,
@@ -1048,6 +1086,12 @@ def _safe_upload_ref(
     if not relative_path:
         relative_path = _fallback_upload_relative_path(purpose=purpose, name=name)
     ref: dict[str, Any] = {}
+    browser_ref = str(upload.get("ref") or artifact.get("ref") or "").strip()
+    internal_ref = str(upload.get("blob_ref") or artifact.get("blob_ref") or "").strip()
+    if browser_ref.startswith(_BLOB_READ_PREFIX):
+        ref["ref"] = browser_ref
+    if internal_ref.startswith("adaos-blob:"):
+        ref["blob_ref"] = internal_ref
     artifact_id = str(upload.get("artifact_id") or artifact.get("artifact_id") or artifact.get("id") or "").strip()
     if sha256:
         ref["sha256"] = sha256
@@ -1060,7 +1104,7 @@ def _safe_upload_ref(
         ref["purpose"] = purpose
     if name:
         ref["name"] = name
-    if relative_path:
+    if relative_path and not browser_ref:
         ref["relative_path"] = relative_path
     mime = str(upload.get("mime") or artifact.get("mime") or "").strip()
     if mime:
@@ -1113,8 +1157,9 @@ def _attach_note_file(payload: Mapping[str, Any] | None = None, **kwargs: Any) -
     mime = str(upload.get("mime") or file_meta.get("mime") or artifact.get("mime") or "").strip() or None
     size_bytes = upload.get("size_bytes") or file_meta.get("size_bytes") or artifact.get("size_bytes")
     relative_path = str(safe_ref.get("relative_path") or "").strip()
-    url = _skill_file_url(relative_path)
-    download_url = _skill_file_url(relative_path, download=True)
+    browser_ref = str(safe_ref.get("ref") or "").strip()
+    url = _browser_safe_url(browser_ref) if browser_ref else _skill_file_url(relative_path)
+    download_url = _browser_safe_url(browser_ref) if browser_ref else _skill_file_url(relative_path, download=True)
     attachment = {
         "id": f"att-{int(_now() * 1000)}",
         "kind": kind,
@@ -1146,9 +1191,59 @@ def _attach_note_file(payload: Mapping[str, Any] | None = None, **kwargs: Any) -
     }
 
 
+@tool("upload_attachment")
+def upload_attachment(
+    filename: str,
+    field_id: str,
+    media_type: str,
+    size_bytes: int,
+    digest: str,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    access.require("workspace.write")
+    if (
+        field_id not in _ATTACHMENT_FIELD_IDS
+        or not _SAFE_FILENAME_RE.fullmatch(str(filename or ""))
+        or type(size_bytes) is not int
+        or not 1 <= size_bytes <= _MAX_ATTACHMENT_BYTES
+        or not _SHA256_REF_RE.fullmatch(str(digest or ""))
+        or not str(media_type or "").strip()
+        or len(str(media_type)) > 128
+        or (field_id == "notebook-photo-upload" and not str(media_type).lower().startswith("image/"))
+    ):
+        raise ValueError("invalid_notebook_attachment")
+    receipt = put_upload("attachments")
+    if (
+        receipt.get("digest") != digest
+        or receipt.get("size_bytes") != size_bytes
+        or receipt.get("owner_ref") != f"skill:{_SKILL_NAME}"
+        or receipt.get("media_type") != media_type
+    ):
+        raise ValueError("invalid_notebook_attachment_receipt")
+    return receipt
+
+
+@tool("read_attachment")
+def read_attachment(
+    ref: str,
+    field_id: str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    access.require("workspace.read")
+    token = str(ref or "").strip()
+    if not _SHA256_REF_RE.fullmatch(token):
+        raise ValueError("invalid_notebook_attachment_ref")
+    return {"ok": True, "ref": token}
+
+
 @tool("attach_note_upload")
 def attach_note_upload(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[str, Any]:
-    return _attach_note_file(payload, **kwargs)
+    body = dict(payload or {})
+    body.update({key: value for key, value in kwargs.items() if value is not None})
+    artifact = body.get("artifact_ref") if isinstance(body.get("artifact_ref"), Mapping) else {}
+    if not str(artifact.get("ref") or "").startswith(_BLOB_READ_PREFIX):
+        return {"ok": False, "error": "production_attachment_required"}
+    return _attach_note_file(body)
 
 
 @tool("attach_note_file")

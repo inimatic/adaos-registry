@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-26T11:57:48+00:00",
+  "updated_at": "2026-09-26T12:05:22+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -821,8 +821,8 @@
       "kind": "skill",
       "id": "notebook_skill",
       "name": "notebook_skill",
-      "version": "0.2.1",
-      "updated_at": "2026-09-26T03:01:55+00:00",
+      "version": "0.2.4",
+      "updated_at": "2026-09-26T11:52:18+00:00",
       "path": "skills/notebook_skill",
       "manifest": "skills/notebook_skill/skill.yaml",
       "source": {
@@ -830,7 +830,7 @@
         "manifest": "skills/notebook_skill/skill.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:12983c0265339d25bdda084f4217df56ab4fd8a8d030b8019a63bd4d1094e573",
+        "revision": "sha256:f484a35b186e8c3957b2f8dfe92986eb8a0db54b4094e1330256ad21268fdfcc",
         "path_scope": [
           "projects/notebook/"
         ]
@@ -842,21 +842,21 @@
       },
       "description": "Shared plain-text notebook with one active editable note, a live note list stream, and Telegram export.",
       "runtime_python": "3.11",
-      "tools_count": 12,
+      "tools_count": 13,
       "activation": {
         "mode": "package_lock",
         "project_id": "notebook",
-        "release": "notebook@0.1.0",
-        "release_digest": "sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16",
-        "package_digest": "sha256:ceee939e9880d31406a01e15339805325aa66907cc0fb0052f46ecf52cbd5c31"
+        "release": "notebook@0.1.2",
+        "release_digest": "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275",
+        "package_digest": "sha256:883b968eb980314614b018560e744e6afe94ecfe1b11d71e197197e6d997757d"
       },
       "channels": {
         "stable": {
-          "release": "notebook@0.1.0",
-          "release_digest": "sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16",
-          "source_revision": "sha256:12983c0265339d25bdda084f4217df56ab4fd8a8d030b8019a63bd4d1094e573",
-          "package_digest": "sha256:ceee939e9880d31406a01e15339805325aa66907cc0fb0052f46ecf52cbd5c31",
-          "version": "0.2.1"
+          "release": "notebook@0.1.2",
+          "release_digest": "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275",
+          "source_revision": "sha256:f484a35b186e8c3957b2f8dfe92986eb8a0db54b4094e1330256ad21268fdfcc",
+          "package_digest": "sha256:883b968eb980314614b018560e744e6afe94ecfe1b11d71e197197e6d997757d",
+          "version": "0.2.4"
         }
       }
     },
@@ -4139,8 +4139,8 @@
       "kind": "project",
       "id": "notebook",
       "name": "notebook",
-      "version": "0.1.0",
-      "updated_at": "2026-09-26T03:13:35+00:00",
+      "version": "0.1.2",
+      "updated_at": "2026-09-26T12:05:22+00:00",
       "path": "projects/notebook",
       "manifest": "projects/notebook/project.yaml",
       "source": {
@@ -4191,18 +4191,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "notebook",
-        "release": "notebook@0.1.0",
-        "release_digest": "sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16",
+        "release": "notebook@0.1.2",
+        "release_digest": "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275",
         "primary_component": "skill:notebook_skill",
-        "package_digest": "sha256:ceee939e9880d31406a01e15339805325aa66907cc0fb0052f46ecf52cbd5c31"
+        "package_digest": "sha256:883b968eb980314614b018560e744e6afe94ecfe1b11d71e197197e6d997757d"
       },
       "channels": {
         "stable": {
-          "release": "notebook@0.1.0",
-          "release_digest": "sha256:a9ced2daa10a3cc8f5f6e6a2942652f20115b93e3108666295ebac1a0e34ce16",
-          "source_revision": "sha256:12983c0265339d25bdda084f4217df56ab4fd8a8d030b8019a63bd4d1094e573",
-          "package_digest": "sha256:ceee939e9880d31406a01e15339805325aa66907cc0fb0052f46ecf52cbd5c31",
-          "version": "0.1.0"
+          "release": "notebook@0.1.2",
+          "release_digest": "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275",
+          "source_revision": "sha256:f484a35b186e8c3957b2f8dfe92986eb8a0db54b4094e1330256ad21268fdfcc",
+          "package_digest": "sha256:883b968eb980314614b018560e744e6afe94ecfe1b11d71e197197e6d997757d",
+          "version": "0.1.2"
         }
       }
     },

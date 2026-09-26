@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:notes.manage.adaos-notebook",
+  "binding_definition_digest": "sha256:3ce043cd16b788cf470e2a2ee4eb29bc2278cc5f1112b5f7c6bd2075f66216de",
+  "logical_entrypoint": "notes.manage.adaos-notebook",
+  "package": {
+    "kind": "skill",
+    "id": "notebook_skill",
+    "version": "0.2.4",
+    "digest": "sha256:883b968eb980314614b018560e744e6afe94ecfe1b11d71e197197e6d997757d"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:0b34c2d15083b467b04bddea0b1cf95302df74833909de4056b2f136dce8b5d1"
+}

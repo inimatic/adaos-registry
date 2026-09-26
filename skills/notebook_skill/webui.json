@@ -686,11 +686,12 @@
               "title": "Photo",
               "visibleIf": "$state.notebookViewMode === 'edit'",
               "inputs": {
-                "skill": "notebook_skill",
-                "purpose": "photos",
+                "fileStorage": "skill",
+                "uploadTarget": "notebook_skill.upload_attachment",
+                "readTarget": "notebook_skill.read_attachment",
                 "accept": "image/*",
                 "label": "Attach photo",
-                "maxBytes": 52428800,
+                "maxBytes": 10485760,
                 "label_i18n": {
                   "key": "notebook.attach_photo"
                 }
@@ -726,11 +727,12 @@
               "title": "File",
               "visibleIf": "$state.notebookViewMode === 'edit'",
               "inputs": {
-                "skill": "notebook_skill",
-                "purpose": "attachments",
+                "fileStorage": "skill",
+                "uploadTarget": "notebook_skill.upload_attachment",
+                "readTarget": "notebook_skill.read_attachment",
                 "accept": "*/*",
                 "label": "Attach file",
-                "maxBytes": 134217728,
+                "maxBytes": 10485760,
                 "label_i18n": {
                   "key": "notebook.attach_file"
                 }

@@ -1,27 +1,36 @@
 schema: adaos.project.v1
 kind: project
 id: notebook
-version: 0.1.0
-profiles: [adaos.builder.component_project.v1]
+version: 0.1.2
+profiles:
+- adaos.builder.component_project.v1
 components:
   owned:
   - ref: skill:notebook_skill
     role: primary
     exposure: application
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   dependencies: []
 entrypoints:
 - id: notebook
   presentation: skill:notebook_skill
   default: true
-  bindings: {surface: notebook}
+  bindings:
+    surface: notebook
 catalog:
   title: Notebook
   description: Personal notes, attachments, and durable local note state.
-  categories: [productivity]
-  tags: [notes, cbs-provider]
-publication: {stage: beta, visibility: listed, channel: stable}
+  categories:
+  - productivity
+  tags:
+  - notes
+  - cbs-provider
+publication:
+  stage: beta
+  visibility: listed
+  channel: stable
 install:
   default: false
   features:
@@ -29,12 +38,49 @@ install:
     title: Notebook
     default: true
     optional: false
-    components: [skill:notebook_skill]
+    components:
+    - skill:notebook_skill
 compatibility:
-  required_entrypoints: [notebook]
-  required_contracts: [capability:notes.manage@^1.0.0]
-  validation_profiles: [notebook.local]
+  required_entrypoints:
+  - notebook
+  required_contracts:
+  - capability:notes.manage@^1.0.0
+  validation_profiles:
+  - notebook.local
 lifecycle:
-  uninstall: {components: remove_if_unreferenced, runtime_data: retain, source_artifacts: retain}
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
 created_at: '2026-09-26T02:30:00Z'
 created_by: agent:codex
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.read
+    purpose: Read notes and explicitly attached local files.
+    approval_policy: grant_on_install
+  - id: workspace.write
+    purpose: Create, update, attach, or delete notes requested by the user.
+    approval_policy: owner_only
+    sensitive: true
+  - id: network.egress
+    purpose: Send a note only when the user explicitly invokes the configured Telegram
+      action.
+    approval_policy: owner_only
+    sensitive: true
+  optional: []
+  secrets: []
+  external_providers: []
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected:
+    - note_content
+    - attachment_metadata
+    linked_to_user:
+    - note_content
+    retention: Notes and attachments remain in local Application state.
+    sent_off_device: []
+    tracking: false

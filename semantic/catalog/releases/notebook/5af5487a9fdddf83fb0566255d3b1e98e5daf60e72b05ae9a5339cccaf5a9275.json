@@ -1,0 +1,325 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "notebook",
+    "legacy_project_id": "notebook",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "notebook",
+    "display": {
+      "title": "Notebook",
+      "summary": "Personal notes, attachments, and durable local note state."
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "notebook",
+        "presentation_ref": "skill:notebook_skill"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 2,
+    "created_at": "2026-09-26T03:13:14+00:00",
+    "updated_at": "2026-09-26T03:13:41+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "notebook",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "notebook",
+    "version": "0.1.2",
+    "release_digest": "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "notebook",
+      "version": "0.1.2",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:f484a35b186e8c3957b2f8dfe92986eb8a0db54b4094e1330256ad21268fdfcc",
+        "path_scope": [
+          "projects/notebook/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "notebook_skill",
+          "version": "0.2.4",
+          "digest": "sha256:883b968eb980314614b018560e744e6afe94ecfe1b11d71e197197e6d997757d",
+          "manifest_digest": "sha256:b1c5944004d6d8851a676a586e478a6d413b0a45714fd45735e2a60201b8aa12",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:f484a35b186e8c3957b2f8dfe92986eb8a0db54b4094e1330256ad21268fdfcc",
+            "path_scope": [
+              "skills/notebook_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/notebook_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [
+        "network.egress",
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:f484a35b186e8c3957b2f8dfe92986eb8a0db54b4094e1330256ad21268fdfcc",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:1db578c1a99e1d0481e9f8738b91ca972838bf2a29b26e0659b27b04136e1692"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:f202535b2f57ecc410ce3b2431b603a7523b271e25fda06afcc44494caf0ed2b",
+        "profiles": [
+          "adaos.builder.component_project.v1"
+        ],
+        "members": [
+          {
+            "ref": "skill:notebook_skill",
+            "package_digest": "sha256:883b968eb980314614b018560e744e6afe94ecfe1b11d71e197197e6d997757d",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "notebook",
+            "presentation": "skill:notebook_skill",
+            "default": true,
+            "bindings": {
+              "surface": "notebook"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "notebook"
+          ],
+          "required_contracts": [
+            "capability:notes.manage@^1.0.0"
+          ],
+          "validation_profiles": [
+            "notebook.local"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "network.egress",
+              "purpose": "Send a note only when the user explicitly invokes the configured Telegram action.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "workspace.read",
+              "purpose": "Read notes and explicitly attached local files.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Create, update, attach, or delete notes requested by the user.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "attachment_metadata",
+              "note_content"
+            ],
+            "sent_off_device": [],
+            "linked_to_user": [
+              "note_content"
+            ],
+            "tracking": false,
+            "retention": "Notes and attachments remain in local Application state."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [
+              "attachment_metadata",
+              "note_content"
+            ],
+            "sent_off_device": false,
+            "linked_to_user": true,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "Notebook",
+        "description": "Personal notes, attachments, and durable local note state.",
+        "categories": [
+          "productivity"
+        ],
+        "tags": [
+          "cbs-provider",
+          "notes"
+        ]
+      },
+      "release_digest": "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275"
+    },
+    "accepted_candidate_id": "notebook-0-1-2-9cccaf5a9275",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.project.preflight",
+        "tests": "qualified application and component tests passed",
+        "cbs": "exact native admission or explicit compatibility classification",
+        "checkpoint_source_revision": "52acc1b33133e01ad1f2a4f3f1e6231ac1e16e56",
+        "checkpoint_component_ref": "skill:notebook_skill"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "network.egress",
+          "purpose": "Send a note only when the user explicitly invokes the configured Telegram action.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "workspace.read",
+          "purpose": "Read notes and explicitly attached local files.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Create, update, attach, or delete notes requested by the user.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "attachment_metadata",
+          "note_content"
+        ],
+        "sent_off_device": [],
+        "linked_to_user": [
+          "note_content"
+        ],
+        "tracking": false,
+        "retention": "Notes and attachments remain in local Application state."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [
+          "attachment_metadata",
+          "note_content"
+        ],
+        "sent_off_device": false,
+        "linked_to_user": true,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:562779b6f183ca22bba31463b1513343d6a1fd3909a4b43e4cf7303240feb726",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "notebook",
+      "release_digest": "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [
+        {
+          "id": "network.egress",
+          "title": "Network.Egress",
+          "purpose": "Send a note only when the user explicitly invokes the configured Telegram action.",
+          "required": true
+        },
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Read notes and explicitly attached local files.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Create, update, attach, or delete notes requested by the user.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:73bc637ef17b2548cd2487a485ee1c916195adfbe36392d0e885ca38c9bf239f"
+  },
+  "channels": {
+    "stable": "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275"
+  },
+  "semantic": {
+    "projection_digest": "sha256:ae25c37b0f489e8b947c3fcb761752aba3d6ca182685556e9c1fad1ccf98895a",
+    "path": "semantic/applications/notebook/5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275.json"
+  },
+  "projection_digest": "sha256:9e514e39a2b1c7b971701575a463fdfe5fa8ee4b9dd970b7b02a354013c72a5f"
+}

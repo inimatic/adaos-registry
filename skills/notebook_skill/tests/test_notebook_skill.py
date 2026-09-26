@@ -36,6 +36,13 @@ def skill_file_url(relative_path: str, *, download: bool = False) -> str:
     return f"http://127.0.0.1:8777/api/skills/notebook_skill/files/content/{relative_path}?{query}"
 
 
+def production_attachment_url(digest: str, filename: str) -> str:
+    return (
+        "http://127.0.0.1:8777/api/tools/notebook_skill/read_attachment/"
+        f"attachments/attachments/{digest}/{filename}?token=dev-local-token"
+    )
+
+
 def test_create_save_and_select_note_updates_receiver_specific_streams(monkeypatch):
     mod, _projected, streams = load_module(monkeypatch)
 
@@ -247,6 +254,9 @@ def test_notebook_manifest_uses_receiver_snapshot_recovery_only():
     assert "webio.stream.subscription.changed" not in text
     assert "node.yjs.control.completed" not in text
     assert "data_projections:" not in text
+    assert "storage.blob" in text
+    assert "name: upload_attachment" in text
+    assert "name: read_attachment" in text
 
 
 def test_notebook_back_action_does_not_save_empty_state():
@@ -408,11 +418,11 @@ def test_attach_note_upload_accepts_sanitized_upload_payload(monkeypatch):
             "purpose": "photos",
         },
         "artifact_ref": {
-            "artifact_id": "skill_file:notebook_skill:photos:" + "a" * 16,
+            "ref": "/api/tools/notebook_skill/read_attachment/attachments/attachments/" + "a" * 64 + "/photo.gif",
+            "blob_ref": "adaos-blob:local:sha256:" + "a" * 64,
+            "sha256": "a" * 64,
             "name": "photo.gif",
-            "purpose": "photos",
-            "relative_path": "uploads/photos/photo.gif",
-            "mime": "image/gif",
+            "size_bytes": 123,
         },
         "webspace_id": "desktop",
         "side_effect_class": "local_write",
@@ -421,14 +431,14 @@ def test_attach_note_upload_accepts_sanitized_upload_payload(monkeypatch):
     assert result["ok"] is True
     assert result["attachment"]["kind"] == "photo"
     assert result["attachment"]["name"] == "photo.gif"
-    assert result["attachment"]["artifact_ref"]["artifact_id"] == "skill_file:notebook_skill:photos:aaaaaaaaaaaaaaaa"
-    assert result["attachment"]["artifact_ref"]["relative_path"] == "uploads/photos/photo.gif"
-    assert result["attachment"]["url"] == skill_file_url("uploads/photos/photo.gif")
-    assert result["attachment"]["download_url"] == skill_file_url("uploads/photos/photo.gif", download=True)
+    assert result["attachment"]["artifact_ref"]["blob_ref"].startswith("adaos-blob:")
+    assert result["attachment"]["artifact_ref"]["ref"].startswith("/api/tools/notebook_skill/read_attachment/")
+    assert result["attachment"]["url"] == production_attachment_url("a" * 64, "photo.gif")
+    assert result["attachment"]["download_url"] == production_attachment_url("a" * 64, "photo.gif")
     assert result["attachment"]["summary"] == "image/gif | 123 B"
     editor = next(payload for receiver, payload, _meta in streams[-3:] if receiver == "notebook_skill.editor")
     assert editor["editor"]["attachments"][0]["mime"] == "image/gif"
-    assert editor["editor"]["attachments"][0]["url"] == skill_file_url("uploads/photos/photo.gif")
+    assert editor["editor"]["attachments"][0]["url"] == production_attachment_url("a" * 64, "photo.gif")
 
 
 def test_attach_note_upload_uses_current_note_when_state_note_id_is_unresolved(monkeypatch):
@@ -447,11 +457,11 @@ def test_attach_note_upload_uses_current_note_when_state_note_id_is_unresolved(m
             "purpose": "photos",
         },
         "artifact_ref": {
-            "artifact_id": "skill_file:notebook_skill:photos:" + "b" * 16,
+            "ref": "/api/tools/notebook_skill/read_attachment/attachments/attachments/" + "b" * 64 + "/fallback.jpg",
+            "blob_ref": "adaos-blob:local:sha256:" + "b" * 64,
+            "sha256": "b" * 64,
             "name": "fallback.jpg",
-            "purpose": "photos",
-            "relative_path": "uploads/photos/fallback.jpg",
-            "mime": "image/jpeg",
+            "size_bytes": 321,
         },
         "webspace_id": "desktop",
         "side_effect_class": "local_write",
@@ -459,10 +469,45 @@ def test_attach_note_upload_uses_current_note_when_state_note_id_is_unresolved(m
 
     assert result["ok"] is True
     assert result["note"]["id"] == note_id
-    assert result["attachment"]["url"] == skill_file_url("uploads/photos/fallback.jpg")
+    assert result["attachment"]["url"] == production_attachment_url("b" * 64, "fallback.jpg")
     assert mod._STATE["notes"][note_id]["attachments"][0]["name"] == "fallback.jpg"
     editor = next(payload for receiver, payload, _meta in streams[-3:] if receiver == "notebook_skill.editor")
     assert editor["editor"]["attachments"][0]["name"] == "fallback.jpg"
+
+
+def test_attachment_upload_uses_one_use_blob_ingress_and_exact_receipt(monkeypatch):
+    mod, _projected, _streams = load_module(monkeypatch)
+    required = []
+    monkeypatch.setattr(mod.access, "require", lambda permission: required.append(permission))
+    receipt = {
+        "schema": "adaos.storage.blob.object.v1",
+        "owner_ref": "skill:notebook_skill",
+        "digest": "sha256:" + "c" * 64,
+        "size_bytes": 4,
+        "media_type": "text/plain",
+    }
+    monkeypatch.setattr(mod, "put_upload", lambda logical_name: {**receipt, "logical_name": logical_name})
+
+    result = mod.upload_attachment(
+        filename="note.txt",
+        field_id="notebook-file-upload",
+        media_type="text/plain",
+        size_bytes=4,
+        digest="sha256:" + "c" * 64,
+    )
+
+    assert result["logical_name"] == "attachments"
+    assert required == ["workspace.write"]
+
+
+def test_attachment_read_requires_workspace_reader_and_exact_digest(monkeypatch):
+    mod, _projected, _streams = load_module(monkeypatch)
+    required = []
+    monkeypatch.setattr(mod.access, "require", lambda permission: required.append(permission))
+
+    digest = "sha256:" + "d" * 64
+    assert mod.read_attachment(digest) == {"ok": True, "ref": digest}
+    assert required == ["workspace.read"]
 
 
 def test_note_cards_use_first_line_title_and_remaining_preview(monkeypatch):
