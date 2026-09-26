@@ -1,5 +1,5 @@
 name: prompt_engineer_skill
-version: 0.7.3
+version: 0.7.5
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -103,6 +103,7 @@ tools:
 - name: prompt_load_state
   description: Load or initialize PromptProjectState for a skill or scenario
   entry: handlers.main:prompt_load_state
+  side_effects: local_write
   input_schema:
     type: object
     properties:
@@ -127,6 +128,7 @@ tools:
 - name: prompt_save_base_tz
   description: Update base TZ text for a prompt project
   entry: handlers.main:prompt_save_base_tz
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -157,6 +159,7 @@ tools:
 - name: prompt_append_tz_addendum
   description: Append a new TZ addendum block (append-only)
   entry: handlers.main:prompt_append_tz_addendum
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -191,6 +194,7 @@ tools:
 - name: prompt_get_tz_state
   description: Return base TZ and addenda for Prompt IDE
   entry: handlers.main:prompt_get_tz_state
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -227,6 +231,7 @@ tools:
 - name: prompt_list_dev_projects
   description: List skills and scenarios in DEV space
   entry: handlers.main:prompt_list_dev_projects
+  side_effects: read_only
   input_schema:
     type: object
     properties: {}
@@ -237,6 +242,7 @@ tools:
 - name: prompt_list_dev_objects
   description: List root DEV objects (scenarios and skills)
   entry: handlers.main:prompt_list_dev_objects
+  side_effects: read_only
   input_schema:
     type: object
     properties: {}
@@ -247,6 +253,7 @@ tools:
 - name: prompt_select_project
   description: Mark a Prompt IDE project as selected and sync Builder preview runtime
   entry: handlers.main:prompt_select_project
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -277,6 +284,7 @@ tools:
 - name: prompt_list_project_files
   description: List source files for a prompt project
   entry: handlers.main:prompt_list_project_files
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -298,6 +306,7 @@ tools:
 - name: prompt_list_project_file_tree
   description: List project files as a nested tree for Prompt IDE
   entry: handlers.main:prompt_list_project_file_tree
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -324,6 +333,7 @@ tools:
 - name: prompt_read_project_file
   description: Read a single project file for code viewer
   entry: handlers.main:prompt_read_project_file
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -360,6 +370,7 @@ tools:
 - name: prompt_save_project_file
   description: Save an editable project text file selected in Prompt IDE
   entry: handlers.main:prompt_save_project_file
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -393,6 +404,7 @@ tools:
 - name: prompt_list_templates
   description: List available templates for skills or scenarios
   entry: handlers.main:prompt_list_templates
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -410,6 +422,7 @@ tools:
 - name: prompt_create_dev_project
   description: Create a DEV skill or scenario using a template
   entry: handlers.main:prompt_create_dev_project
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -447,6 +460,7 @@ tools:
   description: List constituent objects (scenario + depends skills or single skill)
     for a Prompt IDE project
   entry: handlers.main:prompt_list_project_objects
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -465,6 +479,7 @@ tools:
 - name: prompt_get_project_meta
   description: Return metadata for a dev scenario or skill
   entry: handlers.main:prompt_get_project_meta
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -503,6 +518,7 @@ tools:
 - name: prompt_update_project_meta
   description: Update metadata (title, description, type) for a dev scenario or skill
   entry: handlers.main:prompt_update_project_meta
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -547,6 +563,7 @@ tools:
 - name: prompt_git_push
   description: Placeholder git push for current project
   entry: handlers.main:prompt_git_push
+  side_effects: external_io
   input_schema:
     type: object
     required:
@@ -576,6 +593,7 @@ tools:
   description: Run TS → detailed implementation brief generation via LLM for current
     project
   entry: handlers.main:tz_execute
+  side_effects: external_io
   input_schema:
     type: object
     required:
@@ -604,6 +622,7 @@ tools:
 - name: prompt_llm_list_models
   description: List available LLM models from the Root LLM proxy
   entry: handlers.main:prompt_llm_list_models
+  side_effects: external_io
   input_schema:
     type: object
     properties:
@@ -627,6 +646,7 @@ tools:
 - name: prompt_llm_model_options
   description: List development LLM model options and current project selection
   entry: handlers.main:prompt_llm_model_options
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -659,6 +679,7 @@ tools:
 - name: prompt_set_llm_profile
   description: Persist selected Builder LLM model profile for the project
   entry: handlers.main:prompt_set_llm_profile
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -691,6 +712,7 @@ tools:
 - name: tz_add_reset
   description: Reset TZ addenda for current project
   entry: handlers.main:tz_add_reset
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -717,6 +739,7 @@ tools:
 - name: prompt_git_update
   description: Placeholder git update/pull for current project
   entry: handlers.main:prompt_git_update
+  side_effects: external_io
   input_schema:
     type: object
     required:
@@ -745,6 +768,7 @@ tools:
 - name: prompt_git_publish
   description: Publish DEV skill or scenario (and dependent skills) to the registry
   entry: handlers.main:prompt_git_publish
+  side_effects: external_io
   input_schema:
     type: object
     required:
@@ -785,6 +809,7 @@ tools:
 - name: prompt_git_delete
   description: Delete DEV skill or scenario from drafts and registry
   entry: handlers.main:prompt_git_delete
+  side_effects: destructive
   input_schema:
     type: object
     required:
@@ -817,6 +842,7 @@ tools:
 - name: prompt_get_git_log
   description: Return recent git operations for a project
   entry: handlers.main:prompt_get_git_log
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -847,6 +873,7 @@ tools:
 - name: prompt_set_workflow_state
   description: Auto-generated from handlers.main:prompt_set_workflow_state
   entry: handlers.main:prompt_set_workflow_state
+  side_effects: local_write
   input_schema:
     type: object
     properties: {}
@@ -854,7 +881,7 @@ tools:
     type: object
     properties: {}
 exports: {}
-updated_at: '2026-09-26T09:34:46+00:00'
+updated_at: '2026-09-26T11:03:29+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.0+3734.11eaf26a

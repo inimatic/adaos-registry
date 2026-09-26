@@ -1,6 +1,6 @@
 id: skill_preview
 name: skill_preview
-version: 0.1.3
+version: 0.1.4
 title: Skill Preview
 description: Generic metadata and README projection for a Builder-selected skill without
   an explicit presentation.
@@ -64,4 +64,4 @@ nlu:
     slot_schemas: {}
     entities: []
 steps: []
-updated_at: '2026-09-26T09:31:21+00:00'
+updated_at: '2026-09-26T11:02:38+00:00'

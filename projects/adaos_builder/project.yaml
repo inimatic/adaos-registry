@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: adaos_builder
-version: 0.3.13
+version: 0.3.14
 profiles:
 - adaos.builder.v1
 - adaos.development.workbench.v1
@@ -144,3 +144,29 @@ lifecycle:
     source_artifacts: retain
 created_at: '2026-08-27T00:00:00+00:00'
 created_by: AdaOS Project Composition
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.read
+    purpose: Inspect project sources, tickets, build state, and validation evidence.
+    approval_policy: grant_on_install
+  - id: workspace.write
+    purpose: Create and update explicitly selected development projects and artifacts.
+    approval_policy: owner_only
+    sensitive: true
+  - id: network.egress
+    purpose: Access configured model, source-control, and publication services during governed development operations.
+    approval_policy: owner_only
+    sensitive: true
+  optional: []
+  secrets: []
+  external_providers: []
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected: [project_source, development_ticket, build_evidence]
+    linked_to_user: []
+    retention: Development artifacts remain in the selected project workspace.
+    sent_off_device: [explicit_model_or_registry_request]
+    tracking: false
