@@ -1,0 +1,144 @@
+{
+  "schema": "adaos.semantic_registry.application_release.v1",
+  "project_id": "adaos_drive",
+  "version": "0.1.21",
+  "application_ref": "scenario:adaos_drive",
+  "project_release_digest": "sha256:613e6ec9ef6d78330b953dd9517efa65e0c4711e32b3c77c911bf58b22e085ec",
+  "source_ref": {
+    "schema": "adaos.artifact.source_ref.v1",
+    "forge": "content-addressed-dev",
+    "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+    "revision": "sha256:db6f9ac19dcfc66d9afec1bd5710ed9df85229f7d629d837e8cbe10525328e45",
+    "path_scope": [
+      "projects/adaos_drive/"
+    ]
+  },
+  "compilation_digest": "sha256:9d9f18acf709e2256a11e7d175291aa5a0363f6083dd1c076ac05c8642192fe1",
+  "semantic_revision_digest": "sha256:9ec1b8597f910e8954d4cf0e47eca9c381f2239f436e844dd17187d37a06e202",
+  "requirements": [
+    {
+      "requirement_ref": "requirement:scenario.adaos_drive.ui",
+      "capability_ref": "capability:application.ui.render",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:c3cf795cbefef2e3b04d403747da3ec18c1104bcd38a437114cfce14c1b65721"
+    },
+    {
+      "requirement_ref": "requirement:scenario.adaos_drive.workspace.files.manage",
+      "capability_ref": "capability:workspace.files.manage",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:31ac2721dc07167783d0be0dfbaf9a5b57ebf85b4b4e34914644c99163f08651"
+    }
+  ],
+  "portable_artifacts": {
+    "adaos.binding.definition.v1": [
+      "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "sha256:f06d98df35801cb3c6e6bf4cacb82f019083a310a2be5996cf2bc9f5041f008f"
+    ],
+    "adaos.binding.delivery.v1": [
+      "sha256:6ef72a32a9ff0b13de048de059b2bc48f00ee243b9c5439b310d7ad35a638545",
+      "sha256:8cf2f2db88ad7cf1a1389e5f19553ca54e6bfc8ece5f40f4612e8112a6b559dd"
+    ],
+    "adaos.capability.contract.v1": [
+      "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7",
+      "sha256:fa1371a762a3b8b6fdad71a8d1435029d73d2e45ebdba997bf623bd643b06b74"
+    ]
+  },
+  "distribution": {
+    "thin": {
+      "requirements_only": true,
+      "registry_required": true
+    },
+    "resolved": {
+      "project_release_digest": "sha256:613e6ec9ef6d78330b953dd9517efa65e0c4711e32b3c77c911bf58b22e085ec",
+      "package_closure": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "adaos_drive",
+          "version": "0.1.13",
+          "digest": "sha256:26772515101a345a87067d608ca62329d5af629dbc41337298b586ef04d5b79d",
+          "manifest_digest": "sha256:9f3fa6410546f62aa0db1b382bad9eb892f6fff891e1ff5ca30780b348fc780f",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:db6f9ac19dcfc66d9afec1bd5710ed9df85229f7d629d837e8cbe10525328e45",
+            "path_scope": [
+              "scenarios/adaos_drive/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/adaos_drive",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "adaos_drive",
+          "version": "0.1.19",
+          "digest": "sha256:790092f8fa00c39c189ce7e8f512ff300aa52d64ede2956735f9643c683f31d3",
+          "manifest_digest": "sha256:497a92a73c02bf2f7cdb6fffc2385ca899a32c2a118ad6766e64ffbd5fd99f15",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:db6f9ac19dcfc66d9afec1bd5710ed9df85229f7d629d837e8cbe10525328e45",
+            "path_scope": [
+              "skills/adaos_drive/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/adaos_drive",
+          "schema_locks": []
+        }
+      ],
+      "portable_artifact_digests": [
+        "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+        "sha256:6ef72a32a9ff0b13de048de059b2bc48f00ee243b9c5439b310d7ad35a638545",
+        "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7",
+        "sha256:8cf2f2db88ad7cf1a1389e5f19553ca54e6bfc8ece5f40f4612e8112a6b559dd",
+        "sha256:f06d98df35801cb3c6e6bf4cacb82f019083a310a2be5996cf2bc9f5041f008f",
+        "sha256:fa1371a762a3b8b6fdad71a8d1435029d73d2e45ebdba997bf623bd643b06b74"
+      ]
+    }
+  },
+  "projection_digest": "sha256:8cdac33d3cee30fb7d958b535aecf5fb751f80ce2dc670e22f17e8285efb8fe0"
+}

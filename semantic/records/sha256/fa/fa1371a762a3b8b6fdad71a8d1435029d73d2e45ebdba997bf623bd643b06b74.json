@@ -1,0 +1,322 @@
+{
+  "authority_requirements": [
+    "workspace.read",
+    "workspace.write"
+  ],
+  "capability_ref": "capability:workspace.files.manage",
+  "compatibility": {},
+  "conformance_refs": [
+    "scenario:workspace.files.manage.v1"
+  ],
+  "contract_digest": "sha256:fa1371a762a3b8b6fdad71a8d1435029d73d2e45ebdba997bf623bd643b06b74",
+  "dependencies": [],
+  "effects": [
+    "reads file metadata and bounded previews from connected folders",
+    "performs only explicitly requested writes within connected folders"
+  ],
+  "invariants": [
+    "file access remains bounded to folders explicitly connected by the owner",
+    "navigation state never grants filesystem authority on its own"
+  ],
+  "operations": [
+    {
+      "errors": [
+        "source_unavailable"
+      ],
+      "input_schema": {
+        "properties": {
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "snapshot",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "snapshot": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "ok",
+          "snapshot"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "source_invalid",
+        "access_denied"
+      ],
+      "input_schema": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "panel": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "operation_id": "add_source",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "source_invalid",
+        "source_unavailable"
+      ],
+      "input_schema": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "label"
+        ],
+        "type": "object"
+      },
+      "operation_id": "rename_source",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "ok",
+          "source"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "source_unavailable",
+        "last_source_protected"
+      ],
+      "input_schema": {
+        "properties": {
+          "source_id": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id"
+        ],
+        "type": "object"
+      },
+      "operation_id": "remove_source",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "removed_source_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "removed_source_id"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "folder_not_found",
+        "access_denied"
+      ],
+      "input_schema": {
+        "properties": {
+          "panel": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "open_folder",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "item_not_found",
+        "access_denied"
+      ],
+      "input_schema": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "new_name": {
+            "type": "string"
+          },
+          "panel": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "new_name"
+        ],
+        "type": "object"
+      },
+      "operation_id": "rename",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "item_not_found",
+        "destination_unavailable"
+      ],
+      "input_schema": {
+        "properties": {
+          "from_panel": {
+            "type": "string"
+          },
+          "panel": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "to_panel": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "copy",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "destination_unavailable",
+        "access_denied"
+      ],
+      "input_schema": {
+        "properties": {
+          "artifact_ref": {
+            "type": "object"
+          },
+          "file": {
+            "type": "object"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "panel": {
+            "type": "string"
+          },
+          "webspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "upload",
+      "output_schema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    }
+  ],
+  "schema": "adaos.capability.contract.v1",
+  "state_ports": [],
+  "title": "Browse and manage explicitly connected workspace folders",
+  "version": "1.1.0"
+}

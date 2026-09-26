@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:application.ui.render.webui-v1",
+  "binding_definition_digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+  "logical_entrypoint": "application.ui.render.webui-v1",
+  "package": {
+    "kind": "scenario",
+    "id": "adaos_drive",
+    "version": "0.1.13",
+    "digest": "sha256:26772515101a345a87067d608ca62329d5af629dbc41337298b586ef04d5b79d"
+  },
+  "physical_member": "webui.json",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:8cf2f2db88ad7cf1a1389e5f19553ca54e6bfc8ece5f40f4612e8112a6b559dd"
+}

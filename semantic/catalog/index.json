@@ -53,9 +53,9 @@
       "application_id": "adaos_drive",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 2,
-      "stable_release_digest": "sha256:9983881b57191e9a45700f929a5df5ef9b35593df5418377d824b56cd650ea8f",
-      "release_key": "adaos_drive@sha256:9983881b57191e9a45700f929a5df5ef9b35593df5418377d824b56cd650ea8f",
-      "projection_digest": "sha256:f4fb8866066cf6ac749376493cb4b0f4d1fc5aeb460f2eb433d26ba40e144101"
+      "stable_release_digest": "sha256:613e6ec9ef6d78330b953dd9517efa65e0c4711e32b3c77c911bf58b22e085ec",
+      "release_key": "adaos_drive@sha256:613e6ec9ef6d78330b953dd9517efa65e0c4711e32b3c77c911bf58b22e085ec",
+      "projection_digest": "sha256:2a3c971e03b413c1febb7f3ffcf031b7c11efa3d454b3f8bdd1502ba49473150"
     },
     "cv_descriptor_lab": {
       "application_id": "cv_descriptor_lab",
@@ -530,7 +530,15 @@
       "release_digest": "sha256:4c47394b70f86cecf82c93c18029732b121f5a452358e6dd9d38d2430eaa9c7e",
       "path": "semantic/catalog/releases/media_center/4c47394b70f86cecf82c93c18029732b121f5a452358e6dd9d38d2430eaa9c7e.json",
       "projection_digest": "sha256:bbaa212697226afcc229ef03a3f169210006e01d05477cac501f1131cdd40653"
+    },
+    "adaos_drive@sha256:613e6ec9ef6d78330b953dd9517efa65e0c4711e32b3c77c911bf58b22e085ec": {
+      "application_id": "adaos_drive",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.21",
+      "release_digest": "sha256:613e6ec9ef6d78330b953dd9517efa65e0c4711e32b3c77c911bf58b22e085ec",
+      "path": "semantic/catalog/releases/adaos_drive/613e6ec9ef6d78330b953dd9517efa65e0c4711e32b3c77c911bf58b22e085ec.json",
+      "projection_digest": "sha256:2a3c971e03b413c1febb7f3ffcf031b7c11efa3d454b3f8bdd1502ba49473150"
     }
   },
-  "index_digest": "sha256:65438a8cc9afc304dd5aa752812737fc48cdc1738b301980e51c151b5a7312db"
+  "index_digest": "sha256:4ed15cd32eb55a1a96a79b3b67e22ce1edb9c58fbe9b02937b35ee6b0c2576e6"
 }

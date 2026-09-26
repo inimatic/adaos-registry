@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:workspace.files.manage.adaos-drive-local",
+  "binding_definition_digest": "sha256:f06d98df35801cb3c6e6bf4cacb82f019083a310a2be5996cf2bc9f5041f008f",
+  "logical_entrypoint": "workspace.files.adaos-drive-local",
+  "package": {
+    "kind": "skill",
+    "id": "adaos_drive",
+    "version": "0.1.19",
+    "digest": "sha256:790092f8fa00c39c189ce7e8f512ff300aa52d64ede2956735f9643c683f31d3"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:6ef72a32a9ff0b13de048de059b2bc48f00ee243b9c5439b310d7ad35a638545"
+}
