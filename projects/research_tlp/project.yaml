@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: research_tlp
-version: 0.3.16
+version: 0.3.18
 profiles:
 - adaos.research.tlp.v1
 components:
@@ -90,3 +90,27 @@ lifecycle:
     source_artifacts: retain
 created_at: '2026-08-27T00:00:00+00:00'
 created_by: AdaOS Project Composition
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.read
+    purpose: Inspect TLP research directions, datasets, and validation evidence.
+    approval_policy: grant_on_install
+  - id: workspace.write
+    purpose: Persist explicit TLP experiment and evaluation operations.
+    approval_policy: owner_only
+    sensitive: true
+  optional: []
+  secrets: []
+  external_providers: []
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected:
+    - research_direction
+    - experiment_evidence
+    linked_to_user: []
+    retention: Research state and evidence remain in the selected workspace.
+    sent_off_device: []
+    tracking: false

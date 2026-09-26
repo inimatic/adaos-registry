@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:application.ui.render.webui-v1",
+  "binding_definition_digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+  "logical_entrypoint": "application.ui.render.webui-v1",
+  "package": {
+    "kind": "scenario",
+    "id": "tlp_research",
+    "version": "0.3.10",
+    "digest": "sha256:b781b84bbde2c1463add855db7dd7428695ac3c2085b3b809ebb84b9d9db933c"
+  },
+  "physical_member": "webui.json",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:a8edf8bea814f88f151ca24d65fb07950047d082d35487620cf3c2bb1d7fb7e1"
+}

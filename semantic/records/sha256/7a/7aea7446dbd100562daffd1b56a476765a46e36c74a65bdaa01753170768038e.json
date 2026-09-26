@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:research.tlp.evaluate.structured-proof-02",
+  "binding_definition_digest": "sha256:baf078d0d8ae4dabfe49d39696279de50aa889d81088a7370fa3764a1c8098e2",
+  "logical_entrypoint": "research.tlp.evaluate.structured-proof-02",
+  "package": {
+    "kind": "skill",
+    "id": "tlp_structured_proof_02",
+    "version": "0.2.6",
+    "digest": "sha256:445a4d49698909982846aae9bf8c78ee594e6b5f9a69ce8f7429d660e70e54de"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:7aea7446dbd100562daffd1b56a476765a46e36c74a65bdaa01753170768038e"
+}

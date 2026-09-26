@@ -1,5 +1,5 @@
 name: tlp_structured_proof_02
-version: 0.2.4
+version: 0.2.6
 description: Governed STL-10 MaxPool2d versus centered per-channel TLP pool2 research
   runner.
 supported_locales:
@@ -39,6 +39,7 @@ tools:
   description: Return the typed research-direction descriptor and current implementation
     readiness.
   entry: handlers.main:describe_direction
+  side_effects: read_only
   input_schema:
     type: object
     additionalProperties: true
@@ -52,6 +53,7 @@ tools:
   description: Run domain-specific checks over a candidate ResearchPrototype without
     accepting it.
   entry: handlers.main:validate_research_prototype
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -69,6 +71,7 @@ tools:
 - name: execution_readiness
   description: Report whether Codex has implemented the experimental runner contract.
   entry: handlers.main:execution_readiness
+  side_effects: read_only
   input_schema:
     type: object
     additionalProperties: true
@@ -599,7 +602,7 @@ nlu_hints:
   slot_schemas: {}
   entities: []
 prototype: research_direction
-updated_at: '2026-09-26T07:08:06+00:00'
+updated_at: '2026-09-26T11:05:38+00:00'
 title: TLP structured realization proof 02 — research assets
 data_lifecycle:
   schema: adaos.skill.data_lifecycle.v1
