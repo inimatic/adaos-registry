@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: adaos_builder
-version: 0.3.14
+version: 0.3.15
 profiles:
 - adaos.builder.v1
 - adaos.development.workbench.v1
@@ -155,7 +155,8 @@ permission_profile:
     approval_policy: owner_only
     sensitive: true
   - id: network.egress
-    purpose: Access configured model, source-control, and publication services during governed development operations.
+    purpose: Access configured model, source-control, and publication services during
+      governed development operations.
     approval_policy: owner_only
     sensitive: true
   optional: []
@@ -165,8 +166,12 @@ permission_profile:
   notifications: []
   background_actions: []
   data_practices:
-    collected: [project_source, development_ticket, build_evidence]
+    collected:
+    - project_source
+    - development_ticket
+    - build_evidence
     linked_to_user: []
     retention: Development artifacts remain in the selected project workspace.
-    sent_off_device: [explicit_model_or_registry_request]
+    sent_off_device:
+    - explicit_model_or_registry_request
     tracking: false
