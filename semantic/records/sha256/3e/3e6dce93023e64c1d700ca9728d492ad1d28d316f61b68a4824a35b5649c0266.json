@@ -1,0 +1,115 @@
+{
+  "authority_requirements": [],
+  "capability_ref": "capability:subscriptions.status.inspect",
+  "compatibility": {},
+  "conformance_refs": [
+    "scenario:subscriptions.status.inspect.v1"
+  ],
+  "contract_digest": "sha256:3e6dce93023e64c1d700ca9728d492ad1d28d316f61b68a4824a35b5649c0266",
+  "dependencies": [],
+  "effects": [
+    "reads the current signed entitlement and bounded usage projection",
+    "an explicit refresh may replace only the reconstructible local projection"
+  ],
+  "invariants": [
+    "subscription authority remains in the signed Root entitlement snapshot",
+    "local projections are reconstructible and never become billing authority"
+  ],
+  "operations": [
+    {
+      "errors": [
+        "entitlement_unavailable"
+      ],
+      "input_schema": {
+        "properties": {
+          "refresh_root_if_missing": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "webspace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "get_status",
+      "output_schema": {
+        "properties": {},
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "entitlement_unavailable",
+        "root_unavailable"
+      ],
+      "input_schema": {
+        "properties": {
+          "webspace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "refresh_status",
+      "output_schema": {
+        "properties": {},
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "entitlement_unavailable"
+      ],
+      "input_schema": {
+        "properties": {
+          "webspace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "list_resources",
+      "output_schema": {
+        "properties": {},
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "entitlement_unavailable"
+      ],
+      "input_schema": {
+        "properties": {
+          "webspace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "operation_id": "list_usage_history",
+      "output_schema": {
+        "properties": {},
+        "type": "object"
+      }
+    }
+  ],
+  "schema": "adaos.capability.contract.v1",
+  "state_ports": [],
+  "title": "Inspect subscription status and usage",
+  "version": "1.0.0"
+}

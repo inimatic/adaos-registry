@@ -1,0 +1,51 @@
+schema: adaos.cbs.provider_authoring.v1
+authorship:
+  origin: human_authored
+capability:
+  ref: capability:subscriptions.status.inspect
+  version: 1.0.0
+  title: Inspect subscription status and usage
+  operations:
+  - operation_id: get_status
+    tool: get_status
+    errors:
+    - entitlement_unavailable
+  - operation_id: refresh_status
+    tool: refresh_status
+    errors:
+    - entitlement_unavailable
+    - root_unavailable
+  - operation_id: list_resources
+    tool: list_resources
+    errors:
+    - entitlement_unavailable
+  - operation_id: list_usage_history
+    tool: list_usage_history
+    errors:
+    - entitlement_unavailable
+  invariants:
+  - subscription authority remains in the signed Root entitlement snapshot
+  - local projections are reconstructible and never become billing authority
+  effects:
+  - reads the current signed entitlement and bounded usage projection
+  - an explicit refresh may replace only the reconstructible local projection
+  authority_requirements: []
+  conformance_refs:
+  - scenario:subscriptions.status.inspect.v1
+binding:
+  ref: binding-definition:subscriptions.status.inspect.adaos-root-local
+  version: 1.0.0
+  entry_protocol: adaos.skill.tools.v1
+  logical_entrypoint: subscriptions.status.adaos-root
+  physical_member: handlers/main.py
+  modes:
+  - production
+  profile_classes:
+  - local
+  provider_features:
+  - signed_entitlement_snapshot
+  - reconstructible_projection
+  authority_requirements: []
+  conformance_obligations:
+  - capability_conformance
+  - evidence_freshness

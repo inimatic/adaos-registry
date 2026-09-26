@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: subscription_status
-version: 0.1.11
+version: 0.1.15
 profiles:
 - adaos.builder.component_project.v1
 components:
@@ -13,16 +13,23 @@ components:
     relations:
     - uses
   dependencies: []
-entrypoints: []
+entrypoints:
+- id: subscriptions
+  presentation: skill:subscription_status_skill
+  default: true
+  bindings:
+    surface: subscription_status
 catalog:
-  title: subscription_status_skill
+  title: Subscriptions
   description: User-facing AdaOS subscription status widget and modal backed by the
     local economic entitlement snapshot with explicit Root refresh.
   categories:
-  - development
+  - system
+  - account
   tags:
-  - builder-managed
-  - legacy-component
+  - subscriptions
+  - usage
+  - cbs-provider
 publication:
   stage: alpha
   visibility: unlisted
@@ -36,7 +43,13 @@ install:
     optional: false
     components:
     - skill:subscription_status_skill
-compatibility: {}
+compatibility:
+  required_entrypoints:
+  - subscriptions
+  required_contracts:
+  - capability:subscriptions.status.inspect@^1.0.0
+  validation_profiles:
+  - subscriptions.local
 lifecycle:
   uninstall:
     components: remove_if_unreferenced

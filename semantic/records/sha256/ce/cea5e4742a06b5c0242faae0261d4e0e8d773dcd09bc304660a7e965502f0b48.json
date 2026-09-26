@@ -1,0 +1,28 @@
+{
+  "authority_requirements": [],
+  "binding_definition_ref": "binding-definition:subscriptions.status.inspect.adaos-root-local",
+  "capability_ref": "capability:subscriptions.status.inspect",
+  "capability_version": "1.0.0",
+  "conformance_obligations": [
+    "capability_conformance",
+    "evidence_freshness"
+  ],
+  "definition_digest": "sha256:cea5e4742a06b5c0242faae0261d4e0e8d773dcd09bc304660a7e965502f0b48",
+  "entry_protocol": "adaos.skill.tools.v1",
+  "environment_constraints": {
+    "profile_classes": [
+      "local"
+    ],
+    "provider_features": [
+      "signed_entitlement_snapshot",
+      "reconstructible_projection"
+    ]
+  },
+  "implementation_entrypoint": "subscriptions.status.adaos-root",
+  "modes": [
+    "production"
+  ],
+  "schema": "adaos.binding.definition.v1",
+  "state_support": [],
+  "version": "1.0.0"
+}

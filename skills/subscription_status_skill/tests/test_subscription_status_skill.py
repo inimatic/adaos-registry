@@ -5,6 +5,32 @@ import json
 from pathlib import Path
 
 
+def test_compact_cbs_provider_compiles_to_package_neutral_contracts():
+    from adaos.services.artifact_pipeline.cbs_authoring import (
+        BINDING_OUTPUT_PATH,
+        CAPABILITY_OUTPUT_PATH,
+        compile_cbs_provider_files,
+    )
+
+    root = Path(__file__).resolve().parents[1]
+    files = {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in root.rglob("*")
+        if path.is_file() and ".runtime" not in path.parts
+    }
+    compiled = compile_cbs_provider_files(files, kind="skill")
+
+    assert compiled is not None
+    assert compiled.capability.capability_ref == "capability:subscriptions.status.inspect"
+    assert compiled.binding.binding_definition_ref == (
+        "binding-definition:subscriptions.status.inspect.adaos-root-local"
+    )
+    assert set(compiled.generated_files) == {
+        CAPABILITY_OUTPUT_PATH,
+        BINDING_OUTPUT_PATH,
+    }
+
+
 def _load_module():
     path = Path(__file__).resolve().parents[1] / "handlers" / "main.py"
     spec = importlib.util.spec_from_file_location("test_subscription_status_handlers", path)

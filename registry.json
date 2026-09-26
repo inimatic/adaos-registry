@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-25T21:14:10+00:00",
+  "updated_at": "2026-09-26T01:07:19+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1216,8 +1216,8 @@
       "kind": "skill",
       "id": "subscription_status_skill",
       "name": "subscription_status_skill",
-      "version": "0.1.24",
-      "updated_at": "2026-09-17T20:00:06+00:00",
+      "version": "0.1.27",
+      "updated_at": "2026-09-25T22:13:14+00:00",
       "path": "skills/subscription_status_skill",
       "manifest": "skills/subscription_status_skill/skill.yaml",
       "source": {
@@ -1225,7 +1225,7 @@
         "manifest": "skills/subscription_status_skill/skill.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:c68e7499937e0af312dbe0007fec516260950d1ce89b5d29271b28bcd4e21e7f",
+        "revision": "sha256:de95b5633649ad04871799c0aed6d17cd5d9dcefeda257002efadf6a8da987aa",
         "path_scope": [
           "projects/subscription_status/"
         ]
@@ -1240,18 +1240,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "subscription_status",
-        "release": "subscription_status@0.1.11",
-        "release_digest": "sha256:1ab25bbe90a523bb8b0acb60193a15c2c62e1c0dd33ed9a236076eab18b27538",
-        "package_digest": "sha256:a8972f19ac9fe7203eee5ee97393b93eb62049b5fce44e25b5c136ff3b0a4c02"
+        "release": "subscription_status@0.1.15",
+        "release_digest": "sha256:7f5d353a3d2a04a5dcfb4aa2909e6def60a978a40dd191b77fdfeabcc329d798",
+        "package_digest": "sha256:20e9d148e33429441857faa70e1b873fdb694f30d72d96ee5cead238e3cac24a"
       },
-      "tools_count": 5,
+      "tools_count": 7,
       "channels": {
         "stable": {
-          "release": "subscription_status@0.1.11",
-          "release_digest": "sha256:1ab25bbe90a523bb8b0acb60193a15c2c62e1c0dd33ed9a236076eab18b27538",
-          "source_revision": "sha256:c68e7499937e0af312dbe0007fec516260950d1ce89b5d29271b28bcd4e21e7f",
-          "package_digest": "sha256:a8972f19ac9fe7203eee5ee97393b93eb62049b5fce44e25b5c136ff3b0a4c02",
-          "version": "0.1.24"
+          "release": "subscription_status@0.1.15",
+          "release_digest": "sha256:7f5d353a3d2a04a5dcfb4aa2909e6def60a978a40dd191b77fdfeabcc329d798",
+          "source_revision": "sha256:de95b5633649ad04871799c0aed6d17cd5d9dcefeda257002efadf6a8da987aa",
+          "package_digest": "sha256:20e9d148e33429441857faa70e1b873fdb694f30d72d96ee5cead238e3cac24a",
+          "version": "0.1.27"
         }
       }
     },
@@ -4385,8 +4385,8 @@
       "kind": "project",
       "id": "subscription_status",
       "name": "subscription_status",
-      "version": "0.1.11",
-      "updated_at": "2026-09-17T20:00:58+00:00",
+      "version": "0.1.15",
+      "updated_at": "2026-09-26T01:07:19+00:00",
       "path": "projects/subscription_status",
       "manifest": "projects/subscription_status/project.yaml",
       "source": {
@@ -4398,14 +4398,16 @@
         "name": "subscription_status",
         "id": "subscription_status"
       },
-      "title": "subscription_status_skill",
+      "title": "Subscriptions",
       "description": "User-facing AdaOS subscription status widget and modal backed by the local economic entitlement snapshot with explicit Root refresh.",
       "categories": [
-        "development"
+        "system",
+        "account"
       ],
       "tags": [
-        "builder-managed",
-        "legacy-component"
+        "subscriptions",
+        "usage",
+        "cbs-provider"
       ],
       "publication": {
         "stage": "alpha",
@@ -4437,18 +4439,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "subscription_status",
-        "release": "subscription_status@0.1.11",
-        "release_digest": "sha256:1ab25bbe90a523bb8b0acb60193a15c2c62e1c0dd33ed9a236076eab18b27538",
+        "release": "subscription_status@0.1.15",
+        "release_digest": "sha256:7f5d353a3d2a04a5dcfb4aa2909e6def60a978a40dd191b77fdfeabcc329d798",
         "primary_component": "skill:subscription_status_skill",
-        "package_digest": "sha256:a8972f19ac9fe7203eee5ee97393b93eb62049b5fce44e25b5c136ff3b0a4c02"
+        "package_digest": "sha256:20e9d148e33429441857faa70e1b873fdb694f30d72d96ee5cead238e3cac24a"
       },
       "channels": {
         "stable": {
-          "release": "subscription_status@0.1.11",
-          "release_digest": "sha256:1ab25bbe90a523bb8b0acb60193a15c2c62e1c0dd33ed9a236076eab18b27538",
-          "source_revision": "sha256:c68e7499937e0af312dbe0007fec516260950d1ce89b5d29271b28bcd4e21e7f",
-          "package_digest": "sha256:a8972f19ac9fe7203eee5ee97393b93eb62049b5fce44e25b5c136ff3b0a4c02",
-          "version": "0.1.11"
+          "release": "subscription_status@0.1.15",
+          "release_digest": "sha256:7f5d353a3d2a04a5dcfb4aa2909e6def60a978a40dd191b77fdfeabcc329d798",
+          "source_revision": "sha256:de95b5633649ad04871799c0aed6d17cd5d9dcefeda257002efadf6a8da987aa",
+          "package_digest": "sha256:20e9d148e33429441857faa70e1b873fdb694f30d72d96ee5cead238e3cac24a",
+          "version": "0.1.15"
         }
       }
     },

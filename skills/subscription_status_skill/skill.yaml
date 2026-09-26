@@ -1,5 +1,5 @@
 name: subscription_status_skill
-version: 0.1.24
+version: 0.1.27
 description: User-facing AdaOS subscription status widget and modal backed by the
   local economic entitlement snapshot with explicit Root refresh.
 webui_owner: shared
@@ -20,7 +20,14 @@ data_projections:
     path: data/subscription_status
 memory_budget:
   expected_rss_mb: 48
-lifecycle: {}
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases: []
+  legacy_adoption: reconstructible_empty
+lifecycle:
+  drain: subscription_status_drain
+  rehydrate: subscription_status_rehydrate
 events:
   subscribe:
   - sys.ready
@@ -31,6 +38,43 @@ events:
   - subnet.member.status.changed
 default_tool: get_status
 tools:
+- name: subscription_status_drain
+  description: Quiesce the reconstructible subscription projection before a release
+    switch.
+  entry: handlers.main:subscription_status_drain
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      reason:
+        type:
+        - string
+        - 'null'
+  output_schema:
+    type: object
+    properties:
+      ok:
+        type: boolean
+    required:
+    - ok
+- name: subscription_status_rehydrate
+  description: Rebuild the subscription projection after a release switch.
+  entry: handlers.main:subscription_status_rehydrate
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      reason:
+        type:
+        - string
+        - 'null'
+  output_schema:
+    type: object
+    properties:
+      ok:
+        type: boolean
+    required:
+    - ok
 - name: get_status
   description: Return and project the current local AdaOS subscription status.
   entry: handlers.main:get_status
@@ -122,7 +166,7 @@ nlu:
     - show AdaOS subscription status
     - показать подписку AdaOS
     tool: get_status
-updated_at: '2026-09-17T20:00:06+00:00'
+updated_at: '2026-09-25T22:13:14+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.950+5766.76010ad67

@@ -406,6 +406,28 @@ def get_status(webspace_id: str | None = None, refresh_root_if_missing: bool = T
     )
 
 
+@tool("subscription_status_drain")
+def subscription_status_drain(reason: str | None = None) -> dict[str, Any]:
+    """Acknowledge that this provider has no durable worker or write queue."""
+
+    return {
+        "ok": True,
+        "status": "drained",
+        "reason": _text(reason) or "application_release_switch",
+    }
+
+
+@tool("subscription_status_rehydrate")
+def subscription_status_rehydrate(reason: str | None = None) -> dict[str, Any]:
+    """Acknowledge activation; projections are rebuilt lazily for each Webspace."""
+
+    return {
+        "ok": True,
+        "status": "ready",
+        "reason": _text(reason) or "application_release_switch",
+    }
+
+
 @tool("refresh_status")
 def refresh_status(webspace_id: str | None = None) -> dict[str, Any]:
     target = _webspace_id(webspace_id)
