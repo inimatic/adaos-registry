@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: media_center
-version: 0.6.108
+version: 0.6.110
 profiles:
 - adaos.media_center.v1
 - adaos.media_center.tv.v1
@@ -146,7 +146,8 @@ permission_profile:
     approval_policy: owner_only
     sensitive: true
   - id: network.egress
-    purpose: Coordinate explicitly requested deployment and topology operations with configured subnet services.
+    purpose: Coordinate explicitly requested deployment and topology operations with
+      configured subnet services.
     approval_policy: owner_only
     sensitive: true
   optional: []
@@ -156,8 +157,14 @@ permission_profile:
   notifications: []
   background_actions: []
   data_practices:
-    collected: [media_metadata, playback_state, playlist]
-    linked_to_user: [playback_state, playlist]
-    retention: Media remains at its configured source; local catalog and preferences are retained.
+    collected:
+    - media_metadata
+    - playback_state
+    - playlist
+    linked_to_user:
+    - playback_state
+    - playlist
+    retention: Media remains at its configured source; local catalog and preferences
+      are retained.
     sent_off_device: []
     tracking: false

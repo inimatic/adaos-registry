@@ -1,0 +1,737 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "media_center",
+    "legacy_project_id": "media_center",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "media_center",
+    "display": {
+      "title": "Media Center",
+      "summary": "Distributed in-place household media library, playback, and remote control."
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "library",
+        "presentation_ref": "scenario:media_center"
+      },
+      {
+        "entrypoint_id": "tv",
+        "presentation_ref": "scenario:media_center"
+      },
+      {
+        "entrypoint_id": "remote",
+        "presentation_ref": "scenario:media_center"
+      },
+      {
+        "entrypoint_id": "embedded",
+        "presentation_ref": "scenario:media_center"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 2,
+    "created_at": "2026-09-26T01:17:33+00:00",
+    "updated_at": "2026-09-26T01:37:49+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "media_center",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "media_center",
+    "version": "0.6.110",
+    "release_digest": "sha256:3c785122657992b29a9719da3aae4e984a5267c75537e01806c1443ca3d2aab0",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "media_center",
+      "version": "0.6.110",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:a48b31bdd5f49daa2569bc2518e1d80abc576900d1ac16c9ca1dee862e2ccabf",
+        "path_scope": [
+          "projects/media_center/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "media_center",
+          "version": "0.6.42",
+          "digest": "sha256:e3b16f0892b6c75b2faad238a03de94b015dfed234713d87b35857fecf25b052",
+          "manifest_digest": "sha256:2b8ce4b40c3d4e7f3085f387f68e59b817763c897c7e082f2f3e562006c096f4",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:a48b31bdd5f49daa2569bc2518e1d80abc576900d1ac16c9ca1dee862e2ccabf",
+            "path_scope": [
+              "scenarios/media_center/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/media_center",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "media_center_skill",
+          "version": "0.8.98",
+          "digest": "sha256:22bae50a8b4d96bd84ebd23e264281c87d15e919416efe5d933bfe871baa899a",
+          "manifest_digest": "sha256:59bd72496f67023a17ec54290e22de8a19821ce46352e430361c9fb889886789",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:a48b31bdd5f49daa2569bc2518e1d80abc576900d1ac16c9ca1dee862e2ccabf",
+            "path_scope": [
+              "skills/media_center_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/media_center_skill",
+          "schema_locks": [
+            {
+              "lock_id": "skill:media_center_skill:schemas/catalog-correction.v1.schema.json",
+              "digest": "sha256:bc4a21966202e5a61152319d67cf1b7e3884c78b784a9a5deaeccdf0dc3ed773"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/collection-membership.v1.schema.json",
+              "digest": "sha256:8434092eb7db1c8e1288a5dc199d47662fdfeb822f071e526a1e52345ed39270"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/folder-node.v1.schema.json",
+              "digest": "sha256:519254c3d08a0d52b12145b1922a18e4107f27a364ad70fe98f5bcc032a56018"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/media-collection.v1.schema.json",
+              "digest": "sha256:d3a982d56ae8ed31e384794865ee86ece66be3992f830b5572dd9375fd40eb34"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/media-source.v1.schema.json",
+              "digest": "sha256:e100b430a04d07d4ec9e6c8acb740f5eacbc0a22851dff6e3d6f3393da65d3bd"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/media-variant.v1.schema.json",
+              "digest": "sha256:cfc7deff2354a3464e576161f423f46b261b514286b90c3ae8d5bf7857a2d600"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/media-work.v1.schema.json",
+              "digest": "sha256:f250d05a90a4ff40b5c03801d2356094129f1b1febd3a14ae4718b1534c87d29"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/metadata-claim.v1.schema.json",
+              "digest": "sha256:3a66ef10b385a8df8ff57d0ffef580ff448c0320cc80782dd1fd3a590ec60ae8"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/playback-plan.v2.schema.json",
+              "digest": "sha256:2e4b95fd59758849982ec3f304b484b41d561c906f8e62a9de5353d6f7c26f03"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/playback-route.v1.schema.json",
+              "digest": "sha256:9cf5f4b94ab66cf53cb0b1b022a28c95b9464c5163252c33384c6f3ddbc742df"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/playlist.v1.schema.json",
+              "digest": "sha256:7de59c37f56cf1e9a7323b60860469ddd89622eb3c373c4fe6a633cb9dbdb991"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/profile.v1.schema.json",
+              "digest": "sha256:4227072c05af5d6f89ee683a54fc16aede46813e01b27422d56d7a568c2e50aa"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/queue-source.v1.schema.json",
+              "digest": "sha256:eb56f22092f27f2431e60b5660d3a517fc2764d918cfbac88be67e8655402632"
+            }
+          ]
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "media_control_skill",
+          "version": "0.2.24",
+          "digest": "sha256:d30736ce00b5a91d555ec8aaf75669e9f47798dbef9c436770f090b84524d4ba",
+          "manifest_digest": "sha256:39fe42ab98166f8a0589732cff60b7e7be7d997c3a02e492b10093e9be4642eb",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:a48b31bdd5f49daa2569bc2518e1d80abc576900d1ac16c9ca1dee862e2ccabf",
+            "path_scope": [
+              "skills/media_control_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/media_control_skill",
+          "schema_locks": [
+            {
+              "lock_id": "skill:media_control_skill:schemas/endpoint-reconciliation.v1.schema.json",
+              "digest": "sha256:815c721b8d3846d28ec71a0b809e91b264fc56640f4b427e991f3ecab128c56b"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-checkpoint.v1.schema.json",
+              "digest": "sha256:c635f8ae1d717cd03f6c0c7625352dab85279360fc841a519b26ac545ab3950e"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-command.v1.schema.json",
+              "digest": "sha256:ffdc91fbb200c9c1d3f9cf81153c2b115310ef62d58d6022631f3136a065144a"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-queue.v1.schema.json",
+              "digest": "sha256:677f38e90e5c3b3854f4d542a36ef42575d27bd94d3f431f824838ef111e4fe4"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-session.v1.schema.json",
+              "digest": "sha256:708928fc7f7591b856086f529aeac1a4d4a6570a782ba88bcc67d60f5acee415"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-target.v1.schema.json",
+              "digest": "sha256:2aa66631cadba05cb55e9bdd329c5af1cad4c8f61515fe95d2f3cc5a895a84dc"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/qoe-summary.v1.schema.json",
+              "digest": "sha256:827264b2105c8e2ceeda986a5954f1c3bc17ea5e17275cd52bc091e7432caa94"
+            }
+          ]
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "media_library_agent",
+          "version": "0.6.48",
+          "digest": "sha256:eefdaa6b2e66e55de1a73d1edc7d6d7f892ee483f3aef96284104c8c827d457a",
+          "manifest_digest": "sha256:2e7c12bc8cefd67e192184b01f10edeb34ada8118f891f22c66549d033ec3310",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:a48b31bdd5f49daa2569bc2518e1d80abc576900d1ac16c9ca1dee862e2ccabf",
+            "path_scope": [
+              "skills/media_library_agent/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/media_library_agent",
+          "schema_locks": [
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-artwork-plan.v1.schema.json",
+              "digest": "sha256:64e9b387a68f0c2f32f3a547d8183497fa2a0b3d84aaff0edd0724cde4bdfe28"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-folder-node.v1.schema.json",
+              "digest": "sha256:f4fb70aa800ef0af396f67ba8727d7f3f8a040806ea6233a090cb8a0bf9c0147"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-rendition-job.v1.schema.json",
+              "digest": "sha256:1451419b221a3051ffa6c2194f902a340008055f8ff85b51674bc6518a59c1c3"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-rendition-plan.v2.schema.json",
+              "digest": "sha256:294a734b9942017f5c18ae67923be58b911dcd8c425e52aebc97fe0dacaa8208"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-root.v1.schema.json",
+              "digest": "sha256:2270e95bf115a336d391f31a2c202424ad295aca7e67a0f30e3bca62bff37d9e"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-scan-job.v1.schema.json",
+              "digest": "sha256:033c9914f2788f4c06a1f68972713578b25af92864c4b1bc0faa477d15807708"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-scan-progress.v1.schema.json",
+              "digest": "sha256:9d143c5b309c50c1f942cfbb52ddf284954388e67ea3fad0524e9df9efc7c8fa"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-source-delta.v1.schema.json",
+              "digest": "sha256:53e12d519eb580aa3ba86e2ad5a863ac69aeeb3d3c299b3eceedc7c192b25d28"
+            }
+          ]
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [
+        "devices.control",
+        "network.egress",
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:a48b31bdd5f49daa2569bc2518e1d80abc576900d1ac16c9ca1dee862e2ccabf",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [
+        {
+          "lock_id": "skill:media_center_skill:schemas/catalog-correction.v1.schema.json",
+          "digest": "sha256:bc4a21966202e5a61152319d67cf1b7e3884c78b784a9a5deaeccdf0dc3ed773"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/collection-membership.v1.schema.json",
+          "digest": "sha256:8434092eb7db1c8e1288a5dc199d47662fdfeb822f071e526a1e52345ed39270"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/folder-node.v1.schema.json",
+          "digest": "sha256:519254c3d08a0d52b12145b1922a18e4107f27a364ad70fe98f5bcc032a56018"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/media-collection.v1.schema.json",
+          "digest": "sha256:d3a982d56ae8ed31e384794865ee86ece66be3992f830b5572dd9375fd40eb34"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/media-source.v1.schema.json",
+          "digest": "sha256:e100b430a04d07d4ec9e6c8acb740f5eacbc0a22851dff6e3d6f3393da65d3bd"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/media-variant.v1.schema.json",
+          "digest": "sha256:cfc7deff2354a3464e576161f423f46b261b514286b90c3ae8d5bf7857a2d600"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/media-work.v1.schema.json",
+          "digest": "sha256:f250d05a90a4ff40b5c03801d2356094129f1b1febd3a14ae4718b1534c87d29"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/metadata-claim.v1.schema.json",
+          "digest": "sha256:3a66ef10b385a8df8ff57d0ffef580ff448c0320cc80782dd1fd3a590ec60ae8"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/playback-plan.v2.schema.json",
+          "digest": "sha256:2e4b95fd59758849982ec3f304b484b41d561c906f8e62a9de5353d6f7c26f03"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/playback-route.v1.schema.json",
+          "digest": "sha256:9cf5f4b94ab66cf53cb0b1b022a28c95b9464c5163252c33384c6f3ddbc742df"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/playlist.v1.schema.json",
+          "digest": "sha256:7de59c37f56cf1e9a7323b60860469ddd89622eb3c373c4fe6a633cb9dbdb991"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/profile.v1.schema.json",
+          "digest": "sha256:4227072c05af5d6f89ee683a54fc16aede46813e01b27422d56d7a568c2e50aa"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/queue-source.v1.schema.json",
+          "digest": "sha256:eb56f22092f27f2431e60b5660d3a517fc2764d918cfbac88be67e8655402632"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/endpoint-reconciliation.v1.schema.json",
+          "digest": "sha256:815c721b8d3846d28ec71a0b809e91b264fc56640f4b427e991f3ecab128c56b"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/playback-checkpoint.v1.schema.json",
+          "digest": "sha256:c635f8ae1d717cd03f6c0c7625352dab85279360fc841a519b26ac545ab3950e"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/playback-command.v1.schema.json",
+          "digest": "sha256:ffdc91fbb200c9c1d3f9cf81153c2b115310ef62d58d6022631f3136a065144a"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/playback-queue.v1.schema.json",
+          "digest": "sha256:677f38e90e5c3b3854f4d542a36ef42575d27bd94d3f431f824838ef111e4fe4"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/playback-session.v1.schema.json",
+          "digest": "sha256:708928fc7f7591b856086f529aeac1a4d4a6570a782ba88bcc67d60f5acee415"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/playback-target.v1.schema.json",
+          "digest": "sha256:2aa66631cadba05cb55e9bdd329c5af1cad4c8f61515fe95d2f3cc5a895a84dc"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/qoe-summary.v1.schema.json",
+          "digest": "sha256:827264b2105c8e2ceeda986a5954f1c3bc17ea5e17275cd52bc091e7432caa94"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-artwork-plan.v1.schema.json",
+          "digest": "sha256:64e9b387a68f0c2f32f3a547d8183497fa2a0b3d84aaff0edd0724cde4bdfe28"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-folder-node.v1.schema.json",
+          "digest": "sha256:f4fb70aa800ef0af396f67ba8727d7f3f8a040806ea6233a090cb8a0bf9c0147"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-rendition-job.v1.schema.json",
+          "digest": "sha256:1451419b221a3051ffa6c2194f902a340008055f8ff85b51674bc6518a59c1c3"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-rendition-plan.v2.schema.json",
+          "digest": "sha256:294a734b9942017f5c18ae67923be58b911dcd8c425e52aebc97fe0dacaa8208"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-root.v1.schema.json",
+          "digest": "sha256:2270e95bf115a336d391f31a2c202424ad295aca7e67a0f30e3bca62bff37d9e"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-scan-job.v1.schema.json",
+          "digest": "sha256:033c9914f2788f4c06a1f68972713578b25af92864c4b1bc0faa477d15807708"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-scan-progress.v1.schema.json",
+          "digest": "sha256:9d143c5b309c50c1f942cfbb52ddf284954388e67ea3fad0524e9df9efc7c8fa"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-source-delta.v1.schema.json",
+          "digest": "sha256:53e12d519eb580aa3ba86e2ad5a863ac69aeeb3d3c299b3eceedc7c192b25d28"
+        }
+      ],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:f36b08f4498d588a606b3dbd2132b06be32ef815406738100f0af1e284bd8de6"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:2be1e88d1d09299b0087d9d4bd093ecd874a3df3d15d7ab5500fd0488d67aae9",
+        "profiles": [
+          "adaos.media_center.desktop.v1",
+          "adaos.media_center.embedded.v1",
+          "adaos.media_center.mobile_control.v1",
+          "adaos.media_center.tv.v1",
+          "adaos.media_center.v1"
+        ],
+        "members": [
+          {
+            "ref": "scenario:media_center",
+            "package_digest": "sha256:e3b16f0892b6c75b2faad238a03de94b015dfed234713d87b35857fecf25b052",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "skill:media_center_skill",
+            "package_digest": "sha256:22bae50a8b4d96bd84ebd23e264281c87d15e919416efe5d933bfe871baa899a",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          },
+          {
+            "ref": "skill:media_control_skill",
+            "package_digest": "sha256:d30736ce00b5a91d555ec8aaf75669e9f47798dbef9c436770f090b84524d4ba",
+            "role": "supporting",
+            "exposure": "advanced",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          },
+          {
+            "ref": "skill:media_library_agent",
+            "package_digest": "sha256:eefdaa6b2e66e55de1a73d1edc7d6d7f892ee483f3aef96284104c8c827d457a",
+            "role": "supporting",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "embedded",
+            "presentation": "scenario:media_center",
+            "bindings": {
+              "presentation_profile": "embedded",
+              "media_role": "compact",
+              "shared_surface": false
+            }
+          },
+          {
+            "id": "library",
+            "presentation": "scenario:media_center",
+            "default": true,
+            "bindings": {
+              "presentation_profile": "desktop",
+              "media_role": "library",
+              "shared_surface": false
+            }
+          },
+          {
+            "id": "remote",
+            "presentation": "scenario:media_center",
+            "bindings": {
+              "presentation_profile": "mobile_control",
+              "media_role": "controller",
+              "shared_surface": false
+            }
+          },
+          {
+            "id": "tv",
+            "presentation": "scenario:media_center",
+            "bindings": {
+              "presentation_profile": "tv",
+              "media_role": "playback_target",
+              "shared_surface": true
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "library",
+            "tv",
+            "remote"
+          ],
+          "required_contracts": [
+            "adaos.project.deployment.v1",
+            "adaos.distributed.service.v1",
+            "adaos.media.library_agent.v1",
+            "adaos.media.catalog.v1",
+            "adaos.media.playback_session.v1"
+          ],
+          "validation_profiles": [
+            "media_center.local",
+            "media_center.distributed",
+            "media_center.presentation"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "devices.control",
+              "purpose": "Control explicitly selected household playback endpoints.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "network.egress",
+              "purpose": "Coordinate explicitly requested deployment and topology operations with configured subnet services.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "workspace.read",
+              "purpose": "Inspect configured media roots, catalog metadata, and playback state.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Maintain the local media catalog, playlists, and playback state.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "media_metadata",
+              "playback_state",
+              "playlist"
+            ],
+            "sent_off_device": [],
+            "linked_to_user": [
+              "playback_state",
+              "playlist"
+            ],
+            "tracking": false,
+            "retention": "Media remains at its configured source; local catalog and preferences are retained."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [
+              "media_metadata",
+              "playback_state",
+              "playlist"
+            ],
+            "sent_off_device": false,
+            "linked_to_user": true,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "Media Center",
+        "description": "Distributed in-place household media library, playback, and remote control.",
+        "categories": [
+          "home",
+          "media"
+        ],
+        "tags": [
+          "audio",
+          "distributed",
+          "remote-control",
+          "tv",
+          "video"
+        ],
+        "icon": "play-circle-outline",
+        "title_i18n": {
+          "en": "Media Center",
+          "ru": "Медиацентр"
+        },
+        "description_i18n": {
+          "en": "Distributed in-place household media library, playback, and remote control.",
+          "ru": "Распределённая домашняя медиатека, воспроизведение и дистанционное управление на месте."
+        }
+      },
+      "release_digest": "sha256:3c785122657992b29a9719da3aae4e984a5267c75537e01806c1443ca3d2aab0"
+    },
+    "accepted_candidate_id": "media_center-0-6-110-443ca3d2aab0",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.project.preflight",
+        "tests": "media_library_agent lifecycle test suite passed; Ruff passed; host activation rehydrate defers to service runtime",
+        "cbs": "exact native admission or explicit compatibility classification",
+        "checkpoint_source_revision": "cf3b414523619cd79055c1c3d9a5dbd994aeb7da",
+        "checkpoint_component_ref": "scenario:media_center"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:3c785122657992b29a9719da3aae4e984a5267c75537e01806c1443ca3d2aab0"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "devices.control",
+          "purpose": "Control explicitly selected household playback endpoints.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "network.egress",
+          "purpose": "Coordinate explicitly requested deployment and topology operations with configured subnet services.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "workspace.read",
+          "purpose": "Inspect configured media roots, catalog metadata, and playback state.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Maintain the local media catalog, playlists, and playback state.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "media_metadata",
+          "playback_state",
+          "playlist"
+        ],
+        "sent_off_device": [],
+        "linked_to_user": [
+          "playback_state",
+          "playlist"
+        ],
+        "tracking": false,
+        "retention": "Media remains at its configured source; local catalog and preferences are retained."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [
+          "media_metadata",
+          "playback_state",
+          "playlist"
+        ],
+        "sent_off_device": false,
+        "linked_to_user": true,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:d856d7f544c8d75dcf797fa0553d27749977962b9cd74c051ae6a3b2b10ef5ab",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "media_center",
+      "release_digest": "sha256:3c785122657992b29a9719da3aae4e984a5267c75537e01806c1443ca3d2aab0",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [
+        {
+          "id": "devices.control",
+          "title": "Devices.Control",
+          "purpose": "Control explicitly selected household playback endpoints.",
+          "required": true
+        },
+        {
+          "id": "network.egress",
+          "title": "Network.Egress",
+          "purpose": "Coordinate explicitly requested deployment and topology operations with configured subnet services.",
+          "required": true
+        },
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Inspect configured media roots, catalog metadata, and playback state.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Maintain the local media catalog, playlists, and playback state.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:9faf964655ee7668812ff485829af01766c323e31ef4e94a365b1e6b1180f00a"
+  },
+  "channels": {
+    "stable": "sha256:3c785122657992b29a9719da3aae4e984a5267c75537e01806c1443ca3d2aab0"
+  },
+  "semantic": {
+    "projection_digest": "sha256:038c82813bc0057a19804078d88802673fb16eaf5755b217aa60d53b61f5d2a3",
+    "path": "semantic/applications/media_center/3c785122657992b29a9719da3aae4e984a5267c75537e01806c1443ca3d2aab0.json"
+  },
+  "projection_digest": "sha256:a333f618e3ca3b178a9bc7934184c72137603d8912a7e93c3b3d3f2fcaf0ba2f"
+}

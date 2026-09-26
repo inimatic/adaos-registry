@@ -274,7 +274,20 @@ def ensure_schema(**_: Any) -> dict[str, Any]:
     summary="Resume queued media-library work after activation.",
     side_effects="local_write",
 )
-def rehydrate(**_: Any) -> dict[str, Any]:
+def rehydrate(**payload: Any) -> dict[str, Any]:
+    lifecycle_host_activation = (
+        text(payload.get("skill")) == "media_library_agent"
+        and text(payload.get("state")) == "active"
+        and not text(os.environ.get("ADAOS_SERVICE_SKILL"))
+    )
+    if lifecycle_host_activation:
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "deferred": True,
+            "deferred_to": "service_process",
+            "worker": {"running": False, "owner": "service_process"},
+        }
     if not _owns_background_worker():
         return {
             "ok": True,

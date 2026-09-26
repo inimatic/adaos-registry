@@ -1434,6 +1434,26 @@ def test_root_lifecycle_defers_repository_ownership_to_service(monkeypatch):
     }
 
 
+def test_activation_lifecycle_defers_to_service_without_runtime_port(monkeypatch):
+    monkeypatch.delenv("ADAOS_RUNTIME_PORT", raising=False)
+    monkeypatch.delenv("ADAOS_SERVICE_SKILL", raising=False)
+    monkeypatch.setattr(
+        main,
+        "_runtime",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("activation host opened the service-owned repository")
+        ),
+    )
+
+    assert main.rehydrate(skill="media_library_agent", state="active") == {
+        "ok": True,
+        "schema": main.SCHEMA_VERSION,
+        "deferred": True,
+        "deferred_to": "service_process",
+        "worker": {"running": False, "owner": "service_process"},
+    }
+
+
 def test_bounded_watcher_debounces_changes_into_incremental_scan(tmp_path):
     library = tmp_path / "library"
     library.mkdir()
