@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-27T11:46:54+00:00",
+  "updated_at": "2026-09-27T12:48:11+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -625,7 +625,7 @@
       "kind": "skill",
       "id": "mlflow_tracker_skill",
       "name": "mlflow_tracker_skill",
-      "version": "0.3.13",
+      "version": "0.3.14",
       "updated_at": "2026-09-27T11:38:51+00:00",
       "path": "skills/mlflow_tracker_skill",
       "manifest": "skills/mlflow_tracker_skill/skill.yaml",
@@ -643,9 +643,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "research_platform",
-        "release": "research_platform@0.1.24",
-        "release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
-        "package_digest": "sha256:247c7e2a13d902ab97dbcf89811467d153018ef8a6dcc8db67b0ed5bcb1552ce"
+        "release": "research_platform@0.1.25",
+        "release_digest": "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
+        "package_digest": "sha256:3afa6a2894bb38423696e05c8334b2d7bde4d42a0e161ed06104e6882f43161d"
       },
       "tools_count": 5
     },
@@ -912,9 +912,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "research_platform",
-        "release": "research_platform@0.1.24",
-        "release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
-        "package_digest": "sha256:cc6b4a4607f62260bcd240f09c813ad687741780b898792ac0562931463c0a18"
+        "release": "research_platform@0.1.25",
+        "release_digest": "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
+        "package_digest": "sha256:84b886ae75b7e05588edd925f5106b56cab11869247018b1bd1eb97c0c100c6d"
       }
     },
     {
@@ -941,9 +941,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "research_platform",
-        "release": "research_platform@0.1.24",
-        "release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
-        "package_digest": "sha256:f7e15a4cafc50c1432737a2e7a691069169cec070e8924472b59d5c17ad04ec8"
+        "release": "research_platform@0.1.25",
+        "release_digest": "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
+        "package_digest": "sha256:c45d6aabbc85786507ad63fb338595e0ffcbd7b342c331b1b634a3cc750f7ec2"
       }
     },
     {
@@ -968,9 +968,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "research_platform",
-        "release": "research_platform@0.1.24",
-        "release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
-        "package_digest": "sha256:511a5915ca134c92f6fc97d4f6dfd2979d6868f92e7b6efaf8b3fe9d701062cf"
+        "release": "research_platform@0.1.25",
+        "release_digest": "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
+        "package_digest": "sha256:8638da437c120efbd50ff4b83adba9a754ad4449f9560e51e49eb323d6a877b8"
       },
       "tools_count": 39
     },
@@ -998,9 +998,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "research_platform",
-        "release": "research_platform@0.1.24",
-        "release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
-        "package_digest": "sha256:2bd3e42730e9b1beb96fadd69a13ebd82957fd777d1d76eb8675b37a83c7c340"
+        "release": "research_platform@0.1.25",
+        "release_digest": "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
+        "package_digest": "sha256:721ae8a1acebda6e93680559f975d0fd9092cb576ad45385de3d32778d762f4c"
       }
     },
     {
@@ -1777,9 +1777,9 @@
       "source": {
         "path": "scenarios/research_workbench",
         "manifest": "scenarios/research_workbench/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:02cd64fad54781b434a0b9d494fdb88631690c71578ca928d2f63f94c3253742",
+        "forge": "github",
+        "repository": "https://github.com/inimatic/adaos-registry.git",
+        "revision": "21e4b84bd6affa3525607b15ef24811c525ce4e9",
         "path_scope": [
           "projects/research_platform/"
         ]
@@ -1800,16 +1800,16 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "research_platform",
-        "release": "research_platform@0.1.24",
-        "release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
-        "package_digest": "sha256:71d0644929ff8f39ba3c305453957da5b87eaaa82b30dd27f214d4da7435b915"
+        "release": "research_platform@0.1.25",
+        "release_digest": "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
+        "package_digest": "sha256:17dcda30d7a897bc1d4c129d81ae19f00b6e573c64530828d6d07b5320aa3628"
       },
       "channels": {
         "stable": {
-          "release": "research_platform@0.1.24",
-          "release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
-          "source_revision": "sha256:02cd64fad54781b434a0b9d494fdb88631690c71578ca928d2f63f94c3253742",
-          "package_digest": "sha256:71d0644929ff8f39ba3c305453957da5b87eaaa82b30dd27f214d4da7435b915",
+          "release": "research_platform@0.1.25",
+          "release_digest": "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
+          "source_revision": "21e4b84bd6affa3525607b15ef24811c525ce4e9",
+          "package_digest": "sha256:17dcda30d7a897bc1d4c129d81ae19f00b6e573c64530828d6d07b5320aa3628",
           "version": "0.1.19"
         }
       }
@@ -2423,8 +2423,8 @@
       "kind": "project",
       "id": "research_platform",
       "name": "research_platform",
-      "version": "0.1.24",
-      "updated_at": "2026-09-27T11:46:54+00:00",
+      "version": "0.1.25",
+      "updated_at": "2026-09-27T12:48:11+00:00",
       "path": "projects/research_platform",
       "manifest": "projects/research_platform/project.yaml",
       "source": {
@@ -2524,18 +2524,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "research_platform",
-        "release": "research_platform@0.1.24",
-        "release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
+        "release": "research_platform@0.1.25",
+        "release_digest": "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
         "primary_component": "scenario:research_workbench",
-        "package_digest": "sha256:71d0644929ff8f39ba3c305453957da5b87eaaa82b30dd27f214d4da7435b915"
+        "package_digest": "sha256:17dcda30d7a897bc1d4c129d81ae19f00b6e573c64530828d6d07b5320aa3628"
       },
       "channels": {
         "stable": {
-          "release": "research_platform@0.1.24",
-          "release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
-          "source_revision": "sha256:02cd64fad54781b434a0b9d494fdb88631690c71578ca928d2f63f94c3253742",
-          "package_digest": "sha256:71d0644929ff8f39ba3c305453957da5b87eaaa82b30dd27f214d4da7435b915",
-          "version": "0.1.24"
+          "release": "research_platform@0.1.25",
+          "release_digest": "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
+          "source_revision": "21e4b84bd6affa3525607b15ef24811c525ce4e9",
+          "package_digest": "sha256:17dcda30d7a897bc1d4c129d81ae19f00b6e573c64530828d6d07b5320aa3628",
+          "version": "0.1.25"
         }
       }
     }

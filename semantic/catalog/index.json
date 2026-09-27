@@ -141,9 +141,9 @@
       "application_id": "research_platform",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 2,
-      "stable_release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
-      "release_key": "research_platform@sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
-      "projection_digest": "sha256:7da90efb9b997a5d75b3385edea7ae66bb9e4f058ab1cbd1ecc96ff455c95ee9"
+      "stable_release_digest": "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
+      "release_key": "research_platform@sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
+      "projection_digest": "sha256:483780c4dc2908628245fced9fa92f0126fa204ab94fc7da635d8d8f23bd29cd"
     }
   },
   "releases": {
@@ -602,7 +602,15 @@
       "release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
       "path": "semantic/catalog/releases/research_platform/f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6.json",
       "projection_digest": "sha256:7da90efb9b997a5d75b3385edea7ae66bb9e4f058ab1cbd1ecc96ff455c95ee9"
+    },
+    "research_platform@sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00": {
+      "application_id": "research_platform",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.25",
+      "release_digest": "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
+      "path": "semantic/catalog/releases/research_platform/0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00.json",
+      "projection_digest": "sha256:483780c4dc2908628245fced9fa92f0126fa204ab94fc7da635d8d8f23bd29cd"
     }
   },
-  "index_digest": "sha256:7334fd3208916ee1df028b7f61e134da972724963e75429ae1af963996b7537b"
+  "index_digest": "sha256:2f266a671de454460a02ca1c8f9bcde96cbd49f9e52c2142852303e8f5f77406"
 }
