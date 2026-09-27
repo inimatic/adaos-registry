@@ -130,7 +130,8 @@
     "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:17dcda30d7a897bc1d4c129d81ae19f00b6e573c64530828d6d07b5320aa3628": "sha256:0e07a549ff707146ea2748d17f157448084b6d8c3f038d4b147a50819c37ea2e",
     "adaos.binding.delivery.v1|binding-definition:research.workbench.manage.adaos@sha256:c3eca3ff4f48e28ee4629eba5f8ebba2ceb33add1bee353c3d27f9030d5067fb|sha256:721ae8a1acebda6e93680559f975d0fd9092cb576ad45385de3d32778d762f4c": "sha256:20401a79d451fc12598cbea7af7edfa08f8aa3c041ed7907328724e09b61ab31",
     "adaos.binding.delivery.v1|binding-definition:research.lifecycle.manage.adaos@sha256:6b8d4d2ef02f8ae2d2c816d4a7c6f60ed378afcc9f9c739b498d3a377512ba40|sha256:8638da437c120efbd50ff4b83adba9a754ad4449f9560e51e49eb323d6a877b8": "sha256:2a9d610e507620643952bd0899c68a3e8eb66fce264d4f59dbd67384c42b6878",
-    "adaos.binding.delivery.v1|binding-definition:research.tracking.manage.mlflow@sha256:00d38a3ca18c573b3846d8d2751adc8a3cff550f7263fc48b9b7247f1bbdb133|sha256:3afa6a2894bb38423696e05c8334b2d7bde4d42a0e161ed06104e6882f43161d": "sha256:9a04deb3c1b12be903dd0c14129053ef9394003063c3346d77a7db4c8f637bb0"
+    "adaos.binding.delivery.v1|binding-definition:research.tracking.manage.mlflow@sha256:00d38a3ca18c573b3846d8d2751adc8a3cff550f7263fc48b9b7247f1bbdb133|sha256:3afa6a2894bb38423696e05c8334b2d7bde4d42a0e161ed06104e6882f43161d": "sha256:9a04deb3c1b12be903dd0c14129053ef9394003063c3346d77a7db4c8f637bb0",
+    "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:e3741e74db660de49effba207188279156f5fbf2be2bd399f4e22aa504cc0db4": "sha256:800d335776ecbfc9b593ada4ad993e9a75d9177d3fa26675e225f3a6acd8b46d"
   },
   "records": {
     "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1": {
@@ -165,6 +166,7 @@
         "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
         "sha256:89fae7a20012deff77bc74fa3bd24f4f56645c1c33165bec39501b4e6b605a27",
         "sha256:8aea0cbbc0acf317974d389a5e517d391abdec1a87e1bdea103f427c6e4d750d",
+        "sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710",
         "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
         "sha256:9105ab0cf0d477edea3347adce777c5e7024734ff77f72fe03e4057fb3605033",
         "sha256:92e3d0c12b8dbec064d609fee711f3aec682ce6d3592a5201fbbf4b61750959a",
@@ -244,6 +246,7 @@
         "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
         "sha256:89fae7a20012deff77bc74fa3bd24f4f56645c1c33165bec39501b4e6b605a27",
         "sha256:8aea0cbbc0acf317974d389a5e517d391abdec1a87e1bdea103f427c6e4d750d",
+        "sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710",
         "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
         "sha256:9105ab0cf0d477edea3347adce777c5e7024734ff77f72fe03e4057fb3605033",
         "sha256:92e3d0c12b8dbec064d609fee711f3aec682ce6d3592a5201fbbf4b61750959a",
@@ -1520,6 +1523,15 @@
       "published_by_release_digests": [
         "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00"
       ]
+    },
+    "sha256:800d335776ecbfc9b593ada4ad993e9a75d9177d3fa26675e225f3a6acd8b46d": {
+      "schema": "adaos.binding.delivery.v1",
+      "identity": "binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "revision": "sha256:e3741e74db660de49effba207188279156f5fbf2be2bd399f4e22aa504cc0db4",
+      "path": "semantic/records/sha256/80/800d335776ecbfc9b593ada4ad993e9a75d9177d3fa26675e225f3a6acd8b46d.json",
+      "published_by_release_digests": [
+        "sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710"
+      ]
     }
   },
   "application_releases": {
@@ -2071,7 +2083,16 @@
       "semantic_revision_digest": "sha256:8841f5eb48f0e16ff2a5d7ac8855382e3aca87f3b38207187564822f141b876c",
       "path": "semantic/applications/research_platform/0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00.json",
       "projection_digest": "sha256:c9e58017099123dc88602e08a187fb0d04cade7f416b2e0dea66260cb57743f4"
+    },
+    "project:applications@sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710": {
+      "project_id": "applications",
+      "version": "0.1.44",
+      "application_ref": "scenario:applications",
+      "project_release_digest": "sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710",
+      "semantic_revision_digest": "sha256:41627210fcac16e17d3da173047dbae957e1ab0b20f73180393f50a0ffa70f88",
+      "path": "semantic/applications/applications/8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710.json",
+      "projection_digest": "sha256:962f1152ef540ee416bce6680a2388010461ace63ccc657b35b6e811870afbfe"
     }
   },
-  "index_digest": "sha256:38ff9b73dd8e564ee7b942c6f332e367ef17a7ee7aeef4ea747bfc52b108835b"
+  "index_digest": "sha256:8a63c0dc0a485b4e9915031ca298c2dd422e7649cd64070c7b5a23af899c1cfb"
 }

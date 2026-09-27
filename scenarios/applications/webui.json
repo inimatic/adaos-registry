@@ -1906,50 +1906,25 @@
                                     "type": "openModal"
                                 },
                                 {
-                                    "on": "click:pin-home",
+                                    "on": "click:manage-home",
                                     "type": "callMcp",
                                     "target": "applications.list_home_targets",
                                     "params": {
                                         "application_id": "$state.selectedApplicationId"
                                     },
-                                    "enabledIf": "$state.selectedApplicationId && $state.applicationInstalled == true && $state.applicationPinnedToHome != true",
+                                    "enabledIf": "$state.selectedApplicationId && $state.applicationInstalled == true",
                                     "dryRun": true,
                                     "resultStateKey": "homeTargets"
                                 },
                                 {
-                                    "on": "click:pin-home",
+                                    "on": "click:manage-home",
                                     "params": {
                                         "homePinSelection": "$state.homeTargets.home_targets.pinned_webspace_ids"
                                     },
                                     "type": "updateState"
                                 },
                                 {
-                                    "on": "click:pin-home",
-                                    "params": {
-                                        "modalId": "manage-home-desktops"
-                                    },
-                                    "type": "openModal"
-                                },
-                                {
-                                    "on": "click:unpin-home",
-                                    "type": "callMcp",
-                                    "target": "applications.list_home_targets",
-                                    "params": {
-                                        "application_id": "$state.selectedApplicationId"
-                                    },
-                                    "enabledIf": "$state.selectedApplicationId && $state.applicationInstalled == true && $state.applicationPinnedToHome == true",
-                                    "dryRun": true,
-                                    "resultStateKey": "homeTargets"
-                                },
-                                {
-                                    "on": "click:unpin-home",
-                                    "params": {
-                                        "homePinSelection": "$state.homeTargets.home_targets.pinned_webspace_ids"
-                                    },
-                                    "type": "updateState"
-                                },
-                                {
-                                    "on": "click:unpin-home",
+                                    "on": "click:manage-home",
                                     "params": {
                                         "modalId": "manage-home-desktops"
                                     },
@@ -2129,20 +2104,12 @@
                                         "visibleIf": "$state.localDevelopmentAvailable == true && $state.developmentDeletionAllowed == true && $state.developmentManifestDigest && $state.developmentPrimaryRef"
                                     },
                                     {
-                                        "id": "pin-home",
+                                        "id": "manage-home",
                                         "icon": "pin-outline",
                                         "kind": "secondary",
-                                        "label": "Pin to Home",
-                                        "label_i18n": "widgets.lifecycle-actions.buttons.pin-home.label",
-                                        "visibleIf": "$state.applicationInstalled == true && $state.applicationPinnedToHome != true"
-                                    },
-                                    {
-                                        "id": "unpin-home",
-                                        "icon": "pin-outline",
-                                        "kind": "secondary",
-                                        "label": "Unpin from Home",
-                                        "label_i18n": "widgets.lifecycle-actions.buttons.unpin-home.label",
-                                        "visibleIf": "$state.applicationInstalled == true && $state.applicationPinnedToHome == true"
+                                        "label": "Pin / unpin on Home",
+                                        "label_i18n": "widgets.lifecycle-actions.buttons.manage-home.label",
+                                        "visibleIf": "$state.applicationInstalled == true"
                                     },
                                     {
                                         "id": "finalize-stable",
@@ -6696,7 +6663,7 @@
                 }
             }
         },
-        "version": "0.1.72",
+        "version": "0.1.74",
         "manifest": "webui.json"
     },
     "generated_by": "builder_skill"

@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: applications
-version: 0.1.43
+version: 0.1.44
 profiles:
 - adaos.system.applications.v1
 components:

@@ -167,13 +167,15 @@ def test_lifecycle_plans_use_displayed_revisions_and_review_before_apply():
         assert "status == 'planned'" in a['enabledIf']
     assert not actions('applications.update_settings')
     life = WIDGETS['lifecycle-actions']
-    for event in ['click:pin-home', 'click:unpin-home']:
-        command = [action for action in life['actions'] if action['on'] == event]
-        assert [action['type'] for action in command] == ['callMcp', 'updateState', 'openModal']
-        assert command[0]['target'] == 'applications.list_home_targets'
-        assert command[0]['dryRun'] is True
-        assert command[1]['params']['homePinSelection'] == '$state.homeTargets.home_targets.pinned_webspace_ids'
-        assert command[2]['params']['modalId'] == 'manage-home-desktops'
+    command = [action for action in life['actions'] if action['on'] == 'click:manage-home']
+    assert [action['type'] for action in command] == ['callMcp', 'updateState', 'openModal']
+    assert command[0]['enabledIf'] == (
+        '$state.selectedApplicationId && $state.applicationInstalled == true'
+    )
+    assert command[0]['target'] == 'applications.list_home_targets'
+    assert command[0]['dryRun'] is True
+    assert command[1]['params']['homePinSelection'] == '$state.homeTargets.home_targets.pinned_webspace_ids'
+    assert command[2]['params']['modalId'] == 'manage-home-desktops'
 
 
 def test_home_desktop_dialog_uses_bounded_root_read_and_batch_mutation():

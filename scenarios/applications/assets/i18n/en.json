@@ -283,6 +283,7 @@
   "widgets.installed-query.title": "Search and filters",
   "widgets.lifecycle-actions.buttons.delete-development.label": "Delete development",
   "widgets.lifecycle-actions.buttons.install.label": "Install",
+  "widgets.lifecycle-actions.buttons.manage-home.label": "Pin / unpin on Home",
   "widgets.lifecycle-actions.buttons.open.label": "Open",
   "widgets.lifecycle-actions.buttons.open-builder.label": "Open in Builder",
   "widgets.lifecycle-actions.buttons.pin-home.label": "Pin to Home",

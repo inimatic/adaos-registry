@@ -283,6 +283,7 @@
   "widgets.installed-query.title": "Поиск и фильтры",
   "widgets.lifecycle-actions.buttons.delete-development.label": "Удалить разработку",
   "widgets.lifecycle-actions.buttons.install.label": "Установить",
+  "widgets.lifecycle-actions.buttons.manage-home.label": "Закрепить / открепить на главной",
   "widgets.lifecycle-actions.buttons.open.label": "Открыть",
   "widgets.lifecycle-actions.buttons.open-builder.label": "Открыть в Builder",
   "widgets.lifecycle-actions.buttons.pin-home.label": "Закрепить на главной",
