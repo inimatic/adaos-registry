@@ -1,12 +1,12 @@
 {
   "version": 2,
-  "updated_at": "2026-09-27T06:08:50+00:00",
+  "updated_at": "2026-09-27T06:32:28+00:00",
   "skills": [
     {
       "kind": "skill",
       "id": "adaos_connect",
       "name": "adaos_connect",
-      "version": "0.16.7",
+      "version": "0.16.9",
       "updated_at": "2026-08-14T19:39:13+00:00",
       "path": "skills/adaos_connect",
       "manifest": "skills/adaos_connect/skill.yaml",
@@ -43,14 +43,7 @@
       },
       "description": "Two-panel browser file manager for explicitly connected local folders.",
       "runtime_python": "3.11",
-      "tools_count": 27,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "adaos_drive",
-        "release": "adaos_drive@0.1.21",
-        "release_digest": "sha256:613e6ec9ef6d78330b953dd9517efa65e0c4711e32b3c77c911bf58b22e085ec",
-        "package_digest": "sha256:790092f8fa00c39c189ce7e8f512ff300aa52d64ede2956735f9643c683f31d3"
-      }
+      "tools_count": 27
     },
     {
       "kind": "skill",
@@ -92,14 +85,7 @@
       },
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 19,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "web_desktop",
-        "release": "web_desktop@0.3.57",
-        "release_digest": "sha256:331fe338fba113b2d2b8da4fef13235b6fb62e565cb21b242bfc86510d23c067",
-        "package_digest": "sha256:a9845236d2c671e108310f27acff6bc28c6f1ff9a2508b2510764274ebe6f04d"
-      }
+      "tools_count": 19
     },
     {
       "kind": "skill",
@@ -125,9 +111,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.15",
-        "release_digest": "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
-        "package_digest": "sha256:b8fb32d50faa18fbb7e8e71a0275587490f7f96da325c6e60d5a7f662e8c9165"
+        "release": "adaos_builder@0.3.17",
+        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
+        "package_digest": "sha256:e798e2d7cb2f3a5b15ff5ddc1a8300847f76046d4476d0f38a8c9908d1326bb5"
       }
     },
     {
@@ -176,16 +162,16 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.15",
-        "release_digest": "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
-        "package_digest": "sha256:e03a9b06721ce46005bb1ce97f7a08908ad6dc5057036a6c77ad17903433ca29"
+        "release": "adaos_builder@0.3.17",
+        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
+        "package_digest": "sha256:039035529f6e8e540adfe96be097197f46cac0e06c1397fbb7f5a1db1380545b"
       }
     },
     {
       "kind": "skill",
       "id": "builder_skill",
       "name": "builder_skill",
-      "version": "0.4.4",
+      "version": "0.4.5",
       "updated_at": "2026-09-26T11:02:50+00:00",
       "path": "skills/builder_skill",
       "manifest": "skills/builder_skill/skill.yaml",
@@ -205,9 +191,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.15",
-        "release_digest": "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
-        "package_digest": "sha256:c1bac1efcc60e652dab1e5915d379de6e613fbc42040266c92468fdcbff4fe61"
+        "release": "adaos_builder@0.3.17",
+        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
+        "package_digest": "sha256:0264f0714cbb4cdc63b97f475344624450962377aef345246192b9407f7e1917"
       }
     },
     {
@@ -264,13 +250,7 @@
       "manifest": "skills/cv_descriptor/skill.yaml",
       "source": {
         "path": "skills/cv_descriptor",
-        "manifest": "skills/cv_descriptor/skill.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:c14b0a18321aaae1828a81b9aa0a03e968c3ca45c9d7e465eae55615e75c39ab",
-        "path_scope": [
-          "projects/cv_descriptor_lab/"
-        ]
+        "manifest": "skills/cv_descriptor/skill.yaml"
       },
       "install": {
         "kind": "skill",
@@ -280,22 +260,11 @@
       "description": "Browser-side CV descriptor pilot. Stores visual-object embeddings, model signatures, thumbnails, and text descriptions while the AdaOS client CV runtime is being built.",
       "runtime_python": "3.11",
       "activation": {
-        "mode": "package_lock",
-        "project_id": "cv_descriptor_lab",
-        "release": "cv_descriptor_lab@0.1.21",
-        "release_digest": "sha256:5cf8ed9bc5dbaec6ecae830c54921a71397b5df65b9ae0113370fc0959250a93",
-        "package_digest": "sha256:c4fb30b9c205fc9ff5daf053ca5a8027fe0f473f0d288b5cd0a99c964481b687"
+        "mode": "on_demand",
+        "startup_allowed": false,
+        "background_refresh": true
       },
-      "tools_count": 11,
-      "channels": {
-        "stable": {
-          "release": "cv_descriptor_lab@0.1.21",
-          "release_digest": "sha256:5cf8ed9bc5dbaec6ecae830c54921a71397b5df65b9ae0113370fc0959250a93",
-          "source_revision": "sha256:c14b0a18321aaae1828a81b9aa0a03e968c3ca45c9d7e465eae55615e75c39ab",
-          "package_digest": "sha256:c4fb30b9c205fc9ff5daf053ca5a8027fe0f473f0d288b5cd0a99c964481b687",
-          "version": "0.1.13"
-        }
-      }
+      "tools_count": 11
     },
     {
       "kind": "skill",
@@ -317,11 +286,9 @@
       "description": "Neutral demo skill for semantic Web UI migration with a metrics table, chart payload, Taiga tree, and live event stream.",
       "runtime_python": "3.11",
       "activation": {
-        "mode": "package_lock",
-        "project_id": "semantic_ui_demo",
-        "release": "semantic_ui_demo@0.10.28",
-        "release_digest": "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
-        "package_digest": "sha256:103c3d8b55ad917fdb130015121034c517f279f6b4c405069e2f4e776fd0472e"
+        "mode": "on_demand",
+        "startup_allowed": false,
+        "background_refresh": true
       },
       "tools_count": 9
     },
@@ -346,11 +313,9 @@
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
       "activation": {
-        "mode": "package_lock",
-        "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.17",
-        "release_digest": "sha256:9794e4f50c83b45d7772b4c7d5832c39b4fe89c6b0872d6b281acb03756080f4",
-        "package_digest": "sha256:70764aab5ae1808f9aa520962195d72df996ddb81c35e95fc17dbd25b01ba2aa"
+        "mode": "on_demand",
+        "startup_allowed": false,
+        "background_refresh": false
       },
       "tools_count": 7
     },
@@ -375,11 +340,9 @@
       "entry": "{'script': 'handlers/main.py'}",
       "runtime_python": "3.11",
       "activation": {
-        "mode": "package_lock",
-        "project_id": "mail_focus_reader",
-        "release": "mail_focus_reader@0.1.4",
-        "release_digest": "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
-        "package_digest": "sha256:403e924b61e66ae9d04aa69a4594d3fe2873349f75904c5633e3e01212c0df19"
+        "mode": "on_demand",
+        "startup_allowed": false,
+        "background_refresh": false
       },
       "tools_count": 18
     },
@@ -403,14 +366,7 @@
       "description": "Application-local Gmail SDK adapter with transient mail reads and durable send deduplication.",
       "entry": "{'module': 'handlers.main', 'callable': 'connection_status'}",
       "runtime_python": "3.11",
-      "tools_count": 8,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "gmail_mail_client",
-        "release": "gmail_mail_client@0.1.4",
-        "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
-        "package_digest": "sha256:57945818da0ee3173d4a861523ef2feb15dc4a60ac89ad5852bd81f7a7d975ff"
-      }
+      "tools_count": 8
     },
     {
       "kind": "skill",
@@ -431,14 +387,7 @@
       },
       "description": "Greets the user at startup and checks whether local infrastructure is healthy.",
       "runtime_python": "3.11",
-      "tools_count": 2,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "web_desktop",
-        "release": "web_desktop@0.3.57",
-        "release_digest": "sha256:331fe338fba113b2d2b8da4fef13235b6fb62e565cb21b242bfc86510d23c067",
-        "package_digest": "sha256:eb695ac298aed7839c2cb7ac4d098b8313cdcd8887073e4fad8b645304e3feae"
-      }
+      "tools_count": 2
     },
     {
       "kind": "skill",
@@ -554,11 +503,9 @@
       "description": "Project-owned resource implementation for project:mail_focus_reader. Realize the accepted Prototype according to the separate Automation brief.",
       "runtime_python": "3.11",
       "activation": {
-        "mode": "package_lock",
-        "project_id": "mail_focus_reader",
-        "release": "mail_focus_reader@0.1.4",
-        "release_digest": "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
-        "package_digest": "sha256:50ef544c107d4589646fa3bc7e92b52e89abcfc0f5b90de48fb2c6a0cf8c249f"
+        "mode": "on_demand",
+        "startup_allowed": false,
+        "background_refresh": false
       }
     },
     {
@@ -581,14 +528,7 @@
       "description": "Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 74,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "media_center",
-        "release": "media_center@0.6.114",
-        "release_digest": "sha256:4c47394b70f86cecf82c93c18029732b121f5a452358e6dd9d38d2430eaa9c7e",
-        "package_digest": "sha256:9fc5dcc4ed9d0724880bd87c7acb06235e9d50f7586d635fb8c04855cc74d0ac"
-      }
+      "tools_count": 74
     },
     {
       "kind": "skill",
@@ -610,20 +550,13 @@
       "description": "Persistent Media Center control plane for playback targets, sessions, queues, commands, checkpoints, and settings.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 22,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "media_center",
-        "release": "media_center@0.6.114",
-        "release_digest": "sha256:4c47394b70f86cecf82c93c18029732b121f5a452358e6dd9d38d2430eaa9c7e",
-        "package_digest": "sha256:3465087c13a40a1e9b4011d900bb78409446048774385cba67f929044cca2265"
-      }
+      "tools_count": 22
     },
     {
       "kind": "skill",
       "id": "media_indexer_skill",
       "name": "media_indexer_skill",
-      "version": "0.1.40",
+      "version": "0.1.42",
       "updated_at": "2026-09-26T19:31:39+00:00",
       "path": "skills/media_indexer_skill",
       "manifest": "skills/media_indexer_skill/skill.yaml",
@@ -664,14 +597,7 @@
       },
       "description": "Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.",
       "runtime_python": "3.11",
-      "tools_count": 31,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "media_center",
-        "release": "media_center@0.6.114",
-        "release_digest": "sha256:4c47394b70f86cecf82c93c18029732b121f5a452358e6dd9d38d2430eaa9c7e",
-        "package_digest": "sha256:205f206c38665cd2ecc5f777ac1ab6b0e28e58172b707f92b332a9ce7083bb4d"
-      }
+      "tools_count": 31
     },
     {
       "kind": "skill",
@@ -683,13 +609,7 @@
       "manifest": "skills/mediaserver/skill.yaml",
       "source": {
         "path": "skills/mediaserver",
-        "manifest": "skills/mediaserver/skill.yaml",
-        "forge": "adaos-root",
-        "repository": "inimatic/adaos-registry",
-        "revision": "d4fc02b417d1f2bf12a6065f13d55634125e5c5a",
-        "path_scope": [
-          "projects/mediaserver/"
-        ]
+        "manifest": "skills/mediaserver/skill.yaml"
       },
       "install": {
         "kind": "skill",
@@ -699,23 +619,7 @@
       "description": "Provides local media upload, playback, and channel health diagnostics.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 4,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "mediaserver",
-        "release": "mediaserver@0.1.1",
-        "release_digest": "sha256:2267588a94126815fa54a3176ac095bc60d94e0cda2fcbe45cb905f8c0a276c7",
-        "package_digest": "sha256:9f2243897b755444c1a49d1b45ba019239bd170d662a675d6e19b8323a5ad7d3"
-      },
-      "channels": {
-        "stable": {
-          "release": "mediaserver@0.1.1",
-          "release_digest": "sha256:2267588a94126815fa54a3176ac095bc60d94e0cda2fcbe45cb905f8c0a276c7",
-          "source_revision": "d4fc02b417d1f2bf12a6065f13d55634125e5c5a",
-          "package_digest": "sha256:9f2243897b755444c1a49d1b45ba019239bd170d662a675d6e19b8323a5ad7d3",
-          "version": "0.9.19"
-        }
-      }
+      "tools_count": 4
     },
     {
       "kind": "skill",
@@ -737,11 +641,14 @@
       "description": "Supervised MLflow tracking provider and native query UI for the AdaOS research tracker contract.",
       "entry": "handlers/main.py",
       "activation": {
-        "mode": "package_lock",
-        "project_id": "research_tlp",
-        "release": "research_tlp@0.3.18",
-        "release_digest": "sha256:ad8c1d22fb71bb4d1a15809765f2dc8194a4f10fb9571de8afda2d50eb477e39",
-        "package_digest": "sha256:7f8e55ed09c4b4de6feafbd1b3314315efba93ec3c6d4c18156d36fcffaaa54f"
+        "mode": "lazy",
+        "when": {
+          "scenarios_active": [
+            "tlp_research"
+          ]
+        },
+        "startup_allowed": true,
+        "background_refresh": false
       },
       "tools_count": 5
     },
@@ -827,13 +734,7 @@
       "manifest": "skills/notebook_skill/skill.yaml",
       "source": {
         "path": "skills/notebook_skill",
-        "manifest": "skills/notebook_skill/skill.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:f484a35b186e8c3957b2f8dfe92986eb8a0db54b4094e1330256ad21268fdfcc",
-        "path_scope": [
-          "projects/notebook/"
-        ]
+        "manifest": "skills/notebook_skill/skill.yaml"
       },
       "install": {
         "kind": "skill",
@@ -842,23 +743,7 @@
       },
       "description": "Shared plain-text notebook with one active editable note, a live note list stream, and Telegram export.",
       "runtime_python": "3.11",
-      "tools_count": 13,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "notebook",
-        "release": "notebook@0.1.2",
-        "release_digest": "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275",
-        "package_digest": "sha256:883b968eb980314614b018560e744e6afe94ecfe1b11d71e197197e6d997757d"
-      },
-      "channels": {
-        "stable": {
-          "release": "notebook@0.1.2",
-          "release_digest": "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275",
-          "source_revision": "sha256:f484a35b186e8c3957b2f8dfe92986eb8a0db54b4094e1330256ad21268fdfcc",
-          "package_digest": "sha256:883b968eb980314614b018560e744e6afe94ecfe1b11d71e197197e6d997757d",
-          "version": "0.2.4"
-        }
-      }
+      "tools_count": 13
     },
     {
       "kind": "skill",
@@ -880,43 +765,7 @@
       "description": "Hub-side pairing skill. Generates short-lived pairing IDs and stores payloads needed to provision new browsers (TV/Smart displays).",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 1,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "web_desktop",
-        "release": "web_desktop@0.3.57",
-        "release_digest": "sha256:331fe338fba113b2d2b8da4fef13235b6fb62e565cb21b242bfc86510d23c067",
-        "package_digest": "sha256:ddac2904f52eea9e23a1b13cf530ae5dc6e4a8f33a44374685ca90df110a4ded"
-      }
-    },
-    {
-      "kind": "skill",
-      "id": "prompt_engineer_skill",
-      "name": "prompt_engineer_skill",
-      "version": "0.7.5",
-      "updated_at": "2026-09-26T11:03:29+00:00",
-      "path": "skills/prompt_engineer_skill",
-      "manifest": "skills/prompt_engineer_skill/skill.yaml",
-      "source": {
-        "path": "skills/prompt_engineer_skill",
-        "manifest": "skills/prompt_engineer_skill/skill.yaml"
-      },
-      "install": {
-        "kind": "skill",
-        "name": "prompt_engineer_skill",
-        "id": "prompt_engineer_skill"
-      },
-      "description": "Prompt IDE backend skill that manages dev scenarios/skills, technical specs and git operations.",
-      "entry": "handlers/main.py",
-      "runtime_python": "3.11",
-      "tools_count": 27,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.15",
-        "release_digest": "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
-        "package_digest": "sha256:40f62db2b7a91a00850ec450111af8965de67896f5da91dba0f3ed9506bd4059"
-      }
+      "tools_count": 1
     },
     {
       "kind": "skill",
@@ -962,14 +811,7 @@
       "description": "Workspace dashboard for ReDevice endpoint inventory, diagnostics, manifest, policy, revoke, and retire operations.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 6,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "redevice_control",
-        "release": "redevice_control@0.1.22",
-        "release_digest": "sha256:c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8",
-        "package_digest": "sha256:8f824a0ebec47ae3cd538795d20630ac457a451813e0ef7432acefd1f571f0df"
-      }
+      "tools_count": 6
     },
     {
       "kind": "skill",
@@ -991,14 +833,7 @@
       "description": "Service skill for ReDevice endpoint settings, assignment, status, and policy-bound device actions.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 12,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "redevice_control",
-        "release": "redevice_control@0.1.22",
-        "release_digest": "sha256:c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8",
-        "package_digest": "sha256:f12e8dcb594cc50123a31ff67c0d7eaf319de0fc427a5baad5f2380c22d6f3eb"
-      }
+      "tools_count": 12
     },
     {
       "kind": "skill",
@@ -1020,14 +855,7 @@
       "description": "Debug ReDevice voice endpoint skill over EndpointAudioService with VAD or push-to-talk capture and member-side STT routing.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 4,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "redevice_control",
-        "release": "redevice_control@0.1.22",
-        "release_digest": "sha256:c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8",
-        "package_digest": "sha256:c8c3b3f073e80bc0c8d7baac5f3373aa3fa675ee96bfc87ee8e4c5495823f7dd"
-      }
+      "tools_count": 4
     },
     {
       "kind": "skill",
@@ -1039,13 +867,7 @@
       "manifest": "skills/release_validation_skill/skill.yaml",
       "source": {
         "path": "skills/release_validation_skill",
-        "manifest": "skills/release_validation_skill/skill.yaml",
-        "forge": "adaos-root",
-        "repository": "inimatic/adaos-registry",
-        "revision": "b6b839474f110b7b90841b0b53c017bd0bf02c25",
-        "path_scope": [
-          "subnets/sn_6acf0c01/nodes/8db40740-b3ff-44bf-baf5-9fb013b35b01/skills/release_validation_skill/"
-        ]
+        "manifest": "skills/release_validation_skill/skill.yaml"
       },
       "install": {
         "kind": "skill",
@@ -1056,22 +878,18 @@
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
       "activation": {
-        "mode": "package_lock",
-        "project_id": "release_validation_skill",
-        "release": "release_validation_skill@0.1.7",
-        "release_digest": "sha256:de584cd26a87b0bf2f58fec56dfaf996545f89f31ac2603fc40c9e5196687c65",
-        "package_digest": "sha256:5703a60257c9d5bc06ee82546d8c1dced5005b8f9b8a47aa667894924e8c2edc"
+        "mode": "lazy",
+        "when": {
+          "scenarios_active": [
+            "release_validation_ops"
+          ],
+          "client_presence": true,
+          "webspace_scope": "active"
+        },
+        "startup_allowed": true,
+        "background_refresh": false
       },
-      "tools_count": 9,
-      "channels": {
-        "stable": {
-          "release": "release_validation_skill@0.1.7",
-          "release_digest": "sha256:de584cd26a87b0bf2f58fec56dfaf996545f89f31ac2603fc40c9e5196687c65",
-          "source_revision": "b6b839474f110b7b90841b0b53c017bd0bf02c25",
-          "package_digest": "sha256:5703a60257c9d5bc06ee82546d8c1dced5005b8f9b8a47aa667894924e8c2edc",
-          "version": "0.1.7"
-        }
-      }
+      "tools_count": 9
     },
     {
       "kind": "skill",
@@ -1093,14 +911,7 @@
       "description": "Contamination-aware execution bridge from frozen research calibration packets to native Builder Automation.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 5,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "research_platform",
-        "release": "research_platform@0.1.21",
-        "release_digest": "sha256:758e6dac8a7bbf92b46400fd6de9680ce5f5277ae5c5a2ab3bf4eb20d08e40f7",
-        "package_digest": "sha256:0e697d3d2a8f1c7c32a11aa8973ccbb7910ac0b7109d5ab046b8e744d557eaf7"
-      }
+      "tools_count": 5
     },
     {
       "kind": "skill",
@@ -1122,14 +933,7 @@
       "description": "Independent, contamination-aware evaluator for AdaOS research-compilation calibrations.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 13,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "research_platform",
-        "release": "research_platform@0.1.21",
-        "release_digest": "sha256:758e6dac8a7bbf92b46400fd6de9680ce5f5277ae5c5a2ab3bf4eb20d08e40f7",
-        "package_digest": "sha256:710aa5ef77b03a8fd8ea5fcf206965820e05bdff938c0a3209345310b9e88505"
-      }
+      "tools_count": 13
     },
     {
       "kind": "skill",
@@ -1151,11 +955,9 @@
       "description": "Reusable provider-neutral research control plane for governed studies, experiments, runner providers, trackers and immutable evidence.",
       "entry": "handlers/main.py",
       "activation": {
-        "mode": "package_lock",
-        "project_id": "research_tlp",
-        "release": "research_tlp@0.3.18",
-        "release_digest": "sha256:ad8c1d22fb71bb4d1a15809765f2dc8194a4f10fb9571de8afda2d50eb477e39",
-        "package_digest": "sha256:fadd96652f46ef82b965127316a348b86934105c4ec719647642355bfabb01e6"
+        "mode": "lazy",
+        "startup_allowed": true,
+        "background_refresh": false
       },
       "tools_count": 39
     },
@@ -1179,14 +981,7 @@
       "description": "Durable pre-Codex orchestration for reusable AdaOS research directions, bounded tasks, compilations, and implementation tracks.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 48,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "research_platform",
-        "release": "research_platform@0.1.21",
-        "release_digest": "sha256:758e6dac8a7bbf92b46400fd6de9680ce5f5277ae5c5a2ab3bf4eb20d08e40f7",
-        "package_digest": "sha256:a57643a569b6909bda60ee320f1c83f64e4cc7ff5ca9fd852eb16ce398f5d863"
-      }
+      "tools_count": 48
     },
     {
       "kind": "skill",
@@ -1228,14 +1023,7 @@
       "description": "Локальная книга рецептов и список покупок.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 7,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "shopping_list_14504c40",
-        "release": "shopping_list_14504c40@0.2.3",
-        "release_digest": "sha256:0386dd98ec902b6ede4135e45697d594f2031b6192b1583e2fda24c898adf6d5",
-        "package_digest": "sha256:a5a0c5d62123874135fdf9fda3a8b2eacd3d5ca0897dde365072e53cb2ec3148"
-      }
+      "tools_count": 7
     },
     {
       "kind": "skill",
@@ -1255,14 +1043,7 @@
         "id": "slideshow_skill"
       },
       "description": "Slideshow pilot skill that shows photos in the widget and can optionally project cached thumbnails to assigned ReDevice endpoints.",
-      "tools_count": 16,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "redevice_control",
-        "release": "redevice_control@0.1.22",
-        "release_digest": "sha256:c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8",
-        "package_digest": "sha256:979a828174e01eb4cc1b7c0d06da58ca709adbd30487e417c9a4d09015d7e2a8"
-      }
+      "tools_count": 16
     },
     {
       "kind": "skill",
@@ -1327,13 +1108,7 @@
       "manifest": "skills/subscription_status_skill/skill.yaml",
       "source": {
         "path": "skills/subscription_status_skill",
-        "manifest": "skills/subscription_status_skill/skill.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:665965cf91adfd35755ac353566a019b5b985b5235b710370b1843a038796ddc",
-        "path_scope": [
-          "projects/subscription_status/"
-        ]
+        "manifest": "skills/subscription_status_skill/skill.yaml"
       },
       "install": {
         "kind": "skill",
@@ -1343,22 +1118,15 @@
       "description": "User-facing AdaOS subscription status widget and modal backed by the local economic entitlement snapshot with explicit Root refresh.",
       "runtime_python": "3.11",
       "activation": {
-        "mode": "package_lock",
-        "project_id": "subscription_status",
-        "release": "subscription_status@0.1.17",
-        "release_digest": "sha256:fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8",
-        "package_digest": "sha256:3320e77c465a2977eb9847e40100caf9e63435fe9c73f10e280980d1f28c57fa"
+        "mode": "lazy",
+        "when": {
+          "client_presence": true,
+          "webspace_scope": "active"
+        },
+        "startup_allowed": true,
+        "background_refresh": false
       },
-      "tools_count": 7,
-      "channels": {
-        "stable": {
-          "release": "subscription_status@0.1.17",
-          "release_digest": "sha256:fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8",
-          "source_revision": "sha256:665965cf91adfd35755ac353566a019b5b985b5235b710370b1843a038796ddc",
-          "package_digest": "sha256:3320e77c465a2977eb9847e40100caf9e63435fe9c73f10e280980d1f28c57fa",
-          "version": "0.1.29"
-        }
-      }
+      "tools_count": 7
     },
     {
       "kind": "skill",
@@ -1425,11 +1193,14 @@
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
       "activation": {
-        "mode": "package_lock",
-        "project_id": "research_tlp",
-        "release": "research_tlp@0.3.18",
-        "release_digest": "sha256:ad8c1d22fb71bb4d1a15809765f2dc8194a4f10fb9571de8afda2d50eb477e39",
-        "package_digest": "sha256:e00ed0763a70108449853f1384ef04fe88ceeba25b36bfeef7be83c8de0fc9d9"
+        "mode": "lazy",
+        "when": {
+          "scenarios_active": [
+            "tlp_research"
+          ]
+        },
+        "startup_allowed": true,
+        "background_refresh": false
       },
       "tools_count": 7
     },
@@ -1454,14 +1225,7 @@
       "description": "Governed STL-10 MaxPool2d versus centered per-channel TLP pool2 research runner.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 7,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "research_tlp",
-        "release": "research_tlp@0.3.18",
-        "release_digest": "sha256:ad8c1d22fb71bb4d1a15809765f2dc8194a4f10fb9571de8afda2d50eb477e39",
-        "package_digest": "sha256:445a4d49698909982846aae9bf8c78ee594e6b5f9a69ce8f7429d660e70e54de"
-      }
+      "tools_count": 7
     },
     {
       "kind": "skill",
@@ -1485,11 +1249,33 @@
       "tools_count": 8,
       "activation": {
         "mode": "package_lock",
-        "project_id": "web_desktop",
-        "release": "web_desktop@0.3.57",
-        "release_digest": "sha256:331fe338fba113b2d2b8da4fef13235b6fb62e565cb21b242bfc86510d23c067",
+        "project_id": "adaos_builder",
+        "release": "adaos_builder@0.3.17",
+        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
         "package_digest": "sha256:66bbd25a130c9be8857e195a0d506adc7bab8a6e2ab47fd2f4778bac935f9d7f"
       }
+    },
+    {
+      "kind": "skill",
+      "id": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+      "name": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+      "version": "0.1.5",
+      "updated_at": "2026-09-16T11:13:13+00:00",
+      "path": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+      "manifest": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill/skill.yaml",
+      "source": {
+        "path": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+        "manifest": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+        "id": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill"
+      },
+      "description": "Persistent volunteer roster with caller-authorized transactional operations.",
+      "entry": "{'module': 'handlers.main'}",
+      "runtime_python": "3.11",
+      "tools_count": 7
     },
     {
       "kind": "skill",
@@ -1532,14 +1318,7 @@
       "description": "Project-owned runtime actions for opening Web Desktop applications, managing Home, and preparing browser, Telegram, and node connection flows.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 9,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "web_desktop",
-        "release": "web_desktop@0.3.57",
-        "release_digest": "sha256:331fe338fba113b2d2b8da4fef13235b6fb62e565cb21b242bfc86510d23c067",
-        "package_digest": "sha256:be42a4bd8b218cc6d9f713c7e60a96225e41918930e05b8972f6165afdf782d9"
-      }
+      "tools_count": 9
     },
     {
       "kind": "skill",
@@ -1561,14 +1340,29 @@
       "description": "Desktop shell skill that handles icon/widget installation via the web desktop SDK.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 0,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "web_desktop",
-        "release": "web_desktop@0.3.57",
-        "release_digest": "sha256:331fe338fba113b2d2b8da4fef13235b6fb62e565cb21b242bfc86510d23c067",
-        "package_digest": "sha256:dc6b9e208019a45a30e2d155e310802559c21a7ff6262acfb9fd524ec4a543de"
-      }
+      "tools_count": 0
+    },
+    {
+      "kind": "skill",
+      "id": "workbench_test_20260914_b_skill",
+      "name": "workbench_test_20260914_b_skill",
+      "version": "0.1.7",
+      "updated_at": "2026-09-15T21:19:20+00:00",
+      "path": "skills/workbench_test_20260914_b_skill",
+      "manifest": "skills/workbench_test_20260914_b_skill/skill.yaml",
+      "source": {
+        "path": "skills/workbench_test_20260914_b_skill",
+        "manifest": "skills/workbench_test_20260914_b_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "workbench_test_20260914_b_skill",
+        "id": "workbench_test_20260914_b_skill"
+      },
+      "description": "Project-owned resource implementation for project:workbench_test_20260914_b. Realize the accepted Prototype according to the separate Automation brief.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 12
     },
     {
       "kind": "skill",
@@ -1604,13 +1398,7 @@
       "manifest": "scenarios/adaos_drive/scenario.yaml",
       "source": {
         "path": "scenarios/adaos_drive",
-        "manifest": "scenarios/adaos_drive/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:db6f9ac19dcfc66d9afec1bd5710ed9df85229f7d629d837e8cbe10525328e45",
-        "path_scope": [
-          "projects/adaos_drive/"
-        ]
+        "manifest": "scenarios/adaos_drive/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -1624,22 +1412,6 @@
         "required": [
           "adaos_drive"
         ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "adaos_drive",
-        "release": "adaos_drive@0.1.21",
-        "release_digest": "sha256:613e6ec9ef6d78330b953dd9517efa65e0c4711e32b3c77c911bf58b22e085ec",
-        "package_digest": "sha256:26772515101a345a87067d608ca62329d5af629dbc41337298b586ef04d5b79d"
-      },
-      "channels": {
-        "stable": {
-          "release": "adaos_drive@0.1.21",
-          "release_digest": "sha256:613e6ec9ef6d78330b953dd9517efa65e0c4711e32b3c77c911bf58b22e085ec",
-          "source_revision": "sha256:db6f9ac19dcfc66d9afec1bd5710ed9df85229f7d629d837e8cbe10525328e45",
-          "package_digest": "sha256:26772515101a345a87067d608ca62329d5af629dbc41337298b586ef04d5b79d",
-          "version": "0.1.13"
-        }
       }
     },
     {
@@ -1652,13 +1424,7 @@
       "manifest": "scenarios/applications/scenario.yaml",
       "source": {
         "path": "scenarios/applications",
-        "manifest": "scenarios/applications/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:7684abd6c15d0f83f39491d456784cdf2b5726c4d30c9430e0a24f8d7b37d942",
-        "path_scope": [
-          "projects/applications/"
-        ]
+        "manifest": "scenarios/applications/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -1681,30 +1447,14 @@
           "text",
           "web"
         ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "applications",
-        "release": "applications@0.1.40",
-        "release_digest": "sha256:9af21f1fc23bae6aa4dea6380002cf7652e8c5550eb2b5d026de78eac971a447",
-        "package_digest": "sha256:e325523389f017f186d9bdea490f423718cb622b1b9da6e95438d5f64b71895c"
-      },
-      "channels": {
-        "stable": {
-          "release": "applications@0.1.40",
-          "release_digest": "sha256:9af21f1fc23bae6aa4dea6380002cf7652e8c5550eb2b5d026de78eac971a447",
-          "source_revision": "sha256:7684abd6c15d0f83f39491d456784cdf2b5726c4d30c9430e0a24f8d7b37d942",
-          "package_digest": "sha256:e325523389f017f186d9bdea490f423718cb622b1b9da6e95438d5f64b71895c",
-          "version": "0.1.69"
-        }
       }
     },
     {
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.100",
-      "updated_at": "2026-09-26T11:02:28+00:00",
+      "version": "0.2.102",
+      "updated_at": "2026-09-27T06:30:28+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.yaml",
       "source": {
@@ -1712,7 +1462,7 @@
         "manifest": "scenarios/builder/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:f614122e491e6812c205ecd1555e111e66dcab15380d09b100e6117a3b8530bf",
+        "revision": "sha256:b59e7be51483eab7d46db7112ed2bc05891a7841fbfa3936bb0dd9efa197dec3",
         "path_scope": [
           "projects/adaos_builder/"
         ]
@@ -1738,38 +1488,19 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.15",
-        "release_digest": "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
-        "package_digest": "sha256:33382b1a1fd14af815a6d0f48ef29333d4c5841735d18217cc5960bfc37b75d0"
+        "release": "adaos_builder@0.3.17",
+        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
+        "package_digest": "sha256:6d2d22313420b46cedd01abfab076abec1d96d1d298186d8ea5c0285dd6760ca"
       },
       "channels": {
         "stable": {
-          "release": "adaos_builder@0.3.15",
-          "release_digest": "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
-          "source_revision": "sha256:f614122e491e6812c205ecd1555e111e66dcab15380d09b100e6117a3b8530bf",
-          "package_digest": "sha256:33382b1a1fd14af815a6d0f48ef29333d4c5841735d18217cc5960bfc37b75d0",
-          "version": "0.2.100"
+          "release": "adaos_builder@0.3.17",
+          "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
+          "source_revision": "sha256:b59e7be51483eab7d46db7112ed2bc05891a7841fbfa3936bb0dd9efa197dec3",
+          "package_digest": "sha256:6d2d22313420b46cedd01abfab076abec1d96d1d298186d8ea5c0285dd6760ca",
+          "version": "0.2.102"
         }
       }
-    },
-    {
-      "kind": "scenario",
-      "id": "builder_pipeline_smoke_1784408500",
-      "name": "builder_pipeline_smoke_1784408500",
-      "version": "0.0.2",
-      "updated_at": "2026-07-18T21:36:06+00:00",
-      "path": "scenarios/builder_pipeline_smoke_1784408500",
-      "manifest": "scenarios/builder_pipeline_smoke_1784408500/scenario.yaml",
-      "source": {
-        "path": "scenarios/builder_pipeline_smoke_1784408500",
-        "manifest": "scenarios/builder_pipeline_smoke_1784408500/scenario.yaml"
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "builder_pipeline_smoke_1784408500",
-        "id": "builder_pipeline_smoke_1784408500"
-      },
-      "trigger": "manual"
     },
     {
       "kind": "scenario",
@@ -1781,13 +1512,7 @@
       "manifest": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146/scenario.yaml",
       "source": {
         "path": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "manifest": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:eda72b2f2e81596ac3e12f65edaac28c30e37b523bfa11ee1fe2d1cd9543f65d",
-        "path_scope": [
-          "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/"
-        ]
+        "manifest": "scenarios/flowboard_lab_for_safely_prototyping_a_r_17528146/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -1815,22 +1540,6 @@
           "text",
           "web"
         ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.17",
-        "release_digest": "sha256:9794e4f50c83b45d7772b4c7d5832c39b4fe89c6b0872d6b281acb03756080f4",
-        "package_digest": "sha256:5dcb1be2da6de0f87cc8bd5f9feee5bd16b2910e3ca2eba54357d409efddab84"
-      },
-      "channels": {
-        "stable": {
-          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.17",
-          "release_digest": "sha256:9794e4f50c83b45d7772b4c7d5832c39b4fe89c6b0872d6b281acb03756080f4",
-          "source_revision": "sha256:eda72b2f2e81596ac3e12f65edaac28c30e37b523bfa11ee1fe2d1cd9543f65d",
-          "package_digest": "sha256:5dcb1be2da6de0f87cc8bd5f9feee5bd16b2910e3ca2eba54357d409efddab84",
-          "version": "0.1.24"
-        }
       }
     },
     {
@@ -1843,13 +1552,7 @@
       "manifest": "scenarios/gmail_cbs_cleanroom/scenario.yaml",
       "source": {
         "path": "scenarios/gmail_cbs_cleanroom",
-        "manifest": "scenarios/gmail_cbs_cleanroom/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:417b4c8371db444d1f5e0b08fc80c80a5f7743c71cffa6712b7b69f640d643e6",
-        "path_scope": [
-          "projects/gmail_cbs_cleanroom/"
-        ]
+        "manifest": "scenarios/gmail_cbs_cleanroom/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -1867,22 +1570,6 @@
         "required": [
           "gmail_cbs_cleanroom_skill"
         ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "gmail_cbs_cleanroom",
-        "release": "gmail_cbs_cleanroom@0.1.10",
-        "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
-        "package_digest": "sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86"
-      },
-      "channels": {
-        "stable": {
-          "release": "gmail_cbs_cleanroom@0.1.10",
-          "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
-          "source_revision": "sha256:417b4c8371db444d1f5e0b08fc80c80a5f7743c71cffa6712b7b69f640d643e6",
-          "package_digest": "sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86",
-          "version": "0.1.6"
-        }
       }
     },
     {
@@ -1895,13 +1582,7 @@
       "manifest": "scenarios/gmail_mail_client/scenario.yaml",
       "source": {
         "path": "scenarios/gmail_mail_client",
-        "manifest": "scenarios/gmail_mail_client/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:05a29791dea8402855aaf1d52075dbe21579e49f2a59fc7d951d01dc5377bda6",
-        "path_scope": [
-          "projects/gmail_mail_client/"
-        ]
+        "manifest": "scenarios/gmail_mail_client/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -1919,22 +1600,6 @@
         "required": [
           "gmail_mail_client_provider_skill"
         ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "gmail_mail_client",
-        "release": "gmail_mail_client@0.1.4",
-        "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
-        "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa"
-      },
-      "channels": {
-        "stable": {
-          "release": "gmail_mail_client@0.1.4",
-          "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
-          "source_revision": "sha256:05a29791dea8402855aaf1d52075dbe21579e49f2a59fc7d951d01dc5377bda6",
-          "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa",
-          "version": "0.1.2"
-        }
       }
     },
     {
@@ -1947,13 +1612,7 @@
       "manifest": "scenarios/inbox_triage/scenario.yaml",
       "source": {
         "path": "scenarios/inbox_triage",
-        "manifest": "scenarios/inbox_triage/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:45d5bd886bd03a99d132b709cb9825f3af6d2c78624b3424f02a73c6a0521ccb",
-        "path_scope": [
-          "projects/inbox_triage/"
-        ]
+        "manifest": "scenarios/inbox_triage/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -1971,47 +1630,6 @@
         "required": [
           "gmail_cbs_cleanroom_skill"
         ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "inbox_triage",
-        "release": "inbox_triage@0.1.4",
-        "release_digest": "sha256:d6e3b4809c1e2ec531acdf40ae6f858a5f51340113d2bf54ca53d3a12fd92b8a",
-        "package_digest": "sha256:2fa808efdae12b4bc2b3c36279ce947efad5e4a3e212837f6a68e4db216f3703"
-      },
-      "channels": {
-        "stable": {
-          "release": "inbox_triage@0.1.4",
-          "release_digest": "sha256:d6e3b4809c1e2ec531acdf40ae6f858a5f51340113d2bf54ca53d3a12fd92b8a",
-          "source_revision": "sha256:45d5bd886bd03a99d132b709cb9825f3af6d2c78624b3424f02a73c6a0521ccb",
-          "package_digest": "sha256:2fa808efdae12b4bc2b3c36279ce947efad5e4a3e212837f6a68e4db216f3703",
-          "version": "0.1.4"
-        }
-      }
-    },
-    {
-      "kind": "scenario",
-      "id": "infrascope",
-      "name": "infrascope",
-      "version": "0.10.3",
-      "updated_at": "2026-08-14T20:30:44+00:00",
-      "path": "scenarios/infrascope",
-      "manifest": "scenarios/infrascope/scenario.yaml",
-      "source": {
-        "path": "scenarios/infrascope",
-        "manifest": "scenarios/infrascope/scenario.yaml"
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "infrascope",
-        "id": "infrascope"
-      },
-      "title": "Infrascope",
-      "description": "Operator control-plane scenario for overview, inventory, and in-context object inspection.",
-      "skills": {
-        "required": [
-          "infrascope_skill"
-        ]
       }
     },
     {
@@ -2024,13 +1642,7 @@
       "manifest": "scenarios/mail_focus_reader/scenario.yaml",
       "source": {
         "path": "scenarios/mail_focus_reader",
-        "manifest": "scenarios/mail_focus_reader/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:9e7b9b17f4b1bebfa2514f9978ea931cf3a719ffb27fc8b38e111a56de3a6d5a",
-        "path_scope": [
-          "projects/mail_focus_reader/"
-        ]
+        "manifest": "scenarios/mail_focus_reader/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -2048,22 +1660,6 @@
         "required": [
           "gmail_cbs_cleanroom_skill"
         ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "mail_focus_reader",
-        "release": "mail_focus_reader@0.1.4",
-        "release_digest": "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
-        "package_digest": "sha256:39dbbeee6e87d158a347b2bd075dbee193a686ac30c78fe9a339f25dd681c150"
-      },
-      "channels": {
-        "stable": {
-          "release": "mail_focus_reader@0.1.4",
-          "release_digest": "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
-          "source_revision": "sha256:9e7b9b17f4b1bebfa2514f9978ea931cf3a719ffb27fc8b38e111a56de3a6d5a",
-          "package_digest": "sha256:39dbbeee6e87d158a347b2bd075dbee193a686ac30c78fe9a339f25dd681c150",
-          "version": "0.1.5"
-        }
       }
     },
     {
@@ -2076,13 +1672,7 @@
       "manifest": "scenarios/media_center/scenario.yaml",
       "source": {
         "path": "scenarios/media_center",
-        "manifest": "scenarios/media_center/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:7d47078fc7c7083dd9f68c3c7b3cf989a5d6cbd817a46732e4359f934dd5a01a",
-        "path_scope": [
-          "projects/media_center/"
-        ]
+        "manifest": "scenarios/media_center/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -2102,81 +1692,6 @@
           "media_library_agent",
           "media_control_skill"
         ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "media_center",
-        "release": "media_center@0.6.114",
-        "release_digest": "sha256:4c47394b70f86cecf82c93c18029732b121f5a452358e6dd9d38d2430eaa9c7e",
-        "package_digest": "sha256:7de13c43e29bc6314eb6ae6e1a7273044b4a7596ab997ffceb5a04abf2e05e70"
-      },
-      "channels": {
-        "stable": {
-          "release": "media_center@0.6.114",
-          "release_digest": "sha256:4c47394b70f86cecf82c93c18029732b121f5a452358e6dd9d38d2430eaa9c7e",
-          "source_revision": "sha256:7d47078fc7c7083dd9f68c3c7b3cf989a5d6cbd817a46732e4359f934dd5a01a",
-          "package_digest": "sha256:7de13c43e29bc6314eb6ae6e1a7273044b4a7596ab997ffceb5a04abf2e05e70",
-          "version": "0.6.42"
-        }
-      }
-    },
-    {
-      "kind": "scenario",
-      "id": "new_face_vision_scenario",
-      "name": "new_face_vision",
-      "version": "0.2.16",
-      "updated_at": "2026-08-11T09:30:57+00:00",
-      "path": "scenarios/new_face_vision",
-      "manifest": "scenarios/new_face_vision/scenario.yaml",
-      "source": {
-        "path": "scenarios/new_face_vision",
-        "manifest": "scenarios/new_face_vision/scenario.yaml"
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "new_face_vision",
-        "id": "new_face_vision_scenario"
-      },
-      "title": "New Face Vision",
-      "description": "Desktop scenario for frame analysis through new_face_vision_skill.",
-      "manifest_id": "new_face_vision_scenario",
-      "skills": {
-        "required": [
-          "new_face_vision_skill"
-        ]
-      }
-    },
-    {
-      "kind": "scenario",
-      "id": "prompt_engineer_scenario",
-      "name": "prompt_engineer_scenario",
-      "version": "0.3.12",
-      "updated_at": "2026-09-26T11:02:33+00:00",
-      "path": "scenarios/prompt_engineer_scenario",
-      "manifest": "scenarios/prompt_engineer_scenario/scenario.yaml",
-      "source": {
-        "path": "scenarios/prompt_engineer_scenario",
-        "manifest": "scenarios/prompt_engineer_scenario/scenario.yaml"
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "prompt_engineer_scenario",
-        "id": "prompt_engineer_scenario"
-      },
-      "title": "Prompt IDE",
-      "description": "Prompt engineering IDE workspace for dev skills and scenarios.",
-      "skills": {
-        "required": [
-          "prompt_engineer_skill",
-          "builder_automation_skill"
-        ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.15",
-        "release_digest": "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
-        "package_digest": "sha256:2e458ceb9bde94d45a04aae618432afad8f3f207ad2bd96055dc8110f3a493d3"
       }
     },
     {
@@ -2189,13 +1704,7 @@
       "manifest": "scenarios/redevice_user_face/scenario.yaml",
       "source": {
         "path": "scenarios/redevice_user_face",
-        "manifest": "scenarios/redevice_user_face/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:3c2ef63076f06ad632ab0698b4410bf89f0eac5445e7466997cbb605bc7b5fcd",
-        "path_scope": [
-          "projects/redevice_control/"
-        ]
+        "manifest": "scenarios/redevice_user_face/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -2213,47 +1722,6 @@
         "optional": [
           "redevice_list"
         ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "redevice_control",
-        "release": "redevice_control@0.1.22",
-        "release_digest": "sha256:c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8",
-        "package_digest": "sha256:70501aaf164d4f0f6f0c6b6e70b272b666f19d59e353bd2589254ed3818f6164"
-      },
-      "channels": {
-        "stable": {
-          "release": "redevice_control@0.1.22",
-          "release_digest": "sha256:c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8",
-          "source_revision": "sha256:3c2ef63076f06ad632ab0698b4410bf89f0eac5445e7466997cbb605bc7b5fcd",
-          "package_digest": "sha256:70501aaf164d4f0f6f0c6b6e70b272b666f19d59e353bd2589254ed3818f6164",
-          "version": "0.1.13"
-        }
-      }
-    },
-    {
-      "kind": "scenario",
-      "id": "release_validation_ops",
-      "name": "release_validation_ops",
-      "version": "0.1.6",
-      "updated_at": "2026-08-26T08:05:00+00:00",
-      "path": "scenarios/release_validation_ops",
-      "manifest": "scenarios/release_validation_ops/scenario.yaml",
-      "source": {
-        "path": "scenarios/release_validation_ops",
-        "manifest": "scenarios/release_validation_ops/scenario.yaml"
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "release_validation_ops",
-        "id": "release_validation_ops"
-      },
-      "title": "Release Validation Operations",
-      "description": "Observe-only AdaOS release validation campaigns.",
-      "skills": {
-        "required": [
-          "release_validation_skill"
-        ]
       }
     },
     {
@@ -2266,13 +1734,7 @@
       "manifest": "scenarios/research_workbench/scenario.yaml",
       "source": {
         "path": "scenarios/research_workbench",
-        "manifest": "scenarios/research_workbench/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:bb203c15f1965f07e3ce2d6bef0595e8aec426f7a16a36b4e57e304a85cd72fc",
-        "path_scope": [
-          "projects/research_platform/"
-        ]
+        "manifest": "scenarios/research_workbench/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -2286,22 +1748,6 @@
         "required": [
           "research_orchestrator_skill"
         ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "research_platform",
-        "release": "research_platform@0.1.21",
-        "release_digest": "sha256:758e6dac8a7bbf92b46400fd6de9680ce5f5277ae5c5a2ab3bf4eb20d08e40f7",
-        "package_digest": "sha256:c67e8bceda844fedb4108f22150dfd2bcad22113d9d30643bc969d70de630fa6"
-      },
-      "channels": {
-        "stable": {
-          "release": "research_platform@0.1.21",
-          "release_digest": "sha256:758e6dac8a7bbf92b46400fd6de9680ce5f5277ae5c5a2ab3bf4eb20d08e40f7",
-          "source_revision": "sha256:bb203c15f1965f07e3ce2d6bef0595e8aec426f7a16a36b4e57e304a85cd72fc",
-          "package_digest": "sha256:c67e8bceda844fedb4108f22150dfd2bcad22113d9d30643bc969d70de630fa6",
-          "version": "0.1.18"
-        }
       }
     },
     {
@@ -2314,13 +1760,7 @@
       "manifest": "scenarios/shopping_list_14504c40/scenario.yaml",
       "source": {
         "path": "scenarios/shopping_list_14504c40",
-        "manifest": "scenarios/shopping_list_14504c40/scenario.yaml",
-        "forge": "adaos-root",
-        "repository": "inimatic/adaos-registry",
-        "revision": "ed5a200e942b208d5b7989e5485782369ddefba2",
-        "path_scope": [
-          "subnets/sn_6acf0c01/nodes/8db40740-b3ff-44bf-baf5-9fb013b35b01/scenarios/shopping_list_14504c40/"
-        ]
+        "manifest": "scenarios/shopping_list_14504c40/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -2333,22 +1773,6 @@
         "required": [
           "shopping_list_14504c40_skill"
         ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "shopping_list_14504c40",
-        "release": "shopping_list_14504c40@0.2.3",
-        "release_digest": "sha256:0386dd98ec902b6ede4135e45697d594f2031b6192b1583e2fda24c898adf6d5",
-        "package_digest": "sha256:96e53862745b6fd6b2450ee2196301c7c10c26e9c05339ba169cfd845600ced5"
-      },
-      "channels": {
-        "stable": {
-          "release": "shopping_list_14504c40@0.2.3",
-          "release_digest": "sha256:0386dd98ec902b6ede4135e45697d594f2031b6192b1583e2fda24c898adf6d5",
-          "source_revision": "ed5a200e942b208d5b7989e5485782369ddefba2",
-          "package_digest": "sha256:96e53862745b6fd6b2450ee2196301c7c10c26e9c05339ba169cfd845600ced5",
-          "version": "0.2.3"
-        }
       }
     },
     {
@@ -2379,34 +1803,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.15",
-        "release_digest": "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
-        "package_digest": "sha256:f8420dcf519a5fdca1c891c85603b268a4ffe13fdc27a54aa0e559f67ed96c02"
-      }
-    },
-    {
-      "kind": "scenario",
-      "id": "streaming_recipe_book_eval",
-      "name": "streaming_recipe_book_eval",
-      "version": "0.0.3",
-      "updated_at": "2026-08-11T09:32:14+00:00",
-      "path": "scenarios/streaming_recipe_book_eval",
-      "manifest": "scenarios/streaming_recipe_book_eval/scenario.yaml",
-      "source": {
-        "path": "scenarios/streaming_recipe_book_eval",
-        "manifest": "scenarios/streaming_recipe_book_eval/scenario.yaml"
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "streaming_recipe_book_eval",
-        "id": "streaming_recipe_book_eval"
-      },
-      "title": "Домашняя книга рецептов",
-      "description": "Responsive persistent recipe catalog.",
-      "skills": {
-        "required": [
-          "streaming_recipe_book_eval_skill"
-        ]
+        "release": "adaos_builder@0.3.17",
+        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
+        "package_digest": "sha256:8e27c5ae7cfb8f1ac3b11f0ef4c1f2d883f38b2ae47539d256af9d5c0a3b2b85"
       }
     },
     {
@@ -2419,13 +1818,7 @@
       "manifest": "scenarios/taiga_ui_demo_scenario/scenario.yaml",
       "source": {
         "path": "scenarios/taiga_ui_demo_scenario",
-        "manifest": "scenarios/taiga_ui_demo_scenario/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:8fff1ddac0a9b64a430835e6a0e7602a3b69c0dd95d0ce71c433d3a46803e091",
-        "path_scope": [
-          "projects/semantic_ui_demo/"
-        ]
+        "manifest": "scenarios/taiga_ui_demo_scenario/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -2439,22 +1832,35 @@
           "web_desktop_skill",
           "demo_metrics_skill"
         ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "test03_recipes",
+      "name": "test03_recipes",
+      "version": "0.2.12",
+      "updated_at": "2026-07-28T08:38:41+00:00",
+      "path": "scenarios/test03_recipes",
+      "manifest": "scenarios/test03_recipes/scenario.yaml",
+      "source": {
+        "path": "scenarios/test03_recipes",
+        "manifest": "scenarios/test03_recipes/scenario.yaml"
       },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "semantic_ui_demo",
-        "release": "semantic_ui_demo@0.10.28",
-        "release_digest": "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
-        "package_digest": "sha256:86ed65adf32f0850dd12ac94e4f7c5b01bd942815b7950d67a496a6cb06baeb5"
+      "install": {
+        "kind": "scenario",
+        "name": "test03_recipes",
+        "id": "test03_recipes"
       },
-      "channels": {
-        "stable": {
-          "release": "semantic_ui_demo@0.10.28",
-          "release_digest": "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
-          "source_revision": "sha256:8fff1ddac0a9b64a430835e6a0e7602a3b69c0dd95d0ce71c433d3a46803e091",
-          "package_digest": "sha256:86ed65adf32f0850dd12ac94e4f7c5b01bd942815b7950d67a496a6cb06baeb5",
-          "version": "0.11.13"
-        }
+      "title": "Кулинарные рецепты",
+      "title_i18n": {
+        "key": "scenario.test03_recipes.title",
+        "fallback": "Test03 Recipes"
+      },
+      "description": "Durable local recipe catalog with favorite selections.",
+      "skills": {
+        "required": [
+          "test03_recipes_skill"
+        ]
       }
     },
     {
@@ -2497,13 +1903,7 @@
       "manifest": "scenarios/tlp_research/scenario.yaml",
       "source": {
         "path": "scenarios/tlp_research",
-        "manifest": "scenarios/tlp_research/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:13b00c9a6153d7c33e4b2b579c34feb24562f0c461047c94b4c15bc5d5ce6a39",
-        "path_scope": [
-          "projects/research_tlp/"
-        ]
+        "manifest": "scenarios/tlp_research/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -2519,22 +1919,41 @@
           "mlflow_tracker_skill",
           "tlp_experiment_skill"
         ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+      "name": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+      "version": "0.1.2",
+      "updated_at": "2026-09-05T06:51:22+00:00",
+      "path": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+      "manifest": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e/scenario.yaml",
+      "source": {
+        "path": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+        "manifest": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e/scenario.yaml"
       },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "research_tlp",
-        "release": "research_tlp@0.3.18",
-        "release_digest": "sha256:ad8c1d22fb71bb4d1a15809765f2dc8194a4f10fb9571de8afda2d50eb477e39",
-        "package_digest": "sha256:b781b84bbde2c1463add855db7dd7428695ac3c2085b3b809ebb84b9d9db933c"
+      "install": {
+        "kind": "scenario",
+        "name": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+        "id": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e"
       },
-      "channels": {
-        "stable": {
-          "release": "research_tlp@0.3.18",
-          "release_digest": "sha256:ad8c1d22fb71bb4d1a15809765f2dc8194a4f10fb9571de8afda2d50eb477e39",
-          "source_revision": "sha256:13b00c9a6153d7c33e4b2b579c34feb24562f0c461047c94b4c15bc5d5ce6a39",
-          "package_digest": "sha256:b781b84bbde2c1463add855db7dd7428695ac3c2085b3b809ebb84b9d9db933c",
-          "version": "0.3.10"
-        }
+      "title": "Trial Workspace Lifecycle E2E 20260905 with a simple status field",
+      "title_i18n": {
+        "key": "scenario.trial_workspace_lifecycle_e2e_20260905_w_5decc38e.title",
+        "fallback": "Trial Workspace Lifecycle E2E 20260905 with a simple status field"
+      },
+      "description": "Builder-created rapid prototype scenario.",
+      "io": {
+        "input": [
+          "voice",
+          "text"
+        ],
+        "output": [
+          "voice",
+          "text",
+          "web"
+        ]
       }
     },
     {
@@ -2547,13 +1966,7 @@
       "manifest": "scenarios/users_access/scenario.yaml",
       "source": {
         "path": "scenarios/users_access",
-        "manifest": "scenarios/users_access/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:84f3dbe8333de9c8a8109cfc5f4210bfb63b4dde1252aca319f0c803f3e17a04",
-        "path_scope": [
-          "projects/users_access/"
-        ]
+        "manifest": "scenarios/users_access/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -2566,22 +1979,36 @@
         "fallback": "Users & Access"
       },
       "description": "Manage people, invitations, roles, devices, sessions, and application access from one protected system application.",
-      "trigger": "manual",
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "users_access",
-        "release": "users_access@0.1.21",
-        "release_digest": "sha256:56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256",
-        "package_digest": "sha256:52687d368e4ec16da141e66d1daa98b65921c3700480d3f4557c413706336ef4"
+      "trigger": "manual"
+    },
+    {
+      "kind": "scenario",
+      "id": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+      "name": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+      "version": "0.1.5",
+      "updated_at": "2026-09-16T11:13:18+00:00",
+      "path": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621",
+      "manifest": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621/scenario.yaml",
+      "source": {
+        "path": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "manifest": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621/scenario.yaml"
       },
-      "channels": {
-        "stable": {
-          "release": "users_access@0.1.21",
-          "release_digest": "sha256:56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256",
-          "source_revision": "sha256:84f3dbe8333de9c8a8109cfc5f4210bfb63b4dde1252aca319f0c803f3e17a04",
-          "package_digest": "sha256:52687d368e4ec16da141e66d1daa98b65921c3700480d3f4557c413706336ef4",
-          "version": "0.1.21"
-        }
+      "install": {
+        "kind": "scenario",
+        "name": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "id": "volunteer_roster_test_-20260916-e2e80de3bec9621"
+      },
+      "title": "Volunteer Roster [TEST]-20260916-e2e80de3bec9621",
+      "title_i18n": {
+        "key": "scenario.volunteer_roster_test_-20260916-e2e80de3bec9621.title",
+        "fallback": "Volunteer Roster [TEST]-20260916-e2e80de3bec9621"
+      },
+      "description": "Persistent volunteer roster for a community event.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "volunteer_roster_test_-20260916-e2e80de3bec9621_skill"
+        ]
       }
     },
     {
@@ -2594,13 +2021,7 @@
       "manifest": "scenarios/web_desktop/scenario.yaml",
       "source": {
         "path": "scenarios/web_desktop",
-        "manifest": "scenarios/web_desktop/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:abb566ff568f41acee3a91c6a8e3611f5de2279af1fd8b162323fe8a6e15d0db",
-        "path_scope": [
-          "projects/web_desktop/"
-        ]
+        "manifest": "scenarios/web_desktop/scenario.yaml"
       },
       "install": {
         "kind": "scenario",
@@ -2621,22 +2042,65 @@
           "pair_new_device_skill",
           "voice_chat_skill"
         ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "workbench_test_20260914_b",
+      "name": "workbench_test_20260914_b",
+      "version": "0.1.8",
+      "updated_at": "2026-09-15T21:19:25+00:00",
+      "path": "scenarios/workbench_test_20260914_b",
+      "manifest": "scenarios/workbench_test_20260914_b/scenario.yaml",
+      "source": {
+        "path": "scenarios/workbench_test_20260914_b",
+        "manifest": "scenarios/workbench_test_20260914_b/scenario.yaml"
       },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "web_desktop",
-        "release": "web_desktop@0.3.57",
-        "release_digest": "sha256:331fe338fba113b2d2b8da4fef13235b6fb62e565cb21b242bfc86510d23c067",
-        "package_digest": "sha256:b92b41967320ab57a4d1fd366e0c7f77516b5a6efb4da3f90189ab0426de4946"
+      "install": {
+        "kind": "scenario",
+        "name": "workbench_test_20260914_b",
+        "id": "workbench_test_20260914_b"
       },
-      "channels": {
-        "stable": {
-          "release": "web_desktop@0.3.57",
-          "release_digest": "sha256:331fe338fba113b2d2b8da4fef13235b6fb62e565cb21b242bfc86510d23c067",
-          "source_revision": "sha256:abb566ff568f41acee3a91c6a8e3611f5de2279af1fd8b162323fe8a6e15d0db",
-          "package_digest": "sha256:b92b41967320ab57a4d1fd366e0c7f77516b5a6efb4da3f90189ab0426de4946",
-          "version": "0.3.49"
-        }
+      "title": "Список чтения",
+      "title_i18n": {
+        "key": "scenario.workbench_test_20260914_b.title",
+        "fallback": "Список чтения"
+      },
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "workbench_test_20260914_b_skill"
+        ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "workflow_lab_dashboard",
+      "name": "workflow_lab_dashboard",
+      "version": "0.1.2",
+      "updated_at": "2026-08-05T20:24:26+00:00",
+      "path": "scenarios/workflow_lab_dashboard",
+      "manifest": "scenarios/workflow_lab_dashboard/scenario.yaml",
+      "source": {
+        "path": "scenarios/workflow_lab_dashboard",
+        "manifest": "scenarios/workflow_lab_dashboard/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "workflow_lab_dashboard",
+        "id": "workflow_lab_dashboard"
+      },
+      "title": "Workflow Lab Dashboard • Панель заявок",
+      "title_i18n": {
+        "key": "scenario.workflow_lab_dashboard.title",
+        "fallback": "Workflow Lab Dashboard"
+      },
+      "description": "Compact bilingual request-state dashboard backed only by deterministic local fixtures.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "workflow_lab_dashboard_skill"
+        ]
       }
     }
   ],
@@ -2645,8 +2109,8 @@
       "kind": "project",
       "id": "adaos_builder",
       "name": "adaos_builder",
-      "version": "0.3.15",
-      "updated_at": "2026-09-26T12:29:55+00:00",
+      "version": "0.3.17",
+      "updated_at": "2026-09-27T06:32:28+00:00",
       "path": "projects/adaos_builder",
       "manifest": "projects/adaos_builder/project.yaml",
       "source": {
@@ -2673,7 +2137,6 @@
       ],
       "tags": [
         "builder",
-        "prompt-ide",
         "project",
         "devspace"
       ],
@@ -2716,20 +2179,6 @@
           ]
         },
         {
-          "id": "prompt-ide",
-          "title": "Prompt IDE",
-          "title_i18n": {
-            "en": "Prompt IDE",
-            "ru": "Prompt IDE"
-          },
-          "default": false,
-          "optional": true,
-          "components": [
-            "scenario:prompt_engineer_scenario",
-            "skill:prompt_engineer_skill"
-          ]
-        },
-        {
           "id": "skill-preview",
           "title": "Skill preview",
           "title_i18n": {
@@ -2745,14 +2194,12 @@
       ],
       "components": [
         "scenario:builder",
-        "scenario:prompt_engineer_scenario",
         "scenario:skill_preview",
         "skill:builder_skill",
         "skill:builder_sdk_control_skill",
-        "skill:builder_automation_skill",
-        "skill:prompt_engineer_skill"
+        "skill:builder_automation_skill"
       ],
-      "components_count": 7,
+      "components_count": 5,
       "profiles": [
         "adaos.builder.v1",
         "adaos.development.workbench.v1"
@@ -2760,626 +2207,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.15",
-        "release_digest": "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
+        "release": "adaos_builder@0.3.17",
+        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
         "primary_component": "scenario:builder",
-        "package_digest": "sha256:33382b1a1fd14af815a6d0f48ef29333d4c5841735d18217cc5960bfc37b75d0"
+        "package_digest": "sha256:6d2d22313420b46cedd01abfab076abec1d96d1d298186d8ea5c0285dd6760ca"
       },
       "channels": {
         "stable": {
-          "release": "adaos_builder@0.3.15",
-          "release_digest": "sha256:88cf68a2859338d97fd38e0784062bbecbe736efde096cb6d82cca4cc75a77aa",
-          "source_revision": "sha256:f614122e491e6812c205ecd1555e111e66dcab15380d09b100e6117a3b8530bf",
-          "package_digest": "sha256:33382b1a1fd14af815a6d0f48ef29333d4c5841735d18217cc5960bfc37b75d0",
-          "version": "0.3.15"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "adaos_drive",
-      "name": "adaos_drive",
-      "version": "0.1.21",
-      "updated_at": "2026-09-26T19:57:01+00:00",
-      "path": "projects/adaos_drive",
-      "manifest": "projects/adaos_drive/project.yaml",
-      "source": {
-        "path": "projects/adaos_drive",
-        "manifest": "projects/adaos_drive/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "adaos_drive",
-        "id": "adaos_drive"
-      },
-      "title": "AdaOS Drive",
-      "title_i18n": {
-        "en": "AdaOS Drive",
-        "ru": "Диск AdaOS"
-      },
-      "description": "Two-panel browser file manager for explicitly connected local folders.",
-      "description_i18n": {
-        "en": "Two-panel browser file manager for explicitly connected local folders.",
-        "ru": "Двухпанельный файловый менеджер браузера для явно подключённых локальных папок."
-      },
-      "categories": [
-        "files",
-        "productivity"
-      ],
-      "tags": [
-        "drive",
-        "file-manager",
-        "local-folders"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "drive",
-          "title": "Drive",
-          "title_i18n": {
-            "en": "Drive",
-            "ru": "Диск"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:adaos_drive",
-            "skill:adaos_drive"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:adaos_drive",
-        "skill:adaos_drive"
-      ],
-      "components_count": 2,
-      "profiles": [
-        "adaos.drive.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "adaos_drive",
-        "release": "adaos_drive@0.1.21",
-        "release_digest": "sha256:613e6ec9ef6d78330b953dd9517efa65e0c4711e32b3c77c911bf58b22e085ec",
-        "primary_component": "scenario:adaos_drive",
-        "package_digest": "sha256:26772515101a345a87067d608ca62329d5af629dbc41337298b586ef04d5b79d"
-      },
-      "channels": {
-        "stable": {
-          "release": "adaos_drive@0.1.21",
-          "release_digest": "sha256:613e6ec9ef6d78330b953dd9517efa65e0c4711e32b3c77c911bf58b22e085ec",
-          "source_revision": "sha256:db6f9ac19dcfc66d9afec1bd5710ed9df85229f7d629d837e8cbe10525328e45",
-          "package_digest": "sha256:26772515101a345a87067d608ca62329d5af629dbc41337298b586ef04d5b79d",
-          "version": "0.1.21"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "ai_event_analysis_lab",
-      "name": "ai_event_analysis_lab",
-      "version": "0.2.22",
-      "updated_at": "2026-08-27T21:05:39+00:00",
-      "path": "projects/ai_event_analysis_lab",
-      "manifest": "projects/ai_event_analysis_lab/project.yaml",
-      "source": {
-        "path": "projects/ai_event_analysis_lab",
-        "manifest": "projects/ai_event_analysis_lab/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "ai_event_analysis_lab",
-        "id": "ai_event_analysis_lab"
-      },
-      "title": "AI Event Analysis Lab",
-      "title_i18n": {
-        "en": "AI Event Analysis Lab",
-        "ru": "Лаборатория анализа AI-событий"
-      },
-      "description": "Measurable AI/ML analysis of AdaOS operational event windows.",
-      "description_i18n": {
-        "en": "Measurable AI/ML analysis of AdaOS operational event windows.",
-        "ru": "Измеримый AI/ML-анализ окон операционных событий AdaOS."
-      },
-      "categories": [
-        "operations",
-        "research"
-      ],
-      "tags": [
-        "event-analysis",
-        "lab",
-        "alpha"
-      ],
-      "publication": {
-        "stage": "alpha",
-        "visibility": "unlisted",
-        "channel": "stable"
-      },
-      "stage": "alpha",
-      "visibility": "unlisted",
-      "channel": "stable",
-      "install_default": false,
-      "components": [
-        "skill:ai_event_analysis_skill"
-      ],
-      "components_count": 1,
-      "profiles": [
-        "adaos.analysis.events.v1"
-      ]
-    },
-    {
-      "kind": "project",
-      "id": "applications",
-      "name": "applications",
-      "version": "0.1.40",
-      "updated_at": "2026-09-27T06:02:29+00:00",
-      "path": "projects/applications",
-      "manifest": "projects/applications/project.yaml",
-      "source": {
-        "path": "projects/applications",
-        "manifest": "projects/applications/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "applications",
-        "id": "applications"
-      },
-      "title": "Applications",
-      "description": "Manage installed applications, Marketplace discovery, releases, updates, permissions, runtime placement, and development status.",
-      "categories": [
-        "system"
-      ],
-      "tags": [
-        "applications",
-        "marketplace",
-        "permissions"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [],
-      "components": [
-        "scenario:applications"
-      ],
-      "components_count": 1,
-      "profiles": [
-        "adaos.system.applications.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "applications",
-        "release": "applications@0.1.40",
-        "release_digest": "sha256:9af21f1fc23bae6aa4dea6380002cf7652e8c5550eb2b5d026de78eac971a447",
-        "primary_component": "scenario:applications",
-        "package_digest": "sha256:e325523389f017f186d9bdea490f423718cb622b1b9da6e95438d5f64b71895c"
-      },
-      "channels": {
-        "stable": {
-          "release": "applications@0.1.40",
-          "release_digest": "sha256:9af21f1fc23bae6aa4dea6380002cf7652e8c5550eb2b5d026de78eac971a447",
-          "source_revision": "sha256:7684abd6c15d0f83f39491d456784cdf2b5726c4d30c9430e0a24f8d7b37d942",
-          "package_digest": "sha256:e325523389f017f186d9bdea490f423718cb622b1b9da6e95438d5f64b71895c",
-          "version": "0.1.40"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "builder",
-      "name": "builder",
-      "version": "0.2.167",
-      "updated_at": "2026-09-17T19:45:09+00:00",
-      "path": "projects/builder",
-      "manifest": "projects/builder/project.yaml",
-      "source": {
-        "path": "projects/builder",
-        "manifest": "projects/builder/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "builder",
-        "id": "builder"
-      },
-      "title": "Builder",
-      "description": "AdaOS project development workbench.",
-      "publication": {
-        "stage": "alpha",
-        "visibility": "unlisted",
-        "channel": "stable"
-      },
-      "stage": "alpha",
-      "visibility": "unlisted",
-      "channel": "stable",
-      "install_default": false,
-      "features": [],
-      "components": [
-        "scenario:builder",
-        "skill:builder_skill",
-        "skill:builder_sdk_control_skill"
-      ],
-      "components_count": 3,
-      "profiles": [],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "builder",
-        "release": "builder@0.2.167",
-        "release_digest": "sha256:a23a7c08251e4762c54cc549ebcc23565d472099c85d628d809c4c44d5ee554c",
-        "primary_component": "scenario:builder",
-        "package_digest": "sha256:1e20af5847454ef69d854594a79e490d8d9e51bf705fb5de72aea6f85e8d0af3"
-      },
-      "channels": {
-        "stable": {
-          "release": "builder@0.2.167",
-          "release_digest": "sha256:a23a7c08251e4762c54cc549ebcc23565d472099c85d628d809c4c44d5ee554c",
-          "source_revision": "sha256:eb09f619eb066b09b4ed4efcb0c2d2a1118d64edc7d0a4fb04cfc6ee2177d19b",
-          "package_digest": "sha256:1e20af5847454ef69d854594a79e490d8d9e51bf705fb5de72aea6f85e8d0af3",
-          "version": "0.2.167"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "builder_pipeline_smoke_1784408500",
-      "name": "builder_pipeline_smoke_1784408500",
-      "version": "0.0.3",
-      "updated_at": "2026-08-27T21:05:39+00:00",
-      "path": "projects/builder_pipeline_smoke_1784408500",
-      "manifest": "projects/builder_pipeline_smoke_1784408500/project.yaml",
-      "source": {
-        "path": "projects/builder_pipeline_smoke_1784408500",
-        "manifest": "projects/builder_pipeline_smoke_1784408500/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "builder_pipeline_smoke_1784408500",
-        "id": "builder_pipeline_smoke_1784408500"
-      },
-      "title": "Builder Pipeline Smoke",
-      "title_i18n": {
-        "en": "Builder Pipeline Smoke",
-        "ru": "Smoke-тест Builder Pipeline"
-      },
-      "description": "Internal SDK-only fixture for Builder pipeline proof.",
-      "description_i18n": {
-        "en": "Internal SDK-only fixture for Builder pipeline proof.",
-        "ru": "Внутренний SDK-only стенд для проверки pipeline Builder."
-      },
-      "categories": [
-        "development"
-      ],
-      "tags": [
-        "internal",
-        "smoke",
-        "fixture"
-      ],
-      "publication": {
-        "stage": "internal",
-        "visibility": "hidden",
-        "channel": "stable"
-      },
-      "stage": "internal",
-      "visibility": "hidden",
-      "channel": "stable",
-      "install_default": false,
-      "components": [
-        "scenario:builder_pipeline_smoke_1784408500",
-        "skill:builder_pipeline_smoke_1784408500_skill"
-      ],
-      "components_count": 2,
-      "profiles": [
-        "adaos.builder.fixture.v1"
-      ]
-    },
-    {
-      "kind": "project",
-      "id": "cv_descriptor_lab",
-      "name": "cv_descriptor_lab",
-      "version": "0.1.21",
-      "updated_at": "2026-09-26T21:23:05+00:00",
-      "path": "projects/cv_descriptor_lab",
-      "manifest": "projects/cv_descriptor_lab/project.yaml",
-      "source": {
-        "path": "projects/cv_descriptor_lab",
-        "manifest": "projects/cv_descriptor_lab/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "cv_descriptor_lab",
-        "id": "cv_descriptor_lab"
-      },
-      "title": "CV Descriptor Lab",
-      "title_i18n": {
-        "en": "CV Descriptor Lab",
-        "ru": "Лаборатория CV-дескрипторов"
-      },
-      "description": "Browser-side visual object descriptor pilot for embeddings, signatures, thumbnails, and descriptions.",
-      "description_i18n": {
-        "en": "Browser-side visual object descriptor pilot for embeddings, signatures, thumbnails, and descriptions.",
-        "ru": "Пилот браузерных CV-дескрипторов для эмбеддингов, сигнатур, миниатюр и описаний."
-      },
-      "categories": [
-        "vision",
-        "demo"
-      ],
-      "tags": [
-        "cv",
-        "descriptors",
-        "lab",
-        "alpha"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "descriptors",
-          "title": "Visual descriptors",
-          "default": true,
-          "optional": false,
-          "components": [
-            "skill:cv_descriptor"
-          ]
-        }
-      ],
-      "components": [
-        "skill:cv_descriptor"
-      ],
-      "components_count": 1,
-      "profiles": [
-        "adaos.cv.descriptor_lab.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "cv_descriptor_lab",
-        "release": "cv_descriptor_lab@0.1.21",
-        "release_digest": "sha256:5cf8ed9bc5dbaec6ecae830c54921a71397b5df65b9ae0113370fc0959250a93",
-        "primary_component": "skill:cv_descriptor",
-        "package_digest": "sha256:c4fb30b9c205fc9ff5daf053ca5a8027fe0f473f0d288b5cd0a99c964481b687"
-      },
-      "channels": {
-        "stable": {
-          "release": "cv_descriptor_lab@0.1.21",
-          "release_digest": "sha256:5cf8ed9bc5dbaec6ecae830c54921a71397b5df65b9ae0113370fc0959250a93",
-          "source_revision": "sha256:c14b0a18321aaae1828a81b9aa0a03e968c3ca45c9d7e465eae55615e75c39ab",
-          "package_digest": "sha256:c4fb30b9c205fc9ff5daf053ca5a8027fe0f473f0d288b5cd0a99c964481b687",
-          "version": "0.1.21"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "default_app_bundle",
-      "name": "default_app_bundle",
-      "version": "0.1.1",
-      "updated_at": "2026-08-27T21:05:39+00:00",
-      "path": "projects/default_app_bundle",
-      "manifest": "projects/default_app_bundle/project.yaml",
-      "source": {
-        "path": "projects/default_app_bundle",
-        "manifest": "projects/default_app_bundle/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "default_app_bundle",
-        "id": "default_app_bundle"
-      },
-      "title": "Default Apps Bundle",
-      "title_i18n": {
-        "en": "Default Apps Bundle",
-        "ru": "Набор приложений по умолчанию"
-      },
-      "description": "Small default AdaOS apps and the current stable NLU service baseline.",
-      "description_i18n": {
-        "en": "Small default AdaOS apps and the current stable NLU service baseline.",
-        "ru": "Небольшие стандартные приложения AdaOS и текущая стабильная базовая служба NLU."
-      },
-      "categories": [
-        "system",
-        "productivity"
-      ],
-      "tags": [
-        "default-install",
-        "notebook",
-        "weather",
-        "conversation",
-        "nlu"
-      ],
-      "publication": {
-        "stage": "alpha",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "alpha",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": true,
-      "features": [
-        {
-          "id": "personal-tools",
-          "title": "Personal tools",
-          "title_i18n": {
-            "en": "Personal tools",
-            "ru": "Персональные инструменты"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "skill:notebook_skill",
-            "skill:weather_skill"
-          ]
-        },
-        {
-          "id": "conversation-companions",
-          "title": "Conversation companions",
-          "title_i18n": {
-            "en": "Conversation companions",
-            "ru": "Собеседники"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "skill:conversation_companions"
-          ]
-        },
-        {
-          "id": "rasa-nlu",
-          "title": "Rasa NLU service",
-          "title_i18n": {
-            "en": "Rasa NLU service",
-            "ru": "Служба Rasa NLU"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "skill:rasa_nlu_service_skill"
-          ]
-        }
-      ],
-      "components": [
-        "skill:notebook_skill",
-        "skill:weather_skill",
-        "skill:conversation_companions",
-        "skill:rasa_nlu_service_skill"
-      ],
-      "components_count": 4,
-      "profiles": [
-        "adaos.default_apps.v1"
-      ]
-    },
-    {
-      "kind": "project",
-      "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-      "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-      "version": "0.1.17",
-      "updated_at": "2026-09-26T11:14:22+00:00",
-      "path": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146",
-      "manifest": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/project.yaml",
-      "source": {
-        "path": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "manifest": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "id": "flowboard_lab_for_safely_prototyping_a_r_17528146"
-      },
-      "title": "Flowboard Lab for safely prototyping a reusable kanban workbench",
-      "description": "Create a new scenario project named Flowboard Lab for safely prototyping a reusable kanban workbench.",
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "board",
-          "title": "Workboard",
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:flowboard_lab_for_safely_prototyping_a_r_17528146",
-            "skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "skill:flowboard_lab_for_safely_prototyping_a_r_17528146_skill"
-      ],
-      "components_count": 2,
-      "profiles": [],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.17",
-        "release_digest": "sha256:9794e4f50c83b45d7772b4c7d5832c39b4fe89c6b0872d6b281acb03756080f4",
-        "primary_component": "scenario:flowboard_lab_for_safely_prototyping_a_r_17528146",
-        "package_digest": "sha256:5dcb1be2da6de0f87cc8bd5f9feee5bd16b2910e3ca2eba54357d409efddab84"
-      },
-      "channels": {
-        "stable": {
-          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.17",
-          "release_digest": "sha256:9794e4f50c83b45d7772b4c7d5832c39b4fe89c6b0872d6b281acb03756080f4",
-          "source_revision": "sha256:eda72b2f2e81596ac3e12f65edaac28c30e37b523bfa11ee1fe2d1cd9543f65d",
-          "package_digest": "sha256:5dcb1be2da6de0f87cc8bd5f9feee5bd16b2910e3ca2eba54357d409efddab84",
-          "version": "0.1.17"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "gmail_cbs_cleanroom",
-      "name": "gmail_cbs_cleanroom",
-      "version": "0.1.10",
-      "updated_at": "2026-09-25T13:09:48+00:00",
-      "path": "projects/gmail_cbs_cleanroom",
-      "manifest": "projects/gmail_cbs_cleanroom/project.yaml",
-      "source": {
-        "path": "projects/gmail_cbs_cleanroom",
-        "manifest": "projects/gmail_cbs_cleanroom/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "gmail_cbs_cleanroom",
-        "id": "gmail_cbs_cleanroom"
-      },
-      "title": "Gmail CBS Cleanroom",
-      "description": "Create a new private AdaOS Application named \"Gmail CBS Cleanroom\" from\nscratch, with technical id gmail_cbs_cleanroom. It must be CBS-compatible. Its\nsemantic Application requires capability:mail.messages.manage version ^1.0.0\nwithout naming Gmail, a package, a skill, endpoints, account ids, or\ncredentials. For this first beta, realize that requirement with an\nApplication-local Gmail binding.\n\nThe user experience must include connection and setup status, inbox and label\nnavigation, search and unread/starred filters, message list and reading,\nlabels, archive, trash, read/unread, star/unstar, compose, and send. Include\nresponsive wide and compact layouts and deterministic loading, empty, offline,\nprovider-error, permission-denied, and authorization-required states. Explain\nleast-privilege access. OAuth secrets and tokens must never enter UI state,\nmanifests, fixtures, logs, errors, or telemetry. Keep shared provider reuse and\na global capability registry outside this first stage.\n\nBuild the executable Prototype now. Keep real external operations as explicit\npending Automation requirements; do not simulate successful authorization or\nuse live Gmail data in the Prototype.",
-      "publication": {
-        "stage": "alpha",
-        "visibility": "unlisted",
-        "channel": "stable"
-      },
-      "stage": "alpha",
-      "visibility": "unlisted",
-      "channel": "stable",
-      "install_default": false,
-      "features": [],
-      "components": [
-        "scenario:gmail_cbs_cleanroom",
-        "skill:gmail_cbs_cleanroom_skill"
-      ],
-      "components_count": 2,
-      "profiles": [],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "gmail_cbs_cleanroom",
-        "release": "gmail_cbs_cleanroom@0.1.10",
-        "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
-        "primary_component": "scenario:gmail_cbs_cleanroom",
-        "package_digest": "sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86"
-      },
-      "channels": {
-        "stable": {
-          "release": "gmail_cbs_cleanroom@0.1.10",
-          "release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
-          "source_revision": "sha256:417b4c8371db444d1f5e0b08fc80c80a5f7743c71cffa6712b7b69f640d643e6",
-          "package_digest": "sha256:3dc1046968bb976843bd5808f863ae9e44c8d62216897ff8d175791dd3d3bd86",
-          "version": "0.1.10"
+          "release": "adaos_builder@0.3.17",
+          "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
+          "source_revision": "sha256:b59e7be51483eab7d46db7112ed2bc05891a7841fbfa3936bb0dd9efa197dec3",
+          "package_digest": "sha256:6d2d22313420b46cedd01abfab076abec1d96d1d298186d8ea5c0285dd6760ca",
+          "version": "0.3.17"
         }
       }
     },
@@ -3388,7 +2227,7 @@
       "id": "gmail_mail_client",
       "name": "gmail_mail_client",
       "version": "0.1.4",
-      "updated_at": "2026-09-24T02:29:50+00:00",
+      "updated_at": "2026-09-27T06:32:27+00:00",
       "path": "projects/gmail_mail_client",
       "manifest": "projects/gmail_mail_client/project.yaml",
       "source": {
@@ -3417,224 +2256,14 @@
         "skill:gmail_mail_client_provider_skill"
       ],
       "components_count": 2,
-      "profiles": [],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "gmail_mail_client",
-        "release": "gmail_mail_client@0.1.4",
-        "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
-        "primary_component": "scenario:gmail_mail_client",
-        "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa"
-      },
-      "channels": {
-        "stable": {
-          "release": "gmail_mail_client@0.1.4",
-          "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
-          "source_revision": "sha256:05a29791dea8402855aaf1d52075dbe21579e49f2a59fc7d951d01dc5377bda6",
-          "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa",
-          "version": "0.1.4"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "home_recipes_03",
-      "name": "home_recipes_03",
-      "version": "0.2.6",
-      "updated_at": "2026-08-27T21:05:39+00:00",
-      "path": "projects/home_recipes_03",
-      "manifest": "projects/home_recipes_03/project.yaml",
-      "source": {
-        "path": "projects/home_recipes_03",
-        "manifest": "projects/home_recipes_03/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "home_recipes_03",
-        "id": "home_recipes_03"
-      },
-      "title": "Home Recipes 03",
-      "title_i18n": {
-        "en": "Home Recipes 03",
-        "ru": "Домашние рецепты 03"
-      },
-      "description": "Published alpha recipe catalog instance used for current home-category development.",
-      "description_i18n": {
-        "en": "Published alpha recipe catalog instance used for current home-category development.",
-        "ru": "Опубликованный alpha-экземпляр каталога рецептов для текущей разработки категории home."
-      },
-      "categories": [
-        "home"
-      ],
-      "tags": [
-        "recipes",
-        "alpha",
-        "instance",
-        "test03"
-      ],
-      "publication": {
-        "stage": "alpha",
-        "visibility": "listed",
-        "channel": "alpha"
-      },
-      "stage": "alpha",
-      "visibility": "listed",
-      "channel": "alpha",
-      "install_default": false,
-      "components": [
-        "skill:test03_recipes_skill"
-      ],
-      "components_count": 1,
-      "profiles": [
-        "adaos.home.recipes.v1"
-      ]
-    },
-    {
-      "kind": "project",
-      "id": "home_recipes_05",
-      "name": "home_recipes_05",
-      "version": "0.1.5",
-      "updated_at": "2026-08-27T21:05:39+00:00",
-      "path": "projects/home_recipes_05",
-      "manifest": "projects/home_recipes_05/project.yaml",
-      "source": {
-        "path": "projects/home_recipes_05",
-        "manifest": "projects/home_recipes_05/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "home_recipes_05",
-        "id": "home_recipes_05"
-      },
-      "title": "Home Recipes 05",
-      "title_i18n": {
-        "en": "Home Recipes 05",
-        "ru": "Домашние рецепты 05"
-      },
-      "description": "Published alpha home recipe catalog with search, creation, and favorites.",
-      "description_i18n": {
-        "en": "Published alpha home recipe catalog with search, creation, and favorites.",
-        "ru": "Опубликованный alpha-каталог домашних рецептов с поиском, созданием и избранным."
-      },
-      "categories": [
-        "home"
-      ],
-      "tags": [
-        "recipes",
-        "alpha",
-        "instance",
-        "test05"
-      ],
-      "publication": {
-        "stage": "alpha",
-        "visibility": "listed",
-        "channel": "alpha"
-      },
-      "stage": "alpha",
-      "visibility": "listed",
-      "channel": "alpha",
-      "install_default": false,
-      "features": [
-        {
-          "id": "recipes",
-          "title": "Recipes",
-          "title_i18n": {
-            "en": "Recipes",
-            "ru": "Рецепты"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:test05_recipes",
-            "skill:test05_recipes_skill"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:test05_recipes",
-        "skill:test05_recipes_skill"
-      ],
-      "components_count": 2,
-      "profiles": [
-        "adaos.home.recipes.v1"
-      ]
-    },
-    {
-      "kind": "project",
-      "id": "home_shopping_list_14504c40",
-      "name": "home_shopping_list_14504c40",
-      "version": "0.0.3",
-      "updated_at": "2026-08-27T21:05:39+00:00",
-      "path": "projects/home_shopping_list_14504c40",
-      "manifest": "projects/home_shopping_list_14504c40/project.yaml",
-      "source": {
-        "path": "projects/home_shopping_list_14504c40",
-        "manifest": "projects/home_shopping_list_14504c40/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "home_shopping_list_14504c40",
-        "id": "home_shopping_list_14504c40"
-      },
-      "title": "Home Shopping List 14504c40",
-      "title_i18n": {
-        "en": "Home Shopping List 14504c40",
-        "ru": "Домашний список покупок 14504c40"
-      },
-      "description": "Published alpha recipe book and shopping-list instance.",
-      "description_i18n": {
-        "en": "Published alpha recipe book and shopping-list instance.",
-        "ru": "Опубликованный alpha-экземпляр книги рецептов и списка покупок."
-      },
-      "categories": [
-        "home"
-      ],
-      "tags": [
-        "recipes",
-        "shopping-list",
-        "alpha",
-        "instance"
-      ],
-      "publication": {
-        "stage": "alpha",
-        "visibility": "listed",
-        "channel": "alpha"
-      },
-      "stage": "alpha",
-      "visibility": "listed",
-      "channel": "alpha",
-      "install_default": false,
-      "features": [
-        {
-          "id": "shopping-list",
-          "title": "Shopping list",
-          "title_i18n": {
-            "en": "Shopping list",
-            "ru": "Список покупок"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:shopping_list_14504c40",
-            "skill:shopping_list_14504c40_skill"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:shopping_list_14504c40",
-        "skill:shopping_list_14504c40_skill"
-      ],
-      "components_count": 2,
-      "profiles": [
-        "adaos.home.shopping_list.v1"
-      ]
+      "profiles": []
     },
     {
       "kind": "project",
       "id": "inbox_triage",
       "name": "inbox_triage",
       "version": "0.1.4",
-      "updated_at": "2026-09-24T18:22:37+00:00",
+      "updated_at": "2026-09-27T06:32:27+00:00",
       "path": "projects/inbox_triage",
       "manifest": "projects/inbox_triage/project.yaml",
       "source": {
@@ -3662,1597 +2291,7 @@
         "scenario:inbox_triage"
       ],
       "components_count": 1,
-      "profiles": [],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "inbox_triage",
-        "release": "inbox_triage@0.1.4",
-        "release_digest": "sha256:d6e3b4809c1e2ec531acdf40ae6f858a5f51340113d2bf54ca53d3a12fd92b8a",
-        "primary_component": "scenario:inbox_triage",
-        "package_digest": "sha256:2fa808efdae12b4bc2b3c36279ce947efad5e4a3e212837f6a68e4db216f3703"
-      },
-      "channels": {
-        "stable": {
-          "release": "inbox_triage@0.1.4",
-          "release_digest": "sha256:d6e3b4809c1e2ec531acdf40ae6f858a5f51340113d2bf54ca53d3a12fd92b8a",
-          "source_revision": "sha256:45d5bd886bd03a99d132b709cb9825f3af6d2c78624b3424f02a73c6a0521ccb",
-          "package_digest": "sha256:2fa808efdae12b4bc2b3c36279ce947efad5e4a3e212837f6a68e4db216f3703",
-          "version": "0.1.4"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "mail_focus_reader",
-      "name": "mail_focus_reader",
-      "version": "0.1.4",
-      "updated_at": "2026-09-25T17:58:26+00:00",
-      "path": "projects/mail_focus_reader",
-      "manifest": "projects/mail_focus_reader/project.yaml",
-      "source": {
-        "path": "projects/mail_focus_reader",
-        "manifest": "projects/mail_focus_reader/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "mail_focus_reader",
-        "id": "mail_focus_reader"
-      },
-      "title": "Mail Focus Reader",
-      "description": "Create a new private application named \"Mail Focus Reader\". The exact technical Application id is mail_focus_reader.\n\nBuild the shortest complete viable mail reading and triage application, not a Gmail clone. Desktop-first UI: a compact folders/labels list on the left and a message list on the right. Selecting a message replaces the list region with the message detail; an explicit Back action restores the list and preserves the selected folder. Only support read/unread, star/unstar, and archive. Do not add compose/send, OAuth settings, label administration, a local mailbox copy, or dashboard widgets.\n\nThe Application must consume the existing portable capability mail.messages.manage ^1.0.0. It must not implement Gmail API or OAuth, and its semantic Application must not name a package, provider, or skill. Reuse the installed CBS Binding/PackageDelivery and an explicitly attachable reusable Gmail credential owned by the capability/provider plane. Use bounded message summaries and progressive next-page pagination for first paint. Fetch full message content only after selection. Mutations require an explicit user gesture. Show connection status and a clear way to attach an existing Gmail connection.\n\nAcceptance: labels load independently; the first message page performs no N+1 metadata fetch; empty, loading, and error states are visible; detail/back preserves the folder; the result can advance through beta, Trial, and workspace; Applications shows only required permissions. Prefer existing AdaOS components and the minimum number of owned artifacts.",
-      "publication": {
-        "stage": "alpha",
-        "visibility": "unlisted",
-        "channel": "stable"
-      },
-      "stage": "alpha",
-      "visibility": "unlisted",
-      "channel": "stable",
-      "install_default": false,
-      "features": [],
-      "components": [
-        "scenario:mail_focus_reader",
-        "skill:mail_focus_reader_skill"
-      ],
-      "components_count": 2,
-      "profiles": [],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "mail_focus_reader",
-        "release": "mail_focus_reader@0.1.4",
-        "release_digest": "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
-        "primary_component": "scenario:mail_focus_reader",
-        "package_digest": "sha256:39dbbeee6e87d158a347b2bd075dbee193a686ac30c78fe9a339f25dd681c150"
-      },
-      "channels": {
-        "stable": {
-          "release": "mail_focus_reader@0.1.4",
-          "release_digest": "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
-          "source_revision": "sha256:9e7b9b17f4b1bebfa2514f9978ea931cf3a719ffb27fc8b38e111a56de3a6d5a",
-          "package_digest": "sha256:39dbbeee6e87d158a347b2bd075dbee193a686ac30c78fe9a339f25dd681c150",
-          "version": "0.1.4"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "media_center",
-      "name": "media_center",
-      "version": "0.6.114",
-      "updated_at": "2026-09-26T16:44:39+00:00",
-      "path": "projects/media_center",
-      "manifest": "projects/media_center/project.yaml",
-      "source": {
-        "path": "projects/media_center",
-        "manifest": "projects/media_center/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "media_center",
-        "id": "media_center"
-      },
-      "title": "Media Center",
-      "title_i18n": {
-        "en": "Media Center",
-        "ru": "Медиацентр"
-      },
-      "description": "Distributed in-place household media library, playback, and remote control.",
-      "description_i18n": {
-        "en": "Distributed in-place household media library, playback, and remote control.",
-        "ru": "Распределённая домашняя медиатека, воспроизведение и дистанционное управление на месте."
-      },
-      "categories": [
-        "media",
-        "home"
-      ],
-      "tags": [
-        "audio",
-        "video",
-        "tv",
-        "remote-control",
-        "distributed"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "library",
-          "title": "Media library",
-          "title_i18n": {
-            "en": "Media library",
-            "ru": "Медиатека"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:media_center",
-            "skill:media_center_skill",
-            "skill:media_library_agent"
-          ]
-        },
-        {
-          "id": "playback-control",
-          "title": "Playback control",
-          "title_i18n": {
-            "en": "Playback control",
-            "ru": "Управление воспроизведением"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "skill:media_control_skill"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:media_center",
-        "skill:media_center_skill",
-        "skill:media_library_agent",
-        "skill:media_control_skill"
-      ],
-      "components_count": 4,
-      "profiles": [
-        "adaos.media_center.v1",
-        "adaos.media_center.tv.v1",
-        "adaos.media_center.desktop.v1",
-        "adaos.media_center.mobile_control.v1",
-        "adaos.media_center.embedded.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "media_center",
-        "release": "media_center@0.6.114",
-        "release_digest": "sha256:4c47394b70f86cecf82c93c18029732b121f5a452358e6dd9d38d2430eaa9c7e",
-        "primary_component": "scenario:media_center",
-        "package_digest": "sha256:7de13c43e29bc6314eb6ae6e1a7273044b4a7596ab997ffceb5a04abf2e05e70"
-      },
-      "channels": {
-        "stable": {
-          "release": "media_center@0.6.114",
-          "release_digest": "sha256:4c47394b70f86cecf82c93c18029732b121f5a452358e6dd9d38d2430eaa9c7e",
-          "source_revision": "sha256:7d47078fc7c7083dd9f68c3c7b3cf989a5d6cbd817a46732e4359f934dd5a01a",
-          "package_digest": "sha256:7de13c43e29bc6314eb6ae6e1a7273044b4a7596ab997ffceb5a04abf2e05e70",
-          "version": "0.6.114"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "media_indexer_lab",
-      "name": "media_indexer_lab",
-      "version": "0.1.36",
-      "updated_at": "2026-08-27T21:05:39+00:00",
-      "path": "projects/media_indexer_lab",
-      "manifest": "projects/media_indexer_lab/project.yaml",
-      "source": {
-        "path": "projects/media_indexer_lab",
-        "manifest": "projects/media_indexer_lab/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "media_indexer_lab",
-        "id": "media_indexer_lab"
-      },
-      "title": "Media Indexer Lab",
-      "title_i18n": {
-        "en": "Media Indexer Lab",
-        "ru": "Лаборатория медиаиндексатора"
-      },
-      "description": "Legacy semantic media indexing pilot retained for diagnosis and possible Media Center reintegration.",
-      "description_i18n": {
-        "en": "Legacy semantic media indexing pilot retained for diagnosis and possible Media Center reintegration.",
-        "ru": "Устаревший пилот семантического индексирования медиа для диагностики и возможной реинтеграции в Media Center."
-      },
-      "categories": [
-        "media",
-        "demo"
-      ],
-      "tags": [
-        "indexer",
-        "lab",
-        "deprecated"
-      ],
-      "publication": {
-        "stage": "deprecated",
-        "visibility": "hidden",
-        "channel": "stable"
-      },
-      "stage": "deprecated",
-      "visibility": "hidden",
-      "channel": "stable",
-      "install_default": false,
-      "components": [
-        "skill:media_indexer_skill"
-      ],
-      "components_count": 1,
-      "profiles": [
-        "adaos.media.indexer_lab.v1"
-      ]
-    },
-    {
-      "kind": "project",
-      "id": "mediaserver",
-      "name": "mediaserver",
-      "version": "0.1.1",
-      "updated_at": "2026-09-02T19:29:44+00:00",
-      "path": "projects/mediaserver",
-      "manifest": "projects/mediaserver/project.yaml",
-      "source": {
-        "path": "projects/mediaserver",
-        "manifest": "projects/mediaserver/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "mediaserver",
-        "id": "mediaserver"
-      },
-      "title": "mediaserver",
-      "description": "Local MVP media debugging skill for upload/playback diagnostics and media-channel readiness checks.",
-      "categories": [
-        "development"
-      ],
-      "tags": [
-        "builder-managed",
-        "legacy-component"
-      ],
-      "publication": {
-        "stage": "alpha",
-        "visibility": "unlisted",
-        "channel": "stable"
-      },
-      "stage": "alpha",
-      "visibility": "unlisted",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "default",
-          "title": "mediaserver",
-          "default": true,
-          "optional": false,
-          "components": [
-            "skill:mediaserver"
-          ]
-        }
-      ],
-      "components": [
-        "skill:mediaserver"
-      ],
-      "components_count": 1,
-      "profiles": [
-        "adaos.builder.component_project.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "mediaserver",
-        "release": "mediaserver@0.1.1",
-        "release_digest": "sha256:2267588a94126815fa54a3176ac095bc60d94e0cda2fcbe45cb905f8c0a276c7",
-        "primary_component": "skill:mediaserver",
-        "package_digest": "sha256:9f2243897b755444c1a49d1b45ba019239bd170d662a675d6e19b8323a5ad7d3"
-      },
-      "channels": {
-        "stable": {
-          "release": "mediaserver@0.1.1",
-          "release_digest": "sha256:2267588a94126815fa54a3176ac095bc60d94e0cda2fcbe45cb905f8c0a276c7",
-          "source_revision": "d4fc02b417d1f2bf12a6065f13d55634125e5c5a",
-          "package_digest": "sha256:9f2243897b755444c1a49d1b45ba019239bd170d662a675d6e19b8323a5ad7d3",
-          "version": "0.1.1"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "new_face_vision",
-      "name": "new_face_vision",
-      "version": "0.2.17",
-      "updated_at": "2026-08-27T21:05:39+00:00",
-      "path": "projects/new_face_vision",
-      "manifest": "projects/new_face_vision/project.yaml",
-      "source": {
-        "path": "projects/new_face_vision",
-        "manifest": "projects/new_face_vision/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "new_face_vision",
-        "id": "new_face_vision"
-      },
-      "title": "New Face Vision",
-      "title_i18n": {
-        "en": "New Face Vision",
-        "ru": "Инспекция New Face Vision"
-      },
-      "description": "Desktop video frame analysis for stone defect inspection.",
-      "description_i18n": {
-        "en": "Desktop video frame analysis for stone defect inspection.",
-        "ru": "Анализ видеокадров на рабочем столе для инспекции дефектов камня."
-      },
-      "categories": [
-        "vision"
-      ],
-      "tags": [
-        "inspection",
-        "video",
-        "deeplabv3",
-        "alpha"
-      ],
-      "publication": {
-        "stage": "alpha",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "alpha",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "inspection",
-          "title": "Vision inspection",
-          "title_i18n": {
-            "en": "Vision inspection",
-            "ru": "Визуальная инспекция"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:new_face_vision_scenario",
-            "skill:new_face_vision_skill"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:new_face_vision_scenario",
-        "skill:new_face_vision_skill"
-      ],
-      "components_count": 2,
-      "profiles": [
-        "adaos.vision.inspection.v1"
-      ]
-    },
-    {
-      "kind": "project",
-      "id": "nlu_runtime",
-      "name": "nlu_runtime",
-      "version": "0.1.1",
-      "updated_at": "2026-08-27T21:05:39+00:00",
-      "path": "projects/nlu_runtime",
-      "manifest": "projects/nlu_runtime/project.yaml",
-      "source": {
-        "path": "projects/nlu_runtime",
-        "manifest": "projects/nlu_runtime/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "nlu_runtime",
-        "id": "nlu_runtime"
-      },
-      "title": "NLU Runtime Modules",
-      "title_i18n": {
-        "en": "NLU Runtime Modules",
-        "ru": "Модули NLU runtime"
-      },
-      "description": "Optional research-stage neural and lightweight local NLU runtimes.",
-      "description_i18n": {
-        "en": "Optional research-stage neural and lightweight local NLU runtimes.",
-        "ru": "Опциональные исследовательские нейронные и лёгкие локальные NLU runtime."
-      },
-      "categories": [
-        "system",
-        "nlu"
-      ],
-      "tags": [
-        "optional",
-        "research",
-        "neural",
-        "lite"
-      ],
-      "publication": {
-        "stage": "alpha",
-        "visibility": "unlisted",
-        "channel": "stable"
-      },
-      "stage": "alpha",
-      "visibility": "unlisted",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "neural-nlu",
-          "title": "Neural NLU service",
-          "title_i18n": {
-            "en": "Neural NLU service",
-            "ru": "Нейронная служба NLU"
-          },
-          "default": false,
-          "optional": true,
-          "components": [
-            "skill:neural_nlu_service_skill"
-          ]
-        },
-        {
-          "id": "lite-nlu",
-          "title": "Lite NLU service",
-          "title_i18n": {
-            "en": "Lite NLU service",
-            "ru": "Лёгкая служба NLU"
-          },
-          "default": false,
-          "optional": true,
-          "components": [
-            "skill:neuro_nlu_lite_skill"
-          ]
-        }
-      ],
-      "components": [
-        "skill:neural_nlu_service_skill",
-        "skill:neuro_nlu_lite_skill"
-      ],
-      "components_count": 2,
-      "profiles": [
-        "adaos.nlu.runtime.v1"
-      ]
-    },
-    {
-      "kind": "project",
-      "id": "notebook",
-      "name": "notebook",
-      "version": "0.1.2",
-      "updated_at": "2026-09-26T12:05:22+00:00",
-      "path": "projects/notebook",
-      "manifest": "projects/notebook/project.yaml",
-      "source": {
-        "path": "projects/notebook",
-        "manifest": "projects/notebook/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "notebook",
-        "id": "notebook"
-      },
-      "title": "Notebook",
-      "description": "Personal notes, attachments, and durable local note state.",
-      "categories": [
-        "productivity"
-      ],
-      "tags": [
-        "notes",
-        "cbs-provider"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "default",
-          "title": "Notebook",
-          "default": true,
-          "optional": false,
-          "components": [
-            "skill:notebook_skill"
-          ]
-        }
-      ],
-      "components": [
-        "skill:notebook_skill"
-      ],
-      "components_count": 1,
-      "profiles": [
-        "adaos.builder.component_project.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "notebook",
-        "release": "notebook@0.1.2",
-        "release_digest": "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275",
-        "primary_component": "skill:notebook_skill",
-        "package_digest": "sha256:883b968eb980314614b018560e744e6afe94ecfe1b11d71e197197e6d997757d"
-      },
-      "channels": {
-        "stable": {
-          "release": "notebook@0.1.2",
-          "release_digest": "sha256:5af5487a9fdddf83fb0566255d3b1e98e5daf60e72b05ae9a5339cccaf5a9275",
-          "source_revision": "sha256:f484a35b186e8c3957b2f8dfe92986eb8a0db54b4094e1330256ad21268fdfcc",
-          "package_digest": "sha256:883b968eb980314614b018560e744e6afe94ecfe1b11d71e197197e6d997757d",
-          "version": "0.1.2"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "ops_infrascope",
-      "name": "ops_infrascope",
-      "version": "0.10.19",
-      "updated_at": "2026-08-27T21:05:59+00:00",
-      "path": "projects/ops_infrascope",
-      "manifest": "projects/ops_infrascope/project.yaml",
-      "source": {
-        "path": "projects/ops_infrascope",
-        "manifest": "projects/ops_infrascope/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "ops_infrascope",
-        "id": "ops_infrascope"
-      },
-      "title": "Infrascope Operations",
-      "title_i18n": {
-        "en": "Infrascope Operations",
-        "ru": "Операции Infrascope"
-      },
-      "description": "Operator inventory, infrastructure state, access, subnet, and service diagnostics.",
-      "description_i18n": {
-        "en": "Operator inventory, infrastructure state, access, subnet, and service diagnostics.",
-        "ru": "Инвентаризация оператора, состояние инфраструктуры, доступ, подсеть и диагностика сервисов."
-      },
-      "categories": [
-        "operations",
-        "system"
-      ],
-      "tags": [
-        "infrascope",
-        "inventory",
-        "marketplace",
-        "infra",
-        "subnet"
-      ],
-      "publication": {
-        "stage": "alpha",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "alpha",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "inventory",
-          "title": "Inventory and marketplace",
-          "title_i18n": {
-            "en": "Inventory and marketplace",
-            "ru": "Inventory и Marketplace"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:infrascope",
-            "skill:infrascope_skill",
-            "skill:infrastate_skill"
-          ]
-        },
-        {
-          "id": "infra-access",
-          "title": "Managed infra access",
-          "title_i18n": {
-            "en": "Managed infra access",
-            "ru": "Управляемый infra access"
-          },
-          "default": false,
-          "optional": true,
-          "components": [
-            "skill:infra_access_skill",
-            "skill:subnet_env",
-            "skill:service_doctor_skill"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:infrascope",
-        "skill:infrascope_skill",
-        "skill:infrastate_skill",
-        "skill:infra_access_skill",
-        "skill:subnet_env",
-        "skill:service_doctor_skill"
-      ],
-      "components_count": 6,
-      "profiles": [
-        "adaos.operations.infrascope.v1"
-      ]
-    },
-    {
-      "kind": "project",
-      "id": "redevice_control",
-      "name": "redevice_control",
-      "version": "0.1.22",
-      "updated_at": "2026-09-26T12:12:06+00:00",
-      "path": "projects/redevice_control",
-      "manifest": "projects/redevice_control/project.yaml",
-      "source": {
-        "path": "projects/redevice_control",
-        "manifest": "projects/redevice_control/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "redevice_control",
-        "id": "redevice_control"
-      },
-      "title": "ReDevice Control",
-      "title_i18n": {
-        "en": "ReDevice Control",
-        "ru": "Управление ReDevice"
-      },
-      "description": "Endpoint inventory, settings, slideshow projection, and voice endpoint controls.",
-      "description_i18n": {
-        "en": "Endpoint inventory, settings, slideshow projection, and voice endpoint controls.",
-        "ru": "Инвентаризация endpoint, настройки, проекция слайдшоу и управление голосовыми endpoint."
-      },
-      "categories": [
-        "devices",
-        "home"
-      ],
-      "tags": [
-        "redevice",
-        "endpoints",
-        "slideshow",
-        "voice",
-        "alpha"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "endpoint-control",
-          "title": "Endpoint control",
-          "title_i18n": {
-            "en": "Endpoint control",
-            "ru": "Управление endpoint"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:redevice_user_face",
-            "skill:redevice_settings",
-            "skill:redevice_list"
-          ]
-        },
-        {
-          "id": "voice",
-          "title": "Voice endpoint",
-          "title_i18n": {
-            "en": "Voice endpoint",
-            "ru": "Голосовой endpoint"
-          },
-          "default": false,
-          "optional": true,
-          "components": [
-            "skill:redevice_voice"
-          ]
-        },
-        {
-          "id": "slideshow",
-          "title": "Slideshow endpoint",
-          "title_i18n": {
-            "en": "Slideshow endpoint",
-            "ru": "Endpoint слайдшоу"
-          },
-          "default": false,
-          "optional": true,
-          "components": [
-            "scenario:redevice_user_face"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:redevice_user_face",
-        "skill:redevice_settings",
-        "skill:redevice_list",
-        "skill:redevice_voice"
-      ],
-      "components_count": 4,
-      "profiles": [
-        "adaos.redevice.control.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "redevice_control",
-        "release": "redevice_control@0.1.22",
-        "release_digest": "sha256:c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8",
-        "primary_component": "scenario:redevice_user_face",
-        "package_digest": "sha256:70501aaf164d4f0f6f0c6b6e70b272b666f19d59e353bd2589254ed3818f6164"
-      },
-      "channels": {
-        "stable": {
-          "release": "redevice_control@0.1.22",
-          "release_digest": "sha256:c15939868394b4de6e4fc1de7b1db28379eb9470123b96692fcbc5f014428fb8",
-          "source_revision": "sha256:3c2ef63076f06ad632ab0698b4410bf89f0eac5445e7466997cbb605bc7b5fcd",
-          "package_digest": "sha256:70501aaf164d4f0f6f0c6b6e70b272b666f19d59e353bd2589254ed3818f6164",
-          "version": "0.1.22"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "release_validation_ops",
-      "name": "release_validation_ops",
-      "version": "0.1.7",
-      "updated_at": "2026-08-27T21:05:39+00:00",
-      "path": "projects/release_validation_ops",
-      "manifest": "projects/release_validation_ops/project.yaml",
-      "source": {
-        "path": "projects/release_validation_ops",
-        "manifest": "projects/release_validation_ops/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "release_validation_ops",
-        "id": "release_validation_ops"
-      },
-      "title": "Release Validation Operations",
-      "title_i18n": {
-        "en": "Release Validation Operations",
-        "ru": "Операции валидации релизов"
-      },
-      "description": "Observe-only release validation campaign runner and evidence log.",
-      "description_i18n": {
-        "en": "Observe-only release validation campaign runner and evidence log.",
-        "ru": "Observe-only runner кампаний валидации релизов и журнал evidence."
-      },
-      "categories": [
-        "operations",
-        "release"
-      ],
-      "tags": [
-        "release-validation",
-        "campaigns",
-        "evidence"
-      ],
-      "publication": {
-        "stage": "alpha",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "alpha",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "validation",
-          "title": "Release validation",
-          "title_i18n": {
-            "en": "Release validation",
-            "ru": "Валидация релизов"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:release_validation_ops",
-            "skill:release_validation_skill"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:release_validation_ops",
-        "skill:release_validation_skill"
-      ],
-      "components_count": 2,
-      "profiles": [
-        "adaos.release_validation.v1"
-      ]
-    },
-    {
-      "kind": "project",
-      "id": "research_platform",
-      "name": "research_platform",
-      "version": "0.1.21",
-      "updated_at": "2026-09-26T11:32:48+00:00",
-      "path": "projects/research_platform",
-      "manifest": "projects/research_platform/project.yaml",
-      "source": {
-        "path": "projects/research_platform",
-        "manifest": "projects/research_platform/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "research_platform",
-        "id": "research_platform"
-      },
-      "title": "Research Platform",
-      "title_i18n": {
-        "en": "Research Platform",
-        "ru": "Исследовательская платформа"
-      },
-      "description": "Reusable governed research workbench, orchestration, experiment management, evaluation, and tracking.",
-      "description_i18n": {
-        "en": "Reusable governed research workbench, orchestration, experiment management, evaluation, and tracking.",
-        "ru": "Переиспользуемая управляемая исследовательская рабочая среда, оркестрация, управление экспериментами, оценка и трекинг."
-      },
-      "categories": [
-        "research"
-      ],
-      "tags": [
-        "workbench",
-        "orchestration",
-        "experiments",
-        "evaluator",
-        "mlflow"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "workbench",
-          "title": "Research workbench",
-          "title_i18n": {
-            "en": "Research workbench",
-            "ru": "Исследовательская рабочая среда"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:research_workbench",
-            "skill:research_orchestrator_skill",
-            "skill:research_manager_skill"
-          ]
-        },
-        {
-          "id": "evaluation",
-          "title": "Evaluation and calibration",
-          "title_i18n": {
-            "en": "Evaluation and calibration",
-            "ru": "Оценка и калибровка"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "skill:research_evaluator_skill",
-            "skill:research_calibration_runner_skill"
-          ]
-        },
-        {
-          "id": "tracker",
-          "title": "MLflow tracker",
-          "title_i18n": {
-            "en": "MLflow tracker",
-            "ru": "Трекер MLflow"
-          },
-          "default": false,
-          "optional": true,
-          "components": [
-            "skill:mlflow_tracker_skill"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:research_workbench",
-        "skill:research_orchestrator_skill",
-        "skill:research_manager_skill",
-        "skill:research_evaluator_skill",
-        "skill:research_calibration_runner_skill",
-        "skill:mlflow_tracker_skill"
-      ],
-      "components_count": 6,
-      "profiles": [
-        "adaos.research.platform.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "research_platform",
-        "release": "research_platform@0.1.21",
-        "release_digest": "sha256:758e6dac8a7bbf92b46400fd6de9680ce5f5277ae5c5a2ab3bf4eb20d08e40f7",
-        "primary_component": "scenario:research_workbench",
-        "package_digest": "sha256:c67e8bceda844fedb4108f22150dfd2bcad22113d9d30643bc969d70de630fa6"
-      },
-      "channels": {
-        "stable": {
-          "release": "research_platform@0.1.21",
-          "release_digest": "sha256:758e6dac8a7bbf92b46400fd6de9680ce5f5277ae5c5a2ab3bf4eb20d08e40f7",
-          "source_revision": "sha256:bb203c15f1965f07e3ce2d6bef0595e8aec426f7a16a36b4e57e304a85cd72fc",
-          "package_digest": "sha256:c67e8bceda844fedb4108f22150dfd2bcad22113d9d30643bc969d70de630fa6",
-          "version": "0.1.21"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "research_tlp",
-      "name": "research_tlp",
-      "version": "0.3.18",
-      "updated_at": "2026-09-26T11:57:48+00:00",
-      "path": "projects/research_tlp",
-      "manifest": "projects/research_tlp/project.yaml",
-      "source": {
-        "path": "projects/research_tlp",
-        "manifest": "projects/research_tlp/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "research_tlp",
-        "id": "research_tlp"
-      },
-      "title": "TLP Mechanistic Research",
-      "title_i18n": {
-        "en": "TLP Mechanistic Research",
-        "ru": "Механистическое исследование TLP"
-      },
-      "description": "Governed TLP research instance with STL-10 proof runner and experiment provider.",
-      "description_i18n": {
-        "en": "Governed TLP research instance with STL-10 proof runner and experiment provider.",
-        "ru": "Управляемый экземпляр исследования TLP со STL-10 proof runner и experiment provider."
-      },
-      "categories": [
-        "research"
-      ],
-      "tags": [
-        "tlp",
-        "alpha",
-        "max-plus",
-        "pooling"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "tlp-study",
-          "title": "TLP study",
-          "title_i18n": {
-            "en": "TLP study",
-            "ru": "Исследование TLP"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:tlp_research",
-            "skill:tlp_structured_proof_02",
-            "skill:tlp_experiment_skill"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:tlp_research",
-        "skill:tlp_structured_proof_02",
-        "skill:tlp_experiment_skill"
-      ],
-      "components_count": 3,
-      "profiles": [
-        "adaos.research.tlp.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "research_tlp",
-        "release": "research_tlp@0.3.18",
-        "release_digest": "sha256:ad8c1d22fb71bb4d1a15809765f2dc8194a4f10fb9571de8afda2d50eb477e39",
-        "primary_component": "scenario:tlp_research",
-        "package_digest": "sha256:b781b84bbde2c1463add855db7dd7428695ac3c2085b3b809ebb84b9d9db933c"
-      },
-      "channels": {
-        "stable": {
-          "release": "research_tlp@0.3.18",
-          "release_digest": "sha256:ad8c1d22fb71bb4d1a15809765f2dc8194a4f10fb9571de8afda2d50eb477e39",
-          "source_revision": "sha256:13b00c9a6153d7c33e4b2b579c34feb24562f0c461047c94b4c15bc5d5ce6a39",
-          "package_digest": "sha256:b781b84bbde2c1463add855db7dd7428695ac3c2085b3b809ebb84b9d9db933c",
-          "version": "0.3.18"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "semantic_ui_demo",
-      "name": "semantic_ui_demo",
-      "version": "0.10.28",
-      "updated_at": "2026-09-26T11:13:18+00:00",
-      "path": "projects/semantic_ui_demo",
-      "manifest": "projects/semantic_ui_demo/project.yaml",
-      "source": {
-        "path": "projects/semantic_ui_demo",
-        "manifest": "projects/semantic_ui_demo/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "semantic_ui_demo",
-        "id": "semantic_ui_demo"
-      },
-      "title": "Semantic UI Demo",
-      "title_i18n": {
-        "en": "Semantic UI Demo",
-        "ru": "Демо Semantic UI"
-      },
-      "description": "Semantic Web UI demo with table, chart payload, and live event stream.",
-      "description_i18n": {
-        "en": "Semantic Web UI demo with table, chart payload, and live event stream.",
-        "ru": "Демо Semantic Web UI с таблицей, chart payload и live event stream."
-      },
-      "categories": [
-        "demo",
-        "development"
-      ],
-      "tags": [
-        "semantic-ui",
-        "taiga",
-        "metrics",
-        "alpha"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "demo",
-          "title": "Demo",
-          "title_i18n": {
-            "en": "Demo",
-            "ru": "Демо"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:taiga_ui_demo_scenario",
-            "skill:demo_metrics_skill"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:taiga_ui_demo_scenario",
-        "skill:demo_metrics_skill"
-      ],
-      "components_count": 2,
-      "profiles": [
-        "adaos.demo.semantic_ui.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "semantic_ui_demo",
-        "release": "semantic_ui_demo@0.10.28",
-        "release_digest": "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
-        "primary_component": "scenario:taiga_ui_demo_scenario",
-        "package_digest": "sha256:86ed65adf32f0850dd12ac94e4f7c5b01bd942815b7950d67a496a6cb06baeb5"
-      },
-      "channels": {
-        "stable": {
-          "release": "semantic_ui_demo@0.10.28",
-          "release_digest": "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
-          "source_revision": "sha256:8fff1ddac0a9b64a430835e6a0e7602a3b69c0dd95d0ce71c433d3a46803e091",
-          "package_digest": "sha256:86ed65adf32f0850dd12ac94e4f7c5b01bd942815b7950d67a496a6cb06baeb5",
-          "version": "0.10.28"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "slideshow",
-      "name": "slideshow",
-      "version": "0.1.5",
-      "updated_at": "2026-09-26T11:00:24+00:00",
-      "path": "projects/slideshow",
-      "manifest": "projects/slideshow/project.yaml",
-      "source": {
-        "path": "projects/slideshow",
-        "manifest": "projects/slideshow/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "slideshow",
-        "id": "slideshow"
-      },
-      "title": "Slideshow",
-      "description": "Local media slideshow indexing and endpoint presentation controls.",
-      "categories": [
-        "media"
-      ],
-      "tags": [
-        "slideshow",
-        "redevice",
-        "cbs-provider"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "default",
-          "title": "Slideshow",
-          "default": true,
-          "optional": false,
-          "components": [
-            "skill:slideshow_skill"
-          ]
-        }
-      ],
-      "components": [
-        "skill:slideshow_skill"
-      ],
-      "components_count": 1,
-      "profiles": [
-        "adaos.builder.component_project.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "slideshow",
-        "release": "slideshow@0.1.5",
-        "release_digest": "sha256:f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410",
-        "primary_component": "skill:slideshow_skill",
-        "package_digest": "sha256:979a828174e01eb4cc1b7c0d06da58ca709adbd30487e417c9a4d09015d7e2a8"
-      },
-      "channels": {
-        "stable": {
-          "release": "slideshow@0.1.5",
-          "release_digest": "sha256:f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410",
-          "source_revision": "sha256:58b503e9d83ab9c1b1b328779b7315d58e1f0054c410a12e2a8be905b290460e",
-          "package_digest": "sha256:979a828174e01eb4cc1b7c0d06da58ca709adbd30487e417c9a4d09015d7e2a8",
-          "version": "0.1.5"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "streaming_recipe_book_eval",
-      "name": "streaming_recipe_book_eval",
-      "version": "0.0.4",
-      "updated_at": "2026-08-27T21:05:39+00:00",
-      "path": "projects/streaming_recipe_book_eval",
-      "manifest": "projects/streaming_recipe_book_eval/project.yaml",
-      "source": {
-        "path": "projects/streaming_recipe_book_eval",
-        "manifest": "projects/streaming_recipe_book_eval/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "streaming_recipe_book_eval",
-        "id": "streaming_recipe_book_eval"
-      },
-      "title": "Streaming Recipe Book Eval",
-      "title_i18n": {
-        "en": "Streaming Recipe Book Eval",
-        "ru": "Оценка потоковой книги рецептов"
-      },
-      "description": "Deprecated recipe catalog evaluation instance retained for comparison.",
-      "description_i18n": {
-        "en": "Deprecated recipe catalog evaluation instance retained for comparison.",
-        "ru": "Deprecated-экземпляр оценки каталога рецептов, сохранённый для сравнения."
-      },
-      "categories": [
-        "home"
-      ],
-      "tags": [
-        "recipes",
-        "eval",
-        "deprecated"
-      ],
-      "publication": {
-        "stage": "deprecated",
-        "visibility": "hidden",
-        "channel": "stable"
-      },
-      "stage": "deprecated",
-      "visibility": "hidden",
-      "channel": "stable",
-      "install_default": false,
-      "components": [
-        "scenario:streaming_recipe_book_eval",
-        "skill:streaming_recipe_book_eval_skill"
-      ],
-      "components_count": 2,
-      "profiles": [
-        "adaos.home.recipes.eval.v1"
-      ]
-    },
-    {
-      "kind": "project",
-      "id": "subscription_status",
-      "name": "subscription_status",
-      "version": "0.1.17",
-      "updated_at": "2026-09-26T11:20:48+00:00",
-      "path": "projects/subscription_status",
-      "manifest": "projects/subscription_status/project.yaml",
-      "source": {
-        "path": "projects/subscription_status",
-        "manifest": "projects/subscription_status/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "subscription_status",
-        "id": "subscription_status"
-      },
-      "title": "Subscriptions",
-      "description": "User-facing AdaOS subscription status widget and modal backed by the local economic entitlement snapshot with explicit Root refresh.",
-      "categories": [
-        "system",
-        "account"
-      ],
-      "tags": [
-        "subscriptions",
-        "usage",
-        "cbs-provider"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "default",
-          "title": "subscription_status_skill",
-          "default": true,
-          "optional": false,
-          "components": [
-            "skill:subscription_status_skill"
-          ]
-        }
-      ],
-      "components": [
-        "skill:subscription_status_skill"
-      ],
-      "components_count": 1,
-      "profiles": [
-        "adaos.builder.component_project.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "subscription_status",
-        "release": "subscription_status@0.1.17",
-        "release_digest": "sha256:fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8",
-        "primary_component": "skill:subscription_status_skill",
-        "package_digest": "sha256:3320e77c465a2977eb9847e40100caf9e63435fe9c73f10e280980d1f28c57fa"
-      },
-      "channels": {
-        "stable": {
-          "release": "subscription_status@0.1.17",
-          "release_digest": "sha256:fa91fb66a431e7336be9369d50c0d2a1850b6d14d4f407346e677ae7b32844b8",
-          "source_revision": "sha256:665965cf91adfd35755ac353566a019b5b985b5235b710370b1843a038796ddc",
-          "package_digest": "sha256:3320e77c465a2977eb9847e40100caf9e63435fe9c73f10e280980d1f28c57fa",
-          "version": "0.1.17"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "users_access",
-      "name": "users_access",
-      "version": "0.1.21",
-      "updated_at": "2026-09-26T02:18:08+00:00",
-      "path": "projects/users_access",
-      "manifest": "projects/users_access/project.yaml",
-      "source": {
-        "path": "projects/users_access",
-        "manifest": "projects/users_access/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "users_access",
-        "id": "users_access"
-      },
-      "title": "Users & Access",
-      "description": "Manage people, invitations, roles, devices, sessions, and application access from one protected system application.",
-      "categories": [
-        "system",
-        "security"
-      ],
-      "tags": [
-        "users",
-        "access",
-        "permissions"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "access-control",
-          "title": "Users and access",
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:users_access"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:users_access"
-      ],
-      "components_count": 1,
-      "profiles": [
-        "adaos.system.users_access.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "users_access",
-        "release": "users_access@0.1.21",
-        "release_digest": "sha256:56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256",
-        "primary_component": "scenario:users_access",
-        "package_digest": "sha256:52687d368e4ec16da141e66d1daa98b65921c3700480d3f4557c413706336ef4"
-      },
-      "channels": {
-        "stable": {
-          "release": "users_access@0.1.21",
-          "release_digest": "sha256:56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256",
-          "source_revision": "sha256:84f3dbe8333de9c8a8109cfc5f4210bfb63b4dde1252aca319f0c803f3e17a04",
-          "package_digest": "sha256:52687d368e4ec16da141e66d1daa98b65921c3700480d3f4557c413706336ef4",
-          "version": "0.1.21"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "voice",
-      "name": "voice",
-      "version": "0.1.7",
-      "updated_at": "2026-09-26T12:13:07+00:00",
-      "path": "projects/voice",
-      "manifest": "projects/voice/project.yaml",
-      "source": {
-        "path": "projects/voice",
-        "manifest": "projects/voice/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "voice",
-        "id": "voice"
-      },
-      "title": "Voice",
-      "description": "Webspace-scoped conversational voice runtime and session projection.",
-      "categories": [
-        "communication"
-      ],
-      "tags": [
-        "voice",
-        "conversation",
-        "cbs-provider"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": false,
-      "features": [
-        {
-          "id": "default",
-          "title": "Voice",
-          "default": true,
-          "optional": false,
-          "components": [
-            "skill:voice_chat_skill"
-          ]
-        }
-      ],
-      "components": [
-        "skill:voice_chat_skill"
-      ],
-      "components_count": 1,
-      "profiles": [
-        "adaos.builder.component_project.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "voice",
-        "release": "voice@0.1.7",
-        "release_digest": "sha256:0b891e2da738e254317eb958eda533333ba2a5d17752ed3c75850f19e0dede55",
-        "primary_component": "skill:voice_chat_skill",
-        "package_digest": "sha256:66bbd25a130c9be8857e195a0d506adc7bab8a6e2ab47fd2f4778bac935f9d7f"
-      },
-      "channels": {
-        "stable": {
-          "release": "voice@0.1.7",
-          "release_digest": "sha256:0b891e2da738e254317eb958eda533333ba2a5d17752ed3c75850f19e0dede55",
-          "source_revision": "sha256:3104761a16f9b59f148f6f9756d688c32a86041c309ab48e85f51f8296c4f842",
-          "package_digest": "sha256:66bbd25a130c9be8857e195a0d506adc7bab8a6e2ab47fd2f4778bac935f9d7f",
-          "version": "0.1.7"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "web_desktop",
-      "name": "web_desktop",
-      "version": "0.3.57",
-      "updated_at": "2026-09-27T06:08:50+00:00",
-      "path": "projects/web_desktop",
-      "manifest": "projects/web_desktop/project.yaml",
-      "source": {
-        "path": "projects/web_desktop",
-        "manifest": "projects/web_desktop/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "web_desktop",
-        "id": "web_desktop"
-      },
-      "title": "Management",
-      "title_i18n": {
-        "en": "Management",
-        "ru": "Управление"
-      },
-      "description": "Default AdaOS desktop shell with project-owned connection flows, voice bridge, and browser surface support.",
-      "description_i18n": {
-        "en": "Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.",
-        "ru": "Стандартная веб-оболочка AdaOS, подключение устройств, голосовой мост и поддержка браузерных интерфейсов."
-      },
-      "categories": [
-        "system",
-        "desktop"
-      ],
-      "tags": [
-        "default-install",
-        "shell",
-        "browser",
-        "voice",
-        "onboarding"
-      ],
-      "publication": {
-        "stage": "beta",
-        "visibility": "listed",
-        "channel": "stable"
-      },
-      "stage": "beta",
-      "visibility": "listed",
-      "channel": "stable",
-      "install_default": true,
-      "features": [
-        {
-          "id": "shell",
-          "title": "Desktop shell",
-          "title_i18n": {
-            "en": "Desktop shell",
-            "ru": "Оболочка рабочего стола"
-          },
-          "default": true,
-          "optional": false,
-          "components": [
-            "scenario:web_desktop",
-            "skill:web_desktop_runtime_skill"
-          ]
-        }
-      ],
-      "components": [
-        "scenario:web_desktop",
-        "skill:web_desktop_runtime_skill"
-      ],
-      "components_count": 2,
-      "profiles": [
-        "adaos.desktop.shell.v1",
-        "adaos.default_install.v1"
-      ],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "web_desktop",
-        "release": "web_desktop@0.3.57",
-        "release_digest": "sha256:331fe338fba113b2d2b8da4fef13235b6fb62e565cb21b242bfc86510d23c067",
-        "primary_component": "scenario:web_desktop",
-        "package_digest": "sha256:b92b41967320ab57a4d1fd366e0c7f77516b5a6efb4da3f90189ab0426de4946"
-      },
-      "channels": {
-        "stable": {
-          "release": "web_desktop@0.3.57",
-          "release_digest": "sha256:331fe338fba113b2d2b8da4fef13235b6fb62e565cb21b242bfc86510d23c067",
-          "source_revision": "sha256:abb566ff568f41acee3a91c6a8e3611f5de2279af1fd8b162323fe8a6e15d0db",
-          "package_digest": "sha256:b92b41967320ab57a4d1fd366e0c7f77516b5a6efb4da3f90189ab0426de4946",
-          "version": "0.3.57"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "workflow_lab",
-      "name": "workflow_lab",
-      "version": "0.1.3",
-      "updated_at": "2026-08-27T21:05:40+00:00",
-      "path": "projects/workflow_lab",
-      "manifest": "projects/workflow_lab/project.yaml",
-      "source": {
-        "path": "projects/workflow_lab",
-        "manifest": "projects/workflow_lab/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "workflow_lab",
-        "id": "workflow_lab"
-      },
-      "title": "Workflow Lab",
-      "title_i18n": {
-        "en": "Workflow Lab",
-        "ru": "Лаборатория workflow"
-      },
-      "description": "Internal conversational workflow control and dashboard reference lab.",
-      "description_i18n": {
-        "en": "Internal conversational workflow control and dashboard reference lab.",
-        "ru": "Внутренняя reference-лаборатория conversational workflow control и dashboard."
-      },
-      "categories": [
-        "development"
-      ],
-      "tags": [
-        "workflow",
-        "lab",
-        "internal"
-      ],
-      "publication": {
-        "stage": "internal",
-        "visibility": "hidden",
-        "channel": "stable"
-      },
-      "stage": "internal",
-      "visibility": "hidden",
-      "channel": "stable",
-      "install_default": false,
-      "components": [
-        "skill:conversational_workflow_lab_skill",
-        "skill:workflow_lab_dashboard_skill"
-      ],
-      "components_count": 2,
-      "profiles": [
-        "adaos.workflow.lab.v1"
-      ]
+      "profiles": []
     }
   ]
 }
