@@ -100,6 +100,7 @@ class MediaLibraryAgentWorker:
         self._job_retention_complete = False
         self._last_job_retention_monotonic = 0.0
         self._artwork_queue_saturated = False
+        self._last_artwork_backfill_admission_monotonic = 0.0
         self._last_search_backfill_monotonic = 0.0
         self._last_storage_maintenance_monotonic = 0.0
 
@@ -384,17 +385,22 @@ class MediaLibraryAgentWorker:
     def _enqueue_embedded_metadata_backfill(self) -> int:
         if self._embedded_metadata_backfill_complete:
             return 0
-        root_ids = self.repository.roots_missing_embedded_metadata(
+        batch = self.repository.embedded_metadata_backfill_batch(
             revision=EMBEDDED_METADATA_REVISION,
-            limit=1,
+            limit=int(
+                os.environ.get("MEDIA_LIBRARY_AGENT_METADATA_BACKFILL_BATCH") or 100
+            ),
         )
-        if not root_ids:
+        if bool(batch.get("complete")):
             self._embedded_metadata_backfill_complete = True
             return 0
-        result = self.repository.create_job(
-            root_ids[0], mode="incremental", webspace_id=""
-        )
-        return int(bool(result.get("accepted")))
+        accepted = 0
+        for root_id in list(batch.get("root_ids") or [])[:1]:
+            result = self.repository.create_job(
+                text(root_id), mode="incremental", webspace_id=""
+            )
+            accepted += int(bool(result.get("accepted")))
+        return accepted
 
     def _run_claimed_rendition_job(self, job: Mapping[str, Any]) -> dict[str, Any]:
         try:
@@ -422,6 +428,14 @@ class MediaLibraryAgentWorker:
             )
 
     def _enqueue_artwork_backfill(self) -> int:
+        now = time.monotonic()
+        admission_interval = self._artwork_backfill_admission_interval_seconds()
+        if (
+            self._last_artwork_backfill_admission_monotonic > 0.0
+            and now - self._last_artwork_backfill_admission_monotonic
+            < admission_interval
+        ):
+            return 0
         active = self.repository.active_artwork_job_count()
         maximum_active = max(
             1,
@@ -492,7 +506,22 @@ class MediaLibraryAgentWorker:
                     break
         self.repository.record_artwork_backfill_state_transitions(state_transitions)
         self.repository.record_artwork_backfill_queued(queued)
+        if examined or queued:
+            self._last_artwork_backfill_admission_monotonic = time.monotonic()
         return queued
+
+    @staticmethod
+    def _artwork_backfill_admission_interval_seconds() -> float:
+        try:
+            value = float(
+                os.environ.get(
+                    "MEDIA_LIBRARY_AGENT_ARTWORK_BACKFILL_ADMISSION_INTERVAL_SECONDS"
+                )
+                or 10.0
+            )
+        except (TypeError, ValueError):
+            value = 10.0
+        return max(0.1, min(300.0, value))
 
     def _queue_artwork_for_source(
         self,
@@ -1100,9 +1129,20 @@ class MediaLibraryAgentWorker:
         }
 
     def artwork_status(self) -> dict[str, Any]:
+        admission_interval = self._artwork_backfill_admission_interval_seconds()
+        admission_age = max(
+            0.0,
+            time.monotonic() - self._last_artwork_backfill_admission_monotonic,
+        )
         return {
             **self.repository.artwork_backfill_status(),
             "active_job_count": self.repository.active_artwork_job_count(),
+            "admission_interval_seconds": admission_interval,
+            "next_admission_in_seconds": (
+                max(0.0, admission_interval - admission_age)
+                if self._last_artwork_backfill_admission_monotonic > 0.0
+                else 0.0
+            ),
             "capabilities": artwork_capabilities(),
         }
 

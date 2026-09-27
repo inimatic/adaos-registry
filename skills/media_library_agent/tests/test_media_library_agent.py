@@ -61,6 +61,28 @@ def test_compact_status_avoids_diagnostic_storage_queries():
     assert "worker" not in health
 
 
+def test_connect_continues_when_synchronous_pragma_is_writer_locked(
+    monkeypatch, tmp_path
+):
+    repository = MediaLibraryAgentRepository(tmp_path / "locked.sqlite3")
+    original_connect = sqlite3.connect
+
+    class LockedSynchronousConnection(sqlite3.Connection):
+        def execute(self, sql, parameters=()):
+            if sql == "PRAGMA synchronous=NORMAL":
+                raise sqlite3.OperationalError("database is locked")
+            return super().execute(sql, parameters)
+
+    def connect_with_locked_synchronous(*args, **kwargs):
+        kwargs["factory"] = LockedSynchronousConnection
+        return original_connect(*args, **kwargs)
+
+    monkeypatch.setattr(sqlite3, "connect", connect_with_locked_synchronous)
+
+    with repository.connect() as connection:
+        assert connection.execute("SELECT 1").fetchone()[0] == 1
+
+
 def test_delta_pages_include_compact_authoritative_library_state(tmp_path):
     library = tmp_path / "library"
     library.mkdir()
@@ -317,6 +339,10 @@ def test_embedded_audio_tags_are_normalized_and_backfilled_on_rescan(
         )
         connection.commit()
     assert repository.roots_missing_embedded_metadata(revision="1") == [root["id"]]
+    bounded = repository.embedded_metadata_backfill_batch(revision="1", limit=1)
+    assert bounded["scanned"] == 1
+    assert bounded["complete"] is False
+    assert bounded["root_ids"] == [root["id"]]
 
     second_job = repository.create_job(root["id"], mode="full")["job"]
     assert worker.run_once()["id"] == second_job["id"]
@@ -325,6 +351,10 @@ def test_embedded_audio_tags_are_normalized_and_backfilled_on_rescan(
     assert refreshed["metadata"]["embedded_metadata_revision"] == "1"
     assert refreshed["metadata"]["album"] == "Album"
     assert repository.roots_missing_embedded_metadata(revision="1") == []
+    repository.embedded_metadata_backfill_batch(revision="1", limit=1)
+    repository.embedded_metadata_backfill_batch(revision="1", limit=1)
+    verified = repository.embedded_metadata_backfill_batch(revision="1", limit=1)
+    assert verified["complete"] is True
 
 
 def test_embedded_metadata_backfill_precedes_artwork_backlog(monkeypatch, tmp_path):
@@ -2848,6 +2878,55 @@ def test_artwork_backfill_queues_preexisting_sources_with_durable_cursor(
     assert status["active_job_count"] == 1
     assert status["cursor"] == ""
     assert status["cycle"] == 1
+
+
+def test_artwork_backfill_admission_is_rate_limited(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_LIBRARY_AGENT_ARTWORK_BACKFILL_QUEUE", "1")
+    monkeypatch.setenv(
+        "MEDIA_LIBRARY_AGENT_ARTWORK_BACKFILL_ADMISSION_INTERVAL_SECONDS", "10"
+    )
+    library = tmp_path / "library"
+    library.mkdir()
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "artwork-backfill-rate.sqlite3", node_id="node-a"
+    )
+    root = repository.add_root(str(library))["root"]
+    for index in range(2):
+        repository.upsert_source(
+            {
+                "root_id": root["id"],
+                "relative_path": f"track-{index}.mp3",
+                "folder_path": "",
+                "name": f"track-{index}.mp3",
+                "media_kind": "audio",
+                "mime_type": "audio/mpeg",
+                "size_bytes": 5,
+                "modified_ns": index + 1,
+                "inode": index + 1,
+                "fingerprint": f"fingerprint-{index}",
+                "metadata": {},
+            },
+            job_id="seed",
+        )
+
+    now = [100.0]
+    monkeypatch.setattr(worker_module.time, "monotonic", lambda: now[0])
+    worker = MediaLibraryAgentWorker(repository)
+    queued: list[str] = []
+    monkeypatch.setattr(
+        worker,
+        "_queue_artwork_for_source",
+        lambda source, **_kwargs: queued.append(source["id"]) or True,
+    )
+
+    assert worker._enqueue_artwork_backfill() == 1
+    assert worker._enqueue_artwork_backfill() == 0
+    assert len(queued) == 1
+    assert worker.artwork_status()["next_admission_in_seconds"] == 10.0
+
+    now[0] = 110.0
+    assert worker._enqueue_artwork_backfill() == 1
+    assert len(queued) == 2
 
 
 def test_job_retention_compacts_legacy_artwork_queue_without_source_loss(

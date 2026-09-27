@@ -307,6 +307,7 @@ class MediaLibraryAgentRepository:
     def __init__(self, db_path: str | Path | None = None, *, node_id: str = ""):
         self.db_path = Path(db_path) if db_path is not None else default_db_path()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._embedded_metadata_triggers_ready = False
         self.node_id = (
             text(
                 node_id
@@ -323,7 +324,16 @@ class MediaLibraryAgentRepository:
         )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys=ON")
-        connection.execute("PRAGMA synchronous=NORMAL")
+        # Changing synchronous mode needs a database lock. A bounded
+        # maintenance write must not make a health/status reader wait for the
+        # full busy timeout before it can even execute its SELECT.
+        connection.execute("PRAGMA busy_timeout=0")
+        try:
+            connection.execute("PRAGMA synchronous=NORMAL")
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc).lower():
+                connection.close()
+                raise
         connection.execute("PRAGMA busy_timeout=30000")
         return connection
 
@@ -1730,6 +1740,152 @@ class MediaLibraryAgentRepository:
                 (text(revision), bounded),
             ).fetchall()
         return [str(row["id"]) for row in rows]
+
+    def embedded_metadata_backfill_batch(
+        self, *, revision: str, limit: int = 100
+    ) -> dict[str, Any]:
+        """Inspect a durable bounded slice instead of scanning all source JSON.
+
+        A complete pass that observed stale rows starts a verification pass. The
+        marker becomes complete only after a later full pass observes no stale
+        rows, so service restarts and concurrently running root scans are safe.
+        """
+        token = text(revision)
+        bounded = max(1, min(500, int(limit or 100)))
+        keys = (
+            "embedded_metadata_backfill_revision",
+            "embedded_metadata_backfill_cursor",
+            "embedded_metadata_backfill_missing",
+            "embedded_metadata_backfill_complete",
+        )
+        with self.connect() as connection:
+            if not self._embedded_metadata_triggers_ready:
+                connection.executescript(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                        media_sources_embedded_metadata_insert
+                    AFTER INSERT ON sources
+                    WHEN NEW.present=1
+                      AND COALESCE(
+                        json_extract(
+                          NEW.metadata_json,
+                          '$.embedded_metadata_revision'
+                        ),
+                        ''
+                      ) <> COALESCE(
+                        (
+                          SELECT value FROM agent_meta
+                          WHERE key='embedded_metadata_backfill_revision'
+                        ),
+                        ''
+                      )
+                    BEGIN
+                      INSERT OR REPLACE INTO agent_meta(key,value) VALUES
+                        ('embedded_metadata_backfill_cursor',''),
+                        ('embedded_metadata_backfill_missing','0'),
+                        ('embedded_metadata_backfill_complete','0');
+                    END;
+                    CREATE TRIGGER IF NOT EXISTS
+                        media_sources_embedded_metadata_update
+                    AFTER UPDATE OF metadata_json,present ON sources
+                    WHEN NEW.present=1
+                      AND COALESCE(
+                        json_extract(
+                          NEW.metadata_json,
+                          '$.embedded_metadata_revision'
+                        ),
+                        ''
+                      ) <> COALESCE(
+                        (
+                          SELECT value FROM agent_meta
+                          WHERE key='embedded_metadata_backfill_revision'
+                        ),
+                        ''
+                      )
+                    BEGIN
+                      INSERT OR REPLACE INTO agent_meta(key,value) VALUES
+                        ('embedded_metadata_backfill_cursor',''),
+                        ('embedded_metadata_backfill_missing','0'),
+                        ('embedded_metadata_backfill_complete','0');
+                    END;
+                    """
+                )
+                self._embedded_metadata_triggers_ready = True
+            meta = self._meta_values(connection, keys)
+            stored_revision = text(
+                meta.get("embedded_metadata_backfill_revision")
+            )
+            if stored_revision != token:
+                cursor = ""
+                missing_seen = False
+                complete = False
+            else:
+                cursor = text(meta.get("embedded_metadata_backfill_cursor"))
+                missing_seen = text(
+                    meta.get("embedded_metadata_backfill_missing")
+                ) in {"1", "true", "yes"}
+                complete = text(
+                    meta.get("embedded_metadata_backfill_complete")
+                ) in {"1", "true", "yes"}
+            if complete:
+                return {
+                    "ok": True,
+                    "revision": token,
+                    "complete": True,
+                    "scanned": 0,
+                    "root_ids": [],
+                    "cursor": "",
+                }
+            rows = connection.execute(
+                "SELECT id,root_id,metadata_json FROM sources "
+                "WHERE present=1 AND id>? ORDER BY id LIMIT ?",
+                (cursor, bounded),
+            ).fetchall()
+            missing_roots: list[str] = []
+            for row in rows:
+                metadata = json_loads(row["metadata_json"], {})
+                observed = (
+                    text(metadata.get("embedded_metadata_revision"))
+                    if isinstance(metadata, Mapping)
+                    else ""
+                )
+                if observed != token:
+                    root_id = text(row["root_id"])
+                    if root_id and root_id not in missing_roots:
+                        missing_roots.append(root_id)
+            missing_seen = missing_seen or bool(missing_roots)
+            pass_finished = len(rows) < bounded
+            complete = pass_finished and not missing_seen
+            next_cursor = text(rows[-1]["id"]) if rows and not pass_finished else ""
+            if pass_finished and missing_seen:
+                # At least one root scan was requested during this pass. Begin
+                # a verification pass without carrying the stale witness over.
+                missing_seen = False
+            self._set_meta(
+                connection, "embedded_metadata_backfill_revision", token
+            )
+            self._set_meta(
+                connection, "embedded_metadata_backfill_cursor", next_cursor
+            )
+            self._set_meta(
+                connection,
+                "embedded_metadata_backfill_missing",
+                "1" if missing_seen else "0",
+            )
+            self._set_meta(
+                connection,
+                "embedded_metadata_backfill_complete",
+                "1" if complete else "0",
+            )
+            connection.commit()
+        return {
+            "ok": True,
+            "revision": token,
+            "complete": complete,
+            "scanned": len(rows),
+            "root_ids": missing_roots,
+            "cursor": next_cursor,
+        }
 
     def disable_root(self, root_id: str) -> dict[str, Any]:
         token = text(root_id)
@@ -3488,8 +3644,14 @@ class MediaLibraryAgentRepository:
                 connection.execute("PRAGMA freelist_count").fetchone()[0]
             )
             auto_vacuum = int(connection.execute("PRAGMA auto_vacuum").fetchone()[0])
+            # COUNT(*) can cold-read the complete multi-gigabyte delta b-tree.
+            # The sequence high-water mark is O(1) and is sufficient for this
+            # diagnostic capacity projection. Compaction may create gaps, so
+            # expose that property rather than claiming exactness.
             delta_count = int(
-                connection.execute("SELECT COUNT(*) FROM source_deltas").fetchone()[0]
+                connection.execute(
+                    "SELECT COALESCE(MAX(sequence),0) FROM source_deltas"
+                ).fetchone()[0]
             )
             compaction_row = connection.execute(
                 "SELECT value FROM agent_meta WHERE key='storage_compaction_state'"
@@ -3516,6 +3678,7 @@ class MediaLibraryAgentRepository:
             ),
             "compaction_recommended": reclaimable_bytes >= 64 * 1024 * 1024,
             "delta_count": delta_count,
+            "delta_count_exact": False,
             "logical_compaction": (
                 dict(compaction) if isinstance(compaction, Mapping) else {}
             ),
