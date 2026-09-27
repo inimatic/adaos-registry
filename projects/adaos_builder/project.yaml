@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: adaos_builder
-version: 0.3.16
+version: 0.3.17
 profiles:
 - adaos.builder.v1
 - adaos.development.workbench.v1
@@ -111,6 +111,11 @@ compatibility:
   validation_profiles:
   - builder.local
 lifecycle:
+  upgrade:
+    retired_components:
+    - ref: skill:prompt_engineer_skill
+      data: retain
+      reason: Retain legacy Prompt IDE data after retiring its obsolete Application surface.
   uninstall:
     components: remove_if_unreferenced
     runtime_data: retain
