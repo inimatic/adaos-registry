@@ -1,0 +1,634 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "research_platform",
+    "legacy_project_id": "research_platform",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "research_platform",
+    "display": {
+      "title": "Research Platform",
+      "summary": "Reusable governed research workbench, orchestration, experiment management, evaluation, and tracking."
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "workbench",
+        "presentation_ref": "scenario:research_workbench"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 2,
+    "created_at": "2026-09-26T03:23:16+00:00",
+    "updated_at": "2026-09-26T05:21:57+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "research_platform",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "research_platform",
+    "version": "0.1.24",
+    "release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "research_platform",
+      "version": "0.1.24",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:02cd64fad54781b434a0b9d494fdb88631690c71578ca928d2f63f94c3253742",
+        "path_scope": [
+          "projects/research_platform/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "research_workbench",
+          "version": "0.1.19",
+          "digest": "sha256:71d0644929ff8f39ba3c305453957da5b87eaaa82b30dd27f214d4da7435b915",
+          "manifest_digest": "sha256:ff8b5ee855bd8631c0afecb403ccc2935c8f539f7e9f7d8a9886677e1e4bf142",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:02cd64fad54781b434a0b9d494fdb88631690c71578ca928d2f63f94c3253742",
+            "path_scope": [
+              "scenarios/research_workbench/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/research_workbench",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "mlflow_tracker_skill",
+          "version": "0.3.13",
+          "digest": "sha256:247c7e2a13d902ab97dbcf89811467d153018ef8a6dcc8db67b0ed5bcb1552ce",
+          "manifest_digest": "sha256:5552c57eac138c01b5a51f4dafafa8e608a4c97b9d992d4980a3de676e2b62af",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:02cd64fad54781b434a0b9d494fdb88631690c71578ca928d2f63f94c3253742",
+            "path_scope": [
+              "skills/mlflow_tracker_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/mlflow_tracker_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "research_calibration_runner_skill",
+          "version": "0.2.10",
+          "digest": "sha256:cc6b4a4607f62260bcd240f09c813ad687741780b898792ac0562931463c0a18",
+          "manifest_digest": "sha256:59b33b2c92fe079c4e03c4effa363afbc2a51858eccb5cf3c7787f85a9c2f0e5",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:02cd64fad54781b434a0b9d494fdb88631690c71578ca928d2f63f94c3253742",
+            "path_scope": [
+              "skills/research_calibration_runner_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/research_calibration_runner_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "research_evaluator_skill",
+          "version": "0.2.12",
+          "digest": "sha256:f7e15a4cafc50c1432737a2e7a691069169cec070e8924472b59d5c17ad04ec8",
+          "manifest_digest": "sha256:f4081a95056c7ba1727bf9bac103d3064fef017e01ee7cb972e96671356cb21f",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:02cd64fad54781b434a0b9d494fdb88631690c71578ca928d2f63f94c3253742",
+            "path_scope": [
+              "skills/research_evaluator_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/research_evaluator_skill",
+          "schema_locks": [
+            {
+              "lock_id": "skill:research_evaluator_skill:schemas/research.calibration_package.v1.schema.json",
+              "digest": "sha256:8186cc6f800d070b5956f18a6ab2634231f4a07376e37497855c27058a1c9574"
+            },
+            {
+              "lock_id": "skill:research_evaluator_skill:schemas/research.calibration_result.v1.schema.json",
+              "digest": "sha256:bdeca1b743611e9db54ee4b6a78eb8f6df93c1368ec1546be1d1519a577d61dd"
+            },
+            {
+              "lock_id": "skill:research_evaluator_skill:schemas/research.calibration_task.v1.schema.json",
+              "digest": "sha256:9e054834dc529047af76c98b6cbd58bce7d5f0ceb3ef7455dcab8926331fac67"
+            }
+          ]
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "research_manager_skill",
+          "version": "0.59.0",
+          "digest": "sha256:511a5915ca134c92f6fc97d4f6dfd2979d6868f92e7b6efaf8b3fe9d701062cf",
+          "manifest_digest": "sha256:9bee8809f62f7c8562ae8c9c3774770b9892b74a04ef17a08b702a313f5862cb",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:02cd64fad54781b434a0b9d494fdb88631690c71578ca928d2f63f94c3253742",
+            "path_scope": [
+              "skills/research_manager_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/research_manager_skill",
+          "schema_locks": [
+            {
+              "lock_id": "skill:research_manager_skill:schemas/evidence.manifest.v1.schema.json",
+              "digest": "sha256:caa2a97fc3395261ca882b5f64dc893e160d209edcdea622f3c4afde1dd4a4f4"
+            },
+            {
+              "lock_id": "skill:research_manager_skill:schemas/research.contracts.v1.schema.json",
+              "digest": "sha256:638fa81661b298a15912914f166b4a281cdac9389ed3f7f473480b860da38f56"
+            },
+            {
+              "lock_id": "skill:research_manager_skill:schemas/tracker.contract.v1.schema.json",
+              "digest": "sha256:785cbd8e3eece8df16b29796be60820504d54f9e0d68974120ab44128b9a85c8"
+            }
+          ]
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "research_orchestrator_skill",
+          "version": "0.85.0",
+          "digest": "sha256:2bd3e42730e9b1beb96fadd69a13ebd82957fd777d1d76eb8675b37a83c7c340",
+          "manifest_digest": "sha256:3c5701778250f2e79eaacfcdbae3453a393f8e26f2b954813612978f3356a26a",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:02cd64fad54781b434a0b9d494fdb88631690c71578ca928d2f63f94c3253742",
+            "path_scope": [
+              "skills/research_orchestrator_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/research_orchestrator_skill",
+          "schema_locks": [
+            {
+              "lock_id": "skill:research_orchestrator_skill:schemas/research.agenda.v1.schema.json",
+              "digest": "sha256:ea8c9f7c5a7bfe449a8f581d4147f6b04904c0e509b3cb743449912337f1e518"
+            },
+            {
+              "lock_id": "skill:research_orchestrator_skill:schemas/research.automation_brief.v1.schema.json",
+              "digest": "sha256:c7a6bc87da7a46ce341a052640bc6ea10ee12a1d9ab527b559d14e06cdb1b28e"
+            },
+            {
+              "lock_id": "skill:research_orchestrator_skill:schemas/research.compilation.v1.schema.json",
+              "digest": "sha256:43c1ff2068b55defc46f875c39b3c4a74c36bed569b24ac381dbf8dfaf94ef77"
+            },
+            {
+              "lock_id": "skill:research_orchestrator_skill:schemas/research.compilation_package.v1.schema.json",
+              "digest": "sha256:8e37857ef1df1b95ec869fa50fd8380ec399ecc01ae25cc58d21c15031256ba1"
+            },
+            {
+              "lock_id": "skill:research_orchestrator_skill:schemas/research.compilation_projection.v1.schema.json",
+              "digest": "sha256:5d11daf8115faf99f94de2d79e4d817d922247f3adc9ee19d597e5b6f7371c04"
+            },
+            {
+              "lock_id": "skill:research_orchestrator_skill:schemas/research.direction.v1.schema.json",
+              "digest": "sha256:81b9464bb1f30a197a0900dbc147f27055eaf59e9e41c66d4f37a660cb8afbc8"
+            },
+            {
+              "lock_id": "skill:research_orchestrator_skill:schemas/research.experiment_plan.v1.schema.json",
+              "digest": "sha256:d0a5585ab501ec7638987fd1bd1ea0f49d0f9a787cafd97dbc57cfce2264542e"
+            },
+            {
+              "lock_id": "skill:research_orchestrator_skill:schemas/research.implementation_track.v1.schema.json",
+              "digest": "sha256:1199ebeab4b38d9251674e1a8832abf0e0efe21f568689e256390b7418c34e73"
+            },
+            {
+              "lock_id": "skill:research_orchestrator_skill:schemas/research.prototype.v1.schema.json",
+              "digest": "sha256:674c15d06612a68fac7dd4436fbcb9d89165db41db15ff459fc6f5126c980321"
+            },
+            {
+              "lock_id": "skill:research_orchestrator_skill:schemas/research.task.v1.schema.json",
+              "digest": "sha256:0f0a5fa719538ec3096efb43716354ac0457c2f29ae333f7164345d452e6e6ac"
+            }
+          ]
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [
+        "network.egress",
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:02cd64fad54781b434a0b9d494fdb88631690c71578ca928d2f63f94c3253742",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [
+        {
+          "lock_id": "skill:research_evaluator_skill:schemas/research.calibration_package.v1.schema.json",
+          "digest": "sha256:8186cc6f800d070b5956f18a6ab2634231f4a07376e37497855c27058a1c9574"
+        },
+        {
+          "lock_id": "skill:research_evaluator_skill:schemas/research.calibration_result.v1.schema.json",
+          "digest": "sha256:bdeca1b743611e9db54ee4b6a78eb8f6df93c1368ec1546be1d1519a577d61dd"
+        },
+        {
+          "lock_id": "skill:research_evaluator_skill:schemas/research.calibration_task.v1.schema.json",
+          "digest": "sha256:9e054834dc529047af76c98b6cbd58bce7d5f0ceb3ef7455dcab8926331fac67"
+        },
+        {
+          "lock_id": "skill:research_manager_skill:schemas/evidence.manifest.v1.schema.json",
+          "digest": "sha256:caa2a97fc3395261ca882b5f64dc893e160d209edcdea622f3c4afde1dd4a4f4"
+        },
+        {
+          "lock_id": "skill:research_manager_skill:schemas/research.contracts.v1.schema.json",
+          "digest": "sha256:638fa81661b298a15912914f166b4a281cdac9389ed3f7f473480b860da38f56"
+        },
+        {
+          "lock_id": "skill:research_manager_skill:schemas/tracker.contract.v1.schema.json",
+          "digest": "sha256:785cbd8e3eece8df16b29796be60820504d54f9e0d68974120ab44128b9a85c8"
+        },
+        {
+          "lock_id": "skill:research_orchestrator_skill:schemas/research.agenda.v1.schema.json",
+          "digest": "sha256:ea8c9f7c5a7bfe449a8f581d4147f6b04904c0e509b3cb743449912337f1e518"
+        },
+        {
+          "lock_id": "skill:research_orchestrator_skill:schemas/research.automation_brief.v1.schema.json",
+          "digest": "sha256:c7a6bc87da7a46ce341a052640bc6ea10ee12a1d9ab527b559d14e06cdb1b28e"
+        },
+        {
+          "lock_id": "skill:research_orchestrator_skill:schemas/research.compilation.v1.schema.json",
+          "digest": "sha256:43c1ff2068b55defc46f875c39b3c4a74c36bed569b24ac381dbf8dfaf94ef77"
+        },
+        {
+          "lock_id": "skill:research_orchestrator_skill:schemas/research.compilation_package.v1.schema.json",
+          "digest": "sha256:8e37857ef1df1b95ec869fa50fd8380ec399ecc01ae25cc58d21c15031256ba1"
+        },
+        {
+          "lock_id": "skill:research_orchestrator_skill:schemas/research.compilation_projection.v1.schema.json",
+          "digest": "sha256:5d11daf8115faf99f94de2d79e4d817d922247f3adc9ee19d597e5b6f7371c04"
+        },
+        {
+          "lock_id": "skill:research_orchestrator_skill:schemas/research.direction.v1.schema.json",
+          "digest": "sha256:81b9464bb1f30a197a0900dbc147f27055eaf59e9e41c66d4f37a660cb8afbc8"
+        },
+        {
+          "lock_id": "skill:research_orchestrator_skill:schemas/research.experiment_plan.v1.schema.json",
+          "digest": "sha256:d0a5585ab501ec7638987fd1bd1ea0f49d0f9a787cafd97dbc57cfce2264542e"
+        },
+        {
+          "lock_id": "skill:research_orchestrator_skill:schemas/research.implementation_track.v1.schema.json",
+          "digest": "sha256:1199ebeab4b38d9251674e1a8832abf0e0efe21f568689e256390b7418c34e73"
+        },
+        {
+          "lock_id": "skill:research_orchestrator_skill:schemas/research.prototype.v1.schema.json",
+          "digest": "sha256:674c15d06612a68fac7dd4436fbcb9d89165db41db15ff459fc6f5126c980321"
+        },
+        {
+          "lock_id": "skill:research_orchestrator_skill:schemas/research.task.v1.schema.json",
+          "digest": "sha256:0f0a5fa719538ec3096efb43716354ac0457c2f29ae333f7164345d452e6e6ac"
+        }
+      ],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:b844908435b54ae0acf2752efac4cba63f801ad69f2b0f9e69bfe823ca8b7a98"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:40ec3777ce8ee7877f5457bef0fbf7eb0c96ac7ef5fb635715a6f51eb425a661",
+        "profiles": [
+          "adaos.research.platform.v1"
+        ],
+        "members": [
+          {
+            "ref": "scenario:research_workbench",
+            "package_digest": "sha256:71d0644929ff8f39ba3c305453957da5b87eaaa82b30dd27f214d4da7435b915",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "skill:mlflow_tracker_skill",
+            "package_digest": "sha256:247c7e2a13d902ab97dbcf89811467d153018ef8a6dcc8db67b0ed5bcb1552ce",
+            "role": "supporting",
+            "exposure": "advanced",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          },
+          {
+            "ref": "skill:research_calibration_runner_skill",
+            "package_digest": "sha256:cc6b4a4607f62260bcd240f09c813ad687741780b898792ac0562931463c0a18",
+            "role": "supporting",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "evaluates"
+            ]
+          },
+          {
+            "ref": "skill:research_evaluator_skill",
+            "package_digest": "sha256:f7e15a4cafc50c1432737a2e7a691069169cec070e8924472b59d5c17ad04ec8",
+            "role": "supporting",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "evaluates"
+            ]
+          },
+          {
+            "ref": "skill:research_manager_skill",
+            "package_digest": "sha256:511a5915ca134c92f6fc97d4f6dfd2979d6868f92e7b6efaf8b3fe9d701062cf",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          },
+          {
+            "ref": "skill:research_orchestrator_skill",
+            "package_digest": "sha256:2bd3e42730e9b1beb96fadd69a13ebd82957fd777d1d76eb8675b37a83c7c340",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "workbench",
+            "presentation": "scenario:research_workbench",
+            "default": true,
+            "bindings": {
+              "platform": "research"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "workbench"
+          ],
+          "required_contracts": [
+            "capability:research.workbench.manage@^1.0.0",
+            "capability:research.lifecycle.manage@^1.0.0",
+            "capability:research.tracking.manage@^1.0.0"
+          ],
+          "validation_profiles": [
+            "research.platform.local"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "network.egress",
+              "purpose": "Contact explicitly configured research and tracking providers.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "workspace.read",
+              "purpose": "Read research directions, datasets, tasks, and evidence in the selected workspace.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Persist experiments, evaluation evidence, calibration results, and tracker state.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "calibration_result",
+              "experiment_evidence",
+              "research_artifact"
+            ],
+            "sent_off_device": [
+              "explicit_provider_request"
+            ],
+            "linked_to_user": [],
+            "tracking": false,
+            "retention": "Research artifacts remain in the configured workspace and tracker."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [
+              "calibration_result",
+              "experiment_evidence",
+              "research_artifact"
+            ],
+            "sent_off_device": true,
+            "linked_to_user": false,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "Research Platform",
+        "description": "Reusable governed research workbench, orchestration, experiment management, evaluation, and tracking.",
+        "categories": [
+          "research"
+        ],
+        "tags": [
+          "evaluator",
+          "experiments",
+          "mlflow",
+          "orchestration",
+          "workbench"
+        ],
+        "icon": "flask-outline",
+        "title_i18n": {
+          "en": "Research Platform",
+          "ru": "Исследовательская платформа"
+        },
+        "description_i18n": {
+          "en": "Reusable governed research workbench, orchestration, experiment management, evaluation, and tracking.",
+          "ru": "Переиспользуемая управляемая исследовательская рабочая среда, оркестрация, управление экспериментами, оценка и трекинг."
+        }
+      },
+      "release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6"
+    },
+    "accepted_candidate_id": "research_platform-0-1-24-92b0c98362e6",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.project.preflight",
+        "tests": "Research UI provider access regression and package build passed",
+        "cbs": "4/4 exact native admission",
+        "checkpoint_source_revision": "db4cd1ecb35626c8990dd087ae177cf36696a351",
+        "checkpoint_component_ref": "scenario:research_workbench",
+        "refs": [
+          "e2e:research-workbench-provider-access",
+          "test:research-orchestrator-permission-manifest"
+        ]
+      }
+    ],
+    "provenance_refs": [
+      "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "network.egress",
+          "purpose": "Contact explicitly configured research and tracking providers.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "workspace.read",
+          "purpose": "Read research directions, datasets, tasks, and evidence in the selected workspace.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Persist experiments, evaluation evidence, calibration results, and tracker state.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "calibration_result",
+          "experiment_evidence",
+          "research_artifact"
+        ],
+        "sent_off_device": [
+          "explicit_provider_request"
+        ],
+        "linked_to_user": [],
+        "tracking": false,
+        "retention": "Research artifacts remain in the configured workspace and tracker."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [
+          "calibration_result",
+          "experiment_evidence",
+          "research_artifact"
+        ],
+        "sent_off_device": true,
+        "linked_to_user": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:24c16269d5132d1d5a78166be6947ac087967954b24a8f435b87fad238f3a4ed",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "research_platform",
+      "release_digest": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [
+        {
+          "id": "network.egress",
+          "title": "Network.Egress",
+          "purpose": "Contact explicitly configured research and tracking providers.",
+          "required": true
+        },
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Read research directions, datasets, tasks, and evidence in the selected workspace.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Persist experiments, evaluation evidence, calibration results, and tracker state.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:532fc9d01ff30d57998cb3651b0afc46ad1e621e646de3f52ac2cecfd4ff973b"
+  },
+  "channels": {
+    "stable": "sha256:f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6"
+  },
+  "semantic": {
+    "projection_digest": "sha256:e599b7671a38e5f04284c2a33d7b39faf9775b571c19b6ea5b94292486946588",
+    "path": "semantic/applications/research_platform/f17910b4509e83e0bfa0ba971b83b9b24e17118f369b2e330d3c92b0c98362e6.json"
+  },
+  "projection_digest": "sha256:7da90efb9b997a5d75b3385edea7ae66bb9e4f058ab1cbd1ecc96ff455c95ee9"
+}

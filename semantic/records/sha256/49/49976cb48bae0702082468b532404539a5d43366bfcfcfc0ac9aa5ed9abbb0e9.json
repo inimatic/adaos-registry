@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:research.tracking.manage.mlflow",
+  "binding_definition_digest": "sha256:00d38a3ca18c573b3846d8d2751adc8a3cff550f7263fc48b9b7247f1bbdb133",
+  "logical_entrypoint": "research.tracking.manage.mlflow",
+  "package": {
+    "kind": "skill",
+    "id": "mlflow_tracker_skill",
+    "version": "0.3.13",
+    "digest": "sha256:247c7e2a13d902ab97dbcf89811467d153018ef8a6dcc8db67b0ed5bcb1552ce"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:49976cb48bae0702082468b532404539a5d43366bfcfcfc0ac9aa5ed9abbb0e9"
+}

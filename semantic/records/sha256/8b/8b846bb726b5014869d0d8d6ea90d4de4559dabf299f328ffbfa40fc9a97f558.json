@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:research.workbench.manage.adaos",
+  "binding_definition_digest": "sha256:c3eca3ff4f48e28ee4629eba5f8ebba2ceb33add1bee353c3d27f9030d5067fb",
+  "logical_entrypoint": "research.workbench.manage.adaos",
+  "package": {
+    "kind": "skill",
+    "id": "research_orchestrator_skill",
+    "version": "0.85.0",
+    "digest": "sha256:2bd3e42730e9b1beb96fadd69a13ebd82957fd777d1d76eb8675b37a83c7c340"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:8b846bb726b5014869d0d8d6ea90d4de4559dabf299f328ffbfa40fc9a97f558"
+}
