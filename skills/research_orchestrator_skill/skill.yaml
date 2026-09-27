@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.83.0
+version: 0.84.0
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
@@ -14,6 +14,9 @@ data_migration:
   source_policy: previous_runtime_bucket
   retention: retain_until_previous_runtime_retired
 capabilities:
+- workspace.read
+- workspace.write
+- network.egress
 - storage.relational
 - builder.project_sources
 - skills.invoke

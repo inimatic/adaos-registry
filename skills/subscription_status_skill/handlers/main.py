@@ -104,7 +104,14 @@ def _write_json_file(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 def _read_plan_change_request() -> dict[str, Any]:
-    payload = _read_json_file(_plan_change_request_path())
+    # Read projections must remain available before the on-demand runtime has
+    # attached its versioned state root (and in isolated contract tests).  The
+    # request is optional state, so absence is equivalent to no request.
+    try:
+        path = _plan_change_request_path()
+    except Exception:
+        return {}
+    payload = _read_json_file(path)
     if payload.get("schema") != PLAN_CHANGE_REQUEST_SCHEMA:
         return {}
     return payload

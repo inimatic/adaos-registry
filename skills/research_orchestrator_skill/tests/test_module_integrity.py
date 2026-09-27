@@ -16,6 +16,9 @@ def test_skill_manifest_and_entrypoint_are_valid() -> None:
     manifest = yaml.safe_load((root / "skill.yaml").read_text(encoding="utf-8"))
     assert manifest["name"] == "research_orchestrator_skill"
     assert set(manifest["capabilities"]) == {
+        "workspace.read",
+        "workspace.write",
+        "network.egress",
         "storage.relational",
         "builder.project_sources",
         "skills.invoke",

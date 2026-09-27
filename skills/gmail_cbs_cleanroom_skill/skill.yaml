@@ -1,5 +1,5 @@
 name: gmail_cbs_cleanroom_skill
-version: 0.1.7
+version: 0.1.8
 supported_locales:
 - en
 - ru

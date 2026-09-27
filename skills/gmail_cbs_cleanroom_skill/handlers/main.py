@@ -6,6 +6,7 @@ from email.policy import SMTP
 from email.utils import getaddresses
 import hashlib
 from html.parser import HTMLParser
+import logging
 import re
 import sqlite3
 import uuid
@@ -16,6 +17,7 @@ from adaos.sdk.data.lifecycle import ensure_database
 from adaos.sdk.providers import gmail
 
 DATABASE = "send_commands.sqlite3"
+_log = logging.getLogger("adaos.skill.gmail_cbs_cleanroom")
 ERRORS = {
     "gmail_account_not_connected": "Connect your Gmail account to continue.",
     "gmail_reconnect_required": "Authorization expired or was revoked. Reconnect your account.",
@@ -30,8 +32,9 @@ ERRORS = {
 
 
 def _error(code):
-    code = code if code in ERRORS else "gmail_provider_unavailable"
-    return {"ok": False, "error": code, "message": ERRORS[code]}
+    provider_code = str(code or "gmail_provider_unavailable")
+    public_code = provider_code if provider_code in ERRORS else "gmail_provider_unavailable"
+    return {"ok": False, "error": public_code, "message": ERRORS[public_code]}
 
 
 def _authorize(write=False):
@@ -63,9 +66,15 @@ def _bounded_call(fn):
     try:
         return fn()
     except gmail.GmailProviderError as exc:
+        _log.warning("gmail provider operation rejected code=%s", exc.code)
         return _error(exc.code)
-    except Exception:
+    except Exception as exc:
         # No remote exception text, response body or request arguments may escape.
+        exception_type = type(exc).__name__
+        _log.warning(
+            "gmail provider adapter failure exception_type=%s",
+            exception_type,
+        )
         return _error("gmail_provider_unavailable")
 
 
