@@ -21,9 +21,9 @@
       "application_id": "applications",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 3,
-      "stable_release_digest": "sha256:9af21f1fc23bae6aa4dea6380002cf7652e8c5550eb2b5d026de78eac971a447",
-      "release_key": "applications@sha256:9af21f1fc23bae6aa4dea6380002cf7652e8c5550eb2b5d026de78eac971a447",
-      "projection_digest": "sha256:3efb19b62f2ff3d673f9b876f3b72faa0a902445e34824d481acc9f79b096fbf"
+      "stable_release_digest": "sha256:6f2f2cb3b18605fc69bab7112dfd957be2fb94b509039a36ef71a078ef30c9ce",
+      "release_key": "applications@sha256:6f2f2cb3b18605fc69bab7112dfd957be2fb94b509039a36ef71a078ef30c9ce",
+      "projection_digest": "sha256:3739871d5bf625328827c100df8f65eec7062337849f6aeb0663827a63831d8c"
     },
     "web_desktop": {
       "application_id": "web_desktop",
@@ -586,7 +586,15 @@
       "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
       "path": "semantic/catalog/releases/adaos_builder/ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c.json",
       "projection_digest": "sha256:63d34ae65612235746630e7a788e358209580aa50da97ca0b6781580c83dd041"
+    },
+    "applications@sha256:6f2f2cb3b18605fc69bab7112dfd957be2fb94b509039a36ef71a078ef30c9ce": {
+      "application_id": "applications",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.43",
+      "release_digest": "sha256:6f2f2cb3b18605fc69bab7112dfd957be2fb94b509039a36ef71a078ef30c9ce",
+      "path": "semantic/catalog/releases/applications/6f2f2cb3b18605fc69bab7112dfd957be2fb94b509039a36ef71a078ef30c9ce.json",
+      "projection_digest": "sha256:3739871d5bf625328827c100df8f65eec7062337849f6aeb0663827a63831d8c"
     }
   },
-  "index_digest": "sha256:c780c7edd81936bbdd0a317fb190a8a9e56b0a6121814bbebad696927b7109cb"
+  "index_digest": "sha256:179da50eef26fce3af815413f91eb0085d4d31783af7ac1621f7e0d9ba5abd41"
 }
