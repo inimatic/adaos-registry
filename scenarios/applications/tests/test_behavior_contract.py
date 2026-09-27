@@ -118,7 +118,8 @@ def test_application_failure_reason_is_visible_from_public_detail(status, reason
 @pytest.mark.parametrize('status', ['planned', 'pending', 'failed', 'conflict', 'succeeded'])
 def test_only_reviewable_plan_can_submit_exact_digest(kind, on, status):
     operation = {'kind': kind, 'operation_id': 'appop.consumer', 'plan_digest': DIGEST,
-                 'status': status, 'plan': {'permission_review': {'approval_required': True}}}
+                 'idempotency_key': 'review.consumer', 'status': status,
+                 'plan': {'permission_review': {'approval_required': True}}}
     state = {'reviewedPlan': {'operation': operation}, 'permissionApproved': True}
     action = command('modal-review-actions', 'click:' + on)
     assert enabled(action, state) is (status == 'planned')
@@ -126,7 +127,7 @@ def test_only_reviewable_plan_can_submit_exact_digest(kind, on, status):
         first = request(action, state)
         assert first == request(action, state) == {
             'operation_id': 'appop.consumer', 'plan_digest': DIGEST,
-            'idempotency_key': 'appop.consumer'}
+            'idempotency_key': 'review.consumer'}
         if kind in ('install', 'update'):
             state['permissionApproved'] = False
             assert not enabled(action, state)

@@ -162,7 +162,7 @@ def test_lifecycle_plans_use_displayed_revisions_and_review_before_apply():
         assert a['idempotencyKey'] == 'auto'
         assert a['resultStateKey'] == 'reviewedPlan'
     for a in actions('applications.apply'):
-        assert a['params'] == {'operation_id':'$state.reviewedPlan.operation.operation_id','plan_digest':'$state.reviewedPlan.operation.plan_digest', 'idempotency_key':'$state.reviewedPlan.operation.operation_id'}
+        assert a['params'] == {'operation_id':'$state.reviewedPlan.operation.operation_id','plan_digest':'$state.reviewedPlan.operation.plan_digest', 'idempotency_key':'$state.reviewedPlan.operation.idempotency_key'}
         assert 'idempotencyKey' not in a
         assert "status == 'planned'" in a['enabledIf']
     assert not actions('applications.update_settings')
@@ -172,13 +172,13 @@ def test_lifecycle_plans_use_displayed_revisions_and_review_before_apply():
 
 
 def test_exact_plan_digest_and_retry_key_survive_synthetic_retry():
-    state = {'reviewedPlan': {'operation': {'operation_id':'appop.synthetic', 'plan_digest':'sha256:'+'a'*64}}}
+    state = {'reviewedPlan': {'operation': {'operation_id':'appop.synthetic', 'plan_digest':'sha256:'+'a'*64, 'idempotency_key':'review.synthetic'}}}
     action = actions('applications.apply')[0]
     first = resolve(action['params'], state, {})
     retry = resolve(action['params'], state, {})
     assert retry == first
     jsonschema.validate(first, CONTRACTS['applications.apply']['input_schema'])
-    assert first['idempotency_key'] == first['operation_id']
+    assert first['idempotency_key'] == 'review.synthetic'
 
 
 def test_application_detail_fields_project_from_published_record():
@@ -221,7 +221,7 @@ def test_apply_retry_keys_use_parameters_and_preserve_modal_command_order():
                     continue
                 command = [action for action in steps if action.get('on') == step['on']]
                 assert [action['type'] for action in command] == ['callMcp', 'closeModal']
-                assert step['params']['idempotency_key'] == step['params']['operation_id']
+                assert step['params']['idempotency_key'] == '$state.reviewedPlan.operation.idempotency_key'
 
 
 def test_setup_schema_editor_and_unsupported_field_gate():

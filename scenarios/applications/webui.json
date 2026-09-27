@@ -2879,7 +2879,7 @@
                                     "params": {
                                         "operation_id": "$state.reviewedPlan.operation.operation_id",
                                         "plan_digest": "$state.reviewedPlan.operation.plan_digest",
-                                        "idempotency_key": "$state.reviewedPlan.operation.operation_id"
+                                        "idempotency_key": "$state.reviewedPlan.operation.idempotency_key"
                                     },
                                     "resultStateKey": "reviewedPlan",
                                     "target": "applications.apply",
@@ -2898,7 +2898,7 @@
                                     "params": {
                                         "operation_id": "$state.reviewedPlan.operation.operation_id",
                                         "plan_digest": "$state.reviewedPlan.operation.plan_digest",
-                                        "idempotency_key": "$state.reviewedPlan.operation.operation_id"
+                                        "idempotency_key": "$state.reviewedPlan.operation.idempotency_key"
                                     },
                                     "resultStateKey": "reviewedPlan",
                                     "target": "applications.apply",
@@ -2917,7 +2917,7 @@
                                     "params": {
                                         "operation_id": "$state.reviewedPlan.operation.operation_id",
                                         "plan_digest": "$state.reviewedPlan.operation.plan_digest",
-                                        "idempotency_key": "$state.reviewedPlan.operation.operation_id"
+                                        "idempotency_key": "$state.reviewedPlan.operation.idempotency_key"
                                     },
                                     "resultStateKey": "reviewedPlan",
                                     "target": "applications.apply",
@@ -2936,7 +2936,7 @@
                                     "params": {
                                         "operation_id": "$state.reviewedPlan.operation.operation_id",
                                         "plan_digest": "$state.reviewedPlan.operation.plan_digest",
-                                        "idempotency_key": "$state.reviewedPlan.operation.operation_id"
+                                        "idempotency_key": "$state.reviewedPlan.operation.idempotency_key"
                                     },
                                     "resultStateKey": "reviewedPlan",
                                     "target": "applications.apply",
@@ -3442,7 +3442,7 @@
                                         "params": {
                                             "operation_id": "$state.reviewedPlan.operation.operation_id",
                                             "plan_digest": "$state.reviewedPlan.operation.plan_digest",
-                                            "idempotency_key": "$state.reviewedPlan.operation.operation_id"
+                                            "idempotency_key": "$state.reviewedPlan.operation.idempotency_key"
                                         },
                                         "resultStateKey": "reviewedPlan",
                                         "target": "applications.apply",
@@ -3465,7 +3465,7 @@
                                         "params": {
                                             "operation_id": "$state.reviewedPlan.operation.operation_id",
                                             "plan_digest": "$state.reviewedPlan.operation.plan_digest",
-                                            "idempotency_key": "$state.reviewedPlan.operation.operation_id"
+                                            "idempotency_key": "$state.reviewedPlan.operation.idempotency_key"
                                         },
                                         "resultStateKey": "reviewedPlan",
                                         "target": "applications.apply",
@@ -3488,7 +3488,7 @@
                                         "params": {
                                             "operation_id": "$state.reviewedPlan.operation.operation_id",
                                             "plan_digest": "$state.reviewedPlan.operation.plan_digest",
-                                            "idempotency_key": "$state.reviewedPlan.operation.operation_id"
+                                            "idempotency_key": "$state.reviewedPlan.operation.idempotency_key"
                                         },
                                         "resultStateKey": "reviewedPlan",
                                         "target": "applications.apply",
@@ -3511,7 +3511,7 @@
                                         "params": {
                                             "operation_id": "$state.reviewedPlan.operation.operation_id",
                                             "plan_digest": "$state.reviewedPlan.operation.plan_digest",
-                                            "idempotency_key": "$state.reviewedPlan.operation.operation_id"
+                                            "idempotency_key": "$state.reviewedPlan.operation.idempotency_key"
                                         },
                                         "resultStateKey": "reviewedPlan",
                                         "target": "applications.apply",
@@ -6401,7 +6401,7 @@
                                         "params": {
                                             "operation_id": "$state.reviewedPlan.operation.operation_id",
                                             "plan_digest": "$state.reviewedPlan.operation.plan_digest",
-                                            "idempotency_key": "$state.reviewedPlan.operation.operation_id"
+                                            "idempotency_key": "$state.reviewedPlan.operation.idempotency_key"
                                         },
                                         "on": "click:confirm",
                                         "invalidates": [
@@ -6516,7 +6516,7 @@
                                         "params": {
                                             "operation_id": "$state.reviewedPlan.operation.operation_id",
                                             "plan_digest": "$state.reviewedPlan.operation.plan_digest",
-                                            "idempotency_key": "$state.reviewedPlan.operation.operation_id"
+                                            "idempotency_key": "$state.reviewedPlan.operation.idempotency_key"
                                         },
                                         "on": "click:confirm",
                                         "invalidates": [
@@ -6562,7 +6562,7 @@
                 }
             }
         },
-        "version": "0.1.66",
+        "version": "0.1.67",
         "manifest": "webui.json"
     },
     "generated_by": "builder_skill"
