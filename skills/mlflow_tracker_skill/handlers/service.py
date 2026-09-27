@@ -28,6 +28,11 @@ def server_environment() -> dict[str, str]:
     if existing:
         entries.extend(existing.split(os.pathsep))
     env["PYTHONPATH"] = os.pathsep.join(dict.fromkeys(entries))
+    # MLflow 3 enables its job-execution subsystem by default. That launches a
+    # job runner plus several Huey workers even though this provider only uses
+    # the tracking API. Keep the default suitable for edge nodes; operators
+    # that need MLflow jobs can opt in with the standard MLflow variable.
+    env.setdefault("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "false")
     return env
 
 

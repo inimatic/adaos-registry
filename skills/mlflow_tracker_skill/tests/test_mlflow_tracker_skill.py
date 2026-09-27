@@ -46,6 +46,18 @@ def test_server_worker_count_can_be_overridden(monkeypatch) -> None:
     assert command[command.index("--workers") + 1] == "2"
 
 
+def test_server_environment_disables_unused_mlflow_job_workers_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", raising=False)
+
+    assert server_environment()["MLFLOW_SERVER_ENABLE_JOB_EXECUTION"] == "false"
+
+
+def test_server_environment_preserves_explicit_mlflow_job_opt_in(monkeypatch) -> None:
+    monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+
+    assert server_environment()["MLFLOW_SERVER_ENABLE_JOB_EXECUTION"] == "true"
+
+
 def test_server_prefers_core_provisioned_storage_bindings(monkeypatch) -> None:
     monkeypatch.setenv("ADAOS_SERVICE_RELATIONAL_URI", "postgresql://service@database/mlflow")
     monkeypatch.setenv("ADAOS_SERVICE_BLOB_URI", "s3://adaos-artifacts/isolated")
