@@ -11921,5 +11921,115 @@
       "adapter": "adaos.sdk.builder.applications",
       "handler": "applications_development_publish_stable_source"
     }
+  },
+  {
+    "id": "applications.list_home_targets",
+    "title": "List Application Home targets",
+    "surface": "operations",
+    "summary": "List non-development desktops and the current Home pin state for one installed Application.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "application_id"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "request_id": {"type": "string"},
+        "trace_id": {"type": "string"},
+        "tool_id": {"type": "string"},
+        "surface": {"type": "string", "enum": ["development", "operations"]},
+        "ok": {"type": "boolean"},
+        "status": {"type": "string"},
+        "dry_run": {"type": "boolean"},
+        "result": {"type": ["object", "array", "string", "number", "boolean", "null"]},
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {"type": "string"},
+            "message": {"type": "string"},
+            "details": {"type": "object"}
+          },
+          "required": ["code", "message"],
+          "additionalProperties": true
+        },
+        "audit_event_id": {"type": "string"},
+        "meta": {"type": "object"}
+      },
+      "required": ["request_id", "trace_id", "tool_id", "surface", "ok", "status", "dry_run"],
+      "additionalProperties": true
+    },
+    "required_capability": "applications.read",
+    "stability": "experimental",
+    "side_effects": "none",
+    "availability": "enabled",
+    "metadata": {
+      "published_by": "plane:applications",
+      "adapter": "adaos.sdk.applications",
+      "handler": "applications_list_home_targets"
+    }
+  },
+  {
+    "id": "applications.set_home_pins",
+    "title": "Set Application Home desktops",
+    "surface": "operations",
+    "summary": "Replace the bounded set of desktops where an installed Application is pinned to Home.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "application_id": {"type": "string"},
+        "webspace_ids": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 160},
+          "uniqueItems": true,
+          "maxItems": 100
+        }
+      },
+      "required": ["application_id", "webspace_ids"],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "request_id": {"type": "string"},
+        "trace_id": {"type": "string"},
+        "tool_id": {"type": "string"},
+        "surface": {"type": "string", "enum": ["development", "operations"]},
+        "ok": {"type": "boolean"},
+        "status": {"type": "string"},
+        "dry_run": {"type": "boolean"},
+        "result": {"type": ["object", "array", "string", "number", "boolean", "null"]},
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {"type": "string"},
+            "message": {"type": "string"},
+            "details": {"type": "object"}
+          },
+          "required": ["code", "message"],
+          "additionalProperties": true
+        },
+        "audit_event_id": {"type": "string"},
+        "meta": {"type": "object"}
+      },
+      "required": ["request_id", "trace_id", "tool_id", "surface", "ok", "status", "dry_run"],
+      "additionalProperties": true
+    },
+    "required_capability": "applications.apply",
+    "stability": "experimental",
+    "side_effects": "write",
+    "availability": "enabled",
+    "metadata": {
+      "published_by": "plane:applications",
+      "adapter": "adaos.sdk.applications",
+      "handler": "applications_set_home_pins"
+    }
   }
 ]

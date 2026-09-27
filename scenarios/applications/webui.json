@@ -545,6 +545,8 @@
                                         "trialTarget": null,
                                         "selectedApplication": {},
                                         "selectedRelease": {},
+                                        "homeTargets": {},
+                                        "homePinSelection": [],
                                         "reviewedPlan": {},
                                         "reviewedTransition": {},
                                         "selectedAccessGrantId": "",
@@ -1906,36 +1908,52 @@
                                 {
                                     "on": "click:pin-home",
                                     "type": "callMcp",
-                                    "target": "applications.set_home_pin",
+                                    "target": "applications.list_home_targets",
                                     "params": {
-                                        "application_id": "$state.selectedApplicationId",
-                                        "pinned": true
+                                        "application_id": "$state.selectedApplicationId"
                                     },
                                     "enabledIf": "$state.selectedApplicationId && $state.applicationInstalled == true && $state.applicationPinnedToHome != true",
-                                    "invalidates": [
-                                        "applications.catalog",
-                                        "applications.detail",
-                                        "applications.setup",
-                                        "applications.access",
-                                        "applications.placement"
-                                    ]
+                                    "dryRun": true,
+                                    "resultStateKey": "homeTargets"
+                                },
+                                {
+                                    "on": "click:pin-home",
+                                    "params": {
+                                        "homePinSelection": "$state.homeTargets.home_targets.pinned_webspace_ids"
+                                    },
+                                    "type": "updateState"
+                                },
+                                {
+                                    "on": "click:pin-home",
+                                    "params": {
+                                        "modalId": "manage-home-desktops"
+                                    },
+                                    "type": "openModal"
                                 },
                                 {
                                     "on": "click:unpin-home",
                                     "type": "callMcp",
-                                    "target": "applications.set_home_pin",
+                                    "target": "applications.list_home_targets",
                                     "params": {
-                                        "application_id": "$state.selectedApplicationId",
-                                        "pinned": false
+                                        "application_id": "$state.selectedApplicationId"
                                     },
                                     "enabledIf": "$state.selectedApplicationId && $state.applicationInstalled == true && $state.applicationPinnedToHome == true",
-                                    "invalidates": [
-                                        "applications.catalog",
-                                        "applications.detail",
-                                        "applications.setup",
-                                        "applications.access",
-                                        "applications.placement"
-                                    ]
+                                    "dryRun": true,
+                                    "resultStateKey": "homeTargets"
+                                },
+                                {
+                                    "on": "click:unpin-home",
+                                    "params": {
+                                        "homePinSelection": "$state.homeTargets.home_targets.pinned_webspace_ids"
+                                    },
+                                    "type": "updateState"
+                                },
+                                {
+                                    "on": "click:unpin-home",
+                                    "params": {
+                                        "modalId": "manage-home-desktops"
+                                    },
+                                    "type": "openModal"
                                 },
                                 {
                                     "type": "openModal",
@@ -3068,6 +3086,134 @@
                 }
             },
             "modals": {
+                "manage-home-desktops": {
+                    "title": "Home desktops",
+                    "presentation": {
+                        "kind": "modal"
+                    },
+                    "schema": {
+                        "id": "manage-home-desktops",
+                        "title": "Home desktops",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "bounded",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "selection": "multiple",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "home-desktops-form",
+                                "type": "ui.form",
+                                "area": "main",
+                                "inputs": {
+                                    "showSubmit": true,
+                                    "submitLabel": "Save Home desktops",
+                                    "resetOnSuccess": false,
+                                    "fields": [
+                                        {
+                                            "id": "webspace_ids",
+                                            "type": "multiChoice",
+                                            "label": "Show this Application on Home",
+                                            "hint": "Choose every desktop where the Application should be pinned.",
+                                            "required": false,
+                                            "stateKey": "homePinSelection",
+                                            "optionValuePath": "webspace_id",
+                                            "optionLabelPaths": [
+                                                "title",
+                                                "webspace_id"
+                                            ],
+                                            "optionsDataSource": {
+                                                "kind": "mcp",
+                                                "toolId": "applications.list_home_targets",
+                                                "arguments": {
+                                                    "application_id": "$state.selectedApplicationId"
+                                                },
+                                                "dryRun": true,
+                                                "resultPath": "response.result.home_targets.targets",
+                                                "invalidationTags": [
+                                                    "applications.catalog",
+                                                    "applications.detail"
+                                                ]
+                                            }
+                                        }
+                                    ],
+                                    "buttons": [
+                                        {
+                                            "id": "save-home-desktops",
+                                            "label": "Save Home desktops"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "id": "save-home-desktops",
+                                        "on": "submit",
+                                        "type": "callMcp",
+                                        "target": "applications.set_home_pins",
+                                        "params": {
+                                            "application_id": "$state.selectedApplicationId",
+                                            "webspace_ids": "$event.values.webspace_ids"
+                                        },
+                                        "resultStateKey": "homeTargets",
+                                        "invalidates": [
+                                            "applications.catalog",
+                                            "applications.detail",
+                                            "applications.setup",
+                                            "applications.access",
+                                            "applications.placement"
+                                        ]
+                                    },
+                                    {
+                                        "id": "save-home-desktops",
+                                        "on": "submit",
+                                        "type": "closeModal"
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "home-desktops-actions",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "variant": "toolbar",
+                                    "buttons": [
+                                        {
+                                            "id": "close",
+                                            "icon": "close-outline",
+                                            "kind": "secondary",
+                                            "label": "Cancel"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:close",
+                                        "type": "closeModal"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                },
                 "review-application-updates": {
                     "title": "Review application updates",
                     "presentation": {

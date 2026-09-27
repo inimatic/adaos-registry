@@ -166,9 +166,29 @@ def test_lifecycle_plans_use_displayed_revisions_and_review_before_apply():
         assert 'idempotencyKey' not in a
         assert "status == 'planned'" in a['enabledIf']
     assert not actions('applications.update_settings')
-    for a in WIDGETS['lifecycle-actions']['actions']:
-        if a['on'] in ['click:pin-home','click:unpin-home']:
-            assert a['type'] == 'callMcp'
+    life = WIDGETS['lifecycle-actions']
+    for event in ['click:pin-home', 'click:unpin-home']:
+        command = [action for action in life['actions'] if action['on'] == event]
+        assert [action['type'] for action in command] == ['callMcp', 'updateState', 'openModal']
+        assert command[0]['target'] == 'applications.list_home_targets'
+        assert command[0]['dryRun'] is True
+        assert command[1]['params']['homePinSelection'] == '$state.homeTargets.home_targets.pinned_webspace_ids'
+        assert command[2]['params']['modalId'] == 'manage-home-desktops'
+
+
+def test_home_desktop_dialog_uses_bounded_root_read_and_batch_mutation():
+    form = WIDGETS['home-desktops-form']
+    field = form['inputs']['fields'][0]
+    assert field['type'] == 'multiChoice'
+    assert field['stateKey'] == 'homePinSelection'
+    assert field['optionsDataSource']['toolId'] == 'applications.list_home_targets'
+    assert field['optionsDataSource']['resultPath'] == 'response.result.home_targets.targets'
+    save = next(action for action in form['actions'] if action.get('type') == 'callMcp')
+    assert save['target'] == 'applications.set_home_pins'
+    assert save['params'] == {
+        'application_id': '$state.selectedApplicationId',
+        'webspace_ids': '$event.values.webspace_ids',
+    }
 
 
 def test_exact_plan_digest_and_retry_key_survive_synthetic_retry():
