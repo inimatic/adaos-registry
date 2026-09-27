@@ -124,10 +124,10 @@
     "voice": {
       "application_id": "voice",
       "publisher_ref": "subnet:sn_6acf0c01",
-      "application_revision": 2,
-      "stable_release_digest": "sha256:0b891e2da738e254317eb958eda533333ba2a5d17752ed3c75850f19e0dede55",
-      "release_key": "voice@sha256:0b891e2da738e254317eb958eda533333ba2a5d17752ed3c75850f19e0dede55",
-      "projection_digest": "sha256:7c5f8e100637e2d2990a2479a2b2418e80632ce34ac86daff1153d76a46e6577"
+      "application_revision": 3,
+      "stable_release_digest": "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97",
+      "release_key": "voice@sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97",
+      "projection_digest": "sha256:214c36f120c5ad1ac0b2186bf674ce658da643fb00921df49af9904b7f10ae14"
     },
     "research_tlp": {
       "application_id": "research_tlp",
@@ -658,7 +658,15 @@
       "release_digest": "sha256:8510b66f85cf0837766fd7550bb534c9bff38d21962a3b5d3906fdedcda0ff30",
       "path": "semantic/catalog/releases/subscription_status/8510b66f85cf0837766fd7550bb534c9bff38d21962a3b5d3906fdedcda0ff30.json",
       "projection_digest": "sha256:61fa38de77d751ea53fff5b882d03f7b030378f45e6bd31f72ade7a9c711b64d"
+    },
+    "voice@sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97": {
+      "application_id": "voice",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.9",
+      "release_digest": "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97",
+      "path": "semantic/catalog/releases/voice/e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97.json",
+      "projection_digest": "sha256:214c36f120c5ad1ac0b2186bf674ce658da643fb00921df49af9904b7f10ae14"
     }
   },
-  "index_digest": "sha256:676e9d1d47ab803852398ea844bcc1b2830d506bdc424895072d99c51c82fb0c"
+  "index_digest": "sha256:873fb09db908eaeb4581e57eea8ea9b3866d0a9b47cdea34529741147c16f6ef"
 }

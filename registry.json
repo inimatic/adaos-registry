@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-27T22:07:03+00:00",
+  "updated_at": "2026-09-27T22:07:55+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1325,13 +1325,19 @@
       "kind": "skill",
       "id": "voice_chat_skill",
       "name": "voice_chat_skill",
-      "version": "0.7.7",
-      "updated_at": "2026-09-26T11:05:54+00:00",
+      "version": "0.7.8",
+      "updated_at": "2026-09-27T21:52:48+00:00",
       "path": "skills/voice_chat_skill",
       "manifest": "skills/voice_chat_skill/skill.yaml",
       "source": {
         "path": "skills/voice_chat_skill",
-        "manifest": "skills/voice_chat_skill/skill.yaml"
+        "manifest": "skills/voice_chat_skill/skill.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:376cfc5074d765eba3ebadcc6bace2124d4d0db464812b5f1868c85b57c740cc",
+        "path_scope": [
+          "projects/voice/"
+        ]
       },
       "install": {
         "kind": "skill",
@@ -1343,10 +1349,19 @@
       "tools_count": 8,
       "activation": {
         "mode": "package_lock",
-        "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.18",
-        "release_digest": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
-        "package_digest": "sha256:66bbd25a130c9be8857e195a0d506adc7bab8a6e2ab47fd2f4778bac935f9d7f"
+        "project_id": "voice",
+        "release": "voice@0.1.9",
+        "release_digest": "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97",
+        "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c"
+      },
+      "channels": {
+        "stable": {
+          "release": "voice@0.1.9",
+          "release_digest": "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97",
+          "source_revision": "sha256:376cfc5074d765eba3ebadcc6bace2124d4d0db464812b5f1868c85b57c740cc",
+          "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c",
+          "version": "0.7.8"
+        }
       }
     },
     {
@@ -2908,6 +2923,78 @@
           "source_revision": "sha256:41b8befb088010b9efeebb09756835a0ce8ad789f6a12cd166cd8069c8488872",
           "package_digest": "sha256:b7388cf6732b95483a9210bfd9799f87e4edc18feb78fb63455ccabd7a00202c",
           "version": "0.1.18"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "voice",
+      "name": "voice",
+      "version": "0.1.9",
+      "updated_at": "2026-09-27T22:07:55+00:00",
+      "path": "projects/voice",
+      "manifest": "projects/voice/project.yaml",
+      "source": {
+        "path": "projects/voice",
+        "manifest": "projects/voice/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "voice",
+        "id": "voice"
+      },
+      "title": "Voice",
+      "description": "Webspace-scoped conversational voice runtime and session projection.",
+      "categories": [
+        "communication"
+      ],
+      "tags": [
+        "voice",
+        "conversation",
+        "cbs-provider"
+      ],
+      "publication": {
+        "stage": "beta",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "beta",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "default",
+          "title": "Voice",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:voice_chat_skill"
+          ]
+        }
+      ],
+      "components": [
+        "skill:voice_chat_skill"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.builder.component_project.v1"
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "voice",
+        "release": "voice@0.1.9",
+        "release_digest": "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97",
+        "primary_component": "skill:voice_chat_skill",
+        "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c"
+      },
+      "channels": {
+        "stable": {
+          "release": "voice@0.1.9",
+          "release_digest": "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97",
+          "source_revision": "sha256:376cfc5074d765eba3ebadcc6bace2124d4d0db464812b5f1868c85b57c740cc",
+          "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c",
+          "version": "0.1.9"
         }
       }
     }

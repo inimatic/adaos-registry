@@ -1,0 +1,308 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "voice",
+    "legacy_project_id": "voice",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "voice",
+    "display": {
+      "title": "Voice",
+      "summary": "Webspace-scoped conversational voice runtime and session projection."
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "voice",
+        "presentation_ref": "voice_chat_app"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 3,
+    "created_at": "2026-09-26T04:32:51+00:00",
+    "updated_at": "2026-09-27T22:08:01+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "voice",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "voice",
+    "version": "0.1.9",
+    "release_digest": "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "voice",
+      "version": "0.1.9",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:376cfc5074d765eba3ebadcc6bace2124d4d0db464812b5f1868c85b57c740cc",
+        "path_scope": [
+          "projects/voice/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "voice_chat_skill",
+          "version": "0.7.8",
+          "digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c",
+          "manifest_digest": "sha256:bad55e4d0152325f4a25870fb9881b4d79a3c1adfae5ce449955912ce5e173b9",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:376cfc5074d765eba3ebadcc6bace2124d4d0db464812b5f1868c85b57c740cc",
+            "path_scope": [
+              "skills/voice_chat_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/voice_chat_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:376cfc5074d765eba3ebadcc6bace2124d4d0db464812b5f1868c85b57c740cc",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:5b9f5300a14816f867cd8590298c4a24279f2292a50ce6d42e9dbe2108e94641"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:4f71c141ac206783d29869dcfa2bbdaa33ab042188c0ef297480661c145ced67",
+        "profiles": [
+          "adaos.builder.component_project.v1"
+        ],
+        "members": [
+          {
+            "ref": "skill:voice_chat_skill",
+            "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "voice",
+            "presentation": "voice_chat_app",
+            "default": true,
+            "bindings": {
+              "surface": "voice_chat"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "voice"
+          ],
+          "required_contracts": [
+            "capability:voice.conversation.run@^1.0.0"
+          ],
+          "validation_profiles": [
+            "voice.local"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "workspace.read",
+              "purpose": "Inspect compact local voice runtime health and snapshots.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Materialize explicitly submitted chat, timer, and compact runtime state.",
+              "approval_policy": "grant_on_install",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "conversation_tail",
+              "timer_state"
+            ],
+            "sent_off_device": [],
+            "linked_to_user": [
+              "conversation_tail"
+            ],
+            "tracking": false,
+            "retention": "A bounded local conversation tail and compact runtime state are retained."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [
+              "conversation_tail",
+              "timer_state"
+            ],
+            "sent_off_device": false,
+            "linked_to_user": true,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "Voice",
+        "description": "Webspace-scoped conversational voice runtime and session projection.",
+        "categories": [
+          "communication"
+        ],
+        "tags": [
+          "cbs-provider",
+          "conversation",
+          "voice"
+        ]
+      },
+      "release_digest": "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97"
+    },
+    "accepted_candidate_id": "voice-0-1-9-af6f408cab97",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.project.preflight",
+        "tests": "canonical entrypoint, CBS contract and maintained Application tests passed",
+        "registry_commit": "25830799628516d352eafd7f17d46a29f1dd4766",
+        "cbs": "native contract admission with exact delivery metadata",
+        "checkpoint_source_revision": "6fcaee53a457d1b7f62643cfc8f92f7defb31fec",
+        "checkpoint_component_ref": "skill:voice_chat_skill"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "workspace.read",
+          "purpose": "Inspect compact local voice runtime health and snapshots.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Materialize explicitly submitted chat, timer, and compact runtime state.",
+          "approval_policy": "grant_on_install",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "conversation_tail",
+          "timer_state"
+        ],
+        "sent_off_device": [],
+        "linked_to_user": [
+          "conversation_tail"
+        ],
+        "tracking": false,
+        "retention": "A bounded local conversation tail and compact runtime state are retained."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [
+          "conversation_tail",
+          "timer_state"
+        ],
+        "sent_off_device": false,
+        "linked_to_user": true,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:76d8ebf3b7bf40c4b265cb655eaddd76624adacc30581c2b4e040e705736d86d",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "voice",
+      "release_digest": "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Inspect compact local voice runtime health and snapshots.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Materialize explicitly submitted chat, timer, and compact runtime state.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:89a1f8aee6405b4e51bdb2cce87114bccc31f27f1e055cca3c735f79dc4edf05"
+  },
+  "channels": {
+    "stable": "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97"
+  },
+  "semantic": {
+    "projection_digest": "sha256:f4c92cc15a4ce80dabb3204325eaaaaa8a2a95c613458300f0d5930374d01a12",
+    "path": "semantic/applications/voice/e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97.json"
+  },
+  "projection_digest": "sha256:214c36f120c5ad1ac0b2186bf674ce658da643fb00921df49af9904b7f10ae14"
+}

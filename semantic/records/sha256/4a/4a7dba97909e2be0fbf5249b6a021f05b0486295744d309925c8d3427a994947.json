@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:voice.conversation.run.adaos",
+  "binding_definition_digest": "sha256:b1c43acc9b83ee92afb193cffedc3364d34d72d25d95abfbe5e6ca9f63e84bea",
+  "logical_entrypoint": "voice.conversation.run.adaos",
+  "package": {
+    "kind": "skill",
+    "id": "voice_chat_skill",
+    "version": "0.7.8",
+    "digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:4a7dba97909e2be0fbf5249b6a021f05b0486295744d309925c8d3427a994947"
+}
