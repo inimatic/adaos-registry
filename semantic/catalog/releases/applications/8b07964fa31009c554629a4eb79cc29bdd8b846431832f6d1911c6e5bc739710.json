@@ -1,0 +1,372 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "applications",
+    "legacy_project_id": "applications",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "applications",
+    "display": {
+      "title": "Applications",
+      "summary": "Manage installed applications, available releases, update tracks, and local developments.",
+      "categories": [
+        "System",
+        "Management"
+      ]
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "main",
+        "presentation_ref": "scenario:applications"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": true,
+      "bootstrap_capable": true,
+      "active_installation_removable": false,
+      "recovery_surfaces": [
+        "cli",
+        "mcp"
+      ]
+    },
+    "lifecycle": "active",
+    "revision": 3,
+    "created_at": "2026-09-06T05:29:12+00:00",
+    "updated_at": "2026-09-25T15:34:27+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "applications",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "applications",
+    "version": "0.1.44",
+    "release_digest": "sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "applications",
+      "version": "0.1.44",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:26a06fe2a0df11fe7c4296f48ad066041372de9131b0e9618ce23ab915c3345f",
+        "path_scope": [
+          "projects/applications/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "applications",
+          "version": "0.1.74",
+          "digest": "sha256:e3741e74db660de49effba207188279156f5fbf2be2bd399f4e22aa504cc0db4",
+          "manifest_digest": "sha256:2bc6a59e9c5c7340e84e4644a86218fb26da8d018a7879c0b2727ecfe9a4130a",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:26a06fe2a0df11fe7c4296f48ad066041372de9131b0e9618ce23ab915c3345f",
+            "path_scope": [
+              "scenarios/applications/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/applications",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [
+        "applications.apply",
+        "applications.develop",
+        "applications.plan",
+        "applications.publish",
+        "applications.read",
+        "applications.report"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:26a06fe2a0df11fe7c4296f48ad066041372de9131b0e9618ce23ab915c3345f",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:c0f22d968e729e75d498e6da38853944cd757d18030915d173d90ac0c192a008"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:f4750e4a2e45213db313b0e38e538b45666970397643e0c5beb1bcd081329ef1",
+        "profiles": [
+          "adaos.system.applications.v1"
+        ],
+        "members": [
+          {
+            "ref": "scenario:applications",
+            "package_digest": "sha256:e3741e74db660de49effba207188279156f5fbf2be2bd399f4e22aa504cc0db4",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "main",
+            "presentation": "scenario:applications",
+            "default": true,
+            "bindings": {}
+          }
+        ],
+        "compatibility": {},
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "applications.apply",
+              "purpose": "Apply exact reviewed lifecycle plans and manage access for the selected Application.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "applications.develop",
+              "purpose": "Manage this publisher's unpublished local Application development.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "applications.plan",
+              "purpose": "Prepare reviewable lifecycle plans and release-readiness checks without applying them.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "applications.publish",
+              "purpose": "Promote an accepted Application release and publish its exact source and portable CBS projection to the shared registry.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "applications.read",
+              "purpose": "Read the Application catalog, installed state, releases, permissions, roles, access grants, and operation history.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "applications.report",
+              "purpose": "Read Root-owned Application development reports.",
+              "approval_policy": "owner_only"
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "access_metadata",
+              "application_metadata"
+            ],
+            "sent_off_device": [],
+            "linked_to_user": [
+              "access_metadata"
+            ],
+            "tracking": false,
+            "retention": "Retained with local Application lifecycle and access audit history."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [
+              "application_metadata",
+              "access_metadata"
+            ],
+            "linked_to_user": true,
+            "sent_off_device": false,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "Applications",
+        "description": "Manage installed applications, Marketplace discovery, releases, updates, permissions, runtime placement, and development status.",
+        "categories": [
+          "system"
+        ],
+        "tags": [
+          "applications",
+          "marketplace",
+          "permissions"
+        ],
+        "icon": "apps-outline"
+      },
+      "release_digest": "sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710"
+    },
+    "accepted_candidate_id": "applications-0-1-44-c6e5bc739710",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.dev.project.trial",
+        "refs": [
+          "pytest:applications-contract:66-passed"
+        ],
+        "checkpoint_source_revision": "f54106e3c5af2f9bfde1c58ac3a9693975985db6",
+        "checkpoint_component_ref": "scenario:applications"
+      },
+      {
+        "schema": "adaos.artifact.trial.v1",
+        "trial_id": "trial-applications-0-1-44-c6e5bc739710",
+        "candidate_digest": "sha256:eb5927155c09fe9e5de81700ec74b8d6e016d170ae2bf4ded645e10a5808d538",
+        "audience": "owner",
+        "data_mode": "empty",
+        "lock_digest": "sha256:116c110ad82a8a4740f2bd507d6a709a2fe23cb7891708e2ce1042fdfb6d8907",
+        "started_at": "2026-09-27T17:08:06+00:00",
+        "status": "accepted",
+        "observations": [
+          {
+            "actor": "user:local",
+            "decision": "accepted",
+            "evidence": [
+              "pytest:applications-contract:66-passed"
+            ]
+          }
+        ],
+        "ended_at": "2026-09-27T17:09:39+00:00",
+        "isolation_evidence": {
+          "status": "verified",
+          "mode": "empty",
+          "reason": "isolated trial Workspace has no seeded data"
+        },
+        "reload_receipt": {
+          "status": "skipped",
+          "mode": "policy_skip",
+          "approved_by": "artifact_pipeline.isolated_trial",
+          "reason": "isolated trial Workspace is not attached to a live runtime",
+          "recorded_at": "2026-09-27T17:08:06+00:00"
+        },
+        "health_receipt": {
+          "status": "passed",
+          "check": "verified_package_materialization",
+          "lock_digest": "sha256:116c110ad82a8a4740f2bd507d6a709a2fe23cb7891708e2ce1042fdfb6d8907",
+          "mode": "callback",
+          "recorded_at": "2026-09-27T17:08:06+00:00"
+        },
+        "rollback_receipt": {
+          "status": "not_required",
+          "reason": "trial accepted for promotion",
+          "recorded_at": "2026-09-27T17:09:39+00:00"
+        },
+        "duration_seconds": 93
+      }
+    ],
+    "provenance_refs": [
+      "sha256:1ac2677eeafc1844e7be9acd1542ea0fccc5f4e14d11285e021ecc75ec66f47e",
+      "sha256:64e07a406b38555a49a5ca347dbe1b33fef586e00d308b99510a0bce8593302a",
+      "sha256:e3bcdf2b41a9481875b5014cb8aa1934d5780122f3746fe009c045f3e220d0c6"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "applications.apply",
+          "purpose": "Apply exact reviewed lifecycle plans and manage access for the selected Application.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "applications.develop",
+          "purpose": "Manage this publisher's unpublished local Application development.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "applications.plan",
+          "purpose": "Prepare reviewable lifecycle plans and release-readiness checks without applying them.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "applications.publish",
+          "purpose": "Promote an accepted Application release and publish its exact source and portable CBS projection to the shared registry.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "applications.read",
+          "purpose": "Read the Application catalog, installed state, releases, permissions, roles, access grants, and operation history.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "applications.report",
+          "purpose": "Read Root-owned Application development reports.",
+          "approval_policy": "owner_only"
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "access_metadata",
+          "application_metadata"
+        ],
+        "sent_off_device": [],
+        "linked_to_user": [
+          "access_metadata"
+        ],
+        "tracking": false,
+        "retention": "Retained with local Application lifecycle and access audit history."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [
+          "application_metadata",
+          "access_metadata"
+        ],
+        "linked_to_user": true,
+        "sent_off_device": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:361214f63706e9c2d4dd60b612400ab71a48b1129134a91937b8664c7b9c35aa",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "published_at": "2026-09-27T17:24:35+00:00"
+  },
+  "channels": {
+    "stable": "sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710"
+  },
+  "semantic": {
+    "projection_digest": "sha256:962f1152ef540ee416bce6680a2388010461ace63ccc657b35b6e811870afbfe",
+    "path": "semantic/applications/applications/8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710.json"
+  },
+  "projection_digest": "sha256:f17db36e77b19877ee421b5e492d0b64d8fcbac2db6402aaa29561490de4b62b"
+}
