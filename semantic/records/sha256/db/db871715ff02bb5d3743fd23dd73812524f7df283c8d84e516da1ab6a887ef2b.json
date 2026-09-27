@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:application.ui.render.webui-v1",
+  "binding_definition_digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+  "logical_entrypoint": "application.ui.render.webui-v1",
+  "package": {
+    "kind": "skill",
+    "id": "cv_descriptor",
+    "version": "0.1.14",
+    "digest": "sha256:291c278a48dc278d512877cce46e9df4ab570066c7bb40607e5f32035f18381c"
+  },
+  "physical_member": "webui.json",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:db871715ff02bb5d3743fd23dd73812524f7df283c8d84e516da1ab6a887ef2b"
+}
