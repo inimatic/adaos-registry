@@ -700,6 +700,17 @@ def test_ner_weights_prefers_skill_runtime_models_dir(monkeypatch, tmp_path: pat
     assert status["source"] == "skill_data_models"
 
 
+def test_ner_weights_uses_owner_runtime_data_instead_of_core_state(monkeypatch, tmp_path: pathlib.Path) -> None:
+    state_dir = tmp_path / "skills" / ".runtime" / "media_indexer_skill" / "v0.1" / "data" / "state"
+    monkeypatch.delenv("MEDIA_INDEXER_MODEL_DIR", raising=False)
+    monkeypatch.delenv("ADAOS_SKILL_ENV_PATH", raising=False)
+    monkeypatch.setenv("ADAOS_SKILL_STATE_DIR", str(state_dir))
+
+    from lib.ner_predictor import _runtime_models_dir
+
+    assert _runtime_models_dir() == state_dir.parent / "files" / "models"
+
+
 def test_filename_parser_extracts_safe_demo_entities() -> None:
     from lib.filename_parser import parse_filename
 

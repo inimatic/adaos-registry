@@ -36,8 +36,17 @@ def _runtime_models_dir() -> Path:
         path = Path(env_path)
         data_root = path.parents[1] if path.parent.name == "db" else path.parent
         return data_root / "files" / "models"
-    base_dir = Path(os.getenv("ADAOS_BASE_DIR") or Path.home() / ".adaos")
-    return base_dir / "state" / "media_indexer_skill" / "models"
+    state_dir = os.getenv("ADAOS_SKILL_STATE_DIR")
+    if state_dir:
+        return Path(state_dir).expanduser().resolve().parent / "files" / "models"
+    try:
+        from adaos.sdk.skill_env import skill_data_root_path
+
+        return skill_data_root_path() / "files" / "models"
+    except Exception:
+        # Source-only tooling has no initialized skill context. Keep its cache
+        # package-local rather than writing into AdaOS core authority.
+        return BASE_DIR / ".runtime-data" / "files" / "models"
 
 
 def model_weights_path() -> Path:
