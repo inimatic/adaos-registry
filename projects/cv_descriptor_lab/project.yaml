@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: cv_descriptor_lab
-version: 0.1.21
+version: 0.1.22
 profiles:
 - adaos.cv.descriptor_lab.v1
 components:
@@ -15,7 +15,7 @@ components:
   dependencies: []
 entrypoints:
 - id: descriptors
-  presentation: skill:cv_descriptor
+  presentation: cv_descriptor_app
   default: true
   bindings:
     descriptor_store: local

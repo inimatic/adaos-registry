@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: subscription_status
-version: 0.1.17
+version: 0.1.18
 profiles:
 - adaos.builder.component_project.v1
 components:
@@ -15,7 +15,7 @@ components:
   dependencies: []
 entrypoints:
 - id: subscriptions
-  presentation: skill:subscription_status_skill
+  presentation: subscription_status_app
   default: true
   bindings:
     surface: subscription_status

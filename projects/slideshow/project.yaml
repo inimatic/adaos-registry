@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: slideshow
-version: 0.1.5
+version: 0.1.6
 profiles: [adaos.builder.component_project.v1]
 components:
   owned:
@@ -13,7 +13,7 @@ components:
   dependencies: []
 entrypoints:
 - id: slideshow
-  presentation: skill:slideshow_skill
+  presentation: slideshow_skill_app
   default: true
   bindings: {surface: slideshow}
 catalog:

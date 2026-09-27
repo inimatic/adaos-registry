@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: notebook
-version: 0.1.2
+version: 0.1.3
 profiles:
 - adaos.builder.component_project.v1
 components:
@@ -15,7 +15,7 @@ components:
   dependencies: []
 entrypoints:
 - id: notebook
-  presentation: skill:notebook_skill
+  presentation: notebook_skill_app
   default: true
   bindings:
     surface: notebook

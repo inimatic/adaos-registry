@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: voice
-version: 0.1.7
+version: 0.1.9
 profiles: [adaos.builder.component_project.v1]
 components:
   owned:
@@ -13,7 +13,7 @@ components:
   dependencies: []
 entrypoints:
 - id: voice
-  presentation: skill:voice_chat_skill
+  presentation: voice_chat_app
   default: true
   bindings: {surface: voice_chat}
 catalog:
