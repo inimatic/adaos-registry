@@ -1,0 +1,572 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "adaos_builder",
+    "legacy_project_id": "adaos_builder",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "adaos_builder",
+    "display": {
+      "title": "AdaOS Builder",
+      "summary": "Project-scoped development workbench for prototypes, automation, trials, and publication."
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "builder",
+        "presentation_ref": "scenario:builder"
+      },
+      {
+        "entrypoint_id": "skill-preview",
+        "presentation_ref": "scenario:skill_preview"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 3,
+    "created_at": "2026-09-26T02:46:33+00:00",
+    "updated_at": "2026-09-27T17:41:08+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "adaos_builder",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "adaos_builder",
+    "version": "0.3.18",
+    "release_digest": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "adaos_builder",
+      "version": "0.3.18",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:cca514e67c5f6376c76dbf5c99b93603a283745fdcf8a9e00fc80d072eed3fa4",
+        "path_scope": [
+          "projects/adaos_builder/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "builder",
+          "version": "0.2.103",
+          "digest": "sha256:9fffa63ce944b8a0928e3b9ebfd3770d7795d6322564c1289c70010f0a518f50",
+          "manifest_digest": "sha256:9a78a6b1241a7ad684a1eb8b6d6d4307fe028a4e40bf7efbba93212e93940b47",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:cca514e67c5f6376c76dbf5c99b93603a283745fdcf8a9e00fc80d072eed3fa4",
+            "path_scope": [
+              "scenarios/builder/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/builder",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "skill_preview",
+          "version": "0.1.4",
+          "digest": "sha256:b5e982aed5c2f37ceb0585972269186a74de0572b153e250a310b2c43fc931b9",
+          "manifest_digest": "sha256:246b853efe0d5c0a1c68de29365f111bbba61a7f06aec24b09157220d2852399",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:cca514e67c5f6376c76dbf5c99b93603a283745fdcf8a9e00fc80d072eed3fa4",
+            "path_scope": [
+              "scenarios/skill_preview/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/skill_preview",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "builder_automation_skill",
+          "version": "0.2.5",
+          "digest": "sha256:96038410026e27de52c3c019b8eb2b52c57c7c856d825e3b530f5e7c361c3e52",
+          "manifest_digest": "sha256:7221c307095e0bc00e05a51484b867aa4689039eabf2798fc9adb632a6698d3e",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:cca514e67c5f6376c76dbf5c99b93603a283745fdcf8a9e00fc80d072eed3fa4",
+            "path_scope": [
+              "skills/builder_automation_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/builder_automation_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "builder_sdk_control_skill",
+          "version": "0.2.4",
+          "digest": "sha256:86fcd1eccd0fd8d3a232afea7798df962e7aefeb3ad1906d4cabfa7f7322f5e7",
+          "manifest_digest": "sha256:d8732b812f280fa15ae8ee689bc77a67e3de382a094824c873b46f802ad14e62",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:cca514e67c5f6376c76dbf5c99b93603a283745fdcf8a9e00fc80d072eed3fa4",
+            "path_scope": [
+              "skills/builder_sdk_control_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/builder_sdk_control_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "builder_skill",
+          "version": "0.4.5",
+          "digest": "sha256:71f58a74baa4c087c594fb26139d886d9d3fc835c911183fca66c2b7ba77c181",
+          "manifest_digest": "sha256:73e183b222d09eae40b26a794ab94252720d897e1638dbed10d7c9bada3f475d",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:cca514e67c5f6376c76dbf5c99b93603a283745fdcf8a9e00fc80d072eed3fa4",
+            "path_scope": [
+              "skills/builder_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/builder_skill",
+          "schema_locks": [],
+          "workflow_lock": {
+            "lock_id": "workflow:builder.change@1.2.0",
+            "digest": "sha256:d68f723e09b06dda8c230dad3cb06dedf0499aa3028f36e10613fbd401d99f0b"
+          },
+          "conversational_lock": {
+            "lock_id": "conversational:skill:builder_skill@0.4.5",
+            "digest": "sha256:80434d4a3278433ea0d26789a397b4fff6e4ec067add6e593cad85ae8324fc31"
+          },
+          "workflow_validation_lock": {
+            "lock_id": "workflow-validation:builder.change@1.2.0",
+            "digest": "sha256:fec9a56678f78ce30399991f546d7a2806b617e18e8a984250b264cd8ae7b3c6"
+          },
+          "workflow_adapter_locks": [
+            {
+              "adapter_id": "builder.codex.run",
+              "kind": "activity",
+              "contract_digest": "sha256:c07d9f814b09188d725b6c37068b92f5be929964ca73a7d01b6222cb2a1409d0",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            },
+            {
+              "adapter_id": "builder.prototype.derive",
+              "kind": "activity",
+              "contract_digest": "sha256:cd3a8aa84471ccab0ad36f4633c030f8584f5ba7d7ca6879a3b0ae1da5f9a001",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            },
+            {
+              "adapter_id": "builder.publication.publish",
+              "kind": "activity",
+              "contract_digest": "sha256:836ca401d6a83e6bc00fa53e83964028c6677cdabf637c076837d2d736ab7547",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            },
+            {
+              "adapter_id": "builder.trial.activate",
+              "kind": "activity",
+              "contract_digest": "sha256:d2327f261f701fbbf4ed8d7ef7109b9c984e25fbac6c979a63ede2b34b593069",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            },
+            {
+              "adapter_id": "builder.codex.run.compensate",
+              "kind": "compensation",
+              "contract_digest": "sha256:c1eddb452242a913abd8a64be8e6600d6526ca5341699c6dac01015fc3378d3c",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            },
+            {
+              "adapter_id": "builder.prototype.derive.compensate",
+              "kind": "compensation",
+              "contract_digest": "sha256:3b0edfb5e5e4ac6a4c98d54b76d60f0fa1bea7af03828c52e5284fc3a4ae9d12",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            },
+            {
+              "adapter_id": "always",
+              "kind": "guard",
+              "contract_digest": "sha256:ffb915119cad9dd771564b8ec46785c0f52ce58b5e443b4de64c8c4d598f7545",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            }
+          ],
+          "workflow_binding_digest": "sha256:f92bdd2a0b2e60c77806da141bd1dec28312b981adbf11c6b78a2a54f240d8ae",
+          "workflow_role_policy_digest": "sha256:04b4065a68510522b05963a2180253dbbe860538fe1d88416f959b58d6df82a4"
+        }
+      ],
+      "resolved_dependencies": [
+        {
+          "kind": "skill",
+          "artifact_id": "voice_chat_skill",
+          "version": "0.7.7",
+          "package_digest": "sha256:66bbd25a130c9be8857e195a0d506adc7bab8a6e2ab47fd2f4778bac935f9d7f",
+          "optional": false
+        }
+      ],
+      "permissions": [
+        "network.egress",
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:cca514e67c5f6376c76dbf5c99b93603a283745fdcf8a9e00fc80d072eed3fa4",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:348b84e92b1e9b6d3e5b562a8b233dabd46009f4ac6c7763e371d84f1c9023bf"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:76d6c60eaefd1378541e0f70c282f6b13400914dea60d3e590e4dd0bb1d9a940",
+        "profiles": [
+          "adaos.builder.v1",
+          "adaos.development.workbench.v1"
+        ],
+        "members": [
+          {
+            "ref": "scenario:builder",
+            "package_digest": "sha256:9fffa63ce944b8a0928e3b9ebfd3770d7795d6322564c1289c70010f0a518f50",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "scenario:skill_preview",
+            "package_digest": "sha256:b5e982aed5c2f37ceb0585972269186a74de0572b153e250a310b2c43fc931b9",
+            "role": "supporting",
+            "exposure": "advanced",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "skill:builder_automation_skill",
+            "package_digest": "sha256:96038410026e27de52c3c019b8eb2b52c57c7c856d825e3b530f5e7c361c3e52",
+            "role": "supporting",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          },
+          {
+            "ref": "skill:builder_sdk_control_skill",
+            "package_digest": "sha256:86fcd1eccd0fd8d3a232afea7798df962e7aefeb3ad1906d4cabfa7f7322f5e7",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          },
+          {
+            "ref": "skill:builder_skill",
+            "package_digest": "sha256:71f58a74baa4c087c594fb26139d886d9d3fc835c911183fca66c2b7ba77c181",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "builder",
+            "presentation": "scenario:builder",
+            "default": true,
+            "bindings": {
+              "workbench": "builder"
+            }
+          },
+          {
+            "id": "skill-preview",
+            "presentation": "scenario:skill_preview",
+            "bindings": {
+              "preview": "skill"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "builder"
+          ],
+          "required_contracts": [
+            "capability:applications.build@^1.0.0"
+          ],
+          "validation_profiles": [
+            "builder.local"
+          ]
+        },
+        "lifecycle": {
+          "upgrade": {
+            "retired_components": [
+              {
+                "ref": "skill:prompt_engineer_skill",
+                "data": "retain",
+                "reason": "Retain legacy Prompt IDE data after retiring its obsolete Application surface."
+              }
+            ]
+          },
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "network.egress",
+              "purpose": "Access configured model, source-control, and publication services during governed development operations.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "workspace.read",
+              "purpose": "Inspect project sources, tickets, build state, and validation evidence.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Create and update explicitly selected development projects and artifacts.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "build_evidence",
+              "development_ticket",
+              "project_source"
+            ],
+            "sent_off_device": [
+              "explicit_model_or_registry_request"
+            ],
+            "linked_to_user": [],
+            "tracking": false,
+            "retention": "Development artifacts remain in the selected project workspace."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [
+              "build_evidence",
+              "development_ticket",
+              "project_source"
+            ],
+            "sent_off_device": true,
+            "linked_to_user": false,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "AdaOS Builder",
+        "description": "Project-scoped development workbench for prototypes, automation, trials, and publication.",
+        "categories": [
+          "development"
+        ],
+        "tags": [
+          "builder",
+          "devspace",
+          "project"
+        ],
+        "icon": "construct-outline",
+        "title_i18n": {
+          "en": "AdaOS Builder",
+          "ru": "Конструктор AdaOS"
+        },
+        "description_i18n": {
+          "en": "Project-scoped development workbench for prototypes, automation, trials, and publication.",
+          "ru": "Проектная рабочая среда разработки для прототипов, автоматизации, испытаний и публикации."
+        }
+      },
+      "release_digest": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d"
+    },
+    "accepted_candidate_id": "adaos_builder-0-3-18-7c4f7c0b0f5d",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.project.preflight",
+        "tests": "Full Builder skill suite and manifest validation passed",
+        "registry_commit": "9f9b86600115",
+        "cbs": "exact native admission or explicit compatibility classification",
+        "checkpoint_source_revision": "a13ca1a9e2d0d328aa4189d9ef3818d126f2dff2",
+        "checkpoint_component_ref": "scenario:builder"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "network.egress",
+          "purpose": "Access configured model, source-control, and publication services during governed development operations.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "workspace.read",
+          "purpose": "Inspect project sources, tickets, build state, and validation evidence.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Create and update explicitly selected development projects and artifacts.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "build_evidence",
+          "development_ticket",
+          "project_source"
+        ],
+        "sent_off_device": [
+          "explicit_model_or_registry_request"
+        ],
+        "linked_to_user": [],
+        "tracking": false,
+        "retention": "Development artifacts remain in the selected project workspace."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [
+          "build_evidence",
+          "development_ticket",
+          "project_source"
+        ],
+        "sent_off_device": true,
+        "linked_to_user": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:e8385abf79f2f95cb8ea73ff7bef87e77ad625d212b20f6792a92576c4d5b69e",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "adaos_builder",
+      "release_digest": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [
+        {
+          "id": "network.egress",
+          "title": "Network.Egress",
+          "purpose": "Access configured model, source-control, and publication services during governed development operations.",
+          "required": true
+        },
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Inspect project sources, tickets, build state, and validation evidence.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Create and update explicitly selected development projects and artifacts.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:1dacf77dc507cebd99d7e4cfdc6f83a955d080be2c37d9e703b40f08e1c06776"
+  },
+  "channels": {
+    "stable": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d"
+  },
+  "semantic": {
+    "projection_digest": "sha256:4e995fd1cd7e990c55d4c7510a634d7171ed2dfa39204f9779774c3759c3d085",
+    "path": "semantic/applications/adaos_builder/7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d.json"
+  },
+  "projection_digest": "sha256:8d798471ab610ce753bdaa038b7bc855b51b34726d2ca9939627c6b3a297b4b0"
+}

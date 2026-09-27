@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-27T17:10:01+00:00",
+  "updated_at": "2026-09-27T17:44:20+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -111,9 +111,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.17",
-        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
-        "package_digest": "sha256:e798e2d7cb2f3a5b15ff5ddc1a8300847f76046d4476d0f38a8c9908d1326bb5"
+        "release": "adaos_builder@0.3.18",
+        "release_digest": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
+        "package_digest": "sha256:96038410026e27de52c3c019b8eb2b52c57c7c856d825e3b530f5e7c361c3e52"
       }
     },
     {
@@ -162,9 +162,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.17",
-        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
-        "package_digest": "sha256:039035529f6e8e540adfe96be097197f46cac0e06c1397fbb7f5a1db1380545b"
+        "release": "adaos_builder@0.3.18",
+        "release_digest": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
+        "package_digest": "sha256:86fcd1eccd0fd8d3a232afea7798df962e7aefeb3ad1906d4cabfa7f7322f5e7"
       }
     },
     {
@@ -191,9 +191,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.17",
-        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
-        "package_digest": "sha256:0264f0714cbb4cdc63b97f475344624450962377aef345246192b9407f7e1917"
+        "release": "adaos_builder@0.3.18",
+        "release_digest": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
+        "package_digest": "sha256:71f58a74baa4c087c594fb26139d886d9d3fc835c911183fca66c2b7ba77c181"
       }
     },
     {
@@ -1270,8 +1270,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.17",
-        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
+        "release": "adaos_builder@0.3.18",
+        "release_digest": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
         "package_digest": "sha256:66bbd25a130c9be8857e195a0d506adc7bab8a6e2ab47fd2f4778bac935f9d7f"
       }
     },
@@ -1495,8 +1495,8 @@
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.102",
-      "updated_at": "2026-09-27T06:30:28+00:00",
+      "version": "0.2.103",
+      "updated_at": "2026-09-27T17:42:00+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.yaml",
       "source": {
@@ -1504,7 +1504,7 @@
         "manifest": "scenarios/builder/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:b59e7be51483eab7d46db7112ed2bc05891a7841fbfa3936bb0dd9efa197dec3",
+        "revision": "sha256:cca514e67c5f6376c76dbf5c99b93603a283745fdcf8a9e00fc80d072eed3fa4",
         "path_scope": [
           "projects/adaos_builder/"
         ]
@@ -1530,17 +1530,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.17",
-        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
-        "package_digest": "sha256:6d2d22313420b46cedd01abfab076abec1d96d1d298186d8ea5c0285dd6760ca"
+        "release": "adaos_builder@0.3.18",
+        "release_digest": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
+        "package_digest": "sha256:9fffa63ce944b8a0928e3b9ebfd3770d7795d6322564c1289c70010f0a518f50"
       },
       "channels": {
         "stable": {
-          "release": "adaos_builder@0.3.17",
-          "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
-          "source_revision": "sha256:b59e7be51483eab7d46db7112ed2bc05891a7841fbfa3936bb0dd9efa197dec3",
-          "package_digest": "sha256:6d2d22313420b46cedd01abfab076abec1d96d1d298186d8ea5c0285dd6760ca",
-          "version": "0.2.102"
+          "release": "adaos_builder@0.3.18",
+          "release_digest": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
+          "source_revision": "sha256:cca514e67c5f6376c76dbf5c99b93603a283745fdcf8a9e00fc80d072eed3fa4",
+          "package_digest": "sha256:9fffa63ce944b8a0928e3b9ebfd3770d7795d6322564c1289c70010f0a518f50",
+          "version": "0.2.103"
         }
       }
     },
@@ -1867,9 +1867,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.17",
-        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
-        "package_digest": "sha256:8e27c5ae7cfb8f1ac3b11f0ef4c1f2d883f38b2ae47539d256af9d5c0a3b2b85"
+        "release": "adaos_builder@0.3.18",
+        "release_digest": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
+        "package_digest": "sha256:b5e982aed5c2f37ceb0585972269186a74de0572b153e250a310b2c43fc931b9"
       }
     },
     {
@@ -2173,8 +2173,8 @@
       "kind": "project",
       "id": "adaos_builder",
       "name": "adaos_builder",
-      "version": "0.3.17",
-      "updated_at": "2026-09-27T06:32:28+00:00",
+      "version": "0.3.18",
+      "updated_at": "2026-09-27T17:44:20+00:00",
       "path": "projects/adaos_builder",
       "manifest": "projects/adaos_builder/project.yaml",
       "source": {
@@ -2271,18 +2271,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.17",
-        "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
+        "release": "adaos_builder@0.3.18",
+        "release_digest": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
         "primary_component": "scenario:builder",
-        "package_digest": "sha256:6d2d22313420b46cedd01abfab076abec1d96d1d298186d8ea5c0285dd6760ca"
+        "package_digest": "sha256:9fffa63ce944b8a0928e3b9ebfd3770d7795d6322564c1289c70010f0a518f50"
       },
       "channels": {
         "stable": {
-          "release": "adaos_builder@0.3.17",
-          "release_digest": "sha256:ebfe8267219576a9c9a709b99e86d5a15e71badb557daac096da4dded204c51c",
-          "source_revision": "sha256:b59e7be51483eab7d46db7112ed2bc05891a7841fbfa3936bb0dd9efa197dec3",
-          "package_digest": "sha256:6d2d22313420b46cedd01abfab076abec1d96d1d298186d8ea5c0285dd6760ca",
-          "version": "0.3.17"
+          "release": "adaos_builder@0.3.18",
+          "release_digest": "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
+          "source_revision": "sha256:cca514e67c5f6376c76dbf5c99b93603a283745fdcf8a9e00fc80d072eed3fa4",
+          "package_digest": "sha256:9fffa63ce944b8a0928e3b9ebfd3770d7795d6322564c1289c70010f0a518f50",
+          "version": "0.3.18"
         }
       }
     },
