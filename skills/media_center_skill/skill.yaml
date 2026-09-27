@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.98
+version: 0.8.99
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -12,6 +12,7 @@ webui:
 runtime:
   python: '3.11'
 capabilities:
+- workspace.write
 - storage.relational
 - media.catalog
 - media.playback_planning

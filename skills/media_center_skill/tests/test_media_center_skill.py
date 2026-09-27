@@ -58,6 +58,14 @@ def test_deployment_operation_status_is_exported_by_the_skill_contract() -> None
     assert definitions["deployment_operation_status"]["side_effects"] == "none"
 
 
+def test_topology_mutations_declare_the_policy_write_capability() -> None:
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    definitions = {item["name"]: item for item in manifest["tools"]}
+
+    assert definitions["define_topology"]["side_effects"] == "local_write"
+    assert "workspace.write" in manifest["capabilities"]
+
+
 def test_background_runtime_reuses_and_disposes_process_owned_workers() -> None:
     runtime = MediaCenterBackgroundRuntime()
     disposed: list[tuple[str, float]] = []
