@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-27T06:32:28+00:00",
+  "updated_at": "2026-09-27T07:52:45+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1418,13 +1418,19 @@
       "kind": "scenario",
       "id": "applications",
       "name": "applications",
-      "version": "0.1.69",
-      "updated_at": "2026-09-27T06:01:58+00:00",
+      "version": "0.1.72",
+      "updated_at": "2026-09-27T07:50:29+00:00",
       "path": "scenarios/applications",
       "manifest": "scenarios/applications/scenario.yaml",
       "source": {
         "path": "scenarios/applications",
-        "manifest": "scenarios/applications/scenario.yaml"
+        "manifest": "scenarios/applications/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:7cb6c8320c003d2fc815df68c98f823a915f784254e7860eaa7a195b1d6f89d9",
+        "path_scope": [
+          "projects/applications/"
+        ]
       },
       "install": {
         "kind": "scenario",
@@ -1447,6 +1453,22 @@
           "text",
           "web"
         ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "applications",
+        "release": "applications@0.1.43",
+        "release_digest": "sha256:6f2f2cb3b18605fc69bab7112dfd957be2fb94b509039a36ef71a078ef30c9ce",
+        "package_digest": "sha256:814e6474aaab0ab8b244cd7938132304ff7ab0ebb245ab5d5afef88f1c7390c2"
+      },
+      "channels": {
+        "stable": {
+          "release": "applications@0.1.43",
+          "release_digest": "sha256:6f2f2cb3b18605fc69bab7112dfd957be2fb94b509039a36ef71a078ef30c9ce",
+          "source_revision": "sha256:7cb6c8320c003d2fc815df68c98f823a915f784254e7860eaa7a195b1d6f89d9",
+          "package_digest": "sha256:814e6474aaab0ab8b244cd7938132304ff7ab0ebb245ab5d5afef88f1c7390c2",
+          "version": "0.1.72"
+        }
       }
     },
     {
@@ -2219,6 +2241,68 @@
           "source_revision": "sha256:b59e7be51483eab7d46db7112ed2bc05891a7841fbfa3936bb0dd9efa197dec3",
           "package_digest": "sha256:6d2d22313420b46cedd01abfab076abec1d96d1d298186d8ea5c0285dd6760ca",
           "version": "0.3.17"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "applications",
+      "name": "applications",
+      "version": "0.1.43",
+      "updated_at": "2026-09-27T07:52:45+00:00",
+      "path": "projects/applications",
+      "manifest": "projects/applications/project.yaml",
+      "source": {
+        "path": "projects/applications",
+        "manifest": "projects/applications/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "applications",
+        "id": "applications"
+      },
+      "title": "Applications",
+      "description": "Manage installed applications, Marketplace discovery, releases, updates, permissions, runtime placement, and development status.",
+      "categories": [
+        "system"
+      ],
+      "tags": [
+        "applications",
+        "marketplace",
+        "permissions"
+      ],
+      "publication": {
+        "stage": "beta",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "beta",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [],
+      "components": [
+        "scenario:applications"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.system.applications.v1"
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "applications",
+        "release": "applications@0.1.43",
+        "release_digest": "sha256:6f2f2cb3b18605fc69bab7112dfd957be2fb94b509039a36ef71a078ef30c9ce",
+        "primary_component": "scenario:applications",
+        "package_digest": "sha256:814e6474aaab0ab8b244cd7938132304ff7ab0ebb245ab5d5afef88f1c7390c2"
+      },
+      "channels": {
+        "stable": {
+          "release": "applications@0.1.43",
+          "release_digest": "sha256:6f2f2cb3b18605fc69bab7112dfd957be2fb94b509039a36ef71a078ef30c9ce",
+          "source_revision": "sha256:7cb6c8320c003d2fc815df68c98f823a915f784254e7860eaa7a195b1d6f89d9",
+          "package_digest": "sha256:814e6474aaab0ab8b244cd7938132304ff7ab0ebb245ab5d5afef88f1c7390c2",
+          "version": "0.1.43"
         }
       }
     },

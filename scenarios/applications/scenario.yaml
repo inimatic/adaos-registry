@@ -1,5 +1,5 @@
 id: applications
-version: 0.1.69
+version: 0.1.72
 name: applications
 description: Builder-created rapid prototype scenario.
 triggers: []
@@ -51,7 +51,7 @@ io:
     output.active: voice
 steps: []
 prototype: builder_scenario
-updated_at: '2026-09-27T06:01:58+00:00'
+updated_at: '2026-09-27T07:50:29+00:00'
 type: desktop
 title: Applications
 title_i18n:

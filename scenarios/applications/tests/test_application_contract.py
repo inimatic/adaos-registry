@@ -181,8 +181,8 @@ def test_home_desktop_dialog_uses_bounded_root_read_and_batch_mutation():
     field = form['inputs']['fields'][0]
     assert field['type'] == 'multiChoice'
     assert field['stateKey'] == 'homePinSelection'
-    assert field['optionsDataSource']['toolId'] == 'applications.list_home_targets'
-    assert field['optionsDataSource']['resultPath'] == 'response.result.home_targets.targets'
+    assert field['optionsStatePath'] == 'homeTargets.home_targets.targets'
+    assert 'optionsDataSource' not in field
     save = next(action for action in form['actions'] if action.get('type') == 'callMcp')
     assert save['target'] == 'applications.set_home_pins'
     assert save['params'] == {
