@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:application.ui.render.webui-v1",
+  "binding_definition_digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+  "logical_entrypoint": "application.ui.render.webui-v1",
+  "package": {
+    "kind": "skill",
+    "id": "notebook_skill",
+    "version": "0.2.5",
+    "digest": "sha256:3bdf7d3213f67525527a3561c4598860ff640eace96e18a6d56a096813326ef6"
+  },
+  "physical_member": "webui.json",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:ee5874cbcb657186cee532a818e1ccf5acfd8f27e2e744db7726074c3713bb01"
+}

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-27T22:03:38+00:00",
+  "updated_at": "2026-09-27T22:04:44+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -742,13 +742,19 @@
       "kind": "skill",
       "id": "notebook_skill",
       "name": "notebook_skill",
-      "version": "0.2.4",
-      "updated_at": "2026-09-26T11:52:18+00:00",
+      "version": "0.2.5",
+      "updated_at": "2026-09-27T21:52:07+00:00",
       "path": "skills/notebook_skill",
       "manifest": "skills/notebook_skill/skill.yaml",
       "source": {
         "path": "skills/notebook_skill",
-        "manifest": "skills/notebook_skill/skill.yaml"
+        "manifest": "skills/notebook_skill/skill.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:0fea3cd2bd3866cb83c366f47dcf4e8db587b27f701e90b5e62b6d21347eb695",
+        "path_scope": [
+          "projects/notebook/"
+        ]
       },
       "install": {
         "kind": "skill",
@@ -757,7 +763,23 @@
       },
       "description": "Shared plain-text notebook with one active editable note, a live note list stream, and Telegram export.",
       "runtime_python": "3.11",
-      "tools_count": 13
+      "tools_count": 13,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "notebook",
+        "release": "notebook@0.1.3",
+        "release_digest": "sha256:23fe7aa94ba1d556ce8a54edabc798ae5e12a89c673d84d17a651e06e073532b",
+        "package_digest": "sha256:3bdf7d3213f67525527a3561c4598860ff640eace96e18a6d56a096813326ef6"
+      },
+      "channels": {
+        "stable": {
+          "release": "notebook@0.1.3",
+          "release_digest": "sha256:23fe7aa94ba1d556ce8a54edabc798ae5e12a89c673d84d17a651e06e073532b",
+          "source_revision": "sha256:0fea3cd2bd3866cb83c366f47dcf4e8db587b27f701e90b5e62b6d21347eb695",
+          "package_digest": "sha256:3bdf7d3213f67525527a3561c4598860ff640eace96e18a6d56a096813326ef6",
+          "version": "0.2.5"
+        }
+      }
     },
     {
       "kind": "skill",
@@ -2517,6 +2539,77 @@
       ],
       "components_count": 1,
       "profiles": []
+    },
+    {
+      "kind": "project",
+      "id": "notebook",
+      "name": "notebook",
+      "version": "0.1.3",
+      "updated_at": "2026-09-27T22:04:44+00:00",
+      "path": "projects/notebook",
+      "manifest": "projects/notebook/project.yaml",
+      "source": {
+        "path": "projects/notebook",
+        "manifest": "projects/notebook/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "notebook",
+        "id": "notebook"
+      },
+      "title": "Notebook",
+      "description": "Personal notes, attachments, and durable local note state.",
+      "categories": [
+        "productivity"
+      ],
+      "tags": [
+        "notes",
+        "cbs-provider"
+      ],
+      "publication": {
+        "stage": "beta",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "beta",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "default",
+          "title": "Notebook",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:notebook_skill"
+          ]
+        }
+      ],
+      "components": [
+        "skill:notebook_skill"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.builder.component_project.v1"
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "notebook",
+        "release": "notebook@0.1.3",
+        "release_digest": "sha256:23fe7aa94ba1d556ce8a54edabc798ae5e12a89c673d84d17a651e06e073532b",
+        "primary_component": "skill:notebook_skill",
+        "package_digest": "sha256:3bdf7d3213f67525527a3561c4598860ff640eace96e18a6d56a096813326ef6"
+      },
+      "channels": {
+        "stable": {
+          "release": "notebook@0.1.3",
+          "release_digest": "sha256:23fe7aa94ba1d556ce8a54edabc798ae5e12a89c673d84d17a651e06e073532b",
+          "source_revision": "sha256:0fea3cd2bd3866cb83c366f47dcf4e8db587b27f701e90b5e62b6d21347eb695",
+          "package_digest": "sha256:3bdf7d3213f67525527a3561c4598860ff640eace96e18a6d56a096813326ef6",
+          "version": "0.1.3"
+        }
+      }
     },
     {
       "kind": "project",

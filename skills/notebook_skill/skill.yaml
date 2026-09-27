@@ -1,5 +1,5 @@
 name: notebook_skill
-version: 0.2.4
+version: 0.2.5
 description: Shared plain-text notebook with one active editable note, a live note
   list stream, and Telegram export.
 supported_locales:
@@ -404,7 +404,7 @@ tools:
     properties:
       ok:
         type: boolean
-updated_at: '2026-09-26T11:52:18+00:00'
+updated_at: '2026-09-27T21:52:07+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.741+4835.a49f9166
