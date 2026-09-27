@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-27T22:06:18+00:00",
+  "updated_at": "2026-09-27T22:07:03+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1183,13 +1183,19 @@
       "kind": "skill",
       "id": "subscription_status_skill",
       "name": "subscription_status_skill",
-      "version": "0.1.29",
-      "updated_at": "2026-09-26T11:02:04+00:00",
+      "version": "0.1.31",
+      "updated_at": "2026-09-27T21:52:37+00:00",
       "path": "skills/subscription_status_skill",
       "manifest": "skills/subscription_status_skill/skill.yaml",
       "source": {
         "path": "skills/subscription_status_skill",
-        "manifest": "skills/subscription_status_skill/skill.yaml"
+        "manifest": "skills/subscription_status_skill/skill.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:41b8befb088010b9efeebb09756835a0ce8ad789f6a12cd166cd8069c8488872",
+        "path_scope": [
+          "projects/subscription_status/"
+        ]
       },
       "install": {
         "kind": "skill",
@@ -1199,15 +1205,22 @@
       "description": "User-facing AdaOS subscription status widget and modal backed by the local economic entitlement snapshot with explicit Root refresh.",
       "runtime_python": "3.11",
       "activation": {
-        "mode": "lazy",
-        "when": {
-          "client_presence": true,
-          "webspace_scope": "active"
-        },
-        "startup_allowed": true,
-        "background_refresh": false
+        "mode": "package_lock",
+        "project_id": "subscription_status",
+        "release": "subscription_status@0.1.18",
+        "release_digest": "sha256:8510b66f85cf0837766fd7550bb534c9bff38d21962a3b5d3906fdedcda0ff30",
+        "package_digest": "sha256:b7388cf6732b95483a9210bfd9799f87e4edc18feb78fb63455ccabd7a00202c"
       },
-      "tools_count": 7
+      "tools_count": 7,
+      "channels": {
+        "stable": {
+          "release": "subscription_status@0.1.18",
+          "release_digest": "sha256:8510b66f85cf0837766fd7550bb534c9bff38d21962a3b5d3906fdedcda0ff30",
+          "source_revision": "sha256:41b8befb088010b9efeebb09756835a0ce8ad789f6a12cd166cd8069c8488872",
+          "package_digest": "sha256:b7388cf6732b95483a9210bfd9799f87e4edc18feb78fb63455ccabd7a00202c",
+          "version": "0.1.31"
+        }
+      }
     },
     {
       "kind": "skill",
@@ -2822,6 +2835,79 @@
           "source_revision": "sha256:ea61e5452bda636c8bc49f3d6e81a8e46085e6252791aee57cc82d7ce3840e1c",
           "package_digest": "sha256:7c2bd1333a90bff966e09788deac6de70212131d523cdaa6a1e7b8d7b644e5ab",
           "version": "0.1.6"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "subscription_status",
+      "name": "subscription_status",
+      "version": "0.1.18",
+      "updated_at": "2026-09-27T22:07:03+00:00",
+      "path": "projects/subscription_status",
+      "manifest": "projects/subscription_status/project.yaml",
+      "source": {
+        "path": "projects/subscription_status",
+        "manifest": "projects/subscription_status/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "subscription_status",
+        "id": "subscription_status"
+      },
+      "title": "Subscriptions",
+      "description": "User-facing AdaOS subscription status widget and modal backed by the local economic entitlement snapshot with explicit Root refresh.",
+      "categories": [
+        "system",
+        "account"
+      ],
+      "tags": [
+        "subscriptions",
+        "usage",
+        "cbs-provider"
+      ],
+      "publication": {
+        "stage": "beta",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "beta",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "default",
+          "title": "subscription_status_skill",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:subscription_status_skill"
+          ]
+        }
+      ],
+      "components": [
+        "skill:subscription_status_skill"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.builder.component_project.v1"
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "subscription_status",
+        "release": "subscription_status@0.1.18",
+        "release_digest": "sha256:8510b66f85cf0837766fd7550bb534c9bff38d21962a3b5d3906fdedcda0ff30",
+        "primary_component": "skill:subscription_status_skill",
+        "package_digest": "sha256:b7388cf6732b95483a9210bfd9799f87e4edc18feb78fb63455ccabd7a00202c"
+      },
+      "channels": {
+        "stable": {
+          "release": "subscription_status@0.1.18",
+          "release_digest": "sha256:8510b66f85cf0837766fd7550bb534c9bff38d21962a3b5d3906fdedcda0ff30",
+          "source_revision": "sha256:41b8befb088010b9efeebb09756835a0ce8ad789f6a12cd166cd8069c8488872",
+          "package_digest": "sha256:b7388cf6732b95483a9210bfd9799f87e4edc18feb78fb63455ccabd7a00202c",
+          "version": "0.1.18"
         }
       }
     }
