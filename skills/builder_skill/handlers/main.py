@@ -54,7 +54,7 @@ CURRENT_KEY = "builder_skill.current_session"
 BUILDER_CONTEXT_KEY = "builder_skill.builder_context"
 MAX_SESSIONS = 50
 WORKBENCH_REFRESH_TOPIC = "builder.workbench.ensure_requested"
-PROMPT_IDE_SCENARIO_ID = "prompt_engineer_scenario"
+BUILDER_WORKBENCH_SCENARIO_ID = "builder"
 CHAT_APPEND_TIMEOUT_S = 0.75
 PENDING_ACTION_TIMEOUT_S = 1.5
 PROMPT_SELECTION_ASYNC_TOPICS = ("prompt.project.changed", "builder.preview.selected")
@@ -1963,7 +1963,7 @@ def _chat_meta(
     prompt_topic_id = _prompt_project_topic_id(session=session, binding=binding)
     use_project_topic = bool(prompt_topic_id)
     if use_project_topic:
-        # The client may still carry a topic from the previously selected Prompt IDE
+        # The client may still carry a topic from the previously selected Builder
         # project. The Builder runtime session is the source of truth for project
         # scoped chat history, so replace stale topic fields before resolving refs.
         meta["conversation_topic_id"] = prompt_topic_id
@@ -16469,7 +16469,7 @@ def _publish_prompt_project_selection(
             {
                 "state": "tz",
                 **payload_base,
-                "scenario_id": PROMPT_IDE_SCENARIO_ID,
+                "scenario_id": BUILDER_WORKBENCH_SCENARIO_ID,
                 "selected_scenario_id": scenario_id,
             },
             source=SKILL_ID,
@@ -16839,14 +16839,14 @@ def _target_required_message(binding: Mapping[str, Any] | None = None) -> str:
     scenario_id = str((binding or {}).get("runtime_scenario_id") or "").strip()
     if scenario_id:
         return (
-            f"{AGENT_LABEL}: \u0432 Prompt IDE \u0432\u044b\u0431\u0440\u0430\u043d \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439 {scenario_id}, "
+            f"{AGENT_LABEL}: \u0432 Builder \u0432\u044b\u0431\u0440\u0430\u043d \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439 {scenario_id}, "
             "\u043d\u043e \u044f \u043d\u0435 \u0432\u0438\u0436\u0443 \u0434\u043b\u044f \u043d\u0435\u0433\u043e Builder-\u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a. "
             "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 Builder-\u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a \u0438\u043b\u0438 \u0441\u043e\u0437\u0434\u0430\u0439\u0442\u0435 \u043d\u043e\u0432\u044b\u0439: "
             "\u00ab\u0421\u0442\u0440\u043e\u0438\u0442\u0435\u043b\u044c, \u0441\u043e\u0437\u0434\u0430\u0439 ...\u00bb."
         )
     return (
         f"{AGENT_LABEL}: \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043e\u0431\u044a\u0435\u043a\u0442 \u0434\u043b\u044f \u0434\u043e\u0440\u0430\u0431\u043e\u0442\u043a\u0438 "
-        "\u0432 Prompt IDE (\u043d\u0430\u0432\u044b\u043a \u0438\u043b\u0438 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439). "
+        "\u0432 Builder (\u043d\u0430\u0432\u044b\u043a \u0438\u043b\u0438 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439). "
         "\u0415\u0441\u043b\u0438 \u043d\u0443\u0436\u0435\u043d \u043d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f, \u043d\u0430\u043f\u0438\u0448\u0438\u0442\u0435: "
         "\u00ab\u0421\u0442\u0440\u043e\u0438\u0442\u0435\u043b\u044c, \u0441\u043e\u0437\u0434\u0430\u0439 ...\u00bb."
     )
@@ -27015,7 +27015,8 @@ def set_ui_revision_current(
 
 
 @tool(
-    summary="Ensure paired Builder Prompt IDE dev webspace.", side_effects="local_write"
+    summary="Ensure paired Builder workbench development desktop.",
+    side_effects="local_write",
 )
 def ensure_dev_webspace(
     webspace_id: str | None = None,
@@ -27052,7 +27053,7 @@ def get_workspace_binding(
 
 
 @tool(
-    summary="Return URL for paired Builder Prompt IDE dev webspace.",
+    summary="Return URL for paired Builder workbench development desktop.",
     side_effects="local_write",
 )
 def open_dev_webspace(

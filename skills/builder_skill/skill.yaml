@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.4.4
+version: 0.4.5
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -591,8 +591,8 @@ tools:
     - ok
     - message
 - name: ensure_dev_webspace
-  description: Create or reuse the paired Prompt IDE dev webspace for the current
-    source webspace.
+  description: Create or reuse the paired Builder workbench development desktop
+    for the current source desktop.
   side_effects: local_write
   entry: handlers.main:ensure_dev_webspace
   input_schema:
@@ -623,7 +623,8 @@ tools:
     - ok
     - binding
 - name: open_dev_webspace
-  description: Return the browser URL for the paired Prompt IDE dev webspace.
+  description: Return the browser URL for the paired Builder workbench development
+    desktop.
   side_effects: local_write
   entry: handlers.main:open_dev_webspace
   input_schema:
@@ -641,7 +642,7 @@ tools:
     - url
     - webspace_id
 - name: attach_dialog_widget
-  description: Return embedded Voice Chat widget config for Builder Prompt IDE.
+  description: Return embedded Voice Chat widget config for the Builder workbench.
   side_effects: none
   entry: handlers.main:attach_dialog_widget
   input_schema:
@@ -656,8 +657,8 @@ tools:
     - ok
     - widget
 - name: set_active_draft
-  description: Switch the active Builder development draft in the paired Prompt IDE
-    dev webspace.
+  description: Switch the active Builder development draft in the paired Builder
+    workbench desktop.
   side_effects: local_write
   entry: handlers.main:set_active_draft
   input_schema:

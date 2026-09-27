@@ -1365,7 +1365,7 @@
                                     },
                                     {
                                         "id": "workspace",
-                                        "label": "Workspace",
+                                        "label": "Desktop",
                                         "label_i18n": "web_desktop.settings.scope.workspace"
                                     },
                                     {
@@ -2397,7 +2397,7 @@
                             "area": "settings-main",
                             "id": "settings-form-workspace",
                             "type": "ui.form",
-                            "title": "Workspace",
+                            "title": "Desktop",
                             "title_i18n": "web_desktop.settings.scope.workspace",
                             "visibleIf": "$state.activeTab === 'settings' && $state.settingsSection === 'workspace'",
                             "inputs": {
