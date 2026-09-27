@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-27T22:04:44+00:00",
+  "updated_at": "2026-09-27T22:06:18+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1088,13 +1088,19 @@
       "kind": "skill",
       "id": "slideshow_skill",
       "name": "slideshow_skill",
-      "version": "0.2.6",
-      "updated_at": "2026-09-26T10:58:12+00:00",
+      "version": "0.2.7",
+      "updated_at": "2026-09-27T21:52:21+00:00",
       "path": "skills/slideshow_skill",
       "manifest": "skills/slideshow_skill/skill.yaml",
       "source": {
         "path": "skills/slideshow_skill",
-        "manifest": "skills/slideshow_skill/skill.yaml"
+        "manifest": "skills/slideshow_skill/skill.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:ea61e5452bda636c8bc49f3d6e81a8e46085e6252791aee57cc82d7ce3840e1c",
+        "path_scope": [
+          "projects/slideshow/"
+        ]
       },
       "install": {
         "kind": "skill",
@@ -1102,7 +1108,23 @@
         "id": "slideshow_skill"
       },
       "description": "Slideshow pilot skill that shows photos in the widget and can optionally project cached thumbnails to assigned ReDevice endpoints.",
-      "tools_count": 16
+      "tools_count": 16,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "slideshow",
+        "release": "slideshow@0.1.6",
+        "release_digest": "sha256:bdfd4beb2e09927b1d86b7b1b3eb14ad41b5a864ed843362e38aa150400826cd",
+        "package_digest": "sha256:7c2bd1333a90bff966e09788deac6de70212131d523cdaa6a1e7b8d7b644e5ab"
+      },
+      "channels": {
+        "stable": {
+          "release": "slideshow@0.1.6",
+          "release_digest": "sha256:bdfd4beb2e09927b1d86b7b1b3eb14ad41b5a864ed843362e38aa150400826cd",
+          "source_revision": "sha256:ea61e5452bda636c8bc49f3d6e81a8e46085e6252791aee57cc82d7ce3840e1c",
+          "package_digest": "sha256:7c2bd1333a90bff966e09788deac6de70212131d523cdaa6a1e7b8d7b644e5ab",
+          "version": "0.2.7"
+        }
+      }
     },
     {
       "kind": "skill",
@@ -2728,6 +2750,78 @@
           "source_revision": "21e4b84bd6affa3525607b15ef24811c525ce4e9",
           "package_digest": "sha256:17dcda30d7a897bc1d4c129d81ae19f00b6e573c64530828d6d07b5320aa3628",
           "version": "0.1.25"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "slideshow",
+      "name": "slideshow",
+      "version": "0.1.6",
+      "updated_at": "2026-09-27T22:06:18+00:00",
+      "path": "projects/slideshow",
+      "manifest": "projects/slideshow/project.yaml",
+      "source": {
+        "path": "projects/slideshow",
+        "manifest": "projects/slideshow/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "slideshow",
+        "id": "slideshow"
+      },
+      "title": "Slideshow",
+      "description": "Local media slideshow indexing and endpoint presentation controls.",
+      "categories": [
+        "media"
+      ],
+      "tags": [
+        "slideshow",
+        "redevice",
+        "cbs-provider"
+      ],
+      "publication": {
+        "stage": "beta",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "beta",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": false,
+      "features": [
+        {
+          "id": "default",
+          "title": "Slideshow",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:slideshow_skill"
+          ]
+        }
+      ],
+      "components": [
+        "skill:slideshow_skill"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.builder.component_project.v1"
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "slideshow",
+        "release": "slideshow@0.1.6",
+        "release_digest": "sha256:bdfd4beb2e09927b1d86b7b1b3eb14ad41b5a864ed843362e38aa150400826cd",
+        "primary_component": "skill:slideshow_skill",
+        "package_digest": "sha256:7c2bd1333a90bff966e09788deac6de70212131d523cdaa6a1e7b8d7b644e5ab"
+      },
+      "channels": {
+        "stable": {
+          "release": "slideshow@0.1.6",
+          "release_digest": "sha256:bdfd4beb2e09927b1d86b7b1b3eb14ad41b5a864ed843362e38aa150400826cd",
+          "source_revision": "sha256:ea61e5452bda636c8bc49f3d6e81a8e46085e6252791aee57cc82d7ce3840e1c",
+          "package_digest": "sha256:7c2bd1333a90bff966e09788deac6de70212131d523cdaa6a1e7b8d7b644e5ab",
+          "version": "0.1.6"
         }
       }
     }

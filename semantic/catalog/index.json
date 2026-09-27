@@ -116,10 +116,10 @@
     "slideshow": {
       "application_id": "slideshow",
       "publisher_ref": "subnet:sn_6acf0c01",
-      "application_revision": 2,
-      "stable_release_digest": "sha256:f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410",
-      "release_key": "slideshow@sha256:f0ff99f653c0ea864fee7401afef43b9b6aacfe9548b8d89b29f3451632ef410",
-      "projection_digest": "sha256:66858eb3a00c19405d64ff3ea88fab20142460276c003653df4c63987a6b4234"
+      "application_revision": 3,
+      "stable_release_digest": "sha256:bdfd4beb2e09927b1d86b7b1b3eb14ad41b5a864ed843362e38aa150400826cd",
+      "release_key": "slideshow@sha256:bdfd4beb2e09927b1d86b7b1b3eb14ad41b5a864ed843362e38aa150400826cd",
+      "projection_digest": "sha256:1d815186235d8985953574802d2192e9003b1c9d65004155485c6b66cb815ee5"
     },
     "voice": {
       "application_id": "voice",
@@ -642,7 +642,15 @@
       "release_digest": "sha256:23fe7aa94ba1d556ce8a54edabc798ae5e12a89c673d84d17a651e06e073532b",
       "path": "semantic/catalog/releases/notebook/23fe7aa94ba1d556ce8a54edabc798ae5e12a89c673d84d17a651e06e073532b.json",
       "projection_digest": "sha256:70cda85c740f242b9180b7b58eca3c0ad9ba3a5ab9f731138c7f470a5fe7c842"
+    },
+    "slideshow@sha256:bdfd4beb2e09927b1d86b7b1b3eb14ad41b5a864ed843362e38aa150400826cd": {
+      "application_id": "slideshow",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.6",
+      "release_digest": "sha256:bdfd4beb2e09927b1d86b7b1b3eb14ad41b5a864ed843362e38aa150400826cd",
+      "path": "semantic/catalog/releases/slideshow/bdfd4beb2e09927b1d86b7b1b3eb14ad41b5a864ed843362e38aa150400826cd.json",
+      "projection_digest": "sha256:1d815186235d8985953574802d2192e9003b1c9d65004155485c6b66cb815ee5"
     }
   },
-  "index_digest": "sha256:3c5ce3f8bfd536f33b2234018195f60685e4576e5b45e8d6e362c24d32a4d5d7"
+  "index_digest": "sha256:888d8f0fe7b969ade70186e0fcca20b2548ee7d6c32f2bfb0ed12d3cd01a13ab"
 }
