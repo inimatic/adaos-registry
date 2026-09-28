@@ -91,12 +91,20 @@ published release or an invented candidate digest.
    Public production use requires the applicable Google verification.
 4. Create an OAuth Client with type **Web application**. A Desktop application
    client is not suitable for this callback flow.
-5. Add this exact Authorized redirect URI (no trailing slash):
+5. Add the exact Authorized redirect URIs used by the environments from which
+   you open AdaOS (no trailing slash):
 
    ```text
    http://127.0.0.1:8777/api/providers/google/gmail/oauth/callback
+   https://integrations.inimatic.com/v1/oauth/callback/cbp_google_oauth_primary
+   https://ru.integrations.inimatic.com/v1/oauth/callback/cbp_google_oauth_primary
    ```
 
+   Direct local access uses the loopback URI. Access through `inimatic.com`
+   uses the public callback authority selected by the subnet zone: the RU zone
+   uses `ru.integrations.inimatic.com`; central/shared zones use
+   `integrations.inimatic.com`. Register every environment you actually use and
+   keep the loopback URI during the migration window.
 6. Copy the client ID and secret into AdaOS **Applications → Settings → Google
    OAuth client ID / Google OAuth client secret**, then save. AdaOS stores them
    in the local credential vault. Never place the secret in chat, source,
