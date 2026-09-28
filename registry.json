@@ -558,8 +558,8 @@
       "kind": "skill",
       "id": "media_control_skill",
       "name": "media_control_skill",
-      "version": "0.2.24",
-      "updated_at": "2026-09-26T11:04:07+00:00",
+      "version": "0.2.25",
+      "updated_at": "2026-09-28T00:02:56+00:00",
       "path": "skills/media_control_skill",
       "manifest": "skills/media_control_skill/skill.yaml",
       "source": {

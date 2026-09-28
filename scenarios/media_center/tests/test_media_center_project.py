@@ -73,6 +73,16 @@ def test_scenario_requires_only_project_owned_runtime_components() -> None:
     assert "media_indexer_skill" not in scenario["depends"]
 
 
+def test_media_control_declares_application_access_capabilities() -> None:
+    manifest = yaml.safe_load(
+        (REGISTRY_ROOT / "skills" / "media_control_skill" / "skill.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert {"workspace.read", "workspace.write"}.issubset(manifest["capabilities"])
+
+
 def test_registry_index_matches_media_center_distribution_manifests() -> None:
     registry = json.loads(
         (REGISTRY_ROOT / "registry.json").read_text(encoding="utf-8")

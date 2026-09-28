@@ -1,5 +1,5 @@
 name: media_control_skill
-version: 0.2.24
+version: 0.2.25
 description: Persistent Media Center control plane for playback targets, sessions,
   queues, commands, checkpoints, and settings.
 supported_locales:
@@ -13,6 +13,8 @@ runtime:
 capabilities:
 - media.playback_planning
 - storage.relational
+- workspace.read
+- workspace.write
 dependencies: []
 events:
   subscribe:
