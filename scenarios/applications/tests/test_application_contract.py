@@ -380,9 +380,13 @@ def test_installed_open_does_not_guess_a_navigation_target():
     button = next(b for b in life['inputs']['buttons'] if b['id'] == 'open-installed')
     guard = '$state.applicationInstalled == true && !($state.trialAccepted == true && $state.trialTarget)'
     assert button['visibleIf'] == guard
-    action = next(a for a in life['actions'] if a['on'] == 'click:open-installed')
-    assert action['enabledIf'] == button['enabledIf'] == guard + ' && $state.effectiveTarget'
-    assert action['type'] == 'openWorkspace'
+    assert button['enabledIf'] == guard + ' && $state.effectiveTarget'
+    actions = [a for a in life['actions'] if a['on'] == 'click:open-installed']
+    action = next(a for a in actions if a['type'] == 'openWorkspace')
+    modal_action = next(a for a in actions if a['type'] == 'openModal')
+    assert action['enabledIf'] == guard + " && $state.effectiveTarget.intent == 'webspace.open'"
+    assert modal_action['enabledIf'] == guard + " && $state.effectiveTarget.intent == 'desktop.open_modal'"
+    assert modal_action['params']['modalId'] == '$state.effectiveTarget.modal_id'
     target = {'intent': 'webspace.open', 'expected_scenario_id': 'different-scenario',
               'webspace_id': 'selected-workspace', 'space_kind': 'workspace',
               'application_id': 'synthetic-app', 'release_digest': 'sha256:' + 'a' * 64}

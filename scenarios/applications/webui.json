@@ -1964,11 +1964,19 @@
                                 {
                                     "type": "openWorkspace",
                                     "on": "click:open-installed",
-                                    "enabledIf": "$state.applicationInstalled == true && !($state.trialAccepted == true && $state.trialTarget) && $state.effectiveTarget",
+                                    "enabledIf": "$state.applicationInstalled == true && !($state.trialAccepted == true && $state.trialTarget) && $state.effectiveTarget.intent == 'webspace.open'",
                                     "params": {
                                         "workspaceId": "$state.effectiveTarget.webspace_id",
                                         "expectedScenarioId": "$state.effectiveTarget.expected_scenario_id",
                                         "newWindow": true
+                                    }
+                                },
+                                {
+                                    "type": "openModal",
+                                    "on": "click:open-installed",
+                                    "enabledIf": "$state.applicationInstalled == true && !($state.trialAccepted == true && $state.trialTarget) && $state.effectiveTarget.intent == 'desktop.open_modal'",
+                                    "params": {
+                                        "modalId": "$state.effectiveTarget.modal_id"
                                     }
                                 },
                                 {
