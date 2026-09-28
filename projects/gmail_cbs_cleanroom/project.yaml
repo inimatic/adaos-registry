@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: gmail_cbs_cleanroom
-version: 0.1.10
+version: 0.1.11
 profiles: []
 components:
   owned:
@@ -131,3 +131,6 @@ permission_profile:
     linked_to_user: true
     sent_off_device: true
     tracking: false
+compatibility:
+  required_contracts:
+  - capability:mail.messages.manage@^1.0.0

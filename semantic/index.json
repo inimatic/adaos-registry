@@ -149,7 +149,9 @@
     "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:6fe27117e5ae6eb68133c1e83e8cba4db75ba7eb696ac15249baeec10d0d6756": "sha256:9be5921fa24738bec3199419f9707cc1a01f7ae914e54f6f07f1703ac5f52d25",
     "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:50f4cf9c8c8185ad91b43f72671e5615fb28461a1b24dca5ac1b5edbe3f26b47": "sha256:ae272ca0f61a42bb6425f9c74ef5932dc77666946250f60fca0f9b2724a9427e",
     "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:6237c5c19b0d6b63af97b2e02cebf1bfd959f8893399752d96aff396995c1f7d": "sha256:58f2f3d8fdc26199932c8c2321b490642cee9b339820435835ceccd04580a933",
-    "adaos.binding.delivery.v1|binding-definition:devices.manage.redevice@sha256:12cfcafa4d8c614c740dc4108ed11fb5d39b3c6f3c1aae59b1dcffc6e0ed35d7|sha256:fbb34633fdc66f3f4c9012a626b50fa6402e626bf3848c03f5330a3e97646eb0": "sha256:e9c02096574308530b32aed349497dce87d757743a6409bcbddecdbc2d1afde6"
+    "adaos.binding.delivery.v1|binding-definition:devices.manage.redevice@sha256:12cfcafa4d8c614c740dc4108ed11fb5d39b3c6f3c1aae59b1dcffc6e0ed35d7|sha256:fbb34633fdc66f3f4c9012a626b50fa6402e626bf3848c03f5330a3e97646eb0": "sha256:e9c02096574308530b32aed349497dce87d757743a6409bcbddecdbc2d1afde6",
+    "adaos.binding.delivery.v1|binding-definition:mail.messages.manage.google-gmail-local@sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2|sha256:9abe440173b826f9cdbec9a45f8fa7f2789071dbf0fff6034225d1a1bf8e0834": "sha256:0800036db83dc8cf07cb89deaca35a082234d354ab5a4adb95c50679c4fbb98e",
+    "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:937fc0cd8feb8829a9e43d9e571698feef11ba20822d34efec44ab515bda2adb": "sha256:e169aca924282b1938efcce7a5fdff8b89a0021f1176a2b4494cc6f94b8366bc"
   },
   "records": {
     "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1": {
@@ -184,6 +186,7 @@
         "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
         "sha256:6f2f2cb3b18605fc69bab7112dfd957be2fb94b509039a36ef71a078ef30c9ce",
         "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
+        "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
         "sha256:7578dcb7696b4a7d25424f3fa117d4a90230b2afcb2a0f16dcde5856c90071ab",
         "sha256:758e6dac8a7bbf92b46400fd6de9680ce5f5277ae5c5a2ab3bf4eb20d08e40f7",
         "sha256:77147de328b7a3720e2c345f379a59101f8d99cf3ad99a05a88bc6abe175b702",
@@ -228,6 +231,7 @@
       "path": "semantic/records/sha256/53/5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2.json",
       "published_by_release_digests": [
         "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
+        "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
         "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
         "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
       ]
@@ -275,6 +279,7 @@
         "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
         "sha256:6f2f2cb3b18605fc69bab7112dfd957be2fb94b509039a36ef71a078ef30c9ce",
         "sha256:7155818c48dcb528dc6bcccfb4037cced38d73ca3c8a63bf3bc97c4f7c0b0f5d",
+        "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
         "sha256:7578dcb7696b4a7d25424f3fa117d4a90230b2afcb2a0f16dcde5856c90071ab",
         "sha256:758e6dac8a7bbf92b46400fd6de9680ce5f5277ae5c5a2ab3bf4eb20d08e40f7",
         "sha256:77147de328b7a3720e2c345f379a59101f8d99cf3ad99a05a88bc6abe175b702",
@@ -328,6 +333,7 @@
       "path": "semantic/records/sha256/f6/f694f5fc917ed4a76330740a7ff555c1c6e0514781f3b29d84c7ce55f5d61698.json",
       "published_by_release_digests": [
         "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
+        "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
         "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
         "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
       ]
@@ -1754,6 +1760,24 @@
       "published_by_release_digests": [
         "sha256:2e3e56a749c4fa564a342026f547b72d92b38059a52f7bed61cae31dee2afb07"
       ]
+    },
+    "sha256:0800036db83dc8cf07cb89deaca35a082234d354ab5a4adb95c50679c4fbb98e": {
+      "schema": "adaos.binding.delivery.v1",
+      "identity": "binding-definition:mail.messages.manage.google-gmail-local@sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2",
+      "revision": "sha256:9abe440173b826f9cdbec9a45f8fa7f2789071dbf0fff6034225d1a1bf8e0834",
+      "path": "semantic/records/sha256/08/0800036db83dc8cf07cb89deaca35a082234d354ab5a4adb95c50679c4fbb98e.json",
+      "published_by_release_digests": [
+        "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f"
+      ]
+    },
+    "sha256:e169aca924282b1938efcce7a5fdff8b89a0021f1176a2b4494cc6f94b8366bc": {
+      "schema": "adaos.binding.delivery.v1",
+      "identity": "binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "revision": "sha256:937fc0cd8feb8829a9e43d9e571698feef11ba20822d34efec44ab515bda2adb",
+      "path": "semantic/records/sha256/e1/e169aca924282b1938efcce7a5fdff8b89a0021f1176a2b4494cc6f94b8366bc.json",
+      "published_by_release_digests": [
+        "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f"
+      ]
     }
   },
   "application_releases": {
@@ -2413,7 +2437,16 @@
       "semantic_revision_digest": "sha256:24201c077a7f96919fe08cde0b31f127e327bf114cf05d19b4bec6f2c22f2d70",
       "path": "semantic/applications/redevice_control/2e3e56a749c4fa564a342026f547b72d92b38059a52f7bed61cae31dee2afb07.json",
       "projection_digest": "sha256:75580a3cc8f916e9c3ca60f89e0a9c80924c9e6b5f5bf1a2624da80338e7be78"
+    },
+    "project:gmail_cbs_cleanroom@sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f": {
+      "project_id": "gmail_cbs_cleanroom",
+      "version": "0.1.11",
+      "application_ref": "application:gmail_cbs_cleanroom",
+      "project_release_digest": "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
+      "semantic_revision_digest": "sha256:f9215579a3d4a7f6814717620a06235038e04ab5191757848f3a907cd2866c8f",
+      "path": "semantic/applications/gmail_cbs_cleanroom/717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f.json",
+      "projection_digest": "sha256:2244a2d8c16aef1dc55471f5e8d55486c8141a581cf545c2e7e1d32f0d5ea377"
     }
   },
-  "index_digest": "sha256:127579b001c95b9f25aaad3f8e1e13cf163909f6379b85d2932fdd31332cbe4e"
+  "index_digest": "sha256:6ef3a9873669a7e2463e656f65d688baa0bae11c9e24f926144c693a9b4064d6"
 }

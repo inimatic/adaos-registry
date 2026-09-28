@@ -13,9 +13,9 @@
       "application_id": "gmail_cbs_cleanroom",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 2,
-      "stable_release_digest": "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
-      "release_key": "gmail_cbs_cleanroom@sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83",
-      "projection_digest": "sha256:7bdf8ccbadac567dc419cf012a93b66a0e3f61057c3b2083897b485fefa92eed"
+      "stable_release_digest": "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
+      "release_key": "gmail_cbs_cleanroom@sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
+      "projection_digest": "sha256:22f68593782b5ff725139d1c5737a4ead25f958cb1d3c31a583aaef72d48c723"
     },
     "applications": {
       "application_id": "applications",
@@ -698,7 +698,15 @@
       "release_digest": "sha256:2e3e56a749c4fa564a342026f547b72d92b38059a52f7bed61cae31dee2afb07",
       "path": "semantic/catalog/releases/redevice_control/2e3e56a749c4fa564a342026f547b72d92b38059a52f7bed61cae31dee2afb07.json",
       "projection_digest": "sha256:5ce17f1d0b767862cdc6547fe8d9698598cc5c4efe8cb496092ebeb520a995fc"
+    },
+    "gmail_cbs_cleanroom@sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f": {
+      "application_id": "gmail_cbs_cleanroom",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.11",
+      "release_digest": "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
+      "path": "semantic/catalog/releases/gmail_cbs_cleanroom/717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f.json",
+      "projection_digest": "sha256:22f68593782b5ff725139d1c5737a4ead25f958cb1d3c31a583aaef72d48c723"
     }
   },
-  "index_digest": "sha256:f1b728c29c34af805e0b14531f8bc92b315940dc9319809044c4f19f9eaef837"
+  "index_digest": "sha256:0a09c5d95660dc3e4776c71b49bc03699ee8b603825e834557515401c0413a56"
 }

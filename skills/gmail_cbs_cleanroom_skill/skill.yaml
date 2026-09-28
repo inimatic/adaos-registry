@@ -1181,6 +1181,6 @@ nlu_hints:
   slot_schemas: {}
   entities: []
 prototype: skill_default
-updated_at: '2026-09-24T22:34:09+00:00'
+updated_at: '2026-09-28T12:02:54+00:00'
 events:
   subscribe: []
