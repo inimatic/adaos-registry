@@ -187,6 +187,8 @@ _background_refresh_task: asyncio.Task[Any] | None = None
 _background_refresh_thread: threading.Thread | None = None
 _background_refresh_pending = False
 _background_refresh_webspace_id: str | None = None
+_background_refresh_targets: set[tuple[str | None, str | None]] = set()
+_background_refresh_targets_guard = threading.Lock()
 _background_refresh_reason = ""
 _background_refresh_requested_at = 0.0
 _marketplace_catalog_cache: dict[tuple[str, str], tuple[float, list[dict[str, Any]]]] = {}
@@ -1970,6 +1972,8 @@ def _cleanup_runtime_state(*, reason: str = "lifecycle", wait: bool = False) -> 
     _background_refresh_reason = ""
     _background_refresh_requested_at = 0.0
     _background_refresh_webspace_id = None
+    with _background_refresh_targets_guard:
+        _background_refresh_targets.clear()
     with _snapshot_cache_guard:
         snapshot_cache_total = len(_snapshot_cache)
         snapshot_lock_total = len(_snapshot_cache_locks)
@@ -7005,13 +7009,19 @@ def _highlight_summary_changes(summary: dict[str, Any], *, context_key: str) -> 
     return payload
 
 
-def _set_background_refresh_pending(*, webspace_id: str | None, reason: str) -> None:
+def _set_background_refresh_pending(
+    *,
+    webspace_id: str | None,
+    reason: str,
+    node_id: str | None = None,
+) -> None:
     global _background_refresh_pending
     global _background_refresh_reason
     global _background_refresh_requested_at
     global _background_refresh_webspace_id
 
     token = str(webspace_id or "").strip() or None
+    target_node_id = str(node_id or "").strip() or None
     coalesced = bool(
         _background_refresh_pending
         or (_background_refresh_task is not None and not _background_refresh_task.done())
@@ -7019,6 +7029,8 @@ def _set_background_refresh_pending(*, webspace_id: str | None, reason: str) -> 
     )
     requested_at = time.time()
     _background_refresh_pending = True
+    with _background_refresh_targets_guard:
+        _background_refresh_targets.add((token, target_node_id))
     if token:
         _background_refresh_webspace_id = token
     _background_refresh_reason = str(reason or "runtime.event").strip() or "runtime.event"
@@ -7031,6 +7043,7 @@ def _set_background_refresh_pending(*, webspace_id: str | None, reason: str) -> 
     _projection_diag["last_refresh_scheduled_at"] = requested_at
     _projection_diag["last_refresh_scheduled_reason"] = _background_refresh_reason
     _projection_diag["last_refresh_scheduled_webspace_id"] = _background_refresh_webspace_id or ""
+    _projection_diag["last_refresh_scheduled_node_id"] = target_node_id or ""
 
 
 async def _background_refresh_worker() -> None:
@@ -7044,7 +7057,14 @@ async def _background_refresh_worker() -> None:
         while True:
             await asyncio.sleep(_BACKGROUND_REFRESH_DEBOUNCE_S)
             webspace_id = _background_refresh_webspace_id
-            target_webspaces = _refresh_target_webspace_ids(webspace_id)
+            with _background_refresh_targets_guard:
+                refresh_targets = sorted(
+                    _background_refresh_targets,
+                    key=lambda item: (str(item[0] or ""), str(item[1] or "")),
+                )
+                _background_refresh_targets.clear()
+            if not refresh_targets:
+                refresh_targets = [(webspace_id, None)]
             reason = _background_refresh_reason or "runtime.event"
             requested_at = _background_refresh_requested_at or time.time()
             _background_refresh_pending = False
@@ -7063,11 +7083,18 @@ async def _background_refresh_worker() -> None:
                 background_refresh_error="",
             )
             try:
-                for target_webspace in target_webspaces:
-                    await asyncio.wait_for(
-                        _refresh_snapshot_async(webspace_id=target_webspace, allow_cache=True),
-                        timeout=_BACKGROUND_REFRESH_TIMEOUT_S,
-                    )
+                for requested_webspace_id, target_node_id in refresh_targets:
+                    for target_webspace in _refresh_target_webspace_ids(requested_webspace_id):
+                        refresh_kwargs: dict[str, Any] = {
+                            "webspace_id": target_webspace,
+                            "allow_cache": True,
+                        }
+                        if target_node_id:
+                            refresh_kwargs["selected_node_id"] = target_node_id
+                        await asyncio.wait_for(
+                            _refresh_snapshot_async(**refresh_kwargs),
+                            timeout=_BACKGROUND_REFRESH_TIMEOUT_S,
+                        )
             except (asyncio.CancelledError, RuntimeError) as exc:
                 if isinstance(exc, RuntimeError) and "Executor shutdown has been called" not in str(exc):
                     raise
@@ -7170,7 +7197,12 @@ def _run_background_refresh_thread() -> None:
         _background_refresh_thread = None
 
 
-def _schedule_snapshot_refresh(*, webspace_id: str | None = None, reason: str = "runtime.event") -> None:
+def _schedule_snapshot_refresh(
+    *,
+    webspace_id: str | None = None,
+    reason: str = "runtime.event",
+    node_id: str | None = None,
+) -> None:
     global _background_refresh_thread
     global _background_refresh_pending
     global _background_refresh_reason
@@ -7179,7 +7211,7 @@ def _schedule_snapshot_refresh(*, webspace_id: str | None = None, reason: str = 
 
     # Event subscribers share the core event loop. Scheduling must stay memory-only;
     # skill-memory JSON I/O is performed by the background worker.
-    _set_background_refresh_pending(webspace_id=webspace_id, reason=reason)
+    _set_background_refresh_pending(webspace_id=webspace_id, reason=reason, node_id=node_id)
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -11188,6 +11220,7 @@ async def _project_sections_async(
     sections: dict[str, Any],
     *,
     webspace_id: str | None = None,
+    selected_node_id: str | None = None,
     reason: str = "infrastate_lightweight_refresh",
 ) -> None:
     if not sections:
@@ -11209,45 +11242,72 @@ async def _project_sections_async(
         if pressure_state == "throttle"
         else _MIN_YJS_PROJECTION_INTERVAL_S
     )
+    target_node_id = str(selected_node_id or "").strip()
     for target_ws in _projection_webspace_ids(webspace_id):
-        if _projection_fingerprints.get(target_ws) == fingerprint:
+        projection_key = f"{target_ws}\0{target_node_id}" if target_node_id else target_ws
+        if _projection_fingerprints.get(projection_key) == fingerprint:
             _projection_diag["skip_total"] = int(_projection_diag.get("skip_total") or 0) + 1
             continue
-        last_applied_at = float(_projection_last_applied_at.get(target_ws) or 0.0)
+        last_applied_at = float(_projection_last_applied_at.get(projection_key) or 0.0)
         if last_applied_at > 0 and now - last_applied_at < effective_min_interval_s:
             _projection_diag["rate_limited_total"] = int(_projection_diag.get("rate_limited_total") or 0) + 1
             continue
         applied = False
         errored = False
         try:
-            _PROJECTION_RUNTIME.bind_ctx_subnet(_WEBSPACE_PROJECTION_CTX)
-            for slot_name, value in compact_sections.items():
-                slot_pressure_policy = _projection_pressure_policy(target_ws)
-                slot_pressure_state = str(slot_pressure_policy.get("policy_state") or "").strip().lower()
-                if slot_pressure_state == "block":
-                    _projection_diag["blocked_total"] = int(_projection_diag.get("blocked_total") or 0) + 1
-                    return
+            if target_node_id:
+                from adaos.services.scenario import ProjectionService
+
+                service = ProjectionService.from_ctx(get_ctx())
                 pushed = False
                 try:
                     pushed = set_current_skill("infrastate_skill")
-                    result = await _PROJECTION_RUNTIME.set_if_changed(
-                        _PROJECTION_SLOT_BY_NAME.get(slot_name) or slot_name,
-                        value,
-                        webspace_id=target_ws,
-                        reason=reason,
-                    )
+                    for slot_name, value in compact_sections.items():
+                        slot_pressure_policy = _projection_pressure_policy(target_ws)
+                        slot_pressure_state = str(slot_pressure_policy.get("policy_state") or "").strip().lower()
+                        if slot_pressure_state == "block":
+                            _projection_diag["blocked_total"] = int(_projection_diag.get("blocked_total") or 0) + 1
+                            return
+                        await service.apply(
+                            "webspace",
+                            slot_name,
+                            value,
+                            webspace_id=target_ws,
+                            node_id=target_node_id,
+                        )
+                    applied = True
                 finally:
                     if pushed:
                         clear_current_skill()
-                applied = applied or bool(result.written)
-                errored = errored or bool(result.error)
+            else:
+                _PROJECTION_RUNTIME.bind_ctx_subnet(_WEBSPACE_PROJECTION_CTX)
+                for slot_name, value in compact_sections.items():
+                    slot_pressure_policy = _projection_pressure_policy(target_ws)
+                    slot_pressure_state = str(slot_pressure_policy.get("policy_state") or "").strip().lower()
+                    if slot_pressure_state == "block":
+                        _projection_diag["blocked_total"] = int(_projection_diag.get("blocked_total") or 0) + 1
+                        return
+                    pushed = False
+                    try:
+                        pushed = set_current_skill("infrastate_skill")
+                        result = await _PROJECTION_RUNTIME.set_if_changed(
+                            _PROJECTION_SLOT_BY_NAME.get(slot_name) or slot_name,
+                            value,
+                            webspace_id=target_ws,
+                            reason=reason,
+                        )
+                    finally:
+                        if pushed:
+                            clear_current_skill()
+                    applied = applied or bool(result.written)
+                    errored = errored or bool(result.error)
         finally:
             pass
         if errored:
             _projection_diag["error_total"] = int(_projection_diag.get("error_total") or 0) + 1
         if applied:
-            _projection_fingerprints[target_ws] = fingerprint
-            _projection_last_applied_at[target_ws] = now
+            _projection_fingerprints[projection_key] = fingerprint
+            _projection_last_applied_at[projection_key] = now
             _projection_diag["apply_total"] = int(_projection_diag.get("apply_total") or 0) + 1
         else:
             _projection_diag["skip_total"] = int(_projection_diag.get("skip_total") or 0) + 1
@@ -11273,6 +11333,7 @@ def _publish_active_stream_receiver_snapshots(webspace_id: str | None, *, reason
 async def _refresh_live_infrastate_async(
     *,
     webspace_id: str | None = None,
+    selected_node_id: str | None = None,
     reason: str = "runtime.event",
     project_control: bool = True,
 ) -> dict[str, Any]:
@@ -11285,7 +11346,10 @@ async def _refresh_live_infrastate_async(
     sections: dict[str, Any] = {}
     try:
         await asyncio.to_thread(_write_ui_state, last_refresh_ts=now)
-        projection_demanded = project_control and _has_active_infrastate_projection_demand(webspace_id)
+        target_node_id = str(selected_node_id or "").strip() or None
+        projection_demanded = project_control and (
+            bool(target_node_id) or _has_active_infrastate_projection_demand(webspace_id)
+        )
         if project_control and not projection_demanded:
             _projection_diag["no_demand_refresh_skip_total"] = int(
                 _projection_diag.get("no_demand_refresh_skip_total") or 0
@@ -11294,6 +11358,7 @@ async def _refresh_live_infrastate_async(
             sections = await asyncio.to_thread(
                 _lightweight_projection_sections,
                 webspace_id=webspace_id,
+                selected_node_id=target_node_id,
             )
             payload_bytes = sum(len(_stable_json_bytes(value)) for value in sections.values())
             _projection_diag["last_refresh_payload_bytes"] = payload_bytes
@@ -11305,6 +11370,7 @@ async def _refresh_live_infrastate_async(
             await _project_sections_async(
                 sections,
                 webspace_id=webspace_id,
+                selected_node_id=target_node_id,
                 reason=f"infrastate_control_refresh:{reason}",
             )
         await asyncio.to_thread(_publish_active_stream_receiver_snapshots, webspace_id, reason=reason)
@@ -11327,9 +11393,15 @@ async def _refresh_live_infrastate_async(
     }
 
 
-async def _refresh_snapshot_async(*, webspace_id: str | None = None, allow_cache: bool = True) -> dict[str, Any]:
+async def _refresh_snapshot_async(
+    *,
+    webspace_id: str | None = None,
+    selected_node_id: str | None = None,
+    allow_cache: bool = True,
+) -> dict[str, Any]:
     return await _refresh_live_infrastate_async(
         webspace_id=webspace_id,
+        selected_node_id=selected_node_id,
         reason="legacy.refresh_snapshot",
         project_control=True,
     )
@@ -11367,10 +11439,14 @@ def on_webio_yjs_snapshot_requested(evt: Any) -> None:
     payload = getattr(evt, "payload", evt)
     if not _is_infrastate_yjs_projection_payload(payload):
         return
-    _schedule_snapshot_refresh(
-        webspace_id=_webspace_id_from_payload(payload),
-        reason="webio.yjs.snapshot_requested",
-    )
+    schedule_kwargs: dict[str, Any] = {
+        "webspace_id": _webspace_id_from_payload(payload),
+        "reason": "webio.yjs.snapshot_requested",
+    }
+    target_node_id = _payload_target_node_id(payload)
+    if target_node_id:
+        schedule_kwargs["node_id"] = target_node_id
+    _schedule_snapshot_refresh(**schedule_kwargs)
 
 
 @subscribe("webio.yjs.subscription.changed")
@@ -11381,10 +11457,14 @@ def on_webio_yjs_subscription_changed(evt: Any) -> None:
     action = str(payload.get("action") or "").strip().lower() or "subscribed"
     if action == "unsubscribed":
         return
-    _schedule_snapshot_refresh(
-        webspace_id=_webspace_id_from_payload(payload),
-        reason="webio.yjs.subscription_changed",
-    )
+    schedule_kwargs: dict[str, Any] = {
+        "webspace_id": _webspace_id_from_payload(payload),
+        "reason": "webio.yjs.subscription_changed",
+    }
+    target_node_id = _payload_target_node_id(payload)
+    if target_node_id:
+        schedule_kwargs["node_id"] = target_node_id
+    _schedule_snapshot_refresh(**schedule_kwargs)
 
 
 @subscribe("webio.stream.snapshot.requested")
@@ -11475,6 +11555,7 @@ def get_snapshot(
                 _project_sections_async(
                     sections,
                     webspace_id=webspace_id,
+                    selected_node_id=requested_node_id or None,
                     reason="tool.get_snapshot.lightweight",
                 )
             )

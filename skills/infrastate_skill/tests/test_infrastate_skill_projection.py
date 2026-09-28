@@ -3592,7 +3592,7 @@ def test_infrastate_get_snapshot_project_false_does_not_project_control(monkeypa
 
 def test_infrastate_get_snapshot_allows_compact_projection_under_yjs_throttle(monkeypatch):
     mod = _load_infrastate_module()
-    projected: list[str | None] = []
+    projected: list[tuple[str | None, str | None]] = []
     mod._projection_diag.update(
         {
             "tool_project_admitted_under_pressure_total": 0,
@@ -3620,14 +3620,23 @@ def test_infrastate_get_snapshot_allows_compact_projection_under_yjs_throttle(mo
         },
     )
 
-    async def _project_sections(sections, webspace_id=None, reason=""):
-        projected.append(webspace_id)
+    async def _project_sections(
+        sections,
+        webspace_id=None,
+        selected_node_id=None,
+        reason="",
+    ):
+        projected.append((webspace_id, selected_node_id))
 
     monkeypatch.setattr(mod, "_project_sections_async", _project_sections)
 
-    result = mod.get_snapshot(webspace_id="desktop", project=True)
+    result = mod.get_snapshot(
+        webspace_id="desktop",
+        target_node_id="member-1",
+        project=True,
+    )
 
-    assert projected == ["desktop"]
+    assert projected == [("desktop", "member-1")]
     assert result["summary"]["value"] == "succeeded"
     assert "logs" not in result
     assert mod._projection_diag["tool_project_admitted_under_pressure_total"] == 1
@@ -4174,6 +4183,83 @@ def test_infrastate_yjs_snapshot_request_schedules_projection_refresh(monkeypatc
     assert scheduled == [
         {"webspace_id": "desktop", "reason": "webio.yjs.snapshot_requested"},
     ]
+
+
+def test_infrastate_yjs_snapshot_request_preserves_target_node(monkeypatch):
+    mod = _load_infrastate_module()
+    scheduled: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        mod,
+        "_schedule_snapshot_refresh",
+        lambda **kwargs: scheduled.append(dict(kwargs)),
+    )
+
+    mod.on_webio_yjs_snapshot_requested(
+        SimpleNamespace(
+            payload={
+                "slot": "infrastate.summary",
+                "webspace_id": "desktop",
+                "target_node_id": "member-1",
+            }
+        )
+    )
+
+    assert scheduled == [
+        {
+            "webspace_id": "desktop",
+            "reason": "webio.yjs.snapshot_requested",
+            "node_id": "member-1",
+        },
+    ]
+
+
+def test_infrastate_projects_remote_node_sections_to_their_node_scope(monkeypatch):
+    mod = _load_infrastate_module()
+    applied: list[dict[str, object]] = []
+
+    class _ProjectionService:
+        async def apply(self, scope, slot, value, **kwargs):
+            applied.append(
+                {
+                    "scope": scope,
+                    "slot": slot,
+                    "value": value,
+                    **kwargs,
+                }
+            )
+
+    from adaos.services.scenario import ProjectionService
+
+    monkeypatch.setattr(ProjectionService, "from_ctx", staticmethod(lambda _ctx: _ProjectionService()))
+    monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
+    monkeypatch.setattr(mod, "_projection_webspace_ids", lambda _webspace_id=None: ["desktop"])
+    monkeypatch.setattr(
+        mod,
+        "_projection_pressure_policy",
+        lambda _webspace_id=None: {"policy_state": "allow"},
+    )
+    mod._projection_fingerprints.clear()
+    mod._projection_last_applied_at.clear()
+
+    asyncio.run(
+        mod._project_sections_async(
+            {"infrastate.summary": {"value": "succeeded"}},
+            webspace_id="desktop",
+            selected_node_id="member-1",
+        )
+    )
+
+    assert applied == [
+        {
+            "scope": "webspace",
+            "slot": "infrastate.summary",
+            "value": {"value": "succeeded"},
+            "webspace_id": "desktop",
+            "node_id": "member-1",
+        }
+    ]
+    assert "desktop\0member-1" in mod._projection_fingerprints
 
 
 def test_infrastate_yjs_subscription_changed_schedules_projection_refresh(monkeypatch):
