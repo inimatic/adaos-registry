@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-27T22:33:06+00:00",
+  "updated_at": "2026-09-28T00:12:38+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -529,8 +529,8 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.8.99",
-      "updated_at": "2026-09-26T11:03:48+00:00",
+      "version": "0.8.100",
+      "updated_at": "2026-09-28T00:07:51+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
       "source": {
@@ -549,17 +549,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.116",
-        "release_digest": "sha256:11372ede3864b1535fae426b6027d8a0f1f4dee181349c7f66230158043a27f9",
-        "package_digest": "sha256:780991d799f2c65f07a6b940fd12bb085c3199c1fffa5f3265a258d3e223ae69"
+        "release": "media_center@0.6.118",
+        "release_digest": "sha256:7578dcb7696b4a7d25424f3fa117d4a90230b2afcb2a0f16dcde5856c90071ab",
+        "package_digest": "sha256:5ff22b859df946d1148f6aec3b5906d20e215f82ca619e4b4a14809552aa8f1c"
       }
     },
     {
       "kind": "skill",
       "id": "media_control_skill",
       "name": "media_control_skill",
-      "version": "0.2.25",
-      "updated_at": "2026-09-28T00:02:56+00:00",
+      "version": "0.2.26",
+      "updated_at": "2026-09-28T00:08:10+00:00",
       "path": "skills/media_control_skill",
       "manifest": "skills/media_control_skill/skill.yaml",
       "source": {
@@ -578,9 +578,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.116",
-        "release_digest": "sha256:11372ede3864b1535fae426b6027d8a0f1f4dee181349c7f66230158043a27f9",
-        "package_digest": "sha256:901a3f1e182c85edb0fdf42b9a5677367f64a16705fbe9e12aee3a6d6effd9ca"
+        "release": "media_center@0.6.118",
+        "release_digest": "sha256:7578dcb7696b4a7d25424f3fa117d4a90230b2afcb2a0f16dcde5856c90071ab",
+        "package_digest": "sha256:0d2a29587dc23be28f089d42b91bfef6d648bbf029982b2568320edbad52ad79"
       }
     },
     {
@@ -613,8 +613,8 @@
       "kind": "skill",
       "id": "media_library_agent",
       "name": "media_library_agent",
-      "version": "0.6.55",
-      "updated_at": "2026-09-26T16:40:26+00:00",
+      "version": "0.6.56",
+      "updated_at": "2026-09-28T00:08:02+00:00",
       "path": "skills/media_library_agent",
       "manifest": "skills/media_library_agent/skill.yaml",
       "source": {
@@ -632,9 +632,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.116",
-        "release_digest": "sha256:11372ede3864b1535fae426b6027d8a0f1f4dee181349c7f66230158043a27f9",
-        "package_digest": "sha256:3d8d9a543b57e432c5f4c50cc3ed2d4f29ce7a2ca0b0dbc22c0c3de5066fdd37"
+        "release": "media_center@0.6.118",
+        "release_digest": "sha256:7578dcb7696b4a7d25424f3fa117d4a90230b2afcb2a0f16dcde5856c90071ab",
+        "package_digest": "sha256:d7808da4803636e00c8cd5553824169cf9c0e0451e4640a0fb7385646e85cbfa"
       }
     },
     {
@@ -1818,8 +1818,8 @@
       "kind": "scenario",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.6.44",
-      "updated_at": "2026-09-27T22:31:45+00:00",
+      "version": "0.6.45",
+      "updated_at": "2026-09-28T00:07:42+00:00",
       "path": "scenarios/media_center",
       "manifest": "scenarios/media_center/scenario.yaml",
       "source": {
@@ -1827,7 +1827,7 @@
         "manifest": "scenarios/media_center/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:720b76b2cd0ac89a93361597ab45050c9ab90d322cc7863b903f6121a7bfc7cd",
+        "revision": "sha256:b92dab980806751b008be3dfe7d88793a1739fbb295e879ea48c3aab296b2042",
         "path_scope": [
           "projects/media_center/"
         ]
@@ -1854,17 +1854,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.116",
-        "release_digest": "sha256:11372ede3864b1535fae426b6027d8a0f1f4dee181349c7f66230158043a27f9",
-        "package_digest": "sha256:3396c9f2df54f70b8a8a8554438c6716eb31d8ecb0f6b49f950ff75d08ac09ce"
+        "release": "media_center@0.6.118",
+        "release_digest": "sha256:7578dcb7696b4a7d25424f3fa117d4a90230b2afcb2a0f16dcde5856c90071ab",
+        "package_digest": "sha256:6fe27117e5ae6eb68133c1e83e8cba4db75ba7eb696ac15249baeec10d0d6756"
       },
       "channels": {
         "stable": {
-          "release": "media_center@0.6.116",
-          "release_digest": "sha256:11372ede3864b1535fae426b6027d8a0f1f4dee181349c7f66230158043a27f9",
-          "source_revision": "sha256:720b76b2cd0ac89a93361597ab45050c9ab90d322cc7863b903f6121a7bfc7cd",
-          "package_digest": "sha256:3396c9f2df54f70b8a8a8554438c6716eb31d8ecb0f6b49f950ff75d08ac09ce",
-          "version": "0.6.44"
+          "release": "media_center@0.6.118",
+          "release_digest": "sha256:7578dcb7696b4a7d25424f3fa117d4a90230b2afcb2a0f16dcde5856c90071ab",
+          "source_revision": "sha256:b92dab980806751b008be3dfe7d88793a1739fbb295e879ea48c3aab296b2042",
+          "package_digest": "sha256:6fe27117e5ae6eb68133c1e83e8cba4db75ba7eb696ac15249baeec10d0d6756",
+          "version": "0.6.45"
         }
       }
     },
@@ -2637,8 +2637,8 @@
       "kind": "project",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.6.116",
-      "updated_at": "2026-09-27T22:33:06+00:00",
+      "version": "0.6.118",
+      "updated_at": "2026-09-28T00:12:38+00:00",
       "path": "projects/media_center",
       "manifest": "projects/media_center/project.yaml",
       "source": {
@@ -2727,18 +2727,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.116",
-        "release_digest": "sha256:11372ede3864b1535fae426b6027d8a0f1f4dee181349c7f66230158043a27f9",
+        "release": "media_center@0.6.118",
+        "release_digest": "sha256:7578dcb7696b4a7d25424f3fa117d4a90230b2afcb2a0f16dcde5856c90071ab",
         "primary_component": "scenario:media_center",
-        "package_digest": "sha256:3396c9f2df54f70b8a8a8554438c6716eb31d8ecb0f6b49f950ff75d08ac09ce"
+        "package_digest": "sha256:6fe27117e5ae6eb68133c1e83e8cba4db75ba7eb696ac15249baeec10d0d6756"
       },
       "channels": {
         "stable": {
-          "release": "media_center@0.6.116",
-          "release_digest": "sha256:11372ede3864b1535fae426b6027d8a0f1f4dee181349c7f66230158043a27f9",
-          "source_revision": "sha256:720b76b2cd0ac89a93361597ab45050c9ab90d322cc7863b903f6121a7bfc7cd",
-          "package_digest": "sha256:3396c9f2df54f70b8a8a8554438c6716eb31d8ecb0f6b49f950ff75d08ac09ce",
-          "version": "0.6.116"
+          "release": "media_center@0.6.118",
+          "release_digest": "sha256:7578dcb7696b4a7d25424f3fa117d4a90230b2afcb2a0f16dcde5856c90071ab",
+          "source_revision": "sha256:b92dab980806751b008be3dfe7d88793a1739fbb295e879ea48c3aab296b2042",
+          "package_digest": "sha256:6fe27117e5ae6eb68133c1e83e8cba4db75ba7eb696ac15249baeec10d0d6756",
+          "version": "0.6.118"
         }
       }
     },
