@@ -515,6 +515,7 @@
                     ],
                     "initialState": {
                         "gmailConnection": null,
+                        "connectionStatus": "unknown",
                         "selected_connection_id": "",
                         "selected_mailbox_id": "",
                         "selected_message_id": "",
@@ -1265,7 +1266,9 @@
                                             "mail.connection",
                                             "mail.labels",
                                             "mail.messages"
-                                        ]
+                                        ],
+                                        "resultStateKey": "connectionStatus",
+                                        "resultPath": "status"
                                     }
                                 ]
                             },

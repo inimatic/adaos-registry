@@ -201,6 +201,8 @@
                                         "gmail.account",
                                         "gmail.mail"
                                     ],
+                                    "resultStateKey": "gmailConnectionStatus",
+                                    "resultPath": "items.0.status",
                                     "label": "Refresh connection",
                                     "label_i18n": "gmail.refresh"
                                 }
@@ -555,6 +557,7 @@
                         "query_msg_search": "",
                         "query_unread_filter": "",
                         "query_starred_filter": "",
+                        "gmailConnectionStatus": "unknown",
                         "selected_Composer_id": ""
                     },
                     "meta": {
