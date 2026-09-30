@@ -1,9 +1,12 @@
 name: builder_sdk_control_skill
-version: 0.2.4
+version: 0.2.5
 description: SDK-only backend for the functional Builder DEV scenario.
 capabilities:
 - applications.develop
 - applications.publish
+- workspace.read
+- workspace.write
+- network.egress
 entry: handlers/main.py
 runtime:
   python: '3.11'
