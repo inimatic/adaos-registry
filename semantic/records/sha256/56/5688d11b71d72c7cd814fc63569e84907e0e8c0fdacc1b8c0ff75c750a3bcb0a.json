@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:mail.messages.manage.google-gmail-local",
+  "binding_definition_digest": "sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2",
+  "logical_entrypoint": "mail.messages.manage.google-gmail",
+  "package": {
+    "kind": "skill",
+    "id": "gmail_cbs_cleanroom_skill",
+    "version": "0.1.10",
+    "digest": "sha256:f3de83a3e530d064151ff34ef1b71bdded28ddd6b882bf3cb9deb743735b7022"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:5688d11b71d72c7cd814fc63569e84907e0e8c0fdacc1b8c0ff75c750a3bcb0a"
+}

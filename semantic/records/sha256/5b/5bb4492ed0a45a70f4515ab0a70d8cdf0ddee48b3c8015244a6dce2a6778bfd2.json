@@ -1,0 +1,54 @@
+{
+  "claim_ref": "evidence-claim:application-release/86524fd9b23df36977c93f60",
+  "claim_kind": "capability_conformance",
+  "subjects": [
+    {
+      "kind": "capability_contract",
+      "ref": "capability:application.ui.render",
+      "digest": "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7"
+    },
+    {
+      "kind": "binding_definition",
+      "ref": "binding-definition:application.ui.render.webui-v1",
+      "digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1"
+    }
+  ],
+  "environment": {
+    "profile_ref": "profile:local/default",
+    "profile_digest": "sha256:49053d9eb749b3c79c7902c6164fe9700865488a49400466f04b7fe50b61f03e"
+  },
+  "dependencies": [
+    {
+      "ref": "project-release:gmail_cbs_cleanroom",
+      "observed_version": "0.1.12",
+      "fingerprint": "sha256:08dbd8e6bf70ff1436aaf39a24dd2100f3a79c751ffa97b18defb9f4713a9795"
+    }
+  ],
+  "suite_digest": "sha256:d8d6a4db5c1c4ca410b18b160fa12c78b5105d0c91888aba25992b8e57cf344e",
+  "evidence_digest": "sha256:d91677c71d86ef8b3b49f01efeaac6cb12d13498caed83d3a7a8e03fedbad240",
+  "provenance": {
+    "issuer": "adaos:application-release-admission",
+    "runner": "trusted-release-validation",
+    "run_id": "sha256:08dbd8e6bf70ff1436aaf39a24dd2100f3a79c751ffa97b18defb9f4713a9795"
+  },
+  "issued_at": "2026-09-30T15:57:55+00:00",
+  "freshness": {
+    "max_age_seconds": 2592000,
+    "invalidated_by": [
+      "dependency_change",
+      "environment_change",
+      "revocation"
+    ]
+  },
+  "result": "verified",
+  "redaction": {
+    "portable": true,
+    "omitted_fields": [
+      "credentials",
+      "local_evidence_context"
+    ]
+  },
+  "portability_scope": "portable",
+  "schema": "adaos.evidence.claim.v1",
+  "claim_digest": "sha256:5bb4492ed0a45a70f4515ab0a70d8cdf0ddee48b3c8015244a6dce2a6778bfd2"
+}

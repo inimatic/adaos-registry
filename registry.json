@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-28T12:20:32+00:00",
+  "updated_at": "2026-09-30T16:01:27+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -65,6 +65,35 @@
       "description": "Research skill for measurable AI/ML analysis of AdaOS operational event windows.",
       "runtime_python": "3.11",
       "tools_count": 13
+    },
+    {
+      "kind": "skill",
+      "id": "automation_manager_prototype_skill",
+      "name": "automation_manager_prototype_skill",
+      "version": "0.1.6",
+      "updated_at": "2026-09-29T17:34:19+00:00",
+      "path": "skills/automation_manager_prototype_skill",
+      "manifest": "skills/automation_manager_prototype_skill/skill.yaml",
+      "source": {
+        "path": "skills/automation_manager_prototype_skill",
+        "manifest": "skills/automation_manager_prototype_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "automation_manager_prototype_skill",
+        "id": "automation_manager_prototype_skill"
+      },
+      "description": "Project-owned resource implementation for project:automation_manager_prototype. Realize the accepted Prototype according to the separate Automation brief.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "automation_manager_prototype",
+        "release": "automation_manager_prototype@0.1.7",
+        "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
+        "package_digest": "sha256:56688ee94ae3e6a8f72a791ba87f8f1aaedbbe255454cc05c721cc1c1e8c6d0b"
+      },
+      "tools_count": 5
     },
     {
       "kind": "skill",
@@ -340,8 +369,8 @@
       "kind": "skill",
       "id": "gmail_cbs_cleanroom_skill",
       "name": "gmail_cbs_cleanroom_skill",
-      "version": "0.1.8",
-      "updated_at": "2026-09-28T12:02:54+00:00",
+      "version": "0.1.10",
+      "updated_at": "2026-09-30T15:55:12+00:00",
       "path": "skills/gmail_cbs_cleanroom_skill",
       "manifest": "skills/gmail_cbs_cleanroom_skill/skill.yaml",
       "source": {
@@ -359,9 +388,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "gmail_cbs_cleanroom",
-        "release": "gmail_cbs_cleanroom@0.1.11",
-        "release_digest": "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
-        "package_digest": "sha256:9abe440173b826f9cdbec9a45f8fa7f2789071dbf0fff6034225d1a1bf8e0834"
+        "release": "gmail_cbs_cleanroom@0.1.12",
+        "release_digest": "sha256:08dbd8e6bf70ff1436aaf39a24dd2100f3a79c751ffa97b18defb9f4713a9795",
+        "package_digest": "sha256:f3de83a3e530d064151ff34ef1b71bdded28ddd6b882bf3cb9deb743735b7022"
       },
       "tools_count": 18
     },
@@ -1611,6 +1640,58 @@
     },
     {
       "kind": "scenario",
+      "id": "automation_manager_prototype",
+      "name": "automation_manager_prototype",
+      "version": "0.1.7",
+      "updated_at": "2026-09-29T17:34:26+00:00",
+      "path": "scenarios/automation_manager_prototype",
+      "manifest": "scenarios/automation_manager_prototype/scenario.yaml",
+      "source": {
+        "path": "scenarios/automation_manager_prototype",
+        "manifest": "scenarios/automation_manager_prototype/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:8c559609d6f143366bccb811b362977f035c3f5dd110d1dbaa58b04dac57e5f5",
+        "path_scope": [
+          "projects/automation_manager_prototype/"
+        ]
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "automation_manager_prototype",
+        "id": "automation_manager_prototype"
+      },
+      "title": "Automation Manager — Operator Panel (demo)",
+      "title_i18n": {
+        "key": "prototype.automation_manager_ru_v3_rulocale_fix.r4.title",
+        "fallback": "Automation Manager — Operator Panel (demo)"
+      },
+      "description": "Empty AdaOS desktop canvas ready for Builder authoring.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "automation_manager_prototype_skill"
+        ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "automation_manager_prototype",
+        "release": "automation_manager_prototype@0.1.7",
+        "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
+        "package_digest": "sha256:98388a24ac1b2f7607a5783137d12be2c9bdd2cb8d623a1ceff48e8da4e29de2"
+      },
+      "channels": {
+        "stable": {
+          "release": "automation_manager_prototype@0.1.7",
+          "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
+          "source_revision": "sha256:8c559609d6f143366bccb811b362977f035c3f5dd110d1dbaa58b04dac57e5f5",
+          "package_digest": "sha256:98388a24ac1b2f7607a5783137d12be2c9bdd2cb8d623a1ceff48e8da4e29de2",
+          "version": "0.1.7"
+        }
+      }
+    },
+    {
+      "kind": "scenario",
       "id": "builder",
       "name": "builder",
       "version": "0.2.103",
@@ -1706,8 +1787,8 @@
       "kind": "scenario",
       "id": "gmail_cbs_cleanroom",
       "name": "gmail_cbs_cleanroom",
-      "version": "0.1.7",
-      "updated_at": "2026-09-28T12:02:46+00:00",
+      "version": "0.1.9",
+      "updated_at": "2026-09-30T15:55:02+00:00",
       "path": "scenarios/gmail_cbs_cleanroom",
       "manifest": "scenarios/gmail_cbs_cleanroom/scenario.yaml",
       "source": {
@@ -1715,7 +1796,7 @@
         "manifest": "scenarios/gmail_cbs_cleanroom/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:8a0759b6f8bd2e534d8bcc9cd2a161c918c958dadfcb776a580482e3f5bc6984",
+        "revision": "sha256:6ff38a9554e23a62f19d86841cf58c1f22ff48eeb21bc3313397a850a4f61d3b",
         "path_scope": [
           "projects/gmail_cbs_cleanroom/"
         ]
@@ -1740,17 +1821,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "gmail_cbs_cleanroom",
-        "release": "gmail_cbs_cleanroom@0.1.11",
-        "release_digest": "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
-        "package_digest": "sha256:937fc0cd8feb8829a9e43d9e571698feef11ba20822d34efec44ab515bda2adb"
+        "release": "gmail_cbs_cleanroom@0.1.12",
+        "release_digest": "sha256:08dbd8e6bf70ff1436aaf39a24dd2100f3a79c751ffa97b18defb9f4713a9795",
+        "package_digest": "sha256:353d66081638c8eb000d48994531bf6ad14bb29b64de0c6d34a9de4b106eabbc"
       },
       "channels": {
         "stable": {
-          "release": "gmail_cbs_cleanroom@0.1.11",
-          "release_digest": "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
-          "source_revision": "sha256:8a0759b6f8bd2e534d8bcc9cd2a161c918c958dadfcb776a580482e3f5bc6984",
-          "package_digest": "sha256:937fc0cd8feb8829a9e43d9e571698feef11ba20822d34efec44ab515bda2adb",
-          "version": "0.1.7"
+          "release": "gmail_cbs_cleanroom@0.1.12",
+          "release_digest": "sha256:08dbd8e6bf70ff1436aaf39a24dd2100f3a79c751ffa97b18defb9f4713a9795",
+          "source_revision": "sha256:6ff38a9554e23a62f19d86841cf58c1f22ff48eeb21bc3313397a850a4f61d3b",
+          "package_digest": "sha256:353d66081638c8eb000d48994531bf6ad14bb29b64de0c6d34a9de4b106eabbc",
+          "version": "0.1.9"
         }
       }
     },
@@ -2534,6 +2615,59 @@
     },
     {
       "kind": "project",
+      "id": "automation_manager_prototype",
+      "name": "automation_manager_prototype",
+      "version": "0.1.7",
+      "updated_at": "2026-09-29T19:35:56+00:00",
+      "path": "projects/automation_manager_prototype",
+      "manifest": "projects/automation_manager_prototype/project.yaml",
+      "source": {
+        "path": "projects/automation_manager_prototype",
+        "manifest": "projects/automation_manager_prototype/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "automation_manager_prototype",
+        "id": "automation_manager_prototype"
+      },
+      "title": "Automation Manager Prototype",
+      "description": "Title: Automation Manager Prototype. Russian dashboard prototype for automation machines, warm pods, Codex accounts, remote tasks and audit events.",
+      "publication": {
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable"
+      },
+      "stage": "alpha",
+      "visibility": "unlisted",
+      "channel": "stable",
+      "install_default": false,
+      "features": [],
+      "components": [
+        "scenario:automation_manager_prototype",
+        "skill:automation_manager_prototype_skill"
+      ],
+      "components_count": 2,
+      "profiles": [],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "automation_manager_prototype",
+        "release": "automation_manager_prototype@0.1.7",
+        "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
+        "primary_component": "scenario:automation_manager_prototype",
+        "package_digest": "sha256:98388a24ac1b2f7607a5783137d12be2c9bdd2cb8d623a1ceff48e8da4e29de2"
+      },
+      "channels": {
+        "stable": {
+          "release": "automation_manager_prototype@0.1.7",
+          "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
+          "source_revision": "sha256:8c559609d6f143366bccb811b362977f035c3f5dd110d1dbaa58b04dac57e5f5",
+          "package_digest": "sha256:98388a24ac1b2f7607a5783137d12be2c9bdd2cb8d623a1ceff48e8da4e29de2",
+          "version": "0.1.7"
+        }
+      }
+    },
+    {
+      "kind": "project",
       "id": "cv_descriptor_lab",
       "name": "cv_descriptor_lab",
       "version": "0.1.22",
@@ -2618,8 +2752,8 @@
       "kind": "project",
       "id": "gmail_cbs_cleanroom",
       "name": "gmail_cbs_cleanroom",
-      "version": "0.1.11",
-      "updated_at": "2026-09-28T12:20:32+00:00",
+      "version": "0.1.12",
+      "updated_at": "2026-09-30T16:01:27+00:00",
       "path": "projects/gmail_cbs_cleanroom",
       "manifest": "projects/gmail_cbs_cleanroom/project.yaml",
       "source": {
@@ -2652,18 +2786,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "gmail_cbs_cleanroom",
-        "release": "gmail_cbs_cleanroom@0.1.11",
-        "release_digest": "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
+        "release": "gmail_cbs_cleanroom@0.1.12",
+        "release_digest": "sha256:08dbd8e6bf70ff1436aaf39a24dd2100f3a79c751ffa97b18defb9f4713a9795",
         "primary_component": "scenario:gmail_cbs_cleanroom",
-        "package_digest": "sha256:937fc0cd8feb8829a9e43d9e571698feef11ba20822d34efec44ab515bda2adb"
+        "package_digest": "sha256:353d66081638c8eb000d48994531bf6ad14bb29b64de0c6d34a9de4b106eabbc"
       },
       "channels": {
         "stable": {
-          "release": "gmail_cbs_cleanroom@0.1.11",
-          "release_digest": "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
-          "source_revision": "sha256:8a0759b6f8bd2e534d8bcc9cd2a161c918c958dadfcb776a580482e3f5bc6984",
-          "package_digest": "sha256:937fc0cd8feb8829a9e43d9e571698feef11ba20822d34efec44ab515bda2adb",
-          "version": "0.1.11"
+          "release": "gmail_cbs_cleanroom@0.1.12",
+          "release_digest": "sha256:08dbd8e6bf70ff1436aaf39a24dd2100f3a79c751ffa97b18defb9f4713a9795",
+          "source_revision": "sha256:6ff38a9554e23a62f19d86841cf58c1f22ff48eeb21bc3313397a850a4f61d3b",
+          "package_digest": "sha256:353d66081638c8eb000d48994531bf6ad14bb29b64de0c6d34a9de4b106eabbc",
+          "version": "0.1.12"
         }
       }
     },

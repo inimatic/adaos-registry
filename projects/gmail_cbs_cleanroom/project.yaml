@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: gmail_cbs_cleanroom
-version: 0.1.11
+version: 0.1.12
 profiles: []
 components:
   owned:

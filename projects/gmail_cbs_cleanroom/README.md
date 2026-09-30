@@ -7,10 +7,11 @@ Gmail provider. AdaOS Core owns OAuth, tokens, refresh, and the fixed
 
 ## Reusable connection release boundary
 
-The beta candidate retains the existing `gmail_cbs_cleanroom_skill` provider
-and Project version `0.1.9`. Forge owns release metadata; the scenario, skill,
-and Project version numbers are independent and remain unchanged.
-This is the existing provider, with no additional implementation or account store.
+The `0.1.12` Project release binds scenario `0.1.9` and
+`gmail_cbs_cleanroom_skill` `0.1.10`. Forge owns release metadata; the scenario,
+skill, and Project version numbers remain independent. This release keeps the
+existing provider and account store while publishing portable CBS conformance
+evidence for install-time semantic resolution.
 
 Consumers explicitly call the exported `reusable_connections` tool to discover
 redacted connection references, then `attach_reusable_connection` with the chosen

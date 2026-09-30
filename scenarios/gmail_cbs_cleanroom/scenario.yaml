@@ -1,6 +1,6 @@
 id: gmail_cbs_cleanroom
 name: gmail_cbs_cleanroom
-version: 0.1.7
+version: 0.1.9
 title: Mail Cleanroom Prototype
 title_i18n:
   key: scenario.gmail_cbs_cleanroom.title
@@ -70,4 +70,4 @@ nlu:
     entities: []
 steps: []
 prototype: scenario_default
-updated_at: '2026-09-28T12:02:46+00:00'
+updated_at: '2026-09-30T15:55:02+00:00'
