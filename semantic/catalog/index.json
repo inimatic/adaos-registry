@@ -28,10 +28,10 @@
     "web_desktop": {
       "application_id": "web_desktop",
       "publisher_ref": "subnet:sn_6acf0c01",
-      "application_revision": 3,
-      "stable_release_digest": "sha256:331fe338fba113b2d2b8da4fef13235b6fb62e565cb21b242bfc86510d23c067",
-      "release_key": "web_desktop@sha256:331fe338fba113b2d2b8da4fef13235b6fb62e565cb21b242bfc86510d23c067",
-      "projection_digest": "sha256:18ae550e73361a3c82b0d8f1927efb60b9b2f8c8cedfd9b9d8741f9b3976fc09"
+      "application_revision": 4,
+      "stable_release_digest": "sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
+      "release_key": "web_desktop@sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
+      "projection_digest": "sha256:6257c3de9c250184c50eb600d839e7ec7bb294c826a6375a7801e08a277a743c"
     },
     "subscription_status": {
       "application_id": "subscription_status",
@@ -706,7 +706,15 @@
       "release_digest": "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
       "path": "semantic/catalog/releases/gmail_cbs_cleanroom/717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f.json",
       "projection_digest": "sha256:22f68593782b5ff725139d1c5737a4ead25f958cb1d3c31a583aaef72d48c723"
+    },
+    "web_desktop@sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49": {
+      "application_id": "web_desktop",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.3.58",
+      "release_digest": "sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
+      "path": "semantic/catalog/releases/web_desktop/89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49.json",
+      "projection_digest": "sha256:6257c3de9c250184c50eb600d839e7ec7bb294c826a6375a7801e08a277a743c"
     }
   },
-  "index_digest": "sha256:0a09c5d95660dc3e4776c71b49bc03699ee8b603825e834557515401c0413a56"
+  "index_digest": "sha256:b7b1c512de47ba41af0e07ddbf45093f8282fb3bc1c67c2c90540a71c83b2a46"
 }

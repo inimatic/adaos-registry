@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-30T16:01:27+00:00",
+  "updated_at": "2026-09-30T19:49:38+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -114,7 +114,14 @@
       },
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 19
+      "tools_count": 19,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.58",
+        "release_digest": "sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
+        "package_digest": "sha256:a9845236d2c671e108310f27acff6bc28c6f1ff9a2508b2510764274ebe6f04d"
+      }
     },
     {
       "kind": "skill",
@@ -435,7 +442,14 @@
       },
       "description": "Greets the user at startup and checks whether local infrastructure is healthy.",
       "runtime_python": "3.11",
-      "tools_count": 2
+      "tools_count": 2,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.58",
+        "release_digest": "sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
+        "package_digest": "sha256:eb695ac298aed7839c2cb7ac4d098b8313cdcd8887073e4fad8b645304e3feae"
+      }
     },
     {
       "kind": "skill",
@@ -853,7 +867,14 @@
       "description": "Hub-side pairing skill. Generates short-lived pairing IDs and stores payloads needed to provision new browsers (TV/Smart displays).",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 1
+      "tools_count": 1,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.58",
+        "release_digest": "sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
+        "package_digest": "sha256:ddac2904f52eea9e23a1b13cf530ae5dc6e4a8f33a44374685ca90df110a4ded"
+      }
     },
     {
       "kind": "skill",
@@ -1389,13 +1410,7 @@
       "manifest": "skills/voice_chat_skill/skill.yaml",
       "source": {
         "path": "skills/voice_chat_skill",
-        "manifest": "skills/voice_chat_skill/skill.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:376cfc5074d765eba3ebadcc6bace2124d4d0db464812b5f1868c85b57c740cc",
-        "path_scope": [
-          "projects/voice/"
-        ]
+        "manifest": "skills/voice_chat_skill/skill.yaml"
       },
       "install": {
         "kind": "skill",
@@ -1407,19 +1422,10 @@
       "tools_count": 8,
       "activation": {
         "mode": "package_lock",
-        "project_id": "voice",
-        "release": "voice@0.1.9",
-        "release_digest": "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.58",
+        "release_digest": "sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
         "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c"
-      },
-      "channels": {
-        "stable": {
-          "release": "voice@0.1.9",
-          "release_digest": "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97",
-          "source_revision": "sha256:376cfc5074d765eba3ebadcc6bace2124d4d0db464812b5f1868c85b57c740cc",
-          "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c",
-          "version": "0.7.8"
-        }
       }
     },
     {
@@ -1485,7 +1491,14 @@
       "description": "Project-owned runtime actions for opening Web Desktop applications, managing Home, and preparing browser, Telegram, and node connection flows.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 9
+      "tools_count": 9,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.58",
+        "release_digest": "sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
+        "package_digest": "sha256:bbf3ca2ea3ccce1b6152e2a5e27f39ec10409e8344a1738b01c709497998b76d"
+      }
     },
     {
       "kind": "skill",
@@ -1507,7 +1520,14 @@
       "description": "Desktop shell skill that handles icon/widget installation via the web desktop SDK.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 0
+      "tools_count": 0,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.58",
+        "release_digest": "sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
+        "package_digest": "sha256:dc6b9e208019a45a30e2d155e310802559c21a7ff6262acfb9fd524ec4a543de"
+      }
     },
     {
       "kind": "skill",
@@ -2344,13 +2364,19 @@
       "kind": "scenario",
       "id": "web_desktop",
       "name": "web_desktop",
-      "version": "0.3.49",
-      "updated_at": "2026-09-27T06:07:23+00:00",
+      "version": "0.3.50",
+      "updated_at": "2026-09-30T19:41:14+00:00",
       "path": "scenarios/web_desktop",
       "manifest": "scenarios/web_desktop/scenario.yaml",
       "source": {
         "path": "scenarios/web_desktop",
-        "manifest": "scenarios/web_desktop/scenario.yaml"
+        "manifest": "scenarios/web_desktop/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:a3c957704b7b7f5e9323cee34e96e4abac04b1aa08ac7159906d4f895a85701b",
+        "path_scope": [
+          "projects/web_desktop/"
+        ]
       },
       "install": {
         "kind": "scenario",
@@ -2371,6 +2397,22 @@
           "pair_new_device_skill",
           "voice_chat_skill"
         ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.58",
+        "release_digest": "sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
+        "package_digest": "sha256:23198b888120ab0ea43fbea5f93a4952247c086cc0cc3c1c1fc275ce01a9eed4"
+      },
+      "channels": {
+        "stable": {
+          "release": "web_desktop@0.3.58",
+          "release_digest": "sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
+          "source_revision": "sha256:a3c957704b7b7f5e9323cee34e96e4abac04b1aa08ac7159906d4f895a85701b",
+          "package_digest": "sha256:23198b888120ab0ea43fbea5f93a4952247c086cc0cc3c1c1fc275ce01a9eed4",
+          "version": "0.3.50"
+        }
       }
     },
     {
@@ -3504,6 +3546,96 @@
           "source_revision": "sha256:376cfc5074d765eba3ebadcc6bace2124d4d0db464812b5f1868c85b57c740cc",
           "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c",
           "version": "0.1.9"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "web_desktop",
+      "name": "web_desktop",
+      "version": "0.3.58",
+      "updated_at": "2026-09-30T19:49:38+00:00",
+      "path": "projects/web_desktop",
+      "manifest": "projects/web_desktop/project.yaml",
+      "source": {
+        "path": "projects/web_desktop",
+        "manifest": "projects/web_desktop/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "web_desktop",
+        "id": "web_desktop"
+      },
+      "title": "Management",
+      "title_i18n": {
+        "en": "Management",
+        "ru": "Управление"
+      },
+      "description": "Default AdaOS desktop shell with project-owned connection flows, voice bridge, and browser surface support.",
+      "description_i18n": {
+        "en": "Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.",
+        "ru": "Стандартная веб-оболочка AdaOS, подключение устройств, голосовой мост и поддержка браузерных интерфейсов."
+      },
+      "categories": [
+        "system",
+        "desktop"
+      ],
+      "tags": [
+        "default-install",
+        "shell",
+        "browser",
+        "voice",
+        "onboarding"
+      ],
+      "publication": {
+        "stage": "beta",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "beta",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": true,
+      "features": [
+        {
+          "id": "shell",
+          "title": "Desktop shell",
+          "title_i18n": {
+            "en": "Desktop shell",
+            "ru": "Оболочка рабочего стола"
+          },
+          "default": true,
+          "optional": false,
+          "components": [
+            "scenario:web_desktop",
+            "skill:web_desktop_runtime_skill"
+          ]
+        }
+      ],
+      "components": [
+        "scenario:web_desktop",
+        "skill:web_desktop_runtime_skill"
+      ],
+      "components_count": 2,
+      "profiles": [
+        "adaos.desktop.shell.v1",
+        "adaos.default_install.v1"
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.58",
+        "release_digest": "sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
+        "primary_component": "scenario:web_desktop",
+        "package_digest": "sha256:23198b888120ab0ea43fbea5f93a4952247c086cc0cc3c1c1fc275ce01a9eed4"
+      },
+      "channels": {
+        "stable": {
+          "release": "web_desktop@0.3.58",
+          "release_digest": "sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
+          "source_revision": "sha256:a3c957704b7b7f5e9323cee34e96e4abac04b1aa08ac7159906d4f895a85701b",
+          "package_digest": "sha256:23198b888120ab0ea43fbea5f93a4952247c086cc0cc3c1c1fc275ce01a9eed4",
+          "version": "0.3.58"
         }
       }
     }
