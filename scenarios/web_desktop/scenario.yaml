@@ -1,5 +1,5 @@
 id: web_desktop
-version: 0.3.52
+version: 0.3.54
 title: Управление
 description: Desktop shell scenario that defines the main UI layout, registry and
   base catalog.
@@ -13,7 +13,7 @@ depends:
 - greet_on_boot_skill
 - pair_new_device_skill
 - voice_chat_skill
-updated_at: '2026-10-01T09:27:49+00:00'
+updated_at: '2026-10-01T09:45:17+00:00'
 data_projections:
 - scope: current_user
   slot: profile.settings

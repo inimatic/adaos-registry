@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import asyncio
+import logging
 from datetime import datetime, timezone
 from threading import Lock
 from time import monotonic
@@ -774,6 +776,64 @@ def list_applications(
         if items:
             result.update(items[0])
     return result
+
+
+@tool("get_runtime_controls", summary="Read operator controls and Rasa service state.", stability="experimental")
+async def get_runtime_controls(**_: Any) -> dict[str, Any]:
+    sdk_access.require("workspace.read")
+    from adaos.services.nlu.rasa_skill_installer import is_rasa_nlu_enabled
+    from adaos.services.operator_controls import read_controls
+    from adaos.services.skill.service_supervisor import get_service_supervisor
+
+    controls = read_controls()
+    supervisor = get_service_supervisor()
+    try:
+        await supervisor.refresh_discovered(force=True)
+        rasa = supervisor.status("rasa_nlu_service_skill", check_health=True)
+    except Exception as exc:
+        rasa = {"running": False, "error": f"{type(exc).__name__}: {exc}"}
+    return {"ok": True, "item": {
+        **controls,
+        "effective_log_level": logging.getLevelName(logging.getLogger("adaos").level),
+        "rasa_configured": bool(is_rasa_nlu_enabled()),
+        "rasa_installed": bool(rasa),
+        "rasa_running": bool((rasa or {}).get("running") or (rasa or {}).get("external_ready")),
+        "rasa_health": (rasa or {}).get("health_ok"),
+        "rasa_env_mode": (rasa or {}).get("env_mode"),
+        "rasa_version_profile": "lightweight",
+        "diet_profile": "deferred",
+    }}
+
+
+@tool("set_runtime_control", summary="Apply an owner-governed runtime control.", stability="experimental")
+async def set_runtime_control(control: str, value: Any = None, **_: Any) -> dict[str, Any]:
+    sdk_access.require("workspace.write")
+    from adaos.services.nlu.rasa_skill_installer import ensure_rasa_service_skill_installed
+    from adaos.services.operator_controls import update_controls
+    from adaos.services.skill.service_supervisor import get_service_supervisor
+
+    selected = _string(control).casefold()
+    if selected == "rasa_install":
+        target = await asyncio.to_thread(ensure_rasa_service_skill_installed)
+        await get_service_supervisor().refresh_discovered(force=True)
+        result = {"installed": True, "path": str(target) if target else None}
+    elif selected in {"rasa_enabled", "core_auto_update", "application_auto_update_default"}:
+        enabled = _bool_value(value)
+        controls = update_controls({selected: enabled})
+        if selected == "rasa_enabled":
+            supervisor = get_service_supervisor()
+            if enabled:
+                await asyncio.to_thread(ensure_rasa_service_skill_installed)
+                await supervisor.refresh_discovered(force=True)
+                await supervisor.start("rasa_nlu_service_skill")
+            else:
+                await supervisor.stop("rasa_nlu_service_skill")
+        result = {selected: enabled, "controls": controls}
+    elif selected == "log_level":
+        result = {"controls": update_controls({"log_level": value})}
+    else:
+        return {"ok": False, "error": "unsupported_runtime_control"}
+    return {"ok": True, "control": selected, **result}
 
 
 @tool(

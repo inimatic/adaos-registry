@@ -29,9 +29,9 @@
       "application_id": "web_desktop",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 4,
-      "stable_release_digest": "sha256:2c4de82f2299d9145d605c1026c96b1f4fec60b23512306262b1fb32e286fce8",
-      "release_key": "web_desktop@sha256:2c4de82f2299d9145d605c1026c96b1f4fec60b23512306262b1fb32e286fce8",
-      "projection_digest": "sha256:427c09b3dd9a1ef8b8c1b2bf48754b39a2d4929c2f354798d71eef47879a5a8f"
+      "stable_release_digest": "sha256:972603ce24a790c83b7c74e16146a5098656088ab89f3ea094b9b449e889ede1",
+      "release_key": "web_desktop@sha256:972603ce24a790c83b7c74e16146a5098656088ab89f3ea094b9b449e889ede1",
+      "projection_digest": "sha256:2679027c8a4fc590c55423453e8c0f2827f20eb970f36e0b0274e447b02f5e64"
     },
     "subscription_status": {
       "application_id": "subscription_status",
@@ -762,7 +762,15 @@
       "release_digest": "sha256:2c4de82f2299d9145d605c1026c96b1f4fec60b23512306262b1fb32e286fce8",
       "path": "semantic/catalog/releases/web_desktop/2c4de82f2299d9145d605c1026c96b1f4fec60b23512306262b1fb32e286fce8.json",
       "projection_digest": "sha256:427c09b3dd9a1ef8b8c1b2bf48754b39a2d4929c2f354798d71eef47879a5a8f"
+    },
+    "web_desktop@sha256:972603ce24a790c83b7c74e16146a5098656088ab89f3ea094b9b449e889ede1": {
+      "application_id": "web_desktop",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.3.61",
+      "release_digest": "sha256:972603ce24a790c83b7c74e16146a5098656088ab89f3ea094b9b449e889ede1",
+      "path": "semantic/catalog/releases/web_desktop/972603ce24a790c83b7c74e16146a5098656088ab89f3ea094b9b449e889ede1.json",
+      "projection_digest": "sha256:2679027c8a4fc590c55423453e8c0f2827f20eb970f36e0b0274e447b02f5e64"
     }
   },
-  "index_digest": "sha256:7104f45b9ae7486b75f52d98967061f61b15d5012113d377259f12d0616be492"
+  "index_digest": "sha256:a5745ddf1f80c3349c8668aafeb5f2651571382b892eb55cdc461e0b91f1d2bb"
 }
