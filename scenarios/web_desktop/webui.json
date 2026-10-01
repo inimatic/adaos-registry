@@ -1735,7 +1735,12 @@
                                 "fields": [
                                     {
                                         "key": "item.rasa_running",
-                                        "label": "Rasa running"
+                                        "label": "Rasa running",
+                                        "actions": [
+                                            { "id": "rasa_install", "label": "Install / repair", "on": "click:rasa_install", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": { "control": "rasa_install" }, "invalidate": ["web_desktop.runtime_controls"] },
+                                            { "id": "rasa_enable", "label": "Enable", "on": "click:rasa_enable", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": { "control": "rasa_enabled", "value": true }, "invalidate": ["web_desktop.runtime_controls"] },
+                                            { "id": "rasa_disable", "label": "Disable", "on": "click:rasa_disable", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": { "control": "rasa_enabled", "value": false }, "invalidate": ["web_desktop.runtime_controls"] }
+                                        ]
                                     },
                                     {
                                         "key": "item.rasa_health",
@@ -1755,15 +1760,27 @@
                                     },
                                     {
                                         "key": "item.effective_log_level",
-                                        "label": "Log level"
+                                        "label": "Log level",
+                                        "actions": [
+                                            { "id": "log_info", "label": "INFO", "on": "click:log_info", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": { "control": "log_level", "value": "INFO" }, "invalidate": ["web_desktop.runtime_controls"] },
+                                            { "id": "log_debug", "label": "DEBUG", "on": "click:log_debug", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": { "control": "log_level", "value": "DEBUG" }, "invalidate": ["web_desktop.runtime_controls"] }
+                                        ]
                                     },
                                     {
                                         "key": "item.core_auto_update",
-                                        "label": "Core auto-update"
+                                        "label": "Core auto-update",
+                                        "actions": [
+                                            { "id": "core_auto_on", "label": "On", "on": "click:core_auto_on", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": { "control": "core_auto_update", "value": true }, "invalidate": ["web_desktop.runtime_controls"] },
+                                            { "id": "core_auto_off", "label": "Off", "on": "click:core_auto_off", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": { "control": "core_auto_update", "value": false }, "invalidate": ["web_desktop.runtime_controls"] }
+                                        ]
                                     },
                                     {
                                         "key": "item.application_auto_update_default",
-                                        "label": "Application auto-update default"
+                                        "label": "Application auto-update default",
+                                        "actions": [
+                                            { "id": "apps_auto_on", "label": "On", "on": "click:apps_auto_on", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": { "control": "application_auto_update_default", "value": true }, "invalidate": ["web_desktop.runtime_controls"] },
+                                            { "id": "apps_auto_off", "label": "Off", "on": "click:apps_auto_off", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": { "control": "application_auto_update_default", "value": false }, "invalidate": ["web_desktop.runtime_controls"] }
+                                        ]
                                     }
                                 ],
                                 "emptyText": "Runtime controls are unavailable."
@@ -1926,7 +1943,7 @@
                                     ]
                                 }
                             ],
-                            "visibleIf": "$state.activeTab === 'system'"
+                            "visibleIf": "false"
                         },
                         {
                             "area": "development-collection",
