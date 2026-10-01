@@ -1,0 +1,64 @@
+schema: adaos.project.v1
+kind: project
+id: weather
+version: 0.1.0
+profiles: [adaos.default_install.v1]
+components:
+  owned:
+  - ref: skill:weather_skill
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [realizes]
+  dependencies: []
+entrypoints:
+- id: weather
+  presentation: weather_app
+  default: true
+  bindings: {surface: weather}
+catalog:
+  title: Weather
+  icon: cloud-outline
+  description: Current weather and a compact desktop weather widget.
+  categories: [information]
+  tags: [weather, default-install]
+publication: {stage: beta, visibility: listed, channel: stable}
+install:
+  default: true
+  features:
+  - id: default
+    title: Weather
+    default: true
+    optional: false
+    components: [skill:weather_skill]
+compatibility:
+  required_entrypoints: [weather]
+  validation_profiles: [weather.local]
+lifecycle:
+  uninstall: {components: remove_if_unreferenced, runtime_data: retain, source_artifacts: retain}
+created_at: '2026-10-01T00:00:00Z'
+created_by: agent:codex
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.read
+    purpose: Read the selected local weather location.
+    approval_policy: grant_on_install
+  - id: workspace.write
+    purpose: Store the selected local weather location and compact projection.
+    approval_policy: grant_on_install
+  - id: network.egress
+    purpose: Retrieve weather data for the explicitly selected location.
+    approval_policy: grant_on_install
+  optional: []
+  secrets: []
+  external_providers: []
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected: [weather_location, weather_snapshot]
+    linked_to_user: []
+    retention: The selected location and latest compact snapshot remain local.
+    sent_off_device: [weather_location]
+    tracking: false

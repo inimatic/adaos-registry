@@ -1,0 +1,56 @@
+schema: adaos.project.v1
+kind: project
+id: nlu_teacher
+version: 0.1.0
+profiles: [adaos.system.nlu_teacher.v1, adaos.default_install.v1]
+components:
+  owned: []
+  dependencies:
+  - ref: skill:web_desktop_skill
+    version: null
+    lifecycle: shared
+    relations: [uses]
+entrypoints:
+- id: main
+  presentation: nlu_teacher_app
+  default: true
+  bindings: {surface: nlu_teacher}
+catalog:
+  title: NLU Teacher
+  icon: school-outline
+  description: Inspect and curate NLU examples, candidates, and feedback signals.
+  categories: [system, development]
+  tags: [nlu, teacher, default-install]
+publication: {stage: beta, visibility: listed, channel: stable}
+install:
+  default: true
+  features: []
+compatibility:
+  required_entrypoints: [main]
+  validation_profiles: [nlu_teacher.local]
+lifecycle:
+  uninstall: {components: remove_if_unreferenced, runtime_data: retain, source_artifacts: retain}
+created_at: '2026-10-01T00:00:00Z'
+created_by: agent:codex
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: workspace.read
+    purpose: Inspect local NLU traces, examples, and candidate revisions.
+    approval_policy: grant_on_install
+  - id: workspace.write
+    purpose: Apply explicitly reviewed NLU training revisions.
+    approval_policy: owner_only
+    sensitive: true
+  optional: []
+  secrets: []
+  external_providers: []
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected: [nlu_feedback, training_examples]
+    linked_to_user: []
+    retention: Local NLU evidence follows the core retention policy.
+    sent_off_device: []
+    tracking: false
