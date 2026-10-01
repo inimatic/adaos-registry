@@ -144,6 +144,14 @@
       "stable_release_digest": "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
       "release_key": "research_platform@sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
       "projection_digest": "sha256:483780c4dc2908628245fced9fa92f0126fa204ab94fc7da635d8d8f23bd29cd"
+    },
+    "nlu_teacher": {
+      "application_id": "nlu_teacher",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "application_revision": 1,
+      "stable_release_digest": "sha256:3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd",
+      "release_key": "nlu_teacher@sha256:3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd",
+      "projection_digest": "sha256:a61ac555cc3b9d30cf082d967360be464a115bc318dd88d3f0cf4c4ef4d20774"
     }
   },
   "releases": {
@@ -722,7 +730,15 @@
       "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
       "path": "semantic/catalog/releases/adaos_builder/e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a.json",
       "projection_digest": "sha256:8e103aaa02c453e324ce7935fb5af78e7f1c69979f6e5f43fa38cd27c28ec569"
+    },
+    "nlu_teacher@sha256:3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd": {
+      "application_id": "nlu_teacher",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.2.0",
+      "release_digest": "sha256:3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd",
+      "path": "semantic/catalog/releases/nlu_teacher/3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd.json",
+      "projection_digest": "sha256:a61ac555cc3b9d30cf082d967360be464a115bc318dd88d3f0cf4c4ef4d20774"
     }
   },
-  "index_digest": "sha256:f13ced24a68fb57503b0933a9d85dc8cda7429a0896f1ffa0880deba8429c586"
+  "index_digest": "sha256:2a246497bd55f33aeb3e22752565ab9e058df5ce07e98bd99a7dea0147b0062b"
 }
