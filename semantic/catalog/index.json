@@ -152,6 +152,14 @@
       "stable_release_digest": "sha256:3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd",
       "release_key": "nlu_teacher@sha256:3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd",
       "projection_digest": "sha256:a61ac555cc3b9d30cf082d967360be464a115bc318dd88d3f0cf4c4ef4d20774"
+    },
+    "weather": {
+      "application_id": "weather",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "application_revision": 1,
+      "stable_release_digest": "sha256:e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7",
+      "release_key": "weather@sha256:e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7",
+      "projection_digest": "sha256:9847cb0ad1d669224b221f4e6c43cc22cbabf6eb15385ce1e2c121c27aced1f7"
     }
   },
   "releases": {
@@ -738,7 +746,15 @@
       "release_digest": "sha256:3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd",
       "path": "semantic/catalog/releases/nlu_teacher/3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd.json",
       "projection_digest": "sha256:a61ac555cc3b9d30cf082d967360be464a115bc318dd88d3f0cf4c4ef4d20774"
+    },
+    "weather@sha256:e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7": {
+      "application_id": "weather",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.4",
+      "release_digest": "sha256:e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7",
+      "path": "semantic/catalog/releases/weather/e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7.json",
+      "projection_digest": "sha256:9847cb0ad1d669224b221f4e6c43cc22cbabf6eb15385ce1e2c121c27aced1f7"
     }
   },
-  "index_digest": "sha256:2a246497bd55f33aeb3e22752565ab9e058df5ce07e98bd99a7dea0147b0062b"
+  "index_digest": "sha256:e52acb1d183fce3c83f4d23630209c9761caaa301fc050cd20cbb43833a52b5f"
 }
