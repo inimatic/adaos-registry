@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:application.ui.render.webui-v1",
+  "binding_definition_digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+  "logical_entrypoint": "application.ui.render.webui-v1",
+  "package": {
+    "kind": "skill",
+    "id": "nlu_teacher_skill",
+    "version": "0.1.1",
+    "digest": "sha256:62faa91f473f21c3da41f7e42a05d507ebd1d990ba7fcd1ce564aa8e7841b9dd"
+  },
+  "physical_member": "webui.json",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:e887d45c547f670a5d3cbc565dfb6e460a5893eee51952bba8c977bb3d77166c"
+}

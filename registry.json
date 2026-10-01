@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-10-01T08:40:25+00:00",
+  "updated_at": "2026-10-01T08:49:21+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -803,6 +803,48 @@
         "background_refresh": false
       },
       "tools_count": 22
+    },
+    {
+      "kind": "skill",
+      "id": "nlu_teacher_skill",
+      "name": "nlu_teacher_skill",
+      "version": "0.1.1",
+      "updated_at": "2026-10-01T08:48:18+00:00",
+      "path": "skills/nlu_teacher_skill",
+      "manifest": "skills/nlu_teacher_skill/skill.yaml",
+      "source": {
+        "path": "skills/nlu_teacher_skill",
+        "manifest": "skills/nlu_teacher_skill/skill.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:f47fa1da93f63adb5779c9499013363a8d03506de7f3801ebb3907b102fa83db",
+        "path_scope": [
+          "projects/nlu_teacher/"
+        ]
+      },
+      "install": {
+        "kind": "skill",
+        "name": "nlu_teacher_skill",
+        "id": "nlu_teacher_skill"
+      },
+      "description": "Native presentation for inspecting and curating AdaOS NLU evidence.",
+      "runtime_python": "3.11",
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "nlu_teacher",
+        "release": "nlu_teacher@0.2.0",
+        "release_digest": "sha256:3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd",
+        "package_digest": "sha256:62faa91f473f21c3da41f7e42a05d507ebd1d990ba7fcd1ce564aa8e7841b9dd"
+      },
+      "channels": {
+        "stable": {
+          "release": "nlu_teacher@0.2.0",
+          "release_digest": "sha256:3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd",
+          "source_revision": "sha256:f47fa1da93f63adb5779c9499013363a8d03506de7f3801ebb3907b102fa83db",
+          "package_digest": "sha256:62faa91f473f21c3da41f7e42a05d507ebd1d990ba7fcd1ce564aa8e7841b9dd",
+          "version": "0.1.1"
+        }
+      }
     },
     {
       "kind": "skill",
@@ -3042,6 +3084,70 @@
           "source_revision": "sha256:26cc45e45b2d218b85ce95a89f38b0486057b3240b2ae9e8125cd0e119e161d7",
           "package_digest": "sha256:50f4cf9c8c8185ad91b43f72671e5615fb28461a1b24dca5ac1b5edbe3f26b47",
           "version": "0.6.119"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "nlu_teacher",
+      "name": "nlu_teacher",
+      "version": "0.2.0",
+      "updated_at": "2026-10-01T08:49:21+00:00",
+      "path": "projects/nlu_teacher",
+      "manifest": "projects/nlu_teacher/project.yaml",
+      "source": {
+        "path": "projects/nlu_teacher",
+        "manifest": "projects/nlu_teacher/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "nlu_teacher",
+        "id": "nlu_teacher"
+      },
+      "title": "NLU Teacher",
+      "description": "Inspect and curate NLU examples, candidates, and feedback signals.",
+      "categories": [
+        "system",
+        "development"
+      ],
+      "tags": [
+        "nlu",
+        "teacher",
+        "default-install"
+      ],
+      "publication": {
+        "stage": "beta",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "beta",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": true,
+      "features": [],
+      "components": [
+        "skill:nlu_teacher_skill"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.system.nlu_teacher.v1",
+        "adaos.default_install.v1"
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "nlu_teacher",
+        "release": "nlu_teacher@0.2.0",
+        "release_digest": "sha256:3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd",
+        "primary_component": "skill:nlu_teacher_skill",
+        "package_digest": "sha256:62faa91f473f21c3da41f7e42a05d507ebd1d990ba7fcd1ce564aa8e7841b9dd"
+      },
+      "channels": {
+        "stable": {
+          "release": "nlu_teacher@0.2.0",
+          "release_digest": "sha256:3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd",
+          "source_revision": "sha256:f47fa1da93f63adb5779c9499013363a8d03506de7f3801ebb3907b102fa83db",
+          "package_digest": "sha256:62faa91f473f21c3da41f7e42a05d507ebd1d990ba7fcd1ce564aa8e7841b9dd",
+          "version": "0.2.0"
         }
       }
     },

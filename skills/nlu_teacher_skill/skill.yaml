@@ -1,0 +1,21 @@
+name: nlu_teacher_skill
+version: 0.1.1
+description: Native presentation for inspecting and curating AdaOS NLU evidence.
+runtime:
+  python: '3.11'
+  activation:
+    mode: lazy
+    startup_allowed: false
+    background_refresh: false
+data_projections:
+- scope: subnet
+  slot: nlu_teacher.events
+  targets:
+  - backend: yjs
+    path: data/nlu_teacher
+memory_budget:
+  expected_rss_mb: 16
+capabilities:
+- workspace.read
+- workspace.write
+updated_at: '2026-10-01T08:48:18+00:00'

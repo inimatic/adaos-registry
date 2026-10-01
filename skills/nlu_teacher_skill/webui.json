@@ -1,0 +1,172 @@
+{
+  "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "apps": [
+    {
+      "id": "nlu_teacher_app",
+      "title": "NLU Teacher",
+      "icon": "school-outline",
+      "launchModal": "nlu_teacher_modal",
+      "action": { "navigate": "nlu_teacher_skill.nlu_teacher_modal" }
+    }
+  ],
+  "registry": {
+    "modals": {
+      "nlu_teacher_modal": {
+        "title": "NLU Teacher",
+        "schema": {
+          "id": "nlu_teacher_modal",
+          "title": "NLU Teacher",
+          "layout": {
+            "version": 2,
+            "pattern": "collection",
+            "density": "comfortable",
+            "contentWidth": "fluid",
+            "scroll": "page",
+            "regions": [
+              {
+                "id": "main",
+                "role": "collection",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": { "wide": "pane", "compact": "stack" }
+              }
+            ],
+            "interaction": {
+              "selection": "none",
+              "rowActivation": "none",
+              "filters": "inline",
+              "actions": "adaptive"
+            }
+          },
+          "widgets": [
+            {
+              "id": "nlu-check-form",
+              "type": "ui.form",
+              "area": "main",
+              "title": "Check phrase",
+              "inputs": {
+                "submitLabel": "Check",
+                "fields": [
+                  {
+                    "id": "phrase",
+                    "type": "text",
+                    "label": "Phrase",
+                    "placeholder": "Show subnet environment variables"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callHost",
+                  "target": "nlu.teacher.probe",
+                  "params": {
+                    "text": "$event.values.phrase",
+                    "result_state_key": "nluTeacherProbeResult",
+                    "use_rasa": true,
+                    "emit_trace": true
+                  }
+                }
+              ]
+            },
+            {
+              "id": "nlu-check-result",
+              "type": "ui.jsonViewer",
+              "area": "main",
+              "title": "Probe result",
+              "inputs": {
+                "stateKey": "nluTeacherProbeResult",
+                "emptyText": "No phrase checked yet"
+              }
+            },
+            {
+              "id": "nlu-events",
+              "type": "ui.list",
+              "area": "main",
+              "title": "User requests",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/nlu_teacher/events",
+                "scope": "shared"
+              },
+              "inputs": {
+                "inset": true,
+                "emptyText": "No teacher events yet",
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "itemAccordion": true,
+                "detailsPath": "raw"
+              }
+            },
+            {
+              "id": "nlu-candidates",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Candidates",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/nlu_teacher/events_by_candidate",
+                "scope": "shared"
+              },
+              "inputs": {
+                "inset": true,
+                "emptyText": "No candidates yet",
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "itemAccordion": true,
+                "detailsPath": "raw"
+              }
+            },
+            {
+              "id": "nlu-signals",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Signals",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/nlu_teacher/workbench_signals",
+                "scope": "shared"
+              },
+              "inputs": {
+                "inset": true,
+                "emptyText": "No teacher signals yet",
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "itemAccordion": true,
+                "detailsPath": "details"
+              }
+            }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "nlu_teacher": { "view": "nlu_teacher_skill.nlu_teacher_modal" }
+            },
+            "defaultRoute": "nlu_teacher"
+          }
+        },
+        "implements": ["nlu_teacher_skill.nlu_teacher_modal"]
+      }
+    }
+  },
+  "contributions": [
+    {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "nlu_teacher_app",
+      "presentation": "nlu_teacher_app"
+    }
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "nlu_teacher_skill.nlu_teacher_modal": {
+        "title": "NLU Teacher",
+        "surfaces": ["modal"],
+        "params": {}
+      }
+    },
+    "defaultView": "nlu_teacher_skill.nlu_teacher_modal"
+  },
+  "navigation": { "defaultView": "nlu_teacher_skill.nlu_teacher_modal" }
+}

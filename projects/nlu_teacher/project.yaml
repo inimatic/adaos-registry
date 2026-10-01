@@ -1,14 +1,14 @@
 schema: adaos.project.v1
 kind: project
 id: nlu_teacher
-version: 0.1.0
+version: 0.2.0
 profiles: [adaos.system.nlu_teacher.v1, adaos.default_install.v1]
 components:
   owned:
-  - ref: skill:web_desktop_skill
+  - ref: skill:nlu_teacher_skill
     role: primary
     exposure: application
-    lifecycle: shared
+    lifecycle: bound
     relations: [presents]
   dependencies: []
 entrypoints:
