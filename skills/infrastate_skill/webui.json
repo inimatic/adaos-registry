@@ -863,7 +863,7 @@
   "apps": [
     {
       "id": "infrastate_app",
-      "title": "Infra State",
+      "title": "AdaOS Status",
       "title_i18n": {
         "key": "infrastate.text.infra_state"
       },
@@ -884,7 +884,7 @@
   "widgets": [
     {
       "id": "infrastate_widget",
-      "title": "Infra State",
+      "title": "AdaOS Status",
       "title_i18n": {
         "key": "infrastate.text.infra_state"
       },

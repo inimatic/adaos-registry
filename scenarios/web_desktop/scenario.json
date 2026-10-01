@@ -1,6 +1,6 @@
 {
     "id": "web_desktop",
-    "version": "0.3.50",
+    "version": "0.3.51",
     "title": "Управление",
     "description": "Desktop shell scenario that defines the main UI layout, registry and base catalog.",
     "type": "desktop",

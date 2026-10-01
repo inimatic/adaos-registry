@@ -170,16 +170,6 @@
                     "flag": "regex_enabled"
                   },
                   {
-                    "id": "neuro_lite",
-                    "label": "Neuro Lite",
-                    "flag": "neuro_lite_enabled"
-                  },
-                  {
-                    "id": "neural",
-                    "label": "Neural",
-                    "flag": "neural_enabled"
-                  },
-                  {
                     "id": "rasa",
                     "label": "RASA",
                     "flag": "rasa_enabled"
@@ -246,8 +236,8 @@
     "data/nlu_runtime": {
       "flags": {
         "regex_enabled": true,
-        "neuro_lite_enabled": true,
-        "neural_enabled": true,
+        "neuro_lite_enabled": false,
+        "neural_enabled": false,
         "rasa_enabled": true,
         "nlu_teacher_enabled": true
       },

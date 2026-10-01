@@ -1716,6 +1716,68 @@
                             "actions": []
                         },
                         {
+                            "id": "runtime-controls-placeholder",
+                            "type": "item.details",
+                            "title": "Runtime controls",
+                            "area": "system-commands",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_runtime_controls",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": ["web_desktop.runtime_controls"],
+                                "preserveLastValue": true
+                            },
+                            "inputs": {
+                                "presentation": "section",
+                                "fields": [
+                                    {"key": "item.rasa_running", "label": "Rasa running"},
+                                    {"key": "item.rasa_health", "label": "Rasa health"},
+                                    {"key": "item.rasa_env_mode", "label": "Rasa environment"},
+                                    {"key": "item.rasa_version_profile", "label": "NLU profile"},
+                                    {"key": "item.diet_profile", "label": "DIET/TensorFlow"},
+                                    {"key": "item.effective_log_level", "label": "Log level"},
+                                    {"key": "item.core_auto_update", "label": "Core auto-update"},
+                                    {"key": "item.application_auto_update_default", "label": "Application auto-update default"}
+                                ],
+                                "emptyText": "Runtime controls are unavailable."
+                            },
+                            "visibleIf": "$state.activeTab === 'system'",
+                            "actions": []
+                        },
+                        {
+                            "area": "system-commands",
+                            "id": "runtime-control-actions",
+                            "type": "ui.actions",
+                            "title": "Runtime actions",
+                            "inputs": {
+                                "variant": "adaptiveToolbar",
+                                "buttons": [
+                                    {"id": "rasa_install", "label": "Install / repair Rasa"},
+                                    {"id": "rasa_enable", "label": "Enable Rasa"},
+                                    {"id": "rasa_disable", "label": "Disable Rasa"},
+                                    {"id": "log_info", "label": "Log: INFO"},
+                                    {"id": "log_debug", "label": "Log: DEBUG"},
+                                    {"id": "core_auto_on", "label": "Core auto-update: on"},
+                                    {"id": "core_auto_off", "label": "Core auto-update: off"},
+                                    {"id": "apps_auto_on", "label": "App auto-update default: on"},
+                                    {"id": "apps_auto_off", "label": "App auto-update default: off"}
+                                ]
+                            },
+                            "actions": [
+                                {"on": "click:rasa_install", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": {"control": "rasa_install"}, "invalidate": ["web_desktop.runtime_controls"]},
+                                {"on": "click:rasa_enable", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": {"control": "rasa_enabled", "value": true}, "invalidate": ["web_desktop.runtime_controls"]},
+                                {"on": "click:rasa_disable", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": {"control": "rasa_enabled", "value": false}, "invalidate": ["web_desktop.runtime_controls"]},
+                                {"on": "click:log_info", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": {"control": "log_level", "value": "INFO"}, "invalidate": ["web_desktop.runtime_controls"]},
+                                {"on": "click:log_debug", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": {"control": "log_level", "value": "DEBUG"}, "invalidate": ["web_desktop.runtime_controls"]},
+                                {"on": "click:core_auto_on", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": {"control": "core_auto_update", "value": true}, "invalidate": ["web_desktop.runtime_controls"]},
+                                {"on": "click:core_auto_off", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": {"control": "core_auto_update", "value": false}, "invalidate": ["web_desktop.runtime_controls"]},
+                                {"on": "click:apps_auto_on", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": {"control": "application_auto_update_default", "value": true}, "invalidate": ["web_desktop.runtime_controls"]},
+                                {"on": "click:apps_auto_off", "type": "callSkill", "target": "web_desktop_runtime_skill.set_runtime_control", "params": {"control": "application_auto_update_default", "value": false}, "invalidate": ["web_desktop.runtime_controls"]}
+                            ],
+                            "visibleIf": "$state.activeTab === 'system'"
+                        },
+                        {
                             "area": "development-collection",
                             "id": "development-query",
                             "type": "ui.queryToolbar",

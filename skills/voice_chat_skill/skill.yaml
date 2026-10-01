@@ -1,5 +1,5 @@
 name: voice_chat_skill
-version: 0.7.8
+version: 0.7.9
 description: Voice chat bridge for web_desktop (text in -> materialize replies through
   the node conversation ledger; shared chat history is exposed as a bounded compatibility
   stream, with YJS kept as a compact status projection).

@@ -321,6 +321,7 @@ def test_owned_operational_surfaces_use_real_tool_or_admitted_mcp_sources() -> N
         "web_desktop_runtime_skill.get_system_overview",
         "web_desktop_runtime_skill.list_developments",
         "web_desktop_runtime_skill.get_preferences",
+        "web_desktop_runtime_skill.get_runtime_controls",
     }
 
     for node in _walk(webui):

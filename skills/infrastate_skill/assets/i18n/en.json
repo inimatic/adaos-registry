@@ -129,7 +129,7 @@
   "infrastate.text.hub": "hub",
   "infrastate.text.hub_alias": "hub, alias",
   "infrastate.text.id": "Id",
-  "infrastate.text.infra_state": "Infra State",
+  "infrastate.text.infra_state": "AdaOS Status",
   "infrastate.text.infrastructure_state": "Infrastructure State",
   "infrastate.text.install": "Install",
   "infrastate.text.installable_projects": "Installable projects",
