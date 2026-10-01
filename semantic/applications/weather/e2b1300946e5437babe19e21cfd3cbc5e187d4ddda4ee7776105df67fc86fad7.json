@@ -1,0 +1,98 @@
+{
+  "schema": "adaos.semantic_registry.application_release.v1",
+  "project_id": "weather",
+  "version": "0.1.4",
+  "application_ref": "application:weather",
+  "presentation_ref": "weather_app",
+  "project_release_digest": "sha256:e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7",
+  "source_ref": {
+    "schema": "adaos.artifact.source_ref.v1",
+    "forge": "content-addressed-dev",
+    "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+    "revision": "sha256:36141add66a7c71b72f4b8ac2ec699afb14a8b58fb4c7e6641374a937a1bd86e",
+    "path_scope": [
+      "projects/weather/"
+    ]
+  },
+  "compilation_digest": "sha256:f141302c9b0feee541cd1bea65c0c54f0b8d373a0bd3c0698c5144ef01090b82",
+  "semantic_revision_digest": "sha256:87530bff495d39517167b3afed4452523753debb0b725d9b49a44680b7662e66",
+  "requirements": [
+    {
+      "requirement_ref": "requirement:application.weather.ui",
+      "capability_ref": "capability:application.ui.render",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:dd156d0d4f05b81521cbc6fd537bf6ac2294581e7d1b2028b2545ac1a57cde9a"
+    }
+  ],
+  "portable_artifacts": {
+    "adaos.binding.definition.v1": [
+      "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1"
+    ],
+    "adaos.binding.delivery.v1": [
+      "sha256:5db54cc6751939faf67425647642030c9d2eaeeed126edc2308ba739f30dd917"
+    ],
+    "adaos.capability.contract.v1": [
+      "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7"
+    ],
+    "adaos.evidence.claim.v1": [
+      "sha256:19b972d76c3e95aee1a3f416a2e7f67221a7ceb619f6e515406ac6bf1ff245ee"
+    ]
+  },
+  "distribution": {
+    "thin": {
+      "requirements_only": true,
+      "registry_required": true
+    },
+    "resolved": {
+      "project_release_digest": "sha256:e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7",
+      "package_closure": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "weather_skill",
+          "version": "2.6.30",
+          "digest": "sha256:014cd7480deda54a649d3ee227feffdf0a1c09cafcd260b62222bec517a6380a",
+          "manifest_digest": "sha256:5b46a5c00f13dafa7095e5eda9f9727dbbbb101014c896e7f6151661cb185ba1",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:36141add66a7c71b72f4b8ac2ec699afb14a8b58fb4c7e6641374a937a1bd86e",
+            "path_scope": [
+              "skills/weather_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/weather_skill",
+          "schema_locks": []
+        }
+      ],
+      "portable_artifact_digests": [
+        "sha256:19b972d76c3e95aee1a3f416a2e7f67221a7ceb619f6e515406ac6bf1ff245ee",
+        "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+        "sha256:5db54cc6751939faf67425647642030c9d2eaeeed126edc2308ba739f30dd917",
+        "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7"
+      ]
+    }
+  },
+  "projection_digest": "sha256:98698b06d1e60aaef4731ef7781922542498b27b6fd2e3a9f4141569250d8439"
+}

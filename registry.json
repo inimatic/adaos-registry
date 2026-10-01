@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-30T19:51:20+00:00",
+  "updated_at": "2026-10-01T08:40:25+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1454,13 +1454,19 @@
       "kind": "skill",
       "id": "weather_skill",
       "name": "weather_skill",
-      "version": "2.6.26",
-      "updated_at": "2026-08-14T19:40:13+00:00",
+      "version": "2.6.30",
+      "updated_at": "2026-10-01T08:39:50+00:00",
       "path": "skills/weather_skill",
       "manifest": "skills/weather_skill/skill.yaml",
       "source": {
         "path": "skills/weather_skill",
-        "manifest": "skills/weather_skill/skill.yaml"
+        "manifest": "skills/weather_skill/skill.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:36141add66a7c71b72f4b8ac2ec699afb14a8b58fb4c7e6641374a937a1bd86e",
+        "path_scope": [
+          "projects/weather/"
+        ]
       },
       "install": {
         "kind": "skill",
@@ -1469,7 +1475,23 @@
       },
       "description": "Standalone SDK weather skill with Open-Meteo forecasts, browser location, declarative actions and subnet projections.",
       "runtime_python": "3.11",
-      "tools_count": 4
+      "tools_count": 4,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "weather",
+        "release": "weather@0.1.4",
+        "release_digest": "sha256:e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7",
+        "package_digest": "sha256:014cd7480deda54a649d3ee227feffdf0a1c09cafcd260b62222bec517a6380a"
+      },
+      "channels": {
+        "stable": {
+          "release": "weather@0.1.4",
+          "release_digest": "sha256:e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7",
+          "source_revision": "sha256:36141add66a7c71b72f4b8ac2ec699afb14a8b58fb4c7e6641374a937a1bd86e",
+          "package_digest": "sha256:014cd7480deda54a649d3ee227feffdf0a1c09cafcd260b62222bec517a6380a",
+          "version": "2.6.30"
+        }
+      }
     },
     {
       "kind": "skill",
@@ -3546,6 +3568,77 @@
           "source_revision": "sha256:376cfc5074d765eba3ebadcc6bace2124d4d0db464812b5f1868c85b57c740cc",
           "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c",
           "version": "0.1.9"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "weather",
+      "name": "weather",
+      "version": "0.1.4",
+      "updated_at": "2026-10-01T08:40:25+00:00",
+      "path": "projects/weather",
+      "manifest": "projects/weather/project.yaml",
+      "source": {
+        "path": "projects/weather",
+        "manifest": "projects/weather/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "weather",
+        "id": "weather"
+      },
+      "title": "Weather",
+      "description": "Current weather and a compact desktop weather widget.",
+      "categories": [
+        "information"
+      ],
+      "tags": [
+        "weather",
+        "default-install"
+      ],
+      "publication": {
+        "stage": "beta",
+        "visibility": "listed",
+        "channel": "stable"
+      },
+      "stage": "beta",
+      "visibility": "listed",
+      "channel": "stable",
+      "install_default": true,
+      "features": [
+        {
+          "id": "default",
+          "title": "Weather",
+          "default": true,
+          "optional": false,
+          "components": [
+            "skill:weather_skill"
+          ]
+        }
+      ],
+      "components": [
+        "skill:weather_skill"
+      ],
+      "components_count": 1,
+      "profiles": [
+        "adaos.default_install.v1"
+      ],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "weather",
+        "release": "weather@0.1.4",
+        "release_digest": "sha256:e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7",
+        "primary_component": "skill:weather_skill",
+        "package_digest": "sha256:014cd7480deda54a649d3ee227feffdf0a1c09cafcd260b62222bec517a6380a"
+      },
+      "channels": {
+        "stable": {
+          "release": "weather@0.1.4",
+          "release_digest": "sha256:e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7",
+          "source_revision": "sha256:36141add66a7c71b72f4b8ac2ec699afb14a8b58fb4c7e6641374a937a1bd86e",
+          "package_digest": "sha256:014cd7480deda54a649d3ee227feffdf0a1c09cafcd260b62222bec517a6380a",
+          "version": "0.1.4"
         }
       }
     },

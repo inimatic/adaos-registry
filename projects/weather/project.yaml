@@ -1,28 +1,37 @@
 schema: adaos.project.v1
 kind: project
 id: weather
-version: 0.1.0
-profiles: [adaos.default_install.v1]
+version: 0.1.4
+profiles:
+- adaos.default_install.v1
 components:
   owned:
   - ref: skill:weather_skill
     role: primary
     exposure: application
     lifecycle: bound
-    relations: [realizes]
+    relations:
+    - realizes
   dependencies: []
 entrypoints:
 - id: weather
   presentation: weather_app
   default: true
-  bindings: {surface: weather}
+  bindings:
+    surface: weather
 catalog:
   title: Weather
   icon: cloud-outline
   description: Current weather and a compact desktop weather widget.
-  categories: [information]
-  tags: [weather, default-install]
-publication: {stage: beta, visibility: listed, channel: stable}
+  categories:
+  - information
+  tags:
+  - weather
+  - default-install
+publication:
+  stage: beta
+  visibility: listed
+  channel: stable
 install:
   default: true
   features:
@@ -30,12 +39,18 @@ install:
     title: Weather
     default: true
     optional: false
-    components: [skill:weather_skill]
+    components:
+    - skill:weather_skill
 compatibility:
-  required_entrypoints: [weather]
-  validation_profiles: [weather.local]
+  required_entrypoints:
+  - weather
+  validation_profiles:
+  - weather.local
 lifecycle:
-  uninstall: {components: remove_if_unreferenced, runtime_data: retain, source_artifacts: retain}
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
 created_at: '2026-10-01T00:00:00Z'
 created_by: agent:codex
 permission_profile:
@@ -57,8 +72,11 @@ permission_profile:
   notifications: []
   background_actions: []
   data_practices:
-    collected: [weather_location, weather_snapshot]
+    collected:
+    - weather_location
+    - weather_snapshot
     linked_to_user: []
     retention: The selected location and latest compact snapshot remain local.
-    sent_off_device: [weather_location]
+    sent_off_device:
+    - weather_location
     tracking: false

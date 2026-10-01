@@ -433,6 +433,12 @@
   },
   "contributions": [
     {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "weather_app",
+      "presentation": "weather_app"
+    },
+    {
       "extensionPoint": "desktop.widgets",
       "type": "widget",
       "id": "weather",

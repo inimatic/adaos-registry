@@ -1,5 +1,5 @@
 name: weather_skill
-version: 2.6.26
+version: 2.6.30
 description: Standalone SDK weather skill with Open-Meteo forecasts, browser location,
   declarative actions and subnet projections.
 runtime:
@@ -166,7 +166,7 @@ nlu:
     enabled: true
     source: teacher
     candidate_id: cand.1768330399036
-updated_at: '2026-08-14T19:40:13+00:00'
+updated_at: '2026-10-01T08:39:50+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.774+4991.d0c42079
@@ -175,4 +175,3 @@ compatibility:
     min_commit: d0c42079b61fba5df8dbcbb9c481abaee6218717
     min_short_commit: d0c42079
     build_date: '2026-08-14T22:38:55+03:00'
-
