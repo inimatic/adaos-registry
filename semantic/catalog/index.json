@@ -29,9 +29,9 @@
       "application_id": "web_desktop",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 4,
-      "stable_release_digest": "sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
-      "release_key": "web_desktop@sha256:89ba8cf3e94f547bcdc24ca14f524e91f3888cf168d3bae6b507a5dbba84fc49",
-      "projection_digest": "sha256:6257c3de9c250184c50eb600d839e7ec7bb294c826a6375a7801e08a277a743c"
+      "stable_release_digest": "sha256:2c4de82f2299d9145d605c1026c96b1f4fec60b23512306262b1fb32e286fce8",
+      "release_key": "web_desktop@sha256:2c4de82f2299d9145d605c1026c96b1f4fec60b23512306262b1fb32e286fce8",
+      "projection_digest": "sha256:427c09b3dd9a1ef8b8c1b2bf48754b39a2d4929c2f354798d71eef47879a5a8f"
     },
     "subscription_status": {
       "application_id": "subscription_status",
@@ -754,7 +754,15 @@
       "release_digest": "sha256:e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7",
       "path": "semantic/catalog/releases/weather/e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7.json",
       "projection_digest": "sha256:9847cb0ad1d669224b221f4e6c43cc22cbabf6eb15385ce1e2c121c27aced1f7"
+    },
+    "web_desktop@sha256:2c4de82f2299d9145d605c1026c96b1f4fec60b23512306262b1fb32e286fce8": {
+      "application_id": "web_desktop",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.3.60",
+      "release_digest": "sha256:2c4de82f2299d9145d605c1026c96b1f4fec60b23512306262b1fb32e286fce8",
+      "path": "semantic/catalog/releases/web_desktop/2c4de82f2299d9145d605c1026c96b1f4fec60b23512306262b1fb32e286fce8.json",
+      "projection_digest": "sha256:427c09b3dd9a1ef8b8c1b2bf48754b39a2d4929c2f354798d71eef47879a5a8f"
     }
   },
-  "index_digest": "sha256:e52acb1d183fce3c83f4d23630209c9761caaa301fc050cd20cbb43833a52b5f"
+  "index_digest": "sha256:7104f45b9ae7486b75f52d98967061f61b15d5012113d377259f12d0616be492"
 }

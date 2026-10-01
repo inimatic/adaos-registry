@@ -1,5 +1,5 @@
 name: web_desktop_runtime_skill
-version: 0.1.28
+version: 0.1.29
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -361,39 +361,6 @@ tools:
         type: string
       message:
         type: string
-- name: get_runtime_controls
-  description: Read durable operator controls and Rasa service state.
-  entry: handlers.main:get_runtime_controls
-  side_effects: none
-  permissions: [workspace.read]
-  application_access:
-    permission: workspace.read
-    capability: desktop.open
-  input_schema: {type: object, properties: {}}
-  output_schema:
-    type: object
-    required: [ok, item]
-    properties: {ok: {type: boolean}, item: {type: object}}
-- name: set_runtime_control
-  description: Apply an owner-governed runtime control from Management System.
-  entry: handlers.main:set_runtime_control
-  side_effects: local_write
-  permissions: [workspace.write]
-  application_access:
-    permission: workspace.write
-    capability: desktop.settings.write
-  input_schema:
-    type: object
-    required: [control]
-    properties:
-      control:
-        type: string
-        enum: [rasa_install, rasa_enabled, log_level, core_auto_update, application_auto_update_default]
-      value: {}
-  output_schema:
-    type: object
-    required: [ok]
-    properties: {ok: {type: boolean}}
 - name: list_developments
   description: List real development projects from the public developer SDK.
   entry: handlers.main:list_developments
@@ -779,4 +746,4 @@ data_routes:
     invalidation_tags:
     - web_desktop.preferences
 prototype: default
-updated_at: '2026-09-26T04:54:18+00:00'
+updated_at: '2026-10-01T09:27:57+00:00'
