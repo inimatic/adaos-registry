@@ -4,12 +4,13 @@ id: nlu_teacher
 version: 0.1.0
 profiles: [adaos.system.nlu_teacher.v1, adaos.default_install.v1]
 components:
-  owned: []
-  dependencies:
+  owned:
   - ref: skill:web_desktop_skill
-    version: null
+    role: primary
+    exposure: application
     lifecycle: shared
-    relations: [uses]
+    relations: [presents]
+  dependencies: []
 entrypoints:
 - id: main
   presentation: nlu_teacher_app
