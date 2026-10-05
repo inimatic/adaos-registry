@@ -259,6 +259,44 @@ def _current_tile(status: Mapping[str, Any], rows: list[Mapping[str, Any]]) -> d
     }
 
 
+def _usage_arc(status: Mapping[str, Any], rows: list[Mapping[str, Any]]) -> dict[str, Any]:
+    current = _current_tile(status, rows)
+    labels = {
+        "llm.requests": "LLM requests",
+        "llm.tokens.input": "LLM input",
+        "llm.tokens.output": "LLM output",
+        "llm.tokens.reasoning": "LLM reasoning",
+        "codex.api.tokens": "Codex",
+    }
+    metrics: list[dict[str, Any]] = []
+    for row in rows:
+        limit = _int_value(row.get("quota_limit"))
+        remaining_value = row.get("quota_remaining")
+        if limit <= 0 or remaining_value in {"", None}:
+            continue
+        remaining = _int_value(remaining_value)
+        used = max(0, min(limit, limit - remaining))
+        percent = round((used / limit) * 100, 1)
+        unit = _text(row.get("quota_unit")) or "units"
+        resource = _text(row.get("resource"))
+        metrics.append(
+            {
+                "id": resource,
+                "label": labels.get(resource, resource),
+                "value": percent,
+                "display": f"{percent:g}%",
+                "description": f"{used:,} of {limit:,} {unit} used; {remaining:,} remaining.",
+                "state": _text(row.get("state")),
+            }
+        )
+    return {
+        **current,
+        "title": "Subscription",
+        "metrics": metrics[:3],
+        "description": current.get("description"),
+    }
+
+
 def _plan_change_projection(status: Mapping[str, Any]) -> dict[str, Any]:
     request = _read_plan_change_request()
     current_plan = _text(status.get("plan_id")) or "none"
@@ -326,13 +364,49 @@ def _projection_payload(status: Mapping[str, Any]) -> dict[str, Any]:
                            "cost_status": cost["status"],
                            "estimated_usd": f"{amount:.6f}" if amount is not None else "",
                            "unpriced_runs": cost.get("unpriced_runs")})
+    application_rows = []
+    iteration_rows = []
+    for application in codex["by_application"][:100]:
+        application_id = _text(application.get("application_id")) or "Unattributed"
+        application_rows.append(
+            {
+                **{
+                    key: value
+                    for key, value in application.items()
+                    if key != "iterations"
+                },
+                "application_id": application_id,
+                "application_type": _text(application.get("application_type")) or "legacy",
+                "iteration_count": len(application.get("iterations") or []),
+            }
+        )
+        for iteration in list(application.get("iterations") or [])[:20]:
+            if len(iteration_rows) >= 200:
+                break
+            iteration_rows.append(
+                {
+                    **iteration,
+                    "application_id": application_id,
+                    "application_type": _text(application.get("application_type")) or "legacy",
+                    "iteration": (
+                        iteration.get("builder_iteration")
+                        if iteration.get("builder_iteration") is not None
+                        else "legacy"
+                    ),
+                }
+            )
     return {
         "current": _current_tile(status, rows),
+        "usage_arc": _usage_arc(status, rows),
         "buttons": [{"id": "details", "label": "Details", "kind": "primary"}],
         "resources": {"items": rows, "generated_at": status.get("generated_at")},
         "usage_history": {"items": _usage_history_rows(rows), "generated_at": status.get("generated_at")},
         "codex_models": {"items": model_rows, "cost": codex["cost"],
                          "generated_at": status.get("generated_at")},
+        "codex_applications": {"items": application_rows,
+                               "generated_at": status.get("generated_at")},
+        "codex_iterations": {"items": iteration_rows,
+                             "generated_at": status.get("generated_at")},
         "plan_change": _plan_change_projection(status),
         "raw": dict(status),
     }

@@ -90,6 +90,8 @@ def test_webui_reads_subscription_projection_without_calling_write_tools() -> No
         "data/subscription_status/resources",
         "data/subscription_status/usage_history",
         "data/subscription_status/codex_models",
+        "data/subscription_status/codex_applications",
+        "data/subscription_status/codex_iterations",
         "data/subscription_status/refresh",
     }
 
@@ -573,3 +575,50 @@ def test_codex_models_display_unknown_cost_without_fabricating_zero(monkeypatch)
     assert rows[1]["estimated_usd"] == ""
     assert rows[1]["cost_status"] == "unavailable"
     assert rows[1]["model"] == "Unknown"
+
+
+def test_codex_usage_is_projected_by_application_and_iteration(monkeypatch):
+    module = _load_module()
+    monkeypatch.setattr(module, "_read_plan_change_request", lambda: {})
+    payload = module._projection_payload({"usage": {"codex.api.tokens": {
+        "usage_breakdown": {"window_24h": {"by_application": [{
+            "application_id": "notes", "application_type": "scenario",
+            "runs": 2, "fresh_input_tokens": 60, "cached_input_tokens": 100,
+            "output_tokens": 15, "reasoning_tokens": 6, "billable_tokens": 175,
+            "last_seen_at": "2026-10-05T09:10:00Z",
+            "iterations": [
+                {"builder_session_id": "automation.scenario.notes", "builder_iteration": 1,
+                 "runs": 1, "fresh_input_tokens": 40, "cached_input_tokens": 20,
+                 "output_tokens": 5, "reasoning_tokens": 2, "billable_tokens": 65},
+                {"builder_session_id": "automation.scenario.notes", "builder_iteration": 0,
+                 "runs": 1, "fresh_input_tokens": 20, "cached_input_tokens": 80,
+                 "output_tokens": 10, "reasoning_tokens": 4, "billable_tokens": 110},
+            ],
+        }]}}}}})
+
+    application = payload["codex_applications"]["items"][0]
+    iterations = payload["codex_iterations"]["items"]
+    assert application["application_id"] == "notes"
+    assert application["iteration_count"] == 2
+    assert "iterations" not in application
+    assert [row["iteration"] for row in iterations] == [1, 0]
+    assert sum(row["billable_tokens"] for row in iterations) == 175
+
+
+def test_usage_arc_does_not_fabricate_exhaustion_when_remaining_is_unknown(monkeypatch):
+    module = _load_module()
+    monkeypatch.setattr(module, "_read_plan_change_request", lambda: {})
+
+    unknown = module._projection_payload({
+        "subscription_state": "active",
+        "plan_id": "builder",
+        "usage": {"llm.requests": {"quota_limit": 1000, "quota_remaining": None}},
+    })
+    known = module._projection_payload({
+        "subscription_state": "active",
+        "plan_id": "builder",
+        "usage": {"llm.requests": {"quota_limit": 1000, "quota_remaining": 750}},
+    })
+
+    assert unknown["usage_arc"]["metrics"] == []
+    assert known["usage_arc"]["metrics"][0]["value"] == 25

@@ -8,6 +8,14 @@
       "description": "No local economic status yet",
       "color": "warning"
     },
+    "data/subscription_status/usage_arc": {
+      "title": "Subscription",
+      "value": "unknown",
+      "label": "AdaOS subscription",
+      "subtitle": "loading / unknown",
+      "description": "No quota usage is available yet",
+      "metrics": []
+    },
     "data/subscription_status/resources": {
       "items": [],
       "generated_at": ""
@@ -17,6 +25,14 @@
       "generated_at": ""
     },
     "data/subscription_status/codex_models": {
+      "items": [],
+      "generated_at": ""
+    },
+    "data/subscription_status/codex_applications": {
+      "items": [],
+      "generated_at": ""
+    },
+    "data/subscription_status/codex_iterations": {
       "items": [],
       "generated_at": ""
     },
@@ -61,7 +77,7 @@
     {
       "id": "subscription_status_widget",
       "title": "Subscription",
-      "type": "visual.metricTile",
+      "type": "visual.multiMetricArc",
       "icon": "card-outline",
       "dataSource": {
         "kind": "y",
@@ -73,15 +89,13 @@
         "emptyText": "--"
       },
       "inputs": {
-        "valuePath": "current.value",
-        "labelPath": "current.label",
-        "subtitlePath": "current.subtitle",
-        "descriptionPath": "current.description",
-        "noticePath": "current.error",
-        "colorPath": "current.color",
-        "emptyText": "--",
-        "loadingText": "Loading subscription...",
-        "refreshMs": 60000
+        "metricsPath": "usage_arc.metrics",
+        "centerValuePath": "usage_arc.value",
+        "centerLabelPath": "usage_arc.label",
+        "subtitlePath": "usage_arc.subtitle",
+        "descriptionPath": "usage_arc.description",
+        "emptyText": "No metered quota is available",
+        "loadingText": "Loading subscription..."
       },
       "actions": [
         {
@@ -452,6 +466,56 @@
                     "label": "Unpriced runs",
                     "width": "115px"
                   }
+                ]
+              }
+            },
+            {
+              "id": "subscription-status-codex-applications",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Codex by application / 24h",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/subscription_status/codex_applications",
+                "scope": "shared"
+              },
+              "inputs": {
+                "emptyText": "No application-attributed usage receipts",
+                "columns": [
+                  {"key": "application_id", "label": "Application", "width": "220px"},
+                  {"key": "application_type", "label": "Type", "width": "90px"},
+                  {"key": "iteration_count", "label": "Iterations", "width": "85px"},
+                  {"key": "runs", "label": "Calls", "width": "70px"},
+                  {"key": "fresh_input_tokens", "label": "Fresh input", "width": "110px"},
+                  {"key": "cached_input_tokens", "label": "Cached input", "width": "110px"},
+                  {"key": "output_tokens", "label": "Output", "width": "90px"},
+                  {"key": "billable_tokens", "label": "Provider total", "width": "115px"},
+                  {"key": "last_seen_at", "label": "Last seen", "width": "190px"}
+                ]
+              }
+            },
+            {
+              "id": "subscription-status-codex-iterations",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Codex by Builder iteration / 24h",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/subscription_status/codex_iterations",
+                "scope": "shared"
+              },
+              "inputs": {
+                "emptyText": "No iteration-attributed usage receipts",
+                "columns": [
+                  {"key": "application_id", "label": "Application", "width": "220px"},
+                  {"key": "iteration", "label": "Iteration", "width": "85px"},
+                  {"key": "runs", "label": "Calls", "width": "70px"},
+                  {"key": "fresh_input_tokens", "label": "Fresh input", "width": "110px"},
+                  {"key": "cached_input_tokens", "label": "Cached input", "width": "110px"},
+                  {"key": "output_tokens", "label": "Output", "width": "90px"},
+                  {"key": "reasoning_tokens", "label": "Reasoning", "width": "100px"},
+                  {"key": "billable_tokens", "label": "Provider total", "width": "115px"},
+                  {"key": "last_seen_at", "label": "Last seen", "width": "190px"}
                 ]
               }
             },
