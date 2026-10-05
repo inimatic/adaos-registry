@@ -15301,6 +15301,18 @@ def test_explicit_new_application_can_compare_itself_with_the_current_one() -> N
         assert skill._parse_builder_command(text, has_session=True)["intent"] == "project.create"
 
 
+def test_explicit_desktop_scenario_creation_does_not_edit_selected_project() -> None:
+    skill = _load_module()
+    text = (
+        'Create a new desktop scenario named "E2E Notes" for keeping short '
+        'personal notes. Keep it in Prototype and do not publish it.'
+    )
+
+    parsed = skill._parse_builder_command(text, has_session=True)
+
+    assert parsed["intent"] == "project.create"
+
+
 def test_branded_adaos_application_request_creates_instead_of_editing_selected_project() -> None:
     skill = _load_module()
     text = (

@@ -17040,7 +17040,7 @@ def _is_explicit_create_request(text: str) -> bool:
     # Product naming is a presentation modifier, not part of the object kind.
     # "AdaOS Application" must remain a create command even when another
     # project is selected; otherwise the turn is silently routed as an edit.
-    adjective_en = r"(?:(?:adaos|full-screen|protected|system|private|public|new)\s+){0,6}"
+    adjective_en = r"(?:(?:adaos|desktop|web|mobile|full-screen|protected|system|private|public|new)\s+){0,6}"
     object_ru = (
         r"(?:\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435|\u043f\u0440\u043e\u0435\u043a\u0442|\u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439|"
         r"\u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f|\u043d\u0430\u0432\u044b\u043a)"
