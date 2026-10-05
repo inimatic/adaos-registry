@@ -1,5 +1,5 @@
 name: conversation_companions
-version: 0.3.0-beta.2
+version: 0.3.0-beta.3
 description: Conversational characters plus a beta Companion operator grounded in
   the AdaOS Companion Control Plane.
 entry: handlers/main.py
@@ -124,6 +124,102 @@ memory_budget:
     cleanup_hook: dispose
 lifecycle:
   dispose: dispose
+testing:
+  consumer_test_seam:
+    schema: adaos.skill.consumer_test_seam.v1
+    id: companion_console
+    mode: mock_exported_tool_boundary
+    provider_conformance_owner: conversation_companions
+    instruction: Consumer tests fake exported tool replies from the declared schemas
+      and fixtures. They do not import provider source, call Root MCP, inspect real
+      learning records or establish Core ingress conformance.
+    call_contract:
+      signature: call(target, params, permissions, reply)
+      target_prefix: conversation_companions.
+      validate_input_schema: true
+      validate_output_schema: true
+      authorization:
+        rule: Every declared tool permission must be present before dispatch.
+        denied_result: {ok: false, error: permission_denied}
+      lifecycle:
+        pending:
+          rule: A started call exposes pending=true and must not update its resultStateKey.
+        completed:
+          rule: A successful declared reply clears pending and may update resultStateKey.
+        failed:
+          rule: A denied or failed reply clears pending, preserves the previous successful
+            state and exposes the bounded error without fabricating success.
+    synthetic_fixtures:
+    - id: context_ready
+      tool: get_companion_context
+      phase: completed
+      result:
+        ok: true
+        webspace_id: synthetic-webspace
+        context:
+          context_digest: sha256:synthetic-context
+          current_scenario: companion_console
+          affordances: []
+    - id: activity_empty
+      tool: list_companion_activity
+      phase: completed
+      result:
+        ok: true
+        webspace_id: synthetic-webspace
+        receipts: []
+        count: 0
+        conversation_text_redacted: true
+    - id: action_pending
+      tool: execute_companion_action
+      phase: pending
+    - id: action_dispatched
+      tool: execute_companion_action
+      phase: completed
+      result:
+        ok: true
+        webspace_id: synthetic-webspace
+        receipt:
+          action_id: companion-action:synthetic
+          operation: ui.home.open
+          status: dispatched
+          cancellable: false
+        message: Synthetic action dispatched.
+    - id: action_failed
+      tool: execute_companion_action
+      phase: failed
+      result:
+        ok: false
+        webspace_id: synthetic-webspace
+        receipt:
+          action_id: companion-action:synthetic-failure
+          operation: ui.home.open
+          status: failed
+          error: {code: executor_error, message: Synthetic failure.}
+        message: Synthetic failure.
+    - id: capability_recorded
+      tool: capture_capability_request
+      phase: completed
+      result:
+        ok: true
+        webspace_id: synthetic-webspace
+        capability_request:
+          id: capability-request:synthetic
+          status: recorded
+    - id: learning_empty
+      tool: get_learning_lab
+      phase: completed
+      result:
+        ok: true
+        session_id: companion-session:synthetic
+        state: active
+        items: []
+        diagnostics: []
+    - id: feedback_recorded
+      tool: learning_lab_action
+      phase: completed
+      result:
+        ok: true
+        result: {status: recorded}
 tools:
 - name: get_learning_lab
   description: Read local development learning sessions, turn evidence, timings, feedback and batch review.

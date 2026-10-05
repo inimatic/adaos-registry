@@ -8,11 +8,14 @@ import yaml
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _tools() -> dict[str, dict]:
-    manifest = yaml.safe_load(
+def _manifest() -> dict:
+    return yaml.safe_load(
         (SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8")
     )
-    return {item["name"]: item for item in manifest["tools"]}
+
+
+def _tools() -> dict[str, dict]:
+    return {item["name"]: item for item in _manifest()["tools"]}
 
 
 def test_learning_lab_exports_publish_exact_application_access() -> None:
@@ -70,3 +73,39 @@ def test_access_contract_has_no_skill_local_role_store() -> None:
     source = (SKILL_ROOT / "handlers" / "main.py").read_text(encoding="utf-8")
     assert "application_roles" not in source
     assert "permission_profile" not in source
+
+
+def test_consumer_seam_covers_authorization_pending_and_failure_states() -> None:
+    seam = _manifest()["testing"]["consumer_test_seam"]
+    assert seam["schema"] == "adaos.skill.consumer_test_seam.v1"
+    assert seam["mode"] == "mock_exported_tool_boundary"
+    assert seam["provider_conformance_owner"] == "conversation_companions"
+    assert seam["call_contract"]["authorization"]["denied_result"] == {
+        "ok": False,
+        "error": "permission_denied",
+    }
+    assert set(seam["call_contract"]["lifecycle"]) == {
+        "pending",
+        "completed",
+        "failed",
+    }
+
+    fixtures = {item["id"]: item for item in seam["synthetic_fixtures"]}
+    assert fixtures["action_pending"] == {
+        "id": "action_pending",
+        "tool": "execute_companion_action",
+        "phase": "pending",
+    }
+    assert fixtures["action_dispatched"]["result"]["receipt"]["status"] == "dispatched"
+    assert fixtures["action_failed"]["result"]["receipt"]["status"] == "failed"
+    assert fixtures["action_failed"]["result"]["ok"] is False
+
+    covered_tools = {item["tool"] for item in fixtures.values()}
+    assert covered_tools == {
+        "get_learning_lab",
+        "learning_lab_action",
+        "get_companion_context",
+        "list_companion_activity",
+        "execute_companion_action",
+        "capture_capability_request",
+    }
