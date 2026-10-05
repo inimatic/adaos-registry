@@ -1,5 +1,5 @@
 name: conversation_companions
-version: 0.3.0-beta.1
+version: 0.3.0-beta.2
 description: Conversational characters plus a beta Companion operator grounded in
   the AdaOS Companion Control Plane.
 entry: handlers/main.py
@@ -135,6 +135,11 @@ tools:
       webspace_id: {type: string}
     additionalProperties: false
   output_schema: {type: object}
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: companion.learning.read
 - name: learning_lab_action
   description: Record explicit human feedback, seal a session or review a batch anomaly. Not callable by the Companion model.
   entry: handlers.main:learning_lab_action
@@ -153,6 +158,11 @@ tools:
       webspace_id: {type: string}
     additionalProperties: false
   output_schema: {type: object}
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: companion.learning.review
 - name: start
   description: Start or resume the first-run character onboarding flow.
   entry: handlers.main:start
@@ -247,6 +257,12 @@ tools:
     required:
     - ok
     - context
+  permissions:
+  - workspace.read
+  - external_provider.use
+  application_access:
+    permission: workspace.read
+    capability: companion.context.read
 - name: list_companion_activity
   description: List recent redacted Companion action receipts from Root MCP.
   entry: handlers.main:list_companion_activity
@@ -268,6 +284,12 @@ tools:
     - ok
     - receipts
     - count
+  permissions:
+  - workspace.read
+  - external_provider.use
+  application_access:
+    permission: workspace.read
+    capability: companion.activity.read
 - name: execute_companion_action
   description: Execute one allowlisted semantic operation through Companion Control
     Plane and return its durable receipt.
@@ -296,6 +318,12 @@ tools:
     - ok
     - receipt
     - message
+  permissions:
+  - workspace.write
+  - external_provider.use
+  application_access:
+    permission: workspace.write
+    capability: companion.action.execute
 - name: capture_capability_request
   description: Record an unmet Companion request as a deduplicated AdaOS Dev Ticket.
   entry: handlers.main:capture_capability_request
@@ -328,6 +356,12 @@ tools:
     required:
     - ok
     - capability_request
+  permissions:
+  - workspace.write
+  - external_provider.use
+  application_access:
+    permission: workspace.write
+    capability: companion.capability_request.capture
 - name: update_profile
   description: Apply a bounded style/profile correction to a character.
   entry: handlers.main:update_profile
