@@ -4572,6 +4572,7 @@ def get_lifecycle(
 )
 def start_automation(
     implementation_brief: str,
+    confirmed_technical_application_id: str | None = None,
     object_type: str = DEFAULT_PROJECT_KIND,
     object_id: str = DEFAULT_PROJECT_ID,
     webspace_id: str | None = None,
@@ -4639,6 +4640,9 @@ def start_automation(
                 object_type=kind,
                 object_id=project_id,
                 implementation_brief=implementation_brief,
+                confirmed_technical_application_id=(
+                    str(confirmed_technical_application_id or "").strip() or None
+                ),
                 webspace_id=source,
                 conversation_id=bound_conversation_id,
                 brief_path=brief_path,

@@ -1078,6 +1078,7 @@ def test_project_automation_uses_primary_workflow_and_aggregate_worker_scope(
 
     result = module.start_automation(
         "Adjust the operator layout",
+        confirmed_technical_application_id="root_mgmnt_ops",
         object_type="project",
         object_id="root_mgmnt",
         webspace_id="desktop",
@@ -1087,6 +1088,7 @@ def test_project_automation_uses_primary_workflow_and_aggregate_worker_scope(
     assert automation_calls[0]["object_type"] == "project"
     assert automation_calls[0]["object_id"] == "root_mgmnt"
     assert automation_calls[0]["change_set_id"] == "CS-root"
+    assert automation_calls[0]["confirmed_technical_application_id"] == "root_mgmnt_ops"
     assert automation_calls[0]["conversation_id"] == "conv.builder.root"
     assert result["execution_scope"]["context_ref"] == "project:root_mgmnt"
     assert result["execution_scope"]["execution_ref"] == "scenario:root_mgmnt_ops"
