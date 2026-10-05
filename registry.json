@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-10-01T09:46:18+00:00",
+  "updated_at": "2026-10-05T21:20:00+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -236,8 +236,8 @@
       "kind": "skill",
       "id": "conversation_companions",
       "name": "conversation_companions",
-      "version": "0.1.14",
-      "updated_at": "2026-08-11T09:24:13+00:00",
+      "version": "0.3.0-beta.2",
+      "updated_at": "2026-10-05T21:20:00+00:00",
       "path": "skills/conversation_companions",
       "manifest": "skills/conversation_companions/skill.yaml",
       "source": {
@@ -249,10 +249,10 @@
         "name": "conversation_companions",
         "id": "conversation_companions"
       },
-      "description": "Draft conversational character skill for onboarding, profile tuning, and controlled user trials.",
+      "description": "Conversational characters plus a beta Companion operator grounded in the AdaOS Companion Control Plane.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 10
+      "tools_count": 16
     },
     {
       "kind": "skill",
