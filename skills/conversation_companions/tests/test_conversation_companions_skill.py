@@ -22,8 +22,22 @@ def test_manifest_declares_tools_and_nlu_actions() -> None:
     manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
 
     tools = {item["name"] for item in manifest["tools"]}
-    assert {"start", "talk", "switch_character", "update_profile", "capture_feedback"}.issubset(tools)
+    assert {
+        "start",
+        "talk",
+        "switch_character",
+        "update_profile",
+        "capture_feedback",
+        "get_companion_context",
+        "list_companion_activity",
+        "execute_companion_action",
+        "capture_capability_request",
+    }.issubset(tools)
     assert manifest["default_tool"] == "talk"
+    assert any(
+        agent["id"] == "agent:conversation_companions:sage"
+        for agent in manifest["conversation"]["agents"]
+    )
     assert "conversation.start" in manifest["nlu"]["intents"]
     assert manifest["nlu"]["intents"]["conversation.talk"]["actions"][0]["tool"] == "talk"
 
@@ -116,6 +130,189 @@ def test_talk_fallback_answers_common_factual_and_term_questions() -> None:
     assert noise["ok"] is True
     assert "помеха" in noise["message"]
     assert noise["message"] != beirut["message"]
+
+
+def test_sage_routes_allowlisted_request_through_companion_plane(monkeypatch) -> None:
+    skill = _load_module()
+    webspace_id = "test-sage-control"
+    skill.reset_session(webspace_id=webspace_id)
+    context = {
+        "webspace_id": webspace_id,
+        "context_digest": "sha256:" + ("a" * 64),
+        "current_scenario": "web_desktop",
+        "affordances": [{"id": "status.node_cpu.read", "available": True}],
+        "published_voice_affordances": [],
+    }
+    calls = []
+
+    monkeypatch.setattr(skill, "_companion_context", lambda _webspace_id: context)
+
+    def call(tool_id, arguments=None):
+        calls.append((tool_id, arguments))
+        return {
+            "receipt": {
+                "action_id": "companion-action:test",
+                "operation": "status.node_cpu.read",
+                "status": "completed",
+                "result": {"cpu": {"percent": 17.5}, "observed_at": "2026-10-05T12:00:00Z"},
+            }
+        }
+
+    monkeypatch.setattr(skill, "_companion_mcp_call", call)
+
+    message, result = skill._sage_control_reply(
+        "Мудрец, какая сейчас загрузка процессора?",
+        webspace_id,
+    )
+
+    assert result["used_mcp"] is True
+    assert result["receipt"]["status"] == "completed"
+    assert "17.5%" in message
+    assert calls[0][0] == "companion.action.execute"
+    assert calls[0][1]["context_digest"] == context["context_digest"]
+
+
+def test_sage_parser_uses_published_affordance_and_typed_state() -> None:
+    skill = _load_module()
+    context = {
+        "context_digest": "sha256:" + ("b" * 64),
+        "published_voice_affordances": [
+            {
+                "id": "diagnostics.open",
+                "labels": {"ru": "Диагностика"},
+                "aliases": ["диагностику"],
+            }
+        ],
+    }
+
+    affordance = skill._sage_action_request(
+        "Мудрец, открой диагностику",
+        context,
+        "desktop",
+    )
+    state = skill._sage_action_request(
+        "Мудрец, установи флаг companion.verbose = false",
+        context,
+        "desktop",
+    )
+
+    assert affordance["operation"] == "ui.affordance.activate"
+    assert affordance["params"] == {"affordance_id": "diagnostics.open"}
+    assert state["operation"] == "ui.state.set"
+    assert state["params"] == {"key": "companion.verbose", "value": False}
+
+
+def test_sage_resolves_scenario_and_modal_by_published_catalog_name() -> None:
+    skill = _load_module()
+    context = {
+        "context_digest": "sha256:" + ("d" * 64),
+        "available_modal_ids": ["node:1:diagnostics_modal"],
+        "published_voice_affordances": [],
+        "catalog_apps": [
+            {
+                "id": "scenario:media_center",
+                "scenario_id": "media_center",
+                "title": "Media Center",
+            },
+            {
+                "id": "diagnostics_app",
+                "title": "Диагностика",
+                "launchModal": "node:1:diagnostics_modal",
+            },
+        ],
+    }
+
+    scenario = skill._sage_action_request(
+        "Мудрец, открой сценарий «Media Center»",
+        context,
+        "desktop",
+    )
+    modal = skill._sage_action_request(
+        "Мудрец, открой Диагностику",
+        context,
+        "desktop",
+    )
+
+    assert scenario["operation"] == "ui.scenario.open"
+    assert scenario["params"] == {"scenario_id": "media_center"}
+    assert modal["operation"] == "ui.modal.open"
+    assert modal["params"] == {"modal_id": "node:1:diagnostics_modal"}
+
+
+def test_sage_records_only_explicit_capability_request(monkeypatch) -> None:
+    skill = _load_module()
+    webspace_id = "test-sage-wanted"
+    skill.reset_session(webspace_id=webspace_id)
+    context = {
+        "webspace_id": webspace_id,
+        "context_digest": "sha256:" + ("c" * 64),
+        "current_scenario": "web_desktop",
+        "affordances": [],
+        "published_voice_affordances": [],
+    }
+    calls = []
+    monkeypatch.setattr(skill, "_companion_context", lambda _webspace_id: context)
+
+    def call(tool_id, arguments=None):
+        calls.append((tool_id, arguments))
+        return {
+            "capability_request": {
+                "status": "recorded",
+                "ticket": {"id": "dticket.test-wanted"},
+            }
+        }
+
+    monkeypatch.setattr(skill, "_companion_mcp_call", call)
+
+    message, result = skill._sage_control_reply(
+        "Мудрец, запиши в реестр хотелок: научиться запускать вечерний сценарий",
+        webspace_id,
+    )
+
+    assert result["used_mcp"] is True
+    assert result["capability_request"]["status"] == "recorded"
+    assert "dticket.test-wanted" in message
+    assert calls[0][0] == "companion.capability_request.capture"
+    assert calls[0][1]["context_digest"] == context["context_digest"]
+    assert calls[0][1]["summary"] == "научиться запускать вечерний сценарий"
+
+
+def test_sage_refuses_cancel_when_no_receipt_is_cancellable(monkeypatch) -> None:
+    skill = _load_module()
+    webspace_id = "test-sage-cancel"
+    skill.reset_session(webspace_id=webspace_id)
+    context = {
+        "webspace_id": webspace_id,
+        "context_digest": "sha256:" + ("e" * 64),
+        "current_scenario": "web_desktop",
+        "affordances": [{"id": "action.cancel", "available": True}],
+        "published_voice_affordances": [],
+    }
+    calls = []
+    monkeypatch.setattr(skill, "_companion_context", lambda _webspace_id: context)
+
+    def call(tool_id, arguments=None):
+        calls.append((tool_id, arguments))
+        return {
+            "receipts": [
+                {
+                    "action_id": "companion-action:done",
+                    "status": "completed",
+                    "cancellable": False,
+                }
+            ]
+        }
+
+    monkeypatch.setattr(skill, "_companion_mcp_call", call)
+
+    message, result = skill._sage_control_reply(
+        "Мудрец, отмени последнее действие",
+        webspace_id,
+    )
+
+    assert result["receipt"] is None
+    assert "нет действия" in message
+    assert calls == [("companion.activity.list", {"webspace_id": webspace_id, "limit": 30})]
 
 
 def test_capture_feedback_stores_trial_observation() -> None:

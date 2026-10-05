@@ -1,7 +1,7 @@
 name: conversation_companions
-version: 0.1.14
-description: Draft conversational character skill for onboarding, profile tuning,
-  and controlled user trials.
+version: 0.3.0-beta.1
+description: Conversational characters plus a beta Companion operator grounded in
+  the AdaOS Companion Control Plane.
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -23,6 +23,24 @@ conversation:
     default_tool: talk
     history_policy: node_local
   agents:
+  - id: agent:conversation_companions:sage
+    label: Мудрец
+    owner: skill:conversation_companions
+    kind: skill_agent
+    channel_id: conversational
+    skill: conversation_companions
+    talk_tool: talk
+    switch_tool: switch_character
+    character_id: sage
+    gender: male
+    voice: ru-male
+    icon: sparkles-outline
+    aliases:
+    - Мудрец
+    - Sage
+    - Companion
+    - компаньон
+    - помощник
   - id: agent:conversation_companions:arseni
     label: Арсений
     owner: skill:conversation_companions
@@ -80,6 +98,12 @@ exports:
   - list_characters
   - switch_character
   - talk
+  - get_companion_context
+  - get_learning_lab
+  - learning_lab_action
+  - list_companion_activity
+  - execute_companion_action
+  - capture_capability_request
   - update_profile
   - capture_feedback
   - reset_session
@@ -101,6 +125,34 @@ memory_budget:
 lifecycle:
   dispose: dispose
 tools:
+- name: get_learning_lab
+  description: Read local development learning sessions, turn evidence, timings, feedback and batch review.
+  entry: handlers.main:get_learning_lab
+  side_effects: read_only
+  input_schema:
+    type: object
+    properties:
+      webspace_id: {type: string}
+    additionalProperties: false
+  output_schema: {type: object}
+- name: learning_lab_action
+  description: Record explicit human feedback, seal a session or review a batch anomaly. Not callable by the Companion model.
+  entry: handlers.main:learning_lab_action
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [action]
+    properties:
+      action: {enum: [seal, feedback, review]}
+      session_id: {type: string}
+      turn_id: {type: string}
+      label: {type: string}
+      correction: {type: string}
+      classification: {type: string}
+      decision: {enum: [accept, reject, quarantine, backlog]}
+      webspace_id: {type: string}
+    additionalProperties: false
+  output_schema: {type: object}
 - name: start
   description: Start or resume the first-run character onboarding flow.
   entry: handlers.main:start
@@ -179,6 +231,103 @@ tools:
     required:
     - ok
     - message
+- name: get_companion_context
+  description: Read the current bounded Companion Context Frame from Root MCP.
+  entry: handlers.main:get_companion_context
+  side_effects: read_only
+  side_effect_class: read_only
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - context
+- name: list_companion_activity
+  description: List recent redacted Companion action receipts from Root MCP.
+  entry: handlers.main:list_companion_activity
+  side_effects: read_only
+  side_effect_class: read_only
+  input_schema:
+    type: object
+    properties:
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - receipts
+    - count
+- name: execute_companion_action
+  description: Execute one allowlisted semantic operation through Companion Control
+    Plane and return its durable receipt.
+  entry: handlers.main:execute_companion_action
+  side_effects: external_io
+  side_effect_class: external_io
+  input_schema:
+    type: object
+    required:
+    - operation
+    properties:
+      operation:
+        type: string
+      params:
+        type: object
+      context_digest:
+        type: string
+      utterance:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - receipt
+    - message
+- name: capture_capability_request
+  description: Record an unmet Companion request as a deduplicated AdaOS Dev Ticket.
+  entry: handlers.main:capture_capability_request
+  side_effects: external_io
+  side_effect_class: external_io
+  input_schema:
+    type: object
+    required:
+    - summary
+    properties:
+      summary:
+        type: string
+      desired_outcome:
+        type: string
+      capability_id:
+        type: string
+      utterance:
+        type: string
+      severity:
+        enum:
+        - info
+        - low
+        - medium
+        - high
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - capability_request
 - name: update_profile
   description: Apply a bounded style/profile correction to a character.
   entry: handlers.main:update_profile
@@ -285,25 +434,72 @@ tools:
     - ok
     - cleared
 data_routes:
+- surface: widget:companion_console.context
+  route: tool/details
+  tool: get_companion_context
+  path: root_mcp:companion.context.get
+  owner: skill:conversation_companions
+  first_paint: loading until a bounded Context Frame is available
+  recovery: preserve the last value and allow explicit refresh
+  guard_visibility: Root MCP policy and the current webspace bound the projection
+  budget:
+    max_items: 400
+    max_payload_bytes: 1048576
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - companion.context
+- surface: widget:companion_console.activity
+  route: tool
+  tool: list_companion_activity
+  path: root_mcp:companion.activity.list
+  owner: skill:conversation_companions
+  first_paint: empty bounded receipt ledger
+  recovery: preserve the last value and allow explicit refresh
+  guard_visibility: conversation text is excluded from the activity projection
+  budget:
+    max_items: 100
+    max_payload_bytes: 1048576
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - companion.activity
 - surface: conversation trial feedback
   route: skill-local
   path: skill_memory:conversation_companions.feedback
   owner: skill:conversation_companions
   first_paint: deterministic onboarding, no LLM dependency
   recovery: reset_session clears local session state only
-  guard_visibility: local skill state; no device-control side effects
+  guard_visibility: character state is local; Мудрец control is allowlisted and
+    receipt-backed through Root MCP
   budget:
     max_items: 200
     max_payload_bytes: 524288
 llm_hints:
-  description: Conversational character skill. It creates a low-friction first impression,
-    helps users choose or tune a persona, and answers without device-control tools.
+  description: Conversational character skill with a Companion operator. Мудрец reads
+    a bounded context and executes only published semantic operations through Root MCP.
   aliases:
   - разговорные персонажи
   - персонаж для разговора
   - советник
   - собеседник
   - поговорим
+  - мудрец
+  - companion
   side_effect_class: local_write
   primary_actions:
   - id: conversation.start
@@ -322,6 +518,8 @@ llm_hints:
     - дай совет
     - что думаешь об этом
     - развлеки меня
+    - Мудрец, сколько токенов потратил Codex
+    - Мудрец, закрой окно
   - id: conversation.switch_character
     intent: conversation.switch_character
     tool: switch_character
@@ -344,6 +542,8 @@ nlu_hints:
   - персонажи
   - собеседник
   - советник
+  - мудрец
+  - companion
   examples:
   - text: поговорим
     locale: ru
@@ -352,6 +552,9 @@ nlu_hints:
     locale: ru
     intent: conversation.start
   - text: дай совет по ситуации
+    locale: ru
+    intent: conversation.talk
+  - text: Мудрец, сколько токенов потратил Codex
     locale: ru
     intent: conversation.talk
   - text: переключись на Нику
@@ -369,7 +572,7 @@ nlu:
     pattern: ^\s*(?:поговорим|давай\s+поговорим|хочу\s+поговорить|хочу\s+выбрать\s+собеседника|выбери\s+собеседника|создай(?:\s+\S+){0,4}\s+персонаж[а]?|запусти\s+(?:собеседника|советника)|собеседник)\s*[.!?]*\s*$
   - id: conversation.switch_character.ru
     intent: conversation.switch_character
-    pattern: \b(?:позови|зови|переключись\s+на|пусть\s+ответит|ответь\s+как)\s+(?P<character_id>Арсени[йя]|Ник[ауи]?|Мир[ау]?|советник|скептик|рассказчик|собеседник)\b
+    pattern: \b(?:позови|зови|переключись\s+на|пусть\s+ответит|ответь\s+как)\s+(?P<character_id>Мудрец|Sage|Companion|компаньон|помощник|Арсени[йя]|Ник[ауи]?|Мир[ау]?|советник|скептик|рассказчик|собеседник)\b
   - id: conversation.update_profile.ru
     intent: conversation.update_profile
     pattern: \b(?:говори\s+короче|будь\s+(?:теплее|мягче|строже|скептичнее)|не\s+задавай\s+вопросы|без\s+вопросов|не\s+спорь|спорь\s+меньше|без\s+сюсю)\b
@@ -404,6 +607,7 @@ nlu:
     conversation.switch_character:
       examples:
       - позови Нику
+      - позови Мудреца
       - переключись на Арсения
       - пусть ответит рассказчик
       - ответь как скептик

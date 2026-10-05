@@ -1,0 +1,946 @@
+{
+  "schema": "adaos.webui.v1",
+  "generated_by": "builder_skill+codex_recovery",
+  "ui": {
+    "application": {
+      "version": "0.3.0-beta.1",
+      "desktop": {
+        "pageSchema": {
+          "id": "companion_console",
+          "title": "Companion Learning Lab · Beta",
+          "initialState": {
+            "mediaQuery": "",
+            "capabilitySummary": "",
+            "capabilityOutcome": "",
+            "capabilitySeverity": "medium",
+            "lastCompanionAction": {
+              "message": "В этой сессии ещё не выполнялись операции."
+            },
+            "lastCapabilityRequest": {
+              "capability_request": {
+                "status": "not_recorded"
+              }
+            },
+            "feedbackTurn": "",
+            "feedbackLabel": "correct",
+            "feedbackCorrection": "",
+            "reviewTurn": "",
+            "reviewClass": "model_planning_error",
+            "reviewDecision": "quarantine",
+            "reviewCorrection": "",
+            "learningAction": {}
+          },
+          "layout": {
+            "version": 2,
+            "pattern": "dashboard",
+            "density": "comfortable",
+            "contentWidth": "fluid",
+            "scroll": "page",
+            "regions": [
+              {
+                "id": "main",
+                "role": "main",
+                "priority": 100,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                }
+              },
+              {
+                "id": "supporting",
+                "role": "utility",
+                "priority": 70,
+                "scroll": "page",
+                "presentation": {
+                  "wide": "pane",
+                  "compact": "stack"
+                },
+                "size": {
+                  "minPx": 280,
+                  "preferredPx": 420,
+                  "maxPx": 620
+                }
+              }
+            ],
+            "interaction": {
+              "selection": "none",
+              "rowActivation": "none",
+              "filters": "inline",
+              "actions": "adaptive"
+            }
+          },
+          "widgets": [
+            {
+              "id": "companion-console-header",
+              "type": "ui.form",
+              "area": "main",
+              "inputs": {
+                "presentation": "section",
+                "fields": [
+                  {
+                    "id": "beta",
+                    "type": "staticContent",
+                    "title": "BETA · Companion Control Plane",
+                    "content": "Диагностическая плоскость для проверки контекста, семантических операций и квитанций Мудреца. Команды не обращаются к DOM и не обходят Root MCP policy."
+                  },
+                  {
+                    "id": "ticket",
+                    "type": "staticContent",
+                    "title": "Development evidence",
+                    "content": "Dev Ticket: dticket.01M44C1ZCSM38KCV3RDQC1DA9P · application: companion_console · channel: beta"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "learning-session",
+              "type": "item.details",
+              "area": "main",
+              "title": "Сессия исследования · только для разработки",
+              "dataSource": {
+                "kind": "skill",
+                "name": "conversation_companions.get_learning_lab",
+                "params": {
+                  "webspace_id": "$client.webspaceId"
+                },
+                "cacheTtlMs": 2000,
+                "maxRequestHz": 1,
+                "preserveLastValue": true,
+                "invalidationTags": [
+                  "companion.learning"
+                ]
+              },
+              "inputs": {
+                "presentation": "section",
+                "fields": [
+                  {
+                    "key": "session_id",
+                    "label": "Session ID"
+                  },
+                  {
+                    "key": "turn_id",
+                    "label": "Последний Turn ID"
+                  },
+                  {
+                    "key": "state",
+                    "label": "Состояние"
+                  },
+                  {
+                    "key": "canonical_mutations",
+                    "label": "Изменений рабочего NLU"
+                  }
+                ],
+                "emptyText": "Обратитесь к Мудрецу в этом Webspace; здесь появится запись сессии."
+              }
+            },
+            {
+              "id": "learning-turns",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Реплики и результаты",
+              "dataSource": {
+                "kind": "skill",
+                "name": "conversation_companions.get_learning_lab",
+                "params": {
+                  "webspace_id": "$client.webspaceId"
+                },
+                "resultPath": "items",
+                "cacheTtlMs": 2000,
+                "maxRequestHz": 1,
+                "preserveLastValue": true,
+                "invalidationTags": [
+                  "companion.learning"
+                ]
+              },
+              "inputs": {
+                "variant": "list",
+                "itemIdKey": "id",
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "meta": [
+                  {
+                    "key": "id",
+                    "label": "Turn ID",
+                    "kind": "text"
+                  },
+                  {
+                    "key": "status",
+                    "label": "Оценка",
+                    "kind": "badge"
+                  },
+                  {
+                    "key": "duration_ms",
+                    "label": "Время, ms",
+                    "kind": "text"
+                  }
+                ],
+                "emptyState": {
+                  "title": "Нет записанных реплик",
+                  "subtitle": "Сначала проведите диалог с Мудрецом."
+                }
+              }
+            },
+            {
+              "id": "learning-evidence",
+              "type": "ui.list",
+              "area": "supporting",
+              "title": "Вызовы модели, инструменты и наблюдения",
+              "dataSource": {
+                "kind": "skill",
+                "name": "conversation_companions.get_learning_lab",
+                "params": {
+                  "webspace_id": "$client.webspaceId"
+                },
+                "resultPath": "diagnostics",
+                "cacheTtlMs": 2000,
+                "maxRequestHz": 1,
+                "preserveLastValue": true,
+                "invalidationTags": [
+                  "companion.learning"
+                ]
+              },
+              "inputs": {
+                "variant": "list",
+                "itemIdKey": "id",
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "meta": [
+                  {
+                    "key": "duration_ms",
+                    "label": "Время, ms",
+                    "kind": "text"
+                  },
+                  {
+                    "key": "id",
+                    "label": "Evidence ID",
+                    "kind": "text"
+                  }
+                ],
+                "emptyState": {
+                  "title": "Нет попыток",
+                  "subtitle": "Ошибки и неудачные попытки также сохраняются."
+                }
+              }
+            },
+            {
+              "id": "learning-feedback",
+              "type": "ui.form",
+              "area": "supporting",
+              "title": "Оценка человеком",
+              "inputs": {
+                "fields": [
+                  {
+                    "id": "turn",
+                    "type": "text",
+                    "label": "Turn ID (пусто — последняя реплика)",
+                    "stateKey": "feedbackTurn"
+                  },
+                  {
+                    "id": "label",
+                    "type": "select",
+                    "label": "Результат",
+                    "stateKey": "feedbackLabel",
+                    "options": [
+                      "correct",
+                      "partial",
+                      "wrong_information",
+                      "wrong_action_target",
+                      "rephrasing_required",
+                      "too_slow",
+                      "capability_absent",
+                      "correction"
+                    ]
+                  },
+                  {
+                    "id": "correction",
+                    "type": "textarea",
+                    "label": "Что произошло и как должно быть",
+                    "stateKey": "feedbackCorrection"
+                  }
+                ],
+                "showSubmit": true,
+                "submitLabel": "Сохранить оценку"
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "conversation_companions.learning_lab_action",
+                  "params": {
+                    "action": "feedback",
+                    "turn_id": "$event.values.turn",
+                    "label": "$event.values.label",
+                    "correction": "$event.values.correction",
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "resultStateKey": "learningAction",
+                  "invalidates": [
+                    "companion.learning"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "learning-seal",
+              "type": "ui.form",
+              "area": "supporting",
+              "title": "Завершение сессии",
+              "inputs": {
+                "fields": [
+                  {
+                    "id": "note",
+                    "type": "staticContent",
+                    "title": "Зафиксировать пакет",
+                    "content": "Запечатывает факты текущей сессии. Поздние оценки добавляются отдельно. Следующая реплика начнёт новую сессию. NLU не переобучается."
+                  }
+                ],
+                "showSubmit": true,
+                "submitLabel": "Запечатать сессию"
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "conversation_companions.learning_lab_action",
+                  "params": {
+                    "action": "seal",
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "resultStateKey": "learningAction",
+                  "invalidates": [
+                    "companion.learning"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "learning-review",
+              "type": "ui.form",
+              "area": "supporting",
+              "title": "Пакетный разбор (после завершения)",
+              "inputs": {
+                "fields": [
+                  {
+                    "id": "turn",
+                    "type": "text",
+                    "label": "Turn ID (пусто — последняя реплика)",
+                    "stateKey": "reviewTurn"
+                  },
+                  {
+                    "id": "classification",
+                    "type": "select",
+                    "label": "Причина",
+                    "stateKey": "reviewClass",
+                    "options": [
+                      "nlu_intent_miss",
+                      "nlu_entity_miss",
+                      "regexp_gap",
+                      "capability_search_miss",
+                      "interaction_contract_gap",
+                      "context_projection_miss",
+                      "mcp_contract_error",
+                      "executor_error",
+                      "ui_observation_gap",
+                      "model_planning_error",
+                      "missing_capability",
+                      "latency_anomaly"
+                    ]
+                  },
+                  {
+                    "id": "decision",
+                    "type": "select",
+                    "label": "Решение",
+                    "stateKey": "reviewDecision",
+                    "options": [
+                      "quarantine",
+                      "accept",
+                      "reject",
+                      "backlog"
+                    ]
+                  },
+                  {
+                    "id": "correction",
+                    "type": "textarea",
+                    "label": "Обоснование",
+                    "stateKey": "reviewCorrection"
+                  }
+                ],
+                "showSubmit": true,
+                "submitLabel": "Записать решение"
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "conversation_companions.learning_lab_action",
+                  "params": {
+                    "action": "review",
+                    "turn_id": "$event.values.turn",
+                    "classification": "$event.values.classification",
+                    "decision": "$event.values.decision",
+                    "correction": "$event.values.correction",
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "resultStateKey": "learningAction",
+                  "invalidates": [
+                    "companion.learning"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "learning-action-result",
+              "type": "item.details",
+              "area": "supporting",
+              "title": "Результат записи оценки",
+              "dataSource": {
+                "kind": "static",
+                "value": {}
+              },
+              "inputs": {
+                "fields": [
+                  {
+                    "id": "ok",
+                    "label": "Сохранено",
+                    "value": "$state.learningAction.ok"
+                  },
+                  {
+                    "id": "result",
+                    "label": "Идентификатор",
+                    "value": "$state.learningAction.result.id"
+                  },
+                  {
+                    "id": "digest",
+                    "label": "Digest пакета",
+                    "value": "$state.learningAction.result.digest"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "context-frame",
+              "type": "item.details",
+              "area": "main",
+              "title": "Текущий Context Frame",
+              "dataSource": {
+                "kind": "skill",
+                "name": "conversation_companions.get_companion_context",
+                "params": {
+                  "webspace_id": "$client.webspaceId"
+                },
+                "resultPath": "context",
+                "cacheTtlMs": 0,
+                "maxRequestHz": 2,
+                "preserveLastValue": true,
+                "invalidationTags": [
+                  "companion.context"
+                ]
+              },
+              "inputs": {
+                "presentation": "section",
+                "fields": [
+                  {
+                    "key": "webspace_id",
+                    "label": "Webspace"
+                  },
+                  {
+                    "key": "current_scenario",
+                    "label": "Активный сценарий"
+                  },
+                  {
+                    "key": "context_digest",
+                    "label": "Context digest"
+                  },
+                  {
+                    "key": "generated_at",
+                    "label": "Сформирован"
+                  },
+                  {
+                    "path": "boundaries.raw_dom_access",
+                    "label": "Raw DOM access"
+                  },
+                  {
+                    "path": "boundaries.arbitrary_event_emit",
+                    "label": "Arbitrary events"
+                  }
+                ],
+                "emptyText": "Context Frame пока недоступен."
+              }
+            },
+            {
+              "id": "context-actions",
+              "type": "ui.actions",
+              "area": "main",
+              "inputs": {
+                "variant": "adaptiveToolbar",
+                "buttons": [
+                  {
+                    "id": "refresh-context",
+                    "label": "Обновить контекст",
+                    "icon": "refresh-outline",
+                    "kind": "secondary"
+                  },
+                  {
+                    "id": "cpu",
+                    "label": "Загрузка CPU",
+                    "icon": "speedometer-outline",
+                    "kind": "primary"
+                  },
+                  {
+                    "id": "tokens",
+                    "label": "Токены Codex",
+                    "icon": "analytics-outline",
+                    "kind": "primary"
+                  },
+                  {
+                    "id": "home",
+                    "label": "Домой",
+                    "icon": "home-outline",
+                    "kind": "secondary"
+                  },
+                  {
+                    "id": "close-modal",
+                    "label": "Закрыть модалку",
+                    "icon": "close-outline",
+                    "kind": "secondary"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "id": "refresh-context",
+                  "on": "click:refresh-context",
+                  "type": "callSkill",
+                  "target": "conversation_companions.get_companion_context",
+                  "params": {
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "resultStateKey": "contextRefresh",
+                  "invalidates": [
+                    "companion.context"
+                  ]
+                },
+                {
+                  "id": "cpu",
+                  "on": "click:cpu",
+                  "type": "callSkill",
+                  "target": "conversation_companions.execute_companion_action",
+                  "params": {
+                    "operation": "status.node_cpu.read",
+                    "params": {},
+                    "utterance": "Companion Console: read node CPU",
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "resultStateKey": "lastCompanionAction",
+                  "invalidates": [
+                    "companion.activity"
+                  ]
+                },
+                {
+                  "id": "tokens",
+                  "on": "click:tokens",
+                  "type": "callSkill",
+                  "target": "conversation_companions.execute_companion_action",
+                  "params": {
+                    "operation": "status.codex_tokens.read",
+                    "params": {},
+                    "utterance": "Companion Console: read Codex token usage",
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "resultStateKey": "lastCompanionAction",
+                  "invalidates": [
+                    "companion.activity"
+                  ]
+                },
+                {
+                  "id": "home",
+                  "on": "click:home",
+                  "type": "callSkill",
+                  "target": "conversation_companions.execute_companion_action",
+                  "confirmation": {
+                    "message": "Отправить семантическую команду перехода домой?",
+                    "confirmLabel": "Отправить"
+                  },
+                  "params": {
+                    "operation": "ui.home.open",
+                    "params": {},
+                    "utterance": "Companion Console: go home",
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "resultStateKey": "lastCompanionAction",
+                  "invalidates": [
+                    "companion.activity"
+                  ]
+                },
+                {
+                  "id": "close-modal",
+                  "on": "click:close-modal",
+                  "type": "callSkill",
+                  "target": "conversation_companions.execute_companion_action",
+                  "params": {
+                    "operation": "ui.modal.close",
+                    "params": {},
+                    "utterance": "Companion Console: close top modal",
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "resultStateKey": "lastCompanionAction",
+                  "invalidates": [
+                    "companion.activity"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "affordances",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Опубликованные операции",
+              "dataSource": {
+                "kind": "skill",
+                "name": "conversation_companions.get_companion_context",
+                "params": {
+                  "webspace_id": "$client.webspaceId"
+                },
+                "resultPath": "context.affordances",
+                "cacheTtlMs": 0,
+                "maxRequestHz": 2,
+                "preserveLastValue": true,
+                "invalidationTags": [
+                  "companion.context"
+                ]
+              },
+              "inputs": {
+                "variant": "cards",
+                "itemIdKey": "id",
+                "titleKey": "title",
+                "subtitleKey": "id",
+                "previewKey": "summary",
+                "meta": [
+                  {
+                    "key": "effect",
+                    "label": "Effect",
+                    "kind": "badge"
+                  },
+                  {
+                    "key": "available",
+                    "label": "Available",
+                    "kind": "badge"
+                  },
+                  {
+                    "key": "context_guarded",
+                    "label": "Context guarded",
+                    "kind": "badge"
+                  }
+                ],
+                "emptyState": {
+                  "title": "Нет доступных операций",
+                  "subtitle": "Проверьте состояние Root MCP и активного сценария."
+                }
+              }
+            },
+            {
+              "id": "media-search",
+              "type": "ui.form",
+              "area": "main",
+              "title": "Media Center search",
+              "inputs": {
+                "layout": "responsiveGrid",
+                "fields": [
+                  {
+                    "id": "query",
+                    "type": "text",
+                    "label": "Название фильма",
+                    "placeholder": "Например, Arrival",
+                    "required": true,
+                    "stateKey": "mediaQuery"
+                  }
+                ],
+                "showSubmit": true,
+                "submitLabel": "Найти"
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "conversation_companions.execute_companion_action",
+                  "params": {
+                    "operation": "media.catalog.search",
+                    "params": {
+                      "query": "$event.values.query",
+                      "limit": 10
+                    },
+                    "utterance": "Companion Console: media search",
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "resultStateKey": "lastCompanionAction",
+                  "invalidates": [
+                    "companion.activity"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "last-receipt",
+              "type": "item.details",
+              "area": "main",
+              "title": "Последняя квитанция",
+              "dataSource": {
+                "kind": "static",
+                "value": {}
+              },
+              "inputs": {
+                "presentation": "section",
+                "fields": [
+                  {
+                    "id": "message",
+                    "label": "Grounded response",
+                    "value": "$state.lastCompanionAction.message"
+                  },
+                  {
+                    "id": "operation",
+                    "label": "Operation",
+                    "value": "$state.lastCompanionAction.receipt.operation"
+                  },
+                  {
+                    "id": "status",
+                    "label": "Status",
+                    "value": "$state.lastCompanionAction.receipt.status"
+                  },
+                  {
+                    "id": "action-id",
+                    "label": "Action id",
+                    "value": "$state.lastCompanionAction.receipt.action_id"
+                  },
+                  {
+                    "id": "accepted-at",
+                    "label": "Accepted at",
+                    "value": "$state.lastCompanionAction.receipt.accepted_at"
+                  },
+                  {
+                    "id": "error",
+                    "label": "Error code",
+                    "value": "$state.lastCompanionAction.receipt.error.code"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "activity",
+              "type": "ui.list",
+              "area": "supporting",
+              "title": "Недавняя активность",
+              "dataSource": {
+                "kind": "skill",
+                "name": "conversation_companions.list_companion_activity",
+                "params": {
+                  "webspace_id": "$client.webspaceId",
+                  "limit": 30
+                },
+                "resultPath": "receipts",
+                "cacheTtlMs": 0,
+                "maxRequestHz": 2,
+                "preserveLastValue": true,
+                "invalidationTags": [
+                  "companion.activity"
+                ]
+              },
+              "inputs": {
+                "variant": "list",
+                "itemIdKey": "action_id",
+                "titleKey": "operation",
+                "subtitleKey": "status",
+                "meta": [
+                  {
+                    "key": "action_id",
+                    "label": "Receipt",
+                    "kind": "text"
+                  },
+                  {
+                    "key": "accepted_at",
+                    "label": "Accepted",
+                    "kind": "text"
+                  },
+                  {
+                    "key": "completed_at",
+                    "label": "Completed",
+                    "kind": "text"
+                  }
+                ],
+                "emptyState": {
+                  "title": "Квитанций пока нет",
+                  "subtitle": "Выполните безопасную read-only операцию."
+                }
+              }
+            },
+            {
+              "id": "capability-request",
+              "type": "ui.form",
+              "area": "supporting",
+              "title": "Реестр хотелок",
+              "inputs": {
+                "layout": "responsiveGrid",
+                "fields": [
+                  {
+                    "id": "summary",
+                    "type": "text",
+                    "label": "Короткое название",
+                    "required": true,
+                    "stateKey": "capabilitySummary"
+                  },
+                  {
+                    "id": "desired_outcome",
+                    "type": "textarea",
+                    "label": "Желаемый результат",
+                    "required": true,
+                    "stateKey": "capabilityOutcome"
+                  },
+                  {
+                    "id": "severity",
+                    "type": "select",
+                    "label": "Важность",
+                    "options": [
+                      "info",
+                      "low",
+                      "medium",
+                      "high"
+                    ],
+                    "stateKey": "capabilitySeverity"
+                  }
+                ],
+                "showSubmit": true,
+                "submitLabel": "Записать хотелку"
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "conversation_companions.capture_capability_request",
+                  "params": {
+                    "summary": "$event.values.summary",
+                    "desired_outcome": "$event.values.desired_outcome",
+                    "capability_id": "user_requested",
+                    "severity": "$event.values.severity",
+                    "webspace_id": "$client.webspaceId"
+                  },
+                  "resultStateKey": "lastCapabilityRequest",
+                  "invalidates": [
+                    "companion.activity"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "capability-request-result",
+              "type": "item.details",
+              "area": "supporting",
+              "dataSource": {
+                "kind": "static",
+                "value": {}
+              },
+              "inputs": {
+                "presentation": "section",
+                "fields": [
+                  {
+                    "id": "request-status",
+                    "label": "Capability request status",
+                    "value": "$state.lastCapabilityRequest.capability_request.status"
+                  },
+                  {
+                    "id": "ticket-id",
+                    "label": "Dev Ticket",
+                    "value": "$state.lastCapabilityRequest.capability_request.ticket.id"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "beta-checklist",
+              "type": "ui.form",
+              "area": "supporting",
+              "title": "Beta contract",
+              "inputs": {
+                "presentation": "section",
+                "fields": [
+                  {
+                    "id": "semantic",
+                    "type": "staticContent",
+                    "title": "1 · Semantic only",
+                    "content": "UI requests use stable operation ids; DOM selectors and arbitrary events are outside the contract."
+                  },
+                  {
+                    "id": "digest",
+                    "type": "staticContent",
+                    "title": "2 · Context guarded",
+                    "content": "The skill fetches the current Context Frame and supplies its digest for every mutating operation."
+                  },
+                  {
+                    "id": "receipt",
+                    "type": "staticContent",
+                    "title": "3 · Receipt grounded",
+                    "content": "dispatched means sent to the UI; only completed means synchronously completed. rejected and failed are shown without optimistic wording."
+                  },
+                  {
+                    "id": "privacy",
+                    "type": "staticContent",
+                    "title": "4 · Bounded evidence",
+                    "content": "The activity ledger is bounded and excludes conversation text."
+                  }
+                ]
+              }
+            }
+          ],
+          "meta": {
+            "status": "beta",
+            "dev_ticket": "dticket.01M44C1ZCSM38KCV3RDQC1DA9P",
+            "builder": {
+              "empty_canvas": false,
+              "proto": "002",
+              "ui_revision": "002",
+              "scenario_id": "companion_console",
+              "recovery_reason": "builder_llm_disabled",
+              "recovered_by": "codex"
+            }
+          },
+          "title_i18n": {
+            "key": "scenario.companion_console.title",
+            "fallback": "Companion Console"
+          }
+        }
+      },
+      "resources": {
+        "companion_console.i18n.en": {
+          "kind": "data",
+          "role": "i18n",
+          "locale": "en",
+          "path": "assets/i18n/en.json",
+          "mime": "application/json",
+          "delivery": "core"
+        },
+        "companion_console.i18n.ru": {
+          "kind": "data",
+          "role": "i18n",
+          "locale": "ru",
+          "path": "assets/i18n/ru.json",
+          "mime": "application/json",
+          "delivery": "core"
+        }
+      }
+    }
+  },
+  "nlu": {
+    "llm_hints": {
+      "aliases": [
+        "Companion Console",
+        "консоль компаньона",
+        "диагностика Мудреца"
+      ],
+      "primary_actions": [
+        {
+          "intent": "companion.console.open",
+          "notes": "Open the beta Companion operator and diagnostics surface."
+        }
+      ]
+    }
+  }
+}

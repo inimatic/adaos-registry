@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import re
 import threading
 import time
 from collections import OrderedDict
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from adaos.sdk.core.decorators import subscribe, tool
+from adaos.services.companion.policy import enabled as sage_enabled, require_enabled
 
 
 SKILL_ID = "conversation_companions"
@@ -24,6 +26,13 @@ DIAGNOSTICS_RECEIVER = "conversation_companions.diagnostics"
 DIALOG_CHANNEL_ID = "conversational"
 CONVERSATION_ID = "conv.skill.conversation_companions.default"
 VOICE_PROFILES = {
+    "sage": {
+        "gender": "male",
+        "voice": "ru-male",
+        "lang": "ru-RU",
+        "browser_voice_hint": "male",
+        "icon": "sparkles-outline",
+    },
     "arseni": {
         "gender": "male",
         "voice": "ru-male",
@@ -136,8 +145,11 @@ def _profiles(webspace_id: str) -> dict[str, dict[str, Any]]:
         for char_id, profile in raw.items():
             if isinstance(profile, dict):
                 merged[str(char_id)] = profile
-        return merged
-    return copy.deepcopy(DEFAULT_PROFILES)
+    else:
+        merged = copy.deepcopy(DEFAULT_PROFILES)
+    if not sage_enabled():
+        merged.pop("sage", None)
+    return merged
 
 
 def _save_profiles(webspace_id: str, profiles: Mapping[str, Mapping[str, Any]]) -> None:
@@ -151,6 +163,8 @@ def _session(webspace_id: str) -> dict[str, Any]:
     else:
         session = {}
     session.setdefault("active_character", DEFAULT_ACTIVE_CHARACTER)
+    if session["active_character"] == "sage" and not sage_enabled():
+        session["active_character"] = DEFAULT_ACTIVE_CHARACTER
     session.setdefault("history", [])
     session.setdefault("created_at", _now())
     session["updated_at"] = _now()
@@ -208,6 +222,11 @@ def _normalize_character_id(value: Any, profiles: Mapping[str, Mapping[str, Any]
     if not token:
         return None
     aliases = {
+        "мудрец": "sage",
+        "companion": "sage",
+        "компаньон": "sage",
+        "помощник": "sage",
+        "sage": "sage",
         "арсений": "arseni",
         "советник": "arseni",
         "консультант": "arseni",
@@ -235,7 +254,7 @@ def _normalize_character_id(value: Any, profiles: Mapping[str, Mapping[str, Any]
 
 def _detect_character_from_text(text: str, profiles: Mapping[str, Mapping[str, Any]]) -> str | None:
     lowered = text.lower()
-    for token in ("арсений", "советник", "консультант", "ника", "скептик", "мира", "рассказчик", "собеседник"):
+    for token in ("мудрец", "companion", "компаньон", "помощник", "sage", "арсений", "советник", "консультант", "ника", "скептик", "мира", "рассказчик", "собеседник"):
         if token in lowered:
             resolved = _normalize_character_id(token, profiles)
             if resolved:
@@ -322,11 +341,16 @@ def _build_system_prompt(
     panel: bool = False,
     profiles: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> str:
+    is_companion = str(profile.get("id") or "").strip() == "sage"
     core = [
         "Ты работаешь внутри AdaOS как разговорный персонаж.",
         "Персонаж - это стиль общения, а не утверждение о реальной личности.",
         "Не утверждай, что у тебя есть физическое тело, реальные чувства или доступ к устройствам.",
-        "Не выполняй команды управления устройствами и не делай вид, что выполнил действие.",
+        (
+            "Ты можешь выполнять только операции, опубликованные Companion Control Plane; опирайся на MCP-квитанцию и различай dispatched и completed."
+            if is_companion
+            else "Не выполняй команды управления устройствами и не делай вид, что выполнил действие."
+        ),
         "Если вопрос требует профессиональной экспертизы, отвечай как общий помощник и обозначай пределы уверенности.",
         "Отвечай по-русски, без markdown-заголовков и без искусственной торжественности.",
         "Если пользователь спрашивает о тебе, имени, роли или стиле, отвечай от имени персонажа: назови имя, роль и манеру общения, без фразы 'я не имею мнения о себе'.",
@@ -377,7 +401,8 @@ def _messages_for_llm(
         text = str(item.get("text") or "").strip()
         if text:
             messages.append({"role": role, "content": text})
-    messages.append({"role": "user", "content": user_text})
+    if messages[-1] != {"role": "user", "content": user_text}:
+        messages.append({"role": "user", "content": user_text})
     return messages
 
 
@@ -398,6 +423,418 @@ def _llm_reply(messages: list[Mapping[str, str]]) -> str | None:
         _LOG.warning("conversation_companions LLM reply failed: %s details=%s", exc, details, exc_info=True)
         return None
     return None
+
+
+def _root_mcp_result(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {}
+    current: Mapping[str, Any] = payload
+    response = current.get("response")
+    if isinstance(response, Mapping):
+        current = response
+    result = current.get("result")
+    if isinstance(result, Mapping):
+        return dict(result)
+    return dict(current)
+
+
+def _companion_mcp_call(tool_id: str, arguments: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    require_enabled()
+    from adaos.sdk.data.root_mcp import call_local_root_mcp_tool
+
+    payload = call_local_root_mcp_tool(
+        tool_id,
+        arguments=dict(arguments or {}),
+        capability_profile="CompanionOperator",
+        actor="skill:conversation_companions",
+        request_id=f"conversation-companion-{int(time.time() * 1000)}",
+    )
+    if isinstance(payload, Mapping) and payload.get("ok") is False:
+        response = payload.get("response") if isinstance(payload.get("response"), Mapping) else {}
+        error = response.get("error") if isinstance(response.get("error"), Mapping) else {}
+        raise RuntimeError(str(error.get("message") or error.get("code") or "Root MCP request failed"))
+    return _root_mcp_result(payload)
+
+
+def _companion_context(webspace_id: str) -> dict[str, Any]:
+    result = _companion_mcp_call(
+        "companion.context.get",
+        {"webspace_id": webspace_id, "include_live": True},
+    )
+    context = result.get("context")
+    return dict(context) if isinstance(context, Mapping) else {}
+
+
+def _flatten_text_values(value: Any) -> list[str]:
+    out: list[str] = []
+    if isinstance(value, str) and value.strip():
+        out.append(value.strip())
+    elif isinstance(value, Mapping):
+        for item in value.values():
+            out.extend(_flatten_text_values(item))
+    elif isinstance(value, list):
+        for item in value:
+            out.extend(_flatten_text_values(item))
+    return out
+
+
+def _parse_typed_value(value: str) -> Any:
+    token = str(value or "").strip()
+    lowered = token.lower()
+    if lowered in {"true", "on", "да", "включен", "включён", "включено"}:
+        return True
+    if lowered in {"false", "off", "нет", "выключен", "выключено"}:
+        return False
+    if re.fullmatch(r"-?\d+", token):
+        return int(token)
+    if re.fullmatch(r"-?\d+(?:[.,]\d+)", token):
+        return float(token.replace(",", "."))
+    return token
+
+
+def _published_affordance_for_text(context: Mapping[str, Any], text: str) -> dict[str, Any] | None:
+    lowered = text.casefold()
+    best: tuple[int, dict[str, Any]] | None = None
+    for raw in context.get("published_voice_affordances") or []:
+        if not isinstance(raw, Mapping):
+            continue
+        item = dict(raw)
+        candidates = [
+            *[str(value) for value in item.get("aliases") or [] if str(value).strip()],
+            *_flatten_text_values(item.get("labels")),
+            str(item.get("title") or ""),
+            str(item.get("id") or ""),
+        ]
+        for candidate in candidates:
+            token = candidate.strip().casefold()
+            if len(token) >= 3 and token in lowered:
+                score = len(token)
+                if best is None or score > best[0]:
+                    best = (score, item)
+    return best[1] if best else None
+
+
+def _catalog_app_for_phrase(
+    context: Mapping[str, Any], phrase: str
+) -> dict[str, Any] | None:
+    requested = re.sub(r"\s+", " ", str(phrase or "").strip(" \t\r\n.?!\"'«»")).casefold()
+    if not requested:
+        return None
+    best: tuple[int, dict[str, Any]] | None = None
+    for raw in context.get("catalog_apps") or []:
+        if not isinstance(raw, Mapping):
+            continue
+        item = dict(raw)
+        item_id = str(item.get("id") or "").strip()
+        candidates = {
+            str(item.get("scenario_id") or "").strip(),
+            str(item.get("title") or "").strip(),
+            item_id,
+            item_id.split(":", 1)[1] if item_id.startswith("scenario:") else "",
+        }
+        for candidate in candidates:
+            normalized = re.sub(r"\s+", " ", candidate).casefold()
+            if not normalized:
+                continue
+            if requested == normalized:
+                score = 10_000 + len(normalized)
+            elif len(normalized) >= 4 and normalized in requested:
+                score = len(normalized)
+            else:
+                requested_words = requested.split()
+                candidate_words = normalized.split()
+                if len(requested_words) != len(candidate_words):
+                    continue
+                prefixes = []
+                for left, right in zip(requested_words, candidate_words):
+                    prefix = 0
+                    for left_char, right_char in zip(left, right):
+                        if left_char != right_char:
+                            break
+                        prefix += 1
+                    prefixes.append(prefix)
+                if not prefixes or any(
+                    prefix < min(5, len(left), len(right))
+                    for prefix, left, right in zip(prefixes, requested_words, candidate_words)
+                ):
+                    continue
+                score = 100 + sum(prefixes)
+            if best is None or score > best[0]:
+                best = (score, item)
+    return best[1] if best else None
+
+
+def _sage_action_request(text: str, context: Mapping[str, Any], webspace_id: str) -> dict[str, Any] | None:
+    lowered = text.casefold()
+    operation = ""
+    params: dict[str, Any] = {}
+
+    if ("codex" in lowered or "кодекс" in lowered) and any(token in lowered for token in ("токен", "расход", "потрат")):
+        operation = "status.codex_tokens.read"
+    elif any(token in lowered for token in ("загрузка процессора", "загружен процессор", "cpu", "процессор загруж")):
+        operation = "status.node_cpu.read"
+    else:
+        movie = re.search(
+            r"(?:найди|поищи|отыщи|покажи)\s+(?:мне\s+)?(?:фильм|кино)\s+[\"«]?(.+?)[\"»]?[.!?]*$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if movie and movie.group(1).strip():
+            operation = "media.catalog.search"
+            params = {"query": movie.group(1).strip(), "limit": 10}
+    if not operation and re.search(r"\b(?:вернись|перейди|иди)\s+домой\b|\b(?:открой|покажи)\s+главн", lowered):
+        operation = "ui.home.open"
+    if not operation and re.search(r"\b(?:закрой|убери)\s+(?:это\s+)?(?:окно|модал|диалог)", lowered):
+        operation = "ui.modal.close"
+    if not operation:
+        scenario = re.search(
+            r"(?:открой|покажи|переключи(?:сь)?\s+на)\s+сценар(?:ий|ия)\s+[\"«]?(.+?)[\"»]?[.!?]*$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if scenario:
+            requested = scenario.group(1).strip()
+            app = _catalog_app_for_phrase(context, requested)
+            scenario_id = str((app or {}).get("scenario_id") or requested).strip()
+            if re.fullmatch(r"[A-Za-z0-9_.-]+", scenario_id):
+                operation = "ui.scenario.open"
+                params = {"scenario_id": scenario_id}
+    if not operation:
+        state = re.search(
+            r"(?:установи|поставь|задай)\s+(?:флаг|настройку)\s+([A-Za-z0-9][A-Za-z0-9_.:-]{0,159})(?:\s*(?:=|в|на)\s*(.+?))?[.!?]*$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if state:
+            operation = "ui.state.set"
+            params = {
+                "key": state.group(1),
+                "value": _parse_typed_value(state.group(2) or "true"),
+            }
+    if not operation and any(token in lowered for token in ("открой", "покажи", "нажми")):
+        affordance = _published_affordance_for_text(context, text)
+        if affordance:
+            operation = "ui.affordance.activate"
+            params = {"affordance_id": affordance.get("id")}
+    if not operation and any(token in lowered for token in ("открой", "покажи")):
+        for modal_id in context.get("available_modal_ids") or []:
+            token = str(modal_id or "").strip()
+            if token and token.casefold() in lowered:
+                operation = "ui.modal.open"
+                params = {"modal_id": token}
+                break
+    if not operation:
+        named_app = re.search(
+            r"(?:открой|покажи|перейди\s+(?:в|на))\s+(?:приложение\s+)?[\"«]?(.+?)[\"»]?[.!?]*$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        app = _catalog_app_for_phrase(context, named_app.group(1)) if named_app else None
+        if app:
+            if app.get("launchModal"):
+                operation = "ui.modal.open"
+                params = {"modal_id": app.get("launchModal")}
+            elif app.get("scenario_id"):
+                operation = "ui.scenario.open"
+                params = {"scenario_id": app.get("scenario_id")}
+    if not operation:
+        return None
+    return {
+        "operation": operation,
+        "params": params,
+        "webspace_id": webspace_id,
+        "context_digest": context.get("context_digest"),
+        "utterance": text,
+    }
+
+
+def _sage_capability_request(text: str) -> dict[str, str] | None:
+    """Extract an explicit request to record a future capability.
+
+    This is deliberately narrower than generic wish detection: Мудрец writes a
+    Dev Ticket only when the user explicitly asks to record the idea.
+    """
+
+    patterns = (
+        r"(?:запиши|добавь|зафиксируй)\s+(?:(?:это|как)\s+)?(?:в\s+)?(?:реестр\s+)?хотел(?:ок|ку)\s*[:—–-]?\s*(.+)",
+        r"(?:запиши|добавь|зафиксируй)\s+(?:задачу|идею)\s+(?:на\s+)?(?:будущее|разработку)\s*[:—–-]?\s*(.+)",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if not match:
+            continue
+        summary = re.sub(r"[.!?]+$", "", match.group(1).strip())
+        if summary:
+            return {
+                "summary": summary[:240],
+                "desired_outcome": summary[:1000],
+                "capability_id": "user_requested",
+            }
+    return None
+
+
+def _receipt_message(receipt: Mapping[str, Any]) -> str:
+    status = str(receipt.get("status") or "unknown")
+    operation = str(receipt.get("operation") or "")
+    if status in {"failed", "rejected"}:
+        error = receipt.get("error") if isinstance(receipt.get("error"), Mapping) else {}
+        reason = str(error.get("message") or error.get("code") or status)
+        return f"Мудрец: действие не выполнено: {reason}."
+    result = receipt.get("result") if isinstance(receipt.get("result"), Mapping) else {}
+    if operation == "status.codex_tokens.read":
+        usage = result.get("usage") if isinstance(result.get("usage"), Mapping) else {}
+        if not usage:
+            return "Мудрец: в текущем снимке нет данных о расходе токенов Codex."
+        parts = []
+        for key, label in (("used_24h", "за 24 часа"), ("used_7d", "за 7 дней"), ("used_30d", "за 30 дней")):
+            if usage.get(key) is not None:
+                parts.append(f"{label}: {usage[key]}")
+        return "Мудрец: токены Codex — " + (", ".join(parts) if parts else json.dumps(dict(usage), ensure_ascii=False)) + "."
+    if operation == "status.node_cpu.read":
+        cpu = result.get("cpu") if isinstance(result.get("cpu"), Mapping) else {}
+        if cpu.get("percent") is None:
+            return "Мудрец: текущая загрузка CPU недоступна."
+        suffix = f" (наблюдение {result.get('observed_at')})" if result.get("observed_at") else ""
+        return f"Мудрец: загрузка CPU сейчас {cpu['percent']}%{suffix}."
+    if operation == "media.catalog.search":
+        items = [item for item in result.get("items") or [] if isinstance(item, Mapping)]
+        if not items:
+            return "Мудрец: Media Center не нашёл совпадений в доступном каталоге."
+        titles = [
+            str(item.get("title") or item.get("name") or item.get("display_title") or item.get("source_id") or "без названия")
+            for item in items[:5]
+        ]
+        return f"Мудрец: Media Center нашёл {len(items)} результатов. Первые: " + "; ".join(titles) + "."
+    if operation == "action.cancel":
+        if result.get("cancelled") is True:
+            return f"Мудрец: действие {result.get('target_action_id') or ''} отменено.".strip()
+        reason = str(result.get("reason") or "action_not_cancellable")
+        return f"Мудрец: действие не отменено: {reason}."
+    if status == "dispatched":
+        return f"Мудрец: команда {operation} отправлена интерфейсу. Квитанция: {receipt.get('action_id')}."
+    return f"Мудрец: операция {operation} завершена. Квитанция: {receipt.get('action_id')}."
+
+
+def _sage_control_reply(text: str, webspace_id: str) -> tuple[str | None, dict[str, Any]]:
+    evidence: dict[str, Any] = {
+        "used_mcp": False,
+        "context": None,
+        "receipt": None,
+        "capability_request": None,
+    }
+    try:
+        context = _companion_context(webspace_id)
+        evidence["used_mcp"] = True
+        evidence["context"] = context
+    except Exception as exc:
+        evidence["error"] = f"{type(exc).__name__}: {exc}"
+        return None, evidence
+    wanted = _sage_capability_request(text)
+    if wanted is not None:
+        try:
+            result = _companion_mcp_call(
+                "companion.capability_request.capture",
+                {
+                    **wanted,
+                    "utterance": text,
+                    "severity": "medium",
+                    "webspace_id": webspace_id,
+                    "companion_id": "sage",
+                    "context_digest": context.get("context_digest"),
+                },
+            )
+            captured = (
+                dict(result.get("capability_request"))
+                if isinstance(result.get("capability_request"), Mapping)
+                else {}
+            )
+            evidence["capability_request"] = captured
+            ticket = (
+                captured.get("ticket")
+                if isinstance(captured.get("ticket"), Mapping)
+                else {}
+            )
+            ticket_id = str(ticket.get("id") or "").strip()
+            suffix = f" Dev Ticket: {ticket_id}." if ticket_id else ""
+            return f"Мудрец: записал хотелку «{wanted['summary']}».{suffix}", evidence
+        except Exception as exc:
+            evidence["error"] = f"{type(exc).__name__}: {exc}"
+            return f"Мудрец: не смог записать хотелку: {exc}.", evidence
+
+    if re.search(r"\b(?:отмени|останови|прерви)\b", text, flags=re.IGNORECASE):
+        explicit = re.search(r"companion-action:[A-Za-z0-9_-]+", text, flags=re.IGNORECASE)
+        target_action_id = explicit.group(0) if explicit else ""
+        if not target_action_id:
+            try:
+                activity = _companion_mcp_call(
+                    "companion.activity.list",
+                    {"webspace_id": webspace_id, "limit": 30},
+                )
+                receipts = [
+                    dict(item)
+                    for item in activity.get("receipts") or []
+                    if isinstance(item, Mapping)
+                ]
+                eligible = [
+                    item
+                    for item in receipts
+                    if item.get("cancellable") is True
+                    and str(item.get("status") or "") in {"pending", "queued"}
+                ]
+                if not eligible:
+                    return "Мудрец: сейчас нет действия, которое система разрешает отменить.", evidence
+                if len(eligible) > 1:
+                    ids = ", ".join(str(item.get("action_id")) for item in eligible[:5])
+                    return f"Мудрец: можно отменить несколько действий; укажите квитанцию: {ids}.", evidence
+                target_action_id = str(eligible[0].get("action_id") or "")
+            except Exception as exc:
+                evidence["error"] = f"{type(exc).__name__}: {exc}"
+                return f"Мудрец: не смог проверить отменяемые действия: {exc}.", evidence
+        request = {
+            "operation": "action.cancel",
+            "params": {"target_action_id": target_action_id},
+            "webspace_id": webspace_id,
+            "context_digest": context.get("context_digest"),
+            "utterance": text,
+        }
+        try:
+            result = _companion_mcp_call("companion.action.execute", request)
+            receipt = result.get("receipt") if isinstance(result.get("receipt"), Mapping) else {}
+            evidence["receipt"] = dict(receipt)
+            return _receipt_message(receipt), evidence
+        except Exception as exc:
+            evidence["error"] = f"{type(exc).__name__}: {exc}"
+            return f"Мудрец: Companion Control Plane сейчас недоступен: {exc}.", evidence
+
+    request = _sage_action_request(text, context, webspace_id)
+    if request is None:
+        return None, evidence
+    try:
+        result = _companion_mcp_call("companion.action.execute", request)
+        receipt = result.get("receipt") if isinstance(result.get("receipt"), Mapping) else {}
+        evidence["receipt"] = dict(receipt)
+        return _receipt_message(receipt), evidence
+    except Exception as exc:
+        evidence["error"] = f"{type(exc).__name__}: {exc}"
+        return f"Мудрец: Companion Control Plane сейчас недоступен: {exc}.", evidence
+
+
+def _sage_context_prompt(context: Mapping[str, Any]) -> str:
+    operations = [
+        str(item.get("id"))
+        for item in context.get("affordances") or []
+        if isinstance(item, Mapping) and item.get("available") is True
+    ]
+    return "\n".join(
+        [
+            "Текущий проверенный контекст Companion:",
+            f"- webspace: {context.get('webspace_id')}",
+            f"- active scenario: {context.get('current_scenario')}",
+            f"- context digest: {context.get('context_digest')}",
+            f"- available operations: {', '.join(operations)}",
+            "Если пользователь просит действие, которое не было выполнено детерминированным маршрутом до вызова LLM, не притворяйся, что выполнил его. Объясни границу и предложи записать хотелку.",
+        ]
+    )
 
 
 def _has_any(text: str, *tokens: str) -> bool:
@@ -686,10 +1123,21 @@ def _build_diagnostics(webspace_id: str) -> dict[str, Any]:
             "conversation.safety_contract",
             "Safety and scope",
             "ready",
-            "local conversation state only; no device-control tools",
+            "local conversation state; Мудрец uses context-guarded Root MCP operations",
             {
-                "side_effects": ["skill_memory.session", "skill_memory.profiles", "skill_memory.feedback", "io.out.chat.append"],
-                "no_device_control": True,
+                "side_effects": [
+                    "skill_memory.session",
+                    "skill_memory.profiles",
+                    "skill_memory.feedback",
+                    "io.out.chat.append",
+                    "companion.action.execute",
+                    "companion.capability_request.capture",
+                ],
+                "raw_device_control": False,
+                "companion_control_plane": True,
+                "semantic_actions_only": True,
+                "context_digest_required_for_mutation": True,
+                "action_receipts": True,
                 "default_tool": "talk",
                 "panel_characters": list(PANEL_CHARACTERS),
             },
@@ -899,16 +1347,38 @@ def talk(
     profiles = _profiles(ws)
     session = _session(ws)
     user_text = str(text or "").strip()
+    if character_id == "sage":
+        require_enabled()
     mode = str(mode or "single").strip().lower()
     if not user_text:
         return start(webspace_id=ws, _meta=_meta)
 
     detected = _normalize_character_id(character_id, profiles) if character_id else _detect_character_from_text(user_text, profiles)
     selected = detected or str(session.get("active_character") or DEFAULT_ACTIVE_CHARACTER)
+    if selected == "sage":
+        require_enabled()
     if selected not in profiles:
         selected = DEFAULT_ACTIVE_CHARACTER
 
-    if mode != "panel" and _looks_like_profile_update_instruction(user_text):
+    if selected == "sage" and not preview:
+        from adaos.services.companion.agent import run_turn
+
+        result = run_turn(user_text, webspace=ws, history=list(session.get("history") or []), meta=dict(_meta or {}))
+        _append_history(ws, role="user", text=user_text, character_id="sage")
+        _append_history(ws, role="assistant", text=result["message"], character_id="sage")
+        session = _session(ws)
+        session["learning_session_id"] = result.get("session_id")
+        session["learning_turn_id"] = result.get("turn_id")
+        if mode != "temporary":
+            session["active_character"] = "sage"
+        _save_session(ws, session)
+        chat_meta = _agent_chat_meta(_meta, webspace_id=ws, character_id="sage", profiles=profiles)
+        chat_meta.update(companion_session_id=result.get("session_id"), companion_turn_id=result.get("turn_id"), action_receipt=result.get("action_receipt"))
+        _safe_emit_chat(result["message"], webspace_id=ws, _meta=chat_meta)
+        return {"ok": not bool(result.get("error")), "webspace_id": ws, "active_character": session["active_character"],
+                "selected_character": "sage", "dialog": _dialog_state(ws, "sage"), "mode": mode, "preview": False, **result}
+
+    if selected != "sage" and mode != "panel" and _looks_like_profile_update_instruction(user_text):
         return update_profile(user_text, character_id=selected, webspace_id=ws, _meta=_meta)
 
     panel = mode == "panel"
@@ -919,8 +1389,28 @@ def talk(
 
     _append_history(ws, role="user", text=user_text, character_id=selected)
     history = _session(ws).get("history", [])
-    reply = None if preview else _llm_reply(_messages_for_llm(user_text=user_text, system_prompt=system_prompt, history=history))
-    used_llm = bool(reply)
+    control_evidence: dict[str, Any] = {
+        "used_mcp": False,
+        "context": None,
+        "receipt": None,
+        "capability_request": None,
+    }
+    reply = None
+    used_control_reply = False
+    if selected == "sage" and not panel and not preview:
+        reply, control_evidence = _sage_control_reply(user_text, ws)
+        used_control_reply = bool(reply)
+        if not reply and isinstance(control_evidence.get("context"), Mapping):
+            system_prompt = f"{system_prompt}\n\n{_sage_context_prompt(control_evidence['context'])}"
+    if not reply and not preview:
+        reply = _llm_reply(
+            _messages_for_llm(
+                user_text=user_text,
+                system_prompt=system_prompt,
+                history=history,
+            )
+        )
+    used_llm = bool(reply) and not used_control_reply
     if not reply:
         if panel:
             reply = (
@@ -946,7 +1436,130 @@ def talk(
         "mode": "panel" if panel else mode,
         "message": reply,
         "used_llm": used_llm,
+        "used_mcp": bool(control_evidence.get("used_mcp")),
+        "action_receipt": control_evidence.get("receipt"),
+        "capability_request": control_evidence.get("capability_request"),
+        "control_error": control_evidence.get("error"),
         "preview": bool(preview),
+    }
+
+
+@tool(summary="Read development learning sessions and evidence.", side_effects="none")
+def get_learning_lab(webspace_id: str | None = None, _meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    from adaos.services.companion.console import snapshot
+
+    require_enabled()
+    return {"ok": True, **snapshot(_webspace_id(webspace_id, _meta))}
+
+
+@tool(summary="Record explicit human feedback or seal a learning session.", side_effects="local_write")
+def learning_lab_action(action: str, session_id: str | None = None, turn_id: str | None = None,
+                        label: str = "correct", correction: str = "", classification: str | None = None,
+                        decision: str = "quarantine", webspace_id: str | None = None,
+                        _meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    from adaos.services.companion.console import act
+
+    require_enabled()
+    result = act(_webspace_id(webspace_id, _meta), action, session_id=session_id, turn_id=turn_id,
+                 label=label, correction=correction, classification=classification, decision=decision)
+    return {"ok": True, "result": result}
+
+
+@tool(summary="Read the current Companion Context Frame.", side_effects="none")
+def get_companion_context(
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    ws = _webspace_id(webspace_id, _meta)
+    return {
+        "ok": True,
+        "webspace_id": ws,
+        "context": _companion_context(ws),
+    }
+
+
+@tool(summary="List recent Companion action receipts.", side_effects="none")
+def list_companion_activity(
+    limit: int = 30,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    ws = _webspace_id(webspace_id, _meta)
+    result = _companion_mcp_call(
+        "companion.activity.list",
+        {"webspace_id": ws, "limit": max(1, min(int(limit), 100))},
+    )
+    return {
+        "ok": True,
+        "webspace_id": ws,
+        "receipts": list(result.get("receipts") or []),
+        "count": int(result.get("count") or 0),
+        "conversation_text_redacted": True,
+    }
+
+
+@tool(summary="Execute an allowlisted Companion operation.", side_effects="external_io")
+def execute_companion_action(
+    operation: str,
+    params: Mapping[str, Any] | None = None,
+    context_digest: str | None = None,
+    utterance: str | None = None,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    ws = _webspace_id(webspace_id, _meta)
+    context = _companion_context(ws)
+    request = {
+        "operation": str(operation or "").strip(),
+        "params": dict(params or {}),
+        "webspace_id": ws,
+        "context_digest": str(context_digest or context.get("context_digest") or ""),
+        "utterance": str(utterance or "").strip(),
+    }
+    result = _companion_mcp_call("companion.action.execute", request)
+    receipt = result.get("receipt") if isinstance(result.get("receipt"), Mapping) else {}
+    return {
+        "ok": str(receipt.get("status") or "") not in {"failed", "rejected"},
+        "webspace_id": ws,
+        "receipt": dict(receipt),
+        "message": _receipt_message(receipt),
+    }
+
+
+@tool(summary="Record an unmet Companion capability request.", side_effects="external_io")
+def capture_capability_request(
+    summary: str,
+    desired_outcome: str | None = None,
+    capability_id: str | None = None,
+    utterance: str | None = None,
+    severity: str = "medium",
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    ws = _webspace_id(webspace_id, _meta)
+    context = _companion_context(ws)
+    result = _companion_mcp_call(
+        "companion.capability_request.capture",
+        {
+            "summary": str(summary or "").strip(),
+            "desired_outcome": str(desired_outcome or summary or "").strip(),
+            "capability_id": str(capability_id or "unclassified").strip(),
+            "utterance": str(utterance or "").strip(),
+            "severity": str(severity or "medium").strip(),
+            "webspace_id": ws,
+            "companion_id": "sage",
+            "context_digest": context.get("context_digest"),
+        },
+    )
+    capability_request = (
+        dict(result.get("capability_request"))
+        if isinstance(result.get("capability_request"), Mapping)
+        else {}
+    )
+    return {
+        "ok": capability_request.get("status") == "recorded",
+        "webspace_id": ws,
+        "capability_request": capability_request,
     }
 
 
@@ -1086,6 +1699,14 @@ def on_webio_stream_subscription_changed(evt: Any) -> None:
 
 def handle(topic: str, payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
     data = dict(payload or {})
+    if topic.endswith("get_companion_context"):
+        return get_companion_context(**data)
+    if topic.endswith("list_companion_activity"):
+        return list_companion_activity(**data)
+    if topic.endswith("execute_companion_action"):
+        return execute_companion_action(**data)
+    if topic.endswith("capture_capability_request"):
+        return capture_capability_request(**data)
     if topic.endswith("start"):
         return start(**data)
     if topic.endswith("switch_character"):
