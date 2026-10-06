@@ -1,8 +1,33 @@
 name: web_desktop_runtime_skill
-version: 0.1.31
+version: 0.1.58
 entry: handlers/main.py
 runtime:
   python: '3.11'
+  activation:
+    mode: lazy
+    startup_allowed: false
+    background_refresh: true
+    assessment:
+      schema: adaos.skill.activation_assessment.v1
+      assessor: builder.compiler
+      classification: event_subscriber
+      handler_digest: sha256:cb2bd23dc2e5b6691349bc6693d61fd745947ccaa1c30815f8fca679cc6885d9
+      observed_subscriptions:
+      - economic.subscription.changed
+      - root.subscription.changed
+      - subscription.usage.changed
+      - webio.stream.snapshot.requested
+      - webio.stream.subscription.changed
+      declared_subscriptions:
+      - economic.subscription.changed
+      - root.subscription.changed
+      - subscription.usage.changed
+      - webio.stream.snapshot.requested
+      - webio.stream.subscription.changed
+      dynamic_subscription_count: 0
+      tool_count: 26
+      reasons:
+      - event_subscriptions_require_early_handler_registration
 description: Project-owned runtime actions for opening Web Desktop applications, managing
   Home, and preparing browser, Telegram, and node connection flows.
 dependencies:
@@ -20,17 +45,312 @@ data_lifecycle:
   schema: adaos.skill.data_lifecycle.v1
   execution: native_tools
   databases: []
+lifecycle:
+  drain: web_desktop_runtime_drain
+  rehydrate: web_desktop_runtime_rehydrate
+  dispose: web_desktop_runtime_dispose
 capabilities:
+- storage.blob
 - workspace.read
 - workspace.write
 events:
-  subscribe: []
-  publish: []
+  subscribe:
+  - economic.subscription.changed
+  - root.subscription.changed
+  - subscription.usage.changed
+  - webio.stream.snapshot.requested
+  - webio.stream.subscription.changed
+  publish:
+  - io.out.stream.publish
 tools:
+- name: web_desktop_runtime_drain
+  description: Stop and join System projection workers before runtime replacement.
+  entry: handlers.main:web_desktop_runtime_drain
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    properties:
+      reason:
+        type: string
+  output_schema:
+    type: object
+- name: web_desktop_runtime_dispose
+  description: Dispose System projection workers and clear transient stream state.
+  entry: handlers.main:web_desktop_runtime_dispose
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    properties:
+      reason:
+        type: string
+  output_schema:
+    type: object
+- name: web_desktop_runtime_rehydrate
+  description: Re-enable System projection workers after a verified runtime cutover.
+  entry: handlers.main:web_desktop_runtime_rehydrate
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    properties:
+      reason:
+        type: string
+  output_schema:
+    type: object
+- name: get_current_builder_application
+  description: Read the authorized current Builder selection and related Preview.
+  entry: handlers.main:get_current_builder_application
+  side_effects: read_only
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: desktop.open
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties: {}
+  output_schema:
+    type: object
+    additionalProperties: false
+    required:
+    - status
+    - reason
+    - title
+    - stage
+    - revision
+    - observed_at
+    - freshness
+    - builder
+    - preview
+    properties:
+      status:
+        enum:
+        - ready
+        - ambiguous
+        - unavailable
+      reason:
+        type: string
+      title:
+        type: string
+      title_i18n:
+        type: object
+        additionalProperties: false
+        required:
+        - key
+        properties:
+          key:
+            type: string
+      stage:
+        type: string
+      revision:
+        type: string
+      observed_at:
+        type:
+        - string
+        - 'null'
+      freshness:
+        enum:
+        - current
+        - unavailable
+      builder:
+        type: object
+        additionalProperties: false
+        required:
+        - available
+        - webspace_id
+        properties:
+          available:
+            type: boolean
+          webspace_id:
+            type: string
+            maxLength: 512
+      preview:
+        type: object
+        additionalProperties: false
+        required:
+        - available
+        - webspace_id
+        properties:
+          available:
+            type: boolean
+          webspace_id:
+            type: string
+            maxLength: 512
+- name: request_core_update
+  description: Apply the Core-governed update intent on the ingress-selected member.
+  entry: handlers.main:request_core_update
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    required:
+    - target_node_id
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+    required:
+    - ok
+    - request_id
+    - target
+    - accepted
+    - current
+    - desired
+    - applied
+    properties:
+      ok:
+        type: boolean
+      request_id:
+        type: string
+      target: {}
+      accepted: {}
+      current: {}
+      desired: {}
+      applied: {}
+- name: set_core_autoupdate
+  description: Apply the Core-governed update intent on the ingress-selected member.
+  entry: handlers.main:set_core_autoupdate
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    required:
+    - target_node_id
+    - enabled
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      enabled:
+        type: boolean
+  output_schema:
+    type: object
+    required:
+    - ok
+    - request_id
+    - target
+    - accepted
+    - current
+    - desired
+    - applied
+    properties:
+      ok:
+        type: boolean
+      request_id:
+        type: string
+      target: {}
+      accepted: {}
+      current: {}
+      desired: {}
+      applied: {}
+- name: rename_selected_node
+  description: Rename the member node selected and routed by Core ingress.
+  entry: handlers.main:rename_selected_node
+  side_effects: local_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    required:
+    - target_node_id
+    - display_name
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      display_name:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+    additionalProperties: true
+    required:
+    - ok
+    - target
+    - node_id
+    - display_name
+    - current
+    - desired
+    - applied
+    properties:
+      ok:
+        type: boolean
+      target:
+        type: string
+      node_id:
+        type:
+        - string
+        - 'null'
+      display_name:
+        type: string
+      current:
+        type: string
+      desired:
+        type: string
+      applied:
+        type: boolean
+- name: get_subscription_usage
+  description: Read authorized rolling subscription token usage without inferring
+    monetary cost.
+  entry: handlers.main:get_subscription_usage
+  side_effects: read_only
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: desktop.open
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      webspace_id:
+        type:
+        - string
+        - 'null'
+      refresh:
+        type: boolean
+        default: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - status
+    - updated_at
+    - usage_arc
+    properties:
+      ok:
+        type: boolean
+      status:
+        enum:
+        - ready
+        - stale
+        - unavailable
+      updated_at:
+        type:
+        - string
+        - 'null'
+      usage_arc:
+        type: object
 - name: list_applications
   description: List desktop applications from the authoritative Applications SDK.
   entry: handlers.main:list_applications
-  side_effects: none
+  side_effects: read_only
   permissions:
   - workspace.read
   application_access:
@@ -57,6 +377,11 @@ tools:
       launchable_only:
         type: boolean
         default: false
+      include_projects:
+        type:
+        - boolean
+        - 'null'
+        default: null
       application_id:
         type:
         - string
@@ -99,6 +424,7 @@ tools:
           - summary
           - icon
           - publisher
+          - application_kind
           - categories
           - category
           - installed
@@ -118,6 +444,10 @@ tools:
             icon:
               type: string
             publisher:
+              type: string
+            application_kind:
+              type: string
+            owner_application_id:
               type: string
             categories:
               type: array
@@ -168,7 +498,7 @@ tools:
 - name: list_home_widgets
   description: List desktop widgets pinned to the Home surface.
   entry: handlers.main:list_home_widgets
-  side_effects: none
+  side_effects: read_only
   permissions:
   - workspace.read
   application_access:
@@ -218,7 +548,7 @@ tools:
   description: List real node devices and browser sessions from the control-plane
     SDK.
   entry: handlers.main:list_devices
-  side_effects: none
+  side_effects: read_only
   permissions:
   - workspace.read
   application_access:
@@ -275,10 +605,93 @@ tools:
         type: string
       message:
         type: string
+- name: rename_device
+  description: Rename a managed device or durable browser endpoint through the Management-owned
+    local contract.
+  entry: handlers.main:rename_device
+  side_effects: local_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    required:
+    - device_ref
+    - name
+    additionalProperties: false
+    properties:
+      device_ref:
+        type: string
+      name:
+        type: string
+        minLength: 1
+        maxLength: 120
+  output_schema:
+    type: object
+- name: assign_device_endpoint
+  description: Assign a browser endpoint to a physical device.
+  entry: handlers.main:assign_device_endpoint
+  side_effects: local_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.open
+  input_schema:
+    type: object
+    required:
+    - endpoint_ref
+    properties:
+      endpoint_ref:
+        type: string
+      parent_device_ref:
+        type:
+        - string
+        - 'null'
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      device_ref:
+        type: string
+      parent_device_ref:
+        type:
+        - string
+        - 'null'
+      error:
+        type: string
+- name: identify_device
+  description: Ask a selected browser endpoint to identify itself to the user.
+  entry: handlers.main:identify_device
+  side_effects: read_only
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: desktop.open
+  input_schema:
+    type: object
+    required:
+    - device_ref
+    properties:
+      device_ref:
+        type: string
+        minLength: 1
+      webspace_id:
+        type:
+        - string
+        - 'null'
+  output_schema:
+    type: object
 - name: get_system_overview
   description: Read the real local system and reliability projections.
   entry: handlers.main:get_system_overview
-  side_effects: none
+  side_effects: read_only
   permissions:
   - workspace.read
   application_access:
@@ -287,6 +700,9 @@ tools:
   input_schema:
     type: object
     properties:
+      target_node_id:
+        type: string
+        minLength: 1
       webspace_id:
         type:
         - string
@@ -297,6 +713,17 @@ tools:
         - 'null'
         enum:
         - summary
+        - skills
+        - development
+        - activity
+        - technical
+        - metrics
+        - applications
+        - members
+        - subnet
+        - dashboard
+        - node_dashboard
+        - current_node
         - services
         - connections
         - quotas
@@ -323,6 +750,40 @@ tools:
     properties:
       ok:
         type: boolean
+      item:
+        type: object
+        properties:
+          content:
+            type: string
+          id:
+            type: string
+          status:
+            type: string
+          apps_count:
+            type:
+            - integer
+            - 'null'
+            minimum: 0
+          available:
+            type: boolean
+          freshness:
+            type: string
+          observed_at:
+            type:
+            - string
+            - 'null'
+          source:
+            type:
+            - string
+            - 'null'
+      skill_summary:
+        type: object
+      development_delivery:
+        type: object
+      activity:
+        type: object
+      technical:
+        type: object
       subject:
         type: object
       services:
@@ -364,7 +825,7 @@ tools:
 - name: get_runtime_controls
   description: Read durable operator controls and Rasa service state.
   entry: handlers.main:get_runtime_controls
-  side_effects: none
+  side_effects: read_only
   permissions:
   - workspace.read
   application_access:
@@ -383,10 +844,59 @@ tools:
         type: boolean
       item:
         type: object
+        properties:
+          rasa_configured:
+            type:
+            - boolean
+            - 'null'
+          rasa_installed:
+            type:
+            - boolean
+            - 'null'
+          rasa_running:
+            type:
+            - boolean
+            - 'null'
+          rasa_health:
+            type:
+            - boolean
+            - 'null'
+          rasa_env_mode:
+            type:
+            - string
+            - 'null'
+          rasa_availability:
+            type:
+            - string
+            - 'null'
+          rasa_version_profile:
+            type:
+            - string
+            - 'null'
+          diet_profile:
+            type:
+            - string
+            - 'null'
+          rasa_enabled:
+            type:
+            - boolean
+            - 'null'
+          core_auto_update:
+            type:
+            - boolean
+            - 'null'
+          application_auto_update_default:
+            type:
+            - boolean
+            - 'null'
+          log_level:
+            type:
+            - string
+            - 'null'
 - name: set_runtime_control
   description: Apply an owner-governed runtime control from Management System.
   entry: handlers.main:set_runtime_control
-  side_effects: local_write
+  side_effects: runtime_write
   permissions:
   - workspace.write
   application_access:
@@ -394,6 +904,7 @@ tools:
     capability: desktop.settings.write
   input_schema:
     type: object
+    additionalProperties: false
     required:
     - control
     properties:
@@ -413,10 +924,21 @@ tools:
     properties:
       ok:
         type: boolean
+      schema:
+        type: string
+      request_id:
+        type: string
+      target: {}
+      accepted: {}
+      current: {}
+      desired: {}
+      applied: {}
+      error:
+        type: string
 - name: list_developments
   description: List real development projects from the public developer SDK.
   entry: handlers.main:list_developments
-  side_effects: none
+  side_effects: read_only
   permissions:
   - workspace.read
   application_access:
@@ -476,7 +998,7 @@ tools:
 - name: get_preferences
   description: Read the current user and device preferences for Web Desktop settings.
   entry: handlers.main:get_preferences
-  side_effects: none
+  side_effects: read_only
   permissions:
   - workspace.read
   application_access:
@@ -546,6 +1068,70 @@ tools:
         type: string
       message:
         type: string
+- name: upload_profile_avatar
+  description: Persist one authenticated profile avatar in the Desktop-owned blob
+    store.
+  entry: handlers.main:upload_profile_avatar
+  side_effects: local_write
+  permissions:
+  - storage.blob
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    required:
+    - filename
+    - field_id
+    - media_type
+    - size_bytes
+    - digest
+    additionalProperties: false
+    properties:
+      filename:
+        type: string
+      field_id:
+        const: avatar_ref
+      media_type:
+        type: string
+      size_bytes:
+        type: integer
+        minimum: 1
+        maximum: 2097152
+      digest:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: read_profile_avatar
+  description: Authorize an authenticated reader to retrieve a Desktop-owned profile
+    avatar.
+  entry: handlers.main:read_profile_avatar
+  side_effects: read_only
+  permissions:
+  - storage.blob
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: desktop.open
+  input_schema:
+    type: object
+    required:
+    - ref
+    additionalProperties: false
+    properties:
+      ref:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+      field_id:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
 - name: update_home_item
   description: Update a Home widget; application mutations are owned by Root MCP.
   entry: handlers.main:update_home_item
@@ -659,18 +1245,155 @@ tools:
         type: boolean
       current:
         type: object
+- name: unlink_node
+  description: Detach a paired member node from the current subnet. The node can be
+    paired again later.
+  entry: handlers.main:unlink_node
+  side_effects: external_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    properties:
+      device_ref:
+        type:
+        - string
+        - 'null'
+      node_id:
+        type:
+        - string
+        - 'null'
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      device_ref:
+        type: string
+      status:
+        type: string
+      message:
+        type: string
+      error:
+        type: string
+- name: rename_subnet
+  description: Persist current subnet display metadata through the public SDK.
+  entry: handlers.main:rename_subnet
+  side_effects: local_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      display_name:
+        type: string
+        minLength: 1
+        maxLength: 120
+    required:
+    - display_name
+  output_schema:
+    type: object
+    additionalProperties: true
+    required:
+    - ok
+    - target
+    - node_id
+    - display_name
+    - current
+    - desired
+    - applied
+    properties:
+      ok:
+        type: boolean
+      target:
+        type: string
+      node_id:
+        type:
+        - string
+        - 'null'
+      display_name:
+        type: string
+      current:
+        type: string
+      desired:
+        type: string
+      applied:
+        type: boolean
 exports:
   tools:
+  - web_desktop_runtime_drain
+  - web_desktop_runtime_dispose
+  - web_desktop_runtime_rehydrate
+  - get_current_builder_application
+  - get_runtime_controls
+  - set_runtime_control
+  - request_core_update
+  - set_core_autoupdate
+  - rename_selected_node
+  - get_subscription_usage
   - list_applications
   - list_home_widgets
   - list_devices
+  - rename_device
+  - assign_device_endpoint
+  - identify_device
   - get_system_overview
   - list_developments
   - get_preferences
   - update_preferences
+  - upload_profile_avatar
+  - read_profile_avatar
   - update_home_item
   - prepare_connection
+  - unlink_node
+  - rename_subnet
 data_routes:
+- surface: widget:web_desktop.development-current-application
+  route: tool
+  tool: get_current_builder_application
+  first_paint: Unavailable until the authorized current selection arrives.
+  recovery: Explicit refresh after unavailable or ambiguous selection.
+  guard_visibility: Clear navigation availability on read failure; never retain destinations.
+  budget:
+    max_payload_bytes: 8192
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    max_request_hz: 1
+    preserve_last_value: false
+    invalidation_tags:
+    - web_desktop.current_builder
+- surface: widget:web_desktop.development-subscription-spend
+  route: tool
+  tool: get_subscription_usage
+  first_paint: Usage is unknown until the authorized snapshot arrives.
+  recovery: Explicit refresh; preserve timestamped stale usage on provider failure.
+  guard_visibility: Show unavailable on denied or unavailable reads, never fabricated
+    zero usage.
+  budget:
+    max_payload_bytes: 4096
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - web_desktop.subscription_usage
 - surface: widget:web_desktop.applications
   route: tool
   tool: list_applications
@@ -819,4 +1542,4 @@ data_routes:
     invalidation_tags:
     - web_desktop.preferences
 prototype: default
-updated_at: '2026-10-01T09:45:24+00:00'
+updated_at: '2026-10-06T07:18:51+00:00'

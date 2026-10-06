@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: web_desktop
-version: 0.3.61
+version: 0.3.82
 profiles:
 - adaos.desktop.shell.v1
 - adaos.default_install.v1
@@ -21,32 +21,32 @@ components:
     - realizes
   dependencies:
   - ref: skill:web_desktop_skill
-    version: null
+    version: ==0.2.4
     lifecycle: shared
     relations:
     - uses
   - ref: skill:greet_on_boot_skill
-    version: null
+    version: ==0.2.4
     lifecycle: shared
     relations:
     - uses
   - ref: skill:pair_new_device_skill
-    version: null
+    version: ==0.1.0
     lifecycle: shared
     relations:
     - uses
   - ref: skill:voice_chat_skill
-    version: null
+    version: ==0.7.8
     lifecycle: shared
     relations:
     - uses
   - ref: skill:browsers_skill
-    version: null
+    version: ==0.15.24
     lifecycle: shared
     relations:
     - uses
   - ref: skill:infrastate_skill
-    version: null
+    version: ==0.75.94
     lifecycle: shared
     relations:
     - uses
@@ -110,6 +110,10 @@ permission_profile:
     approval_policy: grant_on_install
     purpose: Update the user's desktop layout, pins, widgets, and preferences.
     sensitive: true
+  - id: storage.blob
+    approval_policy: grant_on_install
+    purpose: Store and retrieve the signed-in user's content-addressed profile avatar.
+    sensitive: true
   - id: profile.read.self
     approval_policy: grant_on_install
     purpose: Read the signed-in user's display profile and portable preferences.
@@ -134,6 +138,11 @@ application_roles:
   grants:
   - desktop.open
   - desktop.settings.write
+  - workspace.read
+  - workspace.write
+  - storage.blob
+  - profile.read.self
+  - profile.write.self
   assignable_to:
   - owner
   - co_owner
@@ -143,18 +152,24 @@ application_roles:
   requires_permissions:
   - workspace.read
   - workspace.write
+  - storage.blob
   - profile.read.self
   - profile.write.self
 - id: desktop_member
   title: Desktop member
   grants:
   - desktop.open
+  - workspace.read
+  - storage.blob
+  - profile.read.self
+  - profile.write.self
   assignable_to:
   - member
   - child
   - guest
   requires_permissions:
   - workspace.read
+  - storage.blob
   - profile.read.self
   - profile.write.self
 lifecycle:

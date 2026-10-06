@@ -19,29 +19,14 @@
         "schema": {
           "id": "apps_catalog",
           "layout": {
-            "version": 2,
-            "pattern": "collection",
-            "density": "comfortable",
-            "contentWidth": "fluid",
-            "scroll": "page",
-            "regions": [
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
               {
                 "id": "main",
-                "role": "collection",
-                "priority": 100,
-                "scroll": "page",
-                "presentation": {
-                  "wide": "pane",
-                  "compact": "stack"
-                }
+                "role": "main"
               }
-            ],
-            "interaction": {
-              "selection": "single",
-              "rowActivation": "select",
-              "filters": "inline",
-              "actions": "adaptive"
-            }
+            ]
           },
           "widgets": [
             {
@@ -73,29 +58,14 @@
         "schema": {
           "id": "widgets_catalog",
           "layout": {
-            "version": 2,
-            "pattern": "collection",
-            "density": "comfortable",
-            "contentWidth": "fluid",
-            "scroll": "page",
-            "regions": [
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
               {
                 "id": "main",
-                "role": "collection",
-                "priority": 100,
-                "scroll": "page",
-                "presentation": {
-                  "wide": "pane",
-                  "compact": "stack"
-                }
+                "role": "main"
               }
-            ],
-            "interaction": {
-              "selection": "single",
-              "rowActivation": "select",
-              "filters": "inline",
-              "actions": "adaptive"
-            }
+            ]
           },
           "widgets": [
             {
@@ -128,29 +98,14 @@
           "id": "nlu_teacher_modal",
           "title": "NLU Teacher",
           "layout": {
-            "version": 2,
-            "pattern": "collection",
-            "density": "comfortable",
-            "contentWidth": "fluid",
-            "scroll": "page",
-            "regions": [
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
               {
                 "id": "main",
-                "role": "collection",
-                "priority": 100,
-                "scroll": "page",
-                "presentation": {
-                  "wide": "pane",
-                  "compact": "stack"
-                }
+                "role": "main"
               }
-            ],
-            "interaction": {
-              "selection": "none",
-              "rowActivation": "none",
-              "filters": "inline",
-              "actions": "adaptive"
-            }
+            ]
           },
           "initialState": {
             "nluTeacherTab": "requests"

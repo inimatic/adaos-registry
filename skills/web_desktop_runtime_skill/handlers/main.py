@@ -3,8 +3,9 @@ from __future__ import annotations
 from copy import deepcopy
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
-from threading import Lock
+from threading import Lock, RLock
 from time import monotonic
 from typing import Any
 
@@ -12,14 +13,149 @@ from adaos.sdk import access as sdk_access
 from adaos.sdk import applications as sdk_applications
 from adaos.sdk import control_plane as sdk_control_plane
 from adaos.sdk import system as sdk_system
-from adaos.sdk.core.decorators import tool
+from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import access_links as sdk_access_links
+from adaos.sdk.data import device_access as sdk_device_access
 from adaos.sdk.data import profile as sdk_profile
+from adaos.sdk.data.blob import put_upload
 from adaos.sdk.web import (
     application_get_pinned_panels,
     application_set_pinned_panels,
     desktop_get_pinned_applications,
 )
+
+from .operational import project as _project_operational_dashboard
+from .operational import number as _operational_number
+
+
+_MAX_DEVICE_INVENTORY_PAGE_SIZE = 500
+
+
+@subscribe("webio.stream.snapshot.requested")
+def on_webio_stream_snapshot_requested(event: Any) -> None:
+    from .system_stream import snapshot_requested
+    from .system_bootstrap_stream import snapshot_requested as bootstrap_snapshot_requested
+
+    snapshot_requested(event)
+    bootstrap_snapshot_requested(event)
+
+
+@subscribe("webio.stream.subscription.changed")
+def on_webio_stream_subscription_changed(event: Any) -> None:
+    from .system_stream import subscription_changed
+    from .system_bootstrap_stream import subscription_changed as bootstrap_subscription_changed
+
+    subscription_changed(event)
+    bootstrap_subscription_changed(event)
+
+
+@subscribe("root.subscription.changed")
+@subscribe("economic.subscription.changed")
+@subscribe("subscription.usage.changed")
+def on_root_subscription_changed(event: Any) -> None:
+    """Refresh the active System read-model after Root usage changes."""
+    from .system_bootstrap_stream import root_subscription_changed
+
+    root_subscription_changed(event)
+
+
+_SYSTEM_LIFECYCLE_LOCK = RLock()
+
+
+def _drain_system_publishers(*, reason: str) -> dict[str, Any]:
+    with _SYSTEM_LIFECYCLE_LOCK:
+        return _drain_system_publishers_locked(reason=reason)
+
+
+def _drain_system_publishers_locked(*, reason: str) -> dict[str, Any]:
+    """Stop every thread owned by this runtime before replacement."""
+    from .system_bootstrap_stream import drain_refresh, stop_refresh
+    from .system_stream import drain_workers, stop_workers
+
+    stop_workers()
+    stop_refresh()
+    hardware = drain_workers()
+    subscription = drain_refresh()
+    return {
+        "ok": not hardware.get("alive") and not subscription.get("worker_alive"),
+        "reason": str(reason or "runtime_draining"),
+        "hardware": hardware,
+        "subscription": subscription,
+    }
+
+
+@tool("web_desktop_runtime_drain")
+def web_desktop_runtime_drain(reason: str = "drain", **_: Any) -> dict[str, Any]:
+    return _drain_system_publishers(reason=reason)
+
+
+@tool("web_desktop_runtime_dispose")
+def web_desktop_runtime_dispose(reason: str = "dispose", **_: Any) -> dict[str, Any]:
+    return _drain_system_publishers(reason=reason)
+
+
+@tool("web_desktop_runtime_rehydrate")
+def web_desktop_runtime_rehydrate(reason: str = "rehydrate", **_: Any) -> dict[str, Any]:
+    """Re-enable demand publishers after a verified runtime cutover."""
+
+    from .system_bootstrap_stream import rehydrate_refresh
+    from .system_stream import rehydrate_workers
+
+    with _SYSTEM_LIFECYCLE_LOCK:
+        drained = _drain_system_publishers(reason=reason)
+        if not drained["ok"]:
+            return {**drained, "reason": "workers_still_draining"}
+        hardware = rehydrate_workers()
+        subscription = rehydrate_refresh()
+    return {
+        "ok": bool(hardware.get("ok")) and bool(subscription.get("ok")),
+        "reason": str(reason or "runtime_rehydrated"),
+        "hardware": hardware,
+        "subscription": subscription,
+    }
+
+
+@tool("rename_subnet", summary="Persist the current subnet display name.", stability="experimental")
+def rename_subnet(display_name: str) -> dict[str, Any]:
+    sdk_access.require("workspace.write")
+    if not isinstance(display_name, str) or not 1 <= len(display_name.strip()) <= 120:
+        raise ValueError("display_name_invalid")
+    return sdk_system.rename_local_subnet(display_name.strip())
+
+
+@tool("get_current_builder_application", summary="Read the current Builder selection.", stability="experimental")
+def get_current_builder_application() -> dict[str, Any]:
+    from .builder import get_current_builder_application as read_current
+    return read_current()
+
+
+@tool("get_subscription_usage", summary="Read rolling subscription token usage.", stability="experimental")
+def get_subscription_usage(webspace_id: str | None = None, refresh: bool = False) -> dict[str, Any]:
+    from .usage import get_subscription_usage as read_usage
+
+    return read_usage(webspace_id=webspace_id, refresh=refresh)
+
+@tool("request_core_update", summary="Request the governed Core release.", stability="experimental")
+def request_core_update(target_node_id: str) -> dict[str, Any]:
+    # Core ingress consumes target_node_id and routes before this local call.
+    from .updates import request_core_update as request_update
+    return request_update()
+
+
+@tool("rename_selected_node", summary="Rename the ingress-selected member node.", stability="experimental")
+def rename_selected_node(target_node_id: str, display_name: str) -> dict[str, Any]:
+    # Core ingress consumes target_node_id and routes before this local call.
+    if not str(target_node_id or "").strip():
+        raise ValueError("target_node_id_required")
+    from .nodes import rename_selected_node as rename_node
+    return rename_node(display_name)
+
+
+@tool("set_core_autoupdate", summary="Set governed Core autoupdate.", stability="experimental")
+def set_core_autoupdate(target_node_id: str, enabled: bool) -> dict[str, Any]:
+    from .updates import set_core_autoupdate as set_autoupdate
+    return set_autoupdate(enabled)
+
 
 _PREFERENCE_FIELDS: dict[str, str] = {
     "startDestination": "start_destination",
@@ -35,11 +171,14 @@ _PREFERENCE_FIELDS: dict[str, str] = {
     "notifyDeviceStatus": "notify_device_status",
     "quietHours": "quiet_hours",
     "notifyAppUpdates": "notify_application_updates",
+    "showProjects": "show_projects",
     "autoUpdate": "auto_update",
     "followPrerelease": "follow_prerelease",
     "updateWindow": "update_window",
     "meteredDownloads": "metered_downloads",
     "shareTelemetry": "share_telemetry",
+    "participateDevelopment": "participate_application_development",
+    "sendDiagnostics": "send_diagnostics_to_developer",
     "activityRetention": "activity_retention_days",
 }
 
@@ -55,22 +194,20 @@ _PREFERENCE_DEFAULTS: dict[str, Any] = {
     "notifyDeviceStatus": True,
     "quietHours": "off",
     "notifyAppUpdates": True,
+    "showProjects": False,
     "autoUpdate": True,
     "followPrerelease": False,
     "updateWindow": "any",
     "meteredDownloads": False,
     "shareTelemetry": False,
+    "participateDevelopment": False,
+    "sendDiagnostics": False,
     "activityRetention": "90",
 }
 
 _START_DESTINATIONS = {
     "home",
-    "devices",
     "chat",
-    "activity",
-    "settings",
-    "system",
-    "dev",
 }
 
 _APPLICATION_CACHE_TTL_SECONDS = 15.0
@@ -78,9 +215,15 @@ _APPLICATION_CACHE_LOCK = Lock()
 _APPLICATION_CACHE: tuple[float, tuple[dict[str, Any], ...]] | None = None
 _PROFILE_FIELDS: dict[str, str] = {
     "profileName": "display_name",
+    "email": "email",
     "timeZone": "timezone",
     "language": "language",
+    "avatarRef": "avatar_ref",
 }
+_PROFILE_AVATAR_FIELD_ID = "avatar_ref"
+_PROFILE_AVATAR_MAX_BYTES = 2 * 1024 * 1024
+_SHA256_REF_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+_SAFE_FILENAME_RE = re.compile(r"^[^/\\:\x00-\x1f\x7f]{1,200}$")
 
 
 def _application_id(value: Any) -> str:
@@ -190,6 +333,230 @@ def _device_is_active(item: dict[str, Any]) -> bool:
     )
 
 
+def _device_slug(value: Any) -> str:
+    return "-".join(
+        "".join(
+            character if character.isalnum() else " "
+            for character in _string(value).casefold()
+        ).split()
+    )
+
+
+def _browser_zone(item: dict[str, Any]) -> str:
+    explicit = _string(item.get("browser_zone")).upper()
+    if explicit:
+        return explicit
+    origin = _string(item.get("browser_origin")).casefold()
+    if any(token in origin for token in ("127.0.0.1", "localhost", "[::1]")):
+        return "LO"
+    return "RU"
+
+
+def _browser_representation_key(item: dict[str, Any]) -> tuple[str, str, str, str]:
+    identity = _browser_identity(item.get("id"))
+    parent = identity.split("::", 1)[0]
+    webspace = _first_string(*(item.get("workspace_ids") or []), "desktop")
+    return (
+        parent,
+        _browser_zone(item),
+        webspace.casefold(),
+        _string(item.get("browser_origin")).casefold(),
+    )
+
+
+def _collapse_browser_representations(
+    items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Expose one addressable endpoint per zone/webspace representation."""
+
+    pages = [item for item in items if "::" in _browser_identity(item.get("id"))]
+    if not pages:
+        return items
+    parents_with_pages = {
+        _browser_identity(item.get("id")).split("::", 1)[0] for item in pages
+    }
+    selected: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for item in pages:
+        key = _browser_representation_key(item)
+        previous = selected.get(key)
+        if previous is None or (
+            bool(item.get("current")),
+            _timestamp_value(item.get("last_seen")),
+        ) > (
+            bool(previous.get("current")),
+            _timestamp_value(previous.get("last_seen")),
+        ):
+            selected[key] = item
+    standalone = [
+        item
+        for item in items
+        if "::" not in _browser_identity(item.get("id"))
+        and _browser_identity(item.get("id")) not in parents_with_pages
+    ]
+    return [*standalone, *selected.values()]
+
+
+def _device_tree_items(
+    items: list[dict[str, Any]],
+    *,
+    subnet: dict[str, Any] | None = None,
+    subject: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    node_endpoints = [
+        dict(item) for item in items if item.get("device_type") != "browser"
+    ]
+    browser_endpoints = _collapse_browser_representations(
+        [dict(item) for item in items if item.get("device_type") == "browser"]
+    )
+    subnet_info = _mapping(subnet)
+    subnet_id = _string(subnet_info.get("subnet_id"))
+    subnet_name = _string(subnet_info.get("display_name"))
+    subject_info = _mapping(subject)
+    subject_id = _string(subject_info.get("id"))
+    subject_node_token = subject_id.split(":", 1)[-1].casefold()
+
+    physical_roots: dict[str, dict[str, Any]] = {}
+    endpoint_parent: dict[str, str] = {}
+    root_by_title: dict[str, str] = {}
+
+    for endpoint in node_endpoints:
+        endpoint_id = _string(endpoint.get("id"))
+        physical_name = _first_string(
+            endpoint.get("hostname"),
+            *(endpoint.get("node_names") or []),
+            endpoint.get("title"),
+            endpoint_id,
+            "Device",
+        )
+        root_id = f"physical-device:{_device_slug(physical_name) or _device_slug(endpoint_id) or 'local'}"
+        physical_roots.setdefault(
+            root_id,
+            {
+                "id": root_id,
+                "title": physical_name,
+                "summary": "Physical OS device",
+                "kind": "physical_device",
+                "status": endpoint.get("status") or "unknown",
+                "source": "device_inventory",
+                "last_seen": endpoint.get("last_seen") or "",
+                "version": "",
+                "location": endpoint.get("location") or "",
+                "current": bool(endpoint.get("current")),
+                "device_type": "physical_device",
+                "connection": endpoint.get("connection") or "",
+                "route_mode": endpoint.get("route_mode") or "",
+                "workspace_ids": [],
+                "owner": endpoint.get("owner") or "",
+                "parent_device_id": "",
+                "can_accept_endpoints": True,
+                "can_move_endpoint": False,
+                "can_rename": False,
+                "icon": "desktop-outline",
+            },
+        )
+        for key in (
+            endpoint_id,
+            _string(endpoint.get("device_ref")),
+            _string(endpoint.get("title")),
+            physical_name,
+        ):
+            if key:
+                endpoint_parent[key.casefold()] = root_id
+        root_by_title[physical_name.casefold()] = root_id
+        endpoint["parent_device_id"] = root_id
+        endpoint["can_accept_endpoints"] = False
+        endpoint["can_move_endpoint"] = False
+        endpoint["icon"] = "server-outline"
+        endpoint_kind = (
+            "Hub"
+            if _string(endpoint.get("route_mode")).casefold() == "hub"
+            or "hub" in endpoint_id.casefold()
+            or bool(
+                subject_node_token
+                and subject_node_token
+                == _first_string(endpoint.get("node_id"), endpoint_id)
+                .split(":", 1)[-1]
+                .casefold()
+            )
+            else "Node"
+        )
+        endpoint_ref = subnet_id if endpoint_kind == "Hub" and subnet_id else (
+            _string(endpoint.get("node_id")) or endpoint_id.split(":")[-1]
+        )
+        endpoint_name = subnet_name if endpoint_kind == "Hub" and subnet_name else _string(endpoint.get("title"))
+        endpoint["title"] = f"RU:{endpoint_kind}:{endpoint_ref}"
+        if endpoint_name and endpoint_name.casefold() != endpoint_ref.casefold():
+            endpoint["title"] += f" ({endpoint_name})"
+
+    online_physical_roots = [
+        root_id
+        for root_id, root in physical_roots.items()
+        if _string(root.get("status")).casefold() == "online"
+    ]
+    # Older browser-link records predate explicit OS/parent metadata.  When
+    # exactly one OS device is online, it is the only safe automatic parent;
+    # offline phones and retired nodes must not force an artificial
+    # "Browser device" root.  New records keep using their explicit parent.
+    fallback_root_id = (
+        next(iter(physical_roots), "")
+        if len(physical_roots) == 1
+        else online_physical_roots[0]
+        if len(online_physical_roots) == 1
+        else ""
+    )
+    for endpoint in browser_endpoints:
+        parent_ref = _string(endpoint.get("parent_device_ref"))
+        device_name = _string(endpoint.get("device_display_name"))
+        parent = (
+            endpoint_parent.get(parent_ref.casefold(), "")
+            or endpoint_parent.get(device_name.casefold(), "")
+            or root_by_title.get(device_name.casefold(), "")
+            or fallback_root_id
+        )
+        if not parent:
+            physical_name = device_name or _first_string(
+                endpoint.get("os_name"), "Browser device"
+            )
+            parent = f"physical-device:{_device_slug(physical_name) or 'browser'}"
+            physical_roots.setdefault(
+                parent,
+                {
+                    "id": parent,
+                    "title": physical_name,
+                    "summary": "Physical OS device",
+                    "kind": "physical_device",
+                    "status": endpoint.get("status") or "unknown",
+                    "source": "browser_identity",
+                    "last_seen": endpoint.get("last_seen") or "",
+                    "version": "",
+                    "location": "",
+                    "current": bool(endpoint.get("current")),
+                    "device_type": "physical_device",
+                    "connection": endpoint.get("connection") or "",
+                    "route_mode": "",
+                    "workspace_ids": [],
+                    "owner": "",
+                    "parent_device_id": "",
+                    "can_accept_endpoints": True,
+                    "can_move_endpoint": False,
+                    "can_rename": False,
+                    "icon": "desktop-outline",
+                },
+            )
+        webspace = _first_string(*(endpoint.get("workspace_ids") or []), "desktop")
+        browser_name = _first_string(
+            endpoint.get("endpoint_display_name"),
+            endpoint.get("title"),
+            "Browser",
+        )
+        endpoint["title"] = f"{_browser_zone(endpoint)}:Browser:{webspace} ({browser_name})"
+        endpoint["parent_device_id"] = parent
+        endpoint["can_move_endpoint"] = True
+        endpoint["can_accept_endpoints"] = False
+        endpoint["icon"] = "globe-outline"
+    return [*physical_roots.values(), *node_endpoints, *browser_endpoints]
+
+
 def _browser_identity(value: Any) -> str:
     token = _string(value)
     for prefix in ("device:", "browser:"):
@@ -202,13 +569,27 @@ def _browser_link_item(value: Any) -> dict[str, Any]:
     item = _mapping(value)
     browser_id = _browser_identity(item.get("id"))
     status = "online" if _bool_value(item.get("online")) else "offline"
+    is_page_endpoint = "::page_" in browser_id
+    parent_policy: dict[str, Any] = {}
+    if is_page_endpoint:
+        parent_id = browser_id.split("::", 1)[0]
+        try:
+            parent_policy = _mapping(sdk_access_links.get_browser_link(parent_id))
+        except Exception:
+            parent_policy = {}
     endpoint_name = _first_string(
+        parent_policy.get("endpoint_display_name") if is_page_endpoint else None,
+        parent_policy.get("endpoint_title") if is_page_endpoint else None,
+        parent_policy.get("display_name") if is_page_endpoint else None,
         item.get("endpoint_display_name"),
         item.get("endpoint_title"),
         item.get("display_name"),
         item.get("draft_name"),
     )
-    device_name = _first_string(item.get("device_display_name"))
+    device_name = _first_string(
+        item.get("device_display_name"),
+        parent_policy.get("device_display_name"),
+    )
     access_class = _first_string(item.get("access_class"), "device").casefold()
     title = _first_string(
         item.get("title"),
@@ -221,11 +602,28 @@ def _browser_link_item(value: Any) -> dict[str, Any]:
         "Browser",
     )
     webspace_id = _first_string(item.get("last_webspace_id"))
+    browser_origin = _first_string(item.get("browser_origin"))
+    browser_zone = _first_string(item.get("browser_zone"))
+    if is_page_endpoint:
+        page_id = browser_id.rsplit("::", 1)[-1]
+        representation = " · ".join(
+            value for value in (webspace_id, browser_zone, browser_origin) if value
+        )
+        title = f"{endpoint_name or 'Browser tab'}"
+        if representation:
+            title += f" · {representation}"
+        title += f" · {page_id[-8:]}"
     details = [access_class]
+    if webspace_id:
+        details.append(f"webspace: {webspace_id}")
     if device_name and device_name.casefold() != title.casefold():
         details.append(device_name)
     if endpoint_name and endpoint_name.casefold() != title.casefold():
         details.append(endpoint_name)
+    if browser_zone:
+        details.append(f"zone: {browser_zone}")
+    if browser_origin:
+        details.append(f"origin: {browser_origin}")
     return {
         "id": f"browser:{browser_id}",
         "title": title,
@@ -247,6 +645,10 @@ def _browser_link_item(value: Any) -> dict[str, Any]:
         "access_class": access_class,
         "device_display_name": device_name,
         "endpoint_display_name": endpoint_name,
+        "browser_origin": browser_origin,
+        "browser_zone": browser_zone,
+        "os_name": _first_string(item.get("os_name")),
+        "parent_device_ref": _first_string(item.get("parent_device_ref")),
     }
 
 
@@ -305,6 +707,18 @@ def _canonical_item(value: Any, *, source: str) -> dict[str, Any]:
         "route_mode": _first_string(runtime.get("route_mode")),
         "workspace_ids": workspace_ids,
         "owner": _first_string(governance.get("owner_id")),
+        "hostname": _first_string(actual.get("hostname")),
+        "node_names": [
+            _string(name)
+            for name in list(actual.get("node_names") or [])
+            if _string(name)
+        ],
+        "node_id": _first_string(actual.get("device_ref"), item.get("node_id")),
+        "device_ref": _first_string(actual.get("device_ref")),
+        "device_display_name": _first_string(actual.get("device_display_name")),
+        "endpoint_display_name": _first_string(actual.get("endpoint_display_name")),
+        "os_name": _first_string(actual.get("os_name")),
+        "parent_device_ref": _first_string(actual.get("parent_device_ref")),
     }
 
 
@@ -320,6 +734,8 @@ def _preference_record(
         "profileName": _first_string(
             profile.get("display_name"), profile.get("user_id")
         ),
+        "email": _first_string(profile.get("email")),
+        "avatarRef": _first_string(profile.get("avatar_ref")),
         "timeZone": _first_string(
             profile.get("timezone"), preferences.get("timezone"), "UTC"
         ),
@@ -347,21 +763,19 @@ def _preference_record(
             selected_webspace,
         )
     if not _string(record.get("deviceLabel")):
+        controller_token = _controller_device_token(controller_endpoint_id)
         try:
-            devices = list_devices(
-                webspace_id=selected_webspace or None,
-                controller_endpoint_id=controller_endpoint_id,
-                status="all",
-                limit=200,
-            ).get("items", [])
+            link = (
+                sdk_access_links.get_browser_link(controller_token)
+                if controller_token else {}
+            )
+            current = _browser_link_item(link) if link else {}
         except Exception:
-            devices = []
-        current = next(
-            (item for item in devices if _bool_value(_mapping(item).get("current"))),
-            None,
-        )
+            current = {}
         record["deviceLabel"] = _first_string(
-            _mapping(current).get("title"), "Current browser"
+            _mapping(current).get("endpoint_display_name"),
+            _mapping(current).get("title"),
+            "Current browser",
         )
     if record.get("startDestination") not in _START_DESTINATIONS:
         record["startDestination"] = "home"
@@ -475,6 +889,7 @@ def _project_application(model: dict[str, Any]) -> dict[str, Any]:
         application.get("ref"),
         application.get("slug"),
     )
+    application_kind = _first_string(application.get("kind"), "application")
     return {
         "id": application_id,
         "title": _first_string(
@@ -492,6 +907,8 @@ def _project_application(model: dict[str, Any]) -> dict[str, Any]:
             model.get("icon"), application.get("icon"), "apps-outline"
         ),
         "publisher": _publisher(application),
+        "application_kind": application_kind,
+        "owner_application_id": _first_string(application.get("owner_application_id")),
         "categories": categories,
         "category": _first_string(
             application.get("category"), categories[0] if categories else ""
@@ -631,6 +1048,10 @@ def _read_application_models(
                 available_only=False,
                 developed_only=False,
                 include_development=False,
+                # Cache the complete authoritative set. Consumer preferences
+                # are applied after the snapshot so explicit Home membership
+                # remains stronger than discovery visibility.
+                include_projects=True,
             )
             records = _application_records(records)
             _APPLICATION_CACHE = (monotonic(), tuple(records))
@@ -688,6 +1109,7 @@ def list_applications(
     available_only: bool = False,
     developed_only: bool = False,
     launchable_only: bool = False,
+    include_projects: bool | None = None,
     application_id: str | None = None,
     require_selection: bool = False,
     query: str | None = None,
@@ -702,6 +1124,15 @@ def list_applications(
     available_filter = _bool_value(available_only)
     developed_filter = _bool_value(developed_only)
     launchable_filter = _bool_value(launchable_only)
+    if include_projects is None:
+        try:
+            show_projects = _bool_value(
+                _preference_record(webspace_id=webspace_id).get("showProjects")
+            )
+        except Exception:
+            show_projects = False
+    else:
+        show_projects = _bool_value(include_projects)
     selected_id = _string(application_id)
     if _bool_value(require_selection) and not selected_id:
         return _empty_collection()
@@ -732,6 +1163,8 @@ def list_applications(
         item["home_order"] = pinned_order.get(item["id"], 0)
     if selected_id:
         items = [item for item in items if item["id"] == selected_id]
+    if not show_projects and not pinned_filter:
+        items = [item for item in items if item["application_kind"] != "project"]
     if pinned_filter:
         items = [item for item in items if item["pinned"]]
     if installed_filter:
@@ -781,59 +1214,32 @@ def list_applications(
 @tool("get_runtime_controls", summary="Read operator controls and Rasa service state.", stability="experimental")
 async def get_runtime_controls(**_: Any) -> dict[str, Any]:
     sdk_access.require("workspace.read")
-    from adaos.services.nlu.rasa_skill_installer import is_rasa_nlu_enabled
-    from adaos.services.operator_controls import read_controls
-    from adaos.services.skill.service_supervisor import get_service_supervisor
-
-    controls = read_controls()
-    supervisor = get_service_supervisor()
-    try:
-        await supervisor.refresh_discovered(force=True)
-        rasa = supervisor.status("rasa_nlu_service_skill", check_health=True)
-    except Exception as exc:
-        rasa = {"running": False, "error": f"{type(exc).__name__}: {exc}"}
-    return {"ok": True, "item": {
+    snapshot = sdk_system.get_runtime_controls()
+    controls = _mapping(snapshot.get("controls"))
+    rasa = _mapping(snapshot.get("rasa"))
+    return {"ok": snapshot.get("ok", True), "item": {
         **controls,
-        "effective_log_level": logging.getLevelName(logging.getLogger("adaos").level),
-        "rasa_configured": bool(is_rasa_nlu_enabled()),
-        "rasa_installed": bool(rasa),
-        "rasa_running": bool((rasa or {}).get("running") or (rasa or {}).get("external_ready")),
-        "rasa_health": (rasa or {}).get("health_ok"),
-        "rasa_env_mode": (rasa or {}).get("env_mode"),
-        "rasa_version_profile": "lightweight",
-        "diet_profile": "deferred",
+        **{"rasa_" + key: rasa.get(source) for key, source in {
+            "configured": "configured", "installed": "installed",
+            "running": "running", "health": "health",
+            "env_mode": "environment", "version_profile": "version_profile",
+            "availability": "availability",
+        }.items()},
+        "diet_profile": rasa.get("diet_profile"),
     }}
 
 
 @tool("set_runtime_control", summary="Apply an owner-governed runtime control.", stability="experimental")
 async def set_runtime_control(control: str, value: Any = None, **_: Any) -> dict[str, Any]:
     sdk_access.require("workspace.write")
-    from adaos.services.nlu.rasa_skill_installer import ensure_rasa_service_skill_installed
-    from adaos.services.operator_controls import update_controls
-    from adaos.services.skill.service_supervisor import get_service_supervisor
-
-    selected = _string(control).casefold()
-    if selected == "rasa_install":
-        target = await asyncio.to_thread(ensure_rasa_service_skill_installed)
-        await get_service_supervisor().refresh_discovered(force=True)
-        result = {"installed": True, "path": str(target) if target else None}
-    elif selected in {"rasa_enabled", "core_auto_update", "application_auto_update_default"}:
-        enabled = _bool_value(value)
-        controls = update_controls({selected: enabled})
-        if selected == "rasa_enabled":
-            supervisor = get_service_supervisor()
-            if enabled:
-                await asyncio.to_thread(ensure_rasa_service_skill_installed)
-                await supervisor.refresh_discovered(force=True)
-                await supervisor.start("rasa_nlu_service_skill")
-            else:
-                await supervisor.stop("rasa_nlu_service_skill")
-        result = {selected: enabled, "controls": controls}
-    elif selected == "log_level":
-        result = {"controls": update_controls({"log_level": value})}
-    else:
+    invocation = sdk_access.invocation()
+    request_id = invocation.get("request_id") if isinstance(invocation, dict) else None
+    if not isinstance(request_id, str) or not request_id.strip() or len(request_id) > 160:
+        raise ValueError("invocation_request_id_missing")
+    if control not in {"rasa_install", "rasa_enabled", "log_level",
+                       "core_auto_update", "application_auto_update_default"}:
         return {"ok": False, "error": "unsupported_runtime_control"}
-    return {"ok": True, "control": selected, **result}
+    return sdk_system.set_runtime_control(request_id=request_id, control=control, value=value)
 
 
 @tool(
@@ -896,10 +1302,15 @@ def list_devices(
     selected_id = _string(device_id)
     if _bool_value(require_selection) and not selected_id:
         return _empty_collection()
+    status_token = _string(status).casefold()
     try:
         canonical_devices = [
             _canonical_item(item, source="device")
-            for item in sdk_control_plane.list_device_objects()
+            for item in sdk_control_plane.list_device_objects(
+                status=status_token if status_token in {"active", "offline"} else None,
+                include_detached=status_token == "offline",
+                limit=min(_MAX_DEVICE_INVENTORY_PAGE_SIZE, max(40, _bounded_limit(limit) * 4)),
+            )
         ]
         canonical_browsers = [
             _canonical_item(item, source="browser_session")
@@ -921,6 +1332,16 @@ def list_devices(
         devices = [
             item for item in canonical_devices if item.get("device_type") != "browser"
         ] + list(browser_items.values())
+        try:
+            topology = _mapping(
+                sdk_system.get_operational_snapshot(
+                    sections=["summary"],
+                    webspace_id=webspace_id,
+                    limit=1,
+                )
+            )
+        except Exception:
+            topology = {}
     except Exception as exc:  # pragma: no cover - exercised through public SDK mock
         return {
             "ok": False,
@@ -942,19 +1363,36 @@ def list_devices(
         )
         if is_browser and _bool_value(webspace_only) and not belongs_to_webspace:
             continue
-        item["current"] = bool(
-            item["current"]
-            or (
-                controller_device_token
-                and controller_device_token in _string(item["id"])
+        item_identity = _browser_identity(item["id"]) if is_browser else ""
+        controller_matches = bool(
+            controller_device_token
+            and (
+                item_identity == controller_device_token
+                or (
+                    "::" in controller_device_token
+                    and item_identity == controller_device_token
+                )
             )
         )
+        item["current"] = bool(item["current"] or controller_matches)
         if item["current"] and item["title"] in item["id"]:
             item["title"] = (
-                "Current browser tab"
+                f"{(item['workspace_ids'][0] if item['workspace_ids'] else 'Current')} · browser tab"
                 if "::page_" in item["id"]
                 else "Current browser"
             )
+        elif is_browser and "::page_" in item["id"] and item["title"] in item["id"]:
+            item["title"] = f"{(item['workspace_ids'][0] if item['workspace_ids'] else 'Browser')} · tab"
+        # Find addresses the selected page endpoint.  It is not restricted to
+        # the Management page's own webspace: another open representation is a
+        # valid target and Core already knows its last observed webspace.
+        item["can_locate"] = (
+            is_browser
+            and "::" in _browser_identity(item.get("id"))
+            and _device_is_active(item)
+        )
+        item["can_open_system"] = not is_browser
+        item["can_rename"] = True
         items.append(item)
     if selected_id:
         items = [item for item in items if item["id"] == selected_id]
@@ -974,7 +1412,6 @@ def list_devices(
                 ]
             ).casefold()
         ]
-    status_token = _string(status).casefold()
     if status_token == "active":
         items = [item for item in items if _device_is_active(item)]
     elif status_token == "offline":
@@ -988,6 +1425,12 @@ def list_devices(
             item["id"],
         )
     )
+    if not selected_id:
+        items = _device_tree_items(
+            items,
+            subnet=_mapping(topology.get("subnet")),
+            subject=_mapping(topology.get("subject")),
+        )
     total = len(items)
     items = items[: _bounded_limit(limit)]
     result: dict[str, Any] = {
@@ -1007,6 +1450,121 @@ def list_devices(
 
 
 @tool(
+    "rename_device",
+    summary="Rename one managed device or browser endpoint through the Management-owned local contract.",
+    stability="experimental",
+)
+def rename_device(
+    device_ref: str,
+    name: str,
+    **_: Any,
+) -> dict[str, Any]:
+    sdk_access.require("workspace.write")
+    token = _string(device_ref)
+    display_name = _string(name)
+    if not token or token.startswith("physical-device:"):
+        return {"ok": False, "error": "managed_endpoint_required"}
+    if not display_name or len(display_name) > 120:
+        return {"ok": False, "error": "browser_name_invalid"}
+    # Page ids identify representations. The user-facing browser name belongs
+    # to their durable parent endpoint and is inherited by every representation.
+    target_ref = token.split("::", 1)[0] if token.startswith("browser:") else token
+    return sdk_device_access.rename_device(target_ref, display_name)
+
+
+@tool(
+    "assign_device_endpoint",
+    summary="Assign a browser endpoint to a physical device in the device inventory.",
+    stability="experimental",
+)
+def assign_device_endpoint(
+    endpoint_ref: str,
+    parent_device_ref: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    sdk_access.require("workspace.write")
+    return sdk_device_access.assign_browser_parent_device(
+        _string(endpoint_ref),
+        _string(parent_device_ref) or None,
+    )
+
+
+@tool(
+    "identify_device",
+    summary="Ask a selected browser endpoint to identify itself to the user.",
+    stability="experimental",
+)
+def identify_device(
+    device_ref: str,
+    webspace_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    """Expose the Core device signal through the Project-owned runtime contract."""
+
+    sdk_access.require("workspace.read")
+    token = _string(device_ref)
+    if not token:
+        raise ValueError("device_ref_required")
+    return sdk_device_access.identify_device(
+        token,
+        webspace_id=_string(webspace_id) or None,
+    )
+
+
+def _activity_content(projection: dict[str, Any]) -> str:
+    items = [item for item in list(projection.get("items") or []) if isinstance(item, dict)]
+    if projection.get("available") is not True:
+        return "Recent system activity is unavailable."
+    if not items:
+        return "No recent user-impacting system activity."
+    lines = []
+    for item in items[:20]:
+        occurred = _string(item.get("recorded_at")) or "Time unavailable"
+        summary = _string(item.get("summary")) or "System activity"
+        status = _string(item.get("status"))
+        lines.append(f"{occurred} — {summary}" + (f" ({status})" if status else ""))
+    return "\n".join(lines)
+
+
+def _technical_content(projection: dict[str, Any]) -> str:
+    if projection.get("available") is not True:
+        return "Technical details are unavailable."
+    identifiers = _mapping(projection.get("identifiers"))
+    runtime = _mapping(projection.get("runtime"))
+    capacity = _mapping(runtime.get("capacity"))
+    connectivity = _mapping(projection.get("connectivity"))
+    update = _mapping(projection.get("update"))
+    capacity_bits = []
+    for key, label in (
+        ("active_skill_total", "active skills"),
+        ("active_scenario_total", "active scenarios"),
+        ("skill_total", "installed skills"),
+        ("scenario_total", "installed scenarios"),
+    ):
+        if capacity.get(key) is not None:
+            capacity_bits.append(f"{capacity[key]} {label}")
+    ready, observed = connectivity.get("ready"), connectivity.get("observed")
+    connection_summary = _string(connectivity.get("status")) or "unknown"
+    if type(ready) is int and type(observed) is int:
+        connection_summary += f" · {ready} of {observed} ready"
+    update_summary = _string(update.get("state") or update.get("phase")) or "unavailable"
+    if _string(update.get("message")):
+        update_summary += f" · {_string(update.get('message'))}"
+    return "\n".join(
+        [
+            f"Node: {_string(identifiers.get('node_id')) or 'unavailable'}",
+            f"Subnet: {_string(identifiers.get('subnet_id')) or 'unavailable'}",
+            f"Webspace: {_string(identifiers.get('webspace_id')) or 'unavailable'}",
+            f"Runtime: {_string(runtime.get('status')) or 'unknown'}"
+            + (f" · version {_string(runtime.get('version'))}" if _string(runtime.get("version")) else ""),
+            "Capacity: " + (", ".join(capacity_bits) if capacity_bits else "unavailable"),
+            f"Connectivity: {connection_summary}",
+            f"Core update: {update_summary}",
+        ]
+    )
+
+
+@tool(
     "get_system_overview",
     summary="Read the real local system and reliability projections.",
     stability="experimental",
@@ -1015,27 +1573,46 @@ def list_devices(
 def get_system_overview(
     webspace_id: str | None = None,
     section: str | None = None,
+    target_node_id: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
     sdk_access.require("workspace.read")
     selected_section = _string(section).casefold()
     sdk_sections: set[str] = {"summary"}
     if selected_section in {"", "all"}:
-        sdk_sections = {"all"}
+        sdk_sections = {"summary", "services", "connections", "quotas", "incidents",
+                        "update", "applications", "resources", "members"}
     elif selected_section in {"services", "connections", "quotas", "incidents", "update"}:
         sdk_sections.add(selected_section)
+    elif selected_section == "metrics":
+        sdk_sections.add("resources")
+    elif selected_section in {"applications", "members", "skills", "development", "activity", "technical"}:
+        sdk_sections.add(selected_section)
+    elif selected_section == "subnet":
+        sdk_sections.update({"members", "development"})
+    elif selected_section in {"dashboard", "system_bootstrap"}:
+        sdk_sections.update({"members", "applications", "development"})
+    elif selected_section == "node_dashboard":
+        sdk_sections.update({"applications", "skills", "update", "resources", "incidents"})
+    elif selected_section in {"current_node", "update"}:
+        sdk_sections.add("applications")
+        if selected_section == "update":
+            sdk_sections.add("update")
     try:
         snapshot = sdk_system.get_operational_snapshot(
             sections=sdk_sections,
             webspace_id=webspace_id,
             limit=40,
         )
-    except Exception as exc:  # pragma: no cover - exercised through public SDK mock
+        if not isinstance(snapshot, dict) or snapshot.get("ok") is False:
+            raise ValueError("system_snapshot_unavailable")
+    except Exception:  # Transport details are not a browser-facing diagnostic.
         return {
             "ok": False,
             "error": "system_overview_failed",
-            "message": str(exc)
-            or "Control-plane SDK failed while reading system status.",
+            "message": "System status is unavailable. Retry when the node is connected.",
+            "metrics": {}, "items": [], "count": 0, "total": 0,
+            "empty": True, "truncated": False,
             "subject": {},
             "services": [],
             "connections": [],
@@ -1062,25 +1639,58 @@ def get_system_overview(
     ]
     incidents = [item for item in list(snapshot.get("incidents") or []) if isinstance(item, dict)]
     update = _mapping(snapshot.get("update"))
+    resources = _mapping(snapshot.get("resources"))
+    applications = [
+        _canonical_item(item, source="application_registry")
+        | {
+            "version": _string(item.get("version")),
+            "channel": _string(item.get("channel")),
+            "update_state": _string(item.get("update_state")),
+            "has_update": bool(item.get("has_update")),
+        }
+        for item in list(snapshot.get("applications") or [])
+        if isinstance(item, dict)
+    ]
+    members = [
+        _canonical_item(item, source="subnet_membership")
+        | {
+            "connection": _string(item.get("connection") or item.get("status")),
+            "active": _string(item.get("status") or item.get("connection")).casefold()
+            in {"online", "connected", "heartbeat", "ready"},
+            "is_hub": bool(item.get("is_hub") or item.get("role") == "hub"),
+            "development": bool(item.get("development")),
+            "runtime_channel": _string(item.get("runtime_channel")),
+            "runtime_version": _string(item.get("runtime_version") or item.get("version")),
+        }
+        for item in list(snapshot.get("members") or [])
+        if isinstance(item, dict)
+    ]
+    skills = [
+        _canonical_item(item, source="skill_registry")
+        for item in list(snapshot.get("skills") or [])
+        if isinstance(item, dict)
+    ]
     for collection in (services, connections, quotas):
         collection.sort(
             key=lambda item: (item["kind"], item["title"].casefold(), item["id"])
         )
     capacity_resources = _mapping(capacity.get("resources"))
-    active_skill_total = int(capacity_resources.get("active_skill_total") or 0)
-    active_scenario_total = int(capacity_resources.get("active_scenario_total") or 0)
-    services_loaded = selected_section in {"", "all", "services"}
+    active_skill_total = _operational_number(capacity_resources.get("active_skill_total"))
+    active_scenario_total = _operational_number(capacity_resources.get("active_scenario_total"))
+    capacity_known = active_skill_total is not None and active_scenario_total is not None
+    services_loaded = selected_section in {"", "all", "services"} and isinstance(snapshot.get("services"), list)
     if services_loaded:
         service_value: int | str = len(services)
         service_description = (
             f"{sum(item['status'] == 'online' for item in services)} online"
         )
     else:
-        service_value = active_skill_total + active_scenario_total
+        service_value = active_skill_total + active_scenario_total if capacity_known else "Unavailable"
         service_description = (
             f"{active_skill_total} skills, {active_scenario_total} scenarios"
+            if capacity_known else "Runtime component counts unavailable"
         )
-    incidents_loaded = selected_section in {"", "all", "incidents"}
+    incidents_loaded = selected_section in {"", "all", "incidents", "node_dashboard"} and isinstance(snapshot.get("incidents"), list)
     incident_value: int | str = len(incidents) if incidents_loaded else "--"
     incident_description = (
         "No observed incidents"
@@ -1102,12 +1712,12 @@ def get_system_overview(
             if not services_loaded
             else "Observed services",
             "description": service_description,
-            "color": "success" if not services_loaded or not incidents else "warning",
+            "color": "success" if services_loaded and incidents_loaded and not incidents else "warning",
         },
         "capacity": {
-            "value": active_skill_total,
+            "value": active_skill_total if active_skill_total is not None else "Unavailable",
             "label": "Active skills",
-            "description": f"{active_scenario_total} active scenarios",
+            "description": f"{active_scenario_total} active scenarios" if active_scenario_total is not None else "Scenario count unavailable",
             "color": "primary",
         },
         "incidents": {
@@ -1121,7 +1731,7 @@ def get_system_overview(
             else "primary",
         },
         "connections": {
-            "value": len(connections) if selected_section in {"", "all", "connections"} else "--",
+            "value": len(connections) if selected_section in {"", "all", "connections"} and isinstance(snapshot.get("connections"), list) else "--",
             "label": "Observed connections",
             "description": "Control-plane routes and transports",
             "color": "success"
@@ -1133,12 +1743,27 @@ def get_system_overview(
         "update": {
             "value": _string(update.get("state")) or "--",
             "label": "Core update",
-            "description": _string(update.get("message")) or "No active transition",
+            "description": _string(update.get("message")) or "Update status unavailable",
             "color": "warning"
-            if _string(update.get("state")).casefold() not in {"", "idle", "ready", "succeeded"}
+            if _string(update.get("state")).casefold() not in {"idle", "ready", "succeeded"}
             else "success",
         },
     }
+    resource_freshness = _string(resources.get("freshness")) or "unavailable"
+    resource_available = resources.get("available") is True
+    for metric_id, source_key in (("cpu", "cpu"), ("ram", "memory"), ("disk", "disk")):
+        sample = _mapping(resources.get(source_key))
+        percent = _operational_number(sample.get("percent"))
+        if percent is not None and percent > 100:
+            percent = None
+        metrics[metric_id] = {
+            "value": f"{float(percent):.1f}%" if resource_available and percent is not None else "--",
+            "label": metric_id.upper(),
+            "freshness": resource_freshness,
+            "color": "success"
+            if resource_available and percent is not None and float(percent) < 80
+            else "warning",
+        }
     selected_items: list[dict[str, Any]] = []
     if selected_section == "services":
         selected_items = services[:40]
@@ -1151,6 +1776,8 @@ def get_system_overview(
     result = {
         "ok": True,
         "webspace_id": _string(webspace_id),
+        "subnet": _mapping(snapshot.get("subnet")),
+        "service_summary": _mapping(snapshot.get("service_summary")),
         "subject": subject,
         "services": services[:40]
         if selected_section in {"", "all", "services"}
@@ -1162,9 +1789,21 @@ def get_system_overview(
         if selected_section in {"", "all", "quotas"}
         else [],
         "incidents": incidents[:40]
-        if selected_section in {"", "all", "incidents"}
+        if selected_section in {"", "all", "incidents", "node_dashboard"}
         else [],
-        "update": update if selected_section in {"", "all", "update"} else {},
+        "update": update if selected_section in {"", "all", "update", "node_dashboard"} else {},
+        "applications": applications if selected_section in {"", "all", "applications", "dashboard", "system_bootstrap", "node_dashboard"} else [],
+        "members": members if selected_section in {"", "all", "members", "dashboard", "system_bootstrap"} else [],
+        "member_summary": _mapping(snapshot.get("member_summary")),
+        "application_updates": _mapping(snapshot.get("application_updates")),
+        "skills": skills if selected_section in {"skills", "node_dashboard"} else [],
+        "skill_summary": _mapping(snapshot.get("skill_summary"))
+        if selected_section in {"skills", "node_dashboard"}
+        else {},
+        "update_controls": _mapping(snapshot.get("update_controls"))
+        if selected_section in {"update", "node_dashboard"}
+        else {},
+        "resources": resources if selected_section in {"", "all", "metrics", "node_dashboard"} else {},
         "metrics": metrics,
         "items": selected_items,
         "count": len(selected_items),
@@ -1190,6 +1829,48 @@ def get_system_overview(
             else False
         ),
     }
+    # These projections are section-driven. Technical data is requested only
+    # explicitly, never as part of the first-paint summary.
+    if selected_section in {"development", "dashboard", "system_bootstrap"}:
+        result["development_delivery"] = _mapping(
+            snapshot.get("development_delivery")
+        ) or {"available": False, "freshness": "unavailable"}
+    if selected_section == "activity":
+        raw_activity = snapshot.get("activity")
+        result["activity"] = (
+            [dict(item) for item in raw_activity if isinstance(item, dict)]
+            if isinstance(raw_activity, list)
+            else _mapping(raw_activity)
+            or {"available": False, "freshness": "unavailable", "items": []}
+        )
+    if selected_section == "technical":
+        result["technical"] = _mapping(snapshot.get("technical")) or {
+            "available": False,
+            "freshness": "unavailable",
+        }
+    if selected_section in {"activity", "technical"}:
+        projection = result[selected_section]
+        result["item"] = {
+            **(projection if isinstance(projection, dict) else {}),
+            "content": (
+                _activity_content(projection if isinstance(projection, dict) else {"items": projection})
+                if selected_section == "activity"
+                else _technical_content(projection)
+            ),
+        }
+    if selected_section == "skills":
+        summary = result["skill_summary"]
+        total = summary.get("total")
+        known = summary.get("available") is True and type(total) is int and total >= 0
+        item = {
+            "id": subject.get("id", ""), "status": subject.get("status", "unknown"),
+            "apps_count": total if known else None,
+            "available": known, "freshness": summary.get("freshness", "unavailable"),
+            "observed_at": snapshot.get("observed_at"), "source": summary.get("source"),
+        }
+        result.update(item=item, items=[item] if item["id"] else [],
+                      count=1 if item["id"] else 0, total=1 if item["id"] else 0,
+                      empty=not bool(item["id"]))
     if selected_section == "summary":
         result.update(metrics.get("node", {}))
         result["services"] = []
@@ -1197,6 +1878,72 @@ def get_system_overview(
         result["quotas"] = []
         result["incidents"] = []
         result["update"] = {}
+    if selected_section in {"dashboard", "system_bootstrap"}:
+        result["subnet_panel"] = _project_operational_dashboard(snapshot, "subnet")
+        result["applications_tile"] = _project_operational_dashboard(snapshot, "applications")
+    if selected_section == "system_bootstrap":
+        # One admitted read-model for System first paint.  The SDK reads are
+        # deliberately sequential: parallel tool fan-out amplifies SQLite and
+        # Python event-loop contention on a hub and was slower in production
+        # traces.  Keep the flat preference fields for ui.form compatibility,
+        # while retaining named submodels for diagnostics and future masks.
+        try:
+            preference_item = _preference_record(webspace_id=webspace_id)
+        except Exception as exc:
+            preference_item = {
+                "ok": False,
+                "status": "unavailable",
+                "reason": type(exc).__name__,
+            }
+        try:
+            from .usage import get_subscription_usage as read_usage
+
+            usage = read_usage(webspace_id=webspace_id, refresh=False)
+        except Exception as exc:
+            usage = {
+                "ok": False,
+                "status": "unavailable",
+                "reason": type(exc).__name__,
+                "usage_arc": {},
+            }
+        result["preferences"] = preference_item
+        result["subscription_usage"] = usage
+        result.update(preference_item)
+        if isinstance(usage, dict):
+            for key in ("usage_arc", "usage_status", "updated_at"):
+                if key in usage:
+                    result[key] = usage[key]
+            result["subscription_status"] = usage.get("status")
+    if selected_section == "node_dashboard":
+        skill_summary = _mapping(snapshot.get("skill_summary"))
+        skill_total = skill_summary.get("total")
+        skill_known = skill_summary.get("available") is True and type(skill_total) is int and skill_total >= 0
+        result["node_details"] = {
+            "id": subject.get("id", ""),
+            "status": subject.get("status", "unknown"),
+            "apps_count": skill_total if skill_known else "Unavailable",
+            "observed_at": snapshot.get("observed_at"),
+        }
+        result["update_tile"] = _project_operational_dashboard(snapshot, "update")
+        # Keep the named submodel for diagnostics, but also expose the stable
+        # flat dashboard ABI consumed by the ArcChart.  The node dashboard is
+        # a composite read-model; projecting the literal ``node_dashboard``
+        # section below cannot manufacture the metric fields on its own.
+        hardware = _project_operational_dashboard(snapshot, "metrics")
+        result["hardware"] = hardware
+        for key in (
+            "hardware_metrics",
+            "center",
+            "subtitle",
+            "freshness",
+            "value",
+            "label",
+            "description",
+        ):
+            if key in hardware:
+                result[key] = hardware[key]
+        result["attention_tile"] = _project_operational_dashboard(snapshot, "incidents")
+    result.update(_project_operational_dashboard(snapshot, selected_section))
     return result
 
 
@@ -1223,7 +1970,9 @@ def list_developments(
         records = sdk_applications.list_development_projects(
             profile=_string(profile) or None,
             query=_string(query) or None,
-            limit=500,
+            # The UI already declares a bounded result window.  Scanning 500
+            # Builder projects for a six-row Home card dominated first paint.
+            limit=bounded_limit,
         )
     except Exception as exc:  # pragma: no cover - exercised through public SDK mock
         return {
@@ -1363,6 +2112,10 @@ def update_preferences(
         for field, target in _PREFERENCE_FIELDS.items()
         if field in submitted
     }
+    endpoint_name = ""
+    if _bool_value(device_override) and "deviceLabel" in submitted:
+        endpoint_name = _string(submitted.get("deviceLabel"))
+        preference_patch.pop("device_label", None)
     if "startDestination" in submitted:
         start_destination = _string(submitted.get("startDestination"))
         if start_destination not in _START_DESTINATIONS:
@@ -1374,6 +2127,15 @@ def update_preferences(
                 "item": {},
             }
     try:
+        if endpoint_name:
+            endpoint_ref = _string(controller_endpoint_id)
+            if not endpoint_ref.startswith("browser:"):
+                raise ValueError("current_browser_endpoint_unavailable")
+            rename_result = rename_device(endpoint_ref, endpoint_name)
+            if not _bool_value(rename_result.get("ok")):
+                raise ValueError(
+                    _string(rename_result.get("error")) or "browser_endpoint_rename_failed"
+                )
         if profile_patch:
             sdk_profile.update_settings(profile_patch)
         if preference_patch:
@@ -1395,10 +2157,105 @@ def update_preferences(
         }
     return {
         "ok": True,
-        "updated_fields": sorted([*profile_patch, *preference_patch]),
+        "updated_fields": sorted(
+            [*profile_patch, *preference_patch, *(("browser_endpoint_name",) if endpoint_name else ())]
+        ),
         "items": [item],
         "item": item,
         **item,
+    }
+
+
+@tool(
+    "upload_profile_avatar",
+    summary="Persist one authenticated profile avatar in the Desktop-owned blob store.",
+    stability="experimental",
+)
+def upload_profile_avatar(
+    filename: str,
+    field_id: str,
+    media_type: str,
+    size_bytes: int,
+    digest: str,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    sdk_access.require("workspace.write")
+    if (
+        field_id != _PROFILE_AVATAR_FIELD_ID
+        or not _SAFE_FILENAME_RE.fullmatch(str(filename or ""))
+        or type(size_bytes) is not int
+        or not 1 <= size_bytes <= _PROFILE_AVATAR_MAX_BYTES
+        or not _SHA256_REF_RE.fullmatch(str(digest or ""))
+        or not str(media_type or "").lower().startswith("image/")
+        or len(str(media_type or "")) > 128
+    ):
+        raise ValueError("invalid_profile_avatar")
+    receipt = put_upload("profile-avatars")
+    if (
+        receipt.get("digest") != digest
+        or receipt.get("size_bytes") != size_bytes
+        or receipt.get("owner_ref") != "skill:web_desktop_runtime_skill"
+        or receipt.get("media_type") != media_type
+    ):
+        raise ValueError("invalid_profile_avatar_receipt")
+    return receipt
+
+
+@tool(
+    "read_profile_avatar",
+    summary="Authorize an authenticated reader to retrieve a Desktop-owned profile avatar.",
+    stability="experimental",
+)
+def read_profile_avatar(
+    ref: str,
+    field_id: str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    sdk_access.require("workspace.read")
+    token = str(ref or "").strip()
+    if not _SHA256_REF_RE.fullmatch(token):
+        raise ValueError("invalid_profile_avatar_ref")
+    return {"ok": True, "ref": token}
+
+
+@tool(
+    "unlink_node",
+    summary="Detach a paired member node from the current subnet.",
+    stability="experimental",
+    examples=["unlink_node({'device_ref': 'member:edge-node-1'})"],
+)
+def unlink_node(
+    device_ref: str | None = None,
+    node_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    sdk_access.require("workspace.write")
+    token = _string(device_ref or node_id)
+    if token.startswith("device:member:"):
+        token = f"member:{token.removeprefix('device:member:')}"
+    elif token and not token.startswith(("member:", "browser:", "redevice:")):
+        token = f"member:{token}"
+    if not token or token == "member:hub":
+        return {
+            "ok": False,
+            "error": "node_ref_required",
+            "message": "Select a paired member node. The current hub cannot unlink itself.",
+        }
+    result = sdk_device_access.detach_device(token)
+    if not isinstance(result, dict):
+        return {
+            "ok": False,
+            "error": "node_unlink_failed",
+            "message": "The device inventory returned an invalid detach result.",
+        }
+    return {
+        **result,
+        "device_ref": token,
+        "message": (
+            "Node unlinked. It can be paired again later."
+            if result.get("ok")
+            else _string(result.get("message")) or "The node could not be unlinked."
+        ),
     }
 
 
