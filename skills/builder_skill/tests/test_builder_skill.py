@@ -9244,7 +9244,10 @@ def test_normalise_llm_payload_moves_root_modals_into_application() -> None:
         payload["ui"]["application"]["modals"]["comment_modal"]["title"]
         == "Add comment"
     )
-    assert preview["page_schema"] == page_schema
+    migrated_action = preview["page_schema"]["widgets"][0]["actions"][0]
+    assert migrated_action["type"] == "navigate"
+    assert migrated_action["params"]["to"] == "request_center.comment_modal"
+    assert "openModal" not in json.dumps(payload)
     assert skill._validate_builder_webui_payload(payload, preview)["ok"] is True
 
 
@@ -12522,7 +12525,7 @@ def test_builder_webui_validation_rejects_undeclared_modal_action() -> None:
     )
 
     assert validation["ok"] is False
-    assert validation["error"] == "component_contract_invalid"
+    assert validation["error"] == "deprecated_interface"
     assert "undeclared modal" in validation["detail"]
 
     fixed_payload = copy.deepcopy(payload)
@@ -12547,15 +12550,16 @@ def test_builder_webui_validation_rejects_undeclared_modal_action() -> None:
         }
     }
 
-    assert (
-        skill._validate_builder_webui_payload(
-            fixed_payload, {"page_schema": page_schema}
-        )["ok"]
-        is True
+    migrated_payload, migrated_preview = skill._normalise_llm_webui_payload(
+        fixed_payload, previous_preview={"page_schema": page_schema}
     )
+    assert skill._validate_builder_webui_payload(
+        migrated_payload, migrated_preview
+    )["ok"] is True
+    assert "openModal" not in json.dumps(migrated_payload)
 
 
-def test_builder_webui_validation_accepts_platform_owned_modal_action() -> None:
+def test_builder_webui_validation_rejects_deprecated_platform_modal_action() -> None:
     skill = _load_module()
     page_schema = {
         "id": "desktop",
@@ -12588,7 +12592,8 @@ def test_builder_webui_validation_accepts_platform_owned_modal_action() -> None:
         payload, {"page_schema": page_schema}
     )
 
-    assert validation["ok"] is True
+    assert validation["ok"] is False
+    assert "deprecated_interface" == validation["error"]
 
 
 def test_builder_webui_validation_rejects_root_level_modals() -> None:

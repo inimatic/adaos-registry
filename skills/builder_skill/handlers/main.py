@@ -3696,7 +3696,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "cardImageRatio": "Optional CSS aspect ratio such as '16 / 9' or '4 / 3'.",
                 "emptyText": "Empty-state text.",
             },
-            "actions": "For master-detail flows attach select actions directly to the list/table item. A typical modal detail item click uses actions=[{on:'select',type:'updateState',params:{selectedId:'$event.id'}},{on:'select',type:'openModal',params:{modalId:'detail_modal'}}].",
+            "actions": "For master-detail flows attach select actions directly to the list/table item. A modal detail selection first updates selected state, then uses type='navigate' with params.to set to a declared public view and params.modalId set to its modal implementation. Never author deprecated openModal.",
             "notes": [
                 "Do not put '{{a}} - {{b}}' into titleKey/subtitleKey/previewKey.",
                 "When a card needs combined text, add a derived string property to each static dataSource.value row, then point previewKey to that property.",
@@ -3831,7 +3831,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "{op:'increment',path,amount?,min?,max?,removeWhenZero?}, and {op:'remove',path}. "
                 "Paths may contain event references, for example cart.$event.id. Do not invent object keys beginning with $, "
                 "and do not use JavaScript expressions, spreads, array methods, ternaries, or dynamic object literals. "
-                "Use openModal with params.modalId for declared modal prototypes; use callSkill only for real declared skill calls. "
+                "Use navigate with params.to and params.modalId for declared modal prototypes; use callSkill only for real declared skill calls. Never author deprecated openModal. "
                 "Prefer on='click:<buttonId>' for one button. on='click' without action.id applies to every button; "
                 "on='click' with action.id applies only to the button with that id. Do not emit duplicate actions for one button. "
                 "When behavior is removed, delete its action entry; never replace it with a placeholder type='none'. "
@@ -3842,7 +3842,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
         "application_modals": {
             "purpose": "Use ui.application.modals when the user asks for a modal, dialog, popup, drawer, sheet, or separate overlay surface.",
             "shape": "Add ui.application.modals.<modalId>={title,presentation:{kind:'modal'|'drawer'|'sheet'|'sideSheet'},schema:{id,layout,widgets}} alongside ui.application.desktop.pageSchema. Every modal schema must include all three required keys: id, layout, and widgets; for one-area forms use layout:{version:2,pattern:'document',density:'comfortable',contentWidth:'bounded',scroll:'page',regions:[{id:'main',role:'main',priority:100,scroll:'page',presentation:{wide:'pane',compact:'stack'}}]} and area:'main' on every widget.",
-            "open_action": "Open a declared modal from a button/action with actions=[{on:'click', type:'openModal', params:{modalId:'comment_modal'}}].",
+            "open_action": "Expose a public view in ui.application.interfaces.<owner>.views, bind the modal through implements and schema.interface.routes, then open it with {on:'click',type:'navigate',params:{to:'<public-view>',modalId:'comment_modal',surface:'modal'}}. Never author deprecated openModal.",
             "rule": "Do not put schema fields id/layout/widgets directly on the modal descriptor: they must be nested under its schema object. Do not model an explicitly requested modal only as a hidden inline widget; use a declared modal unless the user asks for an inline panel. When replacing an inline detail with a modal, remove the old inline detail/actions and any now-unused layout area instead of retaining a second copy with visibleIf=false. Never return a root-level modals object; modal declarations live only in ui.application.modals. A modal may compose several widgets in one area, for example item.details followed by ui.actions for visible detail commands.",
         },
         "page_schema_auto_actions": {
@@ -3937,7 +3937,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
         },
         "master_detail_and_tabs": {
             "master_detail": "For master-detail prototypes use split/focus-detail layout for side-by-side detail, or an item-triggered modal/drawer for compact detail. The master ui.list/ui.table must own the selection action; detail containers react to the selected record.",
-            "modal_detail": "If detail should open in a modal/dialog, attach openModal to the master item select/click action after updating selected state. Put detail-only secondary actions such as add comment inside the detail modal/panel, not as detached global buttons.",
+            "modal_detail": "If detail should open in a modal/dialog, attach navigate with params.to and params.modalId to the master item select/click action after updating selected state. Put detail-only secondary actions inside the detail modal/panel. Never author deprecated openModal.",
             "side_panel_detail": "If detail should be shown in a right-side panel, use a split/focus-detail layout with a main/master area and an aux/right/detail area. Natural area ids like details are acceptable, but set role to aux/right/detail when possible.",
             "state_bound_detail_pattern": {
                 "initialState": {"selectedRequestId": "req1", "activeTab": "overview"},
@@ -4019,13 +4019,13 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                         "actions": [
                             {
                                 "on": "click",
-                                "type": "openModal",
-                                "params": {"modalId": "detail_action_modal"},
+                                "type": "navigate",
+                                "params": {"to": "detail.action", "modalId": "detail_action_modal", "surface": "modal"},
                             }
                         ],
                     },
                 ],
-                "rule": "A control that belongs to the selected detail uses the same detail area as the detail content, not the master/main area.",
+                "rule": "A control that belongs to the selected detail uses the same detail area as the detail content, not the master/main area. The detail.action view must be declared under ui.application.interfaces and routed to detail_action_modal.",
             },
             "tabs": "For tabs use input.commandBar variant='segmented' plus initialState.activeTab and visibleIf expressions on tab content widgets, unless the user asks for a static tab mock.",
             "details": "Use static data examples that show the selected/default record clearly; do not leave generic placeholder rows from the scaffold.",
@@ -4045,7 +4045,7 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "AdaOS handles deterministic schema validation, revisions, review, and safe apply.",
             "The LLM may freely reshape the declarative UI inside adaos.webui.v1, but must not invent unsupported component types or real side effects.",
             "Interactive controls may demonstrate behavior with local page state, static data, and mock examples.",
-            "Users are expected to speak in natural product/UI language, not AdaOS ABI terminology. Infer the internal schema representation without requiring terms like pageSchema, visibleIf, openModal, modalId, updateState, or dataSource from the user.",
+            "Users are expected to speak in natural product/UI language, not AdaOS ABI terminology. Infer the internal schema representation without requiring terms like pageSchema, visibleIf, navigate, modalId, updateState, or dataSource from the user.",
         ],
         "meaningful_transformation": [
             "Treat current_webui_json as the starting material, not as a constraint to preserve.",
@@ -4063,7 +4063,7 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "interaction": "May add local selectors, command bars, buttons, and visibleIf-driven states for prototype-only flows; when the user asks to choose, compare, preview, or view an example, include an explicit local control.",
             "mock_data": "May create realistic static rows/examples in the requested domain and keep them aligned with fields and display widgets.",
             "copy": "May rewrite labels, titles, section names, placeholders, helper text, and empty states in the user's language.",
-            "modals": "When the user asks for an application-owned modal/dialog/drawer/sheet, declare it in ui.application.modals and open it with an openModal action from the relevant UI element. In master-detail, the relevant element is usually the selected master row/card. Do not put modal declarations in root modals or ui.application.desktop.modals. The Client owns the built-in modal ids settings, workspace_manager, and notification_history; open those ids directly and do not redeclare them in the application.",
+            "modals": "When the user asks for an application-owned modal/dialog/drawer/sheet, declare it in ui.application.modals, expose its public view under ui.application.interfaces, and open it with navigate from the relevant UI element. In master-detail, the relevant element is usually the selected master row/card. Deprecated openModal is migration input only and must never be emitted. Do not put modal declarations in root modals or ui.application.desktop.modals.",
             "natural_language_mapping": "Map ordinary words to ABI structures: modal/dialog/window -> declared modal; tab/section switch -> segmented command bar plus state-driven content; selected item/details -> master-detail; required/error/check -> field validation; compare/variants -> local switching controls.",
         },
         "self_check": [
@@ -4071,7 +4071,7 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "If the result mostly duplicates existing widgets, preserves the same field ids in the same order, or leaves stale sample data after a design request, revise before answering.",
             "For move/place requests, find the requested element by id, title, label, button text, or semantic role and verify its area/container changed to the requested destination. If the element cannot be found, create the expected element in the destination and remove stale duplicates.",
             "If the request asks to preview, view an example, compare alternatives, choose a mode, or switch between variants, verify the page includes a visible local control such as input.commandBar/input.selector/ui.actions plus matching updateState and initialState/visibleIf before answering.",
-            "If the user asks for an application-owned modal/dialog/drawer/sheet, verify ui.application.modals contains the surface and a relevant item/control action opens it with type openModal. Built-in Client modals settings, workspace_manager, and notification_history are already declared by the platform.",
+            "If the user asks for an application-owned modal/dialog/drawer/sheet, verify ui.application.modals contains the surface, ui.application.interfaces exposes its public view, and a relevant item/control action uses navigate with params.to and params.modalId. Verify no deprecated openModal action remains.",
             "If a list/card/table selection should change details, verify the master action updates a selected state key and the detail widgets read data keyed by that selected value; do not return static details that ignore selection.",
             "For an optional collection mode that keeps items whose key belongs to a state array, put one filter with operator='in', that array's stateKey, and enabledIf tied to the mode. Do not maintain a duplicate derived array or poll with autoActions.",
             "For reactive static rows, filter the resolved row property with a literal/expression value. Do not treat a computed dataSource field as page state.",
@@ -12046,7 +12046,19 @@ def _validate_page_schema_component_contracts(
 def _validate_builder_webui_payload(
     payload: Mapping[str, Any], preview_state: Mapping[str, Any]
 ) -> dict[str, Any]:
+    from adaos.services.interface_deprecations import validate_authoring_interfaces
+
     webui_validation = _validate_webui_payload(payload)
+    deprecation_validation = validate_authoring_interfaces(payload)
+    if not deprecation_validation.get("ok"):
+        deprecation_validation = {
+            **deprecation_validation,
+            "error": "deprecated_interface",
+            "detail": "; ".join(
+                f"{item.get('path')} uses {item.get('interface')}; migrate to {item.get('replacement')}"
+                for item in deprecation_validation.get("findings") or []
+            ),
+        }
     page_schema = _extract_webui_page_schema(payload)
     if not page_schema:
         return {
@@ -12056,6 +12068,7 @@ def _validate_builder_webui_payload(
         }
     validations = [
         webui_validation,
+        deprecation_validation,
         _validate_webui_text_integrity(payload),
         _validate_page_schema_component_contracts(page_schema),
         _validate_webui_modal_contracts(payload),
@@ -12153,6 +12166,14 @@ def _normalise_llm_webui_payload(
         if not preview_data.get(key) and previous_preview.get(key):
             preview_data[key] = copy.deepcopy(previous_preview.get(key))
     data = _canonical_webui_payload(data, page_schema)
+    from adaos.services.interface_deprecations import migrate_deprecated_interfaces
+
+    data, _deprecation_migration = migrate_deprecated_interfaces(
+        data,
+        owner=str(page_schema.get("id") or "application"),
+    )
+    page_schema = _extract_webui_page_schema(data)
+    preview_data["page_schema"] = page_schema
     return data, preview_data
 
 
@@ -26786,6 +26807,13 @@ def set_ui_revision_current(
     after_webui = _canonicalise_webui_modal_locations(
         _repair_text_tree(copy.deepcopy(dict(after_webui)))
     )
+    from adaos.services.interface_deprecations import migrate_deprecated_interfaces
+
+    after_webui, _deprecation_migration = migrate_deprecated_interfaces(
+        after_webui,
+        owner=str(session.get("scenario_id") or "application"),
+    )
+    preview = {**dict(preview), "page_schema": _extract_webui_page_schema(after_webui)}
     timings_ms["canonicalize_webui"] = _elapsed_ms(stage_started)
     stage_started = time.perf_counter()
     validation = _validate_builder_webui_payload(after_webui, preview)
