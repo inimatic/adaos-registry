@@ -249,6 +249,30 @@ def _requested_scenario_id_from_meta(_meta: Mapping[str, Any] | None = None) -> 
     return ""
 
 
+def _label_conversation_target_guard(text: str, meta: Mapping[str, Any]) -> dict[str, Any] | None:
+    selected = meta.get("builder_selected_target")
+    if not isinstance(selected, Mapping) or not sdk_builder_semantic_ui.recognizes_label_request(text):
+        return None
+    kind, identity = str(selected.get("object_type") or ""), str(selected.get("object_id") or "")
+    if kind == "scenario":
+        expected = identity
+    elif kind == "project":
+        composition = developer_compositions.get(identity)
+        primary = [item for item in composition["components"]["owned"] if item.get("role") == "primary"]
+        ref = str(primary[0].get("ref") or "") if len(primary) == 1 else ""
+        if not ref.startswith("scenario:"):
+            return None  # Skill-backed projects are outside this graph slice.
+        expected = ref.partition(":")[2]
+    else:
+        return None
+    actual = _requested_scenario_id_from_meta(meta)
+    if not expected or actual != expected:
+        return {"ok": False, "status": "builder_target_mismatch", "error": "builder_target_mismatch", "model_calls": 0,
+                "selected_project_ref": f"{kind}:{identity}", "requested_scenario_id": actual,
+                "message": "The selected project and conversation target disagree. Reopen the project conversation; no label was changed."}
+    return None
+
+
 def _routing_meta_for_explicit_scenario(
     scenario_id: str | None,
     _meta: Mapping[str, Any] | None = None,
@@ -20096,8 +20120,12 @@ def chat(
     conversation_context: Mapping[str, Any] | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    turn_started_at = time.perf_counter()
     _reject_transport_corrupted_text(text, field="text")
     utterance = str(text or "").strip()
+    target_guard = _label_conversation_target_guard(utterance, dict(_meta or {}))
+    if target_guard is not None:
+        return target_guard
     context = _resolve_builder_context_for_turn(webspace_id, _meta)
     if context is None:
         command = _parse_builder_command(utterance, has_session=False)
@@ -20347,15 +20375,28 @@ def chat(
             "topic": topic,
             "dialog": _dialog_state(ws, topic_ref=topic),
         }
-    result = update_current_scenario(
-        instruction=utterance,
-        webspace_id=ws,
-        auto_apply=auto_apply,
-        retry_job_id=retry_job_id,
-        expected_ui_revision=expected_ui_revision,
-        conversation_context=_canonical_conversation_context(conversation_context),
+    d0_started_at = time.perf_counter()
+    result = (None if retry_job_id else _try_semantic_label_request(
+        instruction=_instruction_with_prototype_review_notes(utterance, turn_meta),
+        ws=ws, session=session, binding=binding, topic=topic,
+        auto_apply=auto_apply, expected_revision=expected_ui_revision,
         _meta={**turn_meta, "builder_chat_owns_result_emit": True},
-    )
+    ))
+    if result is not None:
+        result.setdefault("message_meta", {})["builder_d0_turn_timing"] = {
+            "routing_ms": round((d0_started_at - turn_started_at) * 1000, 1),
+            "before_emit_ms": round((time.perf_counter() - turn_started_at) * 1000, 1),
+        }
+    else:
+        result = update_current_scenario(
+            instruction=utterance,
+            webspace_id=ws,
+            auto_apply=auto_apply,
+            retry_job_id=retry_job_id,
+            expected_ui_revision=expected_ui_revision,
+            conversation_context=_canonical_conversation_context(conversation_context),
+            _meta={**turn_meta, "builder_chat_owns_result_emit": True},
+        )
     if result.get("ok"):
         actions = (
             result.get("message_actions")
@@ -25494,7 +25535,13 @@ def _try_semantic_label_request(
     if not sdk_builder_semantic_ui.recognizes_label_request(instruction):
         return None
     root = _project_artifact_root(session)
-    if root is None or not (root / "semantic.webui.json").is_file():
+    if root is None:
+        return None
+    if not (root / "semantic.webui.json").is_file():
+        payload = session.get("webui_payload") or _read_json_file(root / "webui.json") or {}
+        if str(payload.get("generated_by") or "").startswith("builder.semantic_compiler."):
+            return {"ok": True, "status": "semantic_label_rejected", "model_calls": 0,
+                    "message": "Managed semantic source is missing. Restore the exact source before editing labels."}
         return None  # Explicit compatibility path for unmanaged legacy sources.
     started = time.perf_counter()
     meta = dict(_meta or {})

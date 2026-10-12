@@ -2465,7 +2465,11 @@
                                     "conversation_topic_id": "$state.builderTopicId",
                                     "dialog_channel_id": "builder",
                                     "route_id": "voice_chat",
-                                    "thread_id": "$state.builderThreadId"
+                                    "thread_id": "$state.builderThreadId",
+                                    "builder_selected_target": {
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId"
+                                    }
                                 },
                                 "minRows": 4,
                                 "multiline": true,
@@ -2664,7 +2668,11 @@
                                     "conversation_topic_id": "$state.builderTopicId",
                                     "dialog_channel_id": "builder",
                                     "route_id": "voice_chat",
-                                    "thread_id": "$state.builderThreadId"
+                                    "thread_id": "$state.builderThreadId",
+                                    "builder_selected_target": {
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId"
+                                    }
                                 },
                                 "minRows": 4,
                                 "multiline": true,
@@ -2811,7 +2819,7 @@
                     "initialStateSource": {
                         "kind": "y",
                         "path": "data/builder/selection",
-                        "mapping": {
+                        "map": {
                             "selectedProjectKind": "object_type",
                             "selectedProjectId": "object_id",
                             "selectedProjectRef": "ref",
