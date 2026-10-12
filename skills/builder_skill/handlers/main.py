@@ -27,6 +27,7 @@ from adaos.sdk.builder import preview as builder_preview
 from adaos.sdk.builder import project_catalog as sdk_builder_project_catalog
 from adaos.sdk.builder import prototype as sdk_builder_prototype
 from adaos.sdk.builder import review as sdk_builder_review
+from adaos.sdk.builder import semantic_ui as sdk_builder_semantic_ui
 from adaos.sdk.builder import workflow as sdk_builder_workflow
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import pending_actions as sdk_pending_actions
@@ -2334,7 +2335,7 @@ def _project_external_user_turn(
     session: Mapping[str, Any] | None,
     binding: Mapping[str, Any] | None,
     topic_ref: Mapping[str, Any] | None,
-) -> None:
+) -> str | None:
     """Persist external ingress in the canonical Builder project conversation.
 
     Web/Voice surfaces already persist their local user turn before invoking a
@@ -2368,6 +2369,7 @@ def _project_external_user_turn(
         topic_ref=topic_ref,
         from_="user",
     )
+    return canonical_meta["message_id"]
 
 
 def _schedule_safe_emit_chat(
@@ -20175,10 +20177,12 @@ def chat(
             "dialog": _dialog_state(ws, topic_ref=topic),
         }
     if intent != "project.create":
-        _project_external_user_turn(
+        projected_message_id = _project_external_user_turn(
             utterance, webspace_id=ws, _meta=turn_meta,
             session=session, binding=binding, topic_ref=topic,
         )
+        if projected_message_id:
+            turn_meta["source_message_id"] = projected_message_id
     if intent == "project.list":
         return _handle_project_list_command(
             webspace_id=ws,
@@ -25482,6 +25486,98 @@ def _local_llm_job_id(session: Mapping[str, Any], instruction: str) -> str:
     return f"builder_llm_submit_{_hash_suffix(seed)}"
 
 
+def _try_semantic_label_request(
+    *, instruction: str, ws: str, session: dict[str, Any], binding: Mapping[str, Any],
+    topic: Mapping[str, Any], auto_apply: bool, expected_revision: str | None,
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not sdk_builder_semantic_ui.recognizes_label_request(instruction):
+        return None
+    root = _project_artifact_root(session)
+    if root is None or not (root / "semantic.webui.json").is_file():
+        return None  # Explicit compatibility path for unmanaged legacy sources.
+    started = time.perf_counter()
+    meta = dict(_meta or {})
+    message_id = str(meta.get("source_message_id") or meta.get("message_id") or "").strip()
+    if not message_id:
+        message_id = _external_user_turn_message_id(instruction, meta)
+        meta["message_id"] = message_id
+        _safe_emit_chat(instruction, webspace_id=ws, _meta=_api_request_chat_meta(meta),
+                        session=session, binding=binding, topic_ref=topic, from_="api")
+    meta["message_id"] = message_id
+    scenario_id = str(session.get("scenario_id") or "")
+    common = {"session_id": session.get("id"), "scenario_id": scenario_id,
+              "topic": {key: value for key, value in topic.items() if key != "stored"}, "model_calls": 0,
+              "message_meta": {"message_id": f"{message_id}.label-result", "source_message_id": message_id}}
+    timing = {}
+    try:
+        prepared = sdk_builder_semantic_ui.prepare_label_request(
+            project_ref=f"scenario:{scenario_id}", instruction=instruction,
+            source_message_id=message_id, expected_revision=expected_revision)
+        prepared_at = time.perf_counter()
+        timing["prepare_ms"] = round((prepared_at - started) * 1000, 1)
+        if prepared["status"] != "planned":
+            return {**common, **prepared, "ok": True, "message": (
+                "No label changed. Specify one existing label in quotes and, if ambiguous, its language. "
+                'Example: Rename view "Records" to "Work queue" in English.'),
+                "timing": {"total_ms": round((time.perf_counter() - started) * 1000, 1)}}
+        request = copy.deepcopy(prepared["request"])
+        if not auto_apply:
+            return {**common, "ok": True, "status": "semantic_label_proposed", "semantic_request": request,
+                    "message": "The bounded label operation is proposed; no source was changed."}
+        patch = {"id": request["transaction_id"], "summary": instruction, "target": "semantic",
+                 "operation": "semantic_graph", "change_id": request["transaction_id"], "created_at": _now()}
+        if not prepared.get("replayed"):
+            registration = _register_builder_change_set(session=session, patch=patch, request_text=instruction, _meta=meta)
+            if not registration.get("ok"):
+                raise ValueError("Label Change intake failed: " + str(registration.get("error")))
+            state = sdk_builder_workflow.get_state("scenario", scenario_id)
+            if (state.get("change") or {}).get("change_id") != request["change_id"]:
+                raise ValueError("Label intake changed the admitted Change; retry explicitly")
+            request["expected_generation"] = state["generation"]
+        intake_at = time.perf_counter()
+        timing["intake_ms"] = round((intake_at - prepared_at) * 1000, 1)
+        result = sdk_builder_semantic_ui.apply(request)
+        applied_at = time.perf_counter()
+        timing["apply_ms"] = round((applied_at - intake_at) * 1000, 1)
+    except Exception as exc:
+        return {**common, "ok": True, "status": "semantic_label_rejected", "error": "semantic_label_request_rejected",
+                "detail": f"{type(exc).__name__}: {exc}", "message": f"Label request stopped safely: {exc}",
+                "timing": {"total_ms": round((time.perf_counter() - started) * 1000, 1)}}
+    # Semantic commit is authoritative. Delivery failures must not trigger a
+    # second revision, full regeneration, or claim that the source rolled back.
+    delivery = {}
+    try:
+        _sync_session_from_artifacts(session, binding)
+        _save_session(ws, session)
+        if not result.get("replayed"):
+            payload = _read_json_file(root / "webui.json")
+            delivery["prototype_resources"] = developer_prototypes.carry_forward_resources(
+                project_ref=f"project:{scenario_id}", change_id=request["change_id"],
+                revision=result["revision"], webui=payload)
+            delivery["preview"] = _refresh_follow_active_preview(
+                ws, session=session, binding=binding, revision=result["revision"])
+        delivery["workbench"] = _request_workbench_refresh({"webspace_id": ws, "scenario_id": scenario_id})
+    except Exception as exc:
+        delivery["error"] = f"{type(exc).__name__}: {exc}"
+    delivered_at = time.perf_counter()
+    timing["delivery_ms"] = round((delivered_at - applied_at) * 1000, 1)
+    _upsert_builder_change(webspace_id=ws, session=session, patch=patch, request_text=instruction,
+                           status="accepted", _meta=meta, model="deterministic",
+                           extra_meta={"semantic_transaction": result, "delivery": delivery})
+    timing["projection_ms"] = round((time.perf_counter() - delivered_at) * 1000, 1)
+    timing["total_ms"] = round((time.perf_counter() - started) * 1000, 1)
+    common["message_meta"]["builder_d0_timing"] = timing
+    message = f"Label operation {'already recorded' if result.get('replayed') else 'applied'}: revision {result['revision']}."
+    if delivery.get("error") or (isinstance(delivery.get("preview"), Mapping) and not delivery["preview"].get("ok")):
+        message += " Source is committed, but Preview delivery needs retry."
+    if _should_emit_api_tool_chat(_meta):
+        _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, binding=binding, topic_ref=topic)
+    return {**common, "ok": True, "status": "semantic_label_applied", "semantic_transaction": result,
+            "delivery": delivery, "message": message,
+            "timing": timing}
+
+
 @tool(summary="Update current scenario prototype.", side_effects="local_write")
 def update_current_scenario(
     instruction: str,
@@ -25532,6 +25628,12 @@ def update_current_scenario(
             "dialog": _dialog_state(ws, topic_ref=topic),
         }
     text = _instruction_with_prototype_review_notes(instruction, _meta)
+    if not retry_job_id:
+        semantic_result = _try_semantic_label_request(
+            instruction=text, ws=ws, session=session, binding=binding, topic=topic,
+            auto_apply=auto_apply, expected_revision=expected_ui_revision, _meta=_meta)
+        if semantic_result is not None:
+            return semantic_result
     lowered = text.lower()
     if str(retry_job_id or "").strip():
         replay_preflight = _failed_llm_replay_preflight(
