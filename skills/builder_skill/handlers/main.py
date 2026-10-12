@@ -7985,6 +7985,10 @@ def _current_semantic_context(
     expected = payload.get("ui", {}).get("application", {}).get("desktop", {}).get("pageSchema", {}).get("meta", {}).get("builder", {}).get("semantic_digest")
     if not expected or digest != expected:
         raise ValueError("Current semantic Prototype does not match its compiled revision")
+    if document.get("schema") == "adaos.webui.semantic.v2":
+        sdk_builder_prototype.verify_semantic_source(
+            document, payload, project_ref=str(session.get("project_ref") or "")
+        )
     return sdk_builder_prototype.semantic_revision_context(
         document,
         brief,
@@ -12804,6 +12808,7 @@ def _apply_llm_webui_transform(
                     ),
                     project_ref=str(session.get("project_ref") or "").strip()
                     or None,
+                    previous_semantic=(request.get("dynamic_request", {}).get("current_semantic") or {}).get("document"),
                 )
                 if not result.get("ok"):
                     validation = (
@@ -14089,6 +14094,7 @@ def _parse_llm_webui_transform_output(
     output_mode: str = "",
     prototype_brief: Mapping[str, Any] | None = None,
     project_ref: str | None = None,
+    previous_semantic: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     resolved_output_mode = str(output_mode or "").strip().lower()
     if _semantic_output_mode(resolved_output_mode):
@@ -14101,6 +14107,7 @@ def _parse_llm_webui_transform_output(
             semantic_candidate,
             brief=prototype_brief,
             project_ref=project_ref,
+            **({"previous": previous_semantic} if previous_semantic is not None else {}),
         )
         semantic_document = compiled["semantic_document"]
         payload, preview = _normalise_llm_webui_payload(
@@ -15339,6 +15346,7 @@ def _repair_llm_semantic_transform_once(
     output_mode: str,
     _meta: Mapping[str, Any] | None,
     attempt_number: int = 2,
+    previous_semantic: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if any(item.get("code") == "semantic.compiler_contract_invalid" for item in validation_error.get("findings") or []):
         return {"ok": False, "error": "prototype_compiler_contract_invalid", "validation": dict(validation_error),
@@ -15565,6 +15573,7 @@ def _repair_llm_semantic_transform_once(
             output_mode=resolved_output_mode,
             prototype_brief=prototype_brief,
             project_ref=project_ref,
+            previous_semantic=previous_semantic,
         )
     except Exception as exc:
         result = {
@@ -23644,7 +23653,8 @@ def _replay_failed_llm_webui_result(
                 compiled_digest = before_webui.get("ui", {}).get("application", {}).get("desktop", {}).get("pageSchema", {}).get("meta", {}).get("builder", {}).get("semantic_digest")
                 if baseline.get("digest") and baseline["digest"] != compiled_digest:
                     raise ValueError("original semantic source digest mismatch")
-                source_context.update(prototype_brief=brief, project_ref=session.get("project_ref"))
+                source_context.update(prototype_brief=brief, project_ref=session.get("project_ref"),
+                    previous_semantic=(_current_semantic_context(session, before_webui or {}, brief) or {}).get("document"))
         except Exception as exc:
             return {"ok": False, "error": "llm_replay_source_context_unavailable", "detail": str(exc)}
 
@@ -24965,6 +24975,7 @@ def _complete_llm_webui_job(
                 prototype_brief=prototype_brief,
                 project_ref=str(session.get("project_ref") or "").strip()
                 or None,
+                previous_semantic=(_current_semantic_context(session, before_webui or {}, prototype_brief or {}) or {}).get("document") if semantic_mode else None,
             )
             llm_result = _validate_llm_request_postconditions(
                 llm_result,
@@ -25011,6 +25022,7 @@ def _complete_llm_webui_job(
                     job_id=job_id,
                     output_mode=llm_output_mode,
                     _meta=_meta,
+                    previous_semantic=(_current_semantic_context(session, before_webui or {}, prototype_brief or {}) or {}).get("document"),
                 )
                 repair_attempted = not bool(llm_result.get("repair_skipped"))
                 for artifact in llm_result.get("candidate_artifacts") or []:
