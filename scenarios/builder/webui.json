@@ -2456,8 +2456,8 @@
                                 "compact": true,
                                 "ctrlEnterToSend": true,
                                 "enterToSend": true,
-                                "historyButtonLabel": "История",
-                                "loadingHistoryLabel": "Загрузка истории…",
+                                "historyButtonLabel": "History",
+                                "loadingHistoryLabel": "Loading history…",
                                 "meta": {
                                     "active_agent_id": "agent:builder_skill:builder",
                                     "active_agent_label": "Конструктор",
@@ -2487,7 +2487,19 @@
                                     "builder.project.automation",
                                     "builder.project.publication",
                                     "builder.project.change"
-                                ]
+                                ],
+                                "historyButtonLabel_i18n": {
+                                    "locales": {
+                                        "en": "History",
+                                        "ru": "История"
+                                    }
+                                },
+                                "loadingHistoryLabel_i18n": {
+                                    "locales": {
+                                        "en": "Loading history…",
+                                        "ru": "Загрузка истории…"
+                                    }
+                                }
                             },
                             "title_i18n": "builder.text.development.conversation",
                             "actions": []
@@ -2659,8 +2671,8 @@
                                 "compact": true,
                                 "ctrlEnterToSend": true,
                                 "enterToSend": true,
-                                "historyButtonLabel": "История",
-                                "loadingHistoryLabel": "Загрузка истории…",
+                                "historyButtonLabel": "History",
+                                "loadingHistoryLabel": "Loading history…",
                                 "meta": {
                                     "active_agent_id": "agent:builder_skill:builder",
                                     "active_agent_label": "Конструктор",
@@ -2690,7 +2702,19 @@
                                     "builder.project.automation",
                                     "builder.project.publication",
                                     "builder.project.change"
-                                ]
+                                ],
+                                "historyButtonLabel_i18n": {
+                                    "locales": {
+                                        "en": "History",
+                                        "ru": "История"
+                                    }
+                                },
+                                "loadingHistoryLabel_i18n": {
+                                    "locales": {
+                                        "en": "Loading history…",
+                                        "ru": "Загрузка истории…"
+                                    }
+                                }
                             },
                             "title_i18n": "builder.text.development.conversation",
                             "actions": []
