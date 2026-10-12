@@ -7059,26 +7059,6 @@
                                             "key": "title"
                                         },
                                         {
-                                            "label": "Run ID",
-                                            "label_i18n": {
-                                                "locales": {
-                                                    "en": "Run ID",
-                                                    "ru": "ID запуска"
-                                                }
-                                            },
-                                            "key": "id"
-                                        },
-                                        {
-                                            "label": "Change",
-                                            "label_i18n": {
-                                                "locales": {
-                                                    "en": "Change",
-                                                    "ru": "Изменение"
-                                                }
-                                            },
-                                            "key": "change_id"
-                                        },
-                                        {
                                             "label": "Status",
                                             "label_i18n": {
                                                 "locales": {
@@ -7128,6 +7108,170 @@
                                             },
                                             "key": "completed_at"
                                         },
+                                        {
+                                            "label": "Execution measurement coverage",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Execution measurement coverage",
+                                                    "ru": "Наличие измерений исполнения"
+                                                }
+                                            },
+                                            "key": "measurement_label"
+                                        },
+                                        {
+                                            "label": "Failure",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Failure",
+                                                    "ru": "Ошибка"
+                                                }
+                                            },
+                                            "key": "error"
+                                        }
+                                    ],
+                                    "emptyText": "No recorded execution details."
+                                }
+                            },
+                            {
+                                "id": "design-run-context",
+                                "type": "item.details",
+                                "area": "main",
+                                "title": "Inputs and evidence",
+                                "title_i18n": {
+                                    "locales": {
+                                        "en": "Inputs and evidence",
+                                        "ru": "Входные данные и доказательства"
+                                    }
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.selectedTrace"
+                                },
+                                "inputs": {
+                                    "presentation": "section",
+                                    "fields": [
+                                        {
+                                            "label": "Run ID",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Run ID",
+                                                    "ru": "ID запуска"
+                                                }
+                                            },
+                                            "key": "id"
+                                        },
+                                        {
+                                            "label": "Change",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Change",
+                                                    "ru": "Изменение"
+                                                }
+                                            },
+                                            "key": "change_id"
+                                        },
+                                        {
+                                            "label": "Workflow request (not a reconstructed conversation)",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Workflow request (not a reconstructed conversation)",
+                                                    "ru": "Запрос workflow (не восстановленная переписка)"
+                                                }
+                                            },
+                                            "key": "request"
+                                        },
+                                        {
+                                            "label": "Linked conversation messages",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Linked conversation messages",
+                                                    "ru": "Связанные сообщения обсуждения"
+                                                }
+                                            },
+                                            "key": "source_message_ids"
+                                        },
+                                        {
+                                            "label": "Recorded context digest",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Recorded context digest",
+                                                    "ru": "Дайджест сохранённого контекста"
+                                                }
+                                            },
+                                            "key": "context_packet_digest"
+                                        },
+                                        {
+                                            "label": "Inputs",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Inputs",
+                                                    "ru": "Исходные данные"
+                                                }
+                                            },
+                                            "key": "input_refs"
+                                        },
+                                        {
+                                            "label": "Outputs",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Outputs",
+                                                    "ru": "Результаты"
+                                                }
+                                            },
+                                            "key": "output_refs"
+                                        },
+                                        {
+                                            "label": "Evidence",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Evidence",
+                                                    "ru": "Доказательства"
+                                                }
+                                            },
+                                            "key": "evidence_refs"
+                                        },
+                                        {
+                                            "label": "Environment",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Environment",
+                                                    "ru": "Окружение"
+                                                }
+                                            },
+                                            "key": "environment_ref"
+                                        },
+                                        {
+                                            "label": "Measurement sources",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Measurement sources",
+                                                    "ru": "Источники измерений"
+                                                }
+                                            },
+                                            "key": "execution_metrics.source_refs"
+                                        }
+                                    ],
+                                    "emptyText": "No recorded execution details."
+                                }
+                            },
+                            {
+                                "id": "design-run-measurements",
+                                "type": "item.details",
+                                "area": "main",
+                                "title": "Recorded measurements",
+                                "title_i18n": {
+                                    "locales": {
+                                        "en": "Recorded measurements",
+                                        "ru": "Сохранённые измерения"
+                                    }
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.selectedTrace"
+                                },
+                                "inputs": {
+                                    "presentation": "section",
+                                    "fields": [
                                         {
                                             "label": "Model",
                                             "label_i18n": {
@@ -7247,132 +7391,11 @@
                                                 }
                                             },
                                             "key": "client_wait_ms_label"
-                                        },
-                                        {
-                                            "label": "Execution measurement coverage",
-                                            "label_i18n": {
-                                                "locales": {
-                                                    "en": "Execution measurement coverage",
-                                                    "ru": "Наличие измерений исполнения"
-                                                }
-                                            },
-                                            "key": "measurement_label"
-                                        },
-                                        {
-                                            "label": "Failure",
-                                            "label_i18n": {
-                                                "locales": {
-                                                    "en": "Failure",
-                                                    "ru": "Ошибка"
-                                                }
-                                            },
-                                            "key": "error"
                                         }
                                     ],
                                     "emptyText": "No recorded execution details."
-                                }
-                            },
-                            {
-                                "id": "design-run-context",
-                                "type": "item.details",
-                                "area": "main",
-                                "title": "Inputs and evidence",
-                                "title_i18n": {
-                                    "locales": {
-                                        "en": "Inputs and evidence",
-                                        "ru": "Входные данные и доказательства"
-                                    }
                                 },
-                                "dataSource": {
-                                    "kind": "static",
-                                    "value": "$state.selectedTrace"
-                                },
-                                "inputs": {
-                                    "presentation": "section",
-                                    "fields": [
-                                        {
-                                            "label": "Workflow request (not a reconstructed conversation)",
-                                            "label_i18n": {
-                                                "locales": {
-                                                    "en": "Workflow request (not a reconstructed conversation)",
-                                                    "ru": "Запрос workflow (не восстановленная переписка)"
-                                                }
-                                            },
-                                            "key": "request"
-                                        },
-                                        {
-                                            "label": "Linked conversation messages",
-                                            "label_i18n": {
-                                                "locales": {
-                                                    "en": "Linked conversation messages",
-                                                    "ru": "Связанные сообщения обсуждения"
-                                                }
-                                            },
-                                            "key": "source_message_ids"
-                                        },
-                                        {
-                                            "label": "Recorded context digest",
-                                            "label_i18n": {
-                                                "locales": {
-                                                    "en": "Recorded context digest",
-                                                    "ru": "Дайджест сохранённого контекста"
-                                                }
-                                            },
-                                            "key": "context_packet_digest"
-                                        },
-                                        {
-                                            "label": "Inputs",
-                                            "label_i18n": {
-                                                "locales": {
-                                                    "en": "Inputs",
-                                                    "ru": "Исходные данные"
-                                                }
-                                            },
-                                            "key": "input_refs"
-                                        },
-                                        {
-                                            "label": "Outputs",
-                                            "label_i18n": {
-                                                "locales": {
-                                                    "en": "Outputs",
-                                                    "ru": "Результаты"
-                                                }
-                                            },
-                                            "key": "output_refs"
-                                        },
-                                        {
-                                            "label": "Evidence",
-                                            "label_i18n": {
-                                                "locales": {
-                                                    "en": "Evidence",
-                                                    "ru": "Доказательства"
-                                                }
-                                            },
-                                            "key": "evidence_refs"
-                                        },
-                                        {
-                                            "label": "Environment",
-                                            "label_i18n": {
-                                                "locales": {
-                                                    "en": "Environment",
-                                                    "ru": "Окружение"
-                                                }
-                                            },
-                                            "key": "environment_ref"
-                                        },
-                                        {
-                                            "label": "Measurement sources",
-                                            "label_i18n": {
-                                                "locales": {
-                                                    "en": "Measurement sources",
-                                                    "ru": "Источники измерений"
-                                                }
-                                            },
-                                            "key": "execution_metrics.source_refs"
-                                        }
-                                    ],
-                                    "emptyText": "No recorded execution details."
-                                }
+                                "visibleIf": "$state.selectedTrace.execution_metrics"
                             }
                         ]
                     }
