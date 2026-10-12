@@ -2449,6 +2449,8 @@ def _llm_options(payload: Any) -> list[dict[str, Any]]:
             or []
         )
     items: list[dict[str, Any]] = []
+    availability = {str(item.get("id") or item.get("model") or ""): item.get("available")
+                    for item in source.get("data") or [] if isinstance(item, Mapping)}
     for value in raw if isinstance(raw, list) else []:
         item = (
             dict(value)
@@ -2457,6 +2459,10 @@ def _llm_options(payload: Any) -> list[dict[str, Any]]:
         )
         model = str(item.get("id") or item.get("model") or "").strip()
         if not model:
+            continue
+        if item.get("scope", "development") != "development" or item.get("provider") == "openai-codex-cli":
+            continue
+        if item.get("available") is False or availability.get(model) is False:
             continue
         items.append(
             {
@@ -2473,31 +2479,7 @@ def _llm_options(payload: Any) -> list[dict[str, Any]]:
                 "scope": str(item.get("scope") or "development"),
             }
         )
-    if items:
-        return items
-    return [
-        {
-            "id": "gpt-5",
-            "model": "gpt-5",
-            "label": "GPT-5",
-            "provider": "openai",
-            "scope": "development",
-        },
-        {
-            "id": "gpt-4.1",
-            "model": "gpt-4.1",
-            "label": "GPT-4.1",
-            "provider": "openai",
-            "scope": "development",
-        },
-        {
-            "id": "gpt-4o-mini",
-            "model": "gpt-4o-mini",
-            "label": "GPT-4o mini",
-            "provider": "openai",
-            "scope": "development",
-        },
-    ]
+    return items
 
 
 @tool(
@@ -2518,10 +2500,11 @@ def get_llm_options(
         source = f"fallback:{type(exc).__name__}"
     options = _llm_options(payload)
     state = _context(kind, project_id)
-    selected = str(state.get("builder_llm_model") or options[0]["id"])
+    selected = str(state.get("builder_llm_model") or (options[0]["id"] if options else "")) or None
     for item in options:
         item["selected"] = item["id"] == selected
-    return {"ok": True, "value": selected, "options": options, "source": source}
+    return {"ok": bool(options), "value": selected, "options": options, "source": source,
+            "status": "ready" if options else "unavailable"}
 
 
 @tool(
@@ -6829,8 +6812,8 @@ def get_workbench(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFA
     issues = [{**row, "id": row.get("issue_id"), "sources": ", ".join(row.get("source_message_ids") or []),
                "result": ", ".join(str(x) for x in row.get("result_refs") or []), "stage": row.get("lane")}
               for row in change.get("issues", []) if isinstance(row, Mapping)]
-    runs = [{**row, "id": row.get("run_id"), "title": row.get("purpose") or row.get("run_id"),
-             "stage": row.get("activity"), "status": row.get("status")}
+    from adaos.services.builder.run_observability import project_run
+    runs = [project_run(row, request=change.get("request"), source_message_ids=change.get("source_message_ids") or [])
             for row in change.get("runs", []) if isinstance(row, Mapping)]
     title = str(project.get("title") or project_id)
     composition = compositions.get(project_id) if kind == "project" else compositions.project_for_component(f"{kind}:{project_id}")
@@ -6856,6 +6839,7 @@ def get_workbench(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFA
             "workflow_generation": state.get("generation"), "commands": commands,
             "clarification": clarification,
             "request": change.get("request"), "change_id": current["change"],
+            "source_message_count": len(change.get("source_message_ids") or []),
             "prototype_revision": prototype.get("head_revision"),
             "revision_label": " | ".join(str(value) for value in (
                 prototype.get("head_revision"), current["change"]) if value),

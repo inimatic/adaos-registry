@@ -4682,6 +4682,8 @@ def _llm_job_telemetry(
         "timing": copy.deepcopy(dict(timing)) if isinstance(timing, Mapping) else None,
         "provider": copy.deepcopy(provider_payload) if provider_payload else None,
         "usage": copy.deepcopy(dict(usage)) if isinstance(usage, Mapping) else None,
+        "cost": copy.deepcopy(dict(protocol.get("cost") or envelope.get("cost")))
+        if isinstance(protocol.get("cost") or envelope.get("cost"), Mapping) else None,
         "tools": copy.deepcopy(dict(protocol["tools"]))
         if isinstance(protocol.get("tools"), Mapping)
         else None,
@@ -19084,12 +19086,16 @@ def _record_prototype_revision(
     previous_revision: str | None = None,
     change_id: str | None = None,
     prototype_acceptance_required: bool = False,
+    llm_result: Mapping[str, Any] | None = None,
+    reasoning_effort: str | None = None,
 ) -> dict[str, Any]:
     scenario_id = str(session.get("scenario_id") or "").strip()
     revision_token = str(revision or "").strip()
     if not scenario_id or not revision_token:
         return {"ok": False, "skipped": "scenario_or_revision_missing"}
     try:
+        from adaos.services.builder.run_observability import execution_metrics_from_llm
+        execution_metrics = execution_metrics_from_llm(llm_result, reasoning_effort=reasoning_effort) if llm_result else None
         return sdk_builder_workflow.transition(
             "scenario",
             scenario_id,
@@ -19104,6 +19110,9 @@ def _record_prototype_revision(
                 "prototype_acceptance_required": bool(
                     prototype_acceptance_required
                 ),
+                "input_refs": [f"ui_revision:{previous_revision}"] if previous_revision else [],
+                "output_refs": [f"ui_revision:{revision_token}"],
+                "execution_metrics": execution_metrics,
             },
         )
     except Exception as exc:
@@ -22275,6 +22284,10 @@ def _finalize_scenario_update(
         previous_revision=previous_revision,
         change_id=_active_workflow_change_id(session=session, patch=patch),
         prototype_acceptance_required=_webui_has_cbs_intent(after_webui),
+        llm_result=llm_result,
+        reasoning_effort=((_builder_llm_reasoning_for_model(
+            _builder_llm_model_for_session(session, _meta), _meta) or {}).get("effort")
+            if isinstance(llm_result, Mapping) else None),
     )
     workflow_revision_done_at = time.perf_counter()
     review_constraints = _evaluate_review_constraints(

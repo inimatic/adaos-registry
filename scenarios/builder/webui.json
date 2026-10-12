@@ -1090,19 +1090,95 @@
                             "inputs": {
                                 "columns": [
                                     {
-                                        "key": "title",
-                                        "label": "Запуск",
-                                        "label_i18n": "builder.design.Запуск"
+                                        "label": "Run / action",
+                                        "label_i18n": {
+                                            "locales": {
+                                                "en": "Run / action",
+                                                "ru": "Запуск / действие"
+                                            }
+                                        },
+                                        "key": "title"
                                     },
                                     {
-                                        "key": "stage",
-                                        "label": "Этап",
-                                        "label_i18n": "builder.design.Этап"
+                                        "label": "Started",
+                                        "label_i18n": {
+                                            "locales": {
+                                                "en": "Started",
+                                                "ru": "Начало"
+                                            }
+                                        },
+                                        "kind": "datetime",
+                                        "key": "started_at"
                                     },
                                     {
-                                        "key": "status",
-                                        "label": "Статус",
-                                        "label_i18n": "builder.design.Статус"
+                                        "label": "Revision",
+                                        "label_i18n": {
+                                            "locales": {
+                                                "en": "Revision",
+                                                "ru": "Редакция"
+                                            }
+                                        },
+                                        "key": "revision"
+                                    },
+                                    {
+                                        "label": "Status",
+                                        "label_i18n": {
+                                            "locales": {
+                                                "en": "Status",
+                                                "ru": "Статус"
+                                            }
+                                        },
+                                        "key": "status"
+                                    },
+                                    {
+                                        "label": "Model",
+                                        "label_i18n": {
+                                            "locales": {
+                                                "en": "Model",
+                                                "ru": "Модель"
+                                            }
+                                        },
+                                        "key": "model_label"
+                                    },
+                                    {
+                                        "label": "Input tokens",
+                                        "label_i18n": {
+                                            "locales": {
+                                                "en": "Input tokens",
+                                                "ru": "Входные токены"
+                                            }
+                                        },
+                                        "key": "input_tokens_label"
+                                    },
+                                    {
+                                        "label": "Output tokens",
+                                        "label_i18n": {
+                                            "locales": {
+                                                "en": "Output tokens",
+                                                "ru": "Выходные токены"
+                                            }
+                                        },
+                                        "key": "output_tokens_label"
+                                    },
+                                    {
+                                        "label": "Repairs",
+                                        "label_i18n": {
+                                            "locales": {
+                                                "en": "Repairs",
+                                                "ru": "Ремонты"
+                                            }
+                                        },
+                                        "key": "repair_attempts_label"
+                                    },
+                                    {
+                                        "label": "Cost USD",
+                                        "label_i18n": {
+                                            "locales": {
+                                                "en": "Cost USD",
+                                                "ru": "Стоимость USD"
+                                            }
+                                        },
+                                        "key": "cost_label"
                                     }
                                 ],
                                 "pagination": true,
@@ -1113,7 +1189,9 @@
                                     50
                                 ],
                                 "search": true,
-                                "rowKey": "id"
+                                "rowKey": "id",
+                                "compactPresentation": "cards",
+                                "selectionMode": "single"
                             },
                             "actions": [
                                 {
@@ -1127,7 +1205,7 @@
                                     "on": "select",
                                     "type": "openModal",
                                     "params": {
-                                        "modalId": "design-trace"
+                                        "modalId": "design-run-details"
                                     }
                                 }
                             ]
@@ -2686,6 +2764,48 @@
                                 }
                             ],
                             "visibleIf": "$state.workbenchView === 'conversation' && $state.conversationMode === 'informal'"
+                        },
+                        {
+                            "id": "design-conversation-request-provenance",
+                            "type": "item.details",
+                            "area": "main",
+                            "title": "Workflow request without linked discussion",
+                            "title_i18n": {
+                                "locales": {
+                                    "en": "Workflow request without linked discussion",
+                                    "ru": "Запрос workflow без связанных сообщений обсуждения"
+                                }
+                            },
+                            "visibleIf": "$state.workbenchView === 'conversation' && $state.workbench.source_message_count === 0 && $state.workbench.request",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": "$state.workbench"
+                            },
+                            "inputs": {
+                                "presentation": "section",
+                                "fields": [
+                                    {
+                                        "label": "Recorded request",
+                                        "label_i18n": {
+                                            "locales": {
+                                                "en": "Recorded request",
+                                                "ru": "Сохранённый запрос"
+                                            }
+                                        },
+                                        "key": "request"
+                                    },
+                                    {
+                                        "label": "Change",
+                                        "label_i18n": {
+                                            "locales": {
+                                                "en": "Change",
+                                                "ru": "Изменение"
+                                            }
+                                        },
+                                        "key": "change_id"
+                                    }
+                                ]
+                            }
                         }
                     ],
                     "initialStateSource": {
@@ -5992,20 +6112,7 @@
                                             "id": "llmModel",
                                             "label": "Модель",
                                             "type": "select",
-                                            "options": [
-                                                {
-                                                    "label": "gpt-4o",
-                                                    "value": "gpt-4o"
-                                                },
-                                                {
-                                                    "label": "gpt-5",
-                                                    "value": "gpt-5"
-                                                },
-                                                {
-                                                    "label": "o4-mini",
-                                                    "value": "o4-mini"
-                                                }
-                                            ],
+                                            "options": [],
                                             "stateKey": "dev.model",
                                             "default": "gpt-5",
                                             "label_i18n": "builder.text.model",
@@ -6883,6 +6990,392 @@
                             }
                         ]
                     }
+                },
+                "design-run-details": {
+                    "title": "Run details",
+                    "title_i18n": {
+                        "locales": {
+                            "en": "Run details",
+                            "ru": "Детали запуска"
+                        }
+                    },
+                    "presentation": {
+                        "kind": "modal"
+                    },
+                    "schema": {
+                        "id": "design-run-details",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "design-run-execution",
+                                "type": "item.details",
+                                "area": "main",
+                                "title": "Execution",
+                                "title_i18n": {
+                                    "locales": {
+                                        "en": "Execution",
+                                        "ru": "Исполнение"
+                                    }
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.selectedTrace"
+                                },
+                                "inputs": {
+                                    "presentation": "section",
+                                    "fields": [
+                                        {
+                                            "label": "Run / action",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Run / action",
+                                                    "ru": "Запуск / действие"
+                                                }
+                                            },
+                                            "key": "title"
+                                        },
+                                        {
+                                            "label": "Run ID",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Run ID",
+                                                    "ru": "ID запуска"
+                                                }
+                                            },
+                                            "key": "id"
+                                        },
+                                        {
+                                            "label": "Change",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Change",
+                                                    "ru": "Изменение"
+                                                }
+                                            },
+                                            "key": "change_id"
+                                        },
+                                        {
+                                            "label": "Status",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Status",
+                                                    "ru": "Статус"
+                                                }
+                                            },
+                                            "key": "status"
+                                        },
+                                        {
+                                            "label": "Result revision",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Result revision",
+                                                    "ru": "Редакция результата"
+                                                }
+                                            },
+                                            "key": "revision"
+                                        },
+                                        {
+                                            "label": "Executor",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Executor",
+                                                    "ru": "Исполнитель"
+                                                }
+                                            },
+                                            "key": "executor"
+                                        },
+                                        {
+                                            "label": "Started",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Started",
+                                                    "ru": "Начало"
+                                                }
+                                            },
+                                            "key": "started_at"
+                                        },
+                                        {
+                                            "label": "Completed",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Completed",
+                                                    "ru": "Завершение"
+                                                }
+                                            },
+                                            "key": "completed_at"
+                                        },
+                                        {
+                                            "label": "Model",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Model",
+                                                    "ru": "Модель"
+                                                }
+                                            },
+                                            "key": "model_label"
+                                        },
+                                        {
+                                            "label": "Requested reasoning effort",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Requested reasoning effort",
+                                                    "ru": "Запрошенная интенсивность reasoning"
+                                                }
+                                            },
+                                            "key": "effort_label"
+                                        },
+                                        {
+                                            "label": "LLM calls",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "LLM calls",
+                                                    "ru": "LLM-вызовы"
+                                                }
+                                            },
+                                            "key": "llm_calls_label"
+                                        },
+                                        {
+                                            "label": "Repair calls",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Repair calls",
+                                                    "ru": "Вызовы ремонта"
+                                                }
+                                            },
+                                            "key": "repair_attempts_label"
+                                        },
+                                        {
+                                            "label": "Input tokens (including cached)",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Input tokens (including cached)",
+                                                    "ru": "Входные токены (включая кеш)"
+                                                }
+                                            },
+                                            "key": "input_tokens_label"
+                                        },
+                                        {
+                                            "label": "Cached input tokens",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Cached input tokens",
+                                                    "ru": "Кешированные входные токены"
+                                                }
+                                            },
+                                            "key": "cached_input_tokens_label"
+                                        },
+                                        {
+                                            "label": "Output tokens (including reasoning)",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Output tokens (including reasoning)",
+                                                    "ru": "Выходные токены (включая reasoning)"
+                                                }
+                                            },
+                                            "key": "output_tokens_label"
+                                        },
+                                        {
+                                            "label": "Reasoning tokens",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Reasoning tokens",
+                                                    "ru": "Токены reasoning"
+                                                }
+                                            },
+                                            "key": "reasoning_tokens_label"
+                                        },
+                                        {
+                                            "label": "Cost USD and basis",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Cost USD and basis",
+                                                    "ru": "Стоимость USD и основание"
+                                                }
+                                            },
+                                            "key": "cost_label"
+                                        },
+                                        {
+                                            "label": "Root execution time (not pure model time)",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Root execution time (not pure model time)",
+                                                    "ru": "Время исполнения Root (не чистое время модели)"
+                                                }
+                                            },
+                                            "key": "root_time_label"
+                                        },
+                                        {
+                                            "label": "Root queue time, ms",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Root queue time, ms",
+                                                    "ru": "Очередь Root, мс"
+                                                }
+                                            },
+                                            "key": "root_queue_ms_label"
+                                        },
+                                        {
+                                            "label": "Client observation wait, ms",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Client observation wait, ms",
+                                                    "ru": "Ожидание клиентского наблюдателя, мс"
+                                                }
+                                            },
+                                            "key": "client_wait_ms_label"
+                                        },
+                                        {
+                                            "label": "Execution measurement coverage",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Execution measurement coverage",
+                                                    "ru": "Наличие измерений исполнения"
+                                                }
+                                            },
+                                            "key": "measurement_label"
+                                        },
+                                        {
+                                            "label": "Failure",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Failure",
+                                                    "ru": "Ошибка"
+                                                }
+                                            },
+                                            "key": "error"
+                                        }
+                                    ],
+                                    "emptyText": "No recorded execution details."
+                                }
+                            },
+                            {
+                                "id": "design-run-context",
+                                "type": "item.details",
+                                "area": "main",
+                                "title": "Inputs and evidence",
+                                "title_i18n": {
+                                    "locales": {
+                                        "en": "Inputs and evidence",
+                                        "ru": "Входные данные и доказательства"
+                                    }
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.selectedTrace"
+                                },
+                                "inputs": {
+                                    "presentation": "section",
+                                    "fields": [
+                                        {
+                                            "label": "Workflow request (not a reconstructed conversation)",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Workflow request (not a reconstructed conversation)",
+                                                    "ru": "Запрос workflow (не восстановленная переписка)"
+                                                }
+                                            },
+                                            "key": "request"
+                                        },
+                                        {
+                                            "label": "Linked conversation messages",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Linked conversation messages",
+                                                    "ru": "Связанные сообщения обсуждения"
+                                                }
+                                            },
+                                            "key": "source_message_ids"
+                                        },
+                                        {
+                                            "label": "Recorded context digest",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Recorded context digest",
+                                                    "ru": "Дайджест сохранённого контекста"
+                                                }
+                                            },
+                                            "key": "context_packet_digest"
+                                        },
+                                        {
+                                            "label": "Inputs",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Inputs",
+                                                    "ru": "Исходные данные"
+                                                }
+                                            },
+                                            "key": "input_refs"
+                                        },
+                                        {
+                                            "label": "Outputs",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Outputs",
+                                                    "ru": "Результаты"
+                                                }
+                                            },
+                                            "key": "output_refs"
+                                        },
+                                        {
+                                            "label": "Evidence",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Evidence",
+                                                    "ru": "Доказательства"
+                                                }
+                                            },
+                                            "key": "evidence_refs"
+                                        },
+                                        {
+                                            "label": "Environment",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Environment",
+                                                    "ru": "Окружение"
+                                                }
+                                            },
+                                            "key": "environment_ref"
+                                        },
+                                        {
+                                            "label": "Measurement sources",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Measurement sources",
+                                                    "ru": "Источники измерений"
+                                                }
+                                            },
+                                            "key": "execution_metrics.source_refs"
+                                        }
+                                    ],
+                                    "emptyText": "No recorded execution details."
+                                }
+                            }
+                        ]
+                    }
                 }
             },
             "resources": {
@@ -6908,6 +7401,42 @@
                     "path": "assets/i18n/ru.json",
                     "mime": "application/json",
                     "delivery": "core"
+                },
+                "builder.design.i18n.en": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "en",
+                    "scope": "scenario",
+                    "path": "assets/i18n/design-071-en.json",
+                    "mime": "application/json",
+                    "delivery": "core"
+                },
+                "builder.live.i18n.en": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "en",
+                    "scope": "scenario",
+                    "path": "assets/i18n/workbench-live-en.json",
+                    "mime": "application/json",
+                    "delivery": "core"
+                },
+                "builder.design.i18n.ru": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "ru",
+                    "scope": "scenario",
+                    "path": "assets/i18n/design-071-ru.json",
+                    "mime": "application/json",
+                    "delivery": "core"
+                },
+                "builder.live.i18n.ru": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "ru",
+                    "scope": "scenario",
+                    "path": "assets/i18n/workbench-live-ru.json",
+                    "mime": "application/json",
+                    "delivery": "core"
                 }
             }
         },
@@ -6919,6 +7448,58 @@
             "scope": "scenario",
             "path": "assets/design-071-reference.png",
             "mime": "image/png",
+            "delivery": "core"
+        },
+        "builder.i18n.en": {
+            "kind": "data",
+            "role": "i18n",
+            "locale": "en",
+            "path": "assets/i18n/en.json",
+            "mime": "application/json",
+            "delivery": "core"
+        },
+        "builder.i18n.ru": {
+            "kind": "data",
+            "role": "i18n",
+            "locale": "ru",
+            "path": "assets/i18n/ru.json",
+            "mime": "application/json",
+            "delivery": "core"
+        },
+        "builder.design.i18n.en": {
+            "kind": "data",
+            "role": "i18n",
+            "locale": "en",
+            "scope": "scenario",
+            "path": "assets/i18n/design-071-en.json",
+            "mime": "application/json",
+            "delivery": "core"
+        },
+        "builder.live.i18n.en": {
+            "kind": "data",
+            "role": "i18n",
+            "locale": "en",
+            "scope": "scenario",
+            "path": "assets/i18n/workbench-live-en.json",
+            "mime": "application/json",
+            "delivery": "core"
+        },
+        "builder.design.i18n.ru": {
+            "kind": "data",
+            "role": "i18n",
+            "locale": "ru",
+            "scope": "scenario",
+            "path": "assets/i18n/design-071-ru.json",
+            "mime": "application/json",
+            "delivery": "core"
+        },
+        "builder.live.i18n.ru": {
+            "kind": "data",
+            "role": "i18n",
+            "locale": "ru",
+            "scope": "scenario",
+            "path": "assets/i18n/workbench-live-ru.json",
+            "mime": "application/json",
             "delivery": "core"
         }
     }
