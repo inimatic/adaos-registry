@@ -27,7 +27,6 @@ from adaos.sdk.builder import preview as builder_preview
 from adaos.sdk.builder import project_catalog as sdk_builder_project_catalog
 from adaos.sdk.builder import prototype as sdk_builder_prototype
 from adaos.sdk.builder import review as sdk_builder_review
-from adaos.services.builder.model_controls import max_tokens_for_model as _model_max_tokens_for_model, reasoning_for_model as _model_reasoning_for_model
 from adaos.sdk.builder import workflow as sdk_builder_workflow
 from adaos.sdk.builder import semantic_ui as sdk_builder_semantic_ui
 from adaos.sdk.core.decorators import subscribe, tool
@@ -25578,6 +25577,14 @@ def _try_bounded_semantic_request(*, instruction, ws, session, binding, topic, _
         return {"ok": False, "status": "builder_target_mismatch", "model_calls": 0,
                 "message": "The admitted conversation and selected semantic project disagree; no model was called."}
     root = _project_artifact_root(session)
+    if "builder_semantic_write_ref" in meta or "builder_semantic_write_property" in meta:
+        write_ref = str(meta.get("builder_semantic_write_ref") or "").strip()
+        write_property = str(meta.get("builder_semantic_write_property") or "").strip()
+        if not write_ref or not write_property:
+            return {"ok": True, "status": "semantic_proposal_rejected", "model_calls": 0,
+                    "message": "Choose an exact semantic target and property in Builder settings. No model was called."}
+        meta["builder_semantic_write_refs"] = [write_ref]
+        meta["builder_semantic_write_properties"] = {write_ref: [write_property]}
     message_id = str(meta.get("source_message_id") or meta.get("message_id") or "").strip()
     if not message_id:
         message_id = _external_user_turn_message_id(instruction, meta)

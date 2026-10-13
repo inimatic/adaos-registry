@@ -170,7 +170,10 @@
                         "designSettings": {
                             "diagnostics": false
                         },
-                        "informalNote": ""
+                        "informalNote": "",
+                        "builderSemanticEditMode": "full_candidate",
+                        "builderSemanticWriteRef": "",
+                        "builderSemanticWriteProperty": "title.en"
                     },
                     "meta": {
                         "builder": {
@@ -2496,7 +2499,10 @@
                                     "builder_selected_target": {
                                         "object_type": "$state.selectedProjectKind",
                                         "object_id": "$state.selectedProjectId"
-                                    }
+                                    },
+                                    "builder_semantic_edit_mode": "$state.builderSemanticEditMode",
+                                    "builder_semantic_write_ref": "$state.builderSemanticWriteRef",
+                                    "builder_semantic_write_property": "$state.builderSemanticWriteProperty"
                                 },
                                 "minRows": 4,
                                 "multiline": true,
@@ -2711,7 +2717,10 @@
                                     "builder_selected_target": {
                                         "object_type": "$state.selectedProjectKind",
                                         "object_id": "$state.selectedProjectId"
-                                    }
+                                    },
+                                    "builder_semantic_edit_mode": "$state.builderSemanticEditMode",
+                                    "builder_semantic_write_ref": "$state.builderSemanticWriteRef",
+                                    "builder_semantic_write_property": "$state.builderSemanticWriteProperty"
                                 },
                                 "minRows": 4,
                                 "multiline": true,
@@ -6157,6 +6166,162 @@
                                     },
                                     "emptyText": "No details available."
                                 }
+                            },
+                            {
+                                "id": "design-semantic-edit-scope",
+                                "type": "item.details",
+                                "area": "main",
+                                "visibleIf": "$state.builderSemanticEditMode === 'bounded_ops'",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "builder_sdk_control_skill.get_semantic_inspector",
+                                    "params": {
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
+                                    },
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "builder.project.metadata",
+                                        "builder.project.lifecycle",
+                                        "builder.project.preview",
+                                        "builder.project.automation",
+                                        "builder.project.publication",
+                                        "builder.project.change"
+                                    ],
+                                    "preserveLastValue": true,
+                                    "maxRequestHz": 0.2
+                                },
+                                "inputs": {
+                                    "presentation": "section",
+                                    "fields": [
+                                        {
+                                            "key": "status_label",
+                                            "label": "Semantic scope",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Semantic scope",
+                                                    "ru": "Семантическая область"
+                                                }
+                                            }
+                                        }
+                                    ],
+                                    "stateBindings": {
+                                        "builderSemanticRefs": "refs"
+                                    }
+                                }
+                            },
+                            {
+                                "id": "design-semantic-edit-settings",
+                                "type": "ui.form",
+                                "area": "main",
+                                "title": "Prototype edit mode",
+                                "title_i18n": {
+                                    "locales": {
+                                        "en": "Prototype edit mode",
+                                        "ru": "Режим правок прототипа"
+                                    }
+                                },
+                                "inputs": {
+                                    "showSubmit": false,
+                                    "autoCommit": true,
+                                    "fields": [
+                                        {
+                                            "id": "semanticEditMode",
+                                            "type": "select",
+                                            "stateKey": "builderSemanticEditMode",
+                                            "default": "full_candidate",
+                                            "label": "Edit path",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Edit path",
+                                                    "ru": "Способ правки"
+                                                }
+                                            },
+                                            "options": [
+                                                {
+                                                    "value": "full_candidate",
+                                                    "label": "Standard (deterministic edits first)",
+                                                    "label_i18n": {
+                                                        "locales": {
+                                                            "en": "Standard (deterministic edits first)",
+                                                            "ru": "Обычный (сначала точные правки без LLM)"
+                                                        }
+                                                    }
+                                                },
+                                                {
+                                                    "value": "bounded_ops",
+                                                    "label": "Bounded LLM edit: labels or column order (beta)",
+                                                    "label_i18n": {
+                                                        "locales": {
+                                                            "en": "Bounded LLM edit: labels or column order (beta)",
+                                                            "ru": "Ограниченная LLM-правка: подписи или порядок колонок (бета)"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "id": "writeRef",
+                                            "type": "select",
+                                            "stateKey": "builderSemanticWriteRef",
+                                            "default": "",
+                                            "visibleIf": "$state.builderSemanticEditMode === 'bounded_ops'",
+                                            "label": "Exact semantic target",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Exact semantic target",
+                                                    "ru": "Точная семантическая цель"
+                                                }
+                                            },
+                                            "optionsStatePath": "builderSemanticRefs",
+                                            "optionValuePath": "ref",
+                                            "optionLabelPaths": [
+                                                "ref",
+                                                "label_en"
+                                            ]
+                                        },
+                                        {
+                                            "id": "writeProperty",
+                                            "type": "select",
+                                            "stateKey": "builderSemanticWriteProperty",
+                                            "default": "title.en",
+                                            "visibleIf": "$state.builderSemanticEditMode === 'bounded_ops'",
+                                            "label": "Only allowed property",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Only allowed property",
+                                                    "ru": "Единственное разрешённое свойство"
+                                                }
+                                            },
+                                            "options": [
+                                                {
+                                                    "value": "title.en",
+                                                    "label": "title.en"
+                                                },
+                                                {
+                                                    "value": "title.ru",
+                                                    "label": "title.ru"
+                                                },
+                                                {
+                                                    "value": "label.en",
+                                                    "label": "label.en"
+                                                },
+                                                {
+                                                    "value": "label.ru",
+                                                    "label": "label.ru"
+                                                },
+                                                {
+                                                    "value": "field_refs",
+                                                    "label": "field_refs"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                "actions": []
                             },
                             {
                                 "area": "main",

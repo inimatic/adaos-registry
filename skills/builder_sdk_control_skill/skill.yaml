@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.2.8
+version: 0.2.10
 description: SDK-only backend for the functional Builder DEV scenario.
 capabilities:
 - applications.develop
