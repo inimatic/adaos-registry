@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.2.7
+version: 0.2.8
 description: SDK-only backend for the functional Builder DEV scenario.
 capabilities:
 - applications.develop
@@ -1794,6 +1794,21 @@ tools:
         - project
         - scenario
         - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: get_semantic_inspector
+  description: Read exact semantic refs and the last committed bounded write set; no selection or source mutation.
+  entry: handlers.main:get_semantic_inspector
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum: [project, scenario, skill]
       object_id:
         type: string
         minLength: 1

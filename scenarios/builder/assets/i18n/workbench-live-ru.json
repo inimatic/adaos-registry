@@ -157,5 +157,6 @@
   "builder.about.generation_status.cancelled": "Отменено",
   "builder.about.generation_status.invalid_output": "Некорректный результат",
   "builder.about.metering_status.reported": "Учтено",
-  "builder.about.metering_status.not_reported": "Нет данных учета"
+  "builder.about.metering_status.not_reported": "Нет данных учета",
+  "builder.semantic.inspector": "Семантика"
 }

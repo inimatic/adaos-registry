@@ -3171,6 +3171,18 @@ def get_change_context(
     }
 
 
+@tool("get_semantic_inspector", summary="Inspect exact semantic refs and committed bounded writes without changing selection.", side_effects="none")
+def get_semantic_inspector(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+) -> dict[str, Any]:
+    kind, identity = _execution_identity(*_identity(object_type, object_id))
+    if kind != "scenario":
+        return {"status": "unsupported", "project_ref": f"{kind}:{identity}", "refs": [], "write_set": [],
+                "status_label": "This component has no scenario semantic source"}
+    return semantic_ui.inspect(project_ref=f"scenario:{identity}")
+
+
 @tool(
     "apply_semantic_ui_change",
     summary="Apply one reversible semantic UI operation.",

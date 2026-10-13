@@ -2,7 +2,7 @@
     "schema": "adaos.webui.v1",
     "generated_by": "builder-owned-live-implementation",
     "ui": {
-        "version": "0.2.103",
+        "version": "0.2.104",
         "application": {
             "desktop": {
                 "pageSchema": {
@@ -732,6 +732,12 @@
                                         "icon": "git-branch-outline",
                                         "label": "Редакции",
                                         "label_i18n": "builder.design.Редакции"
+                                    },
+                                    {
+                                        "id": "semantic-inspector",
+                                        "icon": "git-compare-outline",
+                                        "label": "Semantics",
+                                        "label_i18n": "builder.semantic.inspector"
                                     }
                                 ]
                             },
@@ -773,6 +779,26 @@
                                     "type": "openModal",
                                     "params": {
                                         "modalId": "design-revisions"
+                                    }
+                                },
+                                {
+                                    "on": "click:semantic-inspector",
+                                    "type": "callSkill",
+                                    "target": "builder_sdk_control_skill.get_semantic_inspector",
+                                    "params": {
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
+                                    },
+                                    "resultStateKey": "semanticInspector"
+                                },
+                                {
+                                    "on": "click:semantic-inspector",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "design-semantic-inspector"
                                     }
                                 }
                             ],
@@ -7429,6 +7455,362 @@
                                     "emptyText": "No recorded execution details."
                                 },
                                 "visibleIf": "$state.selectedTrace.execution_metrics"
+                            }
+                        ]
+                    }
+                },
+                "design-semantic-inspector": {
+                    "title": "Semantic inspector",
+                    "title_i18n": {
+                        "locales": {
+                            "en": "Semantic inspector",
+                            "ru": "Инспектор семантики"
+                        }
+                    },
+                    "presentation": {
+                        "kind": "modal"
+                    },
+                    "schema": {
+                        "id": "design-semantic-inspector",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "fluid",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "selection": "none",
+                                "rowActivation": "none",
+                                "filters": "inline",
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "design-semantic-summary",
+                                "type": "item.details",
+                                "area": "main",
+                                "title": "Exact source and scope",
+                                "title_i18n": {
+                                    "locales": {
+                                        "en": "Exact source and scope",
+                                        "ru": "Точный источник и область изменения"
+                                    }
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.semanticInspector"
+                                },
+                                "inputs": {
+                                    "presentation": "section",
+                                    "fields": [
+                                        {
+                                            "label": "Verification status",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Verification status",
+                                                    "ru": "Статус проверки"
+                                                }
+                                            },
+                                            "key": "status"
+                                        },
+                                        {
+                                            "label": "Semantic source",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Semantic source",
+                                                    "ru": "Семантический источник"
+                                                }
+                                            },
+                                            "key": "project_ref"
+                                        },
+                                        {
+                                            "label": "Current source revision",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Current source revision",
+                                                    "ru": "Текущая редакция источника"
+                                                }
+                                            },
+                                            "key": "source_revision"
+                                        },
+                                        {
+                                            "label": "Current source digest",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Current source digest",
+                                                    "ru": "Дайджест текущего источника"
+                                                }
+                                            },
+                                            "key": "base_hash"
+                                        },
+                                        {
+                                            "label": "Validation read scope (complete source)",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Validation read scope (complete source)",
+                                                    "ru": "Область чтения проверки (полный источник)"
+                                                }
+                                            },
+                                            "key": "read_scope"
+                                        },
+                                        {
+                                            "label": "Supported bounded operations",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Supported bounded operations",
+                                                    "ru": "Поддерживаемые ограниченные операции"
+                                                }
+                                            },
+                                            "key": "supported_operations_text"
+                                        },
+                                        {
+                                            "label": "Last committed transaction",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Last committed transaction",
+                                                    "ru": "Последняя зафиксированная операция"
+                                                }
+                                            },
+                                            "key": "transaction_id"
+                                        },
+                                        {
+                                            "label": "Last operation base revision",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Last operation base revision",
+                                                    "ru": "Базовая редакция последней операции"
+                                                }
+                                            },
+                                            "key": "transaction_source_revision"
+                                        },
+                                        {
+                                            "label": "Admitted write refs",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Admitted write refs",
+                                                    "ru": "Разрешённые ссылки для записи"
+                                                }
+                                            },
+                                            "key": "admitted_write_refs"
+                                        },
+                                        {
+                                            "label": "Dependency hints (not minimal model context)",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Dependency hints (not minimal model context)",
+                                                    "ru": "Зависимости (не минимальный контекст модели)"
+                                                }
+                                            },
+                                            "key": "dependency_refs"
+                                        },
+                                        {
+                                            "label": "Recorded property writes",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Recorded property writes",
+                                                    "ru": "Сохранённые изменения свойств"
+                                                }
+                                            },
+                                            "key": "write_count"
+                                        },
+                                        {
+                                            "label": "Blocked verification stage",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Blocked verification stage",
+                                                    "ru": "Этап остановки проверки"
+                                                }
+                                            },
+                                            "key": "block_reason"
+                                        },
+                                        {
+                                            "label": "Reason",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Reason",
+                                                    "ru": "Причина"
+                                                }
+                                            },
+                                            "key": "block_detail"
+                                        }
+                                    ],
+                                    "emptyText": "No recorded execution details."
+                                }
+                            },
+                            {
+                                "id": "design-semantic-writes",
+                                "type": "ui.table",
+                                "area": "main",
+                                "title": "Last committed write set",
+                                "title_i18n": {
+                                    "locales": {
+                                        "en": "Last committed write set",
+                                        "ru": "Последний зафиксированный набор изменений"
+                                    }
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.semanticInspector.write_set"
+                                },
+                                "inputs": {
+                                    "columns": [
+                                        {
+                                            "label": "Ref",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Ref",
+                                                    "ru": "Ссылка"
+                                                }
+                                            },
+                                            "key": "ref"
+                                        },
+                                        {
+                                            "label": "Property",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Property",
+                                                    "ru": "Свойство"
+                                                }
+                                            },
+                                            "key": "property"
+                                        },
+                                        {
+                                            "label": "Operation",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Operation",
+                                                    "ru": "Операция"
+                                                }
+                                            },
+                                            "key": "kind"
+                                        },
+                                        {
+                                            "label": "Before",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Before",
+                                                    "ru": "До"
+                                                }
+                                            },
+                                            "key": "before_text"
+                                        },
+                                        {
+                                            "label": "After",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "After",
+                                                    "ru": "После"
+                                                }
+                                            },
+                                            "key": "after_text"
+                                        }
+                                    ],
+                                    "rowKey": "seq",
+                                    "pagination": true,
+                                    "pageSize": 10,
+                                    "search": true,
+                                    "compactPresentation": "cards",
+                                    "selectionMode": "none"
+                                }
+                            },
+                            {
+                                "id": "design-semantic-refs",
+                                "type": "ui.table",
+                                "area": "main",
+                                "title": "Semantic refs",
+                                "title_i18n": {
+                                    "locales": {
+                                        "en": "Semantic refs",
+                                        "ru": "Семантические ссылки"
+                                    }
+                                },
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.semanticInspector.refs"
+                                },
+                                "inputs": {
+                                    "columns": [
+                                        {
+                                            "label": "Ref",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Ref",
+                                                    "ru": "Ссылка"
+                                                }
+                                            },
+                                            "key": "ref"
+                                        },
+                                        {
+                                            "label": "Kind",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Kind",
+                                                    "ru": "Вид"
+                                                }
+                                            },
+                                            "key": "kind"
+                                        },
+                                        {
+                                            "label": "English label",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "English label",
+                                                    "ru": "Английская подпись"
+                                                }
+                                            },
+                                            "key": "label_en"
+                                        },
+                                        {
+                                            "label": "Russian label",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Russian label",
+                                                    "ru": "Русская подпись"
+                                                }
+                                            },
+                                            "key": "label_ru"
+                                        },
+                                        {
+                                            "label": "Supported writable properties",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Supported writable properties",
+                                                    "ru": "Поддерживаемые свойства для записи"
+                                                }
+                                            },
+                                            "key": "writes_text"
+                                        },
+                                        {
+                                            "label": "Dependencies",
+                                            "label_i18n": {
+                                                "locales": {
+                                                    "en": "Dependencies",
+                                                    "ru": "Зависимости"
+                                                }
+                                            },
+                                            "key": "dependencies_text"
+                                        }
+                                    ],
+                                    "rowKey": "ref",
+                                    "pagination": true,
+                                    "pageSize": 10,
+                                    "search": true,
+                                    "compactPresentation": "cards",
+                                    "selectionMode": "none"
+                                }
                             }
                         ]
                     }

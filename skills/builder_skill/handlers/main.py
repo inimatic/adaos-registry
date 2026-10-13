@@ -251,7 +251,7 @@ def _requested_scenario_id_from_meta(_meta: Mapping[str, Any] | None = None) -> 
 
 def _label_conversation_target_guard(text: str, meta: Mapping[str, Any]) -> dict[str, Any] | None:
     selected = meta.get("builder_selected_target")
-    if not isinstance(selected, Mapping) or not sdk_builder_semantic_ui.recognizes_label_request(text):
+    if not isinstance(selected, Mapping) or not sdk_builder_semantic_ui.recognizes_request(text):
         return None
     kind, identity = str(selected.get("object_type") or ""), str(selected.get("object_id") or "")
     if kind == "scenario":
@@ -25548,15 +25548,18 @@ def _try_semantic_label_request(
     topic: Mapping[str, Any], auto_apply: bool, expected_revision: str | None,
     _meta: Mapping[str, Any] | None,
 ) -> dict[str, Any] | None:
-    if not sdk_builder_semantic_ui.recognizes_label_request(instruction):
+    if not sdk_builder_semantic_ui.recognizes_request(instruction):
         return None
+    label_request = sdk_builder_semantic_ui.recognizes_label_request(instruction)
+    operation_name = "Label" if label_request else "Semantic"
+    status_prefix = "semantic_label" if label_request else "semantic_edit"
     root = _project_artifact_root(session)
     if root is None:
         return None
     if not (root / "semantic.webui.json").is_file():
         payload = session.get("webui_payload") or _read_json_file(root / "webui.json") or {}
         if str(payload.get("generated_by") or "").startswith("builder.semantic_compiler."):
-            return {"ok": True, "status": "semantic_label_rejected", "model_calls": 0,
+            return {"ok": True, "status": status_prefix + "_rejected", "model_calls": 0,
                     "message": "Managed semantic source is missing. Restore the exact source before editing labels."}
         return None  # Explicit compatibility path for unmanaged legacy sources.
     started = time.perf_counter()
@@ -25574,20 +25577,21 @@ def _try_semantic_label_request(
               "message_meta": {"message_id": f"{message_id}.label-result", "source_message_id": message_id}}
     timing = {}
     try:
-        prepared = sdk_builder_semantic_ui.prepare_label_request(
+        prepared = sdk_builder_semantic_ui.prepare_request(
             project_ref=f"scenario:{scenario_id}", instruction=instruction,
             source_message_id=message_id, expected_revision=expected_revision)
         prepared_at = time.perf_counter()
         timing["prepare_ms"] = round((prepared_at - started) * 1000, 1)
         if prepared["status"] != "planned":
             return {**common, **prepared, "ok": True, "message": (
-                "No label changed. Specify one existing label in quotes and, if ambiguous, its language. "
-                'Example: Rename view "Records" to "Work queue" in English.'),
+                "No semantic property changed. Specify existing labels in quotes and their language. "
+                'Examples: Rename view "Records" to "Work queue" in English; '
+                'Move column "State" before "Name" in view "Records" in English.'),
                 "timing": {"total_ms": round((time.perf_counter() - started) * 1000, 1)}}
         request = copy.deepcopy(prepared["request"])
         if not auto_apply:
-            return {**common, "ok": True, "status": "semantic_label_proposed", "semantic_request": request,
-                    "message": "The bounded label operation is proposed; no source was changed."}
+            return {**common, "ok": True, "status": status_prefix + "_proposed", "semantic_request": request,
+                    "message": "The bounded semantic operation is proposed; no source was changed."}
         patch = {"id": request["transaction_id"], "summary": instruction, "target": "semantic",
                  "operation": "semantic_graph", "change_id": request["transaction_id"], "created_at": _now()}
         if not prepared.get("replayed"):
@@ -25604,8 +25608,8 @@ def _try_semantic_label_request(
         applied_at = time.perf_counter()
         timing["apply_ms"] = round((applied_at - intake_at) * 1000, 1)
     except Exception as exc:
-        return {**common, "ok": True, "status": "semantic_label_rejected", "error": "semantic_label_request_rejected",
-                "detail": f"{type(exc).__name__}: {exc}", "message": f"Label request stopped safely: {exc}",
+        return {**common, "ok": True, "status": status_prefix + "_rejected", "error": status_prefix + "_request_rejected",
+                "detail": f"{type(exc).__name__}: {exc}", "message": f"{operation_name} request stopped safely: {exc}",
                 "timing": {"total_ms": round((time.perf_counter() - started) * 1000, 1)}}
     # Semantic commit is authoritative. Delivery failures must not trigger a
     # second revision, full regeneration, or claim that the source rolled back.
@@ -25631,12 +25635,12 @@ def _try_semantic_label_request(
     timing["projection_ms"] = round((time.perf_counter() - delivered_at) * 1000, 1)
     timing["total_ms"] = round((time.perf_counter() - started) * 1000, 1)
     common["message_meta"]["builder_d0_timing"] = timing
-    message = f"Label operation {'already recorded' if result.get('replayed') else 'applied'}: revision {result['revision']}."
+    message = f"{operation_name} operation {'already recorded' if result.get('replayed') else 'applied'}: revision {result['revision']}."
     if delivery.get("error") or (isinstance(delivery.get("preview"), Mapping) and not delivery["preview"].get("ok")):
         message += " Source is committed, but Preview delivery needs retry."
     if _should_emit_api_tool_chat(_meta):
         _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, binding=binding, topic_ref=topic)
-    return {**common, "ok": True, "status": "semantic_label_applied", "semantic_transaction": result,
+    return {**common, "ok": True, "status": status_prefix + "_applied", "semantic_transaction": result,
             "delivery": delivery, "message": message,
             "timing": timing}
 

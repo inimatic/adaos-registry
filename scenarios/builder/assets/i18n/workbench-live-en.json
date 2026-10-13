@@ -157,5 +157,6 @@
   "builder.about.generation_status.cancelled": "Cancelled",
   "builder.about.generation_status.invalid_output": "Invalid output",
   "builder.about.metering_status.reported": "Reported",
-  "builder.about.metering_status.not_reported": "Not reported"
+  "builder.about.metering_status.not_reported": "Not reported",
+  "builder.semantic.inspector": "Semantics"
 }
