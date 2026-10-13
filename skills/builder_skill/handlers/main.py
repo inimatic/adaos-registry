@@ -20121,12 +20121,23 @@ def chat(
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     turn_started_at = time.perf_counter()
+    routing_stages: dict[str, float] = {}
+    route_phase_started = turn_started_at
+
+    def record_route_phase(name: str) -> None:
+        nonlocal route_phase_started
+        now = time.perf_counter()
+        routing_stages[name] = round((now - route_phase_started) * 1000, 1)
+        route_phase_started = now
+
     _reject_transport_corrupted_text(text, field="text")
     utterance = str(text or "").strip()
     target_guard = _label_conversation_target_guard(utterance, dict(_meta or {}))
+    record_route_phase("target_guard_ms")
     if target_guard is not None:
         return target_guard
     context = _resolve_builder_context_for_turn(webspace_id, _meta)
+    record_route_phase("builder_context_ms")
     if context is None:
         command = _parse_builder_command(utterance, has_session=False)
         command["raw"] = utterance
@@ -20155,10 +20166,13 @@ def chat(
     # Incoming project topic/thread is authoritative.  Align selection before
     # resolving the target session so a stale workbench cannot route this turn.
     requested_binding = _align_workbench_binding_to_meta(ws, turn_meta)
+    record_route_phase("binding_alignment_ms")
     session, binding = _target_session(ws)
+    record_route_phase("target_session_ms")
     if requested_binding is not None:
         binding.update(requested_binding)
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=turn_meta)
+    record_route_phase("conversation_topic_ms")
     command = _parse_builder_command(utterance, has_session=bool(session))
     command["raw"] = utterance
     intent = str(command.get("intent") or "")
@@ -20376,6 +20390,7 @@ def chat(
             "dialog": _dialog_state(ws, topic_ref=topic),
         }
     d0_started_at = time.perf_counter()
+    record_route_phase("command_and_route_ms")
     result = (None if retry_job_id else _try_semantic_label_request(
         instruction=_instruction_with_prototype_review_notes(utterance, turn_meta),
         ws=ws, session=session, binding=binding, topic=topic,
@@ -20386,6 +20401,7 @@ def chat(
         result.setdefault("message_meta", {})["builder_d0_turn_timing"] = {
             "routing_ms": round((d0_started_at - turn_started_at) * 1000, 1),
             "before_emit_ms": round((time.perf_counter() - turn_started_at) * 1000, 1),
+            "routing_stages_ms": routing_stages,
         }
     else:
         result = update_current_scenario(

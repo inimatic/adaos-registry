@@ -209,7 +209,7 @@
                                         "id": "specimens",
                                         "icon": "options-outline",
                                         "displaySelectedLabel": false,
-                                        "refreshOptionsOnOpen": false,
+                                        "refreshOptionsOnOpen": true,
                                         "selectedStateKey": "inspectedProcessRef",
                                         "optionMetaPaths": [
                                             "subtitle"
@@ -229,7 +229,8 @@
                                             ]
                                         },
                                         "label": "Процесс",
-                                        "label_i18n": "builder.design.Процесс"
+                                        "label_i18n": "builder.design.Процесс",
+                                        "loadOptionsOnOpen": true
                                     },
                                     {
                                         "id": "deliveries",
