@@ -11110,6 +11110,7 @@ def _register_builder_change_set(
     patch: Mapping[str, Any],
     request_text: str,
     _meta: Mapping[str, Any] | None,
+    compact: bool = False,
 ) -> dict[str, Any]:
     object_type = _builder_source_artifact_kind(session)
     object_id = str(
@@ -11128,13 +11129,14 @@ def _register_builder_change_set(
         if str((_meta or {}).get(key) or "").strip()
     ]
     try:
-        state = sdk_builder_workflow.get_state(object_type, object_id)
+        state = (sdk_builder_workflow.get_prototype_intake_context(object_type, object_id) if compact
+                 else sdk_builder_workflow.get_state(object_type, object_id))
         current = (
             state.get("change_set")
             if isinstance(state.get("change_set"), Mapping)
-            else {}
+            else state.get("change") if isinstance(state.get("change"), Mapping) else {}
         )
-        current_id = str(current.get("change_set_id") or "").strip()
+        current_id = str(current.get("change_set_id") or current.get("change_id") or "").strip()
         current_status = str(current.get("status") or "").strip()
         terminal = current_status in {"published", "rejected", "superseded"}
         normalized_request = _normalized_change_request(workflow_request)
@@ -25600,7 +25602,7 @@ def _try_bounded_semantic_request(*, instruction, ws, session, binding, topic, _
     try:
         if root is None or not (root / "semantic.webui.json").is_file():
             raise ValueError("A managed semantic source is required for a bounded model proposal")
-        registered = _register_builder_change_set(session=session, patch=patch, request_text=instruction, _meta=meta)
+        registered = _register_builder_change_set(session=session, patch=patch, request_text=instruction, _meta=meta, compact=True)
         if not registered.get("ok"):
             raise ValueError("Semantic proposal intake was rejected")
         admission = sdk_builder_semantic_ui.admit(project_ref=f"scenario:{scenario_id}", instruction=instruction,
@@ -25708,7 +25710,7 @@ def _try_semantic_label_request(
         patch = {"id": request["transaction_id"], "summary": instruction, "target": "semantic",
                  "operation": "semantic_graph", "change_id": request["transaction_id"], "created_at": _now()}
         if not prepared.get("replayed"):
-            registration = _register_builder_change_set(session=session, patch=patch, request_text=instruction, _meta=meta)
+            registration = _register_builder_change_set(session=session, patch=patch, request_text=instruction, _meta=meta, compact=True)
             if not registration.get("ok"):
                 raise ValueError("Label Change intake failed: " + str(registration.get("error")))
             state = sdk_builder_workflow.get_prototype_edit_context("scenario", scenario_id)
