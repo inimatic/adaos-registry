@@ -5710,27 +5710,18 @@
                         {
                             "area": "system-hardware",
                             "dataSource": {
-                                "kind": "skill",
-                                "name": "web_desktop_runtime_skill.get_system_overview",
-                                "params": {
-                                    "section": "node_dashboard",
-                                    "target_node_id": "$state.selectedSystemNodeId"
-                                },
-                                "startPolicy": "materialization_ready",
-                                "preserveLastValue": true,
-                                "maxRequestHz": 0.2,
-                                "invalidationTags": [
-                                    "web_desktop.system",
-                                    "system.members",
-                                    "system.hardware"
-                                ]
+                                "kind": "stream",
+                                "receiver": "web_desktop.system.hardware",
+                                "scope": "node",
+                                "nodeId": "$state.selectedSystemNodeId",
+                                "transport": "auto"
                             },
                             "id": "system-hardware-utilization",
                             "inputs": {
-                                "metricsPath": "hardware.hardware_metrics",
-                                "centerValuePath": "hardware.center.value",
-                                "centerLabelPath": "hardware.center.label",
-                                "subtitlePath": "hardware.subtitle",
+                                "metricsPath": "hardware_metrics",
+                                "centerValuePath": "center.value",
+                                "centerLabelPath": "center.label",
+                                "subtitlePath": "subtitle",
                                 "subtitleFormat": "datetime",
                                 "max": 100,
                                 "minLabel": "0%",
@@ -6490,7 +6481,7 @@
                 }
             }
         },
-        "version": "0.3.94",
+        "version": "0.3.97",
         "manifest": "webui.json"
     },
     "locale_dictionaries": {

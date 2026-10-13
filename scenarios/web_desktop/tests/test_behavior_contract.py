@@ -161,19 +161,18 @@ def test_system_first_paint_coalesces_dashboard_reads():
     expected = {"section": "node_dashboard", "target_node_id": "$state.selectedSystemNodeId"}
     assert all(source["params"] == expected for source in node_sources)
     hardware_source = widgets["system-hardware-utilization"]["dataSource"]
-    assert hardware_source["kind"] == "skill"
-    assert hardware_source["name"] == "web_desktop_runtime_skill.get_system_overview"
-    assert hardware_source["params"] == {
-        "section": "node_dashboard",
-        "target_node_id": "$state.selectedSystemNodeId",
+    assert hardware_source == {
+        "kind": "stream",
+        "receiver": "web_desktop.system.hardware",
+        "scope": "node",
+        "nodeId": "$state.selectedSystemNodeId",
+        "transport": "auto",
     }
-    assert hardware_source["invalidationTags"] == [
-        "web_desktop.system", "system.members", "system.hardware"]
     hardware_inputs = widgets["system-hardware-utilization"]["inputs"]
-    assert hardware_inputs["metricsPath"] == "hardware.hardware_metrics"
-    assert hardware_inputs["centerValuePath"] == "hardware.center.value"
-    assert hardware_inputs["centerLabelPath"] == "hardware.center.label"
-    assert hardware_inputs["subtitlePath"] == "hardware.subtitle"
+    assert hardware_inputs["metricsPath"] == "hardware_metrics"
+    assert hardware_inputs["centerValuePath"] == "center.value"
+    assert hardware_inputs["centerLabelPath"] == "center.label"
+    assert hardware_inputs["subtitlePath"] == "subtitle"
 
 
 def test_subscription_widget_has_one_read_path():
