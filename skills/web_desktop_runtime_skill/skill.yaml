@@ -1,5 +1,5 @@
 name: web_desktop_runtime_skill
-version: 0.1.58
+version: 0.1.61
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -11,7 +11,7 @@ runtime:
       schema: adaos.skill.activation_assessment.v1
       assessor: builder.compiler
       classification: event_subscriber
-      handler_digest: sha256:cb2bd23dc2e5b6691349bc6693d61fd745947ccaa1c30815f8fca679cc6885d9
+      handler_digest: sha256:c3148707e575dfa4b5a596f827f3f2aec9e234a8832baf7b4f45a159c36448f1
       observed_subscriptions:
       - economic.subscription.changed
       - root.subscription.changed
@@ -1006,7 +1006,11 @@ tools:
     capability: desktop.open
   input_schema:
     type: object
-    properties: {}
+    properties:
+      webspace_id:
+        type: string
+      controller_endpoint_id:
+        type: string
   output_schema:
     type: object
     required:
@@ -1040,6 +1044,10 @@ tools:
     required:
     - values
     properties:
+      webspace_id:
+        type: string
+      controller_endpoint_id:
+        type: string
       values:
         type: object
       device_override:
@@ -1357,6 +1365,30 @@ exports:
   - unlink_node
   - rename_subnet
 data_routes:
+- surface: system-hardware
+  route: stream
+  owner: web_desktop_runtime_skill
+  receiver: web_desktop.system.hardware
+  first_paint: loading until selected-node snapshot
+  recovery: snapshot on subscribe
+  update_source: active selected-node subscription
+  budget:
+    max_payload_bytes: 65536
+    max_publish_hz: 0.25
+    snapshot_policy: on_subscribe
+  guard_visibility: unavailable telemetry remains visible
+- surface: system-bootstrap
+  route: stream
+  owner: web_desktop_runtime_skill
+  receiver: web_desktop.system.bootstrap
+  first_paint: loading until System snapshot
+  recovery: snapshot on subscribe
+  update_source: root and economic subscription changes
+  budget:
+    max_payload_bytes: 65536
+    max_publish_hz: 1
+    snapshot_policy: on_subscribe
+  guard_visibility: unavailable preference and usage reasons remain visible
 - surface: widget:web_desktop.development-current-application
   route: tool
   tool: get_current_builder_application
@@ -1542,4 +1574,4 @@ data_routes:
     invalidation_tags:
     - web_desktop.preferences
 prototype: default
-updated_at: '2026-10-06T07:18:51+00:00'
+updated_at: '2026-10-08T21:26:33+00:00'

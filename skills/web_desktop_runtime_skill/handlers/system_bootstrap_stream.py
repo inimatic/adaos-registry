@@ -53,6 +53,11 @@ def snapshot_requested(event: Any) -> None:
 def subscription_changed(event: Any) -> None:
     if _REFRESH_STOP.is_set():
         return
+    value = _payload(event)
+    if value.get("receiver") != RECEIVER:
+        return
+    if value.get("action") != "unsubscribed" and (value.get("action") != "subscribed" or value.get("active") is False):
+        return
     _RUNTIME.handle_subscription_changed(event, receiver_prefix=RECEIVER)
 
 

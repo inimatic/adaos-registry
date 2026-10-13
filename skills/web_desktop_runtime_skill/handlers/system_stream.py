@@ -99,6 +99,11 @@ def _start_worker(webspace_id: str, node_id: str) -> None:
     with _WORKERS_LOCK:
         if _DRAINING:
             return
+        # Never accumulate replacements while a stopped SDK call is in flight.
+        for old_key, (old_stop, old_thread) in [*list(_WORKERS.items()), *_RETIRED]:
+            if old_key[0] == webspace_id and old_thread.is_alive() and (old_stop.is_set() or old_key != key):
+                old_stop.set()
+                return
         if key in _WORKERS and not _WORKERS[key][0].is_set() and _WORKERS[key][1].is_alive():
             return
         if key in _WORKERS:
@@ -130,6 +135,12 @@ def _stop_worker(webspace_id: str, node_id: str) -> None:
         for key in keys:
             stop, _thread = _WORKERS[key]
             stop.set()
+        workers = [(key, _WORKERS[key][1]) for key in keys]
+    for key, thread in workers:
+        thread.join(timeout=0.1)
+        with _WORKERS_LOCK:
+            if not thread.is_alive() and _WORKERS.get(key, (None, None))[1] is thread:
+                _WORKERS.pop(key)
 
 
 def snapshot_requested(event: Any) -> None:
@@ -147,6 +158,8 @@ def subscription_changed(event: Any) -> None:
     webspace_id = _webspace(value)
     node_id = _node(value)
     action = str(value.get("action") or "").strip().lower()
+    if action != "unsubscribed" and (action != "subscribed" or value.get("active") is False):
+        return
     _RUNTIME.handle_subscription_changed(event, receiver_prefix=RECEIVER)
     if action == "unsubscribed":
         _stop_worker(webspace_id, node_id)

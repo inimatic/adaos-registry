@@ -161,13 +161,13 @@ def test_subscription_drain_rehydrate_joins_before_accepting_events(monkeypatch)
         assert not stream.drain_refresh(timeout_s=1)["worker_alive"]
     runtime.reset.assert_called_once()
     stream.root_subscription_changed({})
-    stream.subscription_changed({})
+    stream.subscription_changed({"receiver": stream.RECEIVER, "action": "subscribed"})
     stream.snapshot_requested({})
     assert stream._REFRESH_THREAD is None
     runtime.handle_subscription_changed.assert_not_called()
     runtime.handle_snapshot_requested.assert_not_called()
     assert stream.rehydrate_refresh() == {"ok": True, "worker_alive": False}
-    stream.subscription_changed({})
+    stream.subscription_changed({"receiver": stream.RECEIVER, "action": "subscribed"})
     stream.snapshot_requested({})
     runtime.handle_subscription_changed.assert_called_once()
     runtime.handle_snapshot_requested.assert_called_once()
@@ -236,3 +236,50 @@ def test_worker_publishes_selected_node_before_first_refresh_wait(monkeypatch):
     assert context.node_id == "selected-node"
     assert context.webspace_id == "desktop"
     assert context.receiver == "web_desktop.system.hardware"
+
+
+def test_manifest_declares_only_owned_stream_receivers():
+    manifest = yaml.safe_load((ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    receivers = {r["receiver"] for r in manifest["data_routes"] if r["route"] == "stream"}
+    assert receivers == {"web_desktop.system.hardware", "web_desktop.system.bootstrap"}
+    # Declarative admission input; actual pre-dispatch enforcement is Core-owned.
+    for foreign in ("notebook_skill.notes", "adaos_drive.files", "voice_chat.messages", "demo_metrics.cpu", "web_desktop.system.hardware.foreign"):
+        assert foreign not in receivers
+
+
+def test_stream_routes_declare_positive_payload_budgets():
+    manifest = yaml.safe_load((ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    routes = [route for route in manifest["data_routes"] if route["route"] == "stream"]
+    assert routes
+    for route in routes:
+        limit = route["budget"].get("max_payload_bytes")
+        assert type(limit) is int and limit > 0, route["receiver"]
+
+
+@pytest.mark.parametrize("module", ["handlers.system_stream", "handlers.system_bootstrap_stream"])
+def test_inactive_and_foreign_subscriptions_do_not_reach_stream_runtime(monkeypatch, module):
+    stream = importlib.import_module(module)
+    runtime = Mock()
+    monkeypatch.setattr(stream, "_RUNTIME", runtime)
+    if hasattr(stream, "_DRAINING"):
+        monkeypatch.setattr(stream, "_DRAINING", False)
+    else:
+        monkeypatch.setattr(stream, "_REFRESH_STOP", Event())
+    for value in ({"receiver": "voice_chat.messages", "action": "subscribed"},
+                  {"receiver": stream.RECEIVER, "action": "subscribed", "active": False},
+                  {"receiver": stream.RECEIVER, "action": "unknown"}):
+        stream.subscription_changed(value)
+    runtime.handle_subscription_changed.assert_not_called()
+
+
+def test_repeated_subscribe_unsubscribe_joins_workers(monkeypatch):
+    monkeypatch.setattr(system_stream, "_RUNTIME", Mock())
+    monkeypatch.setattr(system_stream, "_WORKERS", {})
+    monkeypatch.setattr(system_stream, "_RETIRED", [])
+    monkeypatch.setattr(system_stream, "_DRAINING", False)
+    for _ in range(30):
+        event = {"receiver": system_stream.RECEIVER, "webspace_id": "desktop", "action": "subscribed"}
+        system_stream.subscription_changed(event)
+        system_stream.subscription_changed({**event, "action": "unsubscribed"})
+        assert not system_stream._WORKERS
+        assert not system_stream._RETIRED

@@ -104,6 +104,6 @@ def test_owned_tool_and_causal_route():
     assert tool["side_effects"] == "read_only"
     assert tool["application_access"]["permission"] == "workspace.read"
     assert tool["name"] in manifest["exports"]["tools"]
-    route = next(r for r in manifest["data_routes"] if r["tool"] == tool["name"])
+    route = next(r for r in manifest["data_routes"] if r.get("tool") == tool["name"])
     assert route["read_policy"]["preserve_last_value"] is True
     assert "explicit_refresh" in route["read_policy"]["triggers"]

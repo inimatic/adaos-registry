@@ -28,7 +28,7 @@ def test_development_usage_is_live_without_changing_chart_or_policy():
     widget = next(n for n in _walk(document) if n.get("id") == "development-subscription-spend")
     assert widget["dataSource"]["kind"] == "skill"
     assert widget["dataSource"]["name"] == "web_desktop_runtime_skill.get_system_overview"
-    assert widget["dataSource"]["params"] == {"section": "system_bootstrap"}
+    assert widget["dataSource"]["params"] == {"section": "system_bootstrap", "webspace_id": "$client.webspaceId"}
     assert widget["type"] == "visual.multiMetricArc"
     assert widget["inputs"]["metricsPath"] == "usage_arc.metrics"
     assert widget["visibleIf"] == "$state.activeTab === 'dev' && $state.developmentAccess === true"
@@ -149,7 +149,7 @@ def test_system_first_paint_coalesces_dashboard_reads():
     assert all(source == subnet_sources[0] for source in subnet_sources)
     assert subnet_sources[0]["kind"] == "skill"
     assert subnet_sources[0]["name"] == "web_desktop_runtime_skill.get_system_overview"
-    assert subnet_sources[0]["params"] == {"section": "system_bootstrap"}
+    assert subnet_sources[0]["params"] == {"section": "system_bootstrap", "webspace_id": "$client.webspaceId"}
     assert subnet_sources[0]["startPolicy"] == "materialization_ready"
     node_sources = [
         widgets[identity]["dataSource"]
@@ -181,7 +181,7 @@ def test_subscription_widget_has_one_read_path():
     widget = next(n for n in _walk(document) if n.get("id") == "system-subscription-tile")
     assert widget["dataSource"]["kind"] == "skill"
     assert widget["dataSource"]["name"] == "web_desktop_runtime_skill.get_system_overview"
-    assert widget["dataSource"]["params"] == {"section": "system_bootstrap"}
+    assert widget["dataSource"]["params"] == {"section": "system_bootstrap", "webspace_id": "$client.webspaceId"}
     assert not any(action.get("on") == "mount" for action in widget["actions"])
 
 
@@ -309,7 +309,7 @@ def test_ai_usage_widgets_present_reported_24h_7d_30d_windows(monkeypatch):
         assert widget["type"] == "visual.multiMetricArc"
         assert widget["dataSource"]["kind"] == "skill"
         assert widget["dataSource"]["name"] == "web_desktop_runtime_skill.get_system_overview"
-        assert widget["dataSource"]["params"] == {"section": "system_bootstrap"}
+        assert widget["dataSource"]["params"] == {"section": "system_bootstrap", "webspace_id": "$client.webspaceId"}
         for key, field in (("metricsPath", "metrics"), ("centerValuePath", "value"),
                            ("centerLabelPath", "label"), ("subtitlePath", "subtitle"),
                            ("descriptionPath", "description")):
@@ -322,3 +322,54 @@ def test_ai_usage_widgets_present_reported_24h_7d_30d_windows(monkeypatch):
         ("Last 24 hours", "10 tokens", 10.0),
     ]
     assert (arc["label"], arc["value"]) == ("Last 30 days", "100 tokens")
+
+
+def test_preference_forms_read_save_and_invalidate_the_browser_webspace():
+    document = json.loads((SCENARIO_DIR / "webui.json").read_text(encoding="utf-8"))
+    nodes = list(_walk(document))
+    for node in nodes:
+        if node.get("name") == "web_desktop_runtime_skill.get_preferences":
+            assert node["params"]["webspace_id"] == "$client.webspaceId"
+        if node.get("target") == "web_desktop_runtime_skill.update_preferences":
+            assert node["params"]["webspace_id"] == "$client.webspaceId"
+            assert node["params"]["values"] == "$event.values"
+    form = next(n for n in nodes if n.get("id") == "system-participation")
+    assert form["dataSource"]["name"] == "web_desktop_runtime_skill.get_preferences"
+    assert "web_desktop.preferences" in form["dataSource"]["invalidationTags"]
+    assert "isOwnerOrAdministrator === true" in form["visibleIf"]
+
+
+def test_participation_loads_selected_record_and_keeps_editable_bound_fields(monkeypatch):
+    # Scenario tests must also run without companion test collection configuring sys.path.
+    monkeypatch.syspath_prepend(str(SCENARIO_DIR.parents[1] / "skills/web_desktop_runtime_skill"))
+    from handlers import main
+
+    document = json.loads((SCENARIO_DIR / "webui.json").read_text(encoding="utf-8"))
+    nodes = list(_walk(document))
+    form = next(n for n in nodes if n.get("id") == "system-participation")
+    selection = form["inputs"]["selectedStateKey"]
+    initial = next(n for n in nodes if selection in n)
+    monkeypatch.setattr(main.sdk_access, "require", lambda permission: None)
+    monkeypatch.setattr(main.sdk_profile, "get_profile", lambda: {"preferences": {}})
+    result = main.get_preferences()
+    assert result["ok"]
+    assert [item["id"] for item in result["items"]] == [initial[selection]]
+    # ui.form 3.7.1 disables controls while the selected record is unresolved.
+    # A System overview is not the selected preferences record.
+    assert form["dataSource"]["name"] == "web_desktop_runtime_skill.get_preferences"
+    assert not form["inputs"].get("readOnlyIf")
+    fields = {field["id"]: field for field in form["inputs"]["fields"]}
+    for name in ("participateDevelopment", "sendDiagnostics"):
+        assert fields[name]["type"] == "toggle"
+        assert not any(fields[name].get(flag) for flag in ("disabled", "readonly", "readOnly"))
+        assert "defaultValue" not in fields[name]
+    assert fields["delivery_status"]["content"] == "$state.developmentDeliveryStatus"
+    details = next(n for n in nodes if n.get("id") == "system-subnet-details")
+    assert details["inputs"]["stateBindings"]["developmentDeliveryStatus"]["path"] == "subnet_panel.delivery_status"
+    assert form["inputs"]["buttons"][0]["id"] == form["actions"][0]["id"]
+    assert form["actions"][0]["params"]["values"] == "$event.values"
+    # Tab navigation must not clear the selected record or overwrite consent.
+    for node in nodes:
+        if node.get("type") == "updateState":
+            values = node.get("params", {})
+            assert not {selection, "participateDevelopment", "sendDiagnostics"}.intersection(values)

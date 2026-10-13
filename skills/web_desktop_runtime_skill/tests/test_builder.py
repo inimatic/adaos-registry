@@ -133,6 +133,6 @@ def test_manifest_contract_is_complete():
     assert declaration["permissions"] == ["workspace.read"]
     assert declaration["side_effects"] == "read_only"
     assert declaration["input_schema"]["additionalProperties"] is False
-    route = next(r for r in manifest["data_routes"] if r["tool"] == name)
+    route = next(r for r in manifest["data_routes"] if r.get("tool") == name)
     assert route["read_policy"]["preserve_last_value"] is False
     assert route["budget"]["max_payload_bytes"] == 8192

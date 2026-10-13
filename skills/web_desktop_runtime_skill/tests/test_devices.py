@@ -162,17 +162,17 @@ def test_device_tree_projects_physical_os_with_addressable_endpoints():
     assert root["icon"] == "desktop-outline"
     children = [item for item in projected if item.get("parent_device_id") == root["id"]]
     assert {item["title"] for item in children} == {
-        "RU:Hub:sn_6acf0c01 (Home assistant)",
+        "RU:Hub:sn_6acf0c01 (Homepoint)",
         "RU:Browser:desktop (Current browser 1)",
         "RU:Browser:desktop-dev (Current browser 1)",
         "LO:Browser:desktop (Local browser)",
     }
-    assert sum("RU:Browser:desktop (" in item["title"] for item in children) == 1
+    assert sum("RU:Browser:desktop (" in item["title"] for item in children) == 2
     assert {item["icon"] for item in children if item["device_type"] == "browser"} == {"globe-outline"}
     assert all("unassigned" not in item["title"].casefold() for item in projected)
 
 
-def test_legacy_browser_without_parent_uses_only_online_os_and_detects_hub():
+def test_legacy_browser_without_parent_stays_unknown_and_detects_hub():
     active = {
         "id": "member:hub-local",
         "title": "ZVERZVE-A1BNQF7",
@@ -208,13 +208,13 @@ def test_legacy_browser_without_parent_uses_only_online_os_and_detects_hub():
     )
 
     active_root = next(item for item in projected if item["title"] == "ZVERZVE-A1BNQF7")
-    assert not any(item["title"] == "Browser device" for item in projected)
+    assert any(item["title"] == "Browser device" for item in projected)
     assert next(item for item in projected if item["device_type"] == "browser")[
         "parent_device_id"
-    ] == active_root["id"]
+    ] != active_root["id"]
     assert next(item for item in projected if item["id"] == "member:hub-local")[
         "title"
-    ] == "RU:Hub:sn_6acf0c01 (Home assistant)"
+    ] == "RU:Hub:sn_6acf0c01 (ZVERZVE-A1BNQF7)"
 
 
 def test_management_owned_rename_targets_durable_browser_endpoint(monkeypatch):
@@ -291,3 +291,63 @@ def test_physical_device_heading_is_not_renamed_as_an_endpoint(monkeypatch, devi
     monkeypatch.setattr(main.sdk_device_access, "rename_device", rename)
     assert main.rename_device(device_ref, "New name")["ok"] is False
     rename.assert_not_called()
+
+
+def test_remote_browser_does_not_inherit_hub_host():
+    node = {"id": "member:hub", "device_type": "member", "hostname": "ZVERZVE",
+            "node_names": ["node1"], "route_mode": "hub", "title": "ZVERZVE"}
+    browser = _browser("browser:remote::page", webspace="desktop", zone="ru", origin="https://example.test", name="Remote")
+    browser.update(parent_device_ref="", device_display_name="Notebook")
+    items = main._device_tree_items([node, browser], subnet={"subnet_id": "subnet", "display_name": "devhub"})
+    endpoint = next(i for i in items if i["id"] == browser["id"])
+    root = next(i for i in items if i["id"] == endpoint["parent_device_id"])
+    assert root["title"] == "Notebook"
+    assert next(i for i in items if i["id"] == node["id"])["title"] == "RU:Hub:subnet (node1)"
+
+
+@pytest.mark.parametrize("checked", [True, False])
+def test_participation_values_round_trip_without_consent_defaults(monkeypatch, checked):
+    profile = {"preferences": {}}
+    monkeypatch.setattr(main.sdk_access, "require", Mock())
+    monkeypatch.setattr(main.sdk_profile, "get_profile", lambda: profile)
+    monkeypatch.setattr(main.sdk_profile, "update_preferences", lambda patch, **kw: profile["preferences"].update(patch))
+    result = main.update_preferences({"participateDevelopment": checked, "sendDiagnostics": checked}, webspace_id="desktop")
+    assert result["ok"]
+    for _ in range(2):
+        item = main.get_preferences(webspace_id="desktop")["item"]
+        assert item["participateDevelopment"] is checked
+        assert item["sendDiagnostics"] is checked
+
+
+def test_workspace_name_uses_request_scope_for_read_save_and_refresh(monkeypatch):
+    titles = {"desktop": "Desktop", "other-tab": "Other"}
+    monkeypatch.setattr(main.sdk_access, "require", Mock())
+    monkeypatch.setattr(main.sdk_profile, "get_profile", lambda: {"preferences": {"workspace_label": "default"}})
+    monkeypatch.setattr(main.sdk_control_plane, "get_workspace_object", lambda ws: {"title": titles[ws]})
+    profile_write = Mock()
+    monkeypatch.setattr(main.sdk_profile, "update_preferences", profile_write)
+    async def rename(ws, title):
+        titles[ws] = title
+        return {"id": ws, "title": title}
+    monkeypatch.setattr(main, "webspace_rename", rename)
+    assert main.get_preferences(webspace_id="desktop")["workspaceLabel"] == "Desktop"
+    result = main.update_preferences({"workspaceLabel": "Renamed"}, webspace_id="desktop")
+    assert result["ok"]
+    assert result["item"]["workspaceLabel"] == "Renamed"
+    assert main.get_preferences(webspace_id="desktop")["workspaceLabel"] == "Renamed"
+    assert main.get_preferences(webspace_id="other-tab")["workspaceLabel"] == "Other"
+    assert not main.update_preferences({"workspaceLabel": "Wrong"})["ok"]
+    profile_write.assert_not_called()
+
+
+def test_participation_write_denied_before_profile_mutation(monkeypatch):
+    def deny(permission):
+        assert permission == "workspace.write"
+        raise PermissionError("workspace.write denied")
+
+    monkeypatch.setattr(main.sdk_access, "require", deny)
+    write = Mock()
+    monkeypatch.setattr(main.sdk_profile, "update_preferences", write)
+    with pytest.raises(PermissionError):
+        main.update_preferences({"participateDevelopment": True, "sendDiagnostics": True})
+    write.assert_not_called()

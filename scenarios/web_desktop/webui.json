@@ -4420,7 +4420,8 @@
                                     "target": "web_desktop_runtime_skill.update_preferences",
                                     "params": {
                                         "values": "$event.values",
-                                        "device_override": true
+                                        "device_override": true,
+                                        "webspace_id": "$client.webspaceId"
                                     },
                                     "invalidates": [
                                         "web_desktop.preferences"
@@ -4437,7 +4438,10 @@
                                 "invalidationTags": [
                                     "web_desktop.preferences"
                                 ],
-                                "preserveLastValue": true
+                                "preserveLastValue": true,
+                                "params": {
+                                    "webspace_id": "$client.webspaceId"
+                                }
                             }
                         },
                         {
@@ -4518,7 +4522,8 @@
                                     "target": "web_desktop_runtime_skill.update_preferences",
                                     "params": {
                                         "values": "$event.values",
-                                        "device_override": false
+                                        "device_override": false,
+                                        "webspace_id": "$client.webspaceId"
                                     },
                                     "invalidates": [
                                         "web_desktop.preferences"
@@ -4535,7 +4540,10 @@
                                 "invalidationTags": [
                                     "web_desktop.preferences"
                                 ],
-                                "preserveLastValue": true
+                                "preserveLastValue": true,
+                                "params": {
+                                    "webspace_id": "$client.webspaceId"
+                                }
                             }
                         },
                         {
@@ -4624,7 +4632,8 @@
                                     "target": "web_desktop_runtime_skill.update_preferences",
                                     "params": {
                                         "values": "$event.values",
-                                        "device_override": false
+                                        "device_override": false,
+                                        "webspace_id": "$client.webspaceId"
                                     },
                                     "invalidates": [
                                         "web_desktop.preferences"
@@ -4641,7 +4650,10 @@
                                 "invalidationTags": [
                                     "web_desktop.preferences"
                                 ],
-                                "preserveLastValue": true
+                                "preserveLastValue": true,
+                                "params": {
+                                    "webspace_id": "$client.webspaceId"
+                                }
                             }
                         },
                         {
@@ -4698,7 +4710,8 @@
                                     "target": "web_desktop_runtime_skill.update_preferences",
                                     "params": {
                                         "values": "$event.values",
-                                        "device_override": false
+                                        "device_override": false,
+                                        "webspace_id": "$client.webspaceId"
                                     },
                                     "invalidates": [
                                         "web_desktop.preferences"
@@ -4715,7 +4728,10 @@
                                 "invalidationTags": [
                                     "web_desktop.preferences"
                                 ],
-                                "preserveLastValue": true
+                                "preserveLastValue": true,
+                                "params": {
+                                    "webspace_id": "$client.webspaceId"
+                                }
                             }
                         },
                         {
@@ -4864,7 +4880,8 @@
                                 "kind": "skill",
                                 "name": "web_desktop_runtime_skill.get_system_overview",
                                 "params": {
-                                    "section": "system_bootstrap"
+                                    "section": "system_bootstrap",
+                                    "webspace_id": "$client.webspaceId"
                                 },
                                 "startPolicy": "materialization_ready",
                                 "preserveLastValue": true,
@@ -5482,7 +5499,8 @@
                                 "kind": "skill",
                                 "name": "web_desktop_runtime_skill.get_system_overview",
                                 "params": {
-                                    "section": "system_bootstrap"
+                                    "section": "system_bootstrap",
+                                    "webspace_id": "$client.webspaceId"
                                 },
                                 "startPolicy": "materialization_ready",
                                 "preserveLastValue": true,
@@ -5529,7 +5547,8 @@
                                 "kind": "skill",
                                 "name": "web_desktop_runtime_skill.get_system_overview",
                                 "params": {
-                                    "section": "system_bootstrap"
+                                    "section": "system_bootstrap",
+                                    "webspace_id": "$client.webspaceId"
                                 },
                                 "startPolicy": "materialization_ready",
                                 "preserveLastValue": true,
@@ -5577,18 +5596,17 @@
                             "title": "Development participation",
                             "dataSource": {
                                 "kind": "skill",
-                                "name": "web_desktop_runtime_skill.get_system_overview",
-                                "params": {
-                                    "section": "system_bootstrap"
-                                },
+                                "name": "web_desktop_runtime_skill.get_preferences",
                                 "startPolicy": "materialization_ready",
-                                "preserveLastValue": true,
-                                "maxRequestHz": 0.2,
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 1,
                                 "invalidationTags": [
-                                    "web_desktop.system",
-                                    "web_desktop.subscription_usage",
-                                    "system.members"
-                                ]
+                                    "web_desktop.preferences"
+                                ],
+                                "preserveLastValue": true,
+                                "params": {
+                                    "webspace_id": "$client.webspaceId"
+                                }
                             },
                             "inputs": {
                                 "layout": "stack",
@@ -5626,7 +5644,8 @@
                                     "target": "web_desktop_runtime_skill.update_preferences",
                                     "params": {
                                         "values": "$event.values",
-                                        "device_override": false
+                                        "device_override": false,
+                                        "webspace_id": "$client.webspaceId"
                                     },
                                     "invalidates": [
                                         "web_desktop.preferences"
@@ -5642,7 +5661,8 @@
                                 "kind": "skill",
                                 "name": "web_desktop_runtime_skill.get_system_overview",
                                 "params": {
-                                    "section": "system_bootstrap"
+                                    "section": "system_bootstrap",
+                                    "webspace_id": "$client.webspaceId"
                                 },
                                 "startPolicy": "materialization_ready",
                                 "preserveLastValue": true,
@@ -5840,7 +5860,8 @@
                                 "kind": "skill",
                                 "name": "web_desktop_runtime_skill.get_system_overview",
                                 "params": {
-                                    "section": "system_bootstrap"
+                                    "section": "system_bootstrap",
+                                    "webspace_id": "$client.webspaceId"
                                 },
                                 "startPolicy": "materialization_ready",
                                 "preserveLastValue": true,
@@ -6469,7 +6490,7 @@
                 }
             }
         },
-        "version": "0.3.93",
+        "version": "0.3.94",
         "manifest": "webui.json"
     },
     "locale_dictionaries": {

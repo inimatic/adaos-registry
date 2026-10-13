@@ -22,6 +22,7 @@ from adaos.sdk.web import (
     application_get_pinned_panels,
     application_set_pinned_panels,
     desktop_get_pinned_applications,
+    webspace_rename,
 )
 
 from .operational import project as _project_operational_dashboard
@@ -354,7 +355,7 @@ def _browser_zone(item: dict[str, Any]) -> str:
 
 def _browser_representation_key(item: dict[str, Any]) -> tuple[str, str, str, str]:
     identity = _browser_identity(item.get("id"))
-    parent = identity.split("::", 1)[0]
+    parent = identity
     webspace = _first_string(*(item.get("workspace_ids") or []), "desktop")
     return (
         parent,
@@ -483,27 +484,11 @@ def _device_tree_items(
         endpoint_ref = subnet_id if endpoint_kind == "Hub" and subnet_id else (
             _string(endpoint.get("node_id")) or endpoint_id.split(":")[-1]
         )
-        endpoint_name = subnet_name if endpoint_kind == "Hub" and subnet_name else _string(endpoint.get("title"))
+        endpoint_name = _first_string(*(endpoint.get("node_names") or []), endpoint.get("title"))
         endpoint["title"] = f"RU:{endpoint_kind}:{endpoint_ref}"
         if endpoint_name and endpoint_name.casefold() != endpoint_ref.casefold():
             endpoint["title"] += f" ({endpoint_name})"
 
-    online_physical_roots = [
-        root_id
-        for root_id, root in physical_roots.items()
-        if _string(root.get("status")).casefold() == "online"
-    ]
-    # Older browser-link records predate explicit OS/parent metadata.  When
-    # exactly one OS device is online, it is the only safe automatic parent;
-    # offline phones and retired nodes must not force an artificial
-    # "Browser device" root.  New records keep using their explicit parent.
-    fallback_root_id = (
-        next(iter(physical_roots), "")
-        if len(physical_roots) == 1
-        else online_physical_roots[0]
-        if len(online_physical_roots) == 1
-        else ""
-    )
     for endpoint in browser_endpoints:
         parent_ref = _string(endpoint.get("parent_device_ref"))
         device_name = _string(endpoint.get("device_display_name"))
@@ -511,13 +496,12 @@ def _device_tree_items(
             endpoint_parent.get(parent_ref.casefold(), "")
             or endpoint_parent.get(device_name.casefold(), "")
             or root_by_title.get(device_name.casefold(), "")
-            or fallback_root_id
         )
         if not parent:
             physical_name = device_name or _first_string(
                 endpoint.get("os_name"), "Browser device"
             )
-            parent = f"physical-device:{_device_slug(physical_name) or 'browser'}"
+            parent = "physical-device:" + _device_slug(parent_ref or str(endpoint.get("id")))
             physical_roots.setdefault(
                 parent,
                 {
@@ -749,7 +733,9 @@ def _preference_record(
                 preferences.get(key, _PREFERENCE_DEFAULTS.get(field))
             )
     selected_webspace = _string(webspace_id)
-    if not _string(record.get("workspaceLabel")) and selected_webspace:
+    # A legacy profile label is global and can belong to another browser tab.
+    record.pop("workspaceLabel", None)
+    if selected_webspace:
         try:
             workspace = _mapping(
                 sdk_control_plane.get_workspace_object(selected_webspace)
@@ -1593,7 +1579,7 @@ def get_system_overview(
     elif selected_section in {"dashboard", "system_bootstrap"}:
         sdk_sections.update({"members", "applications", "development"})
     elif selected_section == "node_dashboard":
-        sdk_sections.update({"applications", "skills", "update", "resources", "incidents"})
+        sdk_sections.update({"skills", "update", "resources", "incidents"})
     elif selected_section in {"current_node", "update"}:
         sdk_sections.add("applications")
         if selected_section == "update":
@@ -1663,11 +1649,6 @@ def get_system_overview(
             "runtime_version": _string(item.get("runtime_version") or item.get("version")),
         }
         for item in list(snapshot.get("members") or [])
-        if isinstance(item, dict)
-    ]
-    skills = [
-        _canonical_item(item, source="skill_registry")
-        for item in list(snapshot.get("skills") or [])
         if isinstance(item, dict)
     ]
     for collection in (services, connections, quotas):
@@ -1796,13 +1777,6 @@ def get_system_overview(
         "members": members if selected_section in {"", "all", "members", "dashboard", "system_bootstrap"} else [],
         "member_summary": _mapping(snapshot.get("member_summary")),
         "application_updates": _mapping(snapshot.get("application_updates")),
-        "skills": skills if selected_section in {"skills", "node_dashboard"} else [],
-        "skill_summary": _mapping(snapshot.get("skill_summary"))
-        if selected_section in {"skills", "node_dashboard"}
-        else {},
-        "update_controls": _mapping(snapshot.get("update_controls"))
-        if selected_section in {"update", "node_dashboard"}
-        else {},
         "resources": resources if selected_section in {"", "all", "metrics", "node_dashboard"} else {},
         "metrics": metrics,
         "items": selected_items,
@@ -1831,29 +1805,19 @@ def get_system_overview(
     }
     # These projections are section-driven. Technical data is requested only
     # explicitly, never as part of the first-paint summary.
-    if selected_section in {"development", "dashboard", "system_bootstrap"}:
-        result["development_delivery"] = _mapping(
-            snapshot.get("development_delivery")
-        ) or {"available": False, "freshness": "unavailable"}
-    if selected_section == "activity":
-        raw_activity = snapshot.get("activity")
-        result["activity"] = (
-            [dict(item) for item in raw_activity if isinstance(item, dict)]
-            if isinstance(raw_activity, list)
-            else _mapping(raw_activity)
-            or {"available": False, "freshness": "unavailable", "items": []}
-        )
-    if selected_section == "technical":
-        result["technical"] = _mapping(snapshot.get("technical")) or {
-            "available": False,
-            "freshness": "unavailable",
-        }
+    for field, owner_section in (("skill_summary", "skills"),
+                                 ("development_delivery", "development"),
+                                 ("activity", "activity"), ("technical", "technical")):
+        if selected_section == owner_section:
+            result[field] = _mapping(snapshot.get(field)) or {
+                "available": False, "freshness": "unavailable",
+            }
     if selected_section in {"activity", "technical"}:
         projection = result[selected_section]
         result["item"] = {
-            **(projection if isinstance(projection, dict) else {}),
+            **projection,
             "content": (
-                _activity_content(projection if isinstance(projection, dict) else {"items": projection})
+                _activity_content(projection)
                 if selected_section == "activity"
                 else _technical_content(projection)
             ),
@@ -2112,6 +2076,12 @@ def update_preferences(
         for field, target in _PREFERENCE_FIELDS.items()
         if field in submitted
     }
+    workspace_title = None
+    if "workspaceLabel" in submitted:
+        workspace_title = _string(submitted["workspaceLabel"])
+        preference_patch.pop("workspace_label", None)
+        if not _string(webspace_id) or not workspace_title:
+            return {"ok": False, "error": "workspace_identity_required", "items": [], "item": {}}
     endpoint_name = ""
     if _bool_value(device_override) and "deviceLabel" in submitted:
         endpoint_name = _string(submitted.get("deviceLabel"))
@@ -2127,6 +2097,10 @@ def update_preferences(
                 "item": {},
             }
     try:
+        if workspace_title is not None:
+            renamed = asyncio.run(webspace_rename(_string(webspace_id), workspace_title))
+            if renamed is None:
+                raise ValueError("workspace_not_found")
         if endpoint_name:
             endpoint_ref = _string(controller_endpoint_id)
             if not endpoint_ref.startswith("browser:"):
@@ -2158,7 +2132,7 @@ def update_preferences(
     return {
         "ok": True,
         "updated_fields": sorted(
-            [*profile_patch, *preference_patch, *(("browser_endpoint_name",) if endpoint_name else ())]
+            [*profile_patch, *preference_patch, *(("browser_endpoint_name",) if endpoint_name else ()), *(("workspace_title",) if workspace_title is not None else ())]
         ),
         "items": [item],
         "item": item,
