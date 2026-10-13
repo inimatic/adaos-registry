@@ -27,8 +27,9 @@ from adaos.sdk.builder import preview as builder_preview
 from adaos.sdk.builder import project_catalog as sdk_builder_project_catalog
 from adaos.sdk.builder import prototype as sdk_builder_prototype
 from adaos.sdk.builder import review as sdk_builder_review
-from adaos.sdk.builder import semantic_ui as sdk_builder_semantic_ui
+from adaos.services.builder.model_controls import max_tokens_for_model as _model_max_tokens_for_model, reasoning_for_model as _model_reasoning_for_model
 from adaos.sdk.builder import workflow as sdk_builder_workflow
+from adaos.sdk.builder import semantic_ui as sdk_builder_semantic_ui
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import pending_actions as sdk_pending_actions
 from adaos.sdk.data.relational import (
@@ -20391,14 +20392,22 @@ def chat(
         }
     d0_started_at = time.perf_counter()
     record_route_phase("command_and_route_ms")
-    result = (None if retry_job_id else _try_semantic_label_request(
+    edit_mode = str(turn_meta.get("builder_semantic_edit_mode") or "full_candidate")
+    if edit_mode not in {"bounded_ops", "full_document", "full_candidate"}:
+        return {"ok": False, "status": "unsupported_semantic_edit_mode", "model_calls": 0}
+    result = (None if retry_job_id or edit_mode != "full_candidate" else _try_semantic_label_request(
         instruction=_instruction_with_prototype_review_notes(utterance, turn_meta),
         ws=ws, session=session, binding=binding, topic=topic,
         auto_apply=auto_apply, expected_revision=expected_ui_revision,
         _meta={**turn_meta, "builder_chat_owns_result_emit": True},
     ))
+    if edit_mode in {"bounded_ops", "full_document"}:
+        result = _try_bounded_semantic_request(instruction=utterance, ws=ws, session=session,
+            binding=binding, topic=topic, _meta=turn_meta, auto_apply=auto_apply, output_mode=edit_mode)
     if result is not None:
-        result.setdefault("message_meta", {})["builder_d0_turn_timing"] = {
+        timing_key = "builder_semantic_turn_timing" if result.get("model_calls") else "builder_d0_turn_timing"
+        result["route_class"] = "D1" if result.get("model_calls") else "D0"
+        result.setdefault("message_meta", {})[timing_key] = {
             "routing_ms": round((d0_started_at - turn_started_at) * 1000, 1),
             "before_emit_ms": round((time.perf_counter() - turn_started_at) * 1000, 1),
             "routing_stages_ms": routing_stages,
@@ -20413,6 +20422,7 @@ def chat(
             conversation_context=_canonical_conversation_context(conversation_context),
             _meta={**turn_meta, "builder_chat_owns_result_emit": True},
         )
+    emit_started_at = time.perf_counter()
     if result.get("ok"):
         actions = (
             result.get("message_actions")
@@ -20447,15 +20457,24 @@ def chat(
             }
         else:
             _safe_emit_chat(str(result.get("message") or ""), **emit_kwargs)
-    return {
-        **result,
-        "dialog": _dialog_state(
+    emitted_at = time.perf_counter()
+    dialog = _dialog_state(
             ws,
             topic_ref=result.get("topic")
             if isinstance(result.get("topic"), Mapping)
             else topic,
-        ),
-    }
+        )
+    partial = ((result.get("message_meta") or {}).get("builder_semantic_turn_timing")
+               or (result.get("message_meta") or {}).get("builder_d0_turn_timing"))
+    if isinstance(partial, Mapping):
+        result["turn_timing"] = sdk_builder_semantic_ui.record_turn_timing(
+            meta=turn_meta, stage="native_turn", timings={
+                "routing_ms": partial["routing_ms"], "before_emit_ms": partial["before_emit_ms"],
+                "emit_ms": (emitted_at - emit_started_at) * 1000,
+                "dialog_ms": (time.perf_counter() - emitted_at) * 1000,
+                "total_ms": (time.perf_counter() - turn_started_at) * 1000,
+            })
+    return {**result, "dialog": dialog}
 
 
 @tool(summary="Create scenario prototype draft.", side_effects="local_write")
@@ -25543,6 +25562,93 @@ def _local_llm_job_id(session: Mapping[str, Any], instruction: str) -> str:
     return f"builder_llm_submit_{_hash_suffix(seed)}"
 
 
+def _try_bounded_semantic_request(*, instruction, ws, session, binding, topic, _meta, auto_apply, output_mode):
+    """Opt-in proposal path. Core freezes the scope before the durable Root call."""
+    meta = dict(_meta or {})
+    scenario_id = str(session.get("scenario_id") or "")
+    selected = meta.get("builder_selected_target") or {}
+    intended = str(selected.get("object_id") or "") if selected.get("object_type") == "scenario" else ""
+    if selected.get("object_type") == "project":
+        composition = developer_compositions.get(str(selected.get("object_id") or ""))
+        primary = [item for item in composition["components"]["owned"] if item.get("role") == "primary"]
+        ref = str(primary[0].get("ref") or "") if len(primary) == 1 else ""
+        intended = ref.partition(":")[2] if ref.startswith("scenario:") else ""
+    intended = intended or _requested_scenario_id_from_meta(meta)
+    if intended and intended != scenario_id:
+        return {"ok": False, "status": "builder_target_mismatch", "model_calls": 0,
+                "message": "The admitted conversation and selected semantic project disagree; no model was called."}
+    root = _project_artifact_root(session)
+    message_id = str(meta.get("source_message_id") or meta.get("message_id") or "").strip()
+    if not message_id:
+        message_id = _external_user_turn_message_id(instruction, meta)
+        meta["message_id"] = message_id
+        _safe_emit_chat(instruction, webspace_id=ws, _meta=_api_request_chat_meta(meta),
+                        session=session, binding=binding, topic_ref=topic, from_="api")
+    identity = "semantic-proposal-" + hashlib.sha256(f"{scenario_id}:{message_id}".encode()).hexdigest()[:32]
+    patch = {"id": identity, "summary": instruction, "target": "semantic", "operation": "semantic_graph",
+             "change_id": identity, "created_at": _now()}
+    common = {"session_id": session.get("id"), "scenario_id": scenario_id,
+        "message_meta": {"message_id": f"{message_id}.semantic-result", "source_message_id": message_id}}
+    model = _builder_llm_model_for_session(session, meta) or "gpt-5"
+    try:
+        if root is None or not (root / "semantic.webui.json").is_file():
+            raise ValueError("A managed semantic source is required for a bounded model proposal")
+        registered = _register_builder_change_set(session=session, patch=patch, request_text=instruction, _meta=meta)
+        if not registered.get("ok"):
+            raise ValueError("Semantic proposal intake was rejected")
+        admission = sdk_builder_semantic_ui.admit(project_ref=f"scenario:{scenario_id}", instruction=instruction,
+            source_message_id=message_id, write_refs=meta.get("builder_semantic_write_refs"),
+            write_properties=meta.get("builder_semantic_write_properties"), max_ops=1)
+        prepared = sdk_builder_semantic_ui.propose(project_ref=f"scenario:{scenario_id}",
+            admission_id=admission["admission_id"], model=model,
+            reasoning_effort=str(meta.get("builder_llm_reasoning_effort") or "high"), output_mode=output_mode)
+        metrics = prepared["execution_metrics"]
+        common.update(model_calls=prepared["model_calls"], execution_metrics=metrics,
+            root_job_id=prepared["root_job_id"], semantic_admission=admission["admission_id"])
+        if prepared["status"] != "planned":
+            return {**common, "ok": True, "status": "semantic_proposal_" + prepared["status"],
+                    "message": prepared.get("message") or "Specify the exact supported edit."}
+        request = prepared["request"]
+        if not auto_apply:
+            return {**common, "ok": True, "status": "semantic_proposal_ready", "semantic_request": request,
+                    "message": "A bounded proposal is retained. No semantic source was changed."}
+        result = sdk_builder_semantic_ui.apply(request, execution_metrics=metrics)
+        delivery = {}
+        try:
+            _sync_session_from_artifacts(session, binding)
+            _save_session(ws, session)
+            if not result.get("replayed"):
+                delivery["prototype_resources"] = developer_prototypes.carry_forward_resources(
+                    project_ref=f"project:{scenario_id}", change_id=request["change_id"],
+                    revision=result["revision"], webui=_read_json_file(root / "webui.json"))
+                delivery["preview"] = _refresh_follow_active_preview(ws, session=session, binding=binding, revision=result["revision"])
+            delivery["workbench"] = _request_workbench_refresh({"webspace_id": ws, "scenario_id": scenario_id})
+        except Exception as exc:
+            delivery["error"] = f"{type(exc).__name__}: {exc}"
+        _upsert_builder_change(webspace_id=ws, session=session, patch=patch, request_text=instruction,
+            status="accepted", _meta=meta, model=model, extra_meta={"semantic_transaction": result,
+                "semantic_admission": admission["admission_id"], "execution_metrics": metrics, "delivery": delivery})
+        message = f"Semantic operation {'already recorded' if result.get('replayed') else 'applied'}: revision {result['revision']}."
+        if delivery.get("error"):
+            message += " Source is committed; Preview delivery needs retry."
+        return {**common, "ok": True, "status": "semantic_proposal_applied", "message": message,
+                "semantic_transaction": result, "delivery": delivery}
+    except Exception as exc:
+        if 'admission' in locals():
+            try:
+                observation = sdk_builder_semantic_ui.proposal_observation(
+                    project_ref=f"scenario:{scenario_id}", admission_id=admission["admission_id"])
+                common.update(semantic_admission=admission["admission_id"],
+                              **{key: observation[key] for key in ("model_calls", "execution_metrics", "root_job_id") if key in observation})
+            except Exception:
+                pass  # Keep the original failure; private durable evidence remains authoritative.
+        if 'result' in locals():
+            return {**common, "ok": True, "status": "semantic_proposal_committed_delivery_failed",
+                "semantic_transaction": result, "message": f"Semantic source is committed at revision {result['revision']}; delivery failed: {exc}"}
+        return {**common, "ok": True, "status": "semantic_proposal_rejected",
+            "error": type(exc).__name__, "message": f"Bounded semantic proposal stopped: {exc}. No full regeneration was started."}
+
+
 def _try_semantic_label_request(
     *, instruction: str, ws: str, session: dict[str, Any], binding: Mapping[str, Any],
     topic: Mapping[str, Any], auto_apply: bool, expected_revision: str | None,
@@ -25598,7 +25704,7 @@ def _try_semantic_label_request(
             registration = _register_builder_change_set(session=session, patch=patch, request_text=instruction, _meta=meta)
             if not registration.get("ok"):
                 raise ValueError("Label Change intake failed: " + str(registration.get("error")))
-            state = sdk_builder_workflow.get_state("scenario", scenario_id)
+            state = sdk_builder_workflow.get_prototype_edit_context("scenario", scenario_id)
             if (state.get("change") or {}).get("change_id") != request["change_id"]:
                 raise ValueError("Label intake changed the admitted Change; retry explicitly")
             request["expected_generation"] = state["generation"]
