@@ -51,7 +51,7 @@ components:
     relations:
     - uses
   - ref: skill:conversation_companions
-    version: ==0.3.0-beta.4
+    version: ==0.3.1
     lifecycle: shared
     relations:
     - uses
