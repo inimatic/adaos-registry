@@ -1,5 +1,5 @@
 name: conversation_companions
-version: 0.3.1
+version: 0.3.2
 description: Conversational characters plus a beta Companion operator grounded in
   the AdaOS Companion Control Plane.
 entry: handlers/main.py
