@@ -355,7 +355,7 @@ def _browser_zone(item: dict[str, Any]) -> str:
 
 def _browser_representation_key(item: dict[str, Any]) -> tuple[str, str, str, str]:
     identity = _browser_identity(item.get("id"))
-    parent = identity
+    parent = identity.split("::", 1)[0]
     webspace = _first_string(*(item.get("workspace_ids") or []), "desktop")
     return (
         parent,
@@ -381,9 +381,11 @@ def _collapse_browser_representations(
         key = _browser_representation_key(item)
         previous = selected.get(key)
         if previous is None or (
+            "::page_" in _browser_identity(item.get("id")),
             bool(item.get("current")),
             _timestamp_value(item.get("last_seen")),
         ) > (
+            "::page_" in _browser_identity(previous.get("id")),
             bool(previous.get("current")),
             _timestamp_value(previous.get("last_seen")),
         ):

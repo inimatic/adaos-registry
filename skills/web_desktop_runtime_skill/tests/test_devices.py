@@ -167,9 +167,39 @@ def test_device_tree_projects_physical_os_with_addressable_endpoints():
         "RU:Browser:desktop-dev (Current browser 1)",
         "LO:Browser:desktop (Local browser)",
     }
-    assert sum("RU:Browser:desktop (" in item["title"] for item in children) == 2
+    assert sum("RU:Browser:desktop (" in item["title"] for item in children) == 1
     assert {item["icon"] for item in children if item["device_type"] == "browser"} == {"globe-outline"}
     assert all("unassigned" not in item["title"].casefold() for item in projected)
+
+
+def test_browser_transport_and_page_endpoints_collapse_to_one_representation():
+    transport = _browser(
+        "browser:shared-browser::webrtc",
+        webspace="desktop",
+        zone="ru",
+        origin="https://inimatic.com",
+        name="Dev browser",
+        current=True,
+        last_seen="2026-10-13T13:47:02Z",
+    )
+    page = _browser(
+        "browser:shared-browser::page_current",
+        webspace="desktop",
+        zone="ru",
+        origin="https://inimatic.com",
+        name="Dev browser",
+        last_seen="2026-10-13T13:47:00Z",
+    )
+
+    collapsed = main._collapse_browser_representations([transport, page])
+    projected = main._device_tree_items(
+        [transport, page],
+        subnet={"subnet_id": "sn_40443596", "display_name": "sn_40443596"},
+    )
+
+    assert [item["id"] for item in collapsed] == ["browser:shared-browser::page_current"]
+    assert sum(item["kind"] == "physical_device" for item in projected) == 1
+    assert sum(item["device_type"] == "browser" for item in projected) == 1
 
 
 def test_legacy_browser_without_parent_stays_unknown_and_detects_hub():
