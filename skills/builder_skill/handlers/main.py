@@ -9086,6 +9086,11 @@ def _builder_llm_messages(
             }
         )
         purposes.append("active_turn_recap")
+    if os.getenv("ADAOS_BUILDER_PROTOTYPE_CONTEXT_STRATEGY", "full") != "full":
+        compiler = getattr(sdk_builder_prototype, "compile_generation_messages", None)
+        if not callable(compiler):
+            raise RuntimeError("Prototype context strategy requires the current Builder SDK")
+        messages, _delivery = compiler(messages)
     return messages, purposes
 
 
@@ -25610,10 +25615,16 @@ def _try_bounded_semantic_request(*, instruction, ws, session, binding, topic, _
             write_properties=meta.get("builder_semantic_write_properties"), max_ops=1)
         prepared = sdk_builder_semantic_ui.propose(project_ref=f"scenario:{scenario_id}",
             admission_id=admission["admission_id"], model=model,
+            max_tokens=meta.get('builder_semantic_max_tokens', 16384),
             reasoning_effort=str(meta.get("builder_llm_reasoning_effort") or "high"), output_mode=output_mode)
-        metrics = prepared["execution_metrics"]
-        common.update(model_calls=prepared["model_calls"], execution_metrics=metrics,
-            root_job_id=prepared["root_job_id"], semantic_admission=admission["admission_id"])
+        metrics = prepared.get("execution_metrics") or {}
+        common.update(model_calls=prepared.get("model_calls", 0), execution_metrics=metrics,
+            semantic_admission=admission["admission_id"])
+        # Non-planned outcomes can precede submission and have no job id.
+        # Keep their typed reason and all observed paid usage, without fallback.
+        for key in ("root_job_id", "request_digest", "findings", "contract_input_admission"):
+            if key in prepared:
+                common[key] = prepared[key]
         if prepared["status"] != "planned":
             return {**common, "ok": True, "status": "semantic_proposal_" + prepared["status"],
                     "message": prepared.get("message") or "Specify the exact supported edit."}
@@ -25655,7 +25666,8 @@ def _try_bounded_semantic_request(*, instruction, ws, session, binding, topic, _
             return {**common, "ok": True, "status": "semantic_proposal_committed_delivery_failed",
                 "semantic_transaction": result, "message": f"Semantic source is committed at revision {result['revision']}; delivery failed: {exc}"}
         return {**common, "ok": True, "status": "semantic_proposal_rejected",
-            "error": type(exc).__name__, "message": f"Bounded semantic proposal stopped: {exc}. No full regeneration was started."}
+            "error": type(exc).__name__, "findings": getattr(exc, 'findings', []),
+            "message": f"Bounded semantic proposal stopped: {exc}. No full regeneration was started."}
 
 
 def _try_semantic_label_request(
