@@ -27,8 +27,8 @@ from adaos.sdk.builder import preview as builder_preview
 from adaos.sdk.builder import project_catalog as sdk_builder_project_catalog
 from adaos.sdk.builder import prototype as sdk_builder_prototype
 from adaos.sdk.builder import review as sdk_builder_review
-from adaos.sdk.builder import semantic_ui as sdk_builder_semantic_ui
 from adaos.sdk.builder import workflow as sdk_builder_workflow
+from adaos.sdk.builder import semantic_ui as sdk_builder_semantic_ui
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import pending_actions as sdk_pending_actions
 from adaos.sdk.data.relational import (
@@ -147,7 +147,8 @@ _STATE_MIGRATIONS = (
     RelationalMigration(
         version=1,
         name="partition Builder runtime state",
-        idempotent=True,
+        idempotent=False,
+        dialects=("sqlite",),
         statements=(
             "CREATE TABLE builder_state (state_key TEXT PRIMARY KEY, "
             "payload_json TEXT NOT NULL, updated_at TEXT NOT NULL)",
@@ -3954,6 +3955,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "For readable computed summaries use item.details with a static dataSource containing these values. Within one static object, later fields may reference earlier resolved fields through $data.<field>; order dependent fields after their inputs. "
                 "Form staticContent is literal copy and does not interpolate state or computed expressions."
             ),
+            "declarative_expression_contract": developer_ui.expression_contract(),
             "reactive_static_collections": (
                 "A static row may expose quantity:'$state.quantities.item1' and a computed amount expression. "
                 "To show only populated rows, filter the resolved row field directly, for example {key:'quantity',operator:'gt',value:0}. "
@@ -4764,6 +4766,11 @@ def _combine_llm_job_telemetry(
         "repair": copy.deepcopy(dict(repair_usage)),
     }
     combined["repair"] = copy.deepcopy(dict(repair_telemetry))
+    def observation(value):
+        return {key: copy.deepcopy(value[key]) for key in
+                ("root_job_id", "usage", "cost", "provider", "model", "timing") if key in value}
+    combined["attempt_observations"] = copy.deepcopy(primary.get("attempt_observations") or [observation(primary)])
+    combined["attempt_observations"].append(observation(repair_telemetry))
     return combined
 
 
@@ -9086,35 +9093,40 @@ def _builder_llm_messages(
             }
         )
         purposes.append("active_turn_recap")
+    if os.getenv("ADAOS_BUILDER_PROTOTYPE_CONTEXT_STRATEGY", "full") != "full":
+        compiler = getattr(sdk_builder_prototype, "compile_generation_messages", None)
+        if not callable(compiler):
+            raise RuntimeError("Prototype context strategy requires the current Builder SDK")
+        messages, _delivery = compiler(messages)
     return messages, purposes
 
 
 def _balanced_json_object(text: str) -> str | None:
     source = str(text or "")
-    for start, char in enumerate(source):
-        if char != "{":
+    start = source.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(source)):
+        current = source[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif current == "\\":
+                escaped = True
+            elif current == '"':
+                in_string = False
             continue
-        depth = 0
-        in_string = False
-        escaped = False
-        for index in range(start, len(source)):
-            current = source[index]
-            if in_string:
-                if escaped:
-                    escaped = False
-                elif current == "\\":
-                    escaped = True
-                elif current == '"':
-                    in_string = False
-                continue
-            if current == '"':
-                in_string = True
-            elif current == "{":
-                depth += 1
-            elif current == "}":
-                depth -= 1
-                if depth == 0:
-                    return source[start : index + 1]
+        if current == '"':
+            in_string = True
+        elif current == "{":
+            depth += 1
+        elif current == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start : index + 1]
     return None
 
 
@@ -9369,7 +9381,11 @@ def _json_pointer_list_index(
             if isinstance(item, Mapping) and str(item.get("id") or "") == stable_id
         ]
         if not matches:
-            raise KeyError(f"JSON Pointer stable id not found: {stable_id}")
+            ids = [str(item.get("id")) for item in items if isinstance(item, Mapping) and item.get("id")]
+            keys = [str(item.get("key")) for item in items if isinstance(item, Mapping) and item.get("key") and not item.get("id")]
+            raise KeyError(f"JSON Pointer stable id not found: {stable_id}; target array ids={ids[:24]!r}; "
+                           f"key-only members={keys[:24]!r}. @ selects id only within this array. "
+                           "Inspect the exact parent; for key-only columns use a guarded index or replace the smallest complete array.")
         if len(matches) > 1:
             raise ValueError(f"JSON Pointer stable id is ambiguous: {stable_id}")
         return matches[0]
@@ -10684,49 +10700,10 @@ def _unsupported_update_state_expression(value: Any) -> str:
     return ""
 
 
-_DECLARATIVE_EXPRESSION_OPS = {
-    "add",
-    "subtract",
-    "multiply",
-    "divide",
-    "min",
-    "max",
-    "round",
-    "equals",
-    "gt",
-    "gte",
-    "lt",
-    "lte",
-    "and",
-    "or",
-    "not",
-    "if",
-    "count",
-    "formatNumber",
-}
-
-
 def _invalid_declarative_expression(value: Any, path: str = "value") -> str:
-    if isinstance(value, Mapping):
-        if str(value.get("kind") or "").strip() == "expression":
-            op = str(value.get("op") or "").strip()
-            if op not in _DECLARATIVE_EXPRESSION_OPS:
-                return f"{path}.op={op!r} is not supported"
-            if op == "if":
-                args = value.get("args")
-                named = "condition" in value and ("then" in value or "else" in value)
-                if not named and (not isinstance(args, list) or len(args) != 3):
-                    return f"{path} if expression requires args=[condition, then, else] or named branches"
-        for key, nested in value.items():
-            found = _invalid_declarative_expression(nested, f"{path}.{key}")
-            if found:
-                return found
-    elif isinstance(value, list):
-        for index, nested in enumerate(value):
-            found = _invalid_declarative_expression(nested, f"{path}[{index}]")
-            if found:
-                return found
-    return ""
+    findings = developer_ui.expression_findings(value, path=path)
+    return (f"{findings[0]['detail']} Contract {findings[0]['contract_version']} "
+            f"({findings[0]['contract_digest']}).") if findings else ""
 
 
 def _brace_wrapped_state_reference(value: Any, path: str = "value") -> str:
@@ -11077,6 +11054,9 @@ def _compact_builder_change_issues(
     compacted: list[dict[str, Any]] = []
     compact_index = 0
     for lane, lane_issues in by_lane.items():
+        typed_fields = ("kind", "source_ref", "applicable_phases", "phase_dispositions", "effect", "effect_ref", "verification_scope", "owner")
+        if len({_compact_json({key: row[key] for key in typed_fields if key in row}) for row in lane_issues}) > 1:
+            return []  # Do not collapse obligations with distinct lifetime/authority.
         bucket_count = allocations[lane]
         for bucket_index in range(bucket_count):
             bucket = lane_issues[bucket_index::bucket_count]
@@ -11099,6 +11079,9 @@ def _compact_builder_change_issues(
                     "title": title[:240],
                     "lane": lane,
                     "acceptance_criteria": criteria,
+                    **{key: copy.deepcopy(bucket[0][key]) for key in typed_fields if key in bucket[0]},
+                    "semantic_refs": list(dict.fromkeys(ref for row in bucket for ref in row.get("semantic_refs", []))),
+                    "source_message_ids": list(dict.fromkeys(ref for row in bucket for ref in row.get("source_message_ids", []))),
                 }
             )
     return compacted
@@ -11110,6 +11093,7 @@ def _register_builder_change_set(
     patch: Mapping[str, Any],
     request_text: str,
     _meta: Mapping[str, Any] | None,
+    compact: bool = False,
 ) -> dict[str, Any]:
     object_type = _builder_source_artifact_kind(session)
     object_id = str(
@@ -11127,14 +11111,20 @@ def _register_builder_change_set(
         for key in ("message_id", "source_message_id", "request_message_id")
         if str((_meta or {}).get(key) or "").strip()
     ]
+    for issue in issues:
+        issue["source_message_ids"] = list(dict.fromkeys(source_message_ids))
+        if patch.get("operation") == "semantic_graph" and patch.get("semantic_refs"):
+            issue["semantic_refs"] = list(dict.fromkeys(patch["semantic_refs"]))
+            issue["kind"] = "product_requirement"
     try:
-        state = sdk_builder_workflow.get_state(object_type, object_id)
+        state = (sdk_builder_workflow.get_prototype_intake_context(object_type, object_id) if compact
+                 else sdk_builder_workflow.get_state(object_type, object_id))
         current = (
             state.get("change_set")
             if isinstance(state.get("change_set"), Mapping)
-            else {}
+            else state.get("change") if isinstance(state.get("change"), Mapping) else {}
         )
-        current_id = str(current.get("change_set_id") or "").strip()
+        current_id = str(current.get("change_set_id") or current.get("change_id") or "").strip()
         current_status = str(current.get("status") or "").strip()
         terminal = current_status in {"published", "rejected", "superseded"}
         normalized_request = _normalized_change_request(workflow_request)
@@ -15538,6 +15528,8 @@ def _repair_llm_semantic_transform_once(
             generation_options=repair_options,
             output_mode=resolved_output_mode,
             route="prototype.transform.async_semantic_repair",
+            parent_request_id=request_id,
+            parent_job_id=job_id,
             stage="semantic_repair",
             attempt=attempt_number,
             capability_selection=capability_selection,
@@ -16074,6 +16066,8 @@ def _repair_llm_webui_transform_output(
             messages=repair_messages,
             generation_options=repair_options,
             route="prototype.transform.async_repair",
+            parent_request_id=request_id,
+            parent_job_id=job_id,
             stage="repair",
             attempt=1,
             capability_selection=selection,
@@ -19120,8 +19114,7 @@ def _record_prototype_revision(
     if not scenario_id or not revision_token:
         return {"ok": False, "skipped": "scenario_or_revision_missing"}
     try:
-        from adaos.services.builder.run_observability import execution_metrics_from_llm
-        execution_metrics = execution_metrics_from_llm(llm_result, reasoning_effort=reasoning_effort) if llm_result else None
+        execution_metrics = sdk_builder_observability.execution_metrics_from_llm(llm_result, reasoning_effort=reasoning_effort) if llm_result else None
         return sdk_builder_workflow.transition(
             "scenario",
             scenario_id,
@@ -20391,14 +20384,22 @@ def chat(
         }
     d0_started_at = time.perf_counter()
     record_route_phase("command_and_route_ms")
-    result = (None if retry_job_id else _try_semantic_label_request(
+    edit_mode = str(turn_meta.get("builder_semantic_edit_mode") or "full_candidate")
+    if edit_mode not in {"bounded_ops", "full_document", "full_candidate"}:
+        return {"ok": False, "status": "unsupported_semantic_edit_mode", "model_calls": 0}
+    result = (None if retry_job_id or edit_mode != "full_candidate" else _try_semantic_label_request(
         instruction=_instruction_with_prototype_review_notes(utterance, turn_meta),
         ws=ws, session=session, binding=binding, topic=topic,
         auto_apply=auto_apply, expected_revision=expected_ui_revision,
         _meta={**turn_meta, "builder_chat_owns_result_emit": True},
     ))
+    if edit_mode in {"bounded_ops", "full_document"}:
+        result = _try_bounded_semantic_request(instruction=utterance, ws=ws, session=session,
+            binding=binding, topic=topic, _meta=turn_meta, auto_apply=auto_apply, output_mode=edit_mode)
     if result is not None:
-        result.setdefault("message_meta", {})["builder_d0_turn_timing"] = {
+        timing_key = "builder_semantic_turn_timing" if result.get("model_calls") else "builder_d0_turn_timing"
+        result["route_class"] = "D1" if result.get("model_calls") else "D0"
+        result.setdefault("message_meta", {})[timing_key] = {
             "routing_ms": round((d0_started_at - turn_started_at) * 1000, 1),
             "before_emit_ms": round((time.perf_counter() - turn_started_at) * 1000, 1),
             "routing_stages_ms": routing_stages,
@@ -20413,6 +20414,7 @@ def chat(
             conversation_context=_canonical_conversation_context(conversation_context),
             _meta={**turn_meta, "builder_chat_owns_result_emit": True},
         )
+    emit_started_at = time.perf_counter()
     if result.get("ok"):
         actions = (
             result.get("message_actions")
@@ -20447,15 +20449,24 @@ def chat(
             }
         else:
             _safe_emit_chat(str(result.get("message") or ""), **emit_kwargs)
-    return {
-        **result,
-        "dialog": _dialog_state(
+    emitted_at = time.perf_counter()
+    dialog = _dialog_state(
             ws,
             topic_ref=result.get("topic")
             if isinstance(result.get("topic"), Mapping)
             else topic,
-        ),
-    }
+        )
+    partial = ((result.get("message_meta") or {}).get("builder_semantic_turn_timing")
+               or (result.get("message_meta") or {}).get("builder_d0_turn_timing"))
+    if isinstance(partial, Mapping):
+        result["turn_timing"] = sdk_builder_semantic_ui.record_turn_timing(
+            meta=turn_meta, stage="native_turn", timings={
+                "routing_ms": partial["routing_ms"], "before_emit_ms": partial["before_emit_ms"],
+                "emit_ms": (emitted_at - emit_started_at) * 1000,
+                "dialog_ms": (time.perf_counter() - emitted_at) * 1000,
+                "total_ms": (time.perf_counter() - turn_started_at) * 1000,
+            })
+    return {**result, "dialog": dialog}
 
 
 @tool(summary="Create scenario prototype draft.", side_effects="local_write")
@@ -20783,10 +20794,21 @@ def create_application_draft(
     application_id: str | None = None,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
+    confirmed_technical_application_id: str | None = None,
 ) -> dict[str, Any]:
     _reject_transport_corrupted_text(idea, field="idea")
     ws = _source_webspace_id(webspace_id, _meta)
     source_idea = str(idea or "").strip() or "application prototype"
+    if confirmed_technical_application_id is not None:
+        metadata = dict(_meta or {})
+        previous = str(metadata.get("application_id") or "").strip()
+        confirmed = str(confirmed_technical_application_id).strip()
+        if metadata.get("technical_application_id_confirmed") is True and previous != confirmed:
+            return {"ok": False, "status": "application_identity_confirmation_invalid",
+                "error": "application_identity_confirmation_invalid",
+                "message": f"{AGENT_LABEL}: conflicting explicit technical Application id confirmations."}
+        metadata.update(application_id=confirmed, technical_application_id_confirmed=True)
+        _meta = metadata
     confirmed_application_id, identity_error = _confirmed_application_id_from_meta(
         source_idea,
         _meta,
@@ -23145,16 +23167,18 @@ def _write_llm_job_request_artifact(
     attempt: int = 1,
     capability_selection: Mapping[str, Any] | None = None,
     message_purposes: Sequence[str] | None = None,
+    parent_request_id: str | None = None,
+    parent_job_id: str | None = None,
 ) -> dict[str, Any] | None:
     token = str(job_id or request_id or "").strip()
     journal_dir = _llm_job_journal_dir(session)
     if not token or journal_dir is None:
-        return None
+        raise RuntimeError("builder_evidence_unavailable_before_model_submit")
     safe_job_id = re.sub(r"[^A-Za-z0-9_.-]+", "_", token).strip("._-") or _hash_suffix(
         token
     )
     exact_messages = copy.deepcopy([dict(message) for message in messages])
-    message_bytes = _compact_json(exact_messages).encode("utf-8", errors="replace")
+    message_bytes = _compact_json(exact_messages).encode("utf-8")
     resolved_purposes = list(message_purposes or ())
     if len(resolved_purposes) != len(exact_messages):
         resolved_purposes = [
@@ -23179,6 +23203,21 @@ def _write_llm_job_request_artifact(
         model=model,
         generation_options=recorded_generation_options,
     )
+    source_inputs = {}
+    for name in ("webui.json", "semantic.webui.json", "prototype.brief.json", "prompt_state.json"):
+        source_path = journal_dir.parent / name
+        if source_path.is_file():
+            raw = source_path.read_bytes()
+            source_inputs[name] = {"sha256": hashlib.sha256(raw).hexdigest(), "content": raw.decode("utf-8")}
+    parent_evidence_ref = None
+    if parent_request_id:
+        parent_token = re.sub(r"[^A-Za-z0-9_.-]+", "_", parent_request_id).strip("._-") or _hash_suffix(parent_request_id)
+        parent_path = journal_dir / f"{parent_token}.request.json"
+        if parent_path.is_file():
+            parent = _read_json_file(parent_path)
+            if parent.get("request_id") != parent_request_id or parent.get("session_id") != session.get("id"):
+                raise RuntimeError("builder_evidence_parent_identity_mismatch")
+            parent_evidence_ref = dict(parent.get("evidence_receipt") or {}).get("ref")
     payload = {
         "schema": "adaos.builder.llm_job_input.v1",
         "job_id": str(job_id or "").strip() or None,
@@ -23188,6 +23227,10 @@ def _write_llm_job_request_artifact(
         "created_at": _now(),
         "message_sha256": hashlib.sha256(message_bytes).hexdigest(),
         "messages": exact_messages,
+        "parent_request_id": parent_request_id,
+        "parent_job_id": parent_job_id,
+        "parent_evidence_ref": parent_evidence_ref,
+        "source_inputs": source_inputs,
         "input_attribution": input_attribution,
         "generation": {
             "model": str(model or "").strip() or None,
@@ -23196,6 +23239,7 @@ def _write_llm_job_request_artifact(
     }
     path = journal_dir / f"{safe_job_id}.request.json"
     try:
+        payload["evidence_receipt"] = sdk_builder_observability.retain_llm_evidence(payload)
         _write_json_file_atomic(
             path, {key: value for key, value in payload.items() if value is not None}
         )
@@ -23207,10 +23251,11 @@ def _write_llm_job_request_artifact(
             token,
             path,
         )
-        return None
+        raise RuntimeError("builder_evidence_write_failed_before_model_submit")
     return {
         "path": f"llm_jobs/{path.name}",
         "sha256": digest,
+        "evidence_receipt": payload["evidence_receipt"],
         "message_sha256": payload["message_sha256"],
         "input_attribution": {
             "schema": input_attribution["schema"],
@@ -23245,10 +23290,12 @@ def _write_llm_job_raw_candidate_artifact(
         re.sub(r"[^A-Za-z0-9_.-]+", "_", str(stage or "received")).strip("._-")
         or "received"
     )
-    response_bytes = str(output_text or "").encode("utf-8", errors="replace")
+    response_bytes = str(output_text or "").encode("utf-8")
     structured_candidate: dict[str, Any] | None = None
     extraction_error: str | None = None
     try:
+        if len(response_bytes) > 256_000:
+            raise ValueError("raw_output_parse_deferred_to_candidate_validation")
         extracted = _extract_json_object(output_text)
         structured_candidate = copy.deepcopy(dict(extracted))
     except Exception as exc:
@@ -23287,6 +23334,7 @@ def _write_llm_job_raw_candidate_artifact(
     }
     path = journal_dir / f"{safe_job_id}.candidate.{safe_stage}.raw.json"
     try:
+        payload["evidence_receipt"] = sdk_builder_observability.retain_llm_evidence(payload)
         _write_json_file_atomic(
             path, {key: value for key, value in payload.items() if value is not None}
         )
@@ -23299,13 +23347,14 @@ def _write_llm_job_raw_candidate_artifact(
             safe_stage,
             path,
         )
-        return None
+        raise RuntimeError("builder_evidence_write_failed_before_model_repair")
     return {
         "kind": "raw_model_output",
         "path": f"llm_jobs/{path.name}",
         "sha256": artifact_sha256,
         "stage": safe_stage,
         "response_sha256": payload["response"]["sha256"],
+        "evidence_receipt": payload["evidence_receipt"],
         "structured": structured_candidate is not None,
         "candidate_sha256": candidate_sha256,
     }
@@ -23359,15 +23408,12 @@ def _write_llm_job_candidate_artifact(
         "stage": safe_stage,
         "created_at": _now(),
         "webui_digest": _webui_source_fingerprint(normalized),
-        "validation": _bounded_repair_diagnostic(
-            result.get("validation")
-            if isinstance(result.get("validation"), Mapping)
-            else {}
-        ),
+        "validation": copy.deepcopy(dict(result.get("validation") or {})),
         "result": normalized_result,
     }
     path = journal_dir / f"{safe_job_id}.candidate.{safe_stage}.json"
     try:
+        payload["evidence_receipt"] = sdk_builder_observability.retain_llm_evidence(payload)
         _write_json_file_atomic(
             path, {key: value for key, value in payload.items() if value is not None}
         )
@@ -23380,7 +23426,7 @@ def _write_llm_job_candidate_artifact(
             safe_stage,
             path,
         )
-        return None
+        raise RuntimeError("builder_evidence_candidate_write_failed")
     return {
         "path": f"llm_jobs/{path.name}",
         "sha256": digest,
@@ -25543,6 +25589,108 @@ def _local_llm_job_id(session: Mapping[str, Any], instruction: str) -> str:
     return f"builder_llm_submit_{_hash_suffix(seed)}"
 
 
+def _try_bounded_semantic_request(*, instruction, ws, session, binding, topic, _meta, auto_apply, output_mode):
+    """Opt-in proposal path. Core freezes the scope before the durable Root call."""
+    meta = dict(_meta or {})
+    scenario_id = str(session.get("scenario_id") or "")
+    selected = meta.get("builder_selected_target") or {}
+    intended = str(selected.get("object_id") or "") if selected.get("object_type") == "scenario" else ""
+    if selected.get("object_type") == "project":
+        composition = developer_compositions.get(str(selected.get("object_id") or ""))
+        primary = [item for item in composition["components"]["owned"] if item.get("role") == "primary"]
+        ref = str(primary[0].get("ref") or "") if len(primary) == 1 else ""
+        intended = ref.partition(":")[2] if ref.startswith("scenario:") else ""
+    intended = intended or _requested_scenario_id_from_meta(meta)
+    if intended and intended != scenario_id:
+        return {"ok": False, "status": "builder_target_mismatch", "model_calls": 0,
+                "message": "The admitted conversation and selected semantic project disagree; no model was called."}
+    root = _project_artifact_root(session)
+    if "builder_semantic_write_ref" in meta or "builder_semantic_write_property" in meta:
+        write_ref = str(meta.get("builder_semantic_write_ref") or "").strip()
+        write_property = str(meta.get("builder_semantic_write_property") or "").strip()
+        if not write_ref or not write_property:
+            return {"ok": True, "status": "semantic_proposal_rejected", "model_calls": 0,
+                    "message": "Choose an exact semantic target and property in Builder settings. No model was called."}
+        meta["builder_semantic_write_refs"] = [write_ref]
+        meta["builder_semantic_write_properties"] = {write_ref: [write_property]}
+    message_id = str(meta.get("source_message_id") or meta.get("message_id") or "").strip()
+    if not message_id:
+        message_id = _external_user_turn_message_id(instruction, meta)
+        meta["message_id"] = message_id
+        _safe_emit_chat(instruction, webspace_id=ws, _meta=_api_request_chat_meta(meta),
+                        session=session, binding=binding, topic_ref=topic, from_="api")
+    identity = "semantic-proposal-" + hashlib.sha256(f"{scenario_id}:{message_id}".encode()).hexdigest()[:32]
+    patch = {"id": identity, "summary": instruction, "target": "semantic", "operation": "semantic_graph",
+             "change_id": identity, "created_at": _now()}
+    common = {"session_id": session.get("id"), "scenario_id": scenario_id,
+        "message_meta": {"message_id": f"{message_id}.semantic-result", "source_message_id": message_id}}
+    model = _builder_llm_model_for_session(session, meta) or "gpt-5"
+    try:
+        if root is None or not (root / "semantic.webui.json").is_file():
+            raise ValueError("A managed semantic source is required for a bounded model proposal")
+        registered = _register_builder_change_set(session=session, patch=patch, request_text=instruction, _meta=meta, compact=True)
+        if not registered.get("ok"):
+            raise ValueError("Semantic proposal intake was rejected")
+        admission = sdk_builder_semantic_ui.admit(project_ref=f"scenario:{scenario_id}", instruction=instruction,
+            source_message_id=message_id, write_refs=meta.get("builder_semantic_write_refs"),
+            write_properties=meta.get("builder_semantic_write_properties"), max_ops=1)
+        prepared = sdk_builder_semantic_ui.propose(project_ref=f"scenario:{scenario_id}",
+            admission_id=admission["admission_id"], model=model,
+            max_tokens=meta.get('builder_semantic_max_tokens', 16384),
+            reasoning_effort=str(meta.get("builder_llm_reasoning_effort") or "high"), output_mode=output_mode)
+        metrics = prepared.get("execution_metrics") or {}
+        common.update(model_calls=prepared.get("model_calls", 0), execution_metrics=metrics,
+            semantic_admission=admission["admission_id"])
+        # Non-planned outcomes can precede submission and have no job id.
+        # Keep their typed reason and all observed paid usage, without fallback.
+        for key in ("root_job_id", "request_digest", "findings", "contract_input_admission"):
+            if key in prepared:
+                common[key] = prepared[key]
+        if prepared["status"] != "planned":
+            return {**common, "ok": True, "status": "semantic_proposal_" + prepared["status"],
+                    "message": prepared.get("message") or "Specify the exact supported edit."}
+        request = prepared["request"]
+        if not auto_apply:
+            return {**common, "ok": True, "status": "semantic_proposal_ready", "semantic_request": request,
+                    "message": "A bounded proposal is retained. No semantic source was changed."}
+        result = sdk_builder_semantic_ui.apply(request, execution_metrics=metrics)
+        delivery = {}
+        try:
+            _sync_session_from_artifacts(session, binding)
+            _save_session(ws, session)
+            if not result.get("replayed"):
+                delivery["prototype_resources"] = developer_prototypes.carry_forward_resources(
+                    project_ref=f"project:{scenario_id}", change_id=request["change_id"],
+                    revision=result["revision"], webui=_read_json_file(root / "webui.json"))
+                delivery["preview"] = _refresh_follow_active_preview(ws, session=session, binding=binding, revision=result["revision"])
+            delivery["workbench"] = _request_workbench_refresh({"webspace_id": ws, "scenario_id": scenario_id})
+        except Exception as exc:
+            delivery["error"] = f"{type(exc).__name__}: {exc}"
+        _upsert_builder_change(webspace_id=ws, session=session, patch=patch, request_text=instruction,
+            status="accepted", _meta=meta, model=model, extra_meta={"semantic_transaction": result,
+                "semantic_admission": admission["admission_id"], "execution_metrics": metrics, "delivery": delivery})
+        message = f"Semantic operation {'already recorded' if result.get('replayed') else 'applied'}: revision {result['revision']}."
+        if delivery.get("error"):
+            message += " Source is committed; Preview delivery needs retry."
+        return {**common, "ok": True, "status": "semantic_proposal_applied", "message": message,
+                "semantic_transaction": result, "delivery": delivery}
+    except Exception as exc:
+        if 'admission' in locals():
+            try:
+                observation = sdk_builder_semantic_ui.proposal_observation(
+                    project_ref=f"scenario:{scenario_id}", admission_id=admission["admission_id"])
+                common.update(semantic_admission=admission["admission_id"],
+                              **{key: observation[key] for key in ("model_calls", "execution_metrics", "root_job_id") if key in observation})
+            except Exception:
+                pass  # Keep the original failure; private durable evidence remains authoritative.
+        if 'result' in locals():
+            return {**common, "ok": True, "status": "semantic_proposal_committed_delivery_failed",
+                "semantic_transaction": result, "message": f"Semantic source is committed at revision {result['revision']}; delivery failed: {exc}"}
+        return {**common, "ok": True, "status": "semantic_proposal_rejected",
+            "error": type(exc).__name__, "findings": getattr(exc, 'findings', []),
+            "message": f"Bounded semantic proposal stopped: {exc}. No full regeneration was started."}
+
+
 def _try_semantic_label_request(
     *, instruction: str, ws: str, session: dict[str, Any], binding: Mapping[str, Any],
     topic: Mapping[str, Any], auto_apply: bool, expected_revision: str | None,
@@ -25593,12 +25741,13 @@ def _try_semantic_label_request(
             return {**common, "ok": True, "status": status_prefix + "_proposed", "semantic_request": request,
                     "message": "The bounded semantic operation is proposed; no source was changed."}
         patch = {"id": request["transaction_id"], "summary": instruction, "target": "semantic",
-                 "operation": "semantic_graph", "change_id": request["transaction_id"], "created_at": _now()}
+                 "operation": "semantic_graph", "change_id": request["transaction_id"], "created_at": _now(),
+                 "semantic_refs": list(request["write_refs"])}
         if not prepared.get("replayed"):
-            registration = _register_builder_change_set(session=session, patch=patch, request_text=instruction, _meta=meta)
+            registration = _register_builder_change_set(session=session, patch=patch, request_text=instruction, _meta=meta, compact=True)
             if not registration.get("ok"):
                 raise ValueError("Label Change intake failed: " + str(registration.get("error")))
-            state = sdk_builder_workflow.get_state("scenario", scenario_id)
+            state = sdk_builder_workflow.get_prototype_edit_context("scenario", scenario_id)
             if (state.get("change") or {}).get("change_id") != request["change_id"]:
                 raise ValueError("Label intake changed the admitted Change; retry explicitly")
             request["expected_generation"] = state["generation"]
