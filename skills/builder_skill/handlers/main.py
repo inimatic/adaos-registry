@@ -11054,6 +11054,9 @@ def _compact_builder_change_issues(
     compacted: list[dict[str, Any]] = []
     compact_index = 0
     for lane, lane_issues in by_lane.items():
+        typed_fields = ("kind", "source_ref", "applicable_phases", "phase_dispositions", "effect", "effect_ref", "verification_scope", "owner")
+        if len({_compact_json({key: row[key] for key in typed_fields if key in row}) for row in lane_issues}) > 1:
+            return []  # Do not collapse obligations with distinct lifetime/authority.
         bucket_count = allocations[lane]
         for bucket_index in range(bucket_count):
             bucket = lane_issues[bucket_index::bucket_count]
@@ -11076,6 +11079,9 @@ def _compact_builder_change_issues(
                     "title": title[:240],
                     "lane": lane,
                     "acceptance_criteria": criteria,
+                    **{key: copy.deepcopy(bucket[0][key]) for key in typed_fields if key in bucket[0]},
+                    "semantic_refs": list(dict.fromkeys(ref for row in bucket for ref in row.get("semantic_refs", []))),
+                    "source_message_ids": list(dict.fromkeys(ref for row in bucket for ref in row.get("source_message_ids", []))),
                 }
             )
     return compacted
@@ -11105,6 +11111,11 @@ def _register_builder_change_set(
         for key in ("message_id", "source_message_id", "request_message_id")
         if str((_meta or {}).get(key) or "").strip()
     ]
+    for issue in issues:
+        issue["source_message_ids"] = list(dict.fromkeys(source_message_ids))
+        if patch.get("operation") == "semantic_graph" and patch.get("semantic_refs"):
+            issue["semantic_refs"] = list(dict.fromkeys(patch["semantic_refs"]))
+            issue["kind"] = "product_requirement"
     try:
         state = (sdk_builder_workflow.get_prototype_intake_context(object_type, object_id) if compact
                  else sdk_builder_workflow.get_state(object_type, object_id))
@@ -25709,7 +25720,8 @@ def _try_semantic_label_request(
             return {**common, "ok": True, "status": status_prefix + "_proposed", "semantic_request": request,
                     "message": "The bounded semantic operation is proposed; no source was changed."}
         patch = {"id": request["transaction_id"], "summary": instruction, "target": "semantic",
-                 "operation": "semantic_graph", "change_id": request["transaction_id"], "created_at": _now()}
+                 "operation": "semantic_graph", "change_id": request["transaction_id"], "created_at": _now(),
+                 "semantic_refs": list(request["write_refs"])}
         if not prepared.get("replayed"):
             registration = _register_builder_change_set(session=session, patch=patch, request_text=instruction, _meta=meta, compact=True)
             if not registration.get("ok"):
