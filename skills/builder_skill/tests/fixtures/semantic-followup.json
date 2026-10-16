@@ -1,0 +1,44 @@
+{
+  "schema": "adaos.webui.semantic.v2",
+  "document_id": "semantic-label-workbench",
+  "brief_ref": "brief:000000000000000000000000",
+  "brief_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "title": {"key": "app.title", "en": "Semantic label workbench", "ru": "Семантические изменения подписей"},
+  "layout": {"pattern": "split"},
+  "resources": [
+    {
+      "id": "records", "identity_field_refs": ["id"],
+      "item_semantics": "One independently editable synthetic record.",
+      "item_label": {"key": "record.item", "en": "Record", "ru": "Запись"},
+      "fields": [
+        {"id": "name", "label": {"key": "record.name", "en": "Name", "ru": "Название"}, "value_type": "short_text", "required": true, "editable": true},
+        {"id": "state", "label": {"key": "record.state", "en": "State", "ru": "Состояние"}, "value_type": "choice", "required": true, "editable": true,
+         "options": [{"value": "open", "label": {"key": "state.open", "en": "Open", "ru": "Открыто"}}, {"value": "done", "label": {"key": "state.done", "en": "Done", "ru": "Завершено"}}]},
+        {"id": "team_id", "label": {"key": "record.team", "en": "Team", "ru": "Команда"}, "value_type": "short_text", "required": true, "editable": true}
+      ],
+      "records": [{"id": "record-1", "name": "First task", "state": "open", "team_id": "team-1"}, {"id": "record-2", "name": "Second task", "state": "done", "team_id": "team-2"}]
+    },
+    {
+      "id": "teams", "identity_field_refs": ["id"],
+      "item_semantics": "One synthetic team available for record selection.",
+      "item_label": {"key": "team.item", "en": "Team", "ru": "Команда"},
+      "fields": [{"id": "team_name", "label": {"key": "team.name", "en": "Team name", "ru": "Название команды"}, "value_type": "short_text", "required": true, "editable": false}],
+      "records": [{"id": "team-1", "team_name": "Alpha"}, {"id": "team-2", "team_name": "Beta"}]
+    }
+  ],
+  "relationships": [{"id": "record_team", "from_resource_ref": "records", "from_field_ref": "team_id", "to_resource_ref": "teams", "to_field_ref": "id", "cardinality": "many_to_one"}],
+  "views": [
+    {"id": "records-list", "resource_ref": "records", "role": "collection", "region_role": "primary", "presentation": "table", "title": {"key": "records.list", "en": "Records", "ru": "Записи"}, "field_refs": ["name", "state", "team_id"], "empty_state": {"title": {"key": "records.empty", "en": "No records", "ru": "Нет записей"}}},
+    {"id": "record-details", "resource_ref": "records", "role": "details", "region_role": "supporting", "title": {"key": "record.details", "en": "Selected record", "ru": "Выбранная запись"}, "field_refs": ["name", "state", "team_id"]},
+    {"id": "record-editor", "resource_ref": "records", "role": "editor", "region_role": "supporting", "surface": "modal", "title": {"key": "record.editor", "en": "Edit record", "ru": "Редактировать запись"}, "field_refs": ["name", "state", "team_id"]},
+    {"id": "teams-list", "resource_ref": "teams", "role": "collection", "region_role": "supporting", "presentation": "table", "title": {"key": "teams.list", "en": "Teams", "ru": "Команды"}, "field_refs": ["team_name"]}
+  ],
+  "commands": [
+    {"id": "create", "kind": "create", "view_ref": "record-editor", "label": {"key": "cmd.create", "en": "Create", "ru": "Создать"}, "input_field_refs": ["name", "state", "team_id"], "fixed_values": {}, "exposure": {"placement": "collection_header", "presentation": "button"}},
+    {"id": "edit", "kind": "update", "view_ref": "record-editor", "label": {"key": "cmd.edit", "en": "Edit", "ru": "Изменить"}, "input_field_refs": ["name", "state", "team_id"], "fixed_values": {}, "exposure": {"placement": "row_action", "presentation": "icon"}},
+    {"id": "save", "kind": "update", "view_ref": "record-editor", "label": {"key": "cmd.save", "en": "Save", "ru": "Сохранить"}, "input_field_refs": ["name", "state", "team_id"], "fixed_values": {}, "exposure": {"placement": "editor_primary", "presentation": "button"}},
+    {"id": "delete", "kind": "delete", "view_ref": "record-editor", "label": {"key": "cmd.delete", "en": "Delete", "ru": "Удалить"}, "input_field_refs": [], "fixed_values": {}, "exposure": {"placement": "editor_danger", "presentation": "button"}},
+    {"id": "complete", "kind": "transition", "view_ref": "record-editor", "label": {"key": "cmd.complete", "en": "Complete", "ru": "Завершить"}, "input_field_refs": [], "fixed_values": {"state": "done"}, "guard": {"when": {"field_ref": "state", "operator": "equals", "value": "open"}, "require_nonempty": ["name"]}, "exposure": {"placement": "editor_primary", "presentation": "button"}}
+  ],
+  "representative_states": [], "requirement_bindings": [], "capability_gaps": []
+}
