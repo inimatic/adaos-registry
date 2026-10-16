@@ -15422,6 +15422,16 @@ def test_explicit_tool_confirmation_is_discoverable_and_uses_the_same_identity_g
     assert result["application_id"] == calls[0]["scenario_id"] == "owned_confirmed_app"
 
 
+def test_compact_provider_outputs_match_the_discoverable_tool_manifest():
+    from adaos.services.artifact_pipeline.cbs_authoring import compile_cbs_provider_files
+    names = ("skill.yaml", "handlers/main.py", "contracts/provider.cbs.yaml",
+        "contracts/capability.contract.json", "contracts/binding.definition.json")
+    compiled = compile_cbs_provider_files({name: (SKILL_ROOT / name).read_bytes() for name in names},
+        kind="skill", allow_generated_outputs=True)
+    operation = next(item for item in compiled.capability.to_dict()["operations"] if item["operation_id"] == "create_application_draft")
+    assert "confirmed_technical_application_id" in operation["input_schema"]["properties"]
+
+
 @pytest.mark.parametrize("conflict", ["idea", "argument", "legacy_confirmation"])
 def test_explicit_tool_confirmation_conflicts_fail_before_publisher_or_creation(monkeypatch, conflict):
     skill = _load_module()
