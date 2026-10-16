@@ -20794,10 +20794,21 @@ def create_application_draft(
     application_id: str | None = None,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
+    confirmed_technical_application_id: str | None = None,
 ) -> dict[str, Any]:
     _reject_transport_corrupted_text(idea, field="idea")
     ws = _source_webspace_id(webspace_id, _meta)
     source_idea = str(idea or "").strip() or "application prototype"
+    if confirmed_technical_application_id is not None:
+        metadata = dict(_meta or {})
+        previous = str(metadata.get("application_id") or "").strip()
+        confirmed = str(confirmed_technical_application_id).strip()
+        if metadata.get("technical_application_id_confirmed") is True and previous != confirmed:
+            return {"ok": False, "status": "application_identity_confirmation_invalid",
+                "error": "application_identity_confirmation_invalid",
+                "message": f"{AGENT_LABEL}: conflicting explicit technical Application id confirmations."}
+        metadata.update(application_id=confirmed, technical_application_id_confirmed=True)
+        _meta = metadata
     confirmed_application_id, identity_error = _confirmed_application_id_from_meta(
         source_idea,
         _meta,

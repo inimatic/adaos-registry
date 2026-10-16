@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.4.21
+version: 0.4.22
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -175,6 +175,10 @@ tools:
         type: string
       application_id:
         type: string
+      confirmed_technical_application_id:
+        type: string
+        pattern: ^[a-z](?:[a-z0-9_.-]{0,126}[a-z0-9])?$
+        description: Exact explicitly confirmed technical Application id; must agree with the idea and application_id before any creation or provider call.
       webspace_id:
         type: string
     additionalProperties: true

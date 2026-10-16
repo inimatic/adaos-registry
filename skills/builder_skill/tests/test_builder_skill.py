@@ -15409,6 +15409,33 @@ def test_conflicting_confirmed_technical_application_id_fails_before_creation(
     assert "requested_mail_app" in result["message"]
 
 
+def test_explicit_tool_confirmation_is_discoverable_and_uses_the_same_identity_guard(monkeypatch):
+    skill = _load_module()
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    declaration = next(item for item in manifest["tools"] if item["name"] == "create_application_draft")
+    assert "confirmed_technical_application_id" in declaration["input_schema"]["properties"]
+    calls = []
+    monkeypatch.setattr(skill.sdk_builder_applications, "publisher_context", lambda: {"publisher_ref": "publisher:test"})
+    monkeypatch.setattr(skill, "create_scenario_draft", lambda **kw: calls.append(kw) or {"ok": False, "status": "draft_creation_failed"})
+    result = skill.create_application_draft("Create an Application with exact technical id owned_confirmed_app.",
+        confirmed_technical_application_id="owned_confirmed_app", webspace_id="owned-test")
+    assert result["application_id"] == calls[0]["scenario_id"] == "owned_confirmed_app"
+
+
+@pytest.mark.parametrize("conflict", ["idea", "argument", "legacy_confirmation"])
+def test_explicit_tool_confirmation_conflicts_fail_before_publisher_or_creation(monkeypatch, conflict):
+    skill = _load_module()
+    monkeypatch.setattr(skill.sdk_builder_applications, "publisher_context", lambda: pytest.fail("conflict must fail before publisher"))
+    monkeypatch.setattr(skill, "create_scenario_draft", lambda **kw: pytest.fail("conflict must fail before creation"))
+    kwargs = {"idea": "Create an Application with exact technical id owned_confirmed_app.",
+        "confirmed_technical_application_id": "owned_confirmed_app", "webspace_id": "owned-test"}
+    if conflict == "idea": kwargs["idea"] = "Create an Application with exact technical id other_app."
+    if conflict == "argument": kwargs["application_id"] = "other_app"
+    if conflict == "legacy_confirmation": kwargs["_meta"] = {"application_id": "other_app", "technical_application_id_confirmed": True}
+    result = skill.create_application_draft(**kwargs)
+    assert result["ok"] is False and result["status"] == "application_identity_confirmation_invalid"
+
+
 def test_long_russian_create_request_with_exact_technical_id_cannot_edit_selected_project() -> None:
     skill = _load_module()
     text = (
