@@ -147,7 +147,8 @@ _STATE_MIGRATIONS = (
     RelationalMigration(
         version=1,
         name="partition Builder runtime state",
-        idempotent=True,
+        idempotent=False,
+        dialects=("sqlite",),
         statements=(
             "CREATE TABLE builder_state (state_key TEXT PRIMARY KEY, "
             "payload_json TEXT NOT NULL, updated_at TEXT NOT NULL)",
@@ -3954,6 +3955,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "For readable computed summaries use item.details with a static dataSource containing these values. Within one static object, later fields may reference earlier resolved fields through $data.<field>; order dependent fields after their inputs. "
                 "Form staticContent is literal copy and does not interpolate state or computed expressions."
             ),
+            "declarative_expression_contract": developer_ui.expression_contract(),
             "reactive_static_collections": (
                 "A static row may expose quantity:'$state.quantities.item1' and a computed amount expression. "
                 "To show only populated rows, filter the resolved row field directly, for example {key:'quantity',operator:'gt',value:0}. "
@@ -4764,6 +4766,11 @@ def _combine_llm_job_telemetry(
         "repair": copy.deepcopy(dict(repair_usage)),
     }
     combined["repair"] = copy.deepcopy(dict(repair_telemetry))
+    def observation(value):
+        return {key: copy.deepcopy(value[key]) for key in
+                ("root_job_id", "usage", "cost", "provider", "model", "timing") if key in value}
+    combined["attempt_observations"] = copy.deepcopy(primary.get("attempt_observations") or [observation(primary)])
+    combined["attempt_observations"].append(observation(repair_telemetry))
     return combined
 
 
@@ -9374,7 +9381,11 @@ def _json_pointer_list_index(
             if isinstance(item, Mapping) and str(item.get("id") or "") == stable_id
         ]
         if not matches:
-            raise KeyError(f"JSON Pointer stable id not found: {stable_id}")
+            ids = [str(item.get("id")) for item in items if isinstance(item, Mapping) and item.get("id")]
+            keys = [str(item.get("key")) for item in items if isinstance(item, Mapping) and item.get("key") and not item.get("id")]
+            raise KeyError(f"JSON Pointer stable id not found: {stable_id}; target array ids={ids[:24]!r}; "
+                           f"key-only members={keys[:24]!r}. @ selects id only within this array. "
+                           "Inspect the exact parent; for key-only columns use a guarded index or replace the smallest complete array.")
         if len(matches) > 1:
             raise ValueError(f"JSON Pointer stable id is ambiguous: {stable_id}")
         return matches[0]
@@ -10689,49 +10700,10 @@ def _unsupported_update_state_expression(value: Any) -> str:
     return ""
 
 
-_DECLARATIVE_EXPRESSION_OPS = {
-    "add",
-    "subtract",
-    "multiply",
-    "divide",
-    "min",
-    "max",
-    "round",
-    "equals",
-    "gt",
-    "gte",
-    "lt",
-    "lte",
-    "and",
-    "or",
-    "not",
-    "if",
-    "count",
-    "formatNumber",
-}
-
-
 def _invalid_declarative_expression(value: Any, path: str = "value") -> str:
-    if isinstance(value, Mapping):
-        if str(value.get("kind") or "").strip() == "expression":
-            op = str(value.get("op") or "").strip()
-            if op not in _DECLARATIVE_EXPRESSION_OPS:
-                return f"{path}.op={op!r} is not supported"
-            if op == "if":
-                args = value.get("args")
-                named = "condition" in value and ("then" in value or "else" in value)
-                if not named and (not isinstance(args, list) or len(args) != 3):
-                    return f"{path} if expression requires args=[condition, then, else] or named branches"
-        for key, nested in value.items():
-            found = _invalid_declarative_expression(nested, f"{path}.{key}")
-            if found:
-                return found
-    elif isinstance(value, list):
-        for index, nested in enumerate(value):
-            found = _invalid_declarative_expression(nested, f"{path}[{index}]")
-            if found:
-                return found
-    return ""
+    findings = developer_ui.expression_findings(value, path=path)
+    return (f"{findings[0]['detail']} Contract {findings[0]['contract_version']} "
+            f"({findings[0]['contract_digest']}).") if findings else ""
 
 
 def _brace_wrapped_state_reference(value: Any, path: str = "value") -> str:
@@ -15545,6 +15517,8 @@ def _repair_llm_semantic_transform_once(
             generation_options=repair_options,
             output_mode=resolved_output_mode,
             route="prototype.transform.async_semantic_repair",
+            parent_request_id=request_id,
+            parent_job_id=job_id,
             stage="semantic_repair",
             attempt=attempt_number,
             capability_selection=capability_selection,
@@ -16081,6 +16055,8 @@ def _repair_llm_webui_transform_output(
             messages=repair_messages,
             generation_options=repair_options,
             route="prototype.transform.async_repair",
+            parent_request_id=request_id,
+            parent_job_id=job_id,
             stage="repair",
             attempt=1,
             capability_selection=selection,
@@ -19127,8 +19103,7 @@ def _record_prototype_revision(
     if not scenario_id or not revision_token:
         return {"ok": False, "skipped": "scenario_or_revision_missing"}
     try:
-        from adaos.services.builder.run_observability import execution_metrics_from_llm
-        execution_metrics = execution_metrics_from_llm(llm_result, reasoning_effort=reasoning_effort) if llm_result else None
+        execution_metrics = sdk_builder_observability.execution_metrics_from_llm(llm_result, reasoning_effort=reasoning_effort) if llm_result else None
         return sdk_builder_workflow.transition(
             "scenario",
             scenario_id,
@@ -23170,16 +23145,18 @@ def _write_llm_job_request_artifact(
     attempt: int = 1,
     capability_selection: Mapping[str, Any] | None = None,
     message_purposes: Sequence[str] | None = None,
+    parent_request_id: str | None = None,
+    parent_job_id: str | None = None,
 ) -> dict[str, Any] | None:
     token = str(job_id or request_id or "").strip()
     journal_dir = _llm_job_journal_dir(session)
     if not token or journal_dir is None:
-        return None
+        raise RuntimeError("builder_evidence_unavailable_before_model_submit")
     safe_job_id = re.sub(r"[^A-Za-z0-9_.-]+", "_", token).strip("._-") or _hash_suffix(
         token
     )
     exact_messages = copy.deepcopy([dict(message) for message in messages])
-    message_bytes = _compact_json(exact_messages).encode("utf-8", errors="replace")
+    message_bytes = _compact_json(exact_messages).encode("utf-8")
     resolved_purposes = list(message_purposes or ())
     if len(resolved_purposes) != len(exact_messages):
         resolved_purposes = [
@@ -23204,6 +23181,12 @@ def _write_llm_job_request_artifact(
         model=model,
         generation_options=recorded_generation_options,
     )
+    source_inputs = {}
+    for name in ("webui.json", "semantic.webui.json", "prototype.brief.json", "prompt_state.json"):
+        source_path = journal_dir.parent / name
+        if source_path.is_file():
+            raw = source_path.read_bytes()
+            source_inputs[name] = {"sha256": hashlib.sha256(raw).hexdigest(), "content": raw.decode("utf-8")}
     payload = {
         "schema": "adaos.builder.llm_job_input.v1",
         "job_id": str(job_id or "").strip() or None,
@@ -23213,6 +23196,9 @@ def _write_llm_job_request_artifact(
         "created_at": _now(),
         "message_sha256": hashlib.sha256(message_bytes).hexdigest(),
         "messages": exact_messages,
+        "parent_request_id": parent_request_id,
+        "parent_job_id": parent_job_id,
+        "source_inputs": source_inputs,
         "input_attribution": input_attribution,
         "generation": {
             "model": str(model or "").strip() or None,
@@ -23221,6 +23207,7 @@ def _write_llm_job_request_artifact(
     }
     path = journal_dir / f"{safe_job_id}.request.json"
     try:
+        payload["evidence_receipt"] = sdk_builder_observability.retain_llm_evidence(payload)
         _write_json_file_atomic(
             path, {key: value for key, value in payload.items() if value is not None}
         )
@@ -23232,10 +23219,11 @@ def _write_llm_job_request_artifact(
             token,
             path,
         )
-        return None
+        raise RuntimeError("builder_evidence_write_failed_before_model_submit")
     return {
         "path": f"llm_jobs/{path.name}",
         "sha256": digest,
+        "evidence_receipt": payload["evidence_receipt"],
         "message_sha256": payload["message_sha256"],
         "input_attribution": {
             "schema": input_attribution["schema"],
@@ -23270,10 +23258,12 @@ def _write_llm_job_raw_candidate_artifact(
         re.sub(r"[^A-Za-z0-9_.-]+", "_", str(stage or "received")).strip("._-")
         or "received"
     )
-    response_bytes = str(output_text or "").encode("utf-8", errors="replace")
+    response_bytes = str(output_text or "").encode("utf-8")
     structured_candidate: dict[str, Any] | None = None
     extraction_error: str | None = None
     try:
+        if len(response_bytes) > 256_000:
+            raise ValueError("raw_output_parse_deferred_to_candidate_validation")
         extracted = _extract_json_object(output_text)
         structured_candidate = copy.deepcopy(dict(extracted))
     except Exception as exc:
@@ -23312,6 +23302,7 @@ def _write_llm_job_raw_candidate_artifact(
     }
     path = journal_dir / f"{safe_job_id}.candidate.{safe_stage}.raw.json"
     try:
+        payload["evidence_receipt"] = sdk_builder_observability.retain_llm_evidence(payload)
         _write_json_file_atomic(
             path, {key: value for key, value in payload.items() if value is not None}
         )
@@ -23324,13 +23315,14 @@ def _write_llm_job_raw_candidate_artifact(
             safe_stage,
             path,
         )
-        return None
+        raise RuntimeError("builder_evidence_write_failed_before_model_repair")
     return {
         "kind": "raw_model_output",
         "path": f"llm_jobs/{path.name}",
         "sha256": artifact_sha256,
         "stage": safe_stage,
         "response_sha256": payload["response"]["sha256"],
+        "evidence_receipt": payload["evidence_receipt"],
         "structured": structured_candidate is not None,
         "candidate_sha256": candidate_sha256,
     }
@@ -23384,15 +23376,12 @@ def _write_llm_job_candidate_artifact(
         "stage": safe_stage,
         "created_at": _now(),
         "webui_digest": _webui_source_fingerprint(normalized),
-        "validation": _bounded_repair_diagnostic(
-            result.get("validation")
-            if isinstance(result.get("validation"), Mapping)
-            else {}
-        ),
+        "validation": copy.deepcopy(dict(result.get("validation") or {})),
         "result": normalized_result,
     }
     path = journal_dir / f"{safe_job_id}.candidate.{safe_stage}.json"
     try:
+        payload["evidence_receipt"] = sdk_builder_observability.retain_llm_evidence(payload)
         _write_json_file_atomic(
             path, {key: value for key, value in payload.items() if value is not None}
         )
