@@ -2598,7 +2598,7 @@ def test_update_current_scenario_uses_llm_webui_fallback(monkeypatch, tmp_path) 
     )
 
 
-def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(evidence_skill, 
+def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(evidence_skill,
     monkeypatch,
 ) -> None:
     skill = evidence_skill()
@@ -5082,7 +5082,7 @@ def test_async_llm_completion_repairs_missing_page_schema(
     )
 
 
-def test_repair_uses_partially_transformed_candidate_as_current_webui(evidence_skill, 
+def test_repair_uses_partially_transformed_candidate_as_current_webui(evidence_skill,
     monkeypatch,
 ) -> None:
     skill = evidence_skill()
@@ -5203,7 +5203,7 @@ def test_repair_uses_partially_transformed_candidate_as_current_webui(evidence_s
     assert "Never replace initialState with a partial object" in repair_request["task"]
 
 
-def test_repair_retries_layered_validation_against_latest_candidate(evidence_skill, 
+def test_repair_retries_layered_validation_against_latest_candidate(evidence_skill,
     monkeypatch,
 ) -> None:
     skill = evidence_skill()
@@ -9934,7 +9934,7 @@ def test_builder_preflights_prototype_records_before_finalize(monkeypatch) -> No
     assert "invalid prototype seed[0]" in postcondition["actual"]["error"]
 
 
-def test_builder_oneshot_transform_uses_shared_request_postconditions(evidence_skill, 
+def test_builder_oneshot_transform_uses_shared_request_postconditions(evidence_skill,
     monkeypatch,
 ) -> None:
     skill = evidence_skill()
