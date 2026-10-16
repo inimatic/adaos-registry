@@ -9103,30 +9103,30 @@ def _builder_llm_messages(
 
 def _balanced_json_object(text: str) -> str | None:
     source = str(text or "")
-    for start, char in enumerate(source):
-        if char != "{":
+    start = source.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(source)):
+        current = source[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif current == "\\":
+                escaped = True
+            elif current == '"':
+                in_string = False
             continue
-        depth = 0
-        in_string = False
-        escaped = False
-        for index in range(start, len(source)):
-            current = source[index]
-            if in_string:
-                if escaped:
-                    escaped = False
-                elif current == "\\":
-                    escaped = True
-                elif current == '"':
-                    in_string = False
-                continue
-            if current == '"':
-                in_string = True
-            elif current == "{":
-                depth += 1
-            elif current == "}":
-                depth -= 1
-                if depth == 0:
-                    return source[start : index + 1]
+        if current == '"':
+            in_string = True
+        elif current == "{":
+            depth += 1
+        elif current == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start : index + 1]
     return None
 
 
@@ -23198,6 +23198,15 @@ def _write_llm_job_request_artifact(
         if source_path.is_file():
             raw = source_path.read_bytes()
             source_inputs[name] = {"sha256": hashlib.sha256(raw).hexdigest(), "content": raw.decode("utf-8")}
+    parent_evidence_ref = None
+    if parent_request_id:
+        parent_token = re.sub(r"[^A-Za-z0-9_.-]+", "_", parent_request_id).strip("._-") or _hash_suffix(parent_request_id)
+        parent_path = journal_dir / f"{parent_token}.request.json"
+        if parent_path.is_file():
+            parent = _read_json_file(parent_path)
+            if parent.get("request_id") != parent_request_id or parent.get("session_id") != session.get("id"):
+                raise RuntimeError("builder_evidence_parent_identity_mismatch")
+            parent_evidence_ref = dict(parent.get("evidence_receipt") or {}).get("ref")
     payload = {
         "schema": "adaos.builder.llm_job_input.v1",
         "job_id": str(job_id or "").strip() or None,
@@ -23209,6 +23218,7 @@ def _write_llm_job_request_artifact(
         "messages": exact_messages,
         "parent_request_id": parent_request_id,
         "parent_job_id": parent_job_id,
+        "parent_evidence_ref": parent_evidence_ref,
         "source_inputs": source_inputs,
         "input_attribution": input_attribution,
         "generation": {
@@ -23405,7 +23415,7 @@ def _write_llm_job_candidate_artifact(
             safe_stage,
             path,
         )
-        return None
+        raise RuntimeError("builder_evidence_candidate_write_failed")
     return {
         "path": f"llm_jobs/{path.name}",
         "sha256": digest,
