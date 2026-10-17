@@ -12718,6 +12718,7 @@ def _apply_llm_webui_transform(
                         messages,
                         model=selected_model,
                         **generation_options,
+                        **_builder_spend_options(session),
                     )
                     response_status = str(response.get("status") or "").strip().lower()
                     response_job_id = str(
@@ -12792,6 +12793,7 @@ def _apply_llm_webui_transform(
                         messages,
                         model=selected_model,
                         **generation_options,
+                        **_builder_spend_options(session),
                     )
             except Exception as exc:
                 detail = f"{type(exc).__name__}: {exc}"
@@ -15536,7 +15538,7 @@ def _repair_llm_semantic_transform_once(
             message_purposes=message_purposes,
         )
         started_at = _now()
-        response = submit_response_job(messages, model=selected_model, **repair_options)
+        response = submit_response_job(messages, model=selected_model, **repair_options, **_builder_spend_options(session))
         repair_job_id = str(response.get("job_id") or response.get("id") or "").strip()
         client = (
             response.get("_client")
@@ -16077,6 +16079,7 @@ def _repair_llm_webui_transform_output(
             repair_messages,
             model=selected_model,
             **repair_options,
+            **_builder_spend_options(session),
         )
         repair_job_id = str(response.get("job_id") or response.get("id") or "").strip()
         client = (
@@ -22851,6 +22854,7 @@ def _submit_llm_webui_transform_job(
                 messages,
                 model=selected_model,
                 **submitted_options,
+                **_builder_spend_options(session),
             )
             submit_done_at = _now()
             submit_attempts.append(
@@ -23151,6 +23155,16 @@ _TERMINAL_LLM_JOB_STATUSES = frozenset({"succeeded", "failed", "cancelled", "can
 def _llm_job_journal_dir(session: Mapping[str, Any]) -> Path | None:
     root = _project_artifact_root(session)
     return root / "llm_jobs" if root is not None else None
+
+
+def _builder_spend_options(session: Mapping[str, Any]) -> dict[str, Any]:
+    scenario = str(session.get("scenario_id") or "").strip()
+    if not scenario:
+        return {}
+    scope = "builder:scenario:" + scenario
+    if sdk_builder_observability.usd_budget(scope).get("status") == "not_configured":
+        return {}
+    return {"spend_scope": scope, "spend_run_id": str(session.get("id") or "")}
 
 
 def _write_llm_job_request_artifact(
