@@ -141,6 +141,37 @@ def _layout(*region_ids: str, pattern: str | None = None) -> dict:
     }
 
 
+def test_requirement_intake_retains_more_than_twenty_clauses_and_long_criteria():
+    skill = _load_module()
+    clauses = [f'Keep distinct requirement {i}' for i in range(25)]
+    rows = skill._builder_change_issues('\n'.join(clauses), change_id='change')
+    assert len(rows) == 25
+    assert all(clause in row['acceptance_criteria'][0] for clause, row in zip(clauses, rows))
+    clause = ' '.join(f'condition{i}' for i in range(200))
+    rows = skill._builder_change_issues(clause, change_id='long')
+    parts = [criterion.split(': ',1)[1] for row in rows for criterion in row['acceptance_criteria']]
+    assert ' '.join(parts) == clause
+    assert all(len(criterion) <= 500 for row in rows for criterion in row['acceptance_criteria'])
+    with pytest.raises(ValueError, match='exceed_admitted_capacity'):
+        skill._builder_change_issues('\n'.join(f'Requirement {i}' for i in range(1001)), change_id='over')
+
+
+def test_change_registration_starts_a_new_change_when_compaction_would_drop_criteria(monkeypatch):
+    skill = _load_module()
+    generated = [{'issue_id':f'new-{i}', 'title':f'Condition {i}', 'lane':'prototype',
+                  'acceptance_criteria':[f'Preserve condition {i}']} for i in range(25)]
+    monkeypatch.setattr(skill,'_builder_change_issues',lambda *args,**kwargs:copy.deepcopy(generated))
+    monkeypatch.setattr(skill.sdk_builder_workflow,'get_state',lambda *args:{'change_set': {
+        'change_set_id':'old', 'status':'in_progress', 'issues':[{'issue_id':f'old-{i}'} for i in range(49)]}})
+    calls=[]
+    monkeypatch.setattr(skill.sdk_builder_workflow,'transition',lambda *args,**kwargs:calls.append((args,kwargs)) or {'ok':True})
+    result=skill._register_builder_change_set(session={'scenario_id':'test'},patch={'id':'next'},
+        request_text='Preserve all conditions',_meta={'source_message_id':'m:canonical'})
+    assert result['ok'] and calls[0][0][-1] == 'plan_change_set'
+    assert len(calls[0][1]['metadata']['issues']) == 25
+    assert [row['acceptance_criteria'] for row in calls[0][1]['metadata']['issues']] == [row['acceptance_criteria'] for row in generated]
+
+
 def test_background_thread_propagates_runtime_context() -> None:
     skill = _load_module()
     runtime_owner = ContextVar("builder_test_runtime_owner", default=None)
@@ -498,7 +529,10 @@ def test_detailed_change_request_is_bounded_after_issue_decomposition(
     assert len(transitions[0]["request"]) <= 4000
     assert "Detailed source:" in transitions[0]["request"]
     assert transitions[0]["source_message_ids"] == ["message-detailed"]
-    assert len(transitions[0]["issues"]) == 20
+    assert len(transitions[0]["issues"]) == 50
+    criteria = [criterion for issue in transitions[0]['issues'] for criterion in issue['acceptance_criteria']]
+    assert len(criteria) == 80
+    assert all(any(f'Requirement {index}:' in criterion for criterion in criteria) for index in range(1,81))
     assert transitions[0]["issues"][0]["title"].startswith("Requirement 1:")
 
 
@@ -14453,14 +14487,17 @@ def test_chat_guides_underspecified_first_idea(monkeypatch) -> None:
     )
 
 
+@pytest.mark.parametrize('instruction,authorized', [('Add a lint gate before push.', False),
+    ('Разрешаю изменение интерфейса: Разделить Фото, Ретушь и Результаты.', True)])
 def test_chat_routes_followup_to_automation_sdk_at_automation_stage(
-    monkeypatch,
+    monkeypatch, instruction, authorized,
 ) -> None:
     skill = _load_module()
     emitted: list[dict] = []
     submitted: list[dict] = []
     session = {"scenario_id": "builder", "artifact_root": "/dev/scenarios/builder"}
     binding = {"runtime_scenario_id": "builder", "dev_webspace_id": "desktop-dev"}
+    monkeypatch.setattr(skill, '_project_external_user_turn', lambda *args, **kwargs: 'canonical-ui-message')
 
     monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
     monkeypatch.setattr(
@@ -14505,16 +14542,18 @@ def test_chat_routes_followup_to_automation_sdk_at_automation_stage(
         ),
     )
 
-    result = skill.chat("Add a lint gate before push.", webspace_id="desktop")
+    result = skill.chat(instruction, webspace_id="desktop")
 
     assert result["status"] == "automation_queued"
     assert result["project"] == {"type": "scenario", "id": "builder"}
     assert submitted == [
         {
-            "text": "Add a lint gate before push.",
+            "text": instruction,
             "object_type": "scenario",
             "object_id": "builder",
             "webspace_id": "desktop",
+            **({'ui_change_authorization': {'reason': instruction.split(':',1)[1].strip(),
+                  'source_message_ids': ['canonical-ui-message']}} if authorized else {}),
         }
     ]
     assert emitted[0]["text"] == "Iteration queued."

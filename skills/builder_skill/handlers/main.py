@@ -1887,12 +1887,22 @@ def _route_automation_chat(
                 "automation": automation_state.get("automation"),
             }
         else:
+            ui_authorization = {}
+            ui_request = re.fullmatch(r"(?:разрешаю изменение интерфейса|authorize ui change)\s*:\s*(.+)",
+                                      utterance.strip(), flags=re.IGNORECASE | re.DOTALL)
+            if ui_request:
+                source_id = str((_meta or {}).get('source_message_id') or '').strip()
+                if not source_id:
+                    raise ValueError('UI change authorization requires a canonical conversation turn')
+                ui_authorization = {'ui_change_authorization': {'reason': ui_request.group(1),
+                                                               'source_message_ids': [source_id]}}
             result = dict(
                 sdk_builder_automation.submit(
                     utterance,
                     object_type=object_type,
                     object_id=object_id,
                     webspace_id=webspace_id,
+                    **ui_authorization,
                 )
                 or {}
             )
@@ -2258,6 +2268,16 @@ def _safe_emit_chat(
     from_: str = "hub",
 ) -> None:
     try:
+        if from_ == 'hub' and session and session.get('scenario_id'):
+            try:
+                budget = sdk_builder_observability.usd_budget('builder:scenario:' + str(session['scenario_id']))
+                if budget.get('status') != 'not_configured':
+                    text += (f"\nБюджет LLM-эксперимента: учтено/зарезервировано ${budget['committed_usd']:.8g} "
+                             f"из ${budget['limit_usd']:.8g}; доступно ${budget['available_usd']:.8g}. "
+                             "Неизвестные расходы сохраняют резерв.")
+            except Exception:
+                _LOG.warning('Builder USD budget projection unavailable', exc_info=True)
+                text += '\nУчёт USD сейчас недоступен; отсутствие квитанции не означает нулевой расход.'
         from adaos.sdk.io.out import chat_append
         from concurrent.futures import (
             ThreadPoolExecutor,
@@ -10957,8 +10977,8 @@ def _builder_change_issue_clauses(request_text: str) -> list[str]:
         clause = re.sub(r"^\s*(?:[-*•]+|\d+[.)])\s*", "", chunk).strip()
         clause = " ".join(clause.split())
         if clause and clause not in clauses:
-            clauses.append(clause[:500])
-    return clauses[:20] or [" ".join(normalized.split())[:500]]
+            clauses.append(clause)
+    return clauses or [" ".join(normalized.split())]
 
 
 def _builder_change_issue_lane(clause: str) -> str:
@@ -11003,23 +11023,34 @@ def _builder_change_issues(
     request_text: str, *, change_id: str
 ) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
-    for index, clause in enumerate(
-        _builder_change_issue_clauses(request_text), start=1
-    ):
+    for clause in _builder_change_issue_clauses(request_text):
         lane = _builder_change_issue_lane(clause)
         criterion_prefix = (
             "The Prototype visibly and coherently satisfies"
             if lane == "prototype"
             else "The implementation and its tests satisfy"
         )
-        issues.append(
-            {
-                "issue_id": f"{change_id}:I{index:02d}"[-80:],
-                "title": clause[:240],
-                "lane": lane,
-                "acceptance_criteria": [f"{criterion_prefix}: {clause}"[:500]],
-            }
-        )
+        capacity = 500 - len(criterion_prefix) - 2
+        parts, current = [], ''
+        for word in clause.split():
+            if len(word) > capacity:
+                raise ValueError('builder_change_requirement_token_too_long; split the statement explicitly')
+            if current and len(current) + len(word) + 1 > capacity:
+                parts.append(current)
+                current = ''
+            current = (current + ' ' + word).strip()
+        if current:
+            parts.append(current)
+        for offset in range(0, len(parts), 20):
+            issues.append({'issue_id': f'{change_id}:I{len(issues)+1:02d}'[-80:],
+                'title': clause[:240], 'lane': lane,
+                'acceptance_criteria': [f'{criterion_prefix}: {part}' for part in parts[offset:offset+20]]})
+            if len(issues) > 1000:
+                raise ValueError('builder_change_requirements_exceed_admitted_capacity; split the Change explicitly')
+    if len(issues) > 50:
+        issues = _compact_builder_change_issues(issues, max_count=50, change_id=change_id)
+        if not issues:
+            raise ValueError('builder_change_requirements_exceed_admitted_capacity; split the Change explicitly')
     return issues
 
 
@@ -11064,11 +11095,13 @@ def _compact_builder_change_issues(
                 continue
             compact_index += 1
             criteria = [
-                str(criterion).strip()[:500]
+                str(criterion).strip()
                 for issue in bucket
                 for criterion in issue.get("acceptance_criteria") or []
                 if str(criterion).strip()
-            ][:20]
+            ]
+            if len(criteria) > 20 or any(len(criterion) > 500 for criterion in criteria):
+                return []  # Start a new Change rather than lose an obligation.
             title = str(bucket[0].get("title") or "Builder change requirement").strip()
             if len(bucket) > 1:
                 suffix = f" (+{len(bucket) - 1} related requirements)"
@@ -11102,7 +11135,10 @@ def _register_builder_change_set(
     change_id = _builder_change_id(session=session, patch=patch)
     if object_type not in {"scenario", "skill"} or not object_id:
         return {"ok": False, "error": "artifact_identity_missing"}
-    issues = _builder_change_issues(request_text, change_id=change_id)
+    try:
+        issues = _builder_change_issues(request_text, change_id=change_id)
+    except ValueError as exc:
+        return {'ok': False, 'error': 'change_requirements_not_admitted', 'detail': str(exc)}
     if not issues:
         return {"ok": False, "error": "change_set_issues_missing"}
     workflow_request = _builder_change_request(request_text)
