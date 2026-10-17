@@ -2266,7 +2266,8 @@ def _safe_emit_chat(
     topic_ref: Mapping[str, Any] | None = None,
     actions: Sequence[Mapping[str, Any]] | None = None,
     from_: str = "hub",
-) -> None:
+) -> bool:
+    acknowledged = False
     try:
         if from_ == 'hub' and session and session.get('scenario_id'):
             try:
@@ -2325,6 +2326,8 @@ def _safe_emit_chat(
                 future = pool.submit(copy_context().run, _append_chat)
                 try:
                     receipt = future.result(timeout=CHAT_APPEND_TIMEOUT_S)
+                    acknowledged = bool(isinstance(receipt, Mapping) and receipt.get('ok') is True
+                                        and receipt.get('persisted') is True)
                     if isinstance(receipt, Mapping) and receipt.get("ok") is False:
                         logging.getLogger(__name__).warning("Builder chat append was not acknowledged: %s", receipt)
                 except FuturesTimeoutError:
@@ -2334,9 +2337,10 @@ def _safe_emit_chat(
             finally:
                 if pool is not None:
                     pool.shutdown(wait=True)
+        return acknowledged
     except Exception:
         logging.getLogger(__name__).warning("Builder chat append failed", exc_info=True)
-        return
+        return False
 
 
 def _external_user_turn_message_id(text: str, _meta: Mapping[str, Any] | None) -> str:
@@ -2391,9 +2395,9 @@ def _project_external_user_turn(
     meta = dict(_meta or {}) if isinstance(_meta, Mapping) else {}
     transport = str(meta.get("io_type") or meta.get("transport") or "").strip().lower()
     source = str(meta.get("prototype_request_source") or "").strip().lower()
-    sdk_request = source in {"api", "e2e"}
+    sdk_request = source in {"api", "e2e"} or _is_api_tool_call(meta)
     if (transport not in {"telegram", "tg"} and not sdk_request) or not str(text or "").strip():
-        return
+        return str(meta.get('source_message_id') or meta.get('message_id') or '').strip() or None
     origin = "E2E test" if source == "e2e" else "SDK" if sdk_request else "Telegram"
     canonical_meta = {
         **meta,
@@ -2405,7 +2409,7 @@ def _project_external_user_turn(
         "action_source": "external_user_turn_projection",
         "origin_label": str(meta.get("origin_label") or origin).strip() or origin,
     }
-    _safe_emit_chat(
+    acknowledged = _safe_emit_chat(
         str(text).strip(),
         webspace_id=webspace_id,
         _meta=canonical_meta,
@@ -2414,6 +2418,8 @@ def _project_external_user_turn(
         topic_ref=topic_ref,
         from_="user",
     )
+    if not acknowledged:
+        raise RuntimeError('builder_user_turn_not_acknowledged')
     return canonical_meta["message_id"]
 
 

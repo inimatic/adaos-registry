@@ -291,14 +291,15 @@ def test_semantic_replay_requires_exact_original_context_and_terminal_root(monke
         assert result["replay"]["incremental_tokens"] == 0
 
 
-@pytest.mark.parametrize("source,expected", [("api", True), ("e2e", True), ("chat", False), ("unknown", False)])
+@pytest.mark.parametrize("source,expected", [("api", True), ("e2e", True), ("chat", False), ("unknown", False), ('normal_api',True)])
 def test_sdk_turns_are_projected_once_without_duplicating_browser_ingress(monkeypatch, source, expected):
     skill = _load_module()
     emitted = []
-    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append((text, kwargs)))
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append((text, kwargs)) or True)
     session = {"scenario_id": "local-example"}
     topic = {"thread_id": "prompt-project:scenario:local-example"}
-    metadata = {"prototype_request_source": source, "message_id": "request-one"}
+    metadata = ({'action_source':'api_tool_call','request_id':'request-one'} if source=='normal_api'
+                else {"prototype_request_source": source, "message_id": "request-one"})
     for _ in range(2):
         skill._project_external_user_turn("Full original instruction", webspace_id="desktop-dev", _meta=metadata,
                                          session=session, binding={}, topic_ref=topic)
@@ -309,6 +310,15 @@ def test_sdk_turns_are_projected_once_without_duplicating_browser_ingress(monkey
         assert emitted[0][1]["session"] == session
         assert emitted[0][1]["from_"] == "user"
         assert emitted[0][0] == "Full original instruction"
+
+
+def test_unacknowledged_external_user_turn_never_becomes_an_authorization_ref(monkeypatch):
+    skill = _load_module()
+    monkeypatch.setattr(skill,'_safe_emit_chat',lambda *args,**kwargs:False)
+    with pytest.raises(RuntimeError,match='user_turn_not_acknowledged'):
+        skill._project_external_user_turn('Authorize UI change: sections',webspace_id='desktop',
+            _meta={'action_source':'api_tool_call','request_id':'no-ack'}, session={'scenario_id':'test'},
+            binding={}, topic_ref={})
 
 
 def _stub_development_context(skill, monkeypatch) -> dict:
@@ -14626,7 +14636,7 @@ def test_chat_owns_single_sync_update_result_emit(monkeypatch) -> None:
     monkeypatch.setattr(
         skill,
         "_safe_emit_chat",
-        lambda text, **_kwargs: emitted.append(str(text)),
+        lambda text, **_kwargs: emitted.append(str(text)) or True,
     )
 
     def _update(**kwargs):
@@ -14643,7 +14653,7 @@ def test_chat_owns_single_sync_update_result_emit(monkeypatch) -> None:
     )
 
     assert result["status"] == "llm_repaired"
-    assert emitted == ["Updated once."]
+    assert emitted == ["Repair the saved candidate.", "Updated once."]
 
 
 def test_chat_does_not_mutate_prototype_when_automation_session_is_not_started(
@@ -17388,7 +17398,7 @@ def test_telegram_user_turn_is_projected_into_builder_project_conversation(
     monkeypatch.setattr(
         skill,
         "_safe_emit_chat",
-        lambda text, **kwargs: emitted.append({"text": text, "kwargs": dict(kwargs)}),
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": dict(kwargs)}) or True,
     )
 
     meta = {
@@ -17595,7 +17605,7 @@ def test_limited_channel_can_select_existing_dev_scenario_without_local_session(
     monkeypatch.setattr(
         skill,
         "_safe_emit_chat",
-        lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}),
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}) or True,
     )
 
     result = skill.chat(
