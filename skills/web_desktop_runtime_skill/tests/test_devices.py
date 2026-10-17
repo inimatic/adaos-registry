@@ -202,6 +202,97 @@ def test_browser_transport_and_page_endpoints_collapse_to_one_representation():
     assert sum(item["device_type"] == "browser" for item in projected) == 1
 
 
+def test_list_devices_syncs_and_projects_registered_desktop_endpoint(monkeypatch):
+    monkeypatch.setattr(main.sdk_access, "require", Mock())
+    registered_endpoint = {
+        "id": "device:redevice:desktop-1",
+        "title": "AdaOS Desktop",
+        "summary": "desktop_client | windows",
+        "kind": "redevice",
+        "runtime": {
+            "status": "online",
+            "connection_state": "online",
+            "route_mode": "root_command_poll",
+            "device_kind": "redevice",
+        },
+        "actual_state": {
+            "hostname": "WORKSTATION",
+            "device_ref": "redevice:desktop-1",
+            "os_name": "windows",
+        },
+    }
+    list_objects = Mock(
+        side_effect=lambda **kwargs: [registered_endpoint]
+        if kwargs.get("kind") == "redevice"
+        else []
+    )
+    monkeypatch.setattr(main.sdk_control_plane, "list_device_objects", list_objects)
+    monkeypatch.setattr(main.sdk_control_plane, "list_browser_session_objects", Mock(return_value=[]))
+    monkeypatch.setattr(main.sdk_access_links, "list_browser_links", Mock(return_value=[]))
+    monkeypatch.setattr(main.sdk_system, "get_operational_snapshot", Mock(return_value={}))
+    endpoint_list = Mock(return_value=[])
+    monkeypatch.setattr(main.sdk_device_access, "list_endpoint_devices", endpoint_list)
+    monkeypatch.setattr(main, "_REDEVICE_LAST_SYNC", 0.0)
+
+    result = main.list_devices(status="active")
+
+    assert result["ok"] is True
+    endpoint = next(
+        item
+        for item in result["items"]
+        if item["id"] == "device:redevice:desktop-1"
+    )
+    assert endpoint["title"] == "RU:Client:desktop-1 (AdaOS Desktop)"
+    assert endpoint["device_type"] == "redevice"
+    assert endpoint["parent_device_id"] == "physical-device:workstation"
+    endpoint_list.assert_called_once_with("redevice", sync_registry=True)
+    assert list_objects.call_args_list[1].kwargs["kind"] == "redevice"
+
+
+def test_registered_desktop_endpoint_replaces_its_browser_transport(monkeypatch):
+    monkeypatch.setattr(main.sdk_access, "require", Mock())
+    registered_endpoint = {
+        "id": "device:redevice:desktop-1",
+        "title": "AdaOS Desktop",
+        "kind": "redevice",
+        "runtime": {
+            "status": "online",
+            "connection_state": "online",
+            "device_kind": "redevice",
+        },
+        "actual_state": {
+            "hostname": "WORKSTATION",
+            "device_ref": "redevice:desktop-1",
+        },
+    }
+    browser_transport = {
+        "id": "browser:desktop-1",
+        "title": "AdaOS Desktop",
+        "kind": "browser_session",
+        "runtime": {"status": "online", "connection_state": "connected"},
+        "actual_state": {"device_ref": "browser:desktop-1"},
+    }
+    monkeypatch.setattr(
+        main.sdk_control_plane,
+        "list_device_objects",
+        Mock(
+            side_effect=lambda **kwargs: [registered_endpoint]
+            if kwargs.get("kind") == "redevice"
+            else [browser_transport]
+        ),
+    )
+    monkeypatch.setattr(main.sdk_control_plane, "list_browser_session_objects", Mock(return_value=[]))
+    monkeypatch.setattr(main.sdk_access_links, "list_browser_links", Mock(return_value=[]))
+    monkeypatch.setattr(main.sdk_system, "get_operational_snapshot", Mock(return_value={}))
+    monkeypatch.setattr(main.sdk_device_access, "list_endpoint_devices", Mock(return_value=[]))
+    monkeypatch.setattr(main, "_REDEVICE_LAST_SYNC", 0.0)
+
+    result = main.list_devices(status="active")
+
+    endpoints = [item for item in result["items"] if item["kind"] != "physical_device"]
+    assert [item["id"] for item in endpoints] == ["device:redevice:desktop-1"]
+
+
 def test_legacy_browser_without_parent_stays_unknown_and_detects_hub():
     active = {
         "id": "member:hub-local",
