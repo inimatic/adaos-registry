@@ -74,14 +74,45 @@ def _load_module():
 @pytest.fixture
 def evidence_skill(tmp_path, monkeypatch):
     """Real acknowledged CAS and journal in an isolated test project."""
-    from adaos.services.builder.llm_input_attribution import retain_llm_evidence
+    from adaos.services.builder.llm_input_attribution import retain_llm_evidence, read_llm_evidence
     def load():
         module = _load_module()
         monkeypatch.setattr(module, "_project_artifact_root", lambda session: tmp_path / "project")
         monkeypatch.setattr(module.sdk_builder_observability, "retain_llm_evidence",
             lambda value: retain_llm_evidence(value, state_dir=tmp_path / "private-state"))
+        monkeypatch.setattr(module.sdk_builder_observability, "read_llm_evidence",
+            lambda receipt: read_llm_evidence(receipt, state_dir=tmp_path / "private-state"))
         return module
     return load
+
+
+def test_repair_request_requires_acknowledged_parent_before_submit(evidence_skill):
+    skill = evidence_skill()
+    with pytest.raises(RuntimeError, match='parent_provenance_incomplete'):
+        skill._write_llm_job_request_artifact(session={'id': 's'}, job_id='repair', request_id='repair',
+            model='gpt-5', messages=[{'role': 'user', 'content': 'repair'}], generation_options={},
+            parent_request_id='missing', parent_job_id='root-parent')
+
+
+def test_repair_request_verifies_parent_cas_and_detects_journal_tampering(evidence_skill):
+    skill = evidence_skill()
+    session = {'id': 's'}
+    common = dict(session=session, model='gpt-5', messages=[{'role': 'user', 'content': 'task'}],
+                  generation_options={})
+    primary = skill._write_llm_job_request_artifact(job_id='primary', request_id='primary', **common)
+    repair = skill._write_llm_job_request_artifact(job_id='repair', request_id='repair',
+        parent_request_id='primary', **common)
+    journal_dir = skill._llm_job_journal_dir(session)
+    retained = json.loads((journal_dir / 'repair.request.json').read_text(encoding='utf-8'))
+    assert retained['parent_provenance']['status'] == 'verified'
+    assert retained['parent_evidence_ref'] == primary['evidence_receipt']['ref']
+    parent_path = journal_dir / 'primary.request.json'
+    parent = json.loads(parent_path.read_text(encoding='utf-8'))
+    parent['messages'][0]['content'] = 'changed after acknowledgement'
+    parent_path.write_text(json.dumps(parent), encoding='utf-8')
+    with pytest.raises(RuntimeError, match='parent_provenance_incomplete'):
+        skill._write_llm_job_request_artifact(job_id='repair-again', request_id='repair-again',
+            parent_request_id='primary', **common)
 
 
 def _layout(*region_ids: str, pattern: str | None = None) -> dict:
@@ -5044,6 +5075,10 @@ def test_async_llm_completion_repairs_missing_page_schema(
 
     monkeypatch.setattr(llm_client, "submit_response_job", fake_submit_response_job)
 
+    # The transport is mocked; retain its real acknowledged primary input.
+    skill._write_llm_job_request_artifact(session=session,
+        job_id='builder-ui-repair', request_id='builder-ui-repair', model='gpt-5',
+        messages=[{'role': 'user', 'content': 'Primary fixture request'}], generation_options={})
     skill._complete_llm_webui_job(
         ws="builder-repair",
         session_id="builder_session_repair",
@@ -7945,6 +7980,10 @@ def test_state_repair_context_and_transport_use_patch_contract(tmp_path, monkeyp
     monkeypatch.setattr(skill.sdk_builder_prototype, "prepare_reference_repair", lambda *_: plan if kind == "reference" else None)
     monkeypatch.setattr(skill.sdk_builder_prototype, f"apply_{kind}_repair", apply)
     monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", parse)
+    # The transport is mocked; retain its real acknowledged primary input.
+    skill._write_llm_job_request_artifact(session={"id": "patch", "scenario_id": "records", "artifact_root": str(tmp_path)},
+        job_id='patch', request_id='patch', model='gpt-5',
+        messages=[{'role': 'user', 'content': 'Primary fixture request'}], generation_options={})
     result = skill._repair_llm_semantic_transform_output(
         session={"id": "patch", "scenario_id": "records", "artifact_root": str(tmp_path)},
         instruction="Show records", previous_preview={}, output_text=json.dumps(candidate),
@@ -8083,6 +8122,14 @@ def test_semantic_repair_receives_full_candidate_brief_and_finding(
         }
 
     monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", parse)
+    # The transport is mocked; retain its real acknowledged primary input.
+    skill._write_llm_job_request_artifact(session={
+            "id": "session-semantic-repair",
+            "scenario_id": "work-items",
+            "artifact_root": str(tmp_path),
+        },
+        job_id='primary-request', request_id='primary-request', model='gpt-5',
+        messages=[{'role': 'user', 'content': 'Primary fixture request'}], generation_options={})
     result = skill._repair_llm_semantic_transform_output(
         session={
             "id": "session-semantic-repair",
@@ -8377,6 +8424,10 @@ def test_complete_repair_retains_candidate_for_later_binding_scope(tmp_path, mon
         raise SemanticPrototypeValidationError(findings)
 
     monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", incomplete)
+    # The transport is mocked; retain its real acknowledged primary input.
+    skill._write_llm_job_request_artifact(session={"id": "test", "scenario_id": "items", "artifact_root": str(tmp_path)},
+        job_id='original', request_id='original', model='gpt-5',
+        messages=[{'role': 'user', 'content': 'Primary fixture request'}], generation_options={})
     result = skill._repair_llm_semantic_transform_once(session={"id": "test", "scenario_id": "items", "artifact_root": str(tmp_path)},
         instruction="Show items", previous_preview={}, output_text=json.dumps(candidate),
         validation_error={"findings": [{"code": "semantic.validation_failed"}]},

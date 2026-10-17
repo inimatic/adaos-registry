@@ -23210,6 +23210,7 @@ def _write_llm_job_request_artifact(
             raw = source_path.read_bytes()
             source_inputs[name] = {"sha256": hashlib.sha256(raw).hexdigest(), "content": raw.decode("utf-8")}
     parent_evidence_ref = None
+    parent_provenance = {"status": "not_applicable"}
     if parent_request_id:
         parent_token = re.sub(r"[^A-Za-z0-9_.-]+", "_", parent_request_id).strip("._-") or _hash_suffix(parent_request_id)
         parent_path = journal_dir / f"{parent_token}.request.json"
@@ -23217,7 +23218,19 @@ def _write_llm_job_request_artifact(
             parent = _read_json_file(parent_path)
             if parent.get("request_id") != parent_request_id or parent.get("session_id") != session.get("id"):
                 raise RuntimeError("builder_evidence_parent_identity_mismatch")
-            parent_evidence_ref = dict(parent.get("evidence_receipt") or {}).get("ref")
+            receipt = dict(parent.get("evidence_receipt") or {})
+            try:
+                retained = sdk_builder_observability.read_llm_evidence(receipt)
+                expected = {key: value for key, value in parent.items()
+                            if key != "evidence_receipt" and value is not None}
+                if expected != {key: value for key, value in retained.items() if value is not None}:
+                    raise ValueError("parent journal differs from acknowledged bytes")
+            except Exception as exc:
+                raise RuntimeError("builder_evidence_parent_provenance_incomplete") from exc
+            parent_evidence_ref = receipt["ref"]
+            parent_provenance = {"status": "verified", "source": "journal_and_cas", "ref": parent_evidence_ref}
+        else:
+            raise RuntimeError("builder_evidence_parent_provenance_incomplete")
     payload = {
         "schema": "adaos.builder.llm_job_input.v1",
         "job_id": str(job_id or "").strip() or None,
@@ -23230,6 +23243,7 @@ def _write_llm_job_request_artifact(
         "parent_request_id": parent_request_id,
         "parent_job_id": parent_job_id,
         "parent_evidence_ref": parent_evidence_ref,
+        "parent_provenance": parent_provenance,
         "source_inputs": source_inputs,
         "input_attribution": input_attribution,
         "generation": {
