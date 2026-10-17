@@ -1896,16 +1896,27 @@ def _route_automation_chat(
                     raise ValueError('UI change authorization requires a canonical conversation turn')
                 ui_authorization = {'ui_change_authorization': {'reason': ui_request.group(1),
                                                                'source_message_ids': [source_id]}}
-            result = dict(
-                sdk_builder_automation.submit(
-                    utterance,
-                    object_type=object_type,
-                    object_id=object_id,
-                    webspace_id=webspace_id,
-                    **ui_authorization,
+            project_control = getattr(sdk_builder_automation, "control_reply", None)
+            if not callable(project_control):
+                result = {
+                    "ok": False, "status": "builder_control_contract_unavailable", "model_started": False,
+                    "message": "Обновите Core: компактный контракт Builder недоступен. Новое задание не отправлено.",
+                }
+            else:
+                result = dict(
+                    sdk_builder_automation.submit(
+                        utterance,
+                        object_type=object_type,
+                        object_id=object_id,
+                        webspace_id=webspace_id,
+                        **ui_authorization,
+                    )
+                    or {}
                 )
-                or {}
-            )
+                result = project_control(
+                    result, object_type=object_type, object_id=object_id,
+                    locale=str((_meta or {}).get("locale") or "ru"),
+                )
     except Exception as exc:
         result = {
             "ok": False,

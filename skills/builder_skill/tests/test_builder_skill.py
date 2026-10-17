@@ -14536,6 +14536,8 @@ def test_chat_routes_followup_to_automation_sdk_at_automation_stage(
             "handled": True,
             "status": "automation_queued",
             "message": "Iteration queued.",
+            "session": {"session_id": "automation.scenario.builder", "current_task_id": "task.control",
+                        "status": "queued", "completion_history": ["retained historical evidence" * 10000]},
         }
 
     monkeypatch.setattr(skill.sdk_builder_automation, "submit", _submit)
@@ -14568,6 +14570,25 @@ def test_chat_routes_followup_to_automation_sdk_at_automation_stage(
     ]
     assert emitted[0]["text"] == "Iteration queued."
     assert emitted[0]["topic_ref"]["thread_id"] == "prompt-project:scenario:builder"
+    assert result["schema"] == "adaos.builder.control_reply.v1"
+    assert result["task_id"] == "task.control"
+    assert "completion_history" not in json.dumps(result)
+    assert len(json.dumps(result, ensure_ascii=False).encode("utf8")) < 64 * 1024
+
+
+def test_chat_missing_control_contract_blocks_before_model_submission(monkeypatch):
+    skill = _load_module()
+    monkeypatch.setattr(skill, "_chat_project_ref", lambda **kwargs: ("scenario", "photo"))
+    monkeypatch.setattr(skill.developer_prompt_context, "get", lambda *args: {"workflow_state": "automation"})
+    monkeypatch.setattr(skill.sdk_builder_workflow, "get_state", lambda *args: {"governed": {"state": "trial_ready"}})
+    monkeypatch.setattr(skill.sdk_builder_automation, "get_state", lambda **kwargs: {"session_present": True})
+    monkeypatch.setattr(skill.sdk_builder_automation, "control_reply", None)
+    monkeypatch.setattr(skill.sdk_builder_automation, "submit", lambda *args, **kwargs: pytest.fail("No submission before contract admission"))
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda *args, **kwargs: None)
+    monkeypatch.setattr(skill, "_dialog_state", lambda *args, **kwargs: {})
+    result = skill._route_automation_chat(utterance="Continue", webspace_id="desktop", session={}, binding={}, topic={}, _meta={})
+    assert result["status"] == "builder_control_contract_unavailable"
+    assert result["model_started"] is False
 
 
 def test_chat_starts_new_prototype_change_after_publication(monkeypatch) -> None:
