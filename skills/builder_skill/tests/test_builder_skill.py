@@ -321,6 +321,29 @@ def test_unacknowledged_external_user_turn_never_becomes_an_authorization_ref(mo
             binding={}, topic_ref={})
 
 
+@pytest.mark.parametrize('confirmed',[True,False])
+def test_external_ingress_reconciles_only_exact_durable_ack_after_notification_timeout(monkeypatch,confirmed):
+    from adaos.sdk.io import out
+    skill=_load_module();calls=[]
+    monkeypatch.setattr(skill,'_safe_emit_chat',lambda *args,**kwargs:False)
+    monkeypatch.setattr(skill,'_chat_meta',lambda *args,**kwargs:{
+        'conversation_id':'conv.builder','conversation_owner':'skill:builder_skill','webspace_id':'desktop',
+        'dialog_channel_id':'builder','thread_id':'project:photo'})
+    def receipt(identity,**kwargs):
+        calls.append((identity,kwargs));return {'ok':confirmed,'persisted':confirmed}
+    monkeypatch.setattr(out,'chat_message_receipt',receipt)
+    kwargs=dict(webspace_id='desktop',_meta={'action_source':'api_tool_call','request_id':'late-ack'},
+                session={'scenario_id':'photo'},binding={},topic_ref={})
+    if confirmed:
+        identity=skill._project_external_user_turn('Exact original request',**kwargs)
+        assert identity==calls[0][0]
+    else:
+        with pytest.raises(RuntimeError,match='user_turn_not_acknowledged'):
+            skill._project_external_user_turn('Exact original request',**kwargs)
+    assert calls[0][1]==dict(conversation_id='conv.builder',thread_id='project:photo',
+        webspace_id='desktop',channel_id='builder',owner='skill:builder_skill',role='user',text='Exact original request')
+
+
 def _stub_development_context(skill, monkeypatch) -> dict:
     packet = {
         "schema": "adaos.builder.context_packet.v1",

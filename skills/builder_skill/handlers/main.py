@@ -2430,6 +2430,24 @@ def _project_external_user_turn(
         from_="user",
     )
     if not acknowledged:
+        # The bounded live notification can still be running after the
+        # canonical commit. Reconcile only this exact scoped message; never
+        # treat a timeout as a failed write or manufacture authorization refs.
+        try:
+            from adaos.sdk.io.out import chat_message_receipt
+            scope = _chat_meta(canonical_meta, webspace_id=_reply_webspace_id(webspace_id, canonical_meta),
+                               session=session, binding=binding, topic_ref=topic_ref)
+            receipt = chat_message_receipt(canonical_meta['message_id'],
+                conversation_id=str(scope.get('conversation_id') or ''),
+                thread_id=str(scope.get('conversation_topic_id') or scope.get('thread_id') or ''),
+                webspace_id=str(scope.get('webspace_id') or ''),
+                channel_id=str(scope.get('dialog_channel_id') or ''),
+                owner=str(scope.get('conversation_owner') or scope.get('owner') or ''),
+                role='user',text=str(text).strip())
+            acknowledged = receipt.get('ok') is True and receipt.get('persisted') is True
+        except Exception:
+            acknowledged = False
+    if not acknowledged:
         raise RuntimeError('builder_user_turn_not_acknowledged')
     return canonical_meta["message_id"]
 
