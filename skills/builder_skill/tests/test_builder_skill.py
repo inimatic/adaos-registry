@@ -14499,8 +14499,9 @@ def test_chat_guides_underspecified_first_idea(monkeypatch) -> None:
 
 @pytest.mark.parametrize('instruction,authorized', [('Add a lint gate before push.', False),
     ('Разрешаю изменение интерфейса: Разделить Фото, Ретушь и Результаты.', True)])
+@pytest.mark.parametrize('locale',['ru','en'])
 def test_chat_routes_followup_to_automation_sdk_at_automation_stage(
-    monkeypatch, instruction, authorized,
+    monkeypatch, instruction, authorized, locale,
 ) -> None:
     skill = _load_module()
     emitted: list[dict] = []
@@ -14554,7 +14555,7 @@ def test_chat_routes_followup_to_automation_sdk_at_automation_stage(
         ),
     )
 
-    result = skill.chat(instruction, webspace_id="desktop")
+    result = skill.chat(instruction, webspace_id="desktop", _meta={'locale':locale})
 
     assert result["status"] == "automation_queued"
     assert result["project"] == {"type": "scenario", "id": "builder"}
@@ -14568,7 +14569,10 @@ def test_chat_routes_followup_to_automation_sdk_at_automation_stage(
                   'source_message_ids': ['canonical-ui-message']}} if authorized else {}),
         }
     ]
-    assert emitted[0]["text"] == "Iteration queued."
+    assert emitted[0]["text"] == result['message']
+    assert result['message'] == ('Task accepted and queued.' if locale=='en' else
+                                 'Задача принята и ожидает выполнения.')
+    assert result['next_action'] == 'wait'
     assert emitted[0]["topic_ref"]["thread_id"] == "prompt-project:scenario:builder"
     assert result["schema"] == "adaos.builder.control_reply.v1"
     assert result["task_id"] == "task.control"
