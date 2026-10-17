@@ -199,9 +199,21 @@ def test_device_inventory_is_filtered_and_bounded_at_the_sdk_boundary():
         and node.func.attr == "list_device_objects"
     ]
 
-    assert len(calls) == 1
-    keywords = {item.arg: item.value for item in calls[0].keywords}
-    assert {"status", "include_detached", "limit"} <= keywords.keys()
+    assert len(calls) == 2
+    keyword_sets = [
+        {item.arg: item.value for item in call.keywords}
+        for call in calls
+    ]
+    assert all(
+        {"status", "include_detached", "limit"} <= keywords.keys()
+        for keywords in keyword_sets
+    )
+    assert [
+        ast.literal_eval(keywords["kind"])
+        if "kind" in keywords
+        else None
+        for keywords in keyword_sets
+    ] == [None, "redevice"]
     cap = next(
         node.value
         for node in tree.body
@@ -214,10 +226,11 @@ def test_device_inventory_is_filtered_and_bounded_at_the_sdk_boundary():
     expected = {
         "status": 'status_token if status_token in {"active", "offline"} else None',
         "include_detached": 'status_token == "offline"',
-        "limit": "min(_MAX_DEVICE_INVENTORY_PAGE_SIZE, max(40, _bounded_limit(limit) * 4))",
+        "limit": "inventory_limit",
     }
-    for name, expression in expected.items():
-        assert ast.dump(keywords[name]) == ast.dump(ast.parse(expression, mode="eval").body)
+    for keywords in keyword_sets:
+        for name, expression in expected.items():
+            assert ast.dump(keywords[name]) == ast.dump(ast.parse(expression, mode="eval").body)
 
 
 def rename_function(access, system):
