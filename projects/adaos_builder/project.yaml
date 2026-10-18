@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: adaos_builder
-version: 0.3.22
+version: 0.3.23
 profiles:
 - adaos.builder.v1
 - adaos.development.workbench.v1
@@ -37,7 +37,11 @@ components:
     lifecycle: bound
     relations:
     - uses
-  dependencies: []
+  dependencies:
+  - ref: skill:voice_chat_skill
+    version: '>=0.7.8,<0.8'
+    relations:
+    - uses
 entrypoints:
 - id: builder
   presentation: scenario:builder

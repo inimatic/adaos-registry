@@ -2547,7 +2547,7 @@
       "kind": "project",
       "id": "adaos_builder",
       "name": "adaos_builder",
-      "version": "0.3.22",
+      "version": "0.3.23",
       "updated_at": "2026-09-30T19:51:20+00:00",
       "path": "projects/adaos_builder",
       "manifest": "projects/adaos_builder/project.yaml",
