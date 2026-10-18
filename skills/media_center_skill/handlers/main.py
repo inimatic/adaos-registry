@@ -63,6 +63,7 @@ from media_center.enrichment import (  # noqa: E402
 from media_center.sync import MediaAgentSyncWorker  # noqa: E402
 from media_center.sync_state import SyncStateStore  # noqa: E402
 from media_center.read_models import dispose_read_models, interactive_read, read_deadline  # noqa: E402
+from media_center.health import health_projection  # noqa: E402
 
 
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".mkv", ".avi", ".wmv", ".ogv"}
@@ -2844,8 +2845,12 @@ def status(
             "reason": "explicit_request_required",
         }
     )
+    sync = _agent_sync_status()
+    job_counts = catalog.background_job_counts()
     return {
         "ok": True,
+        "state": "ready",
+        "ready": True,
         "schema": COORDINATOR_SCHEMA,
         "summary": summary,
         "facets": facets,
@@ -2855,12 +2860,13 @@ def status(
         ),
         "storage": catalog.storage_status(),
         "background_jobs": {
-            "counts": catalog.background_job_counts(),
+            "counts": job_counts,
             "counts_by_kind": catalog.background_job_counts_by_kind(),
         },
-        "agent_sync": _agent_sync_status(),
+        "agent_sync": sync,
         "runtime_bootstrap": background_runtime().bootstrap_status(),
         "enrichment": background_runtime().enrichment_status(),
+        "health": health_projection(read_ready=True, sync=sync, job_counts=job_counts),
     }
 
 

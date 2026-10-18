@@ -40,6 +40,17 @@ _HANDLER_SPEC.loader.exec_module(main)
 _WORKER_STATE_TIMEOUT_SECONDS = 60.0
 
 
+@pytest.fixture(autouse=True)
+def fixture_storage_capacity(monkeypatch):
+    # These tiny-fixture behavior tests do not qualify the host filesystem.
+    # Admission denial/unknown capacity/hysteresis have dedicated injected tests.
+    admission_type = worker_module.StorageAdmission
+    def admitted_fixture(path, **kwargs):
+        kwargs.setdefault("capacity", lambda _path: SimpleNamespace(free=64 * 1024**3))
+        return admission_type(path, **kwargs)
+    monkeypatch.setattr(worker_module, "StorageAdmission", admitted_fixture)
+
+
 def test_agent_declares_core_managed_membership_and_health_projection():
     manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
     membership = manifest["service"]["membership"]

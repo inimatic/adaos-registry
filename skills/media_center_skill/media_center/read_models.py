@@ -7,6 +7,7 @@ import sqlite3
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError, wait
+from .health import health_projection
 
 _deadline = contextvars.ContextVar("media_center_read_deadline", default=0.0)
 
@@ -108,7 +109,8 @@ def interactive_read(function):
                 raise
             return {"ok": True, "state": "loading", "ready": False,
                     "reason": "catalog_read_temporarily_unavailable",
-                    "retry_after_ms": 1000, "items": [], "count": 0}
+                    "retry_after_ms": 1000, "items": [], "count": 0,
+                    "health": health_projection(read_ready=False)}
     return bounded
 
 

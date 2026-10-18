@@ -84,6 +84,7 @@ class MediaAgentSyncWorker:
                 "updated_at": self._updated_at,
                 "last_result": dict(self._last_result),
                 "running": bool(self._thread and self._thread.is_alive()),
+                "poll_seconds": self.poll_seconds,
                 **self._observations,
             }
 
