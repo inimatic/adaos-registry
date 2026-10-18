@@ -12139,7 +12139,7 @@ def _validate_page_schema_component_contracts(
 def _validate_builder_webui_payload(
     payload: Mapping[str, Any], preview_state: Mapping[str, Any]
 ) -> dict[str, Any]:
-    from adaos.services.interface_deprecations import validate_authoring_interfaces
+    from adaos.sdk.developer.ui import validate_authoring_interfaces
 
     webui_validation = _validate_webui_payload(payload)
     deprecation_validation = validate_authoring_interfaces(payload)
@@ -12259,7 +12259,7 @@ def _normalise_llm_webui_payload(
         if not preview_data.get(key) and previous_preview.get(key):
             preview_data[key] = copy.deepcopy(previous_preview.get(key))
     data = _canonical_webui_payload(data, page_schema)
-    from adaos.services.interface_deprecations import migrate_deprecated_interfaces
+    from adaos.sdk.developer.ui import migrate_deprecated_interfaces
 
     data, _deprecation_migration = migrate_deprecated_interfaces(
         data,
@@ -27249,7 +27249,7 @@ def set_ui_revision_current(
     after_webui = _canonicalise_webui_modal_locations(
         _repair_text_tree(copy.deepcopy(dict(after_webui)))
     )
-    from adaos.services.interface_deprecations import migrate_deprecated_interfaces
+    from adaos.sdk.developer.ui import migrate_deprecated_interfaces
 
     after_webui, _deprecation_migration = migrate_deprecated_interfaces(
         after_webui,
