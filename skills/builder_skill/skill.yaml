@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.4.29
+version: 0.4.30
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -83,7 +83,7 @@ tools:
   description: Handle a Builder dialog turn and create or patch a scenario prototype.
   side_effects: local_write
   entry: handlers.main:chat
-  timeout_seconds: 900
+  timeout_seconds: 600
   input_schema:
     type: object
     properties:

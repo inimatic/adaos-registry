@@ -392,7 +392,11 @@ def test_manifest_declares_builder_dialog_agent() -> None:
         "update_current_scenario",
         "get_preview_state",
     }.issubset(tools)
-    assert tools_by_name["chat"]["timeout_seconds"] >= 600
+    assert tools_by_name["chat"]["timeout_seconds"] == 600
+    # Tool-call admission is bounded independently from durable provider jobs.
+    # A larger provider-job deadline must not make this package unpublishable.
+    assert all(0 < tool.get("timeout_seconds", 30) <= 600
+               for tool in manifest["tools"])
     assert tools_by_name["update_current_scenario"]["timeout_seconds"] >= 120
     for tool_name in ("start", "chat", "update_current_scenario"):
         context_schema = tools_by_name[tool_name]["input_schema"]["properties"][
