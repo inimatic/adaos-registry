@@ -51,6 +51,25 @@ def fixture_storage_capacity(monkeypatch):
     monkeypatch.setattr(worker_module, "StorageAdmission", admitted_fixture)
 
 
+def test_agent_declares_headless_service_startup_without_in_core_imports():
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    runtime = manifest["runtime"]
+    assert runtime["kind"] == "service"
+    assert runtime["activation"] == {
+        "mode": "eager", "startup_allowed": True, "background_refresh": True,
+    }
+    assert runtime.get("in_process_events", False) is False
+
+
+def test_agent_storage_reservations_are_owned_durable_data_not_discardable_cache():
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    lifecycle = manifest["data_lifecycle"]
+    assert {item["path"] for item in lifecycle["databases"]} == {
+        "db/media_library_agent.sqlite3", "db/storage_admission.sqlite3",
+    }
+    assert "db/storage_admission.sqlite3" not in lifecycle.get("coordination_files", [])
+
+
 def test_agent_declares_core_managed_membership_and_health_projection():
     manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
     membership = manifest["service"]["membership"]

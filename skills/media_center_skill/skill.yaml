@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.103
+version: 0.8.104
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -2027,7 +2027,10 @@ data_routes:
   owner: skill:media_center_skill
   first_paint: compact catalog status
   recovery: repeat status after scan invalidation
-  guard_visibility: aggregate media counts and source facets only
+  guard_visibility: Aggregate catalog counts, source facets and bounded operational
+    health states for liveness, read readiness, ingest freshness, storage, endpoint
+    observation and retained job outcomes. No filesystem paths, endpoint identities,
+    credentials or individual job details in the operational health presentation.
   budget:
     max_payload_bytes: 65536
     snapshot_policy: manual
@@ -2491,7 +2494,7 @@ nlu_hints:
           type: object
       additionalProperties: true
   entities: []
-updated_at: '2026-10-18T17:28:57+00:00'
+updated_at: '2026-10-18T19:27:36+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.947+5749.575b2f508

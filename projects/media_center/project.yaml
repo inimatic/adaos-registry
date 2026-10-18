@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: media_center
-version: 0.6.120
+version: 0.6.121
 profiles:
 - adaos.media_center.v1
 - adaos.media_center.tv.v1
@@ -165,8 +165,8 @@ permission_profile:
       renditions without changing original files.
     owner: media_library_agent
   - id: metadata_enrichment
-    purpose: Apply configured metadata providers and artwork preparation in bounded background
-      jobs. External providers require their explicit configuration.
+    purpose: Apply configured metadata providers and artwork preparation in bounded
+      background jobs. External providers require their explicit configuration.
     owner: media_center_skill
   data_practices:
     collected:
