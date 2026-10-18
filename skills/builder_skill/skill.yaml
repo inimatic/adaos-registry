@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.4.30
+version: 0.4.31
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -179,7 +179,8 @@ tools:
       confirmed_technical_application_id:
         type: string
         pattern: ^[a-z](?:[a-z0-9_.-]{0,126}[a-z0-9])?$
-        description: Exact explicitly confirmed technical Application id; must agree with the idea and application_id before any creation or provider call.
+        description: Exact explicitly confirmed technical Application id; must agree
+          with the idea and application_id before any creation or provider call.
       webspace_id:
         type: string
     additionalProperties: true
@@ -596,8 +597,8 @@ tools:
     - ok
     - message
 - name: ensure_dev_webspace
-  description: Create or reuse the paired Builder workbench development desktop
-    for the current source desktop.
+  description: Create or reuse the paired Builder workbench development desktop for
+    the current source desktop.
   side_effects: local_write
   entry: handlers.main:ensure_dev_webspace
   input_schema:
@@ -662,8 +663,8 @@ tools:
     - ok
     - widget
 - name: set_active_draft
-  description: Switch the active Builder development draft in the paired Builder
-    workbench desktop.
+  description: Switch the active Builder development draft in the paired Builder workbench
+    desktop.
   side_effects: local_write
   entry: handlers.main:set_active_draft
   input_schema:
@@ -826,7 +827,7 @@ conversation:
     - builder
     - buikder
     - билдер
-updated_at: '2026-09-26T11:02:50+00:00'
+updated_at: '2026-10-18T16:36:50+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.1163

@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.2.11
+version: 0.2.12
 description: SDK-only backend for the functional Builder DEV scenario.
 capabilities:
 - applications.develop
@@ -1800,7 +1800,8 @@ tools:
   output_schema:
     type: object
 - name: get_semantic_inspector
-  description: Read exact semantic refs and the last committed bounded write set; no selection or source mutation.
+  description: Read exact semantic refs and the last committed bounded write set;
+    no selection or source mutation.
   entry: handlers.main:get_semantic_inspector
   side_effects: none
   input_schema:
@@ -1808,7 +1809,10 @@ tools:
     properties:
       object_type:
         type: string
-        enum: [project, scenario, skill]
+        enum:
+        - project
+        - scenario
+        - skill
       object_id:
         type: string
         minLength: 1
@@ -3241,7 +3245,7 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-09-30T19:41:56+00:00'
+updated_at: '2026-10-18T16:37:04+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.1002+6139.cdc1a0cfc

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ast
 import copy
 from contextvars import ContextVar
 import importlib.util
@@ -364,6 +365,21 @@ def _stub_development_context(skill, monkeypatch) -> dict:
         },
     )
     return packet
+
+
+def test_runtime_sources_use_only_public_adaos_sdk_imports() -> None:
+    violations = []
+    for path in SKILL_ROOT.rglob("*.py"):
+        if "tests" in path.relative_to(SKILL_ROOT).parts:
+            continue
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            modules = ([node.module] if isinstance(node, ast.ImportFrom)
+                       else [alias.name for alias in node.names]
+                       if isinstance(node, ast.Import) else [])
+            violations.extend((str(path.relative_to(SKILL_ROOT)), node.lineno, module)
+                              for module in modules if module and module.startswith("adaos.")
+                              and not module.startswith("adaos.sdk"))
+    assert not violations, violations
 
 
 def test_manifest_declares_builder_dialog_agent() -> None:
