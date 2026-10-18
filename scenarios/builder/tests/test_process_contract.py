@@ -1,5 +1,17 @@
 import json
 from pathlib import Path
+import yaml
+
+
+def test_project_retains_required_voice_package_as_shared_dependency():
+    root = Path(__file__).resolve().parents[3]
+    project = yaml.safe_load((root / 'projects/adaos_builder/project.yaml').read_text(encoding='utf-8'))
+    dependency = next(item for item in project['components']['dependencies']
+                      if item['ref'] == 'skill:voice_chat_skill')
+    assert dependency['version'] == '>=0.7.8,<0.8'
+    assert dependency['relations'] == ['uses']
+    assert all(item['ref'] != 'skill:voice_chat_skill'
+               for item in project['components']['owned'])
 
 
 def objects(value):
