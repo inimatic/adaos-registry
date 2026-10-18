@@ -1268,6 +1268,7 @@ def start(
         "active_character": active,
         "dialog": _dialog_state(ws, active),
         "message": message,
+        "chat_emit": {"mode": "receipt_only"},
         "characters": [_short_character_card(p, active=(cid == active)) for cid, p in profiles.items()],
         "next_actions": [
             "Скажи: позови Нику / позови Миру / оставь Арсения.",
@@ -1330,6 +1331,7 @@ def switch_character(
         "dialog": _dialog_state(ws, resolved if not temporary else session.get("active_character", DEFAULT_ACTIVE_CHARACTER)),
         "temporary": bool(temporary),
         "message": message,
+        "chat_emit": {"mode": "receipt_only"},
         "profile": _short_character_card(profile, active=not temporary),
     }
 
@@ -1376,7 +1378,8 @@ def talk(
         chat_meta.update(companion_session_id=result.get("session_id"), companion_turn_id=result.get("turn_id"), action_receipt=result.get("action_receipt"))
         _safe_emit_chat(result["message"], webspace_id=ws, _meta=chat_meta)
         return {"ok": not bool(result.get("error")), "webspace_id": ws, "active_character": session["active_character"],
-                "selected_character": "sage", "dialog": _dialog_state(ws, "sage"), "mode": mode, "preview": False, **result}
+                "selected_character": "sage", "dialog": _dialog_state(ws, "sage"), "mode": mode, "preview": False,
+                **result, "chat_emit": {"mode": "receipt_only"}}
 
     if selected != "sage" and mode != "panel" and _looks_like_profile_update_instruction(user_text):
         return update_profile(user_text, character_id=selected, webspace_id=ws, _meta=_meta)
@@ -1435,6 +1438,7 @@ def talk(
         "dialog": _dialog_state(ws, selected),
         "mode": "panel" if panel else mode,
         "message": reply,
+        "chat_emit": {"mode": "receipt_only"},
         "used_llm": used_llm,
         "used_mcp": bool(control_evidence.get("used_mcp")),
         "action_receipt": control_evidence.get("receipt"),
@@ -1599,6 +1603,7 @@ def update_profile(
         "dialog": _dialog_state(ws, selected),
         "persisted": bool(persist),
         "message": message,
+        "chat_emit": {"mode": "receipt_only"},
         "patch": patch,
         "profile": updated,
     }
@@ -1629,7 +1634,13 @@ def capture_feedback(
     message = "Записал обратную связь. Для контрольной группы важнее ожидания и отторжение, чем только оценка."
     active = _session(ws).get("active_character", DEFAULT_ACTIVE_CHARACTER)
     _safe_emit_chat(message, webspace_id=ws, _meta=_agent_chat_meta(_meta, webspace_id=ws, character_id=active, profiles=_profiles(ws)))
-    return {"ok": True, "webspace_id": ws, "message": message, "feedback_count": len(items)}
+    return {
+        "ok": True,
+        "webspace_id": ws,
+        "message": message,
+        "chat_emit": {"mode": "receipt_only"},
+        "feedback_count": len(items),
+    }
 
 
 @tool(summary="Reset session state.", side_effects="local_write")
@@ -1657,6 +1668,7 @@ def reset_session(
         "ok": True,
         "webspace_id": ws,
         "message": message,
+        "chat_emit": {"mode": "receipt_only"},
         "active_character": DEFAULT_ACTIVE_CHARACTER,
         "dialog": _dialog_state(ws, DEFAULT_ACTIVE_CHARACTER),
     }

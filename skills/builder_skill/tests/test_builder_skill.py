@@ -71,6 +71,50 @@ def _load_module():
     return module
 
 
+@pytest.fixture
+def evidence_skill(tmp_path, monkeypatch):
+    """Real acknowledged CAS and journal in an isolated test project."""
+    from adaos.services.builder.llm_input_attribution import retain_llm_evidence, read_llm_evidence
+    def load():
+        module = _load_module()
+        monkeypatch.setattr(module, "_project_artifact_root", lambda session: tmp_path / "project")
+        monkeypatch.setattr(module.sdk_builder_observability, "retain_llm_evidence",
+            lambda value: retain_llm_evidence(value, state_dir=tmp_path / "private-state"))
+        monkeypatch.setattr(module.sdk_builder_observability, "read_llm_evidence",
+            lambda receipt: read_llm_evidence(receipt, state_dir=tmp_path / "private-state"))
+        return module
+    return load
+
+
+def test_repair_request_requires_acknowledged_parent_before_submit(evidence_skill):
+    skill = evidence_skill()
+    with pytest.raises(RuntimeError, match='parent_provenance_incomplete'):
+        skill._write_llm_job_request_artifact(session={'id': 's'}, job_id='repair', request_id='repair',
+            model='gpt-5', messages=[{'role': 'user', 'content': 'repair'}], generation_options={},
+            parent_request_id='missing', parent_job_id='root-parent')
+
+
+def test_repair_request_verifies_parent_cas_and_detects_journal_tampering(evidence_skill):
+    skill = evidence_skill()
+    session = {'id': 's'}
+    common = dict(session=session, model='gpt-5', messages=[{'role': 'user', 'content': 'task'}],
+                  generation_options={})
+    primary = skill._write_llm_job_request_artifact(job_id='primary', request_id='primary', **common)
+    repair = skill._write_llm_job_request_artifact(job_id='repair', request_id='repair',
+        parent_request_id='primary', **common)
+    journal_dir = skill._llm_job_journal_dir(session)
+    retained = json.loads((journal_dir / 'repair.request.json').read_text(encoding='utf-8'))
+    assert retained['parent_provenance']['status'] == 'verified'
+    assert retained['parent_evidence_ref'] == primary['evidence_receipt']['ref']
+    parent_path = journal_dir / 'primary.request.json'
+    parent = json.loads(parent_path.read_text(encoding='utf-8'))
+    parent['messages'][0]['content'] = 'changed after acknowledgement'
+    parent_path.write_text(json.dumps(parent), encoding='utf-8')
+    with pytest.raises(RuntimeError, match='parent_provenance_incomplete'):
+        skill._write_llm_job_request_artifact(job_id='repair-again', request_id='repair-again',
+            parent_request_id='primary', **common)
+
+
 def _layout(*region_ids: str, pattern: str | None = None) -> dict:
     ids = region_ids or ("main",)
     selected_pattern = pattern or ("document" if len(ids) == 1 else "collection-detail")
@@ -95,6 +139,37 @@ def _layout(*region_ids: str, pattern: str | None = None) -> dict:
             for index, region_id in enumerate(ids)
         ],
     }
+
+
+def test_requirement_intake_retains_more_than_twenty_clauses_and_long_criteria():
+    skill = _load_module()
+    clauses = [f'Keep distinct requirement {i}' for i in range(25)]
+    rows = skill._builder_change_issues('\n'.join(clauses), change_id='change')
+    assert len(rows) == 25
+    assert all(clause in row['acceptance_criteria'][0] for clause, row in zip(clauses, rows))
+    clause = ' '.join(f'condition{i}' for i in range(200))
+    rows = skill._builder_change_issues(clause, change_id='long')
+    parts = [criterion.split(': ',1)[1] for row in rows for criterion in row['acceptance_criteria']]
+    assert ' '.join(parts) == clause
+    assert all(len(criterion) <= 500 for row in rows for criterion in row['acceptance_criteria'])
+    with pytest.raises(ValueError, match='exceed_admitted_capacity'):
+        skill._builder_change_issues('\n'.join(f'Requirement {i}' for i in range(1001)), change_id='over')
+
+
+def test_change_registration_starts_a_new_change_when_compaction_would_drop_criteria(monkeypatch):
+    skill = _load_module()
+    generated = [{'issue_id':f'new-{i}', 'title':f'Condition {i}', 'lane':'prototype',
+                  'acceptance_criteria':[f'Preserve condition {i}']} for i in range(25)]
+    monkeypatch.setattr(skill,'_builder_change_issues',lambda *args,**kwargs:copy.deepcopy(generated))
+    monkeypatch.setattr(skill.sdk_builder_workflow,'get_state',lambda *args:{'change_set': {
+        'change_set_id':'old', 'status':'in_progress', 'issues':[{'issue_id':f'old-{i}'} for i in range(49)]}})
+    calls=[]
+    monkeypatch.setattr(skill.sdk_builder_workflow,'transition',lambda *args,**kwargs:calls.append((args,kwargs)) or {'ok':True})
+    result=skill._register_builder_change_set(session={'scenario_id':'test'},patch={'id':'next'},
+        request_text='Preserve all conditions',_meta={'source_message_id':'m:canonical'})
+    assert result['ok'] and calls[0][0][-1] == 'plan_change_set'
+    assert len(calls[0][1]['metadata']['issues']) == 25
+    assert [row['acceptance_criteria'] for row in calls[0][1]['metadata']['issues']] == [row['acceptance_criteria'] for row in generated]
 
 
 def test_background_thread_propagates_runtime_context() -> None:
@@ -216,14 +291,15 @@ def test_semantic_replay_requires_exact_original_context_and_terminal_root(monke
         assert result["replay"]["incremental_tokens"] == 0
 
 
-@pytest.mark.parametrize("source,expected", [("api", True), ("e2e", True), ("chat", False), ("unknown", False)])
+@pytest.mark.parametrize("source,expected", [("api", True), ("e2e", True), ("chat", False), ("unknown", False), ('normal_api',True)])
 def test_sdk_turns_are_projected_once_without_duplicating_browser_ingress(monkeypatch, source, expected):
     skill = _load_module()
     emitted = []
-    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append((text, kwargs)))
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append((text, kwargs)) or True)
     session = {"scenario_id": "local-example"}
     topic = {"thread_id": "prompt-project:scenario:local-example"}
-    metadata = {"prototype_request_source": source, "message_id": "request-one"}
+    metadata = ({'action_source':'api_tool_call','request_id':'request-one'} if source=='normal_api'
+                else {"prototype_request_source": source, "message_id": "request-one"})
     for _ in range(2):
         skill._project_external_user_turn("Full original instruction", webspace_id="desktop-dev", _meta=metadata,
                                          session=session, binding={}, topic_ref=topic)
@@ -234,6 +310,38 @@ def test_sdk_turns_are_projected_once_without_duplicating_browser_ingress(monkey
         assert emitted[0][1]["session"] == session
         assert emitted[0][1]["from_"] == "user"
         assert emitted[0][0] == "Full original instruction"
+
+
+def test_unacknowledged_external_user_turn_never_becomes_an_authorization_ref(monkeypatch):
+    skill = _load_module()
+    monkeypatch.setattr(skill,'_safe_emit_chat',lambda *args,**kwargs:False)
+    with pytest.raises(RuntimeError,match='user_turn_not_acknowledged'):
+        skill._project_external_user_turn('Authorize UI change: sections',webspace_id='desktop',
+            _meta={'action_source':'api_tool_call','request_id':'no-ack'}, session={'scenario_id':'test'},
+            binding={}, topic_ref={})
+
+
+@pytest.mark.parametrize('confirmed',[True,False])
+def test_external_ingress_reconciles_only_exact_durable_ack_after_notification_timeout(monkeypatch,confirmed):
+    from adaos.sdk.io import out
+    skill=_load_module();calls=[]
+    monkeypatch.setattr(skill,'_safe_emit_chat',lambda *args,**kwargs:False)
+    monkeypatch.setattr(skill,'_chat_meta',lambda *args,**kwargs:{
+        'conversation_id':'conv.builder','conversation_owner':'skill:builder_skill','webspace_id':'desktop',
+        'dialog_channel_id':'builder','thread_id':'project:photo'})
+    def receipt(identity,**kwargs):
+        calls.append((identity,kwargs));return {'ok':confirmed,'persisted':confirmed}
+    monkeypatch.setattr(out,'chat_message_receipt',receipt)
+    kwargs=dict(webspace_id='desktop',_meta={'action_source':'api_tool_call','request_id':'late-ack'},
+                session={'scenario_id':'photo'},binding={},topic_ref={})
+    if confirmed:
+        identity=skill._project_external_user_turn('Exact original request',**kwargs)
+        assert identity==calls[0][0]
+    else:
+        with pytest.raises(RuntimeError,match='user_turn_not_acknowledged'):
+            skill._project_external_user_turn('Exact original request',**kwargs)
+    assert calls[0][1]==dict(conversation_id='conv.builder',thread_id='project:photo',
+        webspace_id='desktop',channel_id='builder',owner='skill:builder_skill',role='user',text='Exact original request')
 
 
 def _stub_development_context(skill, monkeypatch) -> dict:
@@ -454,7 +562,10 @@ def test_detailed_change_request_is_bounded_after_issue_decomposition(
     assert len(transitions[0]["request"]) <= 4000
     assert "Detailed source:" in transitions[0]["request"]
     assert transitions[0]["source_message_ids"] == ["message-detailed"]
-    assert len(transitions[0]["issues"]) == 20
+    assert len(transitions[0]["issues"]) == 50
+    criteria = [criterion for issue in transitions[0]['issues'] for criterion in issue['acceptance_criteria']]
+    assert len(criteria) == 80
+    assert all(any(f'Requirement {index}:' in criterion for criterion in criteria) for index in range(1,81))
     assert transitions[0]["issues"][0]["title"].startswith("Requirement 1:")
 
 
@@ -2585,10 +2696,10 @@ def test_update_current_scenario_uses_llm_webui_fallback(monkeypatch, tmp_path) 
     )
 
 
-def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(
+def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(evidence_skill,
     monkeypatch,
 ) -> None:
-    skill = _load_module()
+    skill = evidence_skill()
     import adaos.sdk.llm.llm_client as llm_client
 
     monkeypatch.setenv("ADAOS_BUILDER_LLM_TIMEOUT_S", "181")
@@ -2656,7 +2767,7 @@ def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(
         preview_state=preview,
     )
 
-    assert result["ok"] is True
+    assert result["ok"] is True, result
     kwargs = captured["kwargs"]
     assert kwargs["timeout"] == 181
     assert kwargs["model"] == "gpt-4o-mini"
@@ -2822,8 +2933,8 @@ def test_one_shot_dev_tool_disables_async_builder_llm(monkeypatch) -> None:
     assert skill._builder_llm_async_enabled() is False
 
 
-def test_one_shot_sync_transform_uses_durable_llm_job(monkeypatch) -> None:
-    skill = _load_module()
+def test_one_shot_sync_transform_uses_durable_llm_job(evidence_skill, monkeypatch) -> None:
+    skill = evidence_skill()
     import adaos.sdk.llm.llm_client as llm_client
 
     monkeypatch.setenv("ADAOS_DEV_TOOL_EXECUTION_MODE", "oneshot")
@@ -2891,7 +3002,7 @@ def test_one_shot_sync_transform_uses_durable_llm_job(monkeypatch) -> None:
         preview_state={},
     )
 
-    assert result["ok"] is True
+    assert result["ok"] is True, result
     assert submit_calls[0]["kwargs"]["stream_protocol"] == "jsonl"
     assert submit_calls[0]["kwargs"]["timeout"] == 15.0
     assert wait_calls == [
@@ -5031,6 +5142,10 @@ def test_async_llm_completion_repairs_missing_page_schema(
 
     monkeypatch.setattr(llm_client, "submit_response_job", fake_submit_response_job)
 
+    # The transport is mocked; retain its real acknowledged primary input.
+    skill._write_llm_job_request_artifact(session=session,
+        job_id='builder-ui-repair', request_id='builder-ui-repair', model='gpt-5',
+        messages=[{'role': 'user', 'content': 'Primary fixture request'}], generation_options={})
     skill._complete_llm_webui_job(
         ws="builder-repair",
         session_id="builder_session_repair",
@@ -5069,10 +5184,10 @@ def test_async_llm_completion_repairs_missing_page_schema(
     )
 
 
-def test_repair_uses_partially_transformed_candidate_as_current_webui(
+def test_repair_uses_partially_transformed_candidate_as_current_webui(evidence_skill,
     monkeypatch,
 ) -> None:
-    skill = _load_module()
+    skill = evidence_skill()
     import adaos.sdk.llm.llm_client as llm_client
 
     original = {
@@ -5153,7 +5268,7 @@ def test_repair_uses_partially_transformed_candidate_as_current_webui(
         candidate_payload=candidate,
     )
 
-    assert result["ok"] is True
+    assert result["ok"] is True, result
     repair_request = json.loads(captured_messages[-1]["content"])
     repair_current = repair_request["repair_context"]["current_webui_json"]
     assert (
@@ -5190,10 +5305,10 @@ def test_repair_uses_partially_transformed_candidate_as_current_webui(
     assert "Never replace initialState with a partial object" in repair_request["task"]
 
 
-def test_repair_retries_layered_validation_against_latest_candidate(
+def test_repair_retries_layered_validation_against_latest_candidate(evidence_skill,
     monkeypatch,
 ) -> None:
-    skill = _load_module()
+    skill = evidence_skill()
     import adaos.sdk.llm.llm_client as llm_client
 
     candidate = {
@@ -5271,7 +5386,7 @@ def test_repair_retries_layered_validation_against_latest_candidate(
         candidate_payload=candidate,
     )
 
-    assert result["ok"] is True
+    assert result["ok"] is True, result
     assert result["payload"]["generated_by"] == "second-repair"
     assert len(captured_messages) == 2
     second_request = json.loads(captured_messages[1][-1]["content"])
@@ -5312,8 +5427,8 @@ def test_repair_validation_summary_includes_nested_capability_findings() -> None
     assert "request_evaluation" not in summary
 
 
-def test_localization_repair_uses_candidate_dictionary_delta(monkeypatch) -> None:
-    skill = _load_module()
+def test_localization_repair_uses_candidate_dictionary_delta(evidence_skill, monkeypatch) -> None:
+    skill = evidence_skill()
     import adaos.sdk.llm.llm_client as llm_client
 
     candidate = {
@@ -5401,7 +5516,7 @@ def test_localization_repair_uses_candidate_dictionary_delta(monkeypatch) -> Non
         },
     )
 
-    assert result["ok"] is True
+    assert result["ok"] is True, result
     repair_request = json.loads(captured_messages[-1]["content"])
     assert "For every actual.missing path" in repair_request["task"]
     assert "This is an Applications recipe repair" not in repair_request["task"]
@@ -5414,8 +5529,8 @@ def test_localization_repair_uses_candidate_dictionary_delta(monkeypatch) -> Non
     )
 
 
-def test_repair_preserves_candidate_prototype_records(monkeypatch) -> None:
-    skill = _load_module()
+def test_repair_preserves_candidate_prototype_records(evidence_skill, monkeypatch) -> None:
+    skill = evidence_skill()
     import adaos.sdk.llm.llm_client as llm_client
 
     candidate = {
@@ -5474,7 +5589,7 @@ def test_repair_preserves_candidate_prototype_records(monkeypatch) -> None:
         candidate_prototype_records=candidate_records,
     )
 
-    assert result["ok"] is True
+    assert result["ok"] is True, result
     assert result["prototype_records"] == candidate_records
     assert result["prototype_records"] is not candidate_records
     repair_request = json.loads(captured_messages[-1]["content"])
@@ -5572,8 +5687,8 @@ def test_transform_request_reports_existing_component_contract_violations(
     assert any("unsupported per-button conditions" in issue for issue in issues)
 
 
-def test_repair_replaces_malformed_jsonl_with_atomic_patch_batch(monkeypatch) -> None:
-    skill = _load_module()
+def test_repair_replaces_malformed_jsonl_with_atomic_patch_batch(evidence_skill, monkeypatch) -> None:
+    skill = evidence_skill()
     import adaos.sdk.llm.llm_client as llm_client
 
     original = {
@@ -5638,7 +5753,7 @@ def test_repair_replaces_malformed_jsonl_with_atomic_patch_batch(monkeypatch) ->
         validation_error={"detail": "JSONDecodeError"},
     )
 
-    assert result["ok"] is True
+    assert result["ok"] is True, result
     assert request_modes == ["json_patch_batch_v1"]
     assert parsed["stream_protocol"] is None
     assert parsed["text"] == {"format": {"type": "json_object"}}
@@ -5653,8 +5768,8 @@ def test_repair_replaces_malformed_jsonl_with_atomic_patch_batch(monkeypatch) ->
     )
 
 
-def test_repair_retries_one_malformed_repair_patch(monkeypatch) -> None:
-    skill = _load_module()
+def test_repair_retries_one_malformed_repair_patch(evidence_skill, monkeypatch) -> None:
+    skill = evidence_skill()
     import adaos.sdk.llm.llm_client as llm_client
 
     original = {
@@ -5725,7 +5840,7 @@ def test_repair_retries_one_malformed_repair_patch(monkeypatch) -> None:
         candidate_payload=original,
     )
 
-    assert result["ok"] is True
+    assert result["ok"] is True, result
     assert len(submit_calls) == 2
     second_request = json.loads(submit_calls[1]["messages"][-1]["content"])
     assert second_request["repair_context"]["failed_postconditions"] == [
@@ -7687,21 +7802,14 @@ def test_semantic_request_keeps_renderer_context_out_of_model_input(
 def test_semantic_followup_requires_exact_bounded_source(monkeypatch, tmp_path):
     import hashlib
     skill = _load_module()
-    source = {"schema": "adaos.webui.semantic.v2", "document_id": "current", "views": []}
+    source = json.loads((SKILL_ROOT / "tests/fixtures/semantic-followup.json").read_text(encoding="utf-8"))
+    compiled = skill.sdk_builder_prototype.compile_semantic(source, project_ref="project:current")
+    source = compiled["semantic_document"]
     digest = "sha256:" + hashlib.sha256(json.dumps(source, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    # This unit exercises the file/revision boundary. Semantic contract and
-    # ownership verification have independent SDK characterization tests.
-    verified = []
-    monkeypatch.setattr(skill.sdk_builder_prototype, "verify_semantic_source",
-                        lambda document, payload, **kwargs: verified.append(document))
-    monkeypatch.setattr(skill.sdk_builder_prototype, "semantic_revision_context",
-                        lambda document, brief, **kwargs: {"document": document, "digest": digest, **kwargs})
     path = tmp_path / "semantic.webui.json"
     path.write_text(json.dumps(source), encoding="utf-8")
-    payload = {"generated_by": "builder.semantic_compiler.v2", "ui": {"application": {"desktop": {
-        "pageSchema": {"meta": {"builder": {"semantic_digest": digest}}}
-    }}}}
-    session = {"artifact_root": str(tmp_path), "ui_revision": "001", "scenario_id": "current"}
+    payload = compiled["webui"]
+    session = {"artifact_root": str(tmp_path), "project_ref": "project:current", "ui_revision": "001", "scenario_id": "current"}
     brief = skill.developer_ui.select("Show a list of work items.", limit=8)[
         "qualification"
     ]["prototype_brief"]
@@ -7710,7 +7818,6 @@ def test_semantic_followup_requires_exact_bounded_source(monkeypatch, tmp_path):
     assert context["revision"] == "001"
     assert context["source_ref"] == "semantic.webui.json"
     assert context["digest"] == digest
-    assert verified == [source]
     path.write_text('{"changed":true}', encoding="utf-8")
     with pytest.raises(ValueError, match="compiled revision"):
         skill._current_semantic_context(session, payload, brief)
@@ -7940,6 +8047,10 @@ def test_state_repair_context_and_transport_use_patch_contract(tmp_path, monkeyp
     monkeypatch.setattr(skill.sdk_builder_prototype, "prepare_reference_repair", lambda *_: plan if kind == "reference" else None)
     monkeypatch.setattr(skill.sdk_builder_prototype, f"apply_{kind}_repair", apply)
     monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", parse)
+    # The transport is mocked; retain its real acknowledged primary input.
+    skill._write_llm_job_request_artifact(session={"id": "patch", "scenario_id": "records", "artifact_root": str(tmp_path)},
+        job_id='patch', request_id='patch', model='gpt-5',
+        messages=[{'role': 'user', 'content': 'Primary fixture request'}], generation_options={})
     result = skill._repair_llm_semantic_transform_output(
         session={"id": "patch", "scenario_id": "records", "artifact_root": str(tmp_path)},
         instruction="Show records", previous_preview={}, output_text=json.dumps(candidate),
@@ -8078,6 +8189,14 @@ def test_semantic_repair_receives_full_candidate_brief_and_finding(
         }
 
     monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", parse)
+    # The transport is mocked; retain its real acknowledged primary input.
+    skill._write_llm_job_request_artifact(session={
+            "id": "session-semantic-repair",
+            "scenario_id": "work-items",
+            "artifact_root": str(tmp_path),
+        },
+        job_id='primary-request', request_id='primary-request', model='gpt-5',
+        messages=[{'role': 'user', 'content': 'Primary fixture request'}], generation_options={})
     result = skill._repair_llm_semantic_transform_output(
         session={
             "id": "session-semantic-repair",
@@ -8372,6 +8491,10 @@ def test_complete_repair_retains_candidate_for_later_binding_scope(tmp_path, mon
         raise SemanticPrototypeValidationError(findings)
 
     monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", incomplete)
+    # The transport is mocked; retain its real acknowledged primary input.
+    skill._write_llm_job_request_artifact(session={"id": "test", "scenario_id": "items", "artifact_root": str(tmp_path)},
+        job_id='original', request_id='original', model='gpt-5',
+        messages=[{'role': 'user', 'content': 'Primary fixture request'}], generation_options={})
     result = skill._repair_llm_semantic_transform_once(session={"id": "test", "scenario_id": "items", "artifact_root": str(tmp_path)},
         instruction="Show items", previous_preview={}, output_text=json.dumps(candidate),
         validation_error={"findings": [{"code": "semantic.validation_failed"}]},
@@ -9210,6 +9333,7 @@ def test_normalise_llm_payload_moves_root_modals_into_application() -> None:
             {
                 "id": "open-comment",
                 "type": "ui.actions",
+                "inputs": {"buttons": [{"id": "open", "label": "Open"}]},
                 "area": "main",
                 "inputs": {"buttons": [{"id": "open", "label": "Open comment"}]},
                 "actions": [
@@ -9930,10 +10054,10 @@ def test_builder_preflights_prototype_records_before_finalize(monkeypatch) -> No
     assert "invalid prototype seed[0]" in postcondition["actual"]["error"]
 
 
-def test_builder_oneshot_transform_uses_shared_request_postconditions(
+def test_builder_oneshot_transform_uses_shared_request_postconditions(evidence_skill,
     monkeypatch,
 ) -> None:
-    skill = _load_module()
+    skill = evidence_skill()
     before = {
         "schema": "adaos.webui.v1",
         "ui": {
@@ -9998,7 +10122,7 @@ def test_builder_oneshot_transform_uses_shared_request_postconditions(
         preview_state={},
     )
 
-    assert result["ok"] is True
+    assert result["ok"] is True, result
     assert result["shared_postconditions"] is True
     assert calls == [
         {
@@ -10010,8 +10134,8 @@ def test_builder_oneshot_transform_uses_shared_request_postconditions(
     ]
 
 
-def test_llm_transform_allows_syntax_and_postcondition_repairs(monkeypatch) -> None:
-    skill = _load_module()
+def test_llm_transform_allows_syntax_and_postcondition_repairs(evidence_skill, monkeypatch) -> None:
+    skill = evidence_skill()
     before = {
         "schema": "adaos.webui.v1",
         "ui": {
@@ -10107,7 +10231,7 @@ def test_llm_transform_allows_syntax_and_postcondition_repairs(monkeypatch) -> N
         preview_state={},
     )
 
-    assert result["ok"] is True
+    assert result["ok"] is True, result
     assert [item["ok"] for item in result["attempts"]] == [False, False, True]
     assert len(messages_by_attempt) == 3
     first_repair = json.loads(messages_by_attempt[1][2]["content"])
@@ -12514,6 +12638,7 @@ def test_builder_webui_validation_rejects_undeclared_modal_action() -> None:
             {
                 "id": "open-detail",
                 "type": "ui.actions",
+                "inputs": {"buttons": [{"id": "open", "label": "Open"}]},
                 "area": "main",
                 "inputs": {"buttons": [{"id": "open", "label": "Open detail"}]},
                 "actions": [
@@ -13737,6 +13862,7 @@ def test_set_ui_revision_current_migrates_legacy_root_modals(
             {
                 "id": "open-details",
                 "type": "ui.actions",
+                "inputs": {"buttons": [{"id": "open", "label": "Open"}]},
                 "area": "main",
                 "inputs": {"buttons": [{"id": "open", "label": "Open details"}]},
                 "title": "Open details",
@@ -13838,8 +13964,8 @@ def test_set_ui_revision_current_migrates_legacy_root_modals(
     assert (
         saved["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["actions"][0][
             "params"
-        ]["modalId"]
-        == "details_modal"
+        ]["to"]
+        == "legacy_modal_revision.details_modal"
     )
 
 
@@ -14398,14 +14524,18 @@ def test_chat_guides_underspecified_first_idea(monkeypatch) -> None:
     )
 
 
+@pytest.mark.parametrize('instruction,authorized', [('Add a lint gate before push.', False),
+    ('Разрешаю изменение интерфейса: Разделить Фото, Ретушь и Результаты.', True)])
+@pytest.mark.parametrize('locale',['ru','en'])
 def test_chat_routes_followup_to_automation_sdk_at_automation_stage(
-    monkeypatch,
+    monkeypatch, instruction, authorized, locale,
 ) -> None:
     skill = _load_module()
     emitted: list[dict] = []
     submitted: list[dict] = []
     session = {"scenario_id": "builder", "artifact_root": "/dev/scenarios/builder"}
     binding = {"runtime_scenario_id": "builder", "dev_webspace_id": "desktop-dev"}
+    monkeypatch.setattr(skill, '_project_external_user_turn', lambda *args, **kwargs: 'canonical-ui-message')
 
     monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
     monkeypatch.setattr(
@@ -14434,6 +14564,8 @@ def test_chat_routes_followup_to_automation_sdk_at_automation_stage(
             "handled": True,
             "status": "automation_queued",
             "message": "Iteration queued.",
+            "session": {"session_id": "automation.scenario.builder", "current_task_id": "task.control",
+                        "status": "queued", "completion_history": ["retained historical evidence" * 10000]},
         }
 
     monkeypatch.setattr(skill.sdk_builder_automation, "submit", _submit)
@@ -14450,20 +14582,44 @@ def test_chat_routes_followup_to_automation_sdk_at_automation_stage(
         ),
     )
 
-    result = skill.chat("Add a lint gate before push.", webspace_id="desktop")
+    result = skill.chat(instruction, webspace_id="desktop", _meta={'locale':locale})
 
     assert result["status"] == "automation_queued"
     assert result["project"] == {"type": "scenario", "id": "builder"}
     assert submitted == [
         {
-            "text": "Add a lint gate before push.",
+            "text": instruction,
             "object_type": "scenario",
             "object_id": "builder",
             "webspace_id": "desktop",
+            **({'ui_change_authorization': {'reason': instruction.split(':',1)[1].strip(),
+                  'source_message_ids': ['canonical-ui-message']}} if authorized else {}),
         }
     ]
-    assert emitted[0]["text"] == "Iteration queued."
+    assert emitted[0]["text"] == result['message']
+    assert result['message'] == ('Task accepted and queued.' if locale=='en' else
+                                 'Задача принята и ожидает выполнения.')
+    assert result['next_action'] == 'wait'
     assert emitted[0]["topic_ref"]["thread_id"] == "prompt-project:scenario:builder"
+    assert result["schema"] == "adaos.builder.control_reply.v1"
+    assert result["task_id"] == "task.control"
+    assert "completion_history" not in json.dumps(result)
+    assert len(json.dumps(result, ensure_ascii=False).encode("utf8")) < 64 * 1024
+
+
+def test_chat_missing_control_contract_blocks_before_model_submission(monkeypatch):
+    skill = _load_module()
+    monkeypatch.setattr(skill, "_chat_project_ref", lambda **kwargs: ("scenario", "photo"))
+    monkeypatch.setattr(skill.developer_prompt_context, "get", lambda *args: {"workflow_state": "automation"})
+    monkeypatch.setattr(skill.sdk_builder_workflow, "get_state", lambda *args: {"governed": {"state": "trial_ready"}})
+    monkeypatch.setattr(skill.sdk_builder_automation, "get_state", lambda **kwargs: {"session_present": True})
+    monkeypatch.setattr(skill.sdk_builder_automation, "control_reply", None)
+    monkeypatch.setattr(skill.sdk_builder_automation, "submit", lambda *args, **kwargs: pytest.fail("No submission before contract admission"))
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda *args, **kwargs: None)
+    monkeypatch.setattr(skill, "_dialog_state", lambda *args, **kwargs: {})
+    result = skill._route_automation_chat(utterance="Continue", webspace_id="desktop", session={}, binding={}, topic={}, _meta={})
+    assert result["status"] == "builder_control_contract_unavailable"
+    assert result["model_started"] is False
 
 
 def test_chat_starts_new_prototype_change_after_publication(monkeypatch) -> None:
@@ -14532,7 +14688,7 @@ def test_chat_owns_single_sync_update_result_emit(monkeypatch) -> None:
     monkeypatch.setattr(
         skill,
         "_safe_emit_chat",
-        lambda text, **_kwargs: emitted.append(str(text)),
+        lambda text, **_kwargs: emitted.append(str(text)) or True,
     )
 
     def _update(**kwargs):
@@ -14549,7 +14705,7 @@ def test_chat_owns_single_sync_update_result_emit(monkeypatch) -> None:
     )
 
     assert result["status"] == "llm_repaired"
-    assert emitted == ["Updated once."]
+    assert emitted == ["Repair the saved candidate.", "Updated once."]
 
 
 def test_chat_does_not_mutate_prototype_when_automation_session_is_not_started(
@@ -15403,6 +15559,43 @@ def test_conflicting_confirmed_technical_application_id_fails_before_creation(
     assert result["ok"] is False
     assert result["status"] == "application_identity_confirmation_invalid"
     assert "requested_mail_app" in result["message"]
+
+
+def test_explicit_tool_confirmation_is_discoverable_and_uses_the_same_identity_guard(monkeypatch):
+    skill = _load_module()
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    declaration = next(item for item in manifest["tools"] if item["name"] == "create_application_draft")
+    assert "confirmed_technical_application_id" in declaration["input_schema"]["properties"]
+    calls = []
+    monkeypatch.setattr(skill.sdk_builder_applications, "publisher_context", lambda: {"publisher_ref": "publisher:test"})
+    monkeypatch.setattr(skill, "create_scenario_draft", lambda **kw: calls.append(kw) or {"ok": False, "status": "draft_creation_failed"})
+    result = skill.create_application_draft("Create an Application with exact technical id owned_confirmed_app.",
+        confirmed_technical_application_id="owned_confirmed_app", webspace_id="owned-test")
+    assert result["application_id"] == calls[0]["scenario_id"] == "owned_confirmed_app"
+
+
+def test_compact_provider_outputs_match_the_discoverable_tool_manifest():
+    from adaos.services.artifact_pipeline.cbs_authoring import compile_cbs_provider_files
+    names = ("skill.yaml", "handlers/main.py", "contracts/provider.cbs.yaml",
+        "contracts/capability.contract.json", "contracts/binding.definition.json")
+    compiled = compile_cbs_provider_files({name: (SKILL_ROOT / name).read_bytes() for name in names},
+        kind="skill", allow_generated_outputs=True)
+    operation = next(item for item in compiled.capability.to_dict()["operations"] if item["operation_id"] == "create_application_draft")
+    assert "confirmed_technical_application_id" in operation["input_schema"]["properties"]
+
+
+@pytest.mark.parametrize("conflict", ["idea", "argument", "legacy_confirmation"])
+def test_explicit_tool_confirmation_conflicts_fail_before_publisher_or_creation(monkeypatch, conflict):
+    skill = _load_module()
+    monkeypatch.setattr(skill.sdk_builder_applications, "publisher_context", lambda: pytest.fail("conflict must fail before publisher"))
+    monkeypatch.setattr(skill, "create_scenario_draft", lambda **kw: pytest.fail("conflict must fail before creation"))
+    kwargs = {"idea": "Create an Application with exact technical id owned_confirmed_app.",
+        "confirmed_technical_application_id": "owned_confirmed_app", "webspace_id": "owned-test"}
+    if conflict == "idea": kwargs["idea"] = "Create an Application with exact technical id other_app."
+    if conflict == "argument": kwargs["application_id"] = "other_app"
+    if conflict == "legacy_confirmation": kwargs["_meta"] = {"application_id": "other_app", "technical_application_id_confirmed": True}
+    result = skill.create_application_draft(**kwargs)
+    assert result["ok"] is False and result["status"] == "application_identity_confirmation_invalid"
 
 
 def test_long_russian_create_request_with_exact_technical_id_cannot_edit_selected_project() -> None:
@@ -17257,7 +17450,7 @@ def test_telegram_user_turn_is_projected_into_builder_project_conversation(
     monkeypatch.setattr(
         skill,
         "_safe_emit_chat",
-        lambda text, **kwargs: emitted.append({"text": text, "kwargs": dict(kwargs)}),
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": dict(kwargs)}) or True,
     )
 
     meta = {
@@ -17464,7 +17657,7 @@ def test_limited_channel_can_select_existing_dev_scenario_without_local_session(
     monkeypatch.setattr(
         skill,
         "_safe_emit_chat",
-        lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}),
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}) or True,
     )
 
     result = skill.chat(

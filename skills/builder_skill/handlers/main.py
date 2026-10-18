@@ -147,7 +147,8 @@ _STATE_MIGRATIONS = (
     RelationalMigration(
         version=1,
         name="partition Builder runtime state",
-        idempotent=True,
+        idempotent=False,
+        dialects=("sqlite",),
         statements=(
             "CREATE TABLE builder_state (state_key TEXT PRIMARY KEY, "
             "payload_json TEXT NOT NULL, updated_at TEXT NOT NULL)",
@@ -1886,15 +1887,36 @@ def _route_automation_chat(
                 "automation": automation_state.get("automation"),
             }
         else:
-            result = dict(
-                sdk_builder_automation.submit(
-                    utterance,
-                    object_type=object_type,
-                    object_id=object_id,
-                    webspace_id=webspace_id,
+            ui_authorization = {}
+            ui_request = re.fullmatch(r"(?:разрешаю изменение интерфейса|authorize ui change)\s*:\s*(.+)",
+                                      utterance.strip(), flags=re.IGNORECASE | re.DOTALL)
+            if ui_request:
+                source_id = str((_meta or {}).get('source_message_id') or '').strip()
+                if not source_id:
+                    raise ValueError('UI change authorization requires a canonical conversation turn')
+                ui_authorization = {'ui_change_authorization': {'reason': ui_request.group(1),
+                                                               'source_message_ids': [source_id]}}
+            project_control = getattr(sdk_builder_automation, "control_reply", None)
+            if not callable(project_control):
+                result = {
+                    "ok": False, "status": "builder_control_contract_unavailable", "model_started": False,
+                    "message": "Обновите Core: компактный контракт Builder недоступен. Новое задание не отправлено.",
+                }
+            else:
+                result = dict(
+                    sdk_builder_automation.submit(
+                        utterance,
+                        object_type=object_type,
+                        object_id=object_id,
+                        webspace_id=webspace_id,
+                        **ui_authorization,
+                    )
+                    or {}
                 )
-                or {}
-            )
+                result = project_control(
+                    result, object_type=object_type, object_id=object_id,
+                    locale=str((_meta or {}).get("locale") or "ru"),
+                )
     except Exception as exc:
         result = {
             "ok": False,
@@ -2255,8 +2277,19 @@ def _safe_emit_chat(
     topic_ref: Mapping[str, Any] | None = None,
     actions: Sequence[Mapping[str, Any]] | None = None,
     from_: str = "hub",
-) -> None:
+) -> bool:
+    acknowledged = False
     try:
+        if from_ == 'hub' and session and session.get('scenario_id'):
+            try:
+                budget = sdk_builder_observability.usd_budget('builder:scenario:' + str(session['scenario_id']))
+                if budget.get('status') != 'not_configured':
+                    text += (f"\nБюджет LLM-эксперимента: учтено/зарезервировано ${budget['committed_usd']:.8g} "
+                             f"из ${budget['limit_usd']:.8g}; доступно ${budget['available_usd']:.8g}. "
+                             "Неизвестные расходы сохраняют резерв.")
+            except Exception:
+                _LOG.warning('Builder USD budget projection unavailable', exc_info=True)
+                text += '\nУчёт USD сейчас недоступен; отсутствие квитанции не означает нулевой расход.'
         from adaos.sdk.io.out import chat_append
         from concurrent.futures import (
             ThreadPoolExecutor,
@@ -2304,6 +2337,8 @@ def _safe_emit_chat(
                 future = pool.submit(copy_context().run, _append_chat)
                 try:
                     receipt = future.result(timeout=CHAT_APPEND_TIMEOUT_S)
+                    acknowledged = bool(isinstance(receipt, Mapping) and receipt.get('ok') is True
+                                        and receipt.get('persisted') is True)
                     if isinstance(receipt, Mapping) and receipt.get("ok") is False:
                         logging.getLogger(__name__).warning("Builder chat append was not acknowledged: %s", receipt)
                 except FuturesTimeoutError:
@@ -2313,9 +2348,10 @@ def _safe_emit_chat(
             finally:
                 if pool is not None:
                     pool.shutdown(wait=True)
+        return acknowledged
     except Exception:
         logging.getLogger(__name__).warning("Builder chat append failed", exc_info=True)
-        return
+        return False
 
 
 def _external_user_turn_message_id(text: str, _meta: Mapping[str, Any] | None) -> str:
@@ -2370,9 +2406,9 @@ def _project_external_user_turn(
     meta = dict(_meta or {}) if isinstance(_meta, Mapping) else {}
     transport = str(meta.get("io_type") or meta.get("transport") or "").strip().lower()
     source = str(meta.get("prototype_request_source") or "").strip().lower()
-    sdk_request = source in {"api", "e2e"}
+    sdk_request = source in {"api", "e2e"} or _is_api_tool_call(meta)
     if (transport not in {"telegram", "tg"} and not sdk_request) or not str(text or "").strip():
-        return
+        return str(meta.get('source_message_id') or meta.get('message_id') or '').strip() or None
     origin = "E2E test" if source == "e2e" else "SDK" if sdk_request else "Telegram"
     canonical_meta = {
         **meta,
@@ -2384,7 +2420,7 @@ def _project_external_user_turn(
         "action_source": "external_user_turn_projection",
         "origin_label": str(meta.get("origin_label") or origin).strip() or origin,
     }
-    _safe_emit_chat(
+    acknowledged = _safe_emit_chat(
         str(text).strip(),
         webspace_id=webspace_id,
         _meta=canonical_meta,
@@ -2393,6 +2429,26 @@ def _project_external_user_turn(
         topic_ref=topic_ref,
         from_="user",
     )
+    if not acknowledged:
+        # The bounded live notification can still be running after the
+        # canonical commit. Reconcile only this exact scoped message; never
+        # treat a timeout as a failed write or manufacture authorization refs.
+        try:
+            from adaos.sdk.io.out import chat_message_receipt
+            scope = _chat_meta(canonical_meta, webspace_id=_reply_webspace_id(webspace_id, canonical_meta),
+                               session=session, binding=binding, topic_ref=topic_ref)
+            receipt = chat_message_receipt(canonical_meta['message_id'],
+                conversation_id=str(scope.get('conversation_id') or ''),
+                thread_id=str(scope.get('conversation_topic_id') or scope.get('thread_id') or ''),
+                webspace_id=str(scope.get('webspace_id') or ''),
+                channel_id=str(scope.get('dialog_channel_id') or ''),
+                owner=str(scope.get('conversation_owner') or scope.get('owner') or ''),
+                role='user',text=str(text).strip())
+            acknowledged = receipt.get('ok') is True and receipt.get('persisted') is True
+        except Exception:
+            acknowledged = False
+    if not acknowledged:
+        raise RuntimeError('builder_user_turn_not_acknowledged')
     return canonical_meta["message_id"]
 
 
@@ -3954,6 +4010,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "For readable computed summaries use item.details with a static dataSource containing these values. Within one static object, later fields may reference earlier resolved fields through $data.<field>; order dependent fields after their inputs. "
                 "Form staticContent is literal copy and does not interpolate state or computed expressions."
             ),
+            "declarative_expression_contract": developer_ui.expression_contract(),
             "reactive_static_collections": (
                 "A static row may expose quantity:'$state.quantities.item1' and a computed amount expression. "
                 "To show only populated rows, filter the resolved row field directly, for example {key:'quantity',operator:'gt',value:0}. "
@@ -4764,6 +4821,11 @@ def _combine_llm_job_telemetry(
         "repair": copy.deepcopy(dict(repair_usage)),
     }
     combined["repair"] = copy.deepcopy(dict(repair_telemetry))
+    def observation(value):
+        return {key: copy.deepcopy(value[key]) for key in
+                ("root_job_id", "usage", "cost", "provider", "model", "timing") if key in value}
+    combined["attempt_observations"] = copy.deepcopy(primary.get("attempt_observations") or [observation(primary)])
+    combined["attempt_observations"].append(observation(repair_telemetry))
     return combined
 
 
@@ -9096,30 +9158,30 @@ def _builder_llm_messages(
 
 def _balanced_json_object(text: str) -> str | None:
     source = str(text or "")
-    for start, char in enumerate(source):
-        if char != "{":
+    start = source.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(source)):
+        current = source[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif current == "\\":
+                escaped = True
+            elif current == '"':
+                in_string = False
             continue
-        depth = 0
-        in_string = False
-        escaped = False
-        for index in range(start, len(source)):
-            current = source[index]
-            if in_string:
-                if escaped:
-                    escaped = False
-                elif current == "\\":
-                    escaped = True
-                elif current == '"':
-                    in_string = False
-                continue
-            if current == '"':
-                in_string = True
-            elif current == "{":
-                depth += 1
-            elif current == "}":
-                depth -= 1
-                if depth == 0:
-                    return source[start : index + 1]
+        if current == '"':
+            in_string = True
+        elif current == "{":
+            depth += 1
+        elif current == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start : index + 1]
     return None
 
 
@@ -9374,7 +9436,11 @@ def _json_pointer_list_index(
             if isinstance(item, Mapping) and str(item.get("id") or "") == stable_id
         ]
         if not matches:
-            raise KeyError(f"JSON Pointer stable id not found: {stable_id}")
+            ids = [str(item.get("id")) for item in items if isinstance(item, Mapping) and item.get("id")]
+            keys = [str(item.get("key")) for item in items if isinstance(item, Mapping) and item.get("key") and not item.get("id")]
+            raise KeyError(f"JSON Pointer stable id not found: {stable_id}; target array ids={ids[:24]!r}; "
+                           f"key-only members={keys[:24]!r}. @ selects id only within this array. "
+                           "Inspect the exact parent; for key-only columns use a guarded index or replace the smallest complete array.")
         if len(matches) > 1:
             raise ValueError(f"JSON Pointer stable id is ambiguous: {stable_id}")
         return matches[0]
@@ -10689,49 +10755,10 @@ def _unsupported_update_state_expression(value: Any) -> str:
     return ""
 
 
-_DECLARATIVE_EXPRESSION_OPS = {
-    "add",
-    "subtract",
-    "multiply",
-    "divide",
-    "min",
-    "max",
-    "round",
-    "equals",
-    "gt",
-    "gte",
-    "lt",
-    "lte",
-    "and",
-    "or",
-    "not",
-    "if",
-    "count",
-    "formatNumber",
-}
-
-
 def _invalid_declarative_expression(value: Any, path: str = "value") -> str:
-    if isinstance(value, Mapping):
-        if str(value.get("kind") or "").strip() == "expression":
-            op = str(value.get("op") or "").strip()
-            if op not in _DECLARATIVE_EXPRESSION_OPS:
-                return f"{path}.op={op!r} is not supported"
-            if op == "if":
-                args = value.get("args")
-                named = "condition" in value and ("then" in value or "else" in value)
-                if not named and (not isinstance(args, list) or len(args) != 3):
-                    return f"{path} if expression requires args=[condition, then, else] or named branches"
-        for key, nested in value.items():
-            found = _invalid_declarative_expression(nested, f"{path}.{key}")
-            if found:
-                return found
-    elif isinstance(value, list):
-        for index, nested in enumerate(value):
-            found = _invalid_declarative_expression(nested, f"{path}[{index}]")
-            if found:
-                return found
-    return ""
+    findings = developer_ui.expression_findings(value, path=path)
+    return (f"{findings[0]['detail']} Contract {findings[0]['contract_version']} "
+            f"({findings[0]['contract_digest']}).") if findings else ""
 
 
 def _brace_wrapped_state_reference(value: Any, path: str = "value") -> str:
@@ -10985,8 +11012,8 @@ def _builder_change_issue_clauses(request_text: str) -> list[str]:
         clause = re.sub(r"^\s*(?:[-*•]+|\d+[.)])\s*", "", chunk).strip()
         clause = " ".join(clause.split())
         if clause and clause not in clauses:
-            clauses.append(clause[:500])
-    return clauses[:20] or [" ".join(normalized.split())[:500]]
+            clauses.append(clause)
+    return clauses or [" ".join(normalized.split())]
 
 
 def _builder_change_issue_lane(clause: str) -> str:
@@ -11031,23 +11058,34 @@ def _builder_change_issues(
     request_text: str, *, change_id: str
 ) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
-    for index, clause in enumerate(
-        _builder_change_issue_clauses(request_text), start=1
-    ):
+    for clause in _builder_change_issue_clauses(request_text):
         lane = _builder_change_issue_lane(clause)
         criterion_prefix = (
             "The Prototype visibly and coherently satisfies"
             if lane == "prototype"
             else "The implementation and its tests satisfy"
         )
-        issues.append(
-            {
-                "issue_id": f"{change_id}:I{index:02d}"[-80:],
-                "title": clause[:240],
-                "lane": lane,
-                "acceptance_criteria": [f"{criterion_prefix}: {clause}"[:500]],
-            }
-        )
+        capacity = 500 - len(criterion_prefix) - 2
+        parts, current = [], ''
+        for word in clause.split():
+            if len(word) > capacity:
+                raise ValueError('builder_change_requirement_token_too_long; split the statement explicitly')
+            if current and len(current) + len(word) + 1 > capacity:
+                parts.append(current)
+                current = ''
+            current = (current + ' ' + word).strip()
+        if current:
+            parts.append(current)
+        for offset in range(0, len(parts), 20):
+            issues.append({'issue_id': f'{change_id}:I{len(issues)+1:02d}'[-80:],
+                'title': clause[:240], 'lane': lane,
+                'acceptance_criteria': [f'{criterion_prefix}: {part}' for part in parts[offset:offset+20]]})
+            if len(issues) > 1000:
+                raise ValueError('builder_change_requirements_exceed_admitted_capacity; split the Change explicitly')
+    if len(issues) > 50:
+        issues = _compact_builder_change_issues(issues, max_count=50, change_id=change_id)
+        if not issues:
+            raise ValueError('builder_change_requirements_exceed_admitted_capacity; split the Change explicitly')
     return issues
 
 
@@ -11082,6 +11120,9 @@ def _compact_builder_change_issues(
     compacted: list[dict[str, Any]] = []
     compact_index = 0
     for lane, lane_issues in by_lane.items():
+        typed_fields = ("kind", "source_ref", "applicable_phases", "phase_dispositions", "effect", "effect_ref", "verification_scope", "owner")
+        if len({_compact_json({key: row[key] for key in typed_fields if key in row}) for row in lane_issues}) > 1:
+            return []  # Do not collapse obligations with distinct lifetime/authority.
         bucket_count = allocations[lane]
         for bucket_index in range(bucket_count):
             bucket = lane_issues[bucket_index::bucket_count]
@@ -11089,11 +11130,13 @@ def _compact_builder_change_issues(
                 continue
             compact_index += 1
             criteria = [
-                str(criterion).strip()[:500]
+                str(criterion).strip()
                 for issue in bucket
                 for criterion in issue.get("acceptance_criteria") or []
                 if str(criterion).strip()
-            ][:20]
+            ]
+            if len(criteria) > 20 or any(len(criterion) > 500 for criterion in criteria):
+                return []  # Start a new Change rather than lose an obligation.
             title = str(bucket[0].get("title") or "Builder change requirement").strip()
             if len(bucket) > 1:
                 suffix = f" (+{len(bucket) - 1} related requirements)"
@@ -11104,6 +11147,9 @@ def _compact_builder_change_issues(
                     "title": title[:240],
                     "lane": lane,
                     "acceptance_criteria": criteria,
+                    **{key: copy.deepcopy(bucket[0][key]) for key in typed_fields if key in bucket[0]},
+                    "semantic_refs": list(dict.fromkeys(ref for row in bucket for ref in row.get("semantic_refs", []))),
+                    "source_message_ids": list(dict.fromkeys(ref for row in bucket for ref in row.get("source_message_ids", []))),
                 }
             )
     return compacted
@@ -11124,7 +11170,10 @@ def _register_builder_change_set(
     change_id = _builder_change_id(session=session, patch=patch)
     if object_type not in {"scenario", "skill"} or not object_id:
         return {"ok": False, "error": "artifact_identity_missing"}
-    issues = _builder_change_issues(request_text, change_id=change_id)
+    try:
+        issues = _builder_change_issues(request_text, change_id=change_id)
+    except ValueError as exc:
+        return {'ok': False, 'error': 'change_requirements_not_admitted', 'detail': str(exc)}
     if not issues:
         return {"ok": False, "error": "change_set_issues_missing"}
     workflow_request = _builder_change_request(request_text)
@@ -11133,6 +11182,11 @@ def _register_builder_change_set(
         for key in ("message_id", "source_message_id", "request_message_id")
         if str((_meta or {}).get(key) or "").strip()
     ]
+    for issue in issues:
+        issue["source_message_ids"] = list(dict.fromkeys(source_message_ids))
+        if patch.get("operation") == "semantic_graph" and patch.get("semantic_refs"):
+            issue["semantic_refs"] = list(dict.fromkeys(patch["semantic_refs"]))
+            issue["kind"] = "product_requirement"
     try:
         state = (sdk_builder_workflow.get_prototype_intake_context(object_type, object_id) if compact
                  else sdk_builder_workflow.get_state(object_type, object_id))
@@ -12735,6 +12789,7 @@ def _apply_llm_webui_transform(
                         messages,
                         model=selected_model,
                         **generation_options,
+                        **_builder_spend_options(session),
                     )
                     response_status = str(response.get("status") or "").strip().lower()
                     response_job_id = str(
@@ -12809,6 +12864,7 @@ def _apply_llm_webui_transform(
                         messages,
                         model=selected_model,
                         **generation_options,
+                        **_builder_spend_options(session),
                     )
             except Exception as exc:
                 detail = f"{type(exc).__name__}: {exc}"
@@ -15545,13 +15601,15 @@ def _repair_llm_semantic_transform_once(
             generation_options=repair_options,
             output_mode=resolved_output_mode,
             route="prototype.transform.async_semantic_repair",
+            parent_request_id=request_id,
+            parent_job_id=job_id,
             stage="semantic_repair",
             attempt=attempt_number,
             capability_selection=capability_selection,
             message_purposes=message_purposes,
         )
         started_at = _now()
-        response = submit_response_job(messages, model=selected_model, **repair_options)
+        response = submit_response_job(messages, model=selected_model, **repair_options, **_builder_spend_options(session))
         repair_job_id = str(response.get("job_id") or response.get("id") or "").strip()
         client = (
             response.get("_client")
@@ -16081,6 +16139,8 @@ def _repair_llm_webui_transform_output(
             messages=repair_messages,
             generation_options=repair_options,
             route="prototype.transform.async_repair",
+            parent_request_id=request_id,
+            parent_job_id=job_id,
             stage="repair",
             attempt=1,
             capability_selection=selection,
@@ -16090,6 +16150,7 @@ def _repair_llm_webui_transform_output(
             repair_messages,
             model=selected_model,
             **repair_options,
+            **_builder_spend_options(session),
         )
         repair_job_id = str(response.get("job_id") or response.get("id") or "").strip()
         client = (
@@ -19127,8 +19188,7 @@ def _record_prototype_revision(
     if not scenario_id or not revision_token:
         return {"ok": False, "skipped": "scenario_or_revision_missing"}
     try:
-        from adaos.services.builder.run_observability import execution_metrics_from_llm
-        execution_metrics = execution_metrics_from_llm(llm_result, reasoning_effort=reasoning_effort) if llm_result else None
+        execution_metrics = sdk_builder_observability.execution_metrics_from_llm(llm_result, reasoning_effort=reasoning_effort) if llm_result else None
         return sdk_builder_workflow.transition(
             "scenario",
             scenario_id,
@@ -20808,10 +20868,21 @@ def create_application_draft(
     application_id: str | None = None,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
+    confirmed_technical_application_id: str | None = None,
 ) -> dict[str, Any]:
     _reject_transport_corrupted_text(idea, field="idea")
     ws = _source_webspace_id(webspace_id, _meta)
     source_idea = str(idea or "").strip() or "application prototype"
+    if confirmed_technical_application_id is not None:
+        metadata = dict(_meta or {})
+        previous = str(metadata.get("application_id") or "").strip()
+        confirmed = str(confirmed_technical_application_id).strip()
+        if metadata.get("technical_application_id_confirmed") is True and previous != confirmed:
+            return {"ok": False, "status": "application_identity_confirmation_invalid",
+                "error": "application_identity_confirmation_invalid",
+                "message": f"{AGENT_LABEL}: conflicting explicit technical Application id confirmations."}
+        metadata.update(application_id=confirmed, technical_application_id_confirmed=True)
+        _meta = metadata
     confirmed_application_id, identity_error = _confirmed_application_id_from_meta(
         source_idea,
         _meta,
@@ -22854,6 +22925,7 @@ def _submit_llm_webui_transform_job(
                 messages,
                 model=selected_model,
                 **submitted_options,
+                **_builder_spend_options(session),
             )
             submit_done_at = _now()
             submit_attempts.append(
@@ -23156,6 +23228,16 @@ def _llm_job_journal_dir(session: Mapping[str, Any]) -> Path | None:
     return root / "llm_jobs" if root is not None else None
 
 
+def _builder_spend_options(session: Mapping[str, Any]) -> dict[str, Any]:
+    scenario = str(session.get("scenario_id") or "").strip()
+    if not scenario:
+        return {}
+    scope = "builder:scenario:" + scenario
+    if sdk_builder_observability.usd_budget(scope).get("status") == "not_configured":
+        return {}
+    return {"spend_scope": scope, "spend_run_id": str(session.get("id") or "")}
+
+
 def _write_llm_job_request_artifact(
     *,
     session: Mapping[str, Any],
@@ -23170,16 +23252,18 @@ def _write_llm_job_request_artifact(
     attempt: int = 1,
     capability_selection: Mapping[str, Any] | None = None,
     message_purposes: Sequence[str] | None = None,
+    parent_request_id: str | None = None,
+    parent_job_id: str | None = None,
 ) -> dict[str, Any] | None:
     token = str(job_id or request_id or "").strip()
     journal_dir = _llm_job_journal_dir(session)
     if not token or journal_dir is None:
-        return None
+        raise RuntimeError("builder_evidence_unavailable_before_model_submit")
     safe_job_id = re.sub(r"[^A-Za-z0-9_.-]+", "_", token).strip("._-") or _hash_suffix(
         token
     )
     exact_messages = copy.deepcopy([dict(message) for message in messages])
-    message_bytes = _compact_json(exact_messages).encode("utf-8", errors="replace")
+    message_bytes = _compact_json(exact_messages).encode("utf-8")
     resolved_purposes = list(message_purposes or ())
     if len(resolved_purposes) != len(exact_messages):
         resolved_purposes = [
@@ -23204,6 +23288,34 @@ def _write_llm_job_request_artifact(
         model=model,
         generation_options=recorded_generation_options,
     )
+    source_inputs = {}
+    for name in ("webui.json", "semantic.webui.json", "prototype.brief.json", "prompt_state.json"):
+        source_path = journal_dir.parent / name
+        if source_path.is_file():
+            raw = source_path.read_bytes()
+            source_inputs[name] = {"sha256": hashlib.sha256(raw).hexdigest(), "content": raw.decode("utf-8")}
+    parent_evidence_ref = None
+    parent_provenance = {"status": "not_applicable"}
+    if parent_request_id:
+        parent_token = re.sub(r"[^A-Za-z0-9_.-]+", "_", parent_request_id).strip("._-") or _hash_suffix(parent_request_id)
+        parent_path = journal_dir / f"{parent_token}.request.json"
+        if parent_path.is_file():
+            parent = _read_json_file(parent_path)
+            if parent.get("request_id") != parent_request_id or parent.get("session_id") != session.get("id"):
+                raise RuntimeError("builder_evidence_parent_identity_mismatch")
+            receipt = dict(parent.get("evidence_receipt") or {})
+            try:
+                retained = sdk_builder_observability.read_llm_evidence(receipt)
+                expected = {key: value for key, value in parent.items()
+                            if key != "evidence_receipt" and value is not None}
+                if expected != {key: value for key, value in retained.items() if value is not None}:
+                    raise ValueError("parent journal differs from acknowledged bytes")
+            except Exception as exc:
+                raise RuntimeError("builder_evidence_parent_provenance_incomplete") from exc
+            parent_evidence_ref = receipt["ref"]
+            parent_provenance = {"status": "verified", "source": "journal_and_cas", "ref": parent_evidence_ref}
+        else:
+            raise RuntimeError("builder_evidence_parent_provenance_incomplete")
     payload = {
         "schema": "adaos.builder.llm_job_input.v1",
         "job_id": str(job_id or "").strip() or None,
@@ -23213,6 +23325,11 @@ def _write_llm_job_request_artifact(
         "created_at": _now(),
         "message_sha256": hashlib.sha256(message_bytes).hexdigest(),
         "messages": exact_messages,
+        "parent_request_id": parent_request_id,
+        "parent_job_id": parent_job_id,
+        "parent_evidence_ref": parent_evidence_ref,
+        "parent_provenance": parent_provenance,
+        "source_inputs": source_inputs,
         "input_attribution": input_attribution,
         "generation": {
             "model": str(model or "").strip() or None,
@@ -23221,6 +23338,7 @@ def _write_llm_job_request_artifact(
     }
     path = journal_dir / f"{safe_job_id}.request.json"
     try:
+        payload["evidence_receipt"] = sdk_builder_observability.retain_llm_evidence(payload)
         _write_json_file_atomic(
             path, {key: value for key, value in payload.items() if value is not None}
         )
@@ -23232,10 +23350,11 @@ def _write_llm_job_request_artifact(
             token,
             path,
         )
-        return None
+        raise RuntimeError("builder_evidence_write_failed_before_model_submit")
     return {
         "path": f"llm_jobs/{path.name}",
         "sha256": digest,
+        "evidence_receipt": payload["evidence_receipt"],
         "message_sha256": payload["message_sha256"],
         "input_attribution": {
             "schema": input_attribution["schema"],
@@ -23270,10 +23389,12 @@ def _write_llm_job_raw_candidate_artifact(
         re.sub(r"[^A-Za-z0-9_.-]+", "_", str(stage or "received")).strip("._-")
         or "received"
     )
-    response_bytes = str(output_text or "").encode("utf-8", errors="replace")
+    response_bytes = str(output_text or "").encode("utf-8")
     structured_candidate: dict[str, Any] | None = None
     extraction_error: str | None = None
     try:
+        if len(response_bytes) > 256_000:
+            raise ValueError("raw_output_parse_deferred_to_candidate_validation")
         extracted = _extract_json_object(output_text)
         structured_candidate = copy.deepcopy(dict(extracted))
     except Exception as exc:
@@ -23312,6 +23433,7 @@ def _write_llm_job_raw_candidate_artifact(
     }
     path = journal_dir / f"{safe_job_id}.candidate.{safe_stage}.raw.json"
     try:
+        payload["evidence_receipt"] = sdk_builder_observability.retain_llm_evidence(payload)
         _write_json_file_atomic(
             path, {key: value for key, value in payload.items() if value is not None}
         )
@@ -23324,13 +23446,14 @@ def _write_llm_job_raw_candidate_artifact(
             safe_stage,
             path,
         )
-        return None
+        raise RuntimeError("builder_evidence_write_failed_before_model_repair")
     return {
         "kind": "raw_model_output",
         "path": f"llm_jobs/{path.name}",
         "sha256": artifact_sha256,
         "stage": safe_stage,
         "response_sha256": payload["response"]["sha256"],
+        "evidence_receipt": payload["evidence_receipt"],
         "structured": structured_candidate is not None,
         "candidate_sha256": candidate_sha256,
     }
@@ -23384,15 +23507,12 @@ def _write_llm_job_candidate_artifact(
         "stage": safe_stage,
         "created_at": _now(),
         "webui_digest": _webui_source_fingerprint(normalized),
-        "validation": _bounded_repair_diagnostic(
-            result.get("validation")
-            if isinstance(result.get("validation"), Mapping)
-            else {}
-        ),
+        "validation": copy.deepcopy(dict(result.get("validation") or {})),
         "result": normalized_result,
     }
     path = journal_dir / f"{safe_job_id}.candidate.{safe_stage}.json"
     try:
+        payload["evidence_receipt"] = sdk_builder_observability.retain_llm_evidence(payload)
         _write_json_file_atomic(
             path, {key: value for key, value in payload.items() if value is not None}
         )
@@ -23405,7 +23525,7 @@ def _write_llm_job_candidate_artifact(
             safe_stage,
             path,
         )
-        return None
+        raise RuntimeError("builder_evidence_candidate_write_failed")
     return {
         "path": f"llm_jobs/{path.name}",
         "sha256": digest,
@@ -25720,7 +25840,8 @@ def _try_semantic_label_request(
             return {**common, "ok": True, "status": status_prefix + "_proposed", "semantic_request": request,
                     "message": "The bounded semantic operation is proposed; no source was changed."}
         patch = {"id": request["transaction_id"], "summary": instruction, "target": "semantic",
-                 "operation": "semantic_graph", "change_id": request["transaction_id"], "created_at": _now()}
+                 "operation": "semantic_graph", "change_id": request["transaction_id"], "created_at": _now(),
+                 "semantic_refs": list(request["write_refs"])}
         if not prepared.get("replayed"):
             registration = _register_builder_change_set(session=session, patch=patch, request_text=instruction, _meta=meta, compact=True)
             if not registration.get("ok"):

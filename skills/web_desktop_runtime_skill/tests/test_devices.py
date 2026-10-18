@@ -167,9 +167,130 @@ def test_device_tree_projects_physical_os_with_addressable_endpoints():
         "RU:Browser:desktop-dev (Current browser 1)",
         "LO:Browser:desktop (Local browser)",
     }
-    assert sum("RU:Browser:desktop (" in item["title"] for item in children) == 2
+    assert sum("RU:Browser:desktop (" in item["title"] for item in children) == 1
     assert {item["icon"] for item in children if item["device_type"] == "browser"} == {"globe-outline"}
     assert all("unassigned" not in item["title"].casefold() for item in projected)
+
+
+def test_browser_transport_and_page_endpoints_collapse_to_one_representation():
+    transport = _browser(
+        "browser:shared-browser::webrtc",
+        webspace="desktop",
+        zone="ru",
+        origin="https://inimatic.com",
+        name="Dev browser",
+        current=True,
+        last_seen="2026-10-13T13:47:02Z",
+    )
+    page = _browser(
+        "browser:shared-browser::page_current",
+        webspace="desktop",
+        zone="ru",
+        origin="https://inimatic.com",
+        name="Dev browser",
+        last_seen="2026-10-13T13:47:00Z",
+    )
+
+    collapsed = main._collapse_browser_representations([transport, page])
+    projected = main._device_tree_items(
+        [transport, page],
+        subnet={"subnet_id": "sn_40443596", "display_name": "sn_40443596"},
+    )
+
+    assert [item["id"] for item in collapsed] == ["browser:shared-browser::page_current"]
+    assert sum(item["kind"] == "physical_device" for item in projected) == 1
+    assert sum(item["device_type"] == "browser" for item in projected) == 1
+
+
+def test_list_devices_syncs_and_projects_registered_desktop_endpoint(monkeypatch):
+    monkeypatch.setattr(main.sdk_access, "require", Mock())
+    registered_endpoint = {
+        "id": "device:redevice:desktop-1",
+        "title": "AdaOS Desktop",
+        "summary": "desktop_client | windows",
+        "kind": "redevice",
+        "runtime": {
+            "status": "online",
+            "connection_state": "online",
+            "route_mode": "root_command_poll",
+            "device_kind": "redevice",
+        },
+        "actual_state": {
+            "hostname": "WORKSTATION",
+            "device_ref": "redevice:desktop-1",
+            "os_name": "windows",
+        },
+    }
+    list_objects = Mock(
+        side_effect=lambda **kwargs: [registered_endpoint]
+        if kwargs.get("kind") == "redevice"
+        else []
+    )
+    monkeypatch.setattr(main.sdk_control_plane, "list_device_objects", list_objects)
+    monkeypatch.setattr(main.sdk_control_plane, "list_browser_session_objects", Mock(return_value=[]))
+    monkeypatch.setattr(main.sdk_access_links, "list_browser_links", Mock(return_value=[]))
+    monkeypatch.setattr(main.sdk_system, "get_operational_snapshot", Mock(return_value={}))
+    endpoint_list = Mock(return_value=[])
+    monkeypatch.setattr(main.sdk_device_access, "list_endpoint_devices", endpoint_list)
+    monkeypatch.setattr(main, "_REDEVICE_LAST_SYNC", 0.0)
+
+    result = main.list_devices(status="active")
+
+    assert result["ok"] is True
+    endpoint = next(
+        item
+        for item in result["items"]
+        if item["id"] == "device:redevice:desktop-1"
+    )
+    assert endpoint["title"] == "RU:Client:desktop-1 (AdaOS Desktop)"
+    assert endpoint["device_type"] == "redevice"
+    assert endpoint["parent_device_id"] == "physical-device:workstation"
+    endpoint_list.assert_called_once_with("redevice", sync_registry=True)
+    assert list_objects.call_args_list[1].kwargs["kind"] == "redevice"
+
+
+def test_registered_desktop_endpoint_replaces_its_browser_transport(monkeypatch):
+    monkeypatch.setattr(main.sdk_access, "require", Mock())
+    registered_endpoint = {
+        "id": "device:redevice:desktop-1",
+        "title": "AdaOS Desktop",
+        "kind": "redevice",
+        "runtime": {
+            "status": "online",
+            "connection_state": "online",
+            "device_kind": "redevice",
+        },
+        "actual_state": {
+            "hostname": "WORKSTATION",
+            "device_ref": "redevice:desktop-1",
+        },
+    }
+    browser_transport = {
+        "id": "browser:desktop-1",
+        "title": "AdaOS Desktop",
+        "kind": "browser_session",
+        "runtime": {"status": "online", "connection_state": "connected"},
+        "actual_state": {"device_ref": "browser:desktop-1"},
+    }
+    monkeypatch.setattr(
+        main.sdk_control_plane,
+        "list_device_objects",
+        Mock(
+            side_effect=lambda **kwargs: [registered_endpoint]
+            if kwargs.get("kind") == "redevice"
+            else [browser_transport]
+        ),
+    )
+    monkeypatch.setattr(main.sdk_control_plane, "list_browser_session_objects", Mock(return_value=[]))
+    monkeypatch.setattr(main.sdk_access_links, "list_browser_links", Mock(return_value=[]))
+    monkeypatch.setattr(main.sdk_system, "get_operational_snapshot", Mock(return_value={}))
+    monkeypatch.setattr(main.sdk_device_access, "list_endpoint_devices", Mock(return_value=[]))
+    monkeypatch.setattr(main, "_REDEVICE_LAST_SYNC", 0.0)
+
+    result = main.list_devices(status="active")
+
+    endpoints = [item for item in result["items"] if item["kind"] != "physical_device"]
+    assert [item["id"] for item in endpoints] == ["device:redevice:desktop-1"]
 
 
 def test_legacy_browser_without_parent_stays_unknown_and_detects_hub():

@@ -118,10 +118,13 @@ def test_node_reads_are_bounded_and_preserve_last_known_values():
         assert source["maxRequestHz"] == 0.2
         assert "'archive'" not in widgets[identity]["visibleIf"]
     hardware_source = widgets["system-hardware-utilization"]["dataSource"]
-    assert hardware_source["kind"] == "skill"
-    assert hardware_source["name"] == "web_desktop_runtime_skill.get_system_overview"
-    assert hardware_source["params"]["section"] == "node_dashboard"
-    assert hardware_source["params"]["target_node_id"] == "$state.selectedSystemNodeId"
+    assert hardware_source == {
+        "kind": "stream",
+        "receiver": "web_desktop.system.hardware",
+        "scope": "node",
+        "nodeId": "$state.selectedSystemNodeId",
+        "transport": "auto",
+    }
     assert "'archive'" not in widgets["system-hardware-utilization"]["visibleIf"]
     for identity in ("system-hardware-utilization-offline", "system-update-status-archive", "system-node-offline-name", "system-attention-dashboard-offline"):
         source = widgets[identity]["dataSource"]

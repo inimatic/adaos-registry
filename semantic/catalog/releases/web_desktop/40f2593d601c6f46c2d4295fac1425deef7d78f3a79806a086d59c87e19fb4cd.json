@@ -1,0 +1,553 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "web_desktop",
+    "legacy_project_id": "web_desktop",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "web_desktop",
+    "display": {
+      "title": "Management",
+      "summary": "Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.",
+      "categories": [
+        "system",
+        "desktop"
+      ]
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "desktop",
+        "presentation_ref": "scenario:web_desktop"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 4,
+    "created_at": "2026-09-19T09:55:35+00:00",
+    "updated_at": "2026-09-30T19:49:46+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "web_desktop",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "web_desktop",
+    "version": "0.3.87",
+    "release_digest": "sha256:40f2593d601c6f46c2d4295fac1425deef7d78f3a79806a086d59c87e19fb4cd",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "web_desktop",
+      "version": "0.3.87",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:35230b0515245c325ce61ff2ae8afedb9b4cc6ee74b6696e551e1e69230030df",
+        "path_scope": [
+          "projects/web_desktop/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "web_desktop",
+          "version": "0.3.98",
+          "digest": "sha256:db33fe2a7c5a896799a15d5202d958386c1389d3c52eeb344c8a68e32e6692dd",
+          "manifest_digest": "sha256:7435cbcc706c9191b02c589932563aa04cc5b1a1403d183b98daeb596e459488",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:35230b0515245c325ce61ff2ae8afedb9b4cc6ee74b6696e551e1e69230030df",
+            "path_scope": [
+              "scenarios/web_desktop/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/web_desktop",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "web_desktop_runtime_skill",
+          "version": "0.1.62",
+          "digest": "sha256:adad2cbe43a4e668a76c64b6ff3010920ae199c500ae036e69ed6199051a1c20",
+          "manifest_digest": "sha256:c410f3c97d0d72bf23184f8a27bed50941cf4d060ca36d19228b0c69b06bde57",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:35230b0515245c325ce61ff2ae8afedb9b4cc6ee74b6696e551e1e69230030df",
+            "path_scope": [
+              "skills/web_desktop_runtime_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/web_desktop_runtime_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [
+        {
+          "kind": "skill",
+          "artifact_id": "browsers_skill",
+          "version": "0.15.24",
+          "package_digest": "sha256:a9845236d2c671e108310f27acff6bc28c6f1ff9a2508b2510764274ebe6f04d",
+          "optional": false,
+          "version_spec": "==0.15.24"
+        },
+        {
+          "kind": "skill",
+          "artifact_id": "conversation_companions",
+          "version": "0.3.0-beta.3",
+          "package_digest": "sha256:02f810b1b3fb21042803722b808d9ae008b7cf4f7de23313a423b5600ecd1f82",
+          "optional": false,
+          "version_spec": "==0.3.0-beta.3"
+        },
+        {
+          "kind": "skill",
+          "artifact_id": "greet_on_boot_skill",
+          "version": "0.2.4",
+          "package_digest": "sha256:eb695ac298aed7839c2cb7ac4d098b8313cdcd8887073e4fad8b645304e3feae",
+          "optional": false,
+          "version_spec": "==0.2.4"
+        },
+        {
+          "kind": "skill",
+          "artifact_id": "infrastate_skill",
+          "version": "0.75.94",
+          "package_digest": "sha256:b6869dd1f060f8f08c871fc208369a2c9ad77e2afce4b6ededbfc29248741a8b",
+          "optional": false,
+          "version_spec": "==0.75.94"
+        },
+        {
+          "kind": "skill",
+          "artifact_id": "pair_new_device_skill",
+          "version": "0.1.0",
+          "package_digest": "sha256:ddac2904f52eea9e23a1b13cf530ae5dc6e4a8f33a44374685ca90df110a4ded",
+          "optional": false,
+          "version_spec": "==0.1.0"
+        },
+        {
+          "kind": "skill",
+          "artifact_id": "voice_chat_skill",
+          "version": "0.7.8",
+          "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c",
+          "optional": false,
+          "version_spec": "==0.7.8"
+        },
+        {
+          "kind": "skill",
+          "artifact_id": "web_desktop_skill",
+          "version": "0.2.4",
+          "package_digest": "sha256:dc6b9e208019a45a30e2d155e310802559c21a7ff6262acfb9fd524ec4a543de",
+          "optional": false,
+          "version_spec": "==0.2.4"
+        }
+      ],
+      "permissions": [
+        "profile.read.self",
+        "profile.write.self",
+        "storage.blob",
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:35230b0515245c325ce61ff2ae8afedb9b4cc6ee74b6696e551e1e69230030df",
+          "builder": "adaos.dev.project.push"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:ecf912a7f36de681d95116de77831a8375192a56ffcb2f0dba849d733906c0a1"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:52ac80f5dbc156065422987c7549e21457e622e962689d580d99af1d1edc9e7b",
+        "profiles": [
+          "adaos.default_install.v1",
+          "adaos.desktop.shell.v1"
+        ],
+        "members": [
+          {
+            "ref": "scenario:web_desktop",
+            "package_digest": "sha256:db33fe2a7c5a896799a15d5202d958386c1389d3c52eeb344c8a68e32e6692dd",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "skill:web_desktop_runtime_skill",
+            "package_digest": "sha256:adad2cbe43a4e668a76c64b6ff3010920ae199c500ae036e69ed6199051a1c20",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "desktop",
+            "presentation": "scenario:web_desktop",
+            "default": true,
+            "bindings": {
+              "shell": "web_desktop"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "desktop"
+          ],
+          "validation_profiles": [
+            "desktop.default"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "retain",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "profile.read.self",
+              "purpose": "Read the signed-in user's display profile and portable preferences.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "profile.write.self",
+              "purpose": "Update the signed-in user's own display profile and portable preferences.",
+              "approval_policy": "grant_on_install",
+              "sensitive": true
+            },
+            {
+              "id": "storage.blob",
+              "purpose": "Store and retrieve the signed-in user's content-addressed profile avatar.",
+              "approval_policy": "grant_on_install",
+              "sensitive": true
+            },
+            {
+              "id": "workspace.read",
+              "purpose": "Open desktop applications and read desktop launcher state.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Update the user's desktop layout, pins, widgets, and preferences.",
+              "approval_policy": "grant_on_install",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [],
+            "sent_off_device": [],
+            "linked_to_user": [],
+            "tracking": false,
+            "retention": null
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [],
+            "sent_off_device": false,
+            "linked_to_user": false,
+            "tracking": false
+          }
+        },
+        "application_roles": [
+          {
+            "id": "desktop_member",
+            "title": "Desktop member",
+            "grants": [
+              "desktop.open",
+              "profile.read.self",
+              "profile.write.self",
+              "storage.blob",
+              "workspace.read"
+            ],
+            "assignable_to": [
+              "child",
+              "guest",
+              "member"
+            ],
+            "default_for": {},
+            "requires_permissions": [
+              "profile.read.self",
+              "profile.write.self",
+              "storage.blob",
+              "workspace.read"
+            ]
+          },
+          {
+            "id": "desktop_owner",
+            "title": "Desktop owner",
+            "grants": [
+              "desktop.open",
+              "desktop.settings.write",
+              "profile.read.self",
+              "profile.write.self",
+              "storage.blob",
+              "workspace.read",
+              "workspace.write"
+            ],
+            "assignable_to": [
+              "admin",
+              "co_owner",
+              "owner"
+            ],
+            "default_for": {
+              "owner": "desktop_owner"
+            },
+            "requires_permissions": [
+              "profile.read.self",
+              "profile.write.self",
+              "storage.blob",
+              "workspace.read",
+              "workspace.write"
+            ]
+          }
+        ]
+      },
+      "catalog": {
+        "title": "Management",
+        "description": "Default AdaOS desktop shell with project-owned connection flows, voice bridge, and browser surface support.",
+        "categories": [
+          "desktop",
+          "system"
+        ],
+        "tags": [
+          "browser",
+          "default-install",
+          "onboarding",
+          "shell",
+          "voice"
+        ],
+        "icon": "desktop-outline",
+        "title_i18n": {
+          "en": "Management",
+          "ru": "Управление"
+        },
+        "description_i18n": {
+          "en": "Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.",
+          "ru": "Стандартная веб-оболочка AdaOS, подключение устройств, голосовой мост и поддержка браузерных интерфейсов."
+        }
+      },
+      "release_digest": "sha256:40f2593d601c6f46c2d4295fac1425deef7d78f3a79806a086d59c87e19fb4cd"
+    },
+    "accepted_candidate_id": "web_desktop-0-3-87-9c87e19fb4cd",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "builder.release.preflight",
+        "checkpoint_package_digest": "sha256:ebdaaa5e0a52d71af2f47f023ed6b07a9348bff79f1b2223c4605dfe3bd9a6e6",
+        "checkpoint_source_revision": "16c838562d53aa01a5256c6bd0d32b3200f74520",
+        "automation_task_id": "task.management-stability.20261013",
+        "change_id": "CH-management-stability-20261013",
+        "checkpoint_component_ref": "scenario:web_desktop"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:40f2593d601c6f46c2d4295fac1425deef7d78f3a79806a086d59c87e19fb4cd"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "profile.read.self",
+          "purpose": "Read the signed-in user's display profile and portable preferences.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "profile.write.self",
+          "purpose": "Update the signed-in user's own display profile and portable preferences.",
+          "approval_policy": "grant_on_install",
+          "sensitive": true
+        },
+        {
+          "id": "storage.blob",
+          "purpose": "Store and retrieve the signed-in user's content-addressed profile avatar.",
+          "approval_policy": "grant_on_install",
+          "sensitive": true
+        },
+        {
+          "id": "workspace.read",
+          "purpose": "Open desktop applications and read desktop launcher state.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Update the user's desktop layout, pins, widgets, and preferences.",
+          "approval_policy": "grant_on_install",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [],
+        "sent_off_device": [],
+        "linked_to_user": [],
+        "tracking": false,
+        "retention": null
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [],
+        "sent_off_device": false,
+        "linked_to_user": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:3297c342cb4f78c5e8cd8096ac0fd398652f664051b0d68ad06670cf5e4d2ec4",
+    "application_roles": [
+      {
+        "id": "desktop_member",
+        "title": "Desktop member",
+        "grants": [
+          "desktop.open",
+          "profile.read.self",
+          "profile.write.self",
+          "storage.blob",
+          "workspace.read"
+        ],
+        "assignable_to": [
+          "child",
+          "guest",
+          "member"
+        ],
+        "default_for": {},
+        "requires_permissions": [
+          "profile.read.self",
+          "profile.write.self",
+          "storage.blob",
+          "workspace.read"
+        ]
+      },
+      {
+        "id": "desktop_owner",
+        "title": "Desktop owner",
+        "grants": [
+          "desktop.open",
+          "desktop.settings.write",
+          "profile.read.self",
+          "profile.write.self",
+          "storage.blob",
+          "workspace.read",
+          "workspace.write"
+        ],
+        "assignable_to": [
+          "admin",
+          "co_owner",
+          "owner"
+        ],
+        "default_for": {
+          "owner": "desktop_owner"
+        },
+        "requires_permissions": [
+          "profile.read.self",
+          "profile.write.self",
+          "storage.blob",
+          "workspace.read",
+          "workspace.write"
+        ]
+      }
+    ],
+    "role_model_digest": "sha256:eb7c4ab8e95855d914005af3c0fec01c465e62fbde9c8e161a131d5541ce8326",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "web_desktop",
+      "release_digest": "sha256:40f2593d601c6f46c2d4295fac1425deef7d78f3a79806a086d59c87e19fb4cd",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [
+        {
+          "id": "profile.read.self",
+          "title": "Profile.Read.Self",
+          "purpose": "Read the signed-in user's display profile and portable preferences.",
+          "required": true
+        },
+        {
+          "id": "profile.write.self",
+          "title": "Profile.Write.Self",
+          "purpose": "Update the signed-in user's own display profile and portable preferences.",
+          "required": true
+        },
+        {
+          "id": "storage.blob",
+          "title": "Storage.Blob",
+          "purpose": "Store and retrieve the signed-in user's content-addressed profile avatar.",
+          "required": true
+        },
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Open desktop applications and read desktop launcher state.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Update the user's desktop layout, pins, widgets, and preferences.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:9a417678a718ba7f307b8a1916a0f92855acbccd66eb99c40e6566d65ab6f17f"
+  },
+  "channels": {
+    "stable": "sha256:40f2593d601c6f46c2d4295fac1425deef7d78f3a79806a086d59c87e19fb4cd"
+  },
+  "semantic": {
+    "projection_digest": "sha256:0c8085fbf497e3002b37312a83cb10a1bb2494f9fd2e874afb1556e88d30ae3c",
+    "path": "semantic/applications/web_desktop/40f2593d601c6f46c2d4295fac1425deef7d78f3a79806a086d59c87e19fb4cd.json"
+  },
+  "projection_digest": "sha256:acfaabcc5eafb176344468fa5fd57cc6d168b410b3be28e808df9b0f1c68fe3b"
+}

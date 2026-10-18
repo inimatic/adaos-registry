@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: web_desktop
-version: 0.3.85
+version: 0.3.88
 profiles:
 - adaos.desktop.shell.v1
 - adaos.default_install.v1
@@ -47,6 +47,11 @@ components:
     - uses
   - ref: skill:infrastate_skill
     version: ==0.75.94
+    lifecycle: shared
+    relations:
+    - uses
+  - ref: skill:conversation_companions
+    version: ==0.3.2
     lifecycle: shared
     relations:
     - uses

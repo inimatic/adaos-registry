@@ -1,5 +1,5 @@
 name: web_desktop_runtime_skill
-version: 0.1.61
+version: 0.1.62
 entry: handlers/main.py
 runtime:
   python: '3.11'

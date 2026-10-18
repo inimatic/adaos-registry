@@ -30,6 +30,9 @@ from .operational import number as _operational_number
 
 
 _MAX_DEVICE_INVENTORY_PAGE_SIZE = 500
+_REDEVICE_SYNC_INTERVAL_S = 20.0
+_REDEVICE_SYNC_LOCK = Lock()
+_REDEVICE_LAST_SYNC = 0.0
 
 
 @subscribe("webio.stream.snapshot.requested")
@@ -355,7 +358,7 @@ def _browser_zone(item: dict[str, Any]) -> str:
 
 def _browser_representation_key(item: dict[str, Any]) -> tuple[str, str, str, str]:
     identity = _browser_identity(item.get("id"))
-    parent = identity
+    parent = identity.split("::", 1)[0]
     webspace = _first_string(*(item.get("workspace_ids") or []), "desktop")
     return (
         parent,
@@ -381,9 +384,11 @@ def _collapse_browser_representations(
         key = _browser_representation_key(item)
         previous = selected.get(key)
         if previous is None or (
+            "::page_" in _browser_identity(item.get("id")),
             bool(item.get("current")),
             _timestamp_value(item.get("last_seen")),
         ) > (
+            "::page_" in _browser_identity(previous.get("id")),
             bool(previous.get("current")),
             _timestamp_value(previous.get("last_seen")),
         ):
@@ -467,23 +472,32 @@ def _device_tree_items(
         endpoint["parent_device_id"] = root_id
         endpoint["can_accept_endpoints"] = False
         endpoint["can_move_endpoint"] = False
-        endpoint["icon"] = "server-outline"
+        endpoint["icon"] = (
+            "desktop-outline" if endpoint.get("device_type") == "redevice" else "server-outline"
+        )
         endpoint_kind = (
-            "Hub"
-            if _string(endpoint.get("route_mode")).casefold() == "hub"
-            or "hub" in endpoint_id.casefold()
-            or bool(
-                subject_node_token
-                and subject_node_token
-                == _first_string(endpoint.get("node_id"), endpoint_id)
-                .split(":", 1)[-1]
-                .casefold()
+            "Client"
+            if endpoint.get("device_type") == "redevice"
+            else (
+                "Hub"
+                if _string(endpoint.get("route_mode")).casefold() == "hub"
+                or "hub" in endpoint_id.casefold()
+                or bool(
+                    subject_node_token
+                    and subject_node_token
+                    == _first_string(endpoint.get("node_id"), endpoint_id)
+                    .split(":", 1)[-1]
+                    .casefold()
+                )
+                else "Node"
             )
-            else "Node"
         )
-        endpoint_ref = subnet_id if endpoint_kind == "Hub" and subnet_id else (
-            _string(endpoint.get("node_id")) or endpoint_id.split(":")[-1]
-        )
+        if endpoint_kind == "Hub" and subnet_id:
+            endpoint_ref = subnet_id
+        elif endpoint_kind == "Client":
+            endpoint_ref = _first_string(endpoint.get("node_id"), endpoint_id).split(":", 1)[-1]
+        else:
+            endpoint_ref = _string(endpoint.get("node_id")) or endpoint_id.split(":")[-1]
         endpoint_name = _first_string(*(endpoint.get("node_names") or []), endpoint.get("title"))
         endpoint["title"] = f"RU:{endpoint_kind}:{endpoint_ref}"
         if endpoint_name and endpoint_name.casefold() != endpoint_ref.casefold():
@@ -634,6 +648,17 @@ def _browser_link_item(value: Any) -> dict[str, Any]:
         "os_name": _first_string(item.get("os_name")),
         "parent_device_ref": _first_string(item.get("parent_device_ref")),
     }
+
+
+def _sync_redevice_registry() -> None:
+    global _REDEVICE_LAST_SYNC
+    now = monotonic()
+    with _REDEVICE_SYNC_LOCK:
+        sync_registry = now - _REDEVICE_LAST_SYNC >= _REDEVICE_SYNC_INTERVAL_S
+        if sync_registry:
+            _REDEVICE_LAST_SYNC = now
+    if sync_registry:
+        sdk_device_access.list_endpoint_devices("redevice", sync_registry=True)
 
 
 def _canonical_item(value: Any, *, source: str) -> dict[str, Any]:
@@ -1290,14 +1315,33 @@ def list_devices(
         return _empty_collection()
     status_token = _string(status).casefold()
     try:
-        canonical_devices = [
-            _canonical_item(item, source="device")
-            for item in sdk_control_plane.list_device_objects(
-                status=status_token if status_token in {"active", "offline"} else None,
-                include_detached=status_token == "offline",
-                limit=min(_MAX_DEVICE_INVENTORY_PAGE_SIZE, max(40, _bounded_limit(limit) * 4)),
-            )
-        ]
+        try:
+            _sync_redevice_registry()
+        except Exception:
+            pass
+        inventory_limit = min(
+            _MAX_DEVICE_INVENTORY_PAGE_SIZE, max(40, _bounded_limit(limit) * 4)
+        )
+        canonical_by_id: dict[str, dict[str, Any]] = {}
+        for raw_item in sdk_control_plane.list_device_objects(
+            status=status_token if status_token in {"active", "offline"} else None,
+            include_detached=status_token == "offline",
+            limit=inventory_limit,
+        ):
+            item = _canonical_item(raw_item, source="device")
+            canonical_by_id[_first_string(item.get("id"), repr(raw_item))] = item
+        # Browser history is ordered before ReDevice records in the unified
+        # inventory. Fetch native endpoints independently so a busy browser
+        # history cannot consume the whole bounded page.
+        for raw_item in sdk_control_plane.list_device_objects(
+            kind="redevice",
+            status=status_token if status_token in {"active", "offline"} else None,
+            include_detached=status_token == "offline",
+            limit=inventory_limit,
+        ):
+            item = _canonical_item(raw_item, source="device")
+            canonical_by_id[_first_string(item.get("id"), repr(raw_item))] = item
+        canonical_devices = list(canonical_by_id.values())
         canonical_browsers = [
             _canonical_item(item, source="browser_session")
             for item in sdk_control_plane.list_browser_session_objects()
@@ -1315,6 +1359,22 @@ def list_devices(
                     browser_items[identity] = rich
         except Exception:
             pass
+        native_endpoint_ids: set[str] = set()
+        for item in canonical_devices:
+            if item.get("device_type") != "redevice":
+                continue
+            endpoint_id = _string(item.get("id")).split("::", 1)[0]
+            for prefix in ("device:redevice:", "redevice:"):
+                if endpoint_id.startswith(prefix):
+                    endpoint_id = endpoint_id.removeprefix(prefix)
+                    break
+            if endpoint_id:
+                native_endpoint_ids.add(endpoint_id)
+        browser_items = {
+            identity: item
+            for identity, item in browser_items.items()
+            if identity.split("::", 1)[0] not in native_endpoint_ids
+        }
         devices = [
             item for item in canonical_devices if item.get("device_type") != "browser"
         ] + list(browser_items.values())

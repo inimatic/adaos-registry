@@ -42,6 +42,27 @@ def test_manifest_declares_tools_and_nlu_actions() -> None:
     assert manifest["nlu"]["intents"]["conversation.talk"]["actions"][0]["tool"] == "talk"
 
 
+def test_manifest_maps_conversational_controls_to_application_permissions() -> None:
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    tools = {item["name"]: item for item in manifest["tools"]}
+
+    for name in ("start", "switch_character", "talk", "update_profile", "capture_feedback", "reset_session"):
+        assert tools[name]["side_effects"] == "local_write"
+        assert tools[name]["permissions"] == ["profile.write.self"]
+        assert tools[name]["application_access"] == {
+            "permission": "profile.write.self",
+            "capability": "profile.write.self",
+        }
+
+    for name in ("list_characters", "get_diagnostics"):
+        assert tools[name]["side_effects"] == "read_only"
+        assert tools[name]["permissions"] == ["profile.read.self"]
+        assert tools[name]["application_access"] == {
+            "permission": "profile.read.self",
+            "capability": "profile.read.self",
+        }
+
+
 def test_start_is_deterministic_and_lists_characters() -> None:
     skill = _load_module()
     skill.reset_session(webspace_id="test-start")
@@ -58,6 +79,7 @@ def test_start_is_deterministic_and_lists_characters() -> None:
     assert result["dialog"]["active_agent"]["voice"] == "ru-male"
     assert result["dialog"]["active_agent"]["icon"] == "male-outline"
     assert result["dialog"]["active_agent"]["voice_profile"]["lang"] == "ru-RU"
+    assert result["chat_emit"] == {"mode": "receipt_only"}
     assert "Арсений" in result["message"]
     assert len(result["characters"]) >= 3
     assert result["next_actions"]
@@ -77,6 +99,7 @@ def test_switch_character_accepts_russian_alias() -> None:
     assert result["dialog"]["active_agent"]["gender"] == "female"
     assert result["dialog"]["active_agent"]["voice"] == "ru-female"
     assert result["dialog"]["active_agent"]["icon"] == "female-outline"
+    assert result["chat_emit"] == {"mode": "receipt_only"}
     assert listing["active_character"] == "nika"
 
 
@@ -88,6 +111,7 @@ def test_update_profile_applies_bounded_style_patch() -> None:
 
     assert result["ok"] is True
     assert result["dialog"]["dialog_channel_id"] == "conversational"
+    assert result["chat_emit"] == {"mode": "receipt_only"}
     assert result["patch"]["verbosity"] == "коротко, одна-две главные мысли"
     assert "теплее" in result["profile"]["tone"]
     assert any("Не заканчивает ответ вопросом" in rule for rule in result["profile"]["style_rules"])
@@ -101,6 +125,7 @@ def test_talk_routes_style_correction_to_profile_update() -> None:
 
     assert result["ok"] is True
     assert result["character_id"] == "arseni"
+    assert result["chat_emit"] == {"mode": "receipt_only"}
     assert result["patch"]["verbosity"] == "коротко, одна-две главные мысли"
     assert "Обновил профиль" in result["message"]
 
@@ -113,6 +138,7 @@ def test_talk_preview_uses_local_fallback_without_llm() -> None:
 
     assert result["ok"] is True
     assert result["selected_character"] == "arseni"
+    assert result["chat_emit"] == {"mode": "receipt_only"}
     assert result["dialog"]["active_agent_id"] == "agent:conversation_companions:arseni"
     assert "Арсений" in result["message"]
 
@@ -329,6 +355,16 @@ def test_capture_feedback_stores_trial_observation() -> None:
 
     assert result["ok"] is True
     assert result["feedback_count"] == 1
+    assert result["chat_emit"] == {"mode": "receipt_only"}
+
+
+def test_reset_session_returns_receipt_only_chat_contract() -> None:
+    skill = _load_module()
+
+    result = skill.reset_session(webspace_id="test-reset-chat-contract")
+
+    assert result["ok"] is True
+    assert result["chat_emit"] == {"mode": "receipt_only"}
 
 
 def test_diagnostics_cache_is_bounded_and_disposable(monkeypatch) -> None:

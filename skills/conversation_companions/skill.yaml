@@ -1,5 +1,5 @@
 name: conversation_companions
-version: 0.3.0-beta.3
+version: 0.3.2
 description: Conversational characters plus a beta Companion operator grounded in
   the AdaOS Companion Control Plane.
 entry: handlers/main.py
@@ -262,6 +262,12 @@ tools:
 - name: start
   description: Start or resume the first-run character onboarding flow.
   entry: handlers.main:start
+  side_effects: local_write
+  permissions:
+  - profile.write.self
+  application_access:
+    permission: profile.write.self
+    capability: profile.write.self
   input_schema:
     type: object
     properties:
@@ -279,6 +285,12 @@ tools:
 - name: list_characters
   description: List available character profiles and the active character.
   entry: handlers.main:list_characters
+  side_effects: read_only
+  permissions:
+  - profile.read.self
+  application_access:
+    permission: profile.read.self
+    capability: profile.read.self
   input_schema:
     type: object
     properties:
@@ -293,6 +305,12 @@ tools:
 - name: switch_character
   description: Switch the active character or use a character temporarily.
   entry: handlers.main:switch_character
+  side_effects: local_write
+  permissions:
+  - profile.write.self
+  application_access:
+    permission: profile.write.self
+    capability: profile.write.self
   input_schema:
     type: object
     required:
@@ -314,6 +332,12 @@ tools:
   description: Reply to a user message as the active character, a chosen character,
     or a small panel.
   entry: handlers.main:talk
+  side_effects: local_write
+  permissions:
+  - profile.write.self
+  application_access:
+    permission: profile.write.self
+    capability: profile.write.self
   input_schema:
     type: object
     properties:
@@ -461,6 +485,12 @@ tools:
 - name: update_profile
   description: Apply a bounded style/profile correction to a character.
   entry: handlers.main:update_profile
+  side_effects: local_write
+  permissions:
+  - profile.write.self
+  application_access:
+    permission: profile.write.self
+    capability: profile.write.self
   input_schema:
     type: object
     required:
@@ -485,6 +515,12 @@ tools:
   description: Capture structured control-group feedback without exposing private
     conversation content.
   entry: handlers.main:capture_feedback
+  side_effects: local_write
+  permissions:
+  - profile.write.self
+  application_access:
+    permission: profile.write.self
+    capability: profile.write.self
   input_schema:
     type: object
     properties:
@@ -507,6 +543,12 @@ tools:
 - name: reset_session
   description: Reset active character and short conversation memory for one webspace.
   entry: handlers.main:reset_session
+  side_effects: local_write
+  permissions:
+  - profile.write.self
+  application_access:
+    permission: profile.write.self
+    capability: profile.write.self
   input_schema:
     type: object
     properties:
@@ -522,6 +564,12 @@ tools:
   description: Return compact operator diagnostics for character trial state without
     exposing conversation or feedback text.
   entry: handlers.main:get_diagnostics
+  side_effects: read_only
+  permissions:
+  - profile.read.self
+  application_access:
+    permission: profile.read.self
+    capability: profile.read.self
   input_schema:
     type: object
     properties:
@@ -538,6 +586,12 @@ tools:
   description: Publish compact operator diagnostics into the WebUI stream without
     exposing conversation or feedback text.
   entry: handlers.main:publish_diagnostics
+  side_effects: local_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: workspace.write
   input_schema:
     type: object
     properties:
@@ -555,6 +609,11 @@ tools:
   entry: handlers.main:dispose
   side_effects: read_only
   side_effect_class: read_only
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: workspace.read
   input_schema:
     type: object
     additionalProperties: true
