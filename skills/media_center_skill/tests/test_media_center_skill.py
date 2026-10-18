@@ -160,8 +160,11 @@ def test_background_runtime_bootstrap_is_async_and_process_owned() -> None:
     assert receipt["bootstrap"]["stopped"] is True
 
 
-def test_rehydrate_defers_runtime_workers_until_sys_ready(monkeypatch) -> None:
+def test_rehydrate_schedules_workers_even_after_sys_ready_was_missed(monkeypatch) -> None:
     started: list[str] = []
+    scheduled = []
+    monkeypatch.setattr(main, "background_runtime", lambda: SimpleNamespace(
+        ensure_bootstrap_started=lambda key, callback: scheduled.append((key, callback)) or True))
 
     class Worker:
         def __init__(self, name: str):
@@ -209,9 +212,11 @@ def test_rehydrate_defers_runtime_workers_until_sys_ready(monkeypatch) -> None:
     assert started == []
     assert result["agent_sync"]["deferred"] is True
     assert result["agent_sync"]["mode"] == "background_cursor_catchup"
-    assert result["agent_sync"]["activation"] == "sys.ready"
+    assert result["agent_sync"]["activation"] == "lifecycle.rehydrate_or_sys.ready"
+    assert result["agent_sync"]["bootstrap_scheduled"] is True
+    assert len(scheduled) == 1 and scheduled[0][1] == main._start_live_runtime
     assert result["agent_sync"]["worker_started"] is False
-    assert result["enrichment"]["activation"] == "sys.ready"
+    assert result["enrichment"]["activation"] == "lifecycle.rehydrate_or_sys.ready"
     assert result["enrichment"]["worker_started"] is False
     assert result["catalog_revision"] == 42
 
@@ -257,7 +262,27 @@ def test_sys_ready_schedules_catalog_bootstrap_without_running_it_inline(
     assert started == []
     assert len(scheduled) == 1
     scheduled[0][1]()
-    assert started == ["library", "operations", "sync", "enrichment"]
+    assert started == ["sync", "enrichment", "library", "operations"]
+
+
+def test_read_tools_declare_workspace_read_for_application_access() -> None:
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    assert "workspace.read" in manifest["capabilities"]
+    assert manifest["runtime"]["activation"]["startup_allowed"] is True
+    assert manifest["runtime"]["activation"]["background_refresh"] is True
+
+
+def test_empty_catalog_read_never_pulls_agent_or_scans(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "empty-read.sqlite3"))
+    monkeypatch.setattr(main, "_run_agent_sync", lambda *a, **kw: pytest.fail("inline sync"))
+    monkeypatch.setattr(main, "scan_sources", lambda *a, **kw: pytest.fail("inline scan"))
+    class Worker:
+        def ensure_started(self):
+            return True
+    monkeypatch.setattr(main, "_agent_sync_runtime", lambda *a: Worker())
+    result = main.library(auto_scan=True)
+    assert result["items"] == []
+    assert "scan" not in result
 
 
 def test_catalog_change_during_bootstrap_does_not_open_the_catalog(
@@ -368,7 +393,8 @@ def test_repository_connect_keeps_default_sync_during_lock(
 
     assert repository.connect() is connection
     assert connection.closed is False
-    assert statements[-1] == "PRAGMA synchronous=NORMAL"
+    assert "PRAGMA synchronous=NORMAL" in statements
+    assert statements[-1] == "PRAGMA busy_timeout=2000"
 
 
 def test_coordinator_cache_fast_path_does_not_repeat_schema_check(
@@ -804,7 +830,7 @@ def test_catalog_page_queue_preserves_current_query_sort_and_start_item(
     }
 
 
-def test_library_auto_scan_uses_sdk_discovery_boundary(monkeypatch, tmp_path):
+def test_cold_library_read_reports_loading_without_initialization(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     monkeypatch.setattr(
         main,
@@ -825,12 +851,11 @@ def test_library_auto_scan_uses_sdk_discovery_boundary(monkeypatch, tmp_path):
     payload = main.library(auto_scan=True, limit=20)
 
     assert payload["ok"] is True
-    assert payload["scan"]["discovered_count"] == 1
-    assert (
-        payload["runtime"]["resource_boundary"]
-        == "adaos.sdk.io.media.list_media_resources"
-    )
-    assert payload["items"][0]["playable"] is True
+    assert payload["state"] == "loading"
+    assert payload["ready"] is False
+    assert payload["items"] == []
+    assert "scan" not in payload
+    assert not (tmp_path / "media_center.sqlite3").exists()
 
 
 def test_catalog_marks_previous_rows_missing_for_scanned_source(monkeypatch, tmp_path):
@@ -865,6 +890,7 @@ def test_playable_filter_excludes_images_by_default(monkeypatch, tmp_path):
 def test_kind_and_favorites_filters_are_exact(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
+    MediaCatalogCoordinator(repo)  # lifecycle initialization, not a read side effect
     repo.scan_resources(
         [_resource("clip.mp4"), _resource("song.mp3"), _resource("poster.jpg")]
     )
@@ -892,6 +918,7 @@ def test_kind_and_favorites_filters_are_exact(monkeypatch, tmp_path):
 def test_library_defaults_to_playable_media(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
+    MediaCatalogCoordinator(repo)
 
     repo.scan_resources(
         [_resource("clip.mp4"), _resource("song.mp3"), _resource("poster.jpg")]
@@ -908,6 +935,7 @@ def test_library_defaults_to_playable_media(monkeypatch, tmp_path):
 def test_library_summary_projection_is_bounded_to_card_fields(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
+    MediaCatalogCoordinator(repo)
     repo.scan_resources([_resource("clip.mp4")])
 
     payload = main.library(
@@ -4244,7 +4272,7 @@ def test_library_snapshot_request_preserves_receiver_params(monkeypatch):
         lambda catalog, **kwargs: published.append((catalog, kwargs)),
     )
 
-    main.on_media_center_snapshot_requested(
+    main._publish_requested_snapshot(
         {
             "receiver": "media_center.library_state",
             "webspace_id": "television",
@@ -4275,7 +4303,7 @@ def test_operation_snapshot_request_is_workspace_scoped(monkeypatch):
         lambda catalog, **kwargs: published.append((catalog, kwargs)),
     )
 
-    main.on_media_center_snapshot_requested(
+    main._publish_requested_snapshot(
         {
             "receiver": "media_center.operation_state",
             "webspace_id": "desktop",

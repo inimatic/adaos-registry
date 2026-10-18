@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.4.18
+version: 0.4.19
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -11,6 +11,7 @@ runtime:
 capabilities:
 - applications.develop
 - applications.publish
+- workspace.read
 - workspace.write
 - storage.relational
 default_tool: chat

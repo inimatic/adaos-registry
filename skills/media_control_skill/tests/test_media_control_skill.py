@@ -3,6 +3,8 @@ from __future__ import annotations
 import sys
 import importlib.util
 import json
+import sqlite3
+import time
 from pathlib import Path
 
 import pytest
@@ -13,6 +15,7 @@ if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 from media_control.repository import MediaControlRepository  # noqa: E402
+from media_control.playback_policy import playback_is_confirmed  # noqa: E402
 
 
 _HANDLER_SPEC = importlib.util.spec_from_file_location(
@@ -44,6 +47,44 @@ def _queue(count: int = 3) -> list[dict]:
         }
         for index in range(count)
     ]
+
+
+@pytest.mark.parametrize("endpoint,position,state,expected", [
+    ({"playback_confirmed": False}, 42_000, "paused", False),
+    ({"playback_confirmed": False}, 120_000, "ended", False),
+    ({"playback_confirmed": True, "media_error_code": 3}, 42_000, "error", False),
+    ({"playback_confirmed": "false"}, 42_000, "paused", False),
+    ({"playback_confirmed": True}, 0, "playing", True),
+    ({}, 42_000, "paused", True),
+    ({}, 0, "loading", False),
+])
+def test_playback_confirmation_does_not_infer_success_from_restored_position(endpoint, position, state, expected):
+    assert playback_is_confirmed(endpoint, position_ms=position, state=state) is expected
+
+
+def test_control_connections_close_and_warm_reads_do_not_repair_schema(monkeypatch):
+    repository = MediaControlRepository()
+    with repository.connect() as closed:
+        closed.execute("SELECT 1")
+    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+        closed.execute("SELECT 1")
+    monkeypatch.setattr(MediaControlRepository, "reconcile_single_session_invariant",
+                        lambda self: pytest.fail("read performed repair"))
+    with repository.connect() as writer:
+        writer.execute("BEGIN IMMEDIATE")
+        started = time.monotonic()
+        reader = MediaControlRepository(repository.db_path)
+        assert reader.diagnostics()["ok"] is True
+        assert time.monotonic() - started < 0.5
+        writer.rollback()
+
+
+def test_future_control_schema_is_never_rewritten_by_forced_initialization():
+    repository = MediaControlRepository()
+    with repository.connect() as connection:
+        connection.execute("PRAGMA user_version=999")
+    with pytest.raises(RuntimeError, match="schema_newer_than_runtime"):
+        repository.ensure_schema(force=True)
 
 
 def _session(repository: MediaControlRepository, *, actor: str = "profile:alice") -> dict:

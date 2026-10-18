@@ -276,7 +276,7 @@ def test_page_state_is_initialized_from_exact_builder_selection_projection() -> 
     assert page["initialStateSource"] == {
         "kind": "y",
         "path": "data/builder/selection",
-        "mapping": {
+        "map": {
             "selectedProjectKind": "object_type",
             "selectedProjectId": "object_id",
             "selectedProjectRef": "ref",

@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.101
+version: 0.8.102
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -11,7 +11,12 @@ webui:
   file: webui.json
 runtime:
   python: '3.11'
+  activation:
+    mode: eager
+    startup_allowed: true
+    background_refresh: true
 capabilities:
+- workspace.read
 - workspace.write
 - storage.relational
 - media.catalog
@@ -87,7 +92,7 @@ memory_budget:
     max_items: 2048
     cleanup_hook: dispose
   background_workers:
-    max_threads: 2
+    max_threads: 6
     cleanup_hook: dispose
 exports:
   tools:

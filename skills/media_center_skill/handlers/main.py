@@ -61,6 +61,8 @@ from media_center.enrichment import (  # noqa: E402
     metadata_provider_configuration,
 )
 from media_center.sync import MediaAgentSyncWorker  # noqa: E402
+from media_center.sync_state import SyncStateStore  # noqa: E402
+from media_center.read_models import dispose_read_models, interactive_read, read_deadline  # noqa: E402
 
 
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".mkv", ".avi", ".wmv", ".ogv"}
@@ -87,6 +89,10 @@ class MediaRootOperationBusy(RuntimeError):
 
 
 def _repository() -> MediaCenterRepository:
+    path = str(default_db_path().resolve())
+    with _coordinator_lock:
+        if _coordinator_cached is not None and _coordinator_path == path:
+            return _coordinator_cached.repository
     return MediaCenterRepository()
 
 
@@ -332,6 +338,7 @@ def _agent_sync_runtime(
                 timeout_seconds=30.0,
             ),
             publish=lambda: _publish_library_snapshot(coordinator),
+            state_store=SyncStateStore(coordinator.repository),
         ),
     )
 
@@ -1076,6 +1083,8 @@ def ensure_schema(**_: Any) -> dict[str, Any]:
 def rehydrate(**_: Any) -> dict[str, Any]:
     repo = _repository()
     catalog = _coordinator(repo)
+    scheduled = background_runtime().ensure_bootstrap_started(
+        str(default_db_path().resolve()), _start_live_runtime)
     return {
         "ok": True,
         "schema": COORDINATOR_SCHEMA,
@@ -1084,14 +1093,15 @@ def rehydrate(**_: Any) -> dict[str, Any]:
             "ok": True,
             "deferred": True,
             "mode": "background_cursor_catchup",
-            "activation": "sys.ready",
+            "activation": "lifecycle.rehydrate_or_sys.ready",
+            "bootstrap_scheduled": scheduled,
             "worker_started": False,
             "status": {"state": "deferred", "revision": 0},
         },
         "enrichment": {
             "running": False,
             "deferred": True,
-            "activation": "sys.ready",
+            "activation": "lifecycle.rehydrate_or_sys.ready",
             "worker_started": False,
         },
     }
@@ -1327,10 +1337,12 @@ def on_sys_ready(_: Any) -> None:
 
 def _start_live_runtime() -> None:
     catalog = _coordinator()
-    _publish_library_snapshot(catalog)
-    _publish_operation_snapshot(catalog)
+    # Progress must not depend on a cold/failed Home projection. In particular,
+    # start synchronization before publication can wait on slow storage.
     _agent_sync_runtime(catalog).ensure_started()
     _enrichment_runtime(catalog).ensure_started()
+    _publish_library_snapshot(catalog)
+    _publish_operation_snapshot(catalog)
 
 
 @subscribe(
@@ -1339,6 +1351,18 @@ def _start_live_runtime() -> None:
 )
 def on_media_center_snapshot_requested(event: Any) -> None:
     payload = _event_payload(event)
+    receiver = str(payload.get("receiver") or "")
+    if receiver not in {"media_center.library_state", "media_center.operation_state"}:
+        return
+    raw_params = payload.get("params")
+    params = dict(raw_params) if isinstance(raw_params, Mapping) else {}
+    key = ":".join((receiver, str(payload.get("webspace_id") or ""),
+                    str(params.get("profile_id") or payload.get("profile_id") or "default"),
+                    str(_bool(params.get("shared_surface", payload.get("shared_surface", False)), False))))
+    background_runtime().queue_projection(key, lambda: _publish_requested_snapshot(payload))
+
+
+def _publish_requested_snapshot(payload: Mapping[str, Any]) -> None:
     receiver = str(payload.get("receiver") or "")
     if receiver == "media_center.operation_state":
         _publish_operation_snapshot(
@@ -1796,6 +1820,7 @@ def import_folder(
     summary="Return the media-center library projection for widgets and playback.",
     side_effects="none",
 )
+@interactive_read
 def library(
     query: str = "",
     media_kind: str = "playable",
@@ -1819,19 +1844,11 @@ def library(
 ) -> dict[str, Any]:
     repo = _repository()
     catalog = _coordinator(repo)
-    scan: dict[str, Any] | None = None
     agent_sync: dict[str, Any] | None = None
     if _bool(auto_scan, True):
-        if catalog.catalog_revision() <= 0:
-            summary = repo.compact_summary()
-            agent_sync = _run_agent_sync(
-                catalog, max_pages=1, limit=500, timeout_seconds=5.0
-            )
-            if not agent_sync.get("ok") and int(summary.get("total_count") or 0) == 0:
-                scan = scan_sources(source="all", limit=5000)
-        else:
-            agent_sync = _agent_sync_status()
-        _agent_sync_runtime(catalog).ensure_started()
+        # Compatibility parameter: a read can observe the lifecycle worker,
+        # but cannot initialize a second worker or carry a read deadline into it.
+        agent_sync = _agent_sync_status()
     try:
         payload = catalog.list_items(
             query=query,
@@ -1860,8 +1877,6 @@ def library(
             ),
             i18n_key="runtime.media_center.error.invalid_media_catalog_cursor",
         )
-    if scan is not None:
-        payload["scan"] = scan
     if agent_sync is not None:
         payload["agent_sync"] = agent_sync
     projection_token = str(projection or "full").strip().lower()
@@ -1897,6 +1912,7 @@ def library(
     summary="Return bounded profile-aware metadata navigation facets.",
     side_effects="none",
 )
+@interactive_read
 def metadata_facets(
     dimension: str = "genre",
     media_kind: str = "playable",
@@ -2043,6 +2059,7 @@ def list_items(**payload: Any) -> dict[str, Any]:
     summary="Run bounded local and federated agent search stages.",
     side_effects="none",
 )
+@interactive_read
 def deep_search(
     query: str = "",
     profile_id: str = "default",
@@ -2201,6 +2218,7 @@ def deep_search(
 
 
 @tool(summary="Read one media-center catalog item.", side_effects="none")
+@interactive_read
 def get_item(
     item_id: str = "",
     profile_id: str = "default",
@@ -2807,6 +2825,7 @@ def set_favorite(item_id: str = "", favorite: bool = True, **_: Any) -> dict[str
 
 
 @tool(summary="Return compact media-center catalog status.", side_effects="none")
+@interactive_read
 def status(
     include_facets: bool = False,
     include_exact_counts: bool = False,
@@ -2841,7 +2860,7 @@ def status(
         },
         "agent_sync": _agent_sync_status(),
         "runtime_bootstrap": background_runtime().bootstrap_status(),
-        "enrichment": _enrichment_runtime(catalog).status(),
+        "enrichment": background_runtime().enrichment_status(),
     }
 
 
@@ -3333,6 +3352,7 @@ def explain_route(
 
 
 @tool(summary="Return bounded home shelves for one media profile.", side_effects="none")
+@interactive_read
 def home(
     profile_id: str = "default",
     limit: int = 12,
@@ -4465,7 +4485,11 @@ def operations(limit: int = 30, **_: Any) -> dict[str, Any]:
 @tool(summary="Stop the process-local enrichment worker.", side_effects="local_write")
 def dispose(**_: Any) -> dict[str, Any]:
     global _coordinator_cached, _coordinator_path
-    background = background_runtime().dispose(timeout=30.0)
+    deadline = time.monotonic() + 30.0
+    readers = dispose_read_models(timeout=5.0)
+    background = background_runtime().dispose(timeout=max(0.0, deadline-time.monotonic()))
+    if readers.get("stopped") is not True:
+        raise RuntimeError("media_center_read_drain_timeout")
     if background.get("stopped") is not True:
         raise RuntimeError("media_center_background_drain_timeout")
     with _coordinator_lock:
@@ -4482,6 +4506,7 @@ def dispose(**_: Any) -> dict[str, Any]:
         "schema": COORDINATOR_SCHEMA,
         "disposed": True,
         "background": background,
+        "readers": readers,
     }
 
 

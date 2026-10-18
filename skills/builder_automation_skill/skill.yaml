@@ -1,11 +1,15 @@
 name: builder_automation_skill
-version: 0.2.5
+version: 0.2.6
 description: System adapter for the Builder Automation stage and its local Codex implementation
   loop.
 entry: handlers/main.py
 runtime:
   python: '3.11'
   sdk_only: true
+capabilities:
+- workspace.read
+- workspace.write
+- network.egress
 default_tool: chat
 supported_locales:
 - en

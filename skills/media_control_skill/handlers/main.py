@@ -21,6 +21,7 @@ from media_control.repository import (  # noqa: E402
     stable_id,
     text,
 )
+from media_control.playback_policy import playback_is_confirmed  # noqa: E402
 
 
 _ACTIVE_NOW_PLAYING_PROJECTIONS: dict[str, dict[str, Any]] = {}
@@ -50,11 +51,7 @@ def _publish_playback_observation(
     endpoint_state = session.get("endpoint_state")
     if not isinstance(endpoint_state, Mapping):
         endpoint_state = {}
-    playback_confirmed = bool(
-        endpoint_state.get("playback_confirmed")
-        or position_ms > 0
-        or state == "ended"
-    )
+    playback_confirmed = playback_is_confirmed(endpoint_state, position_ms=position_ms, state=state)
     try:
         publish_event(
             "media_control.playback.observed",
@@ -74,7 +71,7 @@ def _publish_playback_observation(
                 "media_error_code": max(
                     0, int(endpoint_state.get("media_error_code") or 0)
                 ),
-                "completed": bool(
+                "completed": playback_confirmed and bool(
                     state == "ended"
                     or (duration_ms > 0 and position_ms >= duration_ms * 0.95)
                 ),
@@ -426,7 +423,7 @@ def on_now_playing_subscription_changed(event: Any) -> None:
 
 @tool(summary="Ensure the durable Media Center control-plane schema.", side_effects="local_write")
 def ensure_schema(**_: Any) -> dict[str, Any]:
-    return _repository().ensure_schema()
+    return _repository().ensure_schema(force=True)
 
 
 @tool(summary="Rehydrate bounded now-playing state after activation.", side_effects="none")

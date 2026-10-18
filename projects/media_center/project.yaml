@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: media_center
-version: 0.6.119
+version: 0.6.120
 profiles:
 - adaos.media_center.v1
 - adaos.media_center.tv.v1
@@ -146,8 +146,8 @@ permission_profile:
     approval_policy: owner_only
     sensitive: true
   - id: network.egress
-    purpose: Coordinate explicitly requested deployment and topology operations with
-      configured subnet services.
+    purpose: Coordinate configured subnet services and, when enabled, retrieve metadata
+      and artwork from the selected external provider.
     approval_policy: owner_only
     sensitive: true
   optional: []
@@ -155,7 +155,19 @@ permission_profile:
   external_providers: []
   llm_model_use: []
   notifications: []
-  background_actions: []
+  background_actions:
+  - id: catalog_refresh
+    purpose: Synchronize configured library agents and prepare bounded catalog projections
+      while the installed Application is active, including without an open browser.
+    owner: media_center_skill
+  - id: source_index_and_derived_media
+    purpose: Index explicitly configured roots and prepare admitted artwork or audio/video
+      renditions without changing original files.
+    owner: media_library_agent
+  - id: metadata_enrichment
+    purpose: Apply configured metadata providers and artwork preparation in bounded background
+      jobs. External providers require their explicit configuration.
+    owner: media_center_skill
   data_practices:
     collected:
     - media_metadata

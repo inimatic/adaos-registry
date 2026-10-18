@@ -6824,8 +6824,7 @@ def get_workbench(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFA
     issues = [{**row, "id": row.get("issue_id"), "sources": ", ".join(row.get("source_message_ids") or []),
                "result": ", ".join(str(x) for x in row.get("result_refs") or []), "stage": row.get("lane")}
               for row in change.get("issues", []) if isinstance(row, Mapping)]
-    from adaos.services.builder.run_observability import project_run
-    runs = [project_run(row, request=change.get("request"), source_message_ids=change.get("source_message_ids") or [])
+    runs = [workflow.project_run(row, request=change.get("request"), source_message_ids=change.get("source_message_ids") or [])
             for row in change.get("runs", []) if isinstance(row, Mapping)]
     title = str(project.get("title") or project_id)
     composition = compositions.get(project_id) if kind == "project" else compositions.project_for_component(f"{kind}:{project_id}")

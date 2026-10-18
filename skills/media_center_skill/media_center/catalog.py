@@ -11,6 +11,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, Iterable, Mapping
 from urllib.parse import quote, urlsplit, urlunsplit
+from .read_models import ReadModelUnavailable, read_deadline
 
 
 SCHEMA_VERSION = "adaos.media_center.catalog.v1"
@@ -45,7 +46,8 @@ def default_db_path() -> Path:
     override = _text(os.environ.get("MEDIA_CENTER_DB_PATH"))
     if override:
         path = Path(override).expanduser()
-        path.parent.mkdir(parents=True, exist_ok=True)
+        if not read_deadline():
+            path.parent.mkdir(parents=True, exist_ok=True)
         return path
 
     try:
@@ -56,7 +58,8 @@ def default_db_path() -> Path:
         db_dir = data_root / "db"
     except Exception:
         db_dir = Path(__file__).resolve().parents[1] / ".skill_state" / "db"
-    db_dir.mkdir(parents=True, exist_ok=True)
+    if not read_deadline():
+        db_dir.mkdir(parents=True, exist_ok=True)
     return db_dir / "media_center.sqlite3"
 
 
@@ -71,10 +74,12 @@ def schema_revision_is_current(
     path = Path(db_path)
     if not path.exists():
         return False
-    for attempt in range(_SCHEMA_READ_ATTEMPTS):
+    deadline = read_deadline()
+    attempts = 1 if deadline else _SCHEMA_READ_ATTEMPTS
+    for attempt in range(attempts):
         try:
             with closing(
-                sqlite3.connect(str(path), timeout=_SCHEMA_READ_TIMEOUT_SECONDS)
+                sqlite3.connect(str(path), timeout=(0.025 if deadline else _SCHEMA_READ_TIMEOUT_SECONDS))
             ) as connection:
                 row = connection.execute(
                     f"SELECT value FROM {table} WHERE key=?",
@@ -84,6 +89,8 @@ def schema_revision_is_current(
             message = str(exc).lower()
             if "no such table" in message:
                 return False
+            if deadline:
+                raise ReadModelUnavailable(unavailable_error) from exc
             transient = any(token in message for token in ("locked", "busy"))
             if transient and attempt + 1 < _SCHEMA_READ_ATTEMPTS:
                 time.sleep(_SCHEMA_READ_RETRY_SECONDS[attempt])
@@ -98,18 +105,27 @@ def schema_revision_is_current(
 class MediaCenterRepository:
     def __init__(self, db_path: str | Path | None = None):
         self.db_path = Path(db_path) if db_path is not None else default_db_path()
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.ensure_schema()
+        if read_deadline():
+            if not self._schema_is_current():
+                raise ReadModelUnavailable("catalog_initializing")
+        else:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            self.ensure_schema()
 
     def connect(self) -> sqlite3.Connection:
+        deadline = read_deadline()
         connection = sqlite3.connect(
-            str(self.db_path),
-            timeout=30,
+            (self.db_path.resolve().as_uri() + "?mode=ro" if deadline else str(self.db_path)),
+            uri=bool(deadline),
+            timeout=0.025 if deadline else 2.0,
             factory=_ClosingConnection,
         )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys=ON")
-        connection.execute("PRAGMA busy_timeout=30000")
+        connection.execute(f"PRAGMA busy_timeout={25 if deadline else 2000}")
+        if deadline:
+            connection.execute("PRAGMA query_only=ON")
+            connection.set_progress_handler(lambda: int(time.monotonic() >= deadline), 1000)
         try:
             cache_mb = max(
                 8,
@@ -128,11 +144,14 @@ class MediaCenterRepository:
         connection.execute(f"PRAGMA mmap_size={mmap_mb * 1024 * 1024}")
         connection.execute("PRAGMA temp_store=MEMORY")
         try:
-            connection.execute("PRAGMA synchronous=NORMAL")
+            if not deadline:
+                connection.execute("PRAGMA busy_timeout=0")
+                connection.execute("PRAGMA synchronous=NORMAL")
         except sqlite3.OperationalError as exc:
             if not any(token in str(exc).lower() for token in ("locked", "busy")):
                 connection.close()
                 raise
+        connection.execute(f"PRAGMA busy_timeout={25 if deadline else 2000}")
         return connection
 
     def _schema_is_current(self) -> bool:

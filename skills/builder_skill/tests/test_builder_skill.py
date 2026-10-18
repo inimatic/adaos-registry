@@ -7689,6 +7689,13 @@ def test_semantic_followup_requires_exact_bounded_source(monkeypatch, tmp_path):
     skill = _load_module()
     source = {"schema": "adaos.webui.semantic.v2", "document_id": "current", "views": []}
     digest = "sha256:" + hashlib.sha256(json.dumps(source, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    # This unit exercises the file/revision boundary. Semantic contract and
+    # ownership verification have independent SDK characterization tests.
+    verified = []
+    monkeypatch.setattr(skill.sdk_builder_prototype, "verify_semantic_source",
+                        lambda document, payload, **kwargs: verified.append(document))
+    monkeypatch.setattr(skill.sdk_builder_prototype, "semantic_revision_context",
+                        lambda document, brief, **kwargs: {"document": document, "digest": digest, **kwargs})
     path = tmp_path / "semantic.webui.json"
     path.write_text(json.dumps(source), encoding="utf-8")
     payload = {"generated_by": "builder.semantic_compiler.v2", "ui": {"application": {"desktop": {
@@ -7703,6 +7710,7 @@ def test_semantic_followup_requires_exact_bounded_source(monkeypatch, tmp_path):
     assert context["revision"] == "001"
     assert context["source_ref"] == "semantic.webui.json"
     assert context["digest"] == digest
+    assert verified == [source]
     path.write_text('{"changed":true}', encoding="utf-8")
     with pytest.raises(ValueError, match="compiled revision"):
         skill._current_semantic_context(session, payload, brief)
@@ -9203,6 +9211,7 @@ def test_normalise_llm_payload_moves_root_modals_into_application() -> None:
                 "id": "open-comment",
                 "type": "ui.actions",
                 "area": "main",
+                "inputs": {"buttons": [{"id": "open", "label": "Open comment"}]},
                 "actions": [
                     {
                         "on": "click",
@@ -9248,7 +9257,8 @@ def test_normalise_llm_payload_moves_root_modals_into_application() -> None:
     assert migrated_action["type"] == "navigate"
     assert migrated_action["params"]["to"] == "request_center.comment_modal"
     assert "openModal" not in json.dumps(payload)
-    assert skill._validate_builder_webui_payload(payload, preview)["ok"] is True
+    validation = skill._validate_builder_webui_payload(payload, preview)
+    assert validation["ok"] is True, validation
 
 
 def test_builder_system_prompt_does_not_send_unrequested_image_provider_rules() -> None:
@@ -12505,6 +12515,7 @@ def test_builder_webui_validation_rejects_undeclared_modal_action() -> None:
                 "id": "open-detail",
                 "type": "ui.actions",
                 "area": "main",
+                "inputs": {"buttons": [{"id": "open", "label": "Open detail"}]},
                 "actions": [
                     {
                         "on": "click",
@@ -13727,6 +13738,7 @@ def test_set_ui_revision_current_migrates_legacy_root_modals(
                 "id": "open-details",
                 "type": "ui.actions",
                 "area": "main",
+                "inputs": {"buttons": [{"id": "open", "label": "Open details"}]},
                 "title": "Open details",
                 "actions": [
                     {

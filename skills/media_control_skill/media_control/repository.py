@@ -24,6 +24,15 @@ MAX_QUEUE_PAGE = 30
 MAX_COMMAND_PAGE = 100
 TARGET_ONLINE_SECONDS = 30
 TARGET_FRESHNESS_SECONDS = 60
+DATABASE_SCHEMA_REVISION = 1
+
+
+class _ClosingConnection(sqlite3.Connection):
+    def __exit__(self, *args):
+        try:
+            return super().__exit__(*args)
+        finally:
+            self.close()
 
 
 def now_iso() -> str:
@@ -124,15 +133,30 @@ class MediaControlRepository:
         self.ensure_schema()
 
     def connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(str(self.db_path), timeout=30)
+        connection = sqlite3.connect(str(self.db_path), timeout=2, factory=_ClosingConnection)
         connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA journal_mode=WAL")
-        connection.execute("PRAGMA synchronous=NORMAL")
+        connection.execute("PRAGMA busy_timeout=0")
+        try:
+            connection.execute("PRAGMA synchronous=NORMAL")
+        except sqlite3.OperationalError as exc:
+            if not any(value in str(exc).lower() for value in ("locked", "busy")):
+                connection.close()
+                raise
+        connection.execute("PRAGMA busy_timeout=2000")
         connection.execute("PRAGMA foreign_keys=ON")
         return connection
 
-    def ensure_schema(self) -> dict[str, Any]:
+    def ensure_schema(self, *, force: bool = False) -> dict[str, Any]:
+        if self.db_path.exists():
+            with self.connect() as connection:
+                revision = connection.execute("PRAGMA user_version").fetchone()[0]
+            if revision > DATABASE_SCHEMA_REVISION:
+                raise RuntimeError("media_control_schema_newer_than_runtime")
+            if not force and revision == DATABASE_SCHEMA_REVISION:
+                return {"ok": True, "schema": SCHEMA_VERSION, "db_path": str(self.db_path),
+                        "superseded_session_count": 0, "migration": "current"}
         with self.connect() as connection:
+            connection.execute("PRAGMA journal_mode=WAL")
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS playback_targets (
@@ -322,6 +346,7 @@ class MediaControlRepository:
                     connection.execute(
                         f"ALTER TABLE playback_settings ADD COLUMN {name} {definition}"
                     )
+            connection.execute(f"PRAGMA user_version={DATABASE_SCHEMA_REVISION}")
             connection.commit()
         repaired = self.reconcile_single_session_invariant()
         return {

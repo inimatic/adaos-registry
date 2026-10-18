@@ -2178,6 +2178,45 @@ def _rendition_source(repository, worker, library: Path) -> dict:
     return page["items"][0]["source"]
 
 
+def test_scan_admission_is_atomic_across_independent_repositories(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    library = tmp_path / "library"
+    library.mkdir()
+    db = tmp_path / "scan-admission.sqlite3"
+    repository = MediaLibraryAgentRepository(db, node_id="node-a")
+    root = repository.add_root(str(library))["root"]
+    repositories = [MediaLibraryAgentRepository(db, node_id="node-a") for _ in range(8)]
+    with ThreadPoolExecutor(8) as pool:
+        results = list(pool.map(lambda repo: repo.create_job(root["id"]), repositories))
+    assert sum(result["accepted"] for result in results) == 1
+    assert len({result["job"]["id"] for result in results}) == 1
+
+
+def test_failed_rendition_requires_explicit_force_and_admission_is_atomic(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    library = tmp_path / "library"
+    library.mkdir()
+    (library / "clip.mp4").write_bytes(b"tiny-fixture")
+    repository = MediaLibraryAgentRepository(tmp_path / "jobs.sqlite3", node_id="node-a")
+    worker = MediaLibraryAgentWorker(repository, register=lambda path, root, metadata: {
+        "resource_id": "fixture", "path": str(path), "source_path": str(path),
+        "mime_type": "video/mp4", "metadata": metadata})
+    source = _rendition_source(repository, worker, library)
+    def admit(_):
+        return repository.create_rendition_job(source["id"], profile="browser-mp4-v1", target={})
+    with ThreadPoolExecutor(8) as pool:
+        results = list(pool.map(admit, range(8)))
+    assert sum(result["created"] for result in results) == 1
+    job_id = results[0]["job"]["id"]
+    repository.update_rendition_job(job_id, status="failed", error_code="fixture_failure")
+    repeated = admit(None)
+    assert not repeated["created"]
+    assert repeated["job"]["id"] == job_id
+    assert repeated["job"]["status"] == "failed"
+    forced = repository.create_rendition_job(source["id"], profile="browser-mp4-v1", target={}, force=True)
+    assert forced["created"] and forced["job"]["id"] != job_id
+
+
 def test_rendition_plan_distinguishes_lossless_remux_and_prepared_hls():
     source = {
         "id": "source-tracks",

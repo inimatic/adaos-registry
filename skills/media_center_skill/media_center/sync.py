@@ -21,6 +21,7 @@ class MediaAgentSyncWorker:
         poll_seconds: float = 30.0,
         retry_seconds: float = 5.0,
         catchup_seconds: float = 0.25,
+        state_store: Any = None,
     ) -> None:
         self.sync = sync
         self.publish = publish
@@ -31,6 +32,15 @@ class MediaAgentSyncWorker:
         self._wake = threading.Event()
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
+        self._run_lock = threading.Lock()
+        self._state_store = state_store
+        self._observations = {
+            "attempts": 0, "consecutive_failures": 0,
+            "last_attempt_at": "", "last_success_at": "", "last_progress_at": "",
+            "cursors": [], "error_disposition": "none", "persistence_error": "",
+        }
+        if state_store is not None:
+            self._observations.update(state_store.load())
         self._context = contextvars.copy_context()
         self._revision = 0
         self._state = "idle"
@@ -73,21 +83,47 @@ class MediaAgentSyncWorker:
                 "revision": self._revision,
                 "updated_at": self._updated_at,
                 "last_result": dict(self._last_result),
+                "running": bool(self._thread and self._thread.is_alive()),
+                **self._observations,
             }
 
     def run_once(self) -> dict[str, Any]:
+        # A manual retry and the lifecycle thread cannot enter one Context or
+        # advance the same cursor concurrently.
+        with self._run_lock:
+            return self._run_once()
+
+    def _persist(self) -> None:
+        if self._state_store is None:
+            return
+        with self._lock:
+            value = dict(self._observations)
+        try:
+            self._state_store.save(value)
+        except Exception as exc:
+            with self._lock:
+                self._observations["persistence_error"] = type(exc).__name__
+        else:
+            with self._lock:
+                self._observations["persistence_error"] = ""
+
+    def _run_once(self) -> dict[str, Any]:
         with self._lock:
             self._state = "running"
             self._revision += 1
             self._updated_at = _now()
+            self._observations["attempts"] += 1
+            self._observations["last_attempt_at"] = self._updated_at
+        self._persist()
         try:
             raw = self._context.run(self.sync)
             result = dict(raw) if isinstance(raw, Mapping) else {
                 "ok": False,
                 "error": "media_agent_sync_invalid_result",
             }
-        except Exception:
-            result = {"ok": False, "error": "media_agent_sync_failed"}
+        except Exception as exc:
+            result = {"ok": False, "error": "media_agent_sync_failed",
+                      "error_type": type(exc).__name__}
         summary = {
             key: result[key]
             for key in (
@@ -112,6 +148,20 @@ class MediaAgentSyncWorker:
             self._last_result = summary
             self._revision += 1
             self._updated_at = _now()
+            if result.get("ok"):
+                self._observations["last_success_at"] = self._updated_at
+                self._observations["consecutive_failures"] = 0
+                self._observations["error_disposition"] = "none"
+            else:
+                self._observations["consecutive_failures"] += 1
+                self._observations["error_disposition"] = "retry_backoff"
+            if int(result.get("applied_count") or 0) > 0:
+                self._observations["last_progress_at"] = self._updated_at
+            self._observations["cursors"] = [
+                {key: item[key] for key in ("agent_id", "last_sequence", "next_sequence", "has_more", "ok") if key in item}
+                for item in result.get("agents") or [] if isinstance(item, Mapping)
+            ][:100]
+        self._persist()
         publish_required = bool(
             not previous_summary
             or summary != previous_summary
@@ -133,7 +183,7 @@ class MediaAgentSyncWorker:
                 if result.get("ok") and result.get("has_more")
                 else self.poll_seconds
                 if result.get("ok")
-                else self.retry_seconds
+                else min(60.0, self.retry_seconds * 2 ** min(4, max(0, int(self._observations["consecutive_failures"]) - 1)))
             )
             self._wake.wait(delay)
             self._wake.clear()

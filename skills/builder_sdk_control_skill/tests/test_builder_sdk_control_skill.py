@@ -26,8 +26,10 @@ def _module():
 def local_trial_sdk(monkeypatch):
     from adaos.sdk.builder import applications
     from adaos.sdk.developer import compositions
+    from adaos.sdk.builder import automation
 
     calls = []
+    monkeypatch.setattr(automation, "get_clarification", lambda **kwargs: {"pending": False})
     monkeypatch.setattr(compositions, "project_for_component", lambda _ref: None)
     monkeypatch.setattr(applications, "production_webspace_id", lambda value: "desktop")
     monkeypatch.setattr(
