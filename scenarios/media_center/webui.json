@@ -1059,6 +1059,7 @@
               "dataSource": {
                 "kind": "skill",
                 "name": "media_center_skill.library",
+                "responseStatePath": "state",
                 "params": {
                   "query": "$state.mediaSearch",
                   "media_kind": "$state.mediaKind",
@@ -1147,6 +1148,7 @@
               "dataSource": {
                 "kind": "skill",
                 "name": "media_center_skill.list_collections",
+                "responseStatePath": "state",
                 "params": {
                   "kind": "$state.mediaCollectionKind",
                   "limit": "$state.mediaPageSize",
@@ -1259,6 +1261,7 @@
               "dataSource": {
                 "kind": "skill",
                 "name": "media_center_skill.collection_contents",
+                "responseStatePath": "state",
                 "params": {
                   "collection_id": "$state.mediaCollectionId",
                   "profile_id": "$state.profileId",
@@ -1311,6 +1314,7 @@
               "dataSource": {
                 "kind": "skill",
                 "name": "media_center_skill.collection_contents",
+                "responseStatePath": "state",
                 "params": {
                   "collection_id": "$state.mediaCollectionId",
                   "profile_id": "$state.profileId",
@@ -1368,6 +1372,7 @@
               "dataSource": {
                 "kind": "skill",
                 "name": "media_center_skill.collection_contents",
+                "responseStatePath": "state",
                 "params": {
                   "collection_id": "$state.mediaCollectionId",
                   "profile_id": "$state.profileId",
@@ -1434,6 +1439,7 @@
               "dataSource": {
                 "kind": "skill",
                 "name": "media_center_skill.browse_folders",
+                "responseStatePath": "state",
                 "params": {
                   "agent_id": "$state.mediaFolderAgentId",
                   "root_id": "$state.mediaFolderRootId",
@@ -1487,6 +1493,7 @@
               "dataSource": {
                 "kind": "skill",
                 "name": "media_center_skill.browse_folders",
+                "responseStatePath": "state",
                 "params": {
                   "agent_id": "$state.mediaFolderAgentId",
                   "root_id": "$state.mediaFolderRootId",
@@ -1568,6 +1575,7 @@
               "dataSource": {
                 "kind": "skill",
                 "name": "media_center_skill.list_playlists",
+                "responseStatePath": "state",
                 "params": {
                   "profile_id": "$state.profileId",
                   "limit": "$state.mediaPageSize",
@@ -1901,6 +1909,7 @@
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.get_item",
+                  "responseStatePath": "state",
                   "params": {
                     "item_id": "$state.selectedMediaItemId",
                     "profile_id": "$state.profileId"
@@ -2159,6 +2168,7 @@
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.get_item",
+                  "responseStatePath": "state",
                   "params": {
                     "item_id": "$state.selectedMediaItemId",
                     "profile_id": "$state.profileId"
@@ -2439,6 +2449,7 @@
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.list_playlists",
+                  "responseStatePath": "state",
                   "params": {
                     "profile_id": "$state.profileId",
                     "limit": 50
@@ -2599,6 +2610,7 @@
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.get_item",
+                  "responseStatePath": "state",
                   "params": {
                     "item_id": "$state.selectedMediaItemId",
                     "profile_id": "$state.profileId"
@@ -3110,6 +3122,7 @@
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.metadata_facets",
+                  "responseStatePath": "state",
                   "params": {
                     "dimension": "genre",
                     "media_kind": "$state.mediaKind",
@@ -3163,6 +3176,7 @@
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.metadata_facets",
+                  "responseStatePath": "state",
                   "params": {
                     "dimension": "year",
                     "media_kind": "$state.mediaKind",
@@ -4112,12 +4126,13 @@
               },
               {
                 "id": "media-center-summary",
-                "type": "visual.metricTile",
+                "type": "item.details",
                 "area": "main",
-                "title": "Catalog",
+                "title": "Library status",
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.status",
+                  "responseStatePath": "state",
                   "params": {},
                   "cacheTtlMs": 1000,
                   "invalidationTags": [
@@ -4127,14 +4142,23 @@
                   "maxRequestHz": 1
                 },
                 "inputs": {
-                  "valuePath": "summary.available_count",
-                  "labelPath": "summary.title",
-                  "subtitlePath": "summary.subtitle",
-                  "descriptionPath": "summary.details",
-                  "colorPath": "ok"
+                  "presentation": "section",
+                  "showReadState": true,
+                  "readStatePath": "state",
+                  "fields": [
+                    { "id": "available_items", "key": "available_items", "label": "Available items", "path": "summary.available_count", "format": "number", "label_i18n": { "key": "runtime.media_center.ui.health_available_items" } },
+                    { "id": "catalog_readiness", "key": "catalog_readiness", "label": "Catalog", "path": "health.readiness.state", "valueI18nPrefix": "runtime.media_center.ui.health_state_", "label_i18n": { "key": "runtime.media_center.ui.health_catalog" } },
+                    { "id": "ingest_freshness", "key": "ingest_freshness", "label": "Library updates", "path": "health.ingest.state", "valueI18nPrefix": "runtime.media_center.ui.health_state_", "label_i18n": { "key": "runtime.media_center.ui.health_ingest" } },
+                    { "id": "service_liveness", "key": "service_liveness", "label": "Service", "path": "health.liveness.state", "valueI18nPrefix": "runtime.media_center.ui.health_state_", "label_i18n": { "key": "runtime.media_center.ui.health_service" } },
+                    { "id": "storage_admission", "key": "storage_admission", "label": "Storage admission", "path": "health.storage.state", "valueI18nPrefix": "runtime.media_center.ui.health_state_", "label_i18n": { "key": "runtime.media_center.ui.health_storage" } },
+                    { "id": "endpoint_reachability", "key": "endpoint_reachability", "label": "Playback target", "path": "health.endpoint.state", "valueI18nPrefix": "runtime.media_center.ui.health_state_", "label_i18n": { "key": "runtime.media_center.ui.health_endpoint" } },
+                    { "id": "job_history", "key": "job_history", "label": "Job history", "path": "health.history.state", "valueI18nPrefix": "runtime.media_center.ui.health_state_", "label_i18n": { "key": "runtime.media_center.ui.health_history" } },
+                    { "id": "past_failures", "key": "past_failures", "label": "Past job failures", "path": "health.history.failed_jobs", "format": "number", "label_i18n": { "key": "runtime.media_center.ui.health_failed_jobs" } },
+                    { "id": "last_sync_success", "key": "last_sync_success", "label": "Last successful update", "path": "health.ingest.last_success_at", "format": "datetime", "label_i18n": { "key": "runtime.media_center.ui.health_last_success" } }
+                  ]
                 },
                 "title_i18n": {
-                  "key": "runtime.media_center.ui.catalog"
+                  "key": "runtime.media_center.ui.health_title"
                 }
               },
               {
@@ -4574,6 +4598,7 @@
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.list_roots",
+                  "responseStatePath": "state",
                   "params": {},
                   "cacheTtlMs": 0,
                   "invalidationTags": [
