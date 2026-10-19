@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: media_center
-version: 0.6.122
+version: 0.6.124
 profiles:
 - adaos.media_center.v1
 - adaos.media_center.tv.v1
@@ -150,9 +150,38 @@ permission_profile:
       and artwork from the selected external provider.
     approval_policy: owner_only
     sensitive: true
-  optional: []
-  secrets: []
-  external_providers: []
+  optional:
+  - id: secrets.read
+    purpose: Use the protected application-local TMDb credential for enabled metadata
+      enrichment.
+    approval_policy: owner_only
+    sensitive: true
+  - id: secrets.write
+    purpose: Set or clear the application-local TMDb credential in the metadata settings.
+    approval_policy: owner_only
+    sensitive: true
+  secrets:
+  - id: tmdb_api_credential
+    provider: tmdb
+    scopes:
+    - metadata.read
+    purpose: Authenticate optional TMDb metadata requests without exposing the credential
+      in the UI.
+    required: false
+    binding: app
+  external_providers:
+  - id: musicbrainz
+    destination: musicbrainz.org
+    purpose: Look up normalized audio titles and artist tags only when enabled in
+      metadata settings.
+    scopes:
+    - metadata.read
+  - id: tmdb
+    destination: api.themoviedb.org
+    purpose: Look up normalized video titles and selected tags only when enabled in
+      metadata settings.
+    scopes:
+    - metadata.read
   llm_model_use: []
   notifications: []
   background_actions:
@@ -178,5 +207,7 @@ permission_profile:
     - playlist
     retention: Media remains at its configured source; local catalog and preferences
       are retained.
-    sent_off_device: []
+    sent_off_device:
+    - normalized_media_titles
+    - selected_media_tags
     tracking: false
