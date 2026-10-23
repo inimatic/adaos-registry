@@ -1249,6 +1249,30 @@ def _builder_llm_model_for_session(
     )
 
 
+def _personal_prototype_selection(session, metadata):
+    """Freeze the selected connection before routing, never infer a Root fallback."""
+    result = dict(metadata or {})
+    if 'builder_ai_resource_ref' not in result and not result.get('builder_llm_model'):
+        root = _project_artifact_root(session) if isinstance(session, Mapping) else None
+        state = _load_json_file(root / 'prompt_state.json') if root else {}
+        profile = state.get('llm_profile') if isinstance(state, Mapping) else None
+        if isinstance(profile, Mapping) and profile.get('resource_ref'):
+            result.update(builder_ai_resource_ref=profile['resource_ref'],
+                builder_ai_expected_binding=profile.get('binding_ref'),
+                builder_llm_model=profile.get('model'),
+                builder_subscription_output_policy=profile.get('subscription_output_policy'))
+    if result.get('builder_ai_resource_ref') and not result.get('builder_ai_expected_binding'):
+        from adaos.sdk import ai
+        result['builder_ai_expected_binding'] = ai.status().get('binding_ref')
+    return result
+
+
+def _personal_prototype_jobs(metadata):
+    if (metadata or {}).get('builder_ai_resource_ref'):
+        return sdk_builder_prototype.personal_provider_jobs(metadata)
+    return None
+
+
 def _development_profile_kwargs(callable_obj: Any) -> dict[str, str]:
     """Keep Builder compatible while core and a runtime skill update independently."""
     try:
@@ -12691,6 +12715,9 @@ def _apply_llm_webui_transform(
             submit_response_job,
             wait_response_job,
         )
+        personal = _personal_prototype_jobs(_meta)
+        if personal:
+            send_response, submit_response_job, wait_response_job = personal.send, personal.submit, personal.wait
 
         timeout_s = _builder_llm_timeout_s()
         selected_model = _builder_llm_model_for_session(session, _meta)
@@ -15581,6 +15608,9 @@ def _repair_llm_semantic_transform_once(
     merged_artifact = None
     try:
         from adaos.sdk.llm.llm_client import submit_response_job, wait_response_job
+        personal = _personal_prototype_jobs(_meta)
+        if personal:
+            submit_response_job, wait_response_job = personal.submit, personal.wait
 
         repair_options.update(_development_profile_kwargs(submit_response_job))
         capability_selection = (
@@ -16090,6 +16120,9 @@ def _repair_llm_webui_transform_output(
     repair_input_artifact: dict[str, Any] | None = None
     try:
         from adaos.sdk.llm.llm_client import submit_response_job, wait_response_job
+        personal = _personal_prototype_jobs(_meta)
+        if personal:
+            submit_response_job, wait_response_job = personal.submit, personal.wait
 
         repair_started_at = _now()
         _LOG.debug(
@@ -20162,6 +20195,18 @@ def handle_interaction_response(
     }
 
 
+@tool(summary="Execute an explicitly selected personal ChatGPT Prototype turn.", side_effects="local_write")
+def prototype_chatgpt_edit(text=None, webspace_id=None, auto_apply=True, retry_job_id=None,
+                          expected_ui_revision=None, conversation_context=None, _meta=None):
+    # A named endpoint prevents older Builder packages from silently dropping
+    # a selection. The Core SDK checks the connection/owner before inference.
+    if not (_meta or {}).get('builder_ai_resource_ref'):
+        return {'ok': False, 'status': 'personal_connection_selection_required', 'model_calls': 0}
+    return chat(text=text, webspace_id=webspace_id, auto_apply=auto_apply,
+        retry_job_id=retry_job_id, expected_ui_revision=expected_ui_revision,
+        conversation_context=conversation_context, _meta=_meta)
+
+
 @tool(summary="Start Builder rapid prototyping dialog.", side_effects="local_write")
 def start(
     text: str | None = None,
@@ -20432,14 +20477,12 @@ def chat(
             "command": command,
             "dialog": _dialog_state(ws, topic_ref=topic),
         }
-    automation_result = _route_automation_chat(
-        utterance=utterance,
-        webspace_id=ws,
-        session=session,
-        binding=binding,
-        topic=topic,
-        _meta=turn_meta,
-    )
+    turn_meta = _personal_prototype_selection(session, turn_meta)
+    personal_selected = bool(turn_meta.get('builder_ai_resource_ref'))
+    if personal_selected and turn_meta.get('builder_semantic_edit_mode', 'full_candidate') not in {'full_candidate','bounded_ops','full_document'}:
+        return {'ok': False, 'status': 'personal_chatgpt_requires_foreground_prototype', 'model_calls': 0}
+    automation_result = None if personal_selected else _route_automation_chat(
+        utterance=utterance, webspace_id=ws, session=session, binding=binding, topic=topic, _meta=turn_meta)
     if automation_result is not None:
         return automation_result
     if not session:
@@ -22809,6 +22852,8 @@ def _submit_llm_webui_transform_job(
     )
     try:
         from adaos.sdk.llm.llm_client import submit_response_job
+        personal = _personal_prototype_jobs(_meta)
+        if personal: submit_response_job = personal.submit
     except Exception as exc:
         failed_at = _now()
         detail = f"{type(exc).__name__}: {exc}"
@@ -24115,6 +24160,9 @@ def _replay_failed_llm_webui_result(
             replay_candidate_path = candidate_path
 
     if result is None and (token == root_job_id or bool(response.get("truncated"))):
+        if str(matched.get('base_url') or '').startswith('core-ai:'):
+            return {'ok': False, 'error': 'personal_ai_replay_requires_retained_output',
+                    'detail': 'Retain the original Core AI result; no Root read or resubmission is permitted.'}
         try:
             from adaos.sdk.llm.llm_client import get_response_job
 
@@ -25009,6 +25057,8 @@ def _complete_llm_webui_job(
 
     try:
         from adaos.sdk.llm.llm_client import LlmJobWaitTimeout, wait_response_job
+        personal = _personal_prototype_jobs(_meta)
+        if personal: wait_response_job = personal.wait
 
         job = wait_response_job(
             job_id,
@@ -25736,7 +25786,11 @@ def _try_bounded_semantic_request(*, instruction, ws, session, binding, topic, _
         prepared = sdk_builder_semantic_ui.propose(project_ref=f"scenario:{scenario_id}",
             admission_id=admission["admission_id"], model=model,
             max_tokens=meta.get('builder_semantic_max_tokens', 16384),
-            reasoning_effort=str(meta.get("builder_llm_reasoning_effort") or "high"), output_mode=output_mode)
+            reasoning_effort=str(meta.get("builder_llm_reasoning_effort") or "high"), output_mode=output_mode,
+            **({'ai_resource_ref': meta['builder_ai_resource_ref'],
+                'ai_expected_binding': meta.get('builder_ai_expected_binding'),
+                'subscription_output_policy': meta.get('builder_subscription_output_policy')}
+               if meta.get('builder_ai_resource_ref') else {}))
         metrics = prepared.get("execution_metrics") or {}
         common.update(model_calls=prepared.get("model_calls", 0), execution_metrics=metrics,
             semantic_admission=admission["admission_id"])
@@ -25942,6 +25996,7 @@ def update_current_scenario(
             "topic": topic,
             "dialog": _dialog_state(ws, topic_ref=topic),
         }
+    _meta = _personal_prototype_selection(session, _meta)
     text = _instruction_with_prototype_review_notes(instruction, _meta)
     if not retry_job_id:
         semantic_result = _try_semantic_label_request(
@@ -26087,6 +26142,9 @@ def update_current_scenario(
         and change_set.get("route") == "automation_direct"
     )
     if direct_automation:
+        if (_meta or {}).get('builder_ai_resource_ref'):
+            return {'ok': False, 'status': 'personal_chatgpt_requires_foreground_prototype',
+                    'model_calls': 0, 'message': 'The personal connection cannot execute an Automation handoff.'}
         message = (
             f"{AGENT_LABEL}: запрос зафиксирован как функциональный Change Set "
             f"{change_set.get('change_set_id')}. Прототип не изменён. "
@@ -27631,6 +27689,8 @@ def delete_development_skill(
 
 def handle(topic: str, payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
     data = dict(payload or {})
+    if topic.endswith('prototype_chatgpt_edit'):
+        return prototype_chatgpt_edit(**data)
     if topic.endswith("start"):
         return start(**data)
     if topic.endswith("create_scenario_draft"):

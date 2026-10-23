@@ -20,6 +20,37 @@ import adaos.services as adaos_services
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_personal_endpoint_requires_selection_before_generic_chat(monkeypatch):
+    skill = _load_module()
+    monkeypatch.setattr(skill, 'chat', lambda **_: pytest.fail('missing personal selection entered generic chat'))
+    assert skill.handle('prototype_chatgpt_edit', {'text': 'fixture'})['status'] == 'personal_connection_selection_required'
+
+
+def test_personal_provider_adapter_does_not_replace_the_global_root_transport(monkeypatch):
+    skill = _load_module()
+    calls = []
+    adapter = object()
+    monkeypatch.setattr(skill.sdk_builder_prototype, 'personal_provider_jobs', lambda metadata: calls.append(dict(metadata)) or adapter)
+    metadata = {'builder_ai_resource_ref': 'fixture-personal', 'builder_ai_expected_binding': 'fixture-binding'}
+    assert skill._personal_prototype_jobs({}) is None
+    assert skill._personal_prototype_jobs(metadata) is adapter
+    assert calls == [metadata]
+
+
+def test_saved_personal_profile_is_frozen_but_explicit_root_selection_is_preserved(tmp_path, monkeypatch):
+    skill = _load_module()
+    (tmp_path/'prompt_state.json').write_text(json.dumps({'llm_profile': {
+        'resource_ref': 'fixture-personal', 'model': 'fixture-model', 'binding_ref': 'fixture-binding',
+        'subscription_output_policy': 'provider_default'}}), encoding='utf-8')
+    monkeypatch.setattr(skill, '_project_artifact_root', lambda session: tmp_path)
+    selected = skill._personal_prototype_selection({}, {})
+    assert selected['builder_ai_expected_binding'] == 'fixture-binding'
+    assert selected['builder_llm_model'] == 'fixture-model'
+    explicit = {'builder_llm_model': 'explicit-root-model'}
+    assert skill._personal_prototype_selection({}, explicit) == explicit
+    assert explicit == {'builder_llm_model': 'explicit-root-model'}
+
+
 def _find_repo_root() -> Path | None:
     marker = Path("src") / "adaos" / "services"
     candidates = [Path.cwd(), *SKILL_ROOT.parents]
