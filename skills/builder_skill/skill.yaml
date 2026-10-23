@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.4.28
+version: 0.4.29
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -13,6 +13,7 @@ capabilities:
 - applications.publish
 - workspace.write
 - storage.relational
+- ai.inference
 default_tool: chat
 dependencies: []
 events:
@@ -26,6 +27,7 @@ exports:
   tools:
   - start
   - chat
+  - prototype_chatgpt_edit
   - handle_interaction_response
   - create_scenario_draft
   - create_application_draft
@@ -51,6 +53,24 @@ exports:
   - list_development_skills
   - delete_development_skill
 tools:
+- name: prototype_chatgpt_edit
+  description: Execute a foreground Prototype turn with an explicit personal connection; never Automation or Root fallback.
+  side_effects: local_write
+  entry: handlers.main:prototype_chatgpt_edit
+  timeout_seconds: 900
+  input_schema:
+    type: object
+    properties:
+      text: {type: string}
+      webspace_id: {type: string}
+      auto_apply: {type: boolean}
+      retry_job_id: {type: string}
+      expected_ui_revision: {type: string}
+      conversation_context: {type: object}
+    additionalProperties: true
+  output_schema:
+    type: object
+    required: [ok]
 - name: start
   description: Start or resume the Builder rapid prototyping dialog.
   side_effects: local_write
