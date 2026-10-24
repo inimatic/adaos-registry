@@ -20,6 +20,18 @@ import adaos.services as adaos_services
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_manifest_admits_read_tools_without_weakening_capability_policy(tmp_path):
+    from adaos.services.policy.skill_capabilities import decide_skill_capability
+
+    ctx = types.SimpleNamespace(
+        skill_ctx=ContextVar('builder_manifest_capability_regression', default=types.SimpleNamespace(name='builder_skill', path=SKILL_ROOT)),
+        paths=types.SimpleNamespace(state_dir=lambda: tmp_path),
+    )
+    assert decide_skill_capability(ctx, 'workspace.read').allowed
+    assert decide_skill_capability(ctx, 'workspace.write').allowed
+    assert not decide_skill_capability(ctx, 'credentials.admin').allowed
+
+
 def test_personal_endpoint_requires_selection_before_generic_chat(monkeypatch):
     skill = _load_module()
     monkeypatch.setattr(skill, 'chat', lambda **_: pytest.fail('missing personal selection entered generic chat'))
