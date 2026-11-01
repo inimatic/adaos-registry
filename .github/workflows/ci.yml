@@ -1,11 +1,14 @@
+# Development: dev2027. Release and delivery: qualified main only.
 name: validate-scenario
-on:
+'on':
   pull_request:
-    branches: [main]
+    branches:
+    - main
+    - dev2027
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Schema lint (placeholder)
-        run: echo "ok" # TODO make validation
+    - uses: actions/checkout@v4
+    - name: Schema lint (placeholder)
+      run: echo "ok"

@@ -1,0 +1,21 @@
+# Development: dev2027. Release and delivery: qualified main only.
+name: Static checks
+'on':
+  push:
+    branches:
+    - main
+    - dev2027
+  pull_request: {}
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: static-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+    - uses: actions/checkout@v4
+    - uses: inimatic/.github/.github/actions/static-checks@f4f2f7a1df24896ecd898f6815115ea0522e19f2
