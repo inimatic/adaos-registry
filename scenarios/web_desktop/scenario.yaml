@@ -1,8 +1,7 @@
 id: web_desktop
-version: 0.3.99
+version: 0.3.102
 title: Управление
-description: Desktop shell scenario that defines the main UI layout, registry and
-  base catalog.
+description: Desktop shell scenario that defines the main UI layout, registry and base catalog.
 type: desktop
 supported_locales:
 - en

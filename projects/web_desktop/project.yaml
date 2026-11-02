@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: web_desktop
-version: 0.3.88
+version: 0.3.94
 profiles:
 - adaos.desktop.shell.v1
 - adaos.default_install.v1
@@ -21,7 +21,7 @@ components:
     - realizes
   dependencies:
   - ref: skill:web_desktop_skill
-    version: ==0.2.4
+    version: ==0.2.5
     lifecycle: shared
     relations:
     - uses
@@ -41,7 +41,7 @@ components:
     relations:
     - uses
   - ref: skill:browsers_skill
-    version: ==0.15.24
+    version: ==0.15.26
     lifecycle: shared
     relations:
     - uses
@@ -67,13 +67,11 @@ catalog:
   title_i18n:
     en: Management
     ru: Управление
-  description: Default AdaOS desktop shell with project-owned connection flows, voice
-    bridge, and browser surface support.
+  description: Default AdaOS desktop shell with project-owned connection flows, voice bridge, and browser
+    surface support.
   description_i18n:
-    en: Default AdaOS desktop shell, join flow, voice bridge, and browser surface
-      support.
-    ru: Стандартная веб-оболочка AdaOS, подключение устройств, голосовой мост и поддержка
-      браузерных интерфейсов.
+    en: Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.
+    ru: Стандартная веб-оболочка AdaOS, подключение устройств, голосовой мост и поддержка браузерных интерфейсов.
   categories:
   - system
   - desktop
@@ -126,6 +124,26 @@ permission_profile:
     approval_policy: grant_on_install
     purpose: Update the signed-in user's own display profile and portable preferences.
     sensitive: true
+  - id: applications.read
+    approval_policy: owner_only
+    purpose: Observe and explicitly manage reviewed Core application lifecycle operations.
+    sensitive: false
+  - id: applications.plan
+    approval_policy: owner_only
+    purpose: Observe and explicitly manage reviewed Core application lifecycle operations.
+    sensitive: true
+  - id: applications.apply
+    approval_policy: owner_only
+    purpose: Observe and explicitly manage reviewed Core application lifecycle operations.
+    sensitive: true
+  - id: applications.recover
+    approval_policy: owner_only
+    purpose: Observe and explicitly manage reviewed Core application lifecycle operations.
+    sensitive: true
+  - id: applications.develop
+    approval_policy: owner_only
+    purpose: Observe and explicitly manage reviewed Core application lifecycle operations.
+    sensitive: true
   optional: []
   secrets: []
   data_practices:
@@ -152,8 +170,6 @@ application_roles:
   - owner
   - co_owner
   - admin
-  default_for:
-    owner: desktop_owner
   requires_permissions:
   - workspace.read
   - workspace.write
@@ -177,6 +193,36 @@ application_roles:
   - storage.blob
   - profile.read.self
   - profile.write.self
+- id: desktop_lifecycle_owner
+  title: Desktop lifecycle owner
+  grants:
+  - desktop.open
+  - desktop.settings.write
+  - workspace.read
+  - workspace.write
+  - storage.blob
+  - profile.read.self
+  - profile.write.self
+  - applications.read
+  - applications.plan
+  - applications.apply
+  - applications.recover
+  - applications.develop
+  assignable_to:
+  - owner
+  requires_permissions:
+  - workspace.read
+  - workspace.write
+  - storage.blob
+  - profile.read.self
+  - profile.write.self
+  - applications.read
+  - applications.plan
+  - applications.apply
+  - applications.recover
+  - applications.develop
+  default_for:
+    owner: desktop_lifecycle_owner
 lifecycle:
   uninstall:
     components: retain

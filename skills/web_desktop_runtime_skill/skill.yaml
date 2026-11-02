@@ -1,5 +1,5 @@
 name: web_desktop_runtime_skill
-version: 0.1.62
+version: 0.1.64
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -11,7 +11,7 @@ runtime:
       schema: adaos.skill.activation_assessment.v1
       assessor: builder.compiler
       classification: event_subscriber
-      handler_digest: sha256:c3148707e575dfa4b5a596f827f3f2aec9e234a8832baf7b4f45a159c36448f1
+      handler_digest: sha256:f5ab8a625aef939e6f3792c9553da266b6a6e1b2fb856d9c203b13fbbc2f1d98
       observed_subscriptions:
       - economic.subscription.changed
       - root.subscription.changed
@@ -28,8 +28,8 @@ runtime:
       tool_count: 26
       reasons:
       - event_subscriptions_require_early_handler_registration
-description: Project-owned runtime actions for opening Web Desktop applications, managing
-  Home, and preparing browser, Telegram, and node connection flows.
+description: Project-owned runtime actions for opening Web Desktop applications, managing Home, and preparing
+  browser, Telegram, and node connection flows.
 dependencies:
 - httpx>=0.27
 memory_budget:
@@ -306,8 +306,7 @@ tools:
       applied:
         type: boolean
 - name: get_subscription_usage
-  description: Read authorized rolling subscription token usage without inferring
-    monetary cost.
+  description: Read authorized rolling subscription token usage without inferring monetary cost.
   entry: handlers.main:get_subscription_usage
   side_effects: read_only
   permissions:
@@ -545,8 +544,7 @@ tools:
       message:
         type: string
 - name: list_devices
-  description: List real node devices and browser sessions from the control-plane
-    SDK.
+  description: List real node devices and browser sessions from the control-plane SDK.
   entry: handlers.main:list_devices
   side_effects: read_only
   permissions:
@@ -606,8 +604,8 @@ tools:
       message:
         type: string
 - name: rename_device
-  description: Rename a managed device or durable browser endpoint through the Management-owned
-    local contract.
+  description: Rename a managed device or durable browser endpoint through the Management-owned local
+    contract.
   entry: handlers.main:rename_device
   side_effects: local_write
   permissions:
@@ -1077,8 +1075,7 @@ tools:
       message:
         type: string
 - name: upload_profile_avatar
-  description: Persist one authenticated profile avatar in the Desktop-owned blob
-    store.
+  description: Persist one authenticated profile avatar in the Desktop-owned blob store.
   entry: handlers.main:upload_profile_avatar
   side_effects: local_write
   permissions:
@@ -1115,8 +1112,7 @@ tools:
   output_schema:
     type: object
 - name: read_profile_avatar
-  description: Authorize an authenticated reader to retrieve a Desktop-owned profile
-    avatar.
+  description: Authorize an authenticated reader to retrieve a Desktop-owned profile avatar.
   entry: handlers.main:read_profile_avatar
   side_effects: read_only
   permissions:
@@ -1210,8 +1206,8 @@ tools:
       message:
         type: string
 - name: prepare_connection
-  description: Prepare browser, Telegram, or node connection data for a Desktop device
-    action without relying on the legacy AdaOS Connect skill.
+  description: Prepare browser, Telegram, or node connection data for a Desktop device action without
+    relying on the legacy AdaOS Connect skill.
   entry: handlers.main:prepare_connection
   side_effects: external_write
   permissions:
@@ -1254,8 +1250,7 @@ tools:
       current:
         type: object
 - name: unlink_node
-  description: Detach a paired member node from the current subnet. The node can be
-    paired again later.
+  description: Detach a paired member node from the current subnet. The node can be paired again later.
   entry: handlers.main:unlink_node
   side_effects: external_write
   permissions:
@@ -1412,8 +1407,7 @@ data_routes:
   tool: get_subscription_usage
   first_paint: Usage is unknown until the authorized snapshot arrives.
   recovery: Explicit refresh; preserve timestamped stale usage on provider failure.
-  guard_visibility: Show unavailable on denied or unavailable reads, never fabricated
-    zero usage.
+  guard_visibility: Show unavailable on denied or unavailable reads, never fabricated zero usage.
   budget:
     max_payload_bytes: 4096
   read_policy:
@@ -1429,11 +1423,9 @@ data_routes:
 - surface: widget:web_desktop.applications
   route: tool
   tool: list_applications
-  first_paint: Empty application collection until the authorized registry projection
-    arrives.
+  first_paint: Empty application collection until the authorized registry projection arrives.
   recovery: Explicit retry preserves the last successful application projection.
-  guard_visibility: Show an authorization or read error without reporting an empty
-    registry as success.
+  guard_visibility: Show an authorization or read error without reporting an empty registry as success.
   budget:
     max_payload_bytes: 32768
     max_items: 40
@@ -1452,8 +1444,7 @@ data_routes:
   tool: list_home_widgets
   first_paint: Empty widget collection until the authorized Home projection arrives.
   recovery: Explicit retry preserves the last successful Home widget projection.
-  guard_visibility: Show an authorization or read error without reporting widget state
-    as current.
+  guard_visibility: Show an authorization or read error without reporting widget state as current.
   budget:
     max_payload_bytes: 32768
     max_items: 40
@@ -1470,11 +1461,9 @@ data_routes:
 - surface: widget:web_desktop.devices
   route: tool
   tool: list_devices
-  first_paint: Empty device collection until the authorized control-plane projection
-    arrives.
+  first_paint: Empty device collection until the authorized control-plane projection arrives.
   recovery: Explicit retry preserves the last successful device projection.
-  guard_visibility: Show an authorization or read error without reporting stale device
-    state as current.
+  guard_visibility: Show an authorization or read error without reporting stale device state as current.
   budget:
     max_payload_bytes: 32768
     max_items: 40
@@ -1493,10 +1482,9 @@ data_routes:
   route: tool
   tool: get_system_overview
   first_paint: Unknown system state until the requested authorized projection arrives.
-  recovery: Explicit retry preserves the last successful section and never treats
-    an unqueried section as healthy.
-  guard_visibility: Show unavailable diagnostics without turning missing observations
-    into a healthy status.
+  recovery: Explicit retry preserves the last successful section and never treats an unqueried section
+    as healthy.
+  guard_visibility: Show unavailable diagnostics without turning missing observations into a healthy status.
   budget:
     max_payload_bytes: 65536
     max_items: 40
@@ -1514,11 +1502,9 @@ data_routes:
 - surface: widget:web_desktop.runtime-controls
   route: tool
   tool: get_runtime_controls
-  first_paint: Unknown runtime-control state until the authorized local projection
-    arrives.
+  first_paint: Unknown runtime-control state until the authorized local projection arrives.
   recovery: Explicit retry preserves the last successful operator-control projection.
-  guard_visibility: Keep controls unavailable when the governed workspace read is
-    denied.
+  guard_visibility: Keep controls unavailable when the governed workspace read is denied.
   budget:
     max_payload_bytes: 16384
     max_items: 1
@@ -1537,8 +1523,7 @@ data_routes:
   tool: list_developments
   first_paint: Empty development collection until the authorized project index arrives.
   recovery: Explicit retry preserves the last successful development projection.
-  guard_visibility: Show an authorization or read error without exposing local source
-    paths.
+  guard_visibility: Show an authorization or read error without exposing local source paths.
   budget:
     max_payload_bytes: 32768
     max_items: 40
@@ -1557,8 +1542,7 @@ data_routes:
   tool: get_preferences
   first_paint: Default form state until the authorized profile preferences arrive.
   recovery: Explicit retry preserves the last successful preference projection.
-  guard_visibility: Keep preference forms unavailable when the governed profile read
-    is denied.
+  guard_visibility: Keep preference forms unavailable when the governed profile read is denied.
   budget:
     max_payload_bytes: 16384
     max_items: 1

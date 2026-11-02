@@ -874,6 +874,10 @@ def _project_application(model: dict[str, Any]) -> dict[str, Any]:
     )
     categories = _categories(application)
     local_beta_active = _bool_value(model.get("local_beta_active"))
+    active_release = _mapping(model.get("active_release"))
+    active_project_release = _mapping(active_release.get("project_release"))
+    lifecycle = _mapping(model.get("lifecycle"))
+    admission = _mapping(lifecycle.get("runtime")) or _mapping(model.get("runtime_admission"))
     installed = (
         _bool_value(model.get("installed", application.get("installed")))
         or local_beta_active
@@ -928,6 +932,8 @@ def _project_application(model: dict[str, Any]) -> dict[str, Any]:
         "installed_state": "installed" if installed else "not_installed",
         "local_beta_active": local_beta_active,
         "effective_version": _first_string(
+            active_project_release.get("version"),
+            active_release.get("version"),
             effective.get("version"),
             effective_release.get("version"),
             installed_release.get("version"),
@@ -939,8 +945,13 @@ def _project_application(model: dict[str, Any]) -> dict[str, Any]:
         "channel": effective_channel,
         "update_state": update_state,
         "has_update": has_update,
+        "runtime_admission": admission.get("admission", "unknown"),
+        "runtime_reason": admission.get("reason", "AdmissionNotObserved"),
+        "runtime_expires_at": admission.get("expires_at"),
+        "attention": _mapping(model.get("attention")),
         "scenario_id": scenario_id,
-        "launchable": bool(installed and scenario_id),
+        "launchable": bool(installed and scenario_id and admission.get("admission") not in {
+            "expired", "unavailable", "recovery_required"}),
     }
 
 
