@@ -23932,9 +23932,12 @@ def _write_llm_job_request_artifact(
         generation_options=recorded_generation_options,
         context_capacity_tokens=context_capacity_tokens,
     )
+    source_root = _project_artifact_root(session)
+    if source_root is None:
+        raise RuntimeError("builder_evidence_source_unavailable_before_model_submit")
     source_inputs = {}
     for name in ("webui.json", "semantic.webui.json", "prototype.brief.json", "prompt_state.json"):
-        source_path = journal_dir.parent / name
+        source_path = source_root / name
         if source_path.is_file():
             raw = source_path.read_bytes()
             source_inputs[name] = {"sha256": hashlib.sha256(raw).hexdigest(), "content": raw.decode("utf-8")}

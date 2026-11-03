@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.4.40
+version: 0.4.41
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -16,7 +16,7 @@ runtime:
       schema: adaos.skill.activation_assessment.v1
       assessor: builder.compiler
       classification: event_subscriber
-      handler_digest: sha256:dd0228244224ada42fad3eaa9ea5b7c34407ac241c080c79ce44faa01bf77419
+      handler_digest: sha256:fdf9499b60e5ab4de1e73a9a676af48cc75e906bc7d8c768ed2cf5fcc24036a4
       observed_subscriptions:
       - builder.pending_action.response
       declared_subscriptions:
