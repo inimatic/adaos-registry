@@ -97,6 +97,30 @@ examples:
     locale: ru
     source: authored
     entities: []
+  - id: builder_output_routes_read.example.en.1
+    intent_id: builder_output_routes_read
+    text: Show Builder output routes
+    locale: en
+    source: authored
+    entities: []
+  - id: builder_output_routes_read.example.ru.1
+    intent_id: builder_output_routes_read
+    text: Покажи маршруты ответов Builder
+    locale: ru
+    source: authored
+    entities: []
+  - id: builder_output_routes_select.example.en.1
+    intent_id: builder_output_routes_select
+    text: Choose Builder output routes
+    locale: en
+    source: authored
+    entities: []
+  - id: builder_output_routes_select.example.ru.1
+    intent_id: builder_output_routes_select
+    text: Покажи маршруты ответов Builder
+    locale: ru
+    source: authored
+    entities: []
 hard_negatives:
   - id: builder.negative.status.en
     text: Show builder status

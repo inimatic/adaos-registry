@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.4.29
+version: 0.4.74
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -8,23 +8,47 @@ workflow:
 runtime:
   python: '3.11'
   sdk_only: true
+  activation:
+    mode: lazy
+    startup_allowed: false
+    background_refresh: true
+    assessment:
+      schema: adaos.skill.activation_assessment.v1
+      assessor: builder.compiler
+      classification: event_subscriber
+      handler_digest: sha256:ab7f832a9d1462ac2adc12b0e38c661deca3f39c15d0bf3d1b3cb6b88d877277
+      observed_subscriptions:
+      - builder.pending_action.response
+      declared_subscriptions:
+      - builder.pending_action.response
+      dynamic_subscription_count: 0
+      tool_count: 35
+      reasons:
+      - event_subscriptions_require_early_handler_registration
 capabilities:
+- ai.inference
 - applications.develop
 - applications.publish
+- workspace.read
 - workspace.write
 - storage.relational
-- ai.inference
 default_tool: chat
 dependencies: []
 events:
-  subscribe: []
+  subscribe:
+  - builder.pending_action.response
   publish:
+  - builder.preview.desired
   - io.out.chat.append
   - builder.workbench.ensure_requested
   - builder.ui_revision.materialize
   - desktop.webspace.reload
 exports:
   tools:
+  - add_design_reference
+  - get_output_routes
+  - request_output_routes
+  - select_output_routes
   - start
   - chat
   - prototype_chatgpt_edit
@@ -43,7 +67,9 @@ exports:
   - publish_application_stable_source
   - update_current_scenario
   - get_session
+  - apply_semantic_revision
   - get_preview_state
+  - adopt_current_ui_revision
   - set_ui_revision_current
   - ensure_dev_webspace
   - get_workspace_binding
@@ -53,24 +79,213 @@ exports:
   - list_development_skills
   - delete_development_skill
 tools:
-- name: prototype_chatgpt_edit
-  description: Execute a foreground Prototype turn with an explicit personal connection; never Automation or Root fallback.
+- name: add_design_reference
+  description: Retain immutable HTML or text as a project-scoped design reference;
+    never execute it.
+  entry: handlers.main:add_design_reference
   side_effects: local_write
-  entry: handlers.main:prototype_chatgpt_edit
-  timeout_seconds: 900
+  permissions:
+  - applications.develop
+  - workspace.write
+  input_schema:
+    type: object
+    required:
+    - scenario_id
+    - name
+    - media_type
+    - text
+    properties:
+      scenario_id:
+        type: string
+        minLength: 1
+        maxLength: 128
+      name:
+        type: string
+        minLength: 1
+        maxLength: 160
+      media_type:
+        type: string
+        enum:
+        - text/html
+        - text/css
+        - text/javascript
+        - application/javascript
+        - application/json
+        - text/plain
+        - text/markdown
+      text:
+        type: string
+        minLength: 1
+        maxLength: 262144
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - reference
+    properties:
+      ok:
+        type: boolean
+      reference:
+        type: object
+- name: get_output_routes
+  description: get output routes
+  entry: handlers.main:get_output_routes
+  side_effects: read_only
+  permissions:
+  - workspace.read
   input_schema:
     type: object
     properties:
-      text: {type: string}
-      webspace_id: {type: string}
-      auto_apply: {type: boolean}
-      retry_job_id: {type: string}
-      expected_ui_revision: {type: string}
-      conversation_context: {type: object}
+      webspace_id:
+        type: string
+    additionalProperties: false
+  output_schema:
+    type: object
+    properties:
+      ok:
+        type: boolean
+      status:
+        type: string
+        enum:
+        - ready
+        - unavailable
+      reason:
+        type:
+        - string
+        - 'null'
+      conversation_id:
+        type:
+        - string
+        - 'null'
+      policy_revision:
+        type: integer
+      truncated:
+        type: boolean
+      automatic_external_outputs_default:
+        type: string
+      items:
+        type: array
+        maxItems: 20
+        items:
+          type: object
+          properties:
+            route_id:
+              type: string
+            transport:
+              type: string
+            status:
+              type: string
+              enum:
+              - active
+              - paused
+              - expired
+              - revoked
+            expires_at:
+              type:
+              - string
+              - 'null'
+            selected:
+              type: boolean
+          required:
+          - route_id
+          - transport
+          - status
+          - expires_at
+          - selected
+          additionalProperties: false
+    required:
+    - ok
+    - status
+    additionalProperties: true
+- name: request_output_routes
+  description: request output routes
+  entry: handlers.main:request_output_routes
+  side_effects: local_write
+  permissions:
+  - workspace.write
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+      locale:
+        type: string
+        enum:
+        - en
+        - ru
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: select_output_routes
+  description: select output routes
+  entry: handlers.main:select_output_routes
+  side_effects: local_write
+  permissions:
+  - workspace.write
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+      route_ids:
+        type: array
+        maxItems: 20
+        items:
+          type: string
+      response_id:
+        type: string
+        minLength: 1
+    additionalProperties: false
+    required:
+    - route_ids
+    - response_id
+  output_schema:
+    type: object
+    properties:
+      conversation_id:
+        type:
+        - string
+        - 'null'
+      route_ids:
+        type: array
+        maxItems: 20
+        items:
+          type: string
+      policy_revision:
+        type: integer
+      status:
+        type: string
+      ok:
+        type: boolean
+      reason:
+        type:
+        - string
+        - 'null'
+    additionalProperties: false
+- name: prototype_chatgpt_edit
+  description: Foreground Prototype generation or admitted edit through Core personal
+    ChatGPT. Never falls back to Root or Automation.
+  entry: handlers.main:prototype_chatgpt_edit
+  side_effects: local_write
+  timeout_seconds: 600
+  input_schema:
+    type: object
+    required:
+    - text
+    - webspace_id
+    properties:
+      text:
+        type: string
+      webspace_id:
+        type: string
+      auto_apply:
+        type: boolean
+      conversation_context:
+        type: object
     additionalProperties: true
   output_schema:
     type: object
-    required: [ok]
 - name: start
   description: Start or resume the Builder rapid prototyping dialog.
   side_effects: local_write
@@ -102,7 +317,7 @@ tools:
   description: Handle a Builder dialog turn and create or patch a scenario prototype.
   side_effects: local_write
   entry: handlers.main:chat
-  timeout_seconds: 900
+  timeout_seconds: 600
   input_schema:
     type: object
     properties:
@@ -198,7 +413,8 @@ tools:
       confirmed_technical_application_id:
         type: string
         pattern: ^[a-z](?:[a-z0-9_.-]{0,126}[a-z0-9])?$
-        description: Exact explicitly confirmed technical Application id; must agree with the idea and application_id before any creation or provider call.
+        description: Exact explicitly confirmed technical Application id; must agree
+          with the idea and application_id before creation or provider calls.
       webspace_id:
         type: string
     additionalProperties: true
@@ -217,6 +433,8 @@ tools:
     type: object
     properties:
       session_id:
+        type: string
+      scenario_id:
         type: string
       webspace_id:
         type: string
@@ -575,6 +793,53 @@ tools:
     type: object
     required:
     - ok
+- name: apply_semantic_revision
+  description: Apply one bounded semantic change to an exact Prototype revision and
+    compile it through the canonical semantic compiler.
+  side_effects: local_write
+  entry: handlers.main:apply_semantic_revision
+  input_schema:
+    type: object
+    required:
+    - expected_ui_revision
+    - operation_id
+    - change
+    properties:
+      expected_ui_revision:
+        type: string
+      operation_id:
+        type: string
+      change:
+        type: object
+        required:
+        - kind
+        - view_ref
+        - order_field_ref
+        properties:
+          kind:
+            type: string
+            enum:
+            - set_list_reorder
+          view_ref:
+            type: string
+          order_field_ref:
+            type: string
+          enabled:
+            type: boolean
+        additionalProperties: false
+      session_id:
+        type: string
+      scenario_id:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - status
+  timeout_seconds: 120
 - name: get_preview_state
   description: Return the render-ready declarative preview state for the current Builder
     session.
@@ -596,6 +861,7 @@ tools:
 - name: set_ui_revision_current
   description: Restore a stored Builder UI revision as the current scenario web UI.
   side_effects: local_write
+  timeout_seconds: 120
   entry: handlers.main:set_ui_revision_current
   input_schema:
     type: object
@@ -606,6 +872,8 @@ tools:
         type: string
       session_id:
         type: string
+      scenario_id:
+        type: string
       webspace_id:
         type: string
     additionalProperties: true
@@ -614,9 +882,34 @@ tools:
     required:
     - ok
     - message
+- name: adopt_current_ui_revision
+  description: Validate and adopt the current reviewed Builder WebUI artifact as a
+    new revision.
+  side_effects: local_write
+  entry: handlers.main:adopt_current_ui_revision
+  input_schema:
+    type: object
+    required:
+    - review_note
+    - expected_ui_revision
+    properties:
+      review_note:
+        type: string
+        minLength: 8
+      expected_ui_revision:
+        type: string
+      session_id:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
 - name: ensure_dev_webspace
-  description: Create or reuse the paired Builder workbench development desktop
-    for the current source desktop.
+  description: Create or reuse the paired Prompt IDE dev webspace for the current
+    source webspace.
   side_effects: local_write
   entry: handlers.main:ensure_dev_webspace
   input_schema:
@@ -647,8 +940,7 @@ tools:
     - ok
     - binding
 - name: open_dev_webspace
-  description: Return the browser URL for the paired Builder workbench development
-    desktop.
+  description: Return the browser URL for the paired Prompt IDE dev webspace.
   side_effects: local_write
   entry: handlers.main:open_dev_webspace
   input_schema:
@@ -666,7 +958,7 @@ tools:
     - url
     - webspace_id
 - name: attach_dialog_widget
-  description: Return embedded Voice Chat widget config for the Builder workbench.
+  description: Return embedded Voice Chat widget config for Builder Prompt IDE.
   side_effects: none
   entry: handlers.main:attach_dialog_widget
   input_schema:
@@ -681,8 +973,8 @@ tools:
     - ok
     - widget
 - name: set_active_draft
-  description: Switch the active Builder development draft in the paired Builder
-    workbench desktop.
+  description: Switch the active Builder development draft in the paired Prompt IDE
+    dev webspace.
   side_effects: local_write
   entry: handlers.main:set_active_draft
   input_schema:
@@ -845,15 +1137,15 @@ conversation:
     - builder
     - buikder
     - билдер
-updated_at: '2026-09-26T11:02:50+00:00'
+updated_at: '2026-11-04T09:34:31+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.1163
-    recorded_at: '2026-10-17T10:01:09+03:00'
-    source: builder_feedback_qualification
-    min_commit: e65ebabd8190e6153e6d68dd9133c5943e1627d0
-    min_short_commit: e65ebabd8
-    build_date: '2026-10-17T10:01:09+03:00'
+    min_version: 0.1.1001+6134.0c3bea8cd
+    recorded_at: '2026-09-04T18:03:55+00:00'
+    source: skill_push
+    min_commit: 0c3bea8cd1ab57f3e660a4d4ff59a3451db1c3b2
+    min_short_commit: 0c3bea8c
+    build_date: '2026-09-04T20:59:02+03:00'
 prototype: builder_skill
 conversational:
   manifest: conversational/manifest.yaml

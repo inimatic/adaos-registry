@@ -109,3 +109,27 @@ outputs:
     actions: []
     next_expected_input: text
     handoff_target: null
+  - id: builder_output_routes_read
+    kind: result
+    audience: user
+    risk_level: none
+    reason_code: builder_output_routes_read
+    explanation: Available Builder output routes.
+    summary: Available Builder output routes.
+    content_parts: []
+    details: []
+    actions: []
+    next_expected_input: none
+    handoff_target: null
+  - id: builder_output_routes_select
+    kind: result
+    audience: user
+    risk_level: none
+    reason_code: builder_output_routes_select
+    explanation: Choose a route or disable external outputs.
+    summary: Choose a route or disable external outputs.
+    content_parts: []
+    details: []
+    actions: []
+    next_expected_input: none
+    handoff_target: null
