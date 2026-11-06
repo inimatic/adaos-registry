@@ -207,7 +207,9 @@
     "adaos.evidence.claim.v1|evidence-claim:application-release/66e2293503b53e9337213f89|capability_conformance": "sha256:67886777b93d40e6d789e17e9b0635db3c5b87368805117eb6a083d2f91841d1",
     "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21": "sha256:ad37c896fd6c1fe8d98e72d2eb2df5fab435f4a959880a5e637014d98f482722",
     "adaos.evidence.claim.v1|evidence-claim:application-release/4ca9a961746c7e6f44e9a6f3|capability_conformance": "sha256:ddc5d35097064629998073e61abc7dfaad1e1eab24b836673d5b2dcbe88fba9d",
-    "adaos.binding.delivery.v1|binding-definition:vision.descriptors.manage.browser-local@sha256:9ccc80312d5f9cc134d4e5bba60d4edbd297aeb5810edd95f14252577d4f02f4|sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21": "sha256:fd6828db10ec8ec1260851416a00b086aa51856e0337671b11b4ce0db43ea56e"
+    "adaos.binding.delivery.v1|binding-definition:vision.descriptors.manage.browser-local@sha256:9ccc80312d5f9cc134d4e5bba60d4edbd297aeb5810edd95f14252577d4f02f4|sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21": "sha256:fd6828db10ec8ec1260851416a00b086aa51856e0337671b11b4ce0db43ea56e",
+    "adaos.binding.delivery.v1|binding-definition:mail.messages.manage.google-gmail-local@sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2|sha256:57945818da0ee3173d4a861523ef2feb15dc4a60ac89ad5852bd81f7a7d975ff": "sha256:2ae5f36005fc8ff8a28186c7c01d69f65cc8e6f3154add46d732638613c448b9",
+    "adaos.binding.delivery.v1|binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1|sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa": "sha256:395fad6c245a7f06e33dfae29fb698144e6ad5776382db4e33b3ab6e56cd41ac"
   },
   "records": {
     "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1": {
@@ -262,6 +264,7 @@
         "sha256:89fae7a20012deff77bc74fa3bd24f4f56645c1c33165bec39501b4e6b605a27",
         "sha256:8aea0cbbc0acf317974d389a5e517d391abdec1a87e1bdea103f427c6e4d750d",
         "sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710",
+        "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
         "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
         "sha256:9105ab0cf0d477edea3347adce777c5e7024734ff77f72fe03e4057fb3605033",
         "sha256:92e3d0c12b8dbec064d609fee711f3aec682ce6d3592a5201fbbf4b61750959a",
@@ -305,6 +308,7 @@
         "sha256:08dbd8e6bf70ff1436aaf39a24dd2100f3a79c751ffa97b18defb9f4713a9795",
         "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
         "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
+        "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
         "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
         "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
       ]
@@ -372,6 +376,7 @@
         "sha256:89fae7a20012deff77bc74fa3bd24f4f56645c1c33165bec39501b4e6b605a27",
         "sha256:8aea0cbbc0acf317974d389a5e517d391abdec1a87e1bdea103f427c6e4d750d",
         "sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710",
+        "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
         "sha256:8f162a75fe3b9aa41cedbe9f80d011fad7f06f62614ac09ebdcf4a879778b885",
         "sha256:9105ab0cf0d477edea3347adce777c5e7024734ff77f72fe03e4057fb3605033",
         "sha256:92e3d0c12b8dbec064d609fee711f3aec682ce6d3592a5201fbbf4b61750959a",
@@ -424,6 +429,7 @@
         "sha256:08dbd8e6bf70ff1436aaf39a24dd2100f3a79c751ffa97b18defb9f4713a9795",
         "sha256:310f01a72ffd473d65348f0146210c8198eb9b9454e886d4635681e858980599",
         "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
+        "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
         "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
         "sha256:f69fb37df6b72438d5944747f95630a4800cb0e0ccfbc4a7cbba3e3f485e3d83"
       ]
@@ -2406,6 +2412,24 @@
       "published_by_release_digests": [
         "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98"
       ]
+    },
+    "sha256:2ae5f36005fc8ff8a28186c7c01d69f65cc8e6f3154add46d732638613c448b9": {
+      "schema": "adaos.binding.delivery.v1",
+      "identity": "binding-definition:mail.messages.manage.google-gmail-local@sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2",
+      "revision": "sha256:57945818da0ee3173d4a861523ef2feb15dc4a60ac89ad5852bd81f7a7d975ff",
+      "path": "semantic/records/sha256/2a/2ae5f36005fc8ff8a28186c7c01d69f65cc8e6f3154add46d732638613c448b9.json",
+      "published_by_release_digests": [
+        "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06"
+      ]
+    },
+    "sha256:395fad6c245a7f06e33dfae29fb698144e6ad5776382db4e33b3ab6e56cd41ac": {
+      "schema": "adaos.binding.delivery.v1",
+      "identity": "binding-definition:application.ui.render.webui-v1@sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "revision": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa",
+      "path": "semantic/records/sha256/39/395fad6c245a7f06e33dfae29fb698144e6ad5776382db4e33b3ab6e56cd41ac.json",
+      "published_by_release_digests": [
+        "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06"
+      ]
     }
   },
   "application_releases": {
@@ -3218,7 +3242,16 @@
       "semantic_revision_digest": "sha256:05b7d92b64868294251823e0a2bff56340b15d66bf15dc30b5c07f5e55e7e883",
       "path": "semantic/applications/cv_descriptor_lab/b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98.json",
       "projection_digest": "sha256:6b29e5f10936c3d204ab11f69463a864f2b39e46f0635139118263c4546bb0e1"
+    },
+    "project:gmail_mail_client@sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06": {
+      "project_id": "gmail_mail_client",
+      "version": "0.1.4",
+      "application_ref": "scenario:gmail_mail_client",
+      "project_release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+      "semantic_revision_digest": "sha256:563f0784bb75748e90ebe56279446663d71147be4dfc19024ab380c96d0e41e9",
+      "path": "semantic/applications/gmail_mail_client/8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06.json",
+      "projection_digest": "sha256:1f938877a1cee742110774c5a62da0309a46c538f404f859a31afd0e10f0898c"
     }
   },
-  "index_digest": "sha256:6a251122f99de3a229349f5f96ff50fe80e3b192f5ebe5ee757e99c76137fcc0"
+  "index_digest": "sha256:39eb9a29d03985d0a2614384f5f2e688f5af0a8c049fab6c7ffa6a7388c42235"
 }

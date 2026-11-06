@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:application.ui.render.webui-v1",
+  "binding_definition_digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+  "logical_entrypoint": "application.ui.render.webui-v1",
+  "package": {
+    "kind": "scenario",
+    "id": "gmail_mail_client",
+    "version": "0.1.2",
+    "digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa"
+  },
+  "physical_member": "webui.json",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:395fad6c245a7f06e33dfae29fb698144e6ad5776382db4e33b3ab6e56cd41ac"
+}

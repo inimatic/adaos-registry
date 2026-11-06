@@ -470,7 +470,7 @@
       "id": "gmail_mail_client_provider_skill",
       "name": "gmail_mail_client_provider_skill",
       "version": "0.1.1",
-      "updated_at": "2026-09-24T02:07:46+00:00",
+      "updated_at": "2026-09-24T02:29:50+00:00",
       "path": "skills/gmail_mail_client_provider_skill",
       "manifest": "skills/gmail_mail_client_provider_skill/skill.yaml",
       "source": {
@@ -485,7 +485,14 @@
       "description": "Application-local Gmail SDK adapter with transient mail reads and durable send deduplication.",
       "entry": "{'module': 'handlers.main', 'callable': 'connection_status'}",
       "runtime_python": "3.11",
-      "tools_count": 8
+      "tools_count": 8,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "gmail_mail_client",
+        "release": "gmail_mail_client@0.1.4",
+        "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+        "package_digest": "sha256:57945818da0ee3173d4a861523ef2feb15dc4a60ac89ad5852bd81f7a7d975ff"
+      }
     },
     {
       "kind": "skill",
@@ -2076,12 +2083,18 @@
       "id": "gmail_mail_client",
       "name": "gmail_mail_client",
       "version": "0.1.2",
-      "updated_at": "2026-09-24T02:08:08+00:00",
+      "updated_at": "2026-09-24T02:29:50+00:00",
       "path": "scenarios/gmail_mail_client",
       "manifest": "scenarios/gmail_mail_client/scenario.yaml",
       "source": {
         "path": "scenarios/gmail_mail_client",
-        "manifest": "scenarios/gmail_mail_client/scenario.yaml"
+        "manifest": "scenarios/gmail_mail_client/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:05a29791dea8402855aaf1d52075dbe21579e49f2a59fc7d951d01dc5377bda6",
+        "path_scope": [
+          "projects/gmail_mail_client/"
+        ]
       },
       "install": {
         "kind": "scenario",
@@ -2099,6 +2112,22 @@
         "required": [
           "gmail_mail_client_provider_skill"
         ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "gmail_mail_client",
+        "release": "gmail_mail_client@0.1.4",
+        "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+        "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa"
+      },
+      "channels": {
+        "stable": {
+          "release": "gmail_mail_client@0.1.4",
+          "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+          "source_revision": "sha256:05a29791dea8402855aaf1d52075dbe21579e49f2a59fc7d951d01dc5377bda6",
+          "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa",
+          "version": "0.1.2"
+        }
       }
     },
     {
@@ -3173,7 +3202,7 @@
       "id": "gmail_mail_client",
       "name": "gmail_mail_client",
       "version": "0.1.4",
-      "updated_at": "2026-09-27T06:32:27+00:00",
+      "updated_at": "2026-09-24T02:29:50+00:00",
       "path": "projects/gmail_mail_client",
       "manifest": "projects/gmail_mail_client/project.yaml",
       "source": {
@@ -3202,7 +3231,24 @@
         "skill:gmail_mail_client_provider_skill"
       ],
       "components_count": 2,
-      "profiles": []
+      "profiles": [],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "gmail_mail_client",
+        "release": "gmail_mail_client@0.1.4",
+        "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+        "primary_component": "scenario:gmail_mail_client",
+        "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa"
+      },
+      "channels": {
+        "stable": {
+          "release": "gmail_mail_client@0.1.4",
+          "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+          "source_revision": "sha256:05a29791dea8402855aaf1d52075dbe21579e49f2a59fc7d951d01dc5377bda6",
+          "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa",
+          "version": "0.1.4"
+        }
+      }
     },
     {
       "kind": "project",

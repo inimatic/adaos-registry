@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:mail.messages.manage.google-gmail-local",
+  "binding_definition_digest": "sha256:5398d3562ed19cb375a2ca1372dbfa1c049f84a6cc8873491ee1282196a54eb2",
+  "logical_entrypoint": "mail.messages.manage.google-gmail",
+  "package": {
+    "kind": "skill",
+    "id": "gmail_mail_client_provider_skill",
+    "version": "0.1.1",
+    "digest": "sha256:57945818da0ee3173d4a861523ef2feb15dc4a60ac89ad5852bd81f7a7d975ff"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:2ae5f36005fc8ff8a28186c7c01d69f65cc8e6f3154add46d732638613c448b9"
+}

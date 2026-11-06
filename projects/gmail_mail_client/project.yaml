@@ -1,0 +1,109 @@
+schema: adaos.project.v1
+kind: project
+id: gmail_mail_client
+version: 0.1.4
+profiles: []
+components:
+  owned:
+  - ref: scenario:gmail_mail_client
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations:
+    - uses
+  - ref: skill:gmail_mail_client_provider_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations:
+    - realizes
+    - uses
+  dependencies: []
+entrypoints:
+- id: main
+  presentation: scenario:gmail_mail_client
+  default: true
+  bindings: {}
+catalog:
+  title: Gmail Mail Client
+  description: Create a new private AdaOS Application named "Gmail Mail Client" from
+    scratch. It must be CBS-compatible. Its semantic application requires capability:mail.messages.manage
+    version ^1.0.0 without naming Gmail, a package, a skill, or credentials. For the
+    first beta, implement an application-local Gmail binding. The UI must provide
+    inbox search and filters, message reading, labels, archive, trash, compose and
+    send, connection/setup status, explicit least-privilege disclosures, and deterministic
+    empty/loading/error/permission-denied states. Account credentials and OAuth tokens
+    must never be stored in UI state or logs. Keep shared provider reuse and a global
+    capability registry out of this first stage.
+  categories: []
+  tags: []
+publication:
+  stage: alpha
+  visibility: unlisted
+  channel: stable
+install:
+  default: false
+  features: []
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-09-23T17:49:03Z'
+created_by: builder.chat
+permission_profile:
+  schema: adaos.application.permission_profile.v1
+  required:
+  - id: providers.google.gmail
+    purpose: Use the connected Gmail account.
+    approval_policy: explicit
+    sensitive: true
+  - id: workspace.read
+    purpose: Read mail through the owned tool boundary.
+    approval_policy: explicit
+  - id: workspace.write
+    purpose: Perform requested mail actions and reserve send commands.
+    approval_policy: explicit
+  - id: storage.relational
+    purpose: Persist send command IDs and confirmation status without message content.
+    approval_policy: explicit
+  optional: []
+  secrets: []
+  external_providers:
+  - id: google.gmail
+    account_id: google.gmail
+    title: Gmail account
+    purpose: Read, organize, trash and send mail requested by the user.
+    required: true
+    destination: gmail.googleapis.com
+    account_modes:
+    - delegated_user
+    scopes:
+    - https://www.googleapis.com/auth/gmail.modify
+  llm_model_use: []
+  notifications: []
+  background_actions: []
+  data_practices:
+    collected:
+    - email_metadata
+    - email_content
+    - send_command_status
+    sent_off_device:
+    - email_query
+    - email_content
+    - email_recipient
+    - mail_action
+    linked_to_user:
+    - email_metadata
+    - email_content
+    - send_command_status
+    retention: send_command_status_until_application_data_deleted
+    tracking: false
+  privacy_labels:
+    collected:
+    - email_metadata
+    - email_content
+    - send_command_status
+    linked_to_user: true
+    sent_off_device: true
+    tracking: false

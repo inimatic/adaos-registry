@@ -1,0 +1,48 @@
+{
+    "id": "gmail_mail_client",
+    "name": "gmail_mail_client",
+    "version": "0.1.2",
+    "title": "Gmail Mail Client",
+    "title_i18n": {
+        "key": "scenario.gmail_mail_client.title",
+        "fallback": "Gmail Mail Client"
+    },
+    "description": "Empty AdaOS desktop canvas ready for Builder authoring.",
+    "type": "desktop",
+    "supported_locales": [
+        "en",
+        "ru"
+    ],
+    "depends": [],
+    "runtime": {
+        "skills": {
+            "required": [
+                "gmail_mail_client_provider_skill"
+            ],
+            "optional": []
+        }
+    },
+    "ui": {
+        "manifest": "webui.json"
+    },
+    "trigger": "manual",
+    "vars": {},
+    "llm_hints": {
+        "description": "Create a new private AdaOS Application named \"Gmail Mail Client\" from scratch. It must be CBS-compatible. Its semantic application requires capability:mail.messages.manage version ^1.0.0 without naming Gmail, a package, a skill, or credentials. For the first beta, implement an application-local Gmail binding. The UI must provide inbox search and filters, message reading, labels, archive, trash, compose and send, connection/setup status, explicit least-privilege disclosures, and deterministic empty/loading/error/permission-denied states. Account credentials and OAuth tokens must never be stored in UI state or logs. Keep shared provider reuse and a global capability registry out of this first stage.",
+        "aliases": [],
+        "primary_actions": [],
+        "examples": [],
+        "owner_hints": []
+    },
+    "nlu": {
+        "nlu_hints": {
+            "aliases": [],
+            "examples": [],
+            "slot_schemas": {},
+            "entities": []
+        }
+    },
+    "steps": [],
+    "prototype": "scenario_default",
+    "updated_at": "2026-09-24T02:08:08+00:00"
+}
