@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-06T11:23:32+00:00",
+  "updated_at": "2026-11-06T14:35:20+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -345,15 +345,15 @@
       "id": "cv_descriptor",
       "name": "cv_descriptor",
       "version": "0.1.14",
-      "updated_at": "2026-09-27T21:45:34+00:00",
+      "updated_at": "2026-11-06T14:35:20+00:00",
       "path": "skills/cv_descriptor",
       "manifest": "skills/cv_descriptor/skill.yaml",
       "source": {
         "path": "skills/cv_descriptor",
         "manifest": "skills/cv_descriptor/skill.yaml",
         "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:7be931c95c7bee6e42ac6a10e1169a191f83856b801d13abd8b1b6b8a712a667",
+        "repository": "adaos-dev:applications-beta-reconciliation-20261025",
+        "revision": "sha256:9e1ab44f35f3809c034f332a85d7ee4fbfa81217ebd46e2a6ddb80eb6f811081",
         "path_scope": [
           "projects/cv_descriptor_lab/"
         ]
@@ -368,17 +368,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "cv_descriptor_lab",
-        "release": "cv_descriptor_lab@0.1.22",
-        "release_digest": "sha256:79c9b75dba86a5fed8e6043edbb66d272115b9a98a6c6a08ea1dcf4d6cfe4074",
-        "package_digest": "sha256:291c278a48dc278d512877cce46e9df4ab570066c7bb40607e5f32035f18381c"
+        "release": "cv_descriptor_lab@0.1.23",
+        "release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
+        "package_digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21"
       },
       "tools_count": 11,
       "channels": {
         "stable": {
-          "release": "cv_descriptor_lab@0.1.22",
-          "release_digest": "sha256:79c9b75dba86a5fed8e6043edbb66d272115b9a98a6c6a08ea1dcf4d6cfe4074",
-          "source_revision": "sha256:7be931c95c7bee6e42ac6a10e1169a191f83856b801d13abd8b1b6b8a712a667",
-          "package_digest": "sha256:291c278a48dc278d512877cce46e9df4ab570066c7bb40607e5f32035f18381c",
+          "release": "cv_descriptor_lab@0.1.23",
+          "release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
+          "source_revision": "sha256:9e1ab44f35f3809c034f332a85d7ee4fbfa81217ebd46e2a6ddb80eb6f811081",
+          "package_digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21",
           "version": "0.1.14"
         }
       }
@@ -3037,8 +3037,8 @@
       "kind": "project",
       "id": "cv_descriptor_lab",
       "name": "cv_descriptor_lab",
-      "version": "0.1.22",
-      "updated_at": "2026-09-27T22:03:38+00:00",
+      "version": "0.1.23",
+      "updated_at": "2026-11-06T14:35:20+00:00",
       "path": "projects/cv_descriptor_lab",
       "manifest": "projects/cv_descriptor_lab/project.yaml",
       "source": {
@@ -3100,18 +3100,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "cv_descriptor_lab",
-        "release": "cv_descriptor_lab@0.1.22",
-        "release_digest": "sha256:79c9b75dba86a5fed8e6043edbb66d272115b9a98a6c6a08ea1dcf4d6cfe4074",
+        "release": "cv_descriptor_lab@0.1.23",
+        "release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
         "primary_component": "skill:cv_descriptor",
-        "package_digest": "sha256:291c278a48dc278d512877cce46e9df4ab570066c7bb40607e5f32035f18381c"
+        "package_digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21"
       },
       "channels": {
         "stable": {
-          "release": "cv_descriptor_lab@0.1.22",
-          "release_digest": "sha256:79c9b75dba86a5fed8e6043edbb66d272115b9a98a6c6a08ea1dcf4d6cfe4074",
-          "source_revision": "sha256:7be931c95c7bee6e42ac6a10e1169a191f83856b801d13abd8b1b6b8a712a667",
-          "package_digest": "sha256:291c278a48dc278d512877cce46e9df4ab570066c7bb40607e5f32035f18381c",
-          "version": "0.1.22"
+          "release": "cv_descriptor_lab@0.1.23",
+          "release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
+          "source_revision": "sha256:9e1ab44f35f3809c034f332a85d7ee4fbfa81217ebd46e2a6ddb80eb6f811081",
+          "package_digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21",
+          "version": "0.1.23"
         }
       }
     },

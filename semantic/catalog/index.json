@@ -61,9 +61,9 @@
       "application_id": "cv_descriptor_lab",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 3,
-      "stable_release_digest": "sha256:79c9b75dba86a5fed8e6043edbb66d272115b9a98a6c6a08ea1dcf4d6cfe4074",
-      "release_key": "cv_descriptor_lab@sha256:79c9b75dba86a5fed8e6043edbb66d272115b9a98a6c6a08ea1dcf4d6cfe4074",
-      "projection_digest": "sha256:0155deeb77d5aa36fcbfaae94bfa1432ae9dcf71f57bb42f8e85028dde4c3a54"
+      "stable_release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
+      "release_key": "cv_descriptor_lab@sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
+      "projection_digest": "sha256:49686df4d41acd7e382fd38a2a41af614e9ec542c2725863f65f6b580d00ab59"
     },
     "semantic_ui_demo": {
       "application_id": "semantic_ui_demo",
@@ -842,7 +842,15 @@
       "release_digest": "sha256:3e9ebc366f7e541a5d5618538a0b960a6bd6d047e0c7ea754d9541a3167d0c52",
       "path": "semantic/catalog/releases/context_chat/3e9ebc366f7e541a5d5618538a0b960a6bd6d047e0c7ea754d9541a3167d0c52.json",
       "projection_digest": "sha256:789274566db70d078c06a4305ee541665ca35a58c0689ed0fc68cde1be404b37"
+    },
+    "cv_descriptor_lab@sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98": {
+      "application_id": "cv_descriptor_lab",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.23",
+      "release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
+      "path": "semantic/catalog/releases/cv_descriptor_lab/b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98.json",
+      "projection_digest": "sha256:49686df4d41acd7e382fd38a2a41af614e9ec542c2725863f65f6b580d00ab59"
     }
   },
-  "index_digest": "sha256:bbc160f933c278a202a96c82aa6950e8d6354d29421b3678ec65f1df48d90846"
+  "index_digest": "sha256:74abe36d8bc868a1aaba0e05f7183f00f213a958a229737878c63bfcd90be16a"
 }
