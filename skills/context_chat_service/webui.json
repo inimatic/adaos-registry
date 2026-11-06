@@ -1,0 +1,13 @@
+{
+  "resources": {
+    "context_chat.icon": {
+      "kind": "image",
+      "scope": "skill",
+      "path": "assets/context-chat.svg",
+      "mime": "image/svg+xml",
+      "title": "Context Chat",
+      "alt": "Context Chat",
+      "fallback": "chatbubbles-outline"
+    }
+  }
+}

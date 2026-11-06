@@ -1,0 +1,196 @@
+name: context_chat_service
+version: 0.3.4
+description: 'Личный ChatGPT: проекты, переписка, документы и редактируемая память.'
+supported_locales:
+- ru
+- en
+entry: handlers/main.py
+default_tool: describe
+runtime:
+  kind: service
+  in_process_events: false
+  env:
+    mode: global
+  activation:
+    mode: lazy
+    startup_allowed: true
+    background_refresh: false
+service:
+  host: 127.0.0.1
+  port: 19084
+  command:
+  - -m
+  - handlers.service
+  healthcheck:
+    path: /api/services/context_chat_service/ui/health
+    timeout_ms: 2000
+  ui:
+    enabled: true
+    path: /api/services/context_chat_service/ui
+    access: authenticated
+    origin_policy: same-origin
+    embedding: same-origin
+    max_request_bytes: 16777216
+    content_security_policy: default-src 'self'; img-src 'self' data:; style-src 'self'
+      'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'self'
+      http://127.0.0.1:8100 http://localhost:8100; base-uri 'self'; form-action 'self'
+capabilities:
+- ai.inference
+- storage.relational
+dependencies:
+- pypdf==6.21.1
+exports:
+  tools:
+  - describe
+  - drain_runtime
+  - rehydrate_runtime
+tools:
+- name: describe
+  entry: handlers.main:describe
+  description: Describe Context Chat.
+  side_effects: read_only
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: drain_runtime
+  entry: handlers.lifecycle:drain_runtime
+  description: Owner-scoped Context Chat lifecycle.
+  side_effects: local_write
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: rehydrate_runtime
+  entry: handlers.lifecycle:rehydrate_runtime
+  description: Owner-scoped Context Chat lifecycle.
+  side_effects: local_write
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases:
+  - path: db/context_chat.db
+    migrations:
+    - version: 1
+      name: context_chat_initial
+      statements:
+      - CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT
+        NULL)
+      - CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY, title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', memory
+        TEXT NOT NULL DEFAULT '{}', memory_revision INTEGER NOT NULL DEFAULT 0, context_revision
+        INTEGER NOT NULL DEFAULT 0, memory_status TEXT NOT NULL DEFAULT 'empty', created_at
+        TEXT NOT NULL, updated_at TEXT NOT NULL)
+      - CREATE TABLE IF NOT EXISTS sources (id TEXT PRIMARY KEY, project_id TEXT NOT
+        NULL REFERENCES projects(id) ON DELETE CASCADE, title TEXT NOT NULL, kind
+        TEXT NOT NULL, content TEXT NOT NULL, included INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL)
+      - CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, project_id TEXT
+        NOT NULL REFERENCES projects(id) ON DELETE CASCADE, role TEXT NOT NULL, content
+        TEXT NOT NULL, model TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT
+        'completed', attachments TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL)
+      - CREATE TABLE IF NOT EXISTS runs (id TEXT PRIMARY KEY, project_id TEXT NOT
+        NULL REFERENCES projects(id) ON DELETE CASCADE, kind TEXT NOT NULL, status
+        TEXT NOT NULL, message_id TEXT, error TEXT NOT NULL DEFAULT '', created_at
+        TEXT NOT NULL)
+      idempotent: true
+      dialects:
+      - sqlite
+    - version: 2
+      name: context_chat_beta_turns
+      statements:
+      - ALTER TABLE runs ADD COLUMN request_key TEXT
+      - ALTER TABLE runs ADD COLUMN user_message_id TEXT
+      - CREATE UNIQUE INDEX IF NOT EXISTS run_request_key ON runs(project_id,request_key)
+        WHERE request_key IS NOT NULL
+      - CREATE TABLE IF NOT EXISTS audit_events (id TEXT PRIMARY KEY, action TEXT
+        NOT NULL, status INTEGER NOT NULL, created_at TEXT NOT NULL)
+      idempotent: false
+      dialects:
+      - sqlite
+    - version: 3
+      name: context_chat_tools
+      statements:
+      - CREATE TABLE message_metadata (message_id TEXT PRIMARY KEY REFERENCES messages(id)
+        ON DELETE CASCADE, web_search INTEGER NOT NULL DEFAULT 0, citations TEXT NOT
+        NULL DEFAULT '[]')
+      - CREATE INDEX messages_project ON messages(project_id)
+      idempotent: false
+      dialects:
+      - sqlite
+    - version: 4
+      name: context_chat_workspace
+      statements:
+      - ALTER TABLE projects ADD COLUMN defaults_revision INTEGER NOT NULL DEFAULT
+        0
+      - CREATE TABLE chats (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES
+        projects(id) ON DELETE CASCADE, title TEXT NOT NULL, archived INTEGER NOT
+        NULL DEFAULT 0, profile TEXT NOT NULL DEFAULT '{}', profile_revision INTEGER
+        NOT NULL DEFAULT 0, memory TEXT NOT NULL DEFAULT '{}', memory_revision INTEGER
+        NOT NULL DEFAULT 0, context_revision INTEGER NOT NULL DEFAULT 0, memory_status
+        TEXT NOT NULL DEFAULT 'empty', created_at TEXT NOT NULL, updated_at TEXT NOT
+        NULL)
+      - ALTER TABLE messages ADD COLUMN chat_id TEXT REFERENCES chats(id) ON DELETE
+        CASCADE
+      - ALTER TABLE runs ADD COLUMN chat_id TEXT REFERENCES chats(id) ON DELETE CASCADE
+      - ALTER TABLE runs ADD COLUMN snapshot TEXT NOT NULL DEFAULT '{}'
+      - ALTER TABLE runs ADD COLUMN retry_of TEXT
+      - CREATE TABLE source_versions (id TEXT PRIMARY KEY, source_id TEXT NOT NULL
+        REFERENCES sources(id) ON DELETE CASCADE, revision INTEGER NOT NULL, content
+        TEXT, digest TEXT NOT NULL, extraction TEXT NOT NULL, original BLOB, original_digest
+        TEXT, created_at TEXT NOT NULL, revoked_at TEXT, UNIQUE(source_id,revision))
+      - CREATE TABLE chat_sources (chat_id TEXT NOT NULL REFERENCES chats(id) ON DELETE
+        CASCADE, source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+        version_id TEXT NOT NULL REFERENCES source_versions(id), PRIMARY KEY(chat_id,source_id))
+      - CREATE TABLE source_tombstones (id TEXT PRIMARY KEY, project_id TEXT NOT NULL
+        REFERENCES projects(id) ON DELETE CASCADE, digest TEXT NOT NULL, deleted_at
+        TEXT NOT NULL)
+      - CREATE TABLE migration_journal (id TEXT PRIMARY KEY, receipt TEXT NOT NULL,
+        created_at TEXT NOT NULL)
+      - CREATE INDEX chat_history ON messages(chat_id)
+      - CREATE INDEX chat_runs ON runs(chat_id,created_at)
+      - CREATE UNIQUE INDEX run_retry_once ON runs(retry_of) WHERE retry_of IS NOT
+        NULL
+      - CREATE INDEX project_chats ON chats(project_id,archived,updated_at)
+      - CREATE TABLE source_presets (id TEXT PRIMARY KEY, project_id TEXT NOT NULL
+        REFERENCES projects(id) ON DELETE CASCADE, title TEXT NOT NULL, sources TEXT
+        NOT NULL)
+      - CREATE TABLE shared_memories (project_id TEXT PRIMARY KEY REFERENCES projects(id)
+        ON DELETE CASCADE, memory TEXT NOT NULL, revision INTEGER NOT NULL, promoted_from
+        TEXT, updated_at TEXT NOT NULL)
+      - INSERT INTO chats(id,project_id,title,profile,memory,memory_revision,context_revision,memory_status,created_at,updated_at)
+        SELECT 'legacy-'||id,id,'Основной',json_object('model',model,'effort_mode','provider_default','effort',NULL,'tools',json('[]'),'account_binding',NULL),memory,memory_revision,context_revision,memory_status,created_at,updated_at
+        FROM projects
+      - UPDATE messages SET chat_id='legacy-'||project_id
+      - UPDATE runs SET chat_id='legacy-'||project_id
+      - INSERT INTO source_versions(id,source_id,revision,content,digest,extraction,created_at)
+        SELECT 'legacy-'||id,id,1,content,'','legacy-extracted-text',created_at FROM
+        sources
+      - INSERT INTO chat_sources SELECT 'legacy-'||project_id,id,'legacy-'||id FROM
+        sources WHERE included=1
+      idempotent: false
+      dialects:
+      - sqlite
+  state_files:
+  - path: files/chatgpt-session.enc
+    format: opaque
+    max_bytes: 262144
+  - path: internal/context-chat-binding.json
+    format: json
+    max_bytes: 262144
+  coordination_files:
+  - internal/context-chat-draining.lock
+  - internal/context-chat-instance.lock
+updated_at: '2026-10-21T20:12:03+00:00'
+lifecycle:
+  drain: drain_runtime
+  dispose: drain_runtime
+  rehydrate: rehydrate_runtime
+  after_activate: rehydrate_runtime

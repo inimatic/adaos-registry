@@ -1,0 +1,47 @@
+schema: adaos.project.v1
+kind: project
+id: context_chat
+version: 0.5.2
+profiles: []
+components:
+  owned:
+  - ref: scenario:context_chat
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations:
+    - uses
+  - ref: skill:context_chat_service
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations:
+    - realizes
+    - uses
+  dependencies: []
+entrypoints:
+- id: main
+  presentation: scenario:context_chat
+  default: true
+  bindings: {}
+catalog:
+  title: Context Chat
+  description: 'Проекты и отдельные чаты: Markdown и формулы, документы, изолированная
+    память, модели и сила reasoning.'
+  categories: []
+  tags: []
+  icon: resource:context_chat.icon
+publication:
+  stage: beta
+  visibility: unlisted
+  channel: beta
+install:
+  default: false
+  features: []
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-10-15T19:14:10Z'
+created_by: builder.chat
