@@ -1,13 +1,15 @@
 {
     "id": "applications",
-    "version": "0.1.74",
+    "version": "0.1.88",
     "name": "applications",
     "description": "Builder-created rapid prototype scenario.",
     "triggers": [],
     "depends": [],
     "runtime": {
         "skills": {
-            "required": []
+            "required": [
+                "applications_skill"
+            ]
         }
     },
     "slots": {},
@@ -70,7 +72,7 @@
     },
     "steps": [],
     "prototype": "builder_scenario",
-    "updated_at": "2026-09-27T17:07:47+00:00",
+    "updated_at": "2026-11-05T23:34:46+00:00",
     "type": "desktop",
     "title": "Applications",
     "title_i18n": {

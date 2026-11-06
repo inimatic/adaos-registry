@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: applications
-version: 0.1.44
+version: 0.1.58
 profiles:
 - adaos.system.applications.v1
 components:
@@ -12,7 +12,20 @@ components:
     lifecycle: bound
     relations:
     - uses
-  dependencies: []
+  - ref: skill:applications_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations:
+    - realizes
+    - uses
+  dependencies:
+  - ref: skill:automation_manager_prototype_skill
+    version: ==0.1.6
+    lifecycle: shared
+    relations:
+    - realizes
+    - uses
 entrypoints:
 - id: main
   presentation: scenario:applications
@@ -36,9 +49,6 @@ publication:
 install:
   default: false
   features: []
-development:
-  domain_packs:
-  - applications.compatibility.v1
 lifecycle:
   uninstall:
     components: remove_if_unreferenced
@@ -74,6 +84,17 @@ permission_profile:
       and portable CBS projection to the shared registry.
     approval_policy: owner_only
     sensitive: true
+  - id: applications.recover
+    approval_policy: owner_only
+    purpose: Observe and explicitly manage reviewed Core application lifecycle operations.
+    sensitive: true
+  - id: development.read.tickets
+    purpose: Read development tickets for the selected Application and its components.
+    approval_policy: owner_only
+  - id: development.write.tickets
+    purpose: Submit development requests and comments for the selected Application.
+    approval_policy: owner_only
+    sensitive: true
   optional: []
   secrets: []
   external_providers: []
@@ -84,15 +105,19 @@ permission_profile:
     collected:
     - application_metadata
     - access_metadata
+    - user_content
     linked_to_user:
     - access_metadata
-    retention: Retained with local Application lifecycle and access audit history.
+    - user_content
+    retention: Development requests and comments remain with the canonical development
+      ticket and audit history.
     sent_off_device: []
     tracking: false
   privacy_labels:
     collected:
     - application_metadata
     - access_metadata
+    - user_content
     linked_to_user: true
     sent_off_device: false
     tracking: false

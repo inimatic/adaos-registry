@@ -1,0 +1,128 @@
+{
+  "authority_requirements": [
+    "workspace.read",
+    "workspace.write"
+  ],
+  "capability_ref": "capability:resource.records.manage",
+  "compatibility": {},
+  "conformance_refs": [],
+  "contract_digest": "sha256:d6b03ddd8819d4d4eb86c38e1b11fb20fa36891d27c8e862103fb1061f74c71e",
+  "dependencies": [],
+  "effects": [],
+  "invariants": [],
+  "operations": [
+    {
+      "errors": [
+        "permission_denied",
+        "provider_unavailable"
+      ],
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "filters": {
+            "type": "object"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "resource": {
+            "enum": [
+              "control_plane_health",
+              "hosts",
+              "pods",
+              "codex_sessions",
+              "readiness",
+              "tasks",
+              "audit_log"
+            ],
+            "type": "string"
+          },
+          "search": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource"
+        ],
+        "type": "object"
+      },
+      "operation_id": "query_records",
+      "output_schema": {
+        "type": "object"
+      }
+    },
+    {
+      "errors": [
+        "permission_denied",
+        "invalid_input",
+        "revision_conflict",
+        "provider_unavailable"
+      ],
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmed": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "operation": {
+            "enum": [
+              "create",
+              "update",
+              "delete",
+              "poll",
+              "confirm",
+              "enroll",
+              "drain"
+            ],
+            "type": "string"
+          },
+          "resource": {
+            "enum": [
+              "control_plane_health",
+              "hosts",
+              "pods",
+              "codex_sessions",
+              "readiness",
+              "tasks",
+              "audit_log"
+            ],
+            "type": "string"
+          },
+          "revision": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "values": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "resource",
+          "operation"
+        ],
+        "type": "object"
+      },
+      "operation_id": "mutate_records",
+      "output_schema": {
+        "type": "object"
+      }
+    }
+  ],
+  "schema": "adaos.capability.contract.v1",
+  "state_ports": [],
+  "title": "Manage application-owned records",
+  "version": "1.0.0"
+}

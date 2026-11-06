@@ -40,11 +40,12 @@ def resolve(value, state, event=None):
     return copy.deepcopy(value)
 
 
-def enabled(action, state):
+def enabled(action, state, event=None):
     # Only the boolean guard subset used by these declared commands; no service
     # outcomes or command success behavior are implemented by this test helper.
     expression = re.sub(r'\$state\.([\w.]+)',
                         lambda m: repr(path(state, m[1])), action['enabledIf'])
+    expression = re.sub(r'\$event\.([\w.]+)', lambda m: repr(path(event, m[1])), expression)
     expression = expression.replace('&&', ' and ').replace('||', ' or ')
     expression = re.sub(r'!(?!=)', ' not ', expression)
     expression = re.sub(r'\btrue\b', 'True', expression)
@@ -95,7 +96,7 @@ def test_catalog_response_selects_exact_application_and_discards_previous_contex
     detail = WIDGETS['application-details']['dataSource']
     arguments = resolve(detail['arguments'], state)
     jsonschema.validate(arguments, CONTRACTS[detail['toolId']]['input_schema'])
-    assert arguments == {'application_id': 'consumer-beta'}
+    assert arguments == {'application_id': 'consumer-beta', 'view': 'dashboard', 'webspace_id': '$client.webspaceId'}
     assert not enabled(command('lifecycle-actions', 'click:install'), state)
 
 
@@ -120,7 +121,9 @@ def test_only_reviewable_plan_can_submit_exact_digest(kind, on, status):
     operation = {'kind': kind, 'operation_id': 'appop.consumer', 'plan_digest': DIGEST,
                  'idempotency_key': 'review.consumer', 'status': status,
                  'plan': {'permission_review': {'approval_required': True}}}
-    state = {'reviewedPlan': {'operation': operation}, 'permissionApproved': True}
+    state = {'reviewedPlan': {'operation': operation}, 'permissionApproved': True,
+             'selectedApplicationId': 'app', 'detailApplicationId': 'app',
+             'subscriptionIntent': {'application_id': 'app'}}
     action = command('modal-review-actions', 'click:' + on)
     assert enabled(action, state) is (status == 'planned')
     if status == 'planned':
@@ -167,3 +170,37 @@ def test_changing_removal_policy_invalidates_previously_reviewed_digest():
     assert state['removeDataPolicy'] == 'snapshot_then_delete'
     assert state['reviewedPlan'] == {}
     assert not enabled(command('modal-review-actions', 'click:confirm-remove'), state)
+
+
+def test_row_event_is_guarded_before_and_during_chain_with_old_capture():
+    state = copy.deepcopy(PAGE['initialState'])
+    state.update(selectedApplicationId='app', detailApplicationId='app',
+                 dashboardLifecycleRevision='revision-2', positionRow={'id': 'stale', 'actions': {}},
+                 positionApplicationId='old-app')
+    row = {'id': 'private_beta', 'release_digest': DIGEST, 'scope': 'private', 'stage': 'beta',
+           'version': '2', 'actions': {'update': {'eligible': True, 'tool_id': 'applications.lifecycle.plan',
+           'arguments': {'action': 'update', 'candidate_id': 'candidate-2', 'release_digest': DIGEST,
+                         'target_position_id': 'private_beta'}}}}
+    steps = [a for a in WIDGETS['dashboard-positions']['actions'] if a['on'] == 'click:update']
+    assert all(enabled(a, state, row) for a in steps)
+    state.update(resolve(steps[0]['params'], state, row))
+    assert state['positionRow']['id'] == 'private_beta'
+    assert state['positionRow']['actions']['update']['arguments']['candidate_id'] == 'candidate-2'
+    assert state['positionLifecycleRevision'] == 'revision-2'
+    assert steps[1]['type'] == 'navigateModal' and enabled(steps[1], state, row)
+    state['positionPlanning'] = True
+    assert not enabled(steps[1], state, row)
+    state['positionPlanning'] = False
+    row['actions']['update']['eligible'] = False
+    assert not enabled(steps[0], state, row)
+
+
+def test_subscription_review_rejects_another_selected_application():
+    action = command('modal-review-actions', 'click:confirm-select-track')
+    state = {'selectedApplicationId': 'app-b', 'detailApplicationId': 'app-b',
+             'subscriptionIntent': {'application_id': 'app-a', 'revision': 4},
+             'reviewedPlan': {'operation': {'kind': 'select_track', 'operation_id': 'op',
+                                             'plan_digest': DIGEST, 'status': 'planned'}}}
+    assert not enabled(action, state)
+    state['selectedApplicationId'] = state['detailApplicationId'] = 'app-a'
+    assert enabled(action, state)

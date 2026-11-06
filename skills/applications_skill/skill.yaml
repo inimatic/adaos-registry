@@ -1,0 +1,497 @@
+name: applications_skill
+version: 0.1.10
+description: Project-owned resource implementation for project:applications. Realize
+  the accepted Prototype according to the separate Automation brief.
+supported_locales:
+- en
+- ru
+entry: handlers/main.py
+default_tool: chat
+runtime:
+  python: '3.11'
+  activation:
+    mode: on_demand
+    startup_allowed: false
+    background_refresh: false
+    assessment:
+      schema: adaos.skill.activation_assessment.v1
+      assessor: builder.compiler
+      classification: tool_only
+      handler_digest: sha256:9885388bba032d4307dc26c8c5c7a6b7d74ec3e3c814594f5df5014c29d39f49
+      observed_subscriptions: []
+      declared_subscriptions: []
+      dynamic_subscription_count: 0
+      tool_count: 8
+      reasons:
+      - tool_invocation_can_import_handler_on_demand
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases: []
+  state_files: []
+  coordination_files: []
+  operational_evidence_files: []
+  reconstructible_directories: []
+dependencies: []
+events:
+  subscribe: []
+  publish:
+  - io.out.chat.append
+  - io.out.say
+exports:
+  tools:
+  - chat
+  - ask_for_details
+  - remember_preference
+  - list_dashboard_positions
+  - list_application_tickets
+  - show_application_ticket
+  - create_application_ticket
+  - comment_application_ticket
+tools:
+- name: chat
+  description: Handle a skill-owned dialog turn using the canonical conversation ledger.
+  entry: handlers.main:chat
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      text:
+        type: string
+      webspace_id:
+        type: string
+      conversation_context:
+        type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+    - dialog
+  permissions:
+  - applications.develop
+  application_access:
+    permission: applications.develop
+    capability: applications.develop
+- name: ask_for_details
+  description: Ask a bounded follow-up question through adaos.sdk.chat.ask.
+  entry: handlers.main:ask_for_details
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      question:
+        type: string
+      required_slot:
+        type: string
+      max_turns:
+        type: integer
+        minimum: 1
+        maximum: 5
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+    - dialog
+  permissions:
+  - applications.develop
+  application_access:
+    permission: applications.develop
+    capability: applications.develop
+- name: remember_preference
+  description: Propose a consent-gated skill preference memory write.
+  entry: handlers.main:remember_preference
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - key
+    - text
+    properties:
+      key:
+        type: string
+      text:
+        type: string
+      confidence:
+        type: number
+        minimum: 0
+        maximum: 1
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+    - dialog
+    - pending_action
+  permissions:
+  - applications.develop
+  application_access:
+    permission: applications.develop
+    capability: applications.develop
+- name: list_dashboard_positions
+  description: Read Core dashboard positions for one Application.
+  entry: handlers.main:list_dashboard_positions
+  side_effects: read_only
+  permissions:
+  - applications.read
+  input_schema:
+    type: object
+    required:
+    - application_id
+    properties:
+      application_id:
+        type: string
+        minLength: 1
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - items
+    properties:
+      items:
+        type: array
+        maxItems: 5
+        items:
+          type: object
+  application_access:
+    permission: applications.read
+    capability: applications.read
+- name: list_application_tickets
+  description: List canonical tickets belonging to one Application.
+  entry: handlers.main:list_application_tickets
+  side_effects: read_only
+  permissions:
+  - applications.read
+  - development.read.tickets
+  input_schema:
+    type: object
+    required:
+    - application_id
+    properties:
+      application_id:
+        type: string
+        minLength: 1
+      search:
+        type: string
+        maxLength: 500
+      status:
+        type: string
+        maxLength: 100
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - items
+    properties:
+      items:
+        type: array
+        items:
+          type: object
+  application_access:
+    permission: development.read.tickets
+    capability: development.read.tickets
+- name: show_application_ticket
+  description: Read a scoped ticket and its canonical history.
+  entry: handlers.main:show_application_ticket
+  side_effects: read_only
+  permissions:
+  - applications.read
+  - development.read.tickets
+  input_schema:
+    type: object
+    required:
+    - application_id
+    - ticket_id
+    properties:
+      application_id:
+        type: string
+        minLength: 1
+      ticket_id:
+        type: string
+        minLength: 1
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ticket
+    - events
+    properties:
+      ticket:
+        type: object
+      events:
+        type: array
+        items:
+          type: object
+  application_access:
+    permission: development.read.tickets
+    capability: development.read.tickets
+- name: create_application_ticket
+  description: Submit a development request to the Application project.
+  entry: handlers.main:create_application_ticket
+  side_effects: runtime_write
+  permissions:
+  - applications.read
+  - development.write.tickets
+  input_schema:
+    type: object
+    required:
+    - application_id
+    - summary
+    properties:
+      application_id:
+        type: string
+        minLength: 1
+      summary:
+        type: string
+        minLength: 1
+        maxLength: 2000
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - ticket_id
+    - duplicate
+    properties:
+      ok:
+        type: boolean
+      ticket_id:
+        type: string
+      duplicate:
+        type: boolean
+  application_access:
+    permission: development.write.tickets
+    capability: development.write.tickets
+- name: comment_application_ticket
+  description: Comment on a scoped ticket at its observed revision.
+  entry: handlers.main:comment_application_ticket
+  side_effects: runtime_write
+  permissions:
+  - applications.read
+  - development.read.tickets
+  - development.write.tickets
+  input_schema:
+    type: object
+    required:
+    - application_id
+    - ticket_id
+    - body
+    - expected_revision
+    properties:
+      application_id:
+        type: string
+        minLength: 1
+      ticket_id:
+        type: string
+        minLength: 1
+      body:
+        type: string
+        minLength: 1
+        maxLength: 10000
+      expected_revision:
+        type: integer
+        minimum: 1
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - ticket_id
+    - revision
+    properties:
+      ok:
+        type: boolean
+      ticket_id:
+        type: string
+      revision:
+        type: integer
+        minimum: 1
+  application_access:
+    permission: development.write.tickets
+    capability: development.write.tickets
+data_routes:
+- surface: widget:dashboard-positions
+  route: tool
+  tool: list_dashboard_positions
+  first_paint: Empty until the selected Application is observed.
+  recovery: Explicit refresh repeats the selected Application read.
+  guard_visibility: Show unavailable and permission errors.
+  budget:
+    max_payload_bytes: 65536
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - applications.catalog
+    - applications.detail
+    - applications.setup
+    - applications.access
+    - applications.placement
+- surface: widget:application-tickets
+  route: tool
+  tool: list_application_tickets
+  first_paint: Empty until an authorized Application ticket read completes.
+  recovery: Explicit refresh repeats only the selected Application read.
+  guard_visibility: Show unavailable and permission errors.
+  budget:
+    max_payload_bytes: 65536
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 1
+    preserve_last_value: false
+    invalidation_tags:
+    - applications.tickets
+- surface: widget:application-ticket-detail
+  route: tool
+  tool: show_application_ticket
+  first_paint: Empty until an exact scoped ticket is selected.
+  recovery: Explicit refresh repeats only the selected ticket read.
+  guard_visibility: Hide unless an exact ticket is selected and show read errors.
+  budget:
+    max_payload_bytes: 65536
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 1
+    preserve_last_value: false
+    invalidation_tags:
+    - applications.tickets
+- surface: skill conversation memory
+  route: skill-local
+  path: node_conversation_store:memory.skill_user.applications_skill
+  owner: skill:applications_skill
+  first_paint: empty skill memory projection
+  recovery: memory.search/list rebuilds from node-local conversation store
+  guard_visibility: memory writes are proposed through Pending Actions before long-term
+    reuse
+  budget:
+    max_payload_bytes: 65536
+conversation:
+  dialog_channel:
+    id: applications_skill
+    label: Applications Skill
+    owner: skill:applications_skill
+    default_tool: applications_skill.chat
+    route_id: voice_chat
+    history:
+      store: node
+      visible_tail_messages: 50
+    retrieval:
+      max_messages: 12
+      max_segments: 2
+      max_memory_items: 4
+      max_tokens: 1200
+    repair:
+      no_match: ask_for_details
+      correction: pass_to_tool
+      cancel: close_active_frame
+    response:
+      default_targets:
+      - text_tail
+      - speech_text
+      renderer: dialog.visible_tail
+  history:
+    store: node
+    owner: skill:applications_skill
+    retention_class: normal
+  retrieval:
+    strategy: recent_plus_segments_plus_memory
+    cross_owner_memory: deny_by_default
+  memory:
+    scopes:
+    - conversation
+    - skill_user
+    - agent_user
+    consent: required_for_reusable_memory
+    default_visibility: owner
+  response:
+    default_targets:
+    - text_tail
+    - speech_text
+    structured_envelope: true
+  forms:
+  - id: details
+    kind: slot_collection
+    required_slots:
+    - details
+    repair:
+      max_turns: 3
+      on_exhausted: fallback_to_summary
+  agents:
+  - id: agent:applications_skill:assistant
+    label: Assistant
+    owner: skill:applications_skill
+    kind: skill_agent
+    channel_id: applications_skill
+    skill: applications_skill
+    talk_tool: chat
+    gender: neutral
+    voice: default
+    icon: sparkles-outline
+    aliases:
+    - Assistant
+    - new skill
+  - id: agent:applications_skill:critic
+    label: Reviewer
+    owner: skill:applications_skill
+    kind: skill_agent
+    channel_id: applications_skill
+    skill: applications_skill
+    talk_tool: chat
+    gender: neutral
+    voice: default
+    icon: search-outline
+    aliases:
+    - Reviewer
+    - critic
+llm_hints:
+  description: Project-owned resource implementation for project:applications. Realize
+    the accepted Prototype according to the separate Automation brief.
+  aliases: []
+  primary_actions:
+  - id: applications_skill.chat
+    intent: applications_skill.chat
+    tool: chat
+    side_effect_class: local_write
+    examples:
+    - Ask the skill for help
+  - id: applications_skill.ask_for_details
+    intent: applications_skill.ask_for_details
+    tool: ask_for_details
+    side_effect_class: local_write
+    examples:
+    - Ask a follow-up question
+  examples: []
+  owner_hints:
+  - skill:applications_skill
+nlu_hints:
+  aliases: []
+  examples: []
+  slot_schemas: {}
+  entities: []
+prototype: skill_default
+updated_at: '2026-11-05T23:34:41+00:00'
+capabilities:
+- applications.develop
+- applications.read
+- development.read.tickets
+- development.write.tickets
