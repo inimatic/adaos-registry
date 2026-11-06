@@ -1,16 +1,33 @@
 name: builder_sdk_control_skill
-version: 0.2.8
+version: 0.2.33
 description: SDK-only backend for the functional Builder DEV scenario.
 capabilities:
+- ai.inference
 - applications.develop
 - applications.publish
 - workspace.read
 - workspace.write
 - network.egress
+- applications.read
 entry: handlers/main.py
 runtime:
   python: '3.11'
   sdk_only: true
+  activation:
+    mode: on_demand
+    startup_allowed: false
+    background_refresh: false
+    assessment:
+      schema: adaos.skill.activation_assessment.v1
+      assessor: builder.compiler
+      classification: tool_only
+      handler_digest: sha256:2d99501cf730a5e3826ed48fb85c5ac405dd196a65b1d5185d16c8399a882e16
+      observed_subscriptions: []
+      declared_subscriptions: []
+      dynamic_subscription_count: 0
+      tool_count: 90
+      reasons:
+      - tool_invocation_can_import_handler_on_demand
 default_tool: get_state
 supported_locales:
 - en
@@ -25,6 +42,21 @@ conversation:
   evidence:
     read: builder_changes
 tools:
+- name: get_runtime_revisions
+  description: Observe exact Application Alpha sources, selected Beta and Stable package
+    composition without mutation.
+  entry: handlers.main:get_runtime_revisions
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      application_id:
+        type: string
+        default: adaos_builder
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
 - name: get_clarification
   description: Read current model questions and retained partial answers.
   entry: handlers.main:get_clarification
@@ -939,6 +971,33 @@ tools:
         minLength: 1
   output_schema:
     type: object
+- name: set_prototype_generation_profile
+  description: Select an explicit DEV Prototype qualification profile for this project
+    only.
+  entry: handlers.main:set_prototype_generation_profile
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - profile
+    properties:
+      profile:
+        type: string
+        enum:
+        - default
+        - s2-inline-typed-v1
+        - s2-inline-json-envelope-v1
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
 - name: update_project_metadata
   description: Update bounded project title and description; project type remains
     immutable.
@@ -1726,7 +1785,7 @@ tools:
 - name: get_automation
   description: Read Builder Automation state for a DEV project.
   entry: handlers.main:get_automation
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -1800,7 +1859,8 @@ tools:
   output_schema:
     type: object
 - name: get_semantic_inspector
-  description: Read exact semantic refs and the last committed bounded write set; no selection or source mutation.
+  description: Read exact semantic refs and the last committed bounded write set;
+    no selection or source mutation.
   entry: handlers.main:get_semantic_inspector
   side_effects: none
   input_schema:
@@ -1808,7 +1868,10 @@ tools:
     properties:
       object_type:
         type: string
-        enum: [project, scenario, skill]
+        enum:
+        - project
+        - scenario
+        - skill
       object_id:
         type: string
         minLength: 1
@@ -1891,7 +1954,7 @@ tools:
 - name: get_lifecycle
   description: Project dependent Prototype to Automation to Publication lineage.
   entry: handlers.main:get_lifecycle
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -1904,6 +1967,12 @@ tools:
       object_id:
         type: string
         minLength: 1
+      cursor:
+        type: string
+        maxLength: 256
+      cursor_project:
+        type: string
+        maxLength: 256
       webspace_id:
         type: string
   output_schema:
@@ -1922,7 +1991,7 @@ tools:
           const: stage
         children:
           type: array
-          maxItems: 5
+          maxItems: 100
           items:
             type: object
 - name: start_automation
@@ -1966,6 +2035,30 @@ tools:
       mcp:
         type: object
         description: MCP capability profile; bearer credentials are never persisted.
+      development_session_id:
+        type: string
+        minLength: 1
+        description: Exact governed Development Session; Core validates target scope
+          and materializes its readonly inputs.
+      ui_change_authorization:
+        type: object
+        additionalProperties: false
+        required:
+        - reason
+        - source_message_ids
+        properties:
+          reason:
+            type: string
+            minLength: 1
+            maxLength: 4000
+          source_message_ids:
+            type: array
+            minItems: 1
+            maxItems: 20
+            items:
+              type: string
+              minLength: 1
+              maxLength: 300
   output_schema:
     type: object
 - name: submit_automation
@@ -1995,6 +2088,30 @@ tools:
         type: object
         description: Optional bounded Automation execution and token budget for this
           follow-up.
+      development_session_id:
+        type: string
+        minLength: 1
+        description: Exact governed Development Session; Core validates target scope
+          and materializes its readonly inputs.
+      ui_change_authorization:
+        type: object
+        additionalProperties: false
+        required:
+        - reason
+        - source_message_ids
+        properties:
+          reason:
+            type: string
+            minLength: 1
+            maxLength: 4000
+          source_message_ids:
+            type: array
+            minItems: 1
+            maxItems: 20
+            items:
+              type: string
+              minLength: 1
+              maxLength: 300
   output_schema:
     type: object
 - name: return_to_prototype
@@ -2412,7 +2529,109 @@ tools:
     - ok
     - selected
     - content
+- name: get_data_profiles
+  description: List Project data profiles and the active profile of this Preview Webspace.
+  entry: handlers.main:get_data_profiles
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: select_data_profile
+  description: Switch this Webspace Preview to one Project data profile and rematerialize its pinned UI revision.
+  entry: handlers.main:select_data_profile
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      profile_id:
+        type: string
+        minLength: 1
+      expected_generation:
+        type: integer
+        minimum: 0
+      confirmed:
+        type: boolean
+        default: false
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+    required:
+    - profile_id
+    - expected_generation
+  output_schema:
+    type: object
 data_routes:
+- surface: scenario:builder.data-profile-selector
+  route: tool/collection
+  owner: skill:builder_sdk_control_skill
+  tool: get_data_profiles
+  first_paint: Project default profile until the Webspace preference is resolved
+  recovery: reopen the selector after profile or Preview invalidation
+  budget:
+    max_payload_bytes: 65536
+    max_items: 100
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 1
+    preserve_last_value: false
+    invalidation_tags:
+    - builder.project.preview-data
+    - builder.project.preview
+    - builder.project.metadata
+  guard_visibility:
+    degraded_state: data profiles are unavailable for the selected Project
+    metric: data_route.builder_data_profiles_read
+- surface: scenario:builder.runtime-revisions
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_runtime_revisions
+  first_paint: unknown until the selected Application composition is observed
+  recovery: explicit refresh reloads authoritative package identities
+  budget:
+    max_payload_bytes: 196608
+    max_items: 1
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 1000
+    max_request_hz: 1
+    preserve_last_value: false
+    invalidation_tags:
+    - applications.detail
+    - applications.runtime
+    - builder.runtime
+  guard_visibility:
+    degraded_state: Application runtime composition is unknown or divergent
 - surface: scenario:builder.about
   route: tool/details
   owner: skill:builder_sdk_control_skill
@@ -2514,10 +2733,13 @@ data_routes:
     invalidation_tags:
     - builder.project.metadata
     - builder.project.lifecycle
+    - builder.project.preview
+    - builder.project.preview-data
     - builder.project.automation
+    - builder.project.publication
+    - builder.project.change
     - builder.project.files
     - builder.project.llm
-    - builder.project.change
   guard_visibility:
     degraded_state: current project data is unavailable
     metric: data_route.builder_get_workbench
@@ -3241,7 +3463,7 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-09-30T19:41:56+00:00'
+updated_at: '2026-11-06T21:38:00+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.1002+6139.cdc1a0cfc
@@ -3250,8 +3472,13 @@ compatibility:
     min_commit: cdc1a0cfc10886c891b013e3010fd6bc7ca94856
     min_short_commit: cdc1a0cf
     build_date: '2026-09-04T22:38:35+03:00'
+memory_budget:
+  caches:
+  - name: builder_sessions
+    storage: skill_memory
 data_lifecycle:
   schema: adaos.skill.data_lifecycle.v1
   execution: native_tools
   databases: []
   coordination_files: []
+  legacy_adoption: core_managed_only

@@ -1,55 +1,55 @@
 {
-    "id": "builder",
-    "name": "builder",
-    "type": "desktop",
-    "title": "Builder — рабочее место разработки",
-    "description": "Safe local Builder prototype for the dependent Prototype, Automation, Trial, and Publication lifecycle.",
-    "version": "0.2.104",
-    "title_i18n": {
-        "fallback": "Builder",
-        "key": "scenario.builder.title"
-    },
-    "supported_locales": [
-        "en",
-        "ru"
+  "id": "builder",
+  "name": "builder",
+  "type": "desktop",
+  "title": "Builder — рабочее место разработки",
+  "description": "Safe local Builder prototype for the dependent Prototype, Automation, Trial, and Publication lifecycle.",
+  "version": "0.2.117",
+  "title_i18n": {
+    "fallback": "Builder",
+    "key": "scenario.builder.title"
+  },
+  "supported_locales": [
+    "en",
+    "ru"
+  ],
+  "triggers": [],
+  "slots": {},
+  "params": {},
+  "llm_hints": {
+    "description": "Local declarative Builder prototype",
+    "aliases": [
+      "builder",
+      "constructor"
     ],
-    "triggers": [],
-    "slots": {},
-    "params": {},
-    "llm_hints": {
-        "description": "Local declarative Builder prototype",
-        "aliases": [
-            "builder",
-            "constructor"
-        ],
-        "primary_actions": [],
-        "examples": [
-            "Open the Builder prototype"
-        ],
-        "owner_hints": [
-            "prototype"
-        ]
-    },
-    "nlu": {
-        "nlu_hints": {},
-        "llm_hints": {}
-    },
-    "depends": [
+    "primary_actions": [],
+    "examples": [
+      "Open the Builder prototype"
+    ],
+    "owner_hints": [
+      "prototype"
+    ]
+  },
+  "nlu": {
+    "nlu_hints": {},
+    "llm_hints": {}
+  },
+  "depends": [
+    "builder_skill",
+    "builder_sdk_control_skill",
+    "voice_chat_skill"
+  ],
+  "runtime": {
+    "skills": {
+      "required": [
         "builder_skill",
         "builder_sdk_control_skill",
         "voice_chat_skill"
-    ],
-    "runtime": {
-        "skills": {
-            "required": [
-                "builder_skill",
-                "builder_sdk_control_skill",
-                "voice_chat_skill"
-            ]
-        }
-    },
-    "ui": {
-        "manifest": "webui.json"
-    },
-    "updated_at": "2026-09-27T17:42:00+00:00"
+      ]
+    }
+  },
+  "ui": {
+    "manifest": "webui.json"
+  },
+  "updated_at": "2026-11-06T15:32:51+00:00"
 }
