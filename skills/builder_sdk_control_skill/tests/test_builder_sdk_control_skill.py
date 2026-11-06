@@ -244,6 +244,7 @@ def test_workbench_projects_canonical_state_without_fixture_or_inferred_actor(mo
 ])
 def test_workbench_distinguishes_execution_failure_from_retry_gate(monkeypatch, phase, status, summary) -> None:
     module = _module()
+    monkeypatch.setattr(module, 'get_clarification', lambda *args: {'pending': False})
     monkeypatch.setattr(module, "get_project", lambda *args: {"title": "Sample"})
     monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "primary"))
     monkeypatch.setattr(module.compositions, "get", lambda *args: {})
@@ -260,6 +261,7 @@ def test_workbench_distinguishes_execution_failure_from_retry_gate(monkeypatch, 
 
 def test_workbench_projects_cancelled_terminal_failure_as_cancellation(monkeypatch) -> None:
     module = _module()
+    monkeypatch.setattr(module, 'get_clarification', lambda *args: {'pending': False})
     monkeypatch.setattr(module, "get_project", lambda *args: {"title": "Sample"})
     monkeypatch.setattr(module, "_execution_identity", lambda *args: ("scenario", "primary"))
     monkeypatch.setattr(module.compositions, "get", lambda *args: {})
@@ -370,6 +372,45 @@ def test_prototype_model_preference_reaches_the_primary_execution_context(monkey
     module.set_llm_profile("gpt-5", "project", "aggregate")
     assert calls[0][0] == ("scenario", "primary")
     assert calls[0][1]["llm_model"] == "gpt-5"
+
+
+def test_personal_model_choice_is_distinct_pinned_and_saved_without_root_substitution(monkeypatch):
+    from adaos.sdk import ai
+    module = _module()
+    monkeypatch.setattr(module, '_execution_identity', lambda *args: ('scenario', 'primary'))
+    monkeypatch.setattr(module, 'list_llm_models', lambda **_: {'data': [{'id': 'same-model', 'provider': 'openai'}]})
+    monkeypatch.setattr(module, '_context', lambda *args: {'llm_profile': {'id': 'chatgpt/same-model'}})
+    monkeypatch.setattr(ai, 'status', lambda: {'plan_enabled': True, 'binding_ref': 'exact-binding'})
+    monkeypatch.setattr(ai, 'models', lambda: [{'id': 'same-model'}, {'id': 'not-available', 'available': False},
+        {'id': 'not-admitted', 'reason': 'unsupported'}])
+    calls = []
+    monkeypatch.setattr(module.prompt_context, 'set_preferences', lambda *args, **kwargs: calls.append((args, kwargs)) or {'ok': True})
+    options = module.get_llm_options('project', 'aggregate')
+    assert options['value'] == 'chatgpt/same-model'
+    assert [row['id'] for row in options['options']] == ['same-model', 'chatgpt/same-model']
+    assert [row['selected'] for row in options['options']] == [False, True]
+    module.set_llm_profile('chatgpt/same-model', 'project', 'aggregate')
+    assert calls[0][0] == ('scenario', 'primary')
+    saved = calls[0][1]
+    assert saved['llm_model'] == 'same-model'
+    assert saved['llm_profile']['resource_ref'] == ai.RESOURCE_REF
+    assert saved['llm_profile']['binding_ref'] == 'exact-binding'
+    assert saved['llm_profile']['subscription_output_policy'] == 'provider_default'
+
+
+def test_disconnected_personal_selection_never_becomes_same_named_root_choice(monkeypatch):
+    from adaos.sdk import ai
+    module = _module()
+    monkeypatch.setattr(module, '_execution_identity', lambda *args: ('scenario', 'primary'))
+    monkeypatch.setattr(module, 'list_llm_models', lambda **_: {'data': [{'id': 'same-model', 'provider': 'openai'}]})
+    monkeypatch.setattr(module, '_context', lambda *args: {'llm_profile': {'id': 'chatgpt/same-model'}})
+    monkeypatch.setattr(ai, 'status', lambda: {'plan_enabled': False})
+    monkeypatch.setattr(ai, 'models', lambda: pytest.fail('Disconnected catalog must not be queried'))
+    options = module.get_llm_options('project', 'aggregate')
+    assert options['value'] == 'chatgpt/same-model'
+    assert not any(row['selected'] for row in options['options'])
+    with pytest.raises(ValueError, match='not available'):
+        module.set_llm_profile('chatgpt/same-model', 'project', 'aggregate')
 
 
 def test_readme_conflict_does_not_record_a_successful_change(monkeypatch) -> None:
@@ -555,7 +596,7 @@ def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None
     assert tools["push_project"]["side_effects"] == "local_write"
     assert tools["publish_project"]["side_effects"] == "external_write"
     assert tools["delete_project"]["side_effects"] == "external_write"
-    declared_effects = {"none", "local_write", "ui_navigation", "external_write"}
+    declared_effects = {"none", "read_only", "local_write", "ui_navigation", "external_write"}
     assert all(tool.get("side_effects") in declared_effects for tool in tools.values())
     push_schema = tools["push_project"]["input_schema"]
     assert "checkpoint_id" in push_schema["required"]
@@ -1078,7 +1119,6 @@ def test_project_automation_uses_primary_workflow_and_aggregate_worker_scope(
 
     result = module.start_automation(
         "Adjust the operator layout",
-        confirmed_technical_application_id="root_mgmnt_ops",
         object_type="project",
         object_id="root_mgmnt",
         webspace_id="desktop",
@@ -1088,7 +1128,6 @@ def test_project_automation_uses_primary_workflow_and_aggregate_worker_scope(
     assert automation_calls[0]["object_type"] == "project"
     assert automation_calls[0]["object_id"] == "root_mgmnt"
     assert automation_calls[0]["change_set_id"] == "CS-root"
-    assert automation_calls[0]["confirmed_technical_application_id"] == "root_mgmnt_ops"
     assert automation_calls[0]["conversation_id"] == "conv.builder.root"
     assert result["execution_scope"]["context_ref"] == "project:root_mgmnt"
     assert result["execution_scope"]["execution_ref"] == "scenario:root_mgmnt_ops"
@@ -1945,8 +1984,9 @@ def test_get_automation_diagnostics_projects_managed_search_page(monkeypatch) ->
 
 def test_lifecycle_exposes_bounded_automation_result_children(monkeypatch) -> None:
     module = _module()
+    monkeypatch.setattr(module.prototype, "history", lambda *args, **kwargs: _history_page(['001'], '001'))
     monkeypatch.setattr(
-        module.workflow, "get_state", lambda *_args: _idle_builder_workflow()
+        module.workflow, "get_lifecycle_state", lambda *_args: _idle_builder_workflow()
     )
     monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.2.0"})
     monkeypatch.setattr(module.projects, "list_files", lambda *args, **kwargs: [])
@@ -1983,7 +2023,7 @@ def test_lifecycle_exposes_bounded_automation_result_children(monkeypatch) -> No
     assert child["title"] == "v DEV"
     assert child["version"] in child["title"]
     assert child["version"] != child["source_prototype_version"]
-    assert child["source_prototype_version"] == "0.2.0"
+    assert child["source_prototype_version"] == "001"
     assert child["status"] == "succeeded"
     assert child["phase"] == "verification"
     assert child["summary"] == "Implementation and checks completed"
@@ -1996,6 +2036,7 @@ def test_lifecycle_exposes_bounded_automation_result_children(monkeypatch) -> No
 
 def test_new_scenario_has_only_prototype_before_handoff(monkeypatch) -> None:
     module = _module()
+    monkeypatch.setattr(module.prototype, "history", lambda *args, **kwargs: _history_page([], None))
     monkeypatch.setattr(
         module.projects,
         "describe",
@@ -2013,7 +2054,7 @@ def test_new_scenario_has_only_prototype_before_handoff(monkeypatch) -> None:
     monkeypatch.setattr(module.projects, "list_files", lambda *args, **kwargs: [])
     monkeypatch.setattr(
         module.workflow,
-        "get_state",
+        "get_lifecycle_state",
         lambda *args: {
             "active_phase": "prototype",
             "automation": {"status": "not_started"},
@@ -2040,11 +2081,10 @@ def test_new_scenario_has_only_prototype_before_handoff(monkeypatch) -> None:
     lifecycle = module.get_lifecycle("scenario", "test04_recipes")
 
     assert len(lifecycle) == 1
-    assert lifecycle[0]["version"] in lifecycle[0]["children"][0]["title"]
     assert len(lifecycle[0]["version"].split(".")) == 3
     assert all(part.isdigit() for part in lifecycle[0]["version"].split("."))
-    assert lifecycle[0]["children"][0]["title"] == "v 0.1.0"
-    assert lifecycle[0]["children"][0]["children"] == []
+    assert lifecycle[0]["version"] == "0.1.0"
+    assert lifecycle[0]["children"] == []  # No fabricated release-as-Prototype node.
     assert lifecycle[0]["automationUpdatedAt"] is None
     assert lifecycle[0]["publicationUpdatedAt"] is None
 
@@ -2053,6 +2093,7 @@ def test_return_to_prototype_adaptation_does_not_replace_automation_head(
     monkeypatch,
 ) -> None:
     module = _module()
+    monkeypatch.setattr(module.prototype, "history", lambda *args, **kwargs: _history_page(['050', '051'], '051'))
     monkeypatch.setattr(
         module,
         "_project_descriptor",
@@ -2067,8 +2108,8 @@ def test_return_to_prototype_adaptation_does_not_replace_automation_head(
         module.conversation, "list_development_changes", lambda **_kwargs: []
     )
     monkeypatch.setattr(
-        module,
-        "_workflow_projection",
+        module.workflow,
+        "get_lifecycle_state",
         lambda *_args: {
             "active_phase": "prototype",
             "automation": {
@@ -2378,20 +2419,28 @@ def test_transport_guard_preserves_russian_launch_arguments(monkeypatch) -> None
         lambda text, **kwargs: followups.append((text, kwargs)) or {"ok": True},
     )
 
-    module.start_automation(brief, object_type="scenario", object_id="recipes")
+    ui_scope = {"reason": "Complete owner-requested commands", "source_message_ids": ["message-user"]}
+    module.start_automation(brief, object_type="scenario", object_id="recipes",
+                            development_session_id="research-session", ui_change_authorization=ui_scope)
     budget = {"max_context_tokens": 48_000, "max_model_tokens": 96_000}
     module.submit_automation(
         submitted,
         object_type="scenario",
         object_id="recipes",
         execution_budget=budget,
+        development_session_id="research-session",
+        ui_change_authorization=ui_scope,
     )
 
     assert launched[0]["implementation_brief"] == brief
+    assert launched[0]["development_session_id"] == "research-session"
+    assert launched[0]["ui_change_authorization"] == ui_scope
     assert launched[0]["agent_profile"] == profile
     assert followups[0][0] == submitted
     assert followups[0][1]["agent_profile"] == profile
     assert followups[0][1]["execution_budget"] == budget
+    assert followups[0][1]["development_session_id"] == "research-session"
+    assert followups[0][1]["ui_change_authorization"] == ui_scope
     with pytest.raises(ValueError, match="transport integrity"):
         module.start_automation(
             "Сломано ???", object_type="scenario", object_id="recipes"
@@ -2402,8 +2451,9 @@ def test_publication_release_children_exclude_dry_runs_and_are_bounded(
     monkeypatch,
 ) -> None:
     module = _module()
+    monkeypatch.setattr(module.prototype, "history", lambda *args, **kwargs: _history_page(['001'], '001'))
     monkeypatch.setattr(
-        module.workflow, "get_state", lambda *_args: _idle_builder_workflow()
+        module.workflow, "get_lifecycle_state", lambda *_args: _idle_builder_workflow()
     )
     monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.2.0"})
     monkeypatch.setattr(module.projects, "list_files", lambda *args, **kwargs: [])
@@ -2461,10 +2511,85 @@ def test_publication_release_children_exclude_dry_runs_and_are_bounded(
     assert all(child["updated_at"].endswith("Z") for child in releases)
 
 
-def test_lifecycle_uses_one_stage_contract_and_timestamp_format(monkeypatch) -> None:
+def test_lifecycle_keeps_selected_legacy_beta_under_its_last_source_prototype(
+    monkeypatch,
+) -> None:
     module = _module()
     monkeypatch.setattr(
-        module.workflow, "get_state", lambda *_args: _idle_builder_workflow()
+        module.prototype,
+        "history",
+        lambda *args, **kwargs: _history_page(["003", "002", "001"], "003"),
+    )
+    monkeypatch.setattr(
+        module.workflow,
+        "get_lifecycle_state",
+        lambda *_args: {
+            "active_phase": "prototype",
+            "prototype": {"status": "working", "head_revision": "003"},
+            "automation": {
+                "status": "not_started",
+                "source_prototype_revision": "002",
+            },
+            "publication": {"status": "not_started"},
+            "capabilities": {},
+        },
+    )
+    monkeypatch.setattr(
+        module.automation,
+        "get_state",
+        lambda **kwargs: {"ok": True, "automation": {"status": "idle"}},
+    )
+    monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.1.4"})
+    monkeypatch.setattr(
+        module.conversation, "list_development_changes", lambda **kwargs: []
+    )
+    monkeypatch.setattr(
+        module.applications,
+        "get_runtime_selection",
+        lambda webspace_id, application_id: {
+            "webspace_id": webspace_id,
+            "application_id": application_id,
+            "source": "local_trial",
+            "release_digest": "sha256:" + "4" * 64,
+        },
+    )
+    monkeypatch.setattr(
+        module.applications,
+        "list_releases",
+        lambda application_id: [
+            {
+                "application_id": application_id,
+                "version": "0.1.4",
+                "release_digest": "sha256:" + "4" * 64,
+                "accepted_candidate_id": "infra_ops-0-1-4",
+                "lifecycle": "trial",
+            }
+        ],
+    )
+
+    lifecycle = module.get_lifecycle(
+        "scenario", "infra_ops", webspace_id="desktop"
+    )
+    revisions = {item["revision"]: item for item in lifecycle[0]["children"]}
+    historical_automation = revisions["002"]["children"][0]
+    beta = historical_automation["children"][0]
+
+    assert revisions["003"]["children"] == []
+    assert historical_automation["lifecycleState"] == "past"
+    assert historical_automation["lineageWarning"] == (
+        "publication_source_metadata_missing"
+    )
+    assert beta["version"] == "0.1.4"
+    assert beta["status"] == "beta"
+    assert beta["lineageInferred"] is True
+    assert beta["evidence"]["runtime_selection"]["webspace_id"] == "desktop"
+
+
+def test_lifecycle_uses_one_stage_contract_and_timestamp_format(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(module.prototype, "history", lambda *args, **kwargs: _history_page(['001'], '001'))
+    monkeypatch.setattr(
+        module.workflow, "get_lifecycle_state", lambda *_args: _idle_builder_workflow()
     )
     monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.2.0"})
     monkeypatch.setattr(
@@ -2493,7 +2618,7 @@ def test_lifecycle_uses_one_stage_contract_and_timestamp_format(monkeypatch) -> 
     assert lifecycle[0]["lifecycleStage"] == "prototype"
     assert lifecycle[0]["conversationLabel"] == "Prototype conversation"
     assert lifecycle[0]["dependentStages"] == ["prototype", "automation", "publication"]
-    assert str(lifecycle[0]["updated_at"]).endswith("Z")
+    assert lifecycle[0]["updated_at"] == "2026-07-23T10:00:00Z"
     assert lifecycle[0]["automationUpdatedAt"] is None
     assert lifecycle[0]["publicationUpdatedAt"] is None
 
@@ -2502,6 +2627,7 @@ def test_lifecycle_nests_automation_and_publication_under_source_prototype(
     monkeypatch,
 ) -> None:
     module = _module()
+    monkeypatch.setattr(module.prototype, "history", lambda *args, **kwargs: _history_page(['038', '037'], '038'))
     monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.3.0"})
     monkeypatch.setattr(
         module.projects,
@@ -2518,7 +2644,7 @@ def test_lifecycle_nests_automation_and_publication_under_source_prototype(
     )
     monkeypatch.setattr(
         module.workflow,
-        "get_state",
+        "get_lifecycle_state",
         lambda *args: {
             "active_phase": "automation",
             "prototype": {"status": "frozen", "head_revision": "037"},
@@ -2591,11 +2717,12 @@ def test_lifecycle_does_not_attach_unproven_old_publication_to_current_automatio
     monkeypatch,
 ) -> None:
     module = _module()
+    monkeypatch.setattr(module.prototype, "history", lambda *args, **kwargs: _history_page(['0.4.0'], '0.4.0'))
     monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.4.0"})
     monkeypatch.setattr(module.projects, "list_files", lambda *args, **kwargs: [])
     monkeypatch.setattr(
         module.workflow,
-        "get_state",
+        "get_lifecycle_state",
         lambda *args: {
             "active_phase": "automation",
             "prototype": {"status": "frozen"},
@@ -2665,11 +2792,12 @@ def test_lifecycle_treats_explicit_historical_publication_lineage_as_proven(
     monkeypatch,
 ) -> None:
     module = _module()
+    monkeypatch.setattr(module.prototype, "history", lambda *args, **kwargs: _history_page(['0.4.0'], '0.4.0'))
     monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.4.0"})
     monkeypatch.setattr(module.projects, "list_files", lambda *args, **kwargs: [])
     monkeypatch.setattr(
         module.workflow,
-        "get_state",
+        "get_lifecycle_state",
         lambda *args: {
             "active_phase": "automation",
             "automation": {
@@ -2719,7 +2847,7 @@ def test_lifecycle_treats_explicit_historical_publication_lineage_as_proven(
     )
 
     lifecycle = module.get_lifecycle("skill", "builder")
-    automation_nodes = lifecycle[0]["children"][0]["children"]
+    automation_nodes = [child for revision in lifecycle[0]["children"] for child in revision["children"]]
     proven = next(
         item for item in automation_nodes if item.get("task_id") == "task-historical"
     )
@@ -3561,17 +3689,34 @@ def test_project_catalog_uses_lightweight_state(monkeypatch) -> None:
     assert module.list_projects()[0]["object_id"] == "builder"
 
 
-def test_catalog_updated_uses_owned_component_state_not_preview_or_dependencies(monkeypatch) -> None:
+def test_catalog_updated_uses_core_batch_projection_without_per_component_sdk(monkeypatch) -> None:
     module = _module()
     calls = []
     def state(kind, identifier):
         calls.append((kind, identifier))
         return {"updated_at": "2026-09-11T12:30:00+03:00" if identifier == "primary" else "invalid"}
     monkeypatch.setattr(module, "_catalog_state", state)
-    item = {"created_at": "2026-09-10T00:00:00Z", "component_refs": ["scenario:primary", "skill:helper"], "dependency_refs": ["skill:external"]}
+    item = {"updated": "2026-09-11T12:30:00+03:00", "created_at": "2026-09-10T00:00:00Z", "component_refs": ["scenario:primary", "skill:helper"], "dependency_refs": ["skill:external"]}
     assert module._catalog_updated(item, {"updated_at": "2026-09-10T23:00:00Z"}) == "2026-09-11T09:30:00Z"
-    assert calls == [("scenario", "primary"), ("skill", "helper")]
+    assert calls == []
     assert module._catalog_updated({}, {"updated_at": "DEV"}) is None
+
+
+def test_runtime_header_reuses_its_snapshot_for_lifecycle(monkeypatch):
+    module = _module()
+    revisions = {"status": "aligned", "summary": "same exact snapshot"}
+    calls = []
+    monkeypatch.setattr(module, "_webspace_id", lambda *_args: "test")
+    monkeypatch.setattr(module.applications, "get_runtime_revisions", lambda *_args, **kwargs: calls.append(kwargs) or revisions)
+
+    def lifecycle(_application_id, *, webspace_id, runtime_revisions):
+        assert webspace_id == "test"
+        assert runtime_revisions is revisions
+        return {"runtime": {"admission": "admitted"}}
+
+    monkeypatch.setattr(module.applications, "get_lifecycle", lifecycle)
+    assert module.get_runtime_revisions()["lifecycle"]["runtime"]["admission"] == "admitted"
+    assert len(calls) == 1
 
 
 def test_catalog_orders_by_update_before_limit(monkeypatch) -> None:
@@ -4132,8 +4277,9 @@ def test_project_candidate_idempotency_tracks_composed_package_digest() -> None:
 
 def test_prompt_ide_compatibility_projections_are_browser_ready(monkeypatch) -> None:
     module = _module()
+    monkeypatch.setattr(module.prototype, "history", lambda *args, **kwargs: _history_page(['030', '029'], '030'))
     monkeypatch.setattr(
-        module.workflow, "get_state", lambda *_args: _idle_builder_workflow()
+        module.workflow, "get_lifecycle_state", lambda *_args: _idle_builder_workflow()
     )
 
     def _describe(kind, object_id):
@@ -4732,3 +4878,192 @@ def test_development_feedback_reads_project_scoped_context_inspector(
     assert detail["feedback_id"] == "devfeedback.1"
     assert [item["feedback_id"] for item in rejected] == ["devfeedback.3"]
     assert rejected[0]["rejection_class"] == "weak_patch"
+
+
+def _history_page(revisions, current):
+    items = [{"revision": revision, "scenario_id": "builder", "availability": "retained",
+              "snapshot_available": True, "source_available": True, "current": revision == current,
+              "updated_at": "2026-07-23T10:00:00Z"} for revision in revisions]
+    return {"schema": "adaos.builder.prototype_history.v1", "items": items,
+            "current_revision": current, "current": next((v for v in items if v["current"]), None),
+            "total": len(items), "has_more": False, "next_cursor": None, "missing_revisions": []}
+
+
+"""Hermetic tests of the actual handler functions with public SDK fakes.
+
+Compile the selected functions without importing the SDK reference's unavailable
+Core dependencies. No SDK implementation or service is emulated here.
+"""
+import ast
+from collections.abc import Mapping
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+import yaml
+
+
+SOURCE = Path(__file__).resolve().parents[1] / "handlers/main.py"
+
+
+def item(revision, available=True, current=False):
+    return dict(revision=revision, scenario_id="presentation", current=current,
+                snapshot_available=available, source_available=available,
+                availability="retained" if available else "missing",
+                updated_at="2026-10-23T05:00:00Z")
+
+
+@pytest.fixture
+def harness():
+    calls = []
+    page = dict(items=[item(f"{i:03}") for i in range(60, 10, -1)],
+                current_revision="001", current=item("001", current=True),
+                total=61, has_more=True, next_cursor="page-2")
+    lifecycle = dict(active_phase="prototype", capabilities={}, automation={})
+
+    def history(kind, identifier, **kwargs):
+        calls.append(("history", kind, identifier, kwargs))
+        return page
+
+    def saved_session(**kwargs):
+        calls.append(("automation", kwargs))
+        return {"ok": True, "automation": {}}
+
+    def compact(kind, identifier):
+        calls.append(("workflow", kind, identifier))
+        return lifecycle
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("No file scan, conversation creation, sender or full workflow read")
+
+    namespace = dict(
+        Any=object, Mapping=Mapping, DEFAULT_PROJECT_KIND="scenario", DEFAULT_PROJECT_ID="builder",
+        _identity=lambda k, i: (k, i),
+        _project_descriptor=lambda *args: {"version": "9.8.7"},
+        _execution_identity=lambda k, i: ("scenario", "presentation") if k == "project" else (k, i),
+        _execution_scope=lambda *args: {}, _webspace_id=lambda *args: "desktop",
+        _datetime_value=lambda value: value, _preview_label=lambda stage, version: version,
+        _automation_execution_status=lambda value: value.get("status", "not_started"),
+        _automation_children=lambda *args, **kwargs: [],
+        _publication_children=lambda *args: [], _version_title=lambda v: f"v {v}",
+        prototype=SimpleNamespace(history=history), workflow=SimpleNamespace(get_lifecycle_state=compact, get_state=forbidden),
+        automation=SimpleNamespace(get_state=saved_session),
+        projects=SimpleNamespace(ProjectNotFoundError=LookupError, list_files=forbidden),
+        compositions=SimpleNamespace(ProjectCompositionNotFound=LookupError),
+        _context=forbidden, _project_topic=forbidden, list_project_files=forbidden,
+        conversation=SimpleNamespace(ensure_builder_topic=forbidden),
+    )
+    source = ast.parse(SOURCE.read_text(encoding="utf-8"))
+    functions = [node for node in source.body if isinstance(node, ast.FunctionDef)
+                 and node.name in {"get_lifecycle", "get_automation"}]
+    for node in functions:
+        node.decorator_list = []
+    exec(compile(ast.Module(body=functions, type_ignores=[]), str(SOURCE), "exec"), namespace)
+    return SimpleNamespace(ns=namespace, page=page, state=lifecycle, calls=calls,
+                           read=namespace["get_lifecycle"])
+
+
+@pytest.mark.parametrize("kind", ["project", "scenario"])
+def test_more_than_five_and_old_explicit_current(harness, kind):
+    root = harness.read(kind, "builder")[0]
+    revisions = [n for n in root["children"] if n["kind"] == "revision"]
+    assert len(revisions) == 51
+    assert revisions[-1]["revision"] == "001"
+    assert revisions[-1]["lifecycleState"] == "current"
+    assert all("9.8.7" not in n["title"] for n in revisions)
+    assert all(n["scenario_id"] == "presentation" for n in revisions)
+    assert ("history", kind, "builder", {"limit": 50, "cursor": None}) in harness.calls
+    assert ("workflow", "scenario", "presentation" if kind == "project" else "builder") in harness.calls
+
+
+def test_next_end_reset_and_project_identity(harness):
+    first = harness.read("scenario", "builder")[0]["children"][-1]
+    assert first["canNextPage"] and not first["canResetPage"]
+    harness.page.update(items=[item("009")], has_more=False, next_cursor=None)
+    end = harness.read("scenario", "builder", cursor=first["cursor"],
+                       cursor_project=first["cursorProject"])[0]["children"]
+    assert [c for c in harness.calls if c[0] == "history"][-1][3]["cursor"] == "page-2"
+    assert end[-1]["canResetPage"] and not end[-1]["canNextPage"]
+    assert end[-2]["revision"] == "001"
+    for identifier, cursor in [("other", "page-2"), ("builder", "")]:
+        harness.read("scenario", identifier, cursor=cursor, cursor_project="scenario:builder")
+        history_call = [c for c in harness.calls if c[0] == "history"][-1]
+        assert not history_call[3]["cursor"]
+    assert harness.page["current_revision"] == "001"
+
+
+def test_missing_snapshots_are_explicit_and_never_release_fallback(harness):
+    harness.page.update(items=[item("008", available=False)], current_revision="008",
+                        current=item("008", available=False, current=True), has_more=False)
+    nodes = harness.read("scenario", "builder")[0]["children"]
+    assert len(nodes) == 1  # Do not infer 001..007.
+    node = nodes[0]
+    assert node["revision"] == "008" and node["availability"] == "missing"
+    assert not any(node[key] for key in ("canPreview", "canMakeCurrent", "canStabilize", "canOpenAutomation"))
+    assert node["lineageWarning"] == "prototype_snapshot_missing"
+    assert "snapshot unavailable" in node["title_i18n"]["values"]["en"]
+    harness.page.update(items=[], current=None, current_revision=None)
+    assert harness.read("scenario", "builder")[0]["children"] == []
+
+
+def test_unavailable_lineage_has_own_gap_not_current_parent(harness):
+    harness.page["missing_revisions"] = ["007"]
+    harness.state["automation"] = {"status": "completed", "source_prototype_revision": "007"}
+    harness.ns["_automation_children"] = lambda *args, **kwargs: [{"version": "1.2.3", "task_id": "task"}]
+    nodes = harness.read("scenario", "builder")[0]["children"]
+    current = next(n for n in nodes if n.get("revision") == "001")
+    gap = next(n for n in nodes if n.get("revision") == "007")
+    assert not current["children"]
+    assert gap["lineageWarning"] == "source_prototype_revision_not_retained"
+    assert gap["snapshot_available"] is False and gap["canPreview"] is False
+    assert gap["children"][0]["version"] == "1.2.3"
+
+
+def test_source_outside_page_is_not_declared_missing(harness):
+    harness.state["automation"] = {"status": "completed", "source_prototype_revision": "007"}
+    harness.ns["_automation_children"] = lambda *args, **kwargs: [{"version": "1.2.3"}]
+    nodes = harness.read("scenario", "builder")[0]["children"]
+    gap = next(n for n in nodes if n.get("revision") == "007")
+    assert gap["kind"] == "lineage_gap"
+    assert "availability" not in gap
+    assert gap["lineageWarning"] == "source_prototype_revision_not_in_page"
+
+
+def test_automation_read_uses_explicit_execution_identity_without_topic(harness):
+    harness.ns["get_automation"]("project", "builder", conversation_id="saved")
+    assert harness.calls == [("automation", dict(object_type="scenario", object_id="presentation",
+                                                webspace_id="desktop", conversation_id="saved"))]
+
+
+def test_changed_reads_keep_manifest_graph_and_bounded_output(harness):
+    manifest = yaml.safe_load((SOURCE.parents[1] / "skill.yaml").read_text(encoding="utf-8"))
+    tools = {entry["name"]: entry for entry in manifest["tools"]}
+    module = ast.parse(SOURCE.read_text(encoding="utf-8"))
+    exports = next(ast.literal_eval(node.value) for node in module.body
+                   if isinstance(node, ast.Assign)
+                   and any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets))
+    for name in ("get_lifecycle", "get_automation"):
+        assert name in exports
+        assert tools[name]["entry"] == "handlers.main:" + name
+        assert tools[name]["side_effects"] == "read_only"
+        assert tools[name]["input_schema"]["type"] == "object"
+        assert tools[name]["output_schema"]["type"] in {"array", "object"}
+    assert set(tools["get_lifecycle"]["input_schema"]["properties"]) >= {"cursor", "cursor_project"}
+    route = next(r for r in manifest["data_routes"] if r["tool"] == "get_lifecycle")
+    assert route["read_policy"]["preserve_last_value"] is True
+    assert "state_dependency_changed" in route["read_policy"]["triggers"]
+    assert len(harness.read("project", "builder")[0]["children"]) <= tools["get_lifecycle"]["output_schema"]["items"]["properties"]["children"]["maxItems"]
+
+
+@pytest.mark.parametrize("phase", ["prototype", "automation", "publication"])
+def test_archive_preview_and_legacy_source_make_current_guards(harness, phase):
+    archive = dict(item("008"), source_available=False)
+    legacy = dict(item("007"), availability="legacy", source_available=True)
+    harness.page.update(items=[archive, legacy], has_more=False, next_cursor=None)
+    harness.state["active_phase"] = phase
+    nodes = {node["revision"]: node for node in harness.read("scenario", "builder")[0]["children"] if node["kind"] == "revision"}
+    assert nodes["008"]["canPreview"] is True
+    assert nodes["008"]["canMakeCurrent"] is False
+    assert nodes["007"]["canPreview"] is True
+    assert nodes["007"]["canMakeCurrent"] is (phase == "prototype")
+    assert nodes["001"]["canMakeCurrent"] is False

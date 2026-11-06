@@ -18,6 +18,7 @@ from adaos.sdk.builder import (
     lifecycle as builder_lifecycle,
     model_settings,
     preview,
+    prototype,
     project_catalog,
     review,
     semantic_ui,
@@ -621,11 +622,10 @@ def _catalog_state(kind: str, project_id: str) -> dict[str, Any]:
 
 
 def _catalog_updated(item: Mapping[str, Any], state: Mapping[str, Any]) -> str | None:
-    candidates = [item.get("created_at"), state.get("updated_at")]
-    for ref in item.get("component_refs") or []:
-        identity = _split_component_ref(str(ref))
-        if identity:
-            candidates.append(_catalog_state(*identity).get("updated_at"))
+    # The governed catalog already projects metadata. Resolving each member
+    # here re-enters authoring/access admission per component and can outlive
+    # the read timeout, accumulating duplicate workers on retries.
+    candidates = [item.get("updated"), item.get("created_at"), state.get("updated_at")]
     timestamps: list[datetime] = []
     for value in candidates:
         if not value:
@@ -1314,8 +1314,20 @@ def _automation_children(
     ]
 
 
-def _publication_children(kind: str, project_id: str) -> list[dict[str, Any]]:
-    """Project only durable, successful publication Builder Changes."""
+def _publication_children(
+    kind: str,
+    project_id: str,
+    *,
+    source_webspace_id: str = "desktop",
+) -> list[dict[str, Any]]:
+    """Project durable publication evidence without losing legacy Beta lineage.
+
+    Builder publications carry exact prototype and Automation references in a
+    Development Change.  Older and externally admitted candidates may predate
+    that record, while still having an accepted Application release selected
+    in the source webspace.  Keep that release visible as explicitly inferred
+    lineage instead of silently making the completed Beta disappear.
+    """
     children: list[dict[str, Any]] = []
     try:
         changes = conversation.list_development_changes(
@@ -1368,6 +1380,69 @@ def _publication_children(kind: str, project_id: str) -> list[dict[str, Any]]:
         )
         if len(children) >= MAX_LIFECYCLE_CHILDREN:
             break
+    if children or kind not in {"project", "scenario"}:
+        return children
+
+    try:
+        selection = applications.get_runtime_selection(
+            source_webspace_id, project_id
+        )
+        release_digest = str(selection.get("release_digest") or "").strip()
+        release = next(
+            (
+                dict(item)
+                for item in applications.list_releases(project_id)
+                if str(item.get("release_digest") or "").strip()
+                == release_digest
+            ),
+            None,
+        )
+    except (FileNotFoundError, ValueError):
+        release = None
+        selection = {}
+    except Exception:
+        # Lifecycle inspection must remain available if the Application store
+        # itself is temporarily unavailable.
+        release = None
+        selection = {}
+    if not release or not release.get("accepted_candidate_id"):
+        return children
+
+    version = str(release.get("version") or "DEV").strip() or "DEV"
+    candidate_id = str(release.get("accepted_candidate_id") or "").strip()
+    selected_source = str(selection.get("source") or "").strip()
+    lifecycle = str(release.get("lifecycle") or "accepted").strip()
+    status = "beta" if selected_source == "local_trial" else lifecycle
+    published_at = release.get("published_at")
+    children.append(
+        {
+            "id": f"publication-accepted-{candidate_id}",
+            "kind": "publication_release",
+            "lifecycleState": "complete",
+            "title": _version_title(version),
+            "status": status,
+            "change_id": f"accepted:{candidate_id}",
+            "version": version,
+            "revision": version,
+            "release": release.get("release_digest"),
+            "created_at": _datetime_value(published_at),
+            "updated_at": _datetime_value(published_at),
+            "lifecycleStage": "publication",
+            "conversationLabel": "Publication",
+            "source_automation_task": None,
+            "source_automation_version": None,
+            "source_prototype_revision": None,
+            "change_set_id": None,
+            "canPreview": False,
+            "children": [],
+            "lineageInferred": True,
+            "lineageWarning": "application_release_source_metadata_missing",
+            "evidence": {
+                "release": release,
+                "runtime_selection": dict(selection),
+            },
+        }
+    )
     return children
 
 
@@ -1558,6 +1633,15 @@ def list_projects(
         items.sort(key=lambda row: (str(row["title"]).casefold(), row["id"]))
         items.sort(key=lambda row: row["updated"] or "", reverse=True)
         return items[:bounded_limit]
+
+
+@tool("get_runtime_revisions", summary="Observe exact Alpha, Beta and Stable Application composition without switching runtimes.", side_effects="none")
+def get_runtime_revisions(application_id: str = "adaos_builder", webspace_id: str | None = None,
+                          _meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    room = _webspace_id(webspace_id, _meta)
+    revisions = applications.get_runtime_revisions(application_id, webspace_id=room)
+    return {**revisions, "lifecycle": applications.get_lifecycle(
+        application_id, webspace_id=room, runtime_revisions=revisions)}
 
 
 @tool("get_project", summary="Describe the selected DEV project.", side_effects="none")
@@ -2499,12 +2583,32 @@ def get_llm_options(
         payload = {}
         source = f"fallback:{type(exc).__name__}"
     options = _llm_options(payload)
+    # Separate option identity prevents a Root model with the same name from
+    # silently replacing an explicitly selected personal subscription.
+    personal_status = 'disconnected'
+    try:
+        from adaos.sdk import ai
+        connection = ai.status()
+        if connection.get('plan_enabled') and connection.get('binding_ref'):
+            personal_status = 'connected'
+            for row in ai.models():
+                model_id = row.get('id')
+                if not model_id or row.get('available') is False or row.get('reason'):
+                    continue
+                options.append({'id': 'chatgpt/' + model_id, 'model': model_id,
+                    'label': 'ChatGPT · ' + model_id + ' (personal plan; provider-default output)',
+                    'provider': 'openai.chatgpt', 'resource_ref': ai.RESOURCE_REF,
+                    'binding_ref': connection['binding_ref'], 'scope': 'development',
+                    'subscription_output_policy': 'provider_default'})
+    except (PermissionError, ValueError):
+        personal_status = 'unavailable'
     state = _context(kind, project_id)
-    selected = str(state.get("builder_llm_model") or (options[0]["id"] if options else "")) or None
+    selected = str((state.get('llm_profile') or {}).get('id') or state.get("builder_llm_model") or (options[0]["id"] if options else "")) or None
     for item in options:
         item["selected"] = item["id"] == selected
     return {"ok": bool(options), "value": selected, "options": options, "source": source,
-            "status": "ready" if options else "unavailable"}
+            "status": "ready" if options else "unavailable", 'personal_chatgpt': personal_status,
+            'connection_management_application': 'subscription_status'}
 
 
 @tool(
@@ -2528,7 +2632,7 @@ def set_llm_profile(
     return prompt_context.set_preferences(
         kind,
         project_id,
-        llm_model=option["id"],
+        llm_model=option.get('model') or option["id"],
         llm_provider=option.get("provider"),
         llm_profile=option,
     )
@@ -2555,6 +2659,7 @@ def get_model_settings(object_type: str = DEFAULT_PROJECT_KIND, object_id: str =
     prototype = prompt_context.get(execution_kind, execution_id)
     codex = prototype.get("builder_codex_profile") or {}
     return {"prototype_model": prototype.get("builder_llm_model"),
+            'prototype_resource': (prototype.get('llm_profile') or {}).get('resource_ref') or 'root',
             "codex_model": codex.get("model"), "codex_effort": codex.get("reasoning_effort"),
             "codex_provider": codex.get("provider"),
             "execution_ref": f"{execution_kind}:{execution_id}"}
@@ -3677,7 +3782,7 @@ def list_changes(
 @tool(
     "get_automation",
     summary="Read Builder Automation state for a DEV project.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def get_automation(
     object_type: str = DEFAULT_PROJECT_KIND,
@@ -3688,15 +3793,12 @@ def get_automation(
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
     source = _webspace_id(webspace_id, _meta)
-    topic = _project_topic(kind, project_id, webspace_id=source)
+    execution_kind, execution_id = _execution_identity(kind, project_id)
     result = automation.get_state(
-        object_type=kind,
-        object_id=project_id,
+        object_type=execution_kind,
+        object_id=execution_id,
         webspace_id=source,
-        conversation_id=str(
-            conversation_id or topic.get("conversation_id") or ""
-        ).strip()
-        or None,
+        conversation_id=str(conversation_id or "").strip() or None,
     )
     if result.get("error") == "automation_session_not_found" and isinstance(
         result.get("automation"), Mapping
@@ -4165,140 +4267,69 @@ def get_project_placement_navigation(
 @tool(
     "get_lifecycle",
     summary="Project the prototype, automation, and publication lifecycle tree.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def get_lifecycle(
     object_type: str = DEFAULT_PROJECT_KIND,
     object_id: str = DEFAULT_PROJECT_ID,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
+    cursor: str | None = None,
+    cursor_project: str | None = None,
 ) -> list[dict[str, Any]]:
     kind, project_id = _identity(object_type, object_id)
     try:
         project = _project_descriptor(kind, project_id)
     except (projects.ProjectNotFoundError, compositions.ProjectCompositionNotFound):
         return []
-    state = _context(kind, project_id)
-    workflow_projection = _workflow_projection(kind, project_id, state)
+    execution_kind, execution_id = _execution_identity(kind, project_id)
+    workflow_projection = workflow.get_lifecycle_state(execution_kind, execution_id)
     workflow_capabilities = (
         workflow_projection.get("capabilities")
         if isinstance(workflow_projection.get("capabilities"), Mapping)
         else {}
     )
     active_phase = str(workflow_projection.get("active_phase") or "prototype")
-    current_revision = ""
-    revisions: list[str] = []
-    file_updated_at: dict[str, Any] = {}
-    presentation_scenario_id = (
-        _project_presentation_scenario_id(project_id)
-        if kind == "project"
-        else project_id
-    )
-    file_items = (
-        list_project_files(kind, project_id, limit=1000)
-        if kind == "project"
-        else projects.list_files(kind, project_id, limit=1000)
-    )
-    for item in file_items:
-        path = PurePosixPath(str(item.get("path") or ""))
-        component_path = path
-        if kind == "project":
-            parts = path.parts
-            if (
-                len(parts) >= 5
-                and parts[0] == "components"
-                and parts[1] == "scenario"
-                and parts[2] == presentation_scenario_id
-            ):
-                component_path = PurePosixPath(*parts[3:])
-            else:
-                file_updated_at[path.as_posix()] = item.get("updated_at")
-                continue
-        file_updated_at[component_path.as_posix()] = item.get("updated_at")
-        if (
-            len(component_path.parts) == 2
-            and component_path.parts[0] == "ui_revisions"
-            and component_path.suffix == ".json"
-        ):
-            revisions.append(component_path.stem)
-    if kind in {"project", "scenario"} and presentation_scenario_id:
-        try:
-            current_revision = str(
-                projects.read_file(
-                    "scenario",
-                    presentation_scenario_id,
-                    "ui_revisions/current.txt",
-                    max_bytes=64,
-                )["content"]
-            ).strip()
-        except projects.DeveloperProjectError:
-            current_revision = ""
+    identity = f"{kind}:{project_id}"
+    cursor = str(cursor).strip() if cursor and cursor_project == identity else None
+    history = prototype.history(kind, project_id, limit=50, cursor=cursor)
+    current_revision = str(history.get("current_revision") or "")
+    items = [dict(item) for item in history.get("items", [])]
+    current_item = history.get("current")
+    if isinstance(current_item, Mapping) and not any(
+        str(item.get("revision")) == str(current_item.get("revision")) for item in items
+    ):
+        items.append(dict(current_item))
     revision_nodes: list[dict[str, Any]] = []
-    for revision in sorted(set(revisions), reverse=True)[:5]:
+    for item in items:
+        revision = str(item["revision"])
         current = revision == current_revision
-        revision_nodes.append(
-            {
-                "id": f"ui-revision-{revision}",
-                "kind": "revision",
-                "revision": revision,
-                "lifecycleState": "current" if current else "past",
-                "status": "текущая" if current else "предыдущая",
-                "status_i18n": {
-                    "key": "builder.lifecycle.status.current"
-                    if current
-                    else "builder.lifecycle.status.previous"
-                },
-                "title": f"UI {revision}"
-                + (
-                    f" · v {project.get('version')}"
-                    if current and project.get("version")
-                    else ""
-                ),
-                "version": f"UI {revision}",
-                "previewLabel": _preview_label("prototype", f"UI {revision}"),
-                "updated_at": _datetime_value(
-                    file_updated_at.get(f"ui_revisions/{revision}.json")
-                ),
-                "lifecycleStage": "prototype",
-                "conversationLabel": "Prototype conversation",
-                "badges": ["текущая"] if current else [],
-                "canMakeCurrent": not current and active_phase == "prototype",
-                "canStabilize": current
-                and bool(workflow_capabilities.get("can_stabilize_prototype")),
-                "canOpenAutomation": current
-                and bool(workflow_capabilities.get("can_handoff_to_automation")),
-                "canPreview": kind in {"project", "scenario"},
-            }
-        )
-    if not revision_nodes:
-        revision_nodes.append(
-            {
-                "id": "project-current-version",
-                "kind": "revision",
-                "lifecycleState": "current",
-                "status": "текущая",
-                "status_i18n": {"key": "builder.lifecycle.status.current"},
-                "title": f"v {project.get('version') or 'DEV'}",
-                "version": str(project.get("version") or "DEV"),
-                "previewLabel": _preview_label(
-                    "prototype", project.get("version") or "DEV"
-                ),
-                "updated_at": _datetime_value(
-                    file_updated_at.get(str(project.get("manifest") or "scenario.yaml"))
-                ),
-                "lifecycleStage": "prototype",
-                "conversationLabel": "Prototype conversation",
-                "badges": ["текущая"],
-                "canStabilize": bool(
-                    workflow_capabilities.get("can_stabilize_prototype")
-                ),
-                "canOpenAutomation": bool(
-                    workflow_capabilities.get("can_handoff_to_automation")
-                ),
-                "canPreview": kind in {"project", "scenario"},
-            }
-        )
-    automation_state = get_automation(kind, project_id, webspace_id, _meta)
+        available = bool(item.get("snapshot_available")) and item.get("availability") != "missing"
+        revision_nodes.append({
+            "id": f"ui-revision-{revision}", "kind": "revision", "revision": revision,
+            "scenario_id": item.get("scenario_id"),
+            "availability": item.get("availability"), "snapshot_available": available,
+            "source_available": bool(item.get("source_available")),
+            "lifecycleState": "current" if current else "past",
+            "status": "текущая" if current else "предыдущая",
+            "status_i18n": {"key": "builder.lifecycle.status.current" if current else "builder.lifecycle.status.previous"},
+            "title": f"UI {revision}" if available else f"UI {revision} · снимок недоступен",
+            "title_i18n": {"values": {
+                "ru": f"UI {revision}" if available else f"UI {revision} · снимок недоступен",
+                "en": f"UI {revision}" if available else f"UI {revision} · snapshot unavailable",
+            }},
+            "version": f"UI {revision}",
+            "previewLabel": _preview_label("prototype", f"UI {revision}"),
+            "updated_at": _datetime_value(item.get("updated_at")),
+            "lifecycleStage": "prototype", "conversationLabel": "Prototype conversation",
+            "badges": ["текущая"] if current else [],
+            "canMakeCurrent": available and bool(item.get("source_available")) and not current and active_phase == "prototype",
+            "canStabilize": available and current and bool(workflow_capabilities.get("can_stabilize_prototype")),
+            "canOpenAutomation": available and current and bool(workflow_capabilities.get("can_handoff_to_automation")),
+            "canPreview": available and kind in {"project", "scenario"},
+            "lineageWarning": None if available else "prototype_snapshot_missing",
+        })
+    automation_state = get_automation(kind, project_id, webspace_id, _meta=_meta)
     automation_projection = (
         automation_state.get("automation")
         if isinstance(automation_state.get("automation"), Mapping)
@@ -4363,7 +4394,24 @@ def get_lifecycle(
         automation_children[0]["previewLabel"] = _preview_label(
             "automation", workflow_result_version
         )
-    publication_children = _publication_children(kind, project_id)
+    source_webspace_resolver = globals().get("_preview_source_webspace_id")
+    publication_source_webspace = (
+        source_webspace_resolver(webspace_id, _meta)
+        if callable(source_webspace_resolver)
+        else str(webspace_id or "desktop").strip() or "desktop"
+    )
+    publication_parameters = tuple(
+        getattr(getattr(_publication_children, "__code__", None), "co_varnames", ())
+    )
+    publication_children = (
+        _publication_children(
+            kind,
+            project_id,
+            source_webspace_id=publication_source_webspace,
+        )
+        if "source_webspace_id" in publication_parameters
+        else _publication_children(kind, project_id)
+    )
     publication_projection = (
         workflow_projection.get("publication")
         if isinstance(workflow_projection.get("publication"), Mapping)
@@ -4379,12 +4427,7 @@ def get_lifecycle(
                 for item in revision_nodes
                 if item.get("updated_at")
             ),
-            file_updated_at.get(
-                str(
-                    project.get("manifest")
-                    or ("scenario.yaml" if kind == "scenario" else "skill.yaml")
-                )
-            ),
+            None,
         )
     )
     automation_updated_at = (
@@ -4407,7 +4450,6 @@ def get_lifecycle(
         workflow_automation.get("source_prototype_revision")
         or automation_projection.get("source_prototype_version")
         or current_revision
-        or project_version
     ).strip()
     if source_prototype_revision.lower().startswith("ui "):
         source_prototype_revision = source_prototype_revision[3:].strip()
@@ -4428,18 +4470,32 @@ def get_lifecycle(
             None,
         )
         if target is None:
-            target = next(
-                (
-                    item
-                    for item in revision_nodes
-                    if item.get("lifecycleState") == "current"
-                ),
-                revision_nodes[0],
-            )
-            if token and token != str(
-                target.get("revision") or target.get("version") or ""
-            ):
-                node["lineageWarning"] = "source_prototype_revision_not_retained"
+            missing = token in (history.get("missing_revisions") or [])
+            target = {
+                "id": f"prototype-lineage-gap-{token or 'unknown'}",
+                "kind": "lineage_gap", "revision": token or None,
+                "title": f"UI {token or '?'} · нет на странице истории",
+                "title_i18n": {"values": {
+                    "ru": f"UI {token or '?'} · нет на странице истории",
+                    "en": f"UI {token or '?'} · outside this history page",
+                }},
+                "snapshot_available": False,
+                "lineageWarning": "source_prototype_revision_not_in_page",
+                "lifecycleStage": "prototype", "lifecycleState": "unavailable",
+                "canPreview": False, "canMakeCurrent": False,
+                "canStabilize": False, "canOpenAutomation": False, "children": [],
+            }
+            if missing:
+                target.update(
+                    availability="missing",
+                    lineageWarning="source_prototype_revision_not_retained",
+                    title=f"UI {token} · снимок недоступен",
+                    title_i18n={"values": {
+                        "ru": f"UI {token} · снимок недоступен",
+                        "en": f"UI {token} · snapshot unavailable",
+                    }},
+                )
+            revision_nodes.append(target)
         target.setdefault("children", []).append(node)
 
     current_automation_task = str(
@@ -4534,6 +4590,14 @@ def get_lifecycle(
             or source_prototype_revision,
         )
 
+    if history.get("has_more") or cursor:
+        revision_nodes.append({
+            "id": "revision-history-page", "kind": "history_page",
+            "title": "…", "cursor": history.get("next_cursor"),
+            "cursorProject": identity, "canNextPage": bool(history.get("has_more") and history.get("next_cursor")),
+            "canResetPage": bool(cursor), "canPreview": False,
+        })
+
     return [
         {
             "id": "stage-proto",
@@ -4576,6 +4640,8 @@ def start_automation(
     execution_budget: Mapping[str, Any] | None = None,
     agent_profile: Mapping[str, Any] | None = None,
     mcp: Mapping[str, Any] | None = None,
+    development_session_id: str | None = None,
+    ui_change_authorization: Mapping[str, Any] | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     _require_transport_integrity(implementation_brief)
@@ -4649,6 +4715,8 @@ def start_automation(
                     "builder_codex_profile"
                 ),
                 mcp=mcp,
+                development_session_id=development_session_id,
+                ui_change_authorization=ui_change_authorization,
             )
             or {}
         )
@@ -4676,6 +4744,8 @@ def submit_automation(
     webspace_id: str | None = None,
     conversation_id: str | None = None,
     execution_budget: Mapping[str, Any] | None = None,
+    development_session_id: str | None = None,
+    ui_change_authorization: Mapping[str, Any] | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     _require_transport_integrity(text)
@@ -4694,6 +4764,8 @@ def submit_automation(
             ).strip()
             or None,
             execution_budget=execution_budget,
+            development_session_id=development_session_id,
+            ui_change_authorization=ui_change_authorization,
             agent_profile=prompt_context.get(workflow_kind, workflow_id).get("builder_codex_profile"),
         )
         or {}
@@ -6824,18 +6896,33 @@ def get_workbench(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFA
     issues = [{**row, "id": row.get("issue_id"), "sources": ", ".join(row.get("source_message_ids") or []),
                "result": ", ".join(str(x) for x in row.get("result_refs") or []), "stage": row.get("lane")}
               for row in change.get("issues", []) if isinstance(row, Mapping)]
-    from adaos.services.builder.run_observability import project_run
+    from adaos.sdk.builder.observability import project_run
     runs = [project_run(row, request=change.get("request"), source_message_ids=change.get("source_message_ids") or [])
             for row in change.get("runs", []) if isinstance(row, Mapping)]
     title = str(project.get("title") or project_id)
-    composition = compositions.get(project_id) if kind == "project" else compositions.project_for_component(f"{kind}:{project_id}")
+    ownership = {"status": "resolved"}
+    try:
+        composition = compositions.get(project_id) if kind == "project" else compositions.project_for_component(f"{kind}:{project_id}")
+    except compositions.ProjectCompositionError as exc:
+        if getattr(exc, "code", "") != "project_component_ownership_ambiguous":
+            raise
+        composition = None
+        ownership = {"status": "ambiguous", "component_ref": f"{kind}:{project_id}",
+                     "project_ids": list(getattr(exc, "project_ids", ())),
+                     "explanation": "Select an explicit Project: this component has several owners."}
+        # Reads remain available. Do not select an arbitrary owner or offer
+        # new commands in an ambiguous scope; existing executions are untouched.
+        project = {key: False if key.startswith("can_") else value for key, value in project.items()}
+        commands = {key: False for key in commands}
     development = (composition or {}).get("development") or {}
     current = {"id": process_state, "title": title,
                "summary": str((description.get("progress") or {}).get("wait_explanation") or process_state),
                "timing": state.get("updated_at"), "revision": prototype.get("head_revision"),
                "change": change.get("change_id") or change.get("change_set_id"), "phase": phase,
                "run": implementation.get("head_task_id"), "checks": checks, "process": runs}
-    summary_state = process_state
+    summary_state = "ownership_ambiguous" if ownership["status"] == "ambiguous" else process_state
+    if ownership["status"] == "ambiguous":
+        current["summary"] = ownership["explanation"]
     # A retry-ready gate does not mean its last execution succeeded.
     if phase == "automation" and implementation.get("status") in {"failed", "cancelled"}:
         summary_state = "automation_" + implementation["status"]
@@ -6847,7 +6934,7 @@ def get_workbench(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFA
         commands["retry_automation"] = False
     current["execution_status"] = implementation.get("status") if phase == "automation" else prototype.get("status")
     current["summary_i18n"] = {"key": f"builder.workbench.state.{summary_state}", "fallback": current["summary"]}
-    payload = {**project, "title": title, "current": current, "phase": phase,
+    payload = {**project, "ownership": ownership, "title": title, "current": current, "phase": phase,
             "workflow_generation": state.get("generation"), "commands": commands,
             "clarification": clarification,
             "request": change.get("request"), "change_id": current["change"],

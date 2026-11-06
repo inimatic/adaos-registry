@@ -4,7 +4,7 @@ package_kind: skill
 owner_ref:
   kind: skill
   id: builder_skill
-version: 0.4.29
+version: 0.4.50
 workflow_refs:
 - workflow_type: builder.change
   definition_ref: ../workflow.json
@@ -27,6 +27,10 @@ files:
   - tests/stories/accept-trial.yaml
   - tests/stories/begin-publication.yaml
   - tests/stories/no-match.yaml
+  - tests/stories/output-routes-read-en.yaml
+  - tests/stories/output-routes-read-ru.yaml
+  - tests/stories/output-routes-select-en.yaml
+  - tests/stories/output-routes-select-ru.yaml
   locales:
   - locale.en.yaml
   - locale.ru.yaml

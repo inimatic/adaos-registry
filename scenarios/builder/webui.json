@@ -2,7 +2,7 @@
     "schema": "adaos.webui.v1",
     "generated_by": "builder-owned-live-implementation",
     "ui": {
-        "version": "0.2.104",
+        "version": "0.2.115",
         "application": {
             "desktop": {
                 "pageSchema": {
@@ -170,7 +170,15 @@
                         "designSettings": {
                             "diagnostics": false
                         },
-                        "informalNote": ""
+                        "informalNote": "",
+                        "revisionHistoryCursor": "",
+                        "revisionHistoryProject": "",
+                        "lifecycleApplicationId": "",
+                        "coreLifecyclePlan": {},
+                        "coreWriteLossAcknowledged": false,
+                        "coreObserveStorage": false,
+                        "coreTrialCandidateId": "",
+                        "coreTrialReviewAvailable": false
                     },
                     "meta": {
                         "builder": {
@@ -410,6 +418,52 @@
                                     }
                                 }
                             ]
+                        },
+                        {
+                            "id": "builder-runtime-revisions",
+                            "type": "item.details",
+                            "area": "main",
+                            "title": "Builder · Alpha / Beta / Stable",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "builder_sdk_control_skill.get_runtime_revisions",
+                                "params": {},
+                                "cacheTtlMs": 30000,
+                                "invalidationTags": [
+                                    "applications.detail",
+                                    "applications.runtime",
+                                    "builder.runtime"
+                                ]
+                            },
+                            "inputs": {
+                                "presentation": "section",
+                                "fields": [
+                                    {
+                                        "label": "Composition",
+                                        "path": "summary"
+                                    },
+                                    {
+                                        "label": "Status",
+                                        "path": "status"
+                                    },
+                                    {
+                                        "label": "Selected runtime",
+                                        "path": "selection.runtime_root_ref"
+                                    },
+                                    {
+                                        "label": "Selected release",
+                                        "path": "selection.release_digest"
+                                    },
+                                    {
+                                        "label": "Own runtime admission",
+                                        "path": "lifecycle.runtime.admission"
+                                    },
+                                    {
+                                        "label": "Own lease expires",
+                                        "path": "lifecycle.runtime.expires_at"
+                                    }
+                                ]
+                            }
                         },
                         {
                             "id": "design-current-work",
@@ -2409,11 +2463,13 @@
                                         "options": [
                                             {
                                                 "id": "task",
+                                                "value": "task",
                                                 "label": "Задание",
                                                 "label_i18n": "builder.design.Задание"
                                             },
                                             {
                                                 "id": "informal",
+                                                "value": "informal",
                                                 "label": "Свободное обсуждение",
                                                 "label_i18n": "builder.design.Свободное обсуждение"
                                             }
@@ -2440,7 +2496,7 @@
                                     "on": "select:conversation-mode",
                                     "type": "updateState",
                                     "params": {
-                                        "conversationMode": "$event.id"
+                                        "conversationMode": "$event.value"
                                     }
                                 },
                                 {
@@ -2515,6 +2571,48 @@
                                     "builder.project.publication",
                                     "builder.project.change"
                                 ],
+                                "conversation": {
+                                    "version": 1,
+                                    "owner": "application:builder",
+                                    "label": "$state.selectedProjectId",
+                                    "agent": {
+                                        "mode": "fixed",
+                                        "id": "agent:builder_skill:builder",
+                                        "label": "Builder",
+                                        "icon": "person-circle-outline"
+                                    },
+                                    "history": {
+                                        "mode": "auto",
+                                        "maxMessages": 200
+                                    },
+                                    "voice": true,
+                                    "presentation": {
+                                        "floating": true
+                                    },
+                                    "model": {
+                                        "source": {
+                                            "kind": "skill",
+                                            "name": "builder_sdk_control_skill.get_llm_options",
+                                            "params": {
+                                                "object_type": "$state.selectedProjectKind",
+                                                "object_id": "$state.selectedProjectId",
+                                                "_meta": {
+                                                    "current_scenario": "builder"
+                                                }
+                                            },
+                                            "invalidationTags": [
+                                                "builder.project.llm"
+                                            ],
+                                            "cacheTtlMs": 5000,
+                                            "preserveLastValue": true
+                                        },
+                                        "valuePath": "value",
+                                        "optionsPath": "options",
+                                        "label": "Prototype model"
+                                    }
+                                },
+                                "syncDialogSelection": false,
+                                "composerRows": 2,
                                 "historyButtonLabel_i18n": {
                                     "locales": {
                                         "en": "History",
@@ -2529,7 +2627,22 @@
                                 }
                             },
                             "title_i18n": "builder.text.development.conversation",
-                            "actions": []
+                            "actions": [
+                                {
+                                    "on": "model.change",
+                                    "type": "callSkill",
+                                    "target": "builder_sdk_control_skill.set_llm_profile",
+                                    "params": {
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        },
+                                        "model": "$event.value"
+                                    },
+                                    "invalidates": "builder.project.llm"
+                                }
+                            ]
                         },
                         {
                             "id": "design-conversation-side-informal",
@@ -2561,8 +2674,55 @@
                             },
                             "inputs": {
                                 "compact": true,
-                                "showTimestamps": true
-                            }
+                                "showTimestamps": true,
+                                "conversation": {
+                                    "version": 1,
+                                    "owner": "application:builder",
+                                    "label": "$state.selectedProjectId",
+                                    "agent": {
+                                        "mode": "fixed",
+                                        "id": "agent:builder_skill:builder",
+                                        "label": "Builder",
+                                        "icon": "person-circle-outline"
+                                    },
+                                    "history": {
+                                        "mode": "manual",
+                                        "maxMessages": 200
+                                    },
+                                    "voice": false,
+                                    "presentation": {
+                                        "floating": true
+                                    }
+                                },
+                                "syncDialogSelection": false,
+                                "multiline": true,
+                                "composerRows": 2
+                            },
+                            "actions": [
+                                {
+                                    "on": "send",
+                                    "type": "callSkill",
+                                    "target": "builder_sdk_control_skill.append_discussion",
+                                    "params": {
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        },
+                                        "text": "$event.text"
+                                    },
+                                    "invalidates": [
+                                        "builder.project.metadata",
+                                        "builder.project.lifecycle",
+                                        "builder.project.preview",
+                                        "builder.project.automation",
+                                        "builder.project.publication",
+                                        "builder.project.change",
+                                        "builder.project.files",
+                                        "builder.project.llm"
+                                    ]
+                                }
+                            ]
                         },
                         {
                             "id": "design-composer-side-informal",
@@ -2607,7 +2767,7 @@
                                     ]
                                 }
                             ],
-                            "visibleIf": "$state.workbenchView !== 'conversation' && $state.conversationMode === 'informal'"
+                            "visibleIf": "false"
                         },
                         {
                             "id": "design-conversation-controls-full",
@@ -2624,11 +2784,13 @@
                                         "options": [
                                             {
                                                 "id": "task",
+                                                "value": "task",
                                                 "label": "Задание",
                                                 "label_i18n": "builder.design.Задание"
                                             },
                                             {
                                                 "id": "informal",
+                                                "value": "informal",
                                                 "label": "Свободное обсуждение",
                                                 "label_i18n": "builder.design.Свободное обсуждение"
                                             }
@@ -2655,7 +2817,7 @@
                                     "on": "select:conversation-mode",
                                     "type": "updateState",
                                     "params": {
-                                        "conversationMode": "$event.id"
+                                        "conversationMode": "$event.value"
                                     }
                                 },
                                 {
@@ -2730,6 +2892,48 @@
                                     "builder.project.publication",
                                     "builder.project.change"
                                 ],
+                                "conversation": {
+                                    "version": 1,
+                                    "owner": "application:builder",
+                                    "label": "$state.selectedProjectId",
+                                    "agent": {
+                                        "mode": "fixed",
+                                        "id": "agent:builder_skill:builder",
+                                        "label": "Builder",
+                                        "icon": "person-circle-outline"
+                                    },
+                                    "history": {
+                                        "mode": "auto",
+                                        "maxMessages": 200
+                                    },
+                                    "voice": true,
+                                    "presentation": {
+                                        "floating": true
+                                    },
+                                    "model": {
+                                        "source": {
+                                            "kind": "skill",
+                                            "name": "builder_sdk_control_skill.get_llm_options",
+                                            "params": {
+                                                "object_type": "$state.selectedProjectKind",
+                                                "object_id": "$state.selectedProjectId",
+                                                "_meta": {
+                                                    "current_scenario": "builder"
+                                                }
+                                            },
+                                            "invalidationTags": [
+                                                "builder.project.llm"
+                                            ],
+                                            "cacheTtlMs": 5000,
+                                            "preserveLastValue": true
+                                        },
+                                        "valuePath": "value",
+                                        "optionsPath": "options",
+                                        "label": "Prototype model"
+                                    }
+                                },
+                                "syncDialogSelection": false,
+                                "composerRows": 2,
                                 "historyButtonLabel_i18n": {
                                     "locales": {
                                         "en": "History",
@@ -2744,7 +2948,22 @@
                                 }
                             },
                             "title_i18n": "builder.text.development.conversation",
-                            "actions": []
+                            "actions": [
+                                {
+                                    "on": "model.change",
+                                    "type": "callSkill",
+                                    "target": "builder_sdk_control_skill.set_llm_profile",
+                                    "params": {
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        },
+                                        "model": "$event.value"
+                                    },
+                                    "invalidates": "builder.project.llm"
+                                }
+                            ]
                         },
                         {
                             "id": "design-conversation-full-informal",
@@ -2776,8 +2995,55 @@
                             },
                             "inputs": {
                                 "compact": true,
-                                "showTimestamps": true
-                            }
+                                "showTimestamps": true,
+                                "conversation": {
+                                    "version": 1,
+                                    "owner": "application:builder",
+                                    "label": "$state.selectedProjectId",
+                                    "agent": {
+                                        "mode": "fixed",
+                                        "id": "agent:builder_skill:builder",
+                                        "label": "Builder",
+                                        "icon": "person-circle-outline"
+                                    },
+                                    "history": {
+                                        "mode": "manual",
+                                        "maxMessages": 200
+                                    },
+                                    "voice": false,
+                                    "presentation": {
+                                        "floating": true
+                                    }
+                                },
+                                "syncDialogSelection": false,
+                                "multiline": true,
+                                "composerRows": 2
+                            },
+                            "actions": [
+                                {
+                                    "on": "send",
+                                    "type": "callSkill",
+                                    "target": "builder_sdk_control_skill.append_discussion",
+                                    "params": {
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        },
+                                        "text": "$event.text"
+                                    },
+                                    "invalidates": [
+                                        "builder.project.metadata",
+                                        "builder.project.lifecycle",
+                                        "builder.project.preview",
+                                        "builder.project.automation",
+                                        "builder.project.publication",
+                                        "builder.project.change",
+                                        "builder.project.files",
+                                        "builder.project.llm"
+                                    ]
+                                }
+                            ]
                         },
                         {
                             "id": "design-composer-full-informal",
@@ -2822,7 +3088,7 @@
                                     ]
                                 }
                             ],
-                            "visibleIf": "$state.workbenchView === 'conversation' && $state.conversationMode === 'informal'"
+                            "visibleIf": "false"
                         },
                         {
                             "id": "design-conversation-request-provenance",
@@ -2865,6 +3131,105 @@
                                     }
                                 ]
                             }
+                        },
+                        {
+                            "id": "builder-core-application-lifecycle",
+                            "type": "item.details",
+                            "area": "main",
+                            "title": "Selected Application runtime — Core",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "applications.lifecycle.source",
+                                "arguments": {
+                                    "source_kind": "$state.selectedProjectKind",
+                                    "source_id": "$state.selectedProjectId",
+                                    "webspace_id": "$client.webspaceId"
+                                },
+                                "dryRun": true,
+                                "resultPath": "response.result.lifecycle",
+                                "cacheTtlMs": 1000,
+                                "invalidationTags": [
+                                    "applications.lifecycle",
+                                    "applications.runtime",
+                                    "applications.detail",
+                                    "applications.catalog",
+                                    "builder.runtime",
+                                    "web_desktop.applications",
+                                    "applications.lifecycle.clock"
+                                ]
+                            },
+                            "inputs": {
+                                "presentation": "section",
+                                "fields": [
+                                    {
+                                        "label": "State",
+                                        "path": "summary"
+                                    },
+                                    {
+                                        "label": "Runtime admission",
+                                        "path": "runtime.admission"
+                                    },
+                                    {
+                                        "label": "Execution lease expires",
+                                        "path": "runtime.expires_at"
+                                    },
+                                    {
+                                        "label": "Admission kind",
+                                        "path": "runtime.admission_kind"
+                                    },
+                                    {
+                                        "label": "Candidate decision",
+                                        "path": "candidate.status"
+                                    },
+                                    {
+                                        "label": "Materialization",
+                                        "path": "materialization.status"
+                                    }
+                                ],
+                                "stateBindings": {
+                                    "lifecycleApplicationId": {
+                                        "path": "application_id",
+                                        "default": ""
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "builder-core-lifecycle-actions",
+                            "type": "ui.actions",
+                            "area": "main",
+                            "inputs": {
+                                "buttons": [
+                                    {
+                                        "id": "manage-runtime",
+                                        "label": "Manage runtime and Trials",
+                                        "kind": "secondary",
+                                        "enabledIf": "$state.lifecycleApplicationId"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:manage-runtime",
+                                    "type": "updateState",
+                                    "params": {
+                                        "coreLifecyclePlan": {},
+                                        "coreWriteLossAcknowledged": false
+                                    }
+                                },
+                                {
+                                    "on": "click:manage-runtime",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "core-application-lifecycle",
+                                        "statePatch": {
+                                            "lifecycleApplicationId": "$state.lifecycleApplicationId",
+                                            "coreLifecyclePlan": {},
+                                            "coreWriteLossAcknowledged": false
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     ],
                     "initialStateSource": {
@@ -2881,12 +3246,53 @@
                             "project.description": "description",
                             "project.type": "object_type",
                             "builderTopicId": "conversation_topic_id",
-                            "builderThreadId": "conversation_thread_id"
-                        }
+                            "builderThreadId": "conversation_thread_id",
+                            "applicationTitle": "title"
+                        },
+                        "required": true,
+                        "identityKeys": [
+                            "selectedProjectKind",
+                            "selectedProjectId"
+                        ]
                     },
                     "title_i18n": {
                         "fallback": "Builder",
                         "key": "scenario.builder.title"
+                    },
+                    "autoActions": [
+                        {
+                            "id": "core-lifecycle-observation-clock",
+                            "intervalMs": 15000,
+                            "action": {
+                                "on": "auto:core-lifecycle-clock",
+                                "type": "callMcp",
+                                "target": "applications.lifecycle.events",
+                                "params": {
+                                    "limit": 1
+                                },
+                                "dryRun": true,
+                                "resultStateKey": "coreLifecycleObservationClock",
+                                "invalidates": [
+                                    "applications.lifecycle.clock"
+                                ]
+                            }
+                        }
+                    ],
+                    "navigationState": {
+                        "bindings": [
+                            {
+                                "stateKey": "selectedProjectKind",
+                                "queryKey": "builder_object_type",
+                                "history": "push",
+                                "hydrate": true
+                            },
+                            {
+                                "stateKey": "selectedProjectId",
+                                "queryKey": "builder_object_id",
+                                "history": "push",
+                                "hydrate": true
+                            }
+                        ]
                     }
                 }
             },
@@ -3358,7 +3764,8 @@
                                     "invalidationTags": [
                                         "builder.project.catalog"
                                     ],
-                                    "preserveLastValue": true
+                                    "preserveLastValue": true,
+                                    "readPriority": "interactive"
                                 },
                                 "inputs": {
                                     "pagination": true,
@@ -3472,7 +3879,9 @@
                                             "applicationTitle": "$event.title",
                                             "workbenchView": "result",
                                             "selectedTrace": {},
-                                            "iconGeneration": null
+                                            "iconGeneration": null,
+                                            "revisionHistoryCursor": "",
+                                            "revisionHistoryProject": ""
                                         }
                                     },
                                     {
@@ -3633,7 +4042,8 @@
                                         "on": "change:object_type",
                                         "type": "updateState",
                                         "params": {
-                                            "selectedTemplate": null
+                                            "selectedTemplate": null,
+                                            "newProjectKind": "$event.value"
                                         }
                                     },
                                     {
@@ -3671,7 +4081,9 @@
                                             "applicationTitle": "$event.values.title",
                                             "selectedProjectTitle": "$event.values.title",
                                             "selectedTrace": {},
-                                            "iconGeneration": null
+                                            "iconGeneration": null,
+                                            "revisionHistoryCursor": "",
+                                            "revisionHistoryProject": ""
                                         }
                                     },
                                     {
@@ -5192,7 +5604,7 @@
                                 "area": "main",
                                 "id": "project-tree",
                                 "type": "collection.tree",
-                                "title": "Lifecycle (compatibility)",
+                                "title": "Редакции",
                                 "dataSource": {
                                     "kind": "skill",
                                     "name": "builder_sdk_control_skill.get_lifecycle",
@@ -5201,10 +5613,13 @@
                                         "object_id": "$state.selectedProjectId",
                                         "_meta": {
                                             "current_scenario": "builder"
-                                        }
+                                        },
+                                        "cursor": "$state.revisionHistoryCursor",
+                                        "cursor_project": "$state.revisionHistoryProject"
                                     },
                                     "cacheTtlMs": 0,
                                     "invalidationTags": "builder.project.lifecycle",
+                                    "readPriority": "interactive",
                                     "preserveLastValue": true
                                 },
                                 "inputs": {
@@ -5213,9 +5628,15 @@
                                     "buttons": [
                                         {
                                             "id": "show-preview",
-                                            "label": "Show in Preview",
+                                            "label": "Предпросмотр",
                                             "icon": "eye-outline",
-                                            "whenKey": "canPreview"
+                                            "whenKey": "canPreview",
+                                            "label_i18n": {
+                                                "values": {
+                                                    "ru": "Предпросмотр",
+                                                    "en": "Preview"
+                                                }
+                                            }
                                         },
                                         {
                                             "id": "make-current",
@@ -5244,6 +5665,28 @@
                                             "icon": "rocket-outline",
                                             "whenKey": "canOpenPublication",
                                             "label_i18n": "builder.text.move.to.publication"
+                                        },
+                                        {
+                                            "id": "history-next",
+                                            "label": "Далее",
+                                            "label_i18n": {
+                                                "values": {
+                                                    "ru": "Далее",
+                                                    "en": "Next"
+                                                }
+                                            },
+                                            "whenKey": "canNextPage"
+                                        },
+                                        {
+                                            "id": "history-reset",
+                                            "label": "В начало",
+                                            "label_i18n": {
+                                                "values": {
+                                                    "ru": "В начало",
+                                                    "en": "First page"
+                                                }
+                                            },
+                                            "whenKey": "canResetPage"
                                         }
                                     ],
                                     "compactIndent": true,
@@ -5255,7 +5698,7 @@
                                         "type": "updateState",
                                         "params": {
                                             "selectedNodeId": "$event.id",
-                                            "inspectedPrototypeRevision": "$event.source_prototype_version || $event.revision || $event.version",
+                                            "inspectedPrototypeRevision": "$event.item.revision",
                                             "selectedLifecycleStage": "$event.lifecycleStage",
                                             "lifecycleConversationLabel": "$event.conversationLabel"
                                         }
@@ -5266,10 +5709,16 @@
                                         "target": "builder_skill.set_ui_revision_current",
                                         "params": {
                                             "revision": "$event.item.revision",
+                                            "scenario_id": "$event.item.scenario_id",
                                             "_meta": {
                                                 "current_scenario": "builder"
                                             }
-                                        }
+                                        },
+                                        "invalidates": [
+                                            "builder.project.lifecycle",
+                                            "builder.project.preview",
+                                            "builder.project.metadata"
+                                        ]
                                     },
                                     {
                                         "on": "click:stabilize",
@@ -5310,9 +5759,25 @@
                                             "builder.project.lifecycle",
                                             "builder.project.metadata"
                                         ]
+                                    },
+                                    {
+                                        "on": "click:history-next",
+                                        "type": "updateState",
+                                        "params": {
+                                            "revisionHistoryCursor": "$event.item.cursor",
+                                            "revisionHistoryProject": "$event.item.cursorProject"
+                                        }
+                                    },
+                                    {
+                                        "on": "click:history-reset",
+                                        "type": "updateState",
+                                        "params": {
+                                            "revisionHistoryCursor": "",
+                                            "revisionHistoryProject": "$event.item.cursorProject"
+                                        }
                                     }
                                 ],
-                                "title_i18n": "builder.text.lifecycle"
+                                "title_i18n": "builder.design.Редакции"
                             }
                         ]
                     }
@@ -7811,6 +8276,847 @@
                                     "compactPresentation": "cards",
                                     "selectionMode": "none"
                                 }
+                            }
+                        ]
+                    }
+                },
+                "core-application-lifecycle": {
+                    "title": "Application runtime and Trials — Core",
+                    "presentation": {
+                        "kind": "modal"
+                    },
+                    "schema": {
+                        "id": "core-application-lifecycle",
+                        "title": "Core-owned application lifecycle",
+                        "autoActions": [
+                            {
+                                "id": "core-lifecycle-observation-clock",
+                                "intervalMs": 15000,
+                                "action": {
+                                    "on": "auto:core-lifecycle-clock",
+                                    "type": "callMcp",
+                                    "target": "applications.lifecycle.events",
+                                    "params": {
+                                        "limit": 1
+                                    },
+                                    "dryRun": true,
+                                    "resultStateKey": "coreLifecycleObservationClock",
+                                    "invalidates": [
+                                        "applications.lifecycle.clock"
+                                    ]
+                                }
+                            }
+                        ],
+                        "layout": {
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "bounded",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "selection": "single",
+                                "rowActivation": "select",
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "core-lifecycle-identity",
+                                "type": "item.details",
+                                "area": "main",
+                                "title": "Core runtime authority",
+                                "dataSource": {
+                                    "kind": "mcp",
+                                    "toolId": "applications.lifecycle.show",
+                                    "arguments": {
+                                        "application_id": "$state.lifecycleApplicationId",
+                                        "webspace_id": "$client.webspaceId"
+                                    },
+                                    "dryRun": true,
+                                    "resultPath": "response.result.lifecycle",
+                                    "cacheTtlMs": 1000,
+                                    "invalidationTags": [
+                                        "applications.lifecycle",
+                                        "applications.runtime",
+                                        "applications.detail",
+                                        "applications.catalog",
+                                        "builder.runtime",
+                                        "web_desktop.applications",
+                                        "applications.lifecycle.clock"
+                                    ]
+                                },
+                                "inputs": {
+                                    "presentation": "section",
+                                    "fields": [
+                                        {
+                                            "label": "Application",
+                                            "path": "application_id"
+                                        },
+                                        {
+                                            "label": "State",
+                                            "path": "summary"
+                                        },
+                                        {
+                                            "label": "Version",
+                                            "path": "runtime.version"
+                                        },
+                                        {
+                                            "label": "Admission",
+                                            "path": "runtime.admission"
+                                        },
+                                        {
+                                            "label": "Reason",
+                                            "path": "runtime.reason"
+                                        },
+                                        {
+                                            "label": "Admission kind",
+                                            "path": "runtime.admission_kind"
+                                        },
+                                        {
+                                            "label": "Execution lease expires",
+                                            "path": "runtime.expires_at"
+                                        },
+                                        {
+                                            "label": "Original temporary Trial expiry",
+                                            "path": "runtime.trial_expires_at"
+                                        },
+                                        {
+                                            "label": "Remaining seconds",
+                                            "path": "runtime.remaining_seconds"
+                                        },
+                                        {
+                                            "label": "Stable baseline",
+                                            "path": "installation.stable_release_digest"
+                                        },
+                                        {
+                                            "label": "Candidate",
+                                            "path": "candidate.candidate_id"
+                                        },
+                                        {
+                                            "label": "Candidate decision",
+                                            "path": "candidate.status"
+                                        },
+                                        {
+                                            "label": "Data",
+                                            "path": "data.disposition"
+                                        },
+                                        {
+                                            "label": "Transition pending",
+                                            "path": "data.transition_pending"
+                                        },
+                                        {
+                                            "label": "Materialization",
+                                            "path": "materialization.status"
+                                        },
+                                        {
+                                            "label": "Operation phase",
+                                            "path": "operation.phase"
+                                        }
+                                    ],
+                                    "stateBindings": {
+                                        "coreLifecycleRevision": {
+                                            "path": "revision",
+                                            "default": ""
+                                        },
+                                        "coreCandidateId": {
+                                            "path": "candidate.candidate_id",
+                                            "default": ""
+                                        },
+                                        "coreCandidateDigest": {
+                                            "path": "candidate.candidate_digest",
+                                            "default": ""
+                                        },
+                                        "coreRecoveryCandidateId": {
+                                            "path": "data.recovery_candidate_id",
+                                            "default": ""
+                                        },
+                                        "coreRetainEligible": {
+                                            "path": "actions.retain_local_beta.eligible",
+                                            "default": false
+                                        },
+                                        "coreRestoreEligible": {
+                                            "path": "actions.restore_stable.eligible",
+                                            "default": false
+                                        },
+                                        "coreDeactivateEligible": {
+                                            "path": "actions.deactivate_beta.eligible",
+                                            "default": false
+                                        },
+                                        "coreUninstallEligible": {
+                                            "path": "actions.uninstall.eligible",
+                                            "default": false
+                                        },
+                                        "coreRecoverEligible": {
+                                            "path": "actions.recover.eligible",
+                                            "default": false
+                                        },
+                                        "coreAcceptEligible": {
+                                            "path": "actions.accept_candidate.eligible",
+                                            "default": false
+                                        },
+                                        "coreRejectEligible": {
+                                            "path": "actions.reject_candidate.eligible",
+                                            "default": false
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "id": "core-write-loss-consent",
+                                "type": "input.toggle",
+                                "area": "main",
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.coreWriteLossAcknowledged"
+                                },
+                                "inputs": {
+                                    "label": "I understand: Beta writes stay retained and are not copied back to the restored runtime."
+                                },
+                                "actions": [
+                                    {
+                                        "on": "change",
+                                        "type": "updateState",
+                                        "params": {
+                                            "coreWriteLossAcknowledged": "$event.checked"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-lifecycle-review-actions",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "variant": "toolbar",
+                                    "buttons": [
+                                        {
+                                            "id": "retain-beta",
+                                            "label": "Install this local Beta",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreRetainEligible == true"
+                                        },
+                                        {
+                                            "id": "restore-stable",
+                                            "label": "Return to verified Stable",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreRestoreEligible == true && $state.coreWriteLossAcknowledged == true"
+                                        },
+                                        {
+                                            "id": "deactivate-beta",
+                                            "label": "Restore previous runtime",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreDeactivateEligible == true && $state.coreWriteLossAcknowledged == true"
+                                        },
+                                        {
+                                            "id": "uninstall",
+                                            "label": "Uninstall application; retain data",
+                                            "kind": "danger",
+                                            "enabledIf": "$state.coreUninstallEligible == true"
+                                        },
+                                        {
+                                            "id": "recover",
+                                            "label": "Review preparation recovery",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreRecoverEligible == true"
+                                        },
+                                        {
+                                            "id": "accept-candidate",
+                                            "label": "Accept exact Candidate",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreAcceptEligible == true"
+                                        },
+                                        {
+                                            "id": "reject-candidate",
+                                            "label": "Reject exact Candidate",
+                                            "kind": "danger",
+                                            "enabledIf": "$state.coreRejectEligible == true && $state.coreWriteLossAcknowledged == true"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:retain-beta",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.plan",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "action": "retain_local_beta",
+                                            "expected_revision": "$state.coreLifecycleRevision",
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreRetainEligible == true",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:restore-stable",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.plan",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "action": "restore_stable",
+                                            "expected_revision": "$state.coreLifecycleRevision",
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreRestoreEligible == true && $state.coreWriteLossAcknowledged == true",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:deactivate-beta",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.plan",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "action": "deactivate_beta",
+                                            "expected_revision": "$state.coreLifecycleRevision",
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreDeactivateEligible == true && $state.coreWriteLossAcknowledged == true",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:uninstall",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.plan",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "action": "uninstall",
+                                            "expected_revision": "$state.coreLifecycleRevision",
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreUninstallEligible == true",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:recover",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.plan",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "action": "recover_runtime",
+                                            "expected_revision": "$state.coreLifecycleRevision",
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged",
+                                            "candidate_id": "$state.coreRecoveryCandidateId"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreRecoverEligible == true",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:accept-candidate",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.decide",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "candidate_id": "$state.coreCandidateId",
+                                            "expected_candidate_digest": "$state.coreCandidateDigest",
+                                            "accepted": true,
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreAcceptEligible == true",
+                                        "resultStateKey": "coreCandidateDecision"
+                                    },
+                                    {
+                                        "on": "click:reject-candidate",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.decide",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "candidate_id": "$state.coreCandidateId",
+                                            "expected_candidate_digest": "$state.coreCandidateDigest",
+                                            "accepted": false,
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreRejectEligible == true && $state.coreWriteLossAcknowledged == true",
+                                        "resultStateKey": "coreCandidateDecision"
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-lifecycle-plan",
+                                "type": "item.details",
+                                "area": "main",
+                                "title": "Review exact operation before applying",
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.coreLifecyclePlan"
+                                },
+                                "inputs": {
+                                    "presentation": "section",
+                                    "fields": [
+                                        {
+                                            "label": "Operation",
+                                            "path": "operation.operation_id"
+                                        },
+                                        {
+                                            "label": "Application",
+                                            "path": "operation.application_id"
+                                        },
+                                        {
+                                            "label": "Action",
+                                            "path": "operation.plan.action"
+                                        },
+                                        {
+                                            "label": "Summary",
+                                            "path": "operation.plan.summary"
+                                        },
+                                        {
+                                            "label": "Installation review",
+                                            "path": "operation.plan.review_summary"
+                                        },
+                                        {
+                                            "label": "Release",
+                                            "path": "operation.plan.release_digest"
+                                        },
+                                        {
+                                            "label": "Affected desktops",
+                                            "path": "operation.plan.affected_webspace_ids"
+                                        },
+                                        {
+                                            "label": "Data policy",
+                                            "path": "operation.plan.data_policy"
+                                        },
+                                        {
+                                            "label": "Plan expiry",
+                                            "path": "operation.plan.expires_at"
+                                        },
+                                        {
+                                            "label": "Status",
+                                            "path": "operation.status"
+                                        },
+                                        {
+                                            "label": "Recovery reason",
+                                            "path": "operation.recovery_reason"
+                                        },
+                                        {
+                                            "label": "Result",
+                                            "path": "operation.result.status"
+                                        }
+                                    ]
+                                },
+                                "visibleIf": "$state.coreLifecyclePlan.operation.operation_id"
+                            },
+                            {
+                                "id": "core-lifecycle-confirm",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "variant": "toolbar",
+                                    "buttons": [
+                                        {
+                                            "id": "apply",
+                                            "label": "Apply reviewed operation",
+                                            "kind": "primary",
+                                            "enabledIf": "$state.coreLifecyclePlan.operation.status == 'planned' && $state.coreLifecyclePlan.operation.application_id == $state.lifecycleApplicationId",
+                                            "visibleIf": "$state.coreLifecyclePlan.operation.plan.required_apply_capability != 'applications.recover'"
+                                        },
+                                        {
+                                            "id": "recover",
+                                            "label": "Recover exact operation",
+                                            "kind": "primary",
+                                            "enabledIf": "$state.coreLifecyclePlan.operation.status == 'planned' && $state.coreLifecyclePlan.operation.application_id == $state.lifecycleApplicationId",
+                                            "visibleIf": "$state.coreLifecyclePlan.operation.plan.required_apply_capability == 'applications.recover'"
+                                        },
+                                        {
+                                            "id": "cancel-plan",
+                                            "label": "Cancel saved plan",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreLifecyclePlan.operation.status == 'planned' && $state.coreLifecyclePlan.operation.application_id == $state.lifecycleApplicationId"
+                                        }
+                                    ]
+                                },
+                                "visibleIf": "$state.coreLifecyclePlan.operation.operation_id",
+                                "actions": [
+                                    {
+                                        "on": "click:apply",
+                                        "type": "callMcp",
+                                        "target": "applications.apply",
+                                        "params": {
+                                            "operation_id": "$state.coreLifecyclePlan.operation.operation_id",
+                                            "plan_digest": "$state.coreLifecyclePlan.operation.plan_digest",
+                                            "idempotency_key": "$state.coreLifecyclePlan.operation.idempotency_key"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreLifecyclePlan.operation.status == 'planned' && $state.coreLifecyclePlan.operation.application_id == $state.lifecycleApplicationId",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:recover",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.recover",
+                                        "params": {
+                                            "operation_id": "$state.coreLifecyclePlan.operation.operation_id",
+                                            "plan_digest": "$state.coreLifecyclePlan.operation.plan_digest",
+                                            "idempotency_key": "$state.coreLifecyclePlan.operation.idempotency_key"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreLifecyclePlan.operation.status == 'planned' && $state.coreLifecyclePlan.operation.application_id == $state.lifecycleApplicationId",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:cancel-plan",
+                                        "type": "callMcp",
+                                        "target": "applications.cancel_operation",
+                                        "params": {
+                                            "operation_id": "$state.coreLifecyclePlan.operation.operation_id",
+                                            "plan_digest": "$state.coreLifecyclePlan.operation.plan_digest",
+                                            "idempotency_key": "$state.coreLifecyclePlan.operation.idempotency_key"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreLifecyclePlan.operation.status == 'planned' && $state.coreLifecyclePlan.operation.application_id == $state.lifecycleApplicationId",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-observe-storage",
+                                "type": "input.toggle",
+                                "area": "main",
+                                "inputs": {
+                                    "label": "Measure Trial storage (bounded; unknown is not zero)"
+                                },
+                                "actions": [
+                                    {
+                                        "on": "change",
+                                        "type": "updateState",
+                                        "params": {
+                                            "coreObserveStorage": "$event.checked"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-trial-inventory",
+                                "type": "ui.list",
+                                "area": "main",
+                                "title": "Trials, expired and retained editions",
+                                "dataSource": {
+                                    "kind": "mcp",
+                                    "toolId": "applications.lifecycle.trials",
+                                    "arguments": {
+                                        "application_id": "$state.lifecycleApplicationId",
+                                        "webspace_id": "$client.webspaceId",
+                                        "include_storage": "$state.coreObserveStorage"
+                                    },
+                                    "dryRun": true,
+                                    "resultPath": "response.result.trials",
+                                    "cacheTtlMs": 1000,
+                                    "invalidationTags": [
+                                        "applications.lifecycle",
+                                        "applications.runtime",
+                                        "applications.detail",
+                                        "applications.catalog",
+                                        "builder.runtime",
+                                        "web_desktop.applications",
+                                        "applications.lifecycle.clock"
+                                    ]
+                                },
+                                "inputs": {
+                                    "variant": "list",
+                                    "itemIdKey": "candidate_id",
+                                    "titleKey": "candidate_id",
+                                    "subtitleKey": "version",
+                                    "pagination": true,
+                                    "pageSize": 6,
+                                    "meta": [
+                                        {
+                                            "key": "status",
+                                            "label": "State",
+                                            "kind": "badge"
+                                        },
+                                        {
+                                            "key": "selected",
+                                            "label": "Selected",
+                                            "kind": "boolean"
+                                        },
+                                        {
+                                            "key": "candidate_status",
+                                            "label": "Decision",
+                                            "kind": "badge"
+                                        },
+                                        {
+                                            "key": "expires_at",
+                                            "label": "Temporary Trial lease"
+                                        },
+                                        {
+                                            "key": "deletion_reason",
+                                            "label": "Deletion review"
+                                        },
+                                        {
+                                            "key": "storage_bytes",
+                                            "label": "Bytes"
+                                        },
+                                        {
+                                            "key": "storage_reason",
+                                            "label": "Storage observation"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "select",
+                                        "type": "updateState",
+                                        "params": {
+                                            "coreTrialCandidateId": "$event.candidate_id",
+                                            "coreTrialReviewAvailable": "$event.deletion_review_available",
+                                            "coreLifecyclePlan": {}
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-trial-delete",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "review-delete",
+                                            "label": "Review recoverable deletion of selected row",
+                                            "kind": "danger",
+                                            "enabledIf": "$state.coreTrialCandidateId && $state.coreTrialReviewAvailable == true"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:review-delete",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.plan",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "action": "delete_trial",
+                                            "candidate_id": "$state.coreTrialCandidateId",
+                                            "expected_revision": "$state.coreLifecycleRevision"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreTrialCandidateId && $state.coreTrialReviewAvailable == true",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-lifecycle-operations",
+                                "type": "ui.list",
+                                "area": "main",
+                                "title": "Core lifecycle history",
+                                "dataSource": {
+                                    "kind": "mcp",
+                                    "toolId": "applications.lifecycle.operations",
+                                    "arguments": {
+                                        "application_id": "$state.lifecycleApplicationId",
+                                        "webspace_id": "$client.webspaceId"
+                                    },
+                                    "dryRun": true,
+                                    "resultPath": "response.result.operations",
+                                    "cacheTtlMs": 1000,
+                                    "invalidationTags": [
+                                        "applications.lifecycle",
+                                        "applications.runtime",
+                                        "applications.detail",
+                                        "applications.catalog",
+                                        "builder.runtime",
+                                        "web_desktop.applications",
+                                        "applications.lifecycle.clock"
+                                    ]
+                                },
+                                "inputs": {
+                                    "variant": "list",
+                                    "itemIdKey": "operation_id",
+                                    "titleKey": "action",
+                                    "subtitleKey": "operation_id",
+                                    "pagination": true,
+                                    "pageSize": 6,
+                                    "meta": [
+                                        {
+                                            "key": "source",
+                                            "label": "Journal",
+                                            "kind": "badge"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "label": "Status",
+                                            "kind": "badge"
+                                        },
+                                        {
+                                            "key": "recovery_reason",
+                                            "label": "Recovery"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "select",
+                                        "type": "updateState",
+                                        "params": {
+                                            "coreHistoryOperationId": "$event.operation_id",
+                                            "coreHistoryPlanDigest": "$event.plan_digest",
+                                            "coreHistoryRecoverable": "$event.recoverable"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-history-recovery",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "recover-history",
+                                            "label": "Recover selected exact operation",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreHistoryOperationId && $state.coreHistoryPlanDigest && $state.coreHistoryRecoverable == true"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:recover-history",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.recover",
+                                        "params": {
+                                            "operation_id": "$state.coreHistoryOperationId",
+                                            "plan_digest": "$state.coreHistoryPlanDigest"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreHistoryOperationId && $state.coreHistoryPlanDigest && $state.coreHistoryRecoverable == true",
+                                        "resultStateKey": "coreHistoryRecoveryResult"
+                                    }
+                                ]
                             }
                         ]
                     }

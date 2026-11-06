@@ -156,8 +156,8 @@
       "kind": "skill",
       "id": "builder_automation_skill",
       "name": "builder_automation_skill",
-      "version": "0.2.5",
-      "updated_at": "2026-09-26T11:03:22+00:00",
+      "version": "0.2.10",
+      "updated_at": "2026-11-06T03:41:03+00:00",
       "path": "skills/builder_automation_skill",
       "manifest": "skills/builder_automation_skill/skill.yaml",
       "source": {
@@ -172,14 +172,14 @@
       "description": "System adapter for the Builder Automation stage and its local Codex implementation loop.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 3,
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.19",
-        "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-        "package_digest": "sha256:f3af7ec654916d7b1d8c82fa8c6ce11a6d8bc3fea6094f5be126c6bc5cc769a0"
-      }
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:9d4a342f78a7f7069cc9766e60f845f4c9cd0f3fc8187af1a55c1d318cf50fd1"
+      },
+      "tools_count": 3
     },
     {
       "kind": "skill",
@@ -207,8 +207,8 @@
       "kind": "skill",
       "id": "builder_sdk_control_skill",
       "name": "builder_sdk_control_skill",
-      "version": "0.2.6",
-      "updated_at": "2026-09-30T19:41:56+00:00",
+      "version": "0.2.29",
+      "updated_at": "2026-11-06T03:41:03+00:00",
       "path": "skills/builder_sdk_control_skill",
       "manifest": "skills/builder_sdk_control_skill/skill.yaml",
       "source": {
@@ -223,21 +223,21 @@
       "description": "SDK-only backend for the functional Builder DEV scenario.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 85,
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.19",
-        "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-        "package_digest": "sha256:da1694cf275d78c9d79484208b8d7ddb5fdd1cb1943946ee021abab1cc48d257"
-      }
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:0eef8cd6506e84969ef9a43c84974f7b7a3ff52c1d7874de5f15d5a361ff2739"
+      },
+      "tools_count": 87
     },
     {
       "kind": "skill",
       "id": "builder_skill",
       "name": "builder_skill",
-      "version": "0.4.5",
-      "updated_at": "2026-09-26T11:02:50+00:00",
+      "version": "0.4.50",
+      "updated_at": "2026-11-06T03:41:03+00:00",
       "path": "skills/builder_skill",
       "manifest": "skills/builder_skill/skill.yaml",
       "source": {
@@ -252,14 +252,14 @@
       "description": "Rapid prototyping Builder skill for creating and editing scenario UI drafts from voice or text dialog.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 28,
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.19",
-        "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-        "package_digest": "sha256:0a0d4341e83fd64ba08cc3da7713e9700b4a3d2062f4fcd821157b74c136bff0"
-      }
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:0cba00832b1f979901b3d374672639dad9b79c7690b20cd59a013938d2e46e75"
+      },
+      "tools_count": 35
     },
     {
       "kind": "skill",
@@ -958,6 +958,35 @@
     },
     {
       "kind": "skill",
+      "id": "prompt_engineer_skill",
+      "name": "prompt_engineer_skill",
+      "version": "0.7.11",
+      "updated_at": "2026-11-06T03:41:03+00:00",
+      "path": "skills/prompt_engineer_skill",
+      "manifest": "skills/prompt_engineer_skill/skill.yaml",
+      "source": {
+        "path": "skills/prompt_engineer_skill",
+        "manifest": "skills/prompt_engineer_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "prompt_engineer_skill",
+        "id": "prompt_engineer_skill"
+      },
+      "description": "Prompt IDE backend skill that manages dev scenarios/skills, technical specs and git operations.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "adaos_builder",
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:40e66e3e02ccb865fc0dbc069b1a0103ab66bf29dde36a1bb696f80340168be0"
+      },
+      "tools_count": 27
+    },
+    {
+      "kind": "skill",
       "id": "rasa_nlu_service_skill",
       "name": "rasa_nlu_service_skill",
       "version": "0.1.15",
@@ -1485,7 +1514,7 @@
       "id": "voice_chat_skill",
       "name": "voice_chat_skill",
       "version": "0.7.8",
-      "updated_at": "2026-11-02T12:02:11+00:00",
+      "updated_at": "2026-11-06T03:41:03+00:00",
       "path": "skills/voice_chat_skill",
       "manifest": "skills/voice_chat_skill/skill.yaml",
       "source": {
@@ -1502,9 +1531,9 @@
       "tools_count": 8,
       "activation": {
         "mode": "package_lock",
-        "project_id": "web_desktop",
-        "release": "web_desktop@0.3.94",
-        "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
+        "project_id": "adaos_builder",
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
         "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c"
       }
     },
@@ -1821,8 +1850,8 @@
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.103",
-      "updated_at": "2026-09-27T17:42:00+00:00",
+      "version": "0.2.115",
+      "updated_at": "2026-11-06T03:41:03+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.yaml",
       "source": {
@@ -1830,7 +1859,7 @@
         "manifest": "scenarios/builder/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:79f1e92adb6c137c43eb770003aef02a660fe7be83a964b028f5aa096c58763b",
+        "revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
         "path_scope": [
           "projects/adaos_builder/"
         ]
@@ -1856,17 +1885,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.19",
-        "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-        "package_digest": "sha256:18f30e668e057eb3913034ddd13d892003f4b28af46cb4cb3eeb02563687c79b"
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:0bc61280d319dfd1ed6862e801d7f4c4b87fe98f6d72e3ed60476e82bbce0746"
       },
       "channels": {
         "stable": {
-          "release": "adaos_builder@0.3.19",
-          "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-          "source_revision": "sha256:79f1e92adb6c137c43eb770003aef02a660fe7be83a964b028f5aa096c58763b",
-          "package_digest": "sha256:18f30e668e057eb3913034ddd13d892003f4b28af46cb4cb3eeb02563687c79b",
-          "version": "0.2.103"
+          "release": "adaos_builder@0.3.42",
+          "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+          "source_revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
+          "package_digest": "sha256:0bc61280d319dfd1ed6862e801d7f4c4b87fe98f6d72e3ed60476e82bbce0746",
+          "version": "0.2.115"
         }
       }
     },
@@ -2108,6 +2137,39 @@
     },
     {
       "kind": "scenario",
+      "id": "prompt_engineer_scenario",
+      "name": "prompt_engineer_scenario",
+      "version": "0.3.15",
+      "updated_at": "2026-11-06T03:41:03+00:00",
+      "path": "scenarios/prompt_engineer_scenario",
+      "manifest": "scenarios/prompt_engineer_scenario/scenario.yaml",
+      "source": {
+        "path": "scenarios/prompt_engineer_scenario",
+        "manifest": "scenarios/prompt_engineer_scenario/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "prompt_engineer_scenario",
+        "id": "prompt_engineer_scenario"
+      },
+      "title": "Prompt IDE",
+      "description": "Prompt engineering IDE workspace for dev skills and scenarios.",
+      "skills": {
+        "required": [
+          "prompt_engineer_skill",
+          "builder_automation_skill"
+        ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "adaos_builder",
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:dc96cb929cd446e01a062758f1b319ee8ca3f7bf33c5924c82eda2787e3d3e97"
+      }
+    },
+    {
+      "kind": "scenario",
       "id": "redevice_user_face",
       "name": "redevice_user_face",
       "version": "0.1.14",
@@ -2235,8 +2297,8 @@
       "kind": "scenario",
       "id": "skill_preview",
       "name": "skill_preview",
-      "version": "0.1.4",
-      "updated_at": "2026-09-26T11:02:38+00:00",
+      "version": "0.1.8",
+      "updated_at": "2026-11-06T03:41:03+00:00",
       "path": "scenarios/skill_preview",
       "manifest": "scenarios/skill_preview/scenario.yaml",
       "source": {
@@ -2249,6 +2311,10 @@
         "id": "skill_preview"
       },
       "title": "Skill Preview",
+      "title_i18n": {
+        "key": "scenario.skill_preview.title",
+        "fallback": "Skill Preview"
+      },
       "description": "Generic metadata and README projection for a Builder-selected skill without an explicit presentation.",
       "trigger": "manual",
       "skills": {
@@ -2259,9 +2325,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.19",
-        "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-        "package_digest": "sha256:c4ff9395354d2c6905a47b9dc8185064374f45f05b1381981cde90596a02219f"
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:4cb1ad036097bd975874877090d5789482e6a4f77a760438f529796de0b5c546"
       }
     },
     {
@@ -2588,8 +2654,8 @@
       "kind": "project",
       "id": "adaos_builder",
       "name": "adaos_builder",
-      "version": "0.3.19",
-      "updated_at": "2026-09-30T19:51:20+00:00",
+      "version": "0.3.42",
+      "updated_at": "2026-11-06T03:41:03+00:00",
       "path": "projects/adaos_builder",
       "manifest": "projects/adaos_builder/project.yaml",
       "source": {
@@ -2616,6 +2682,7 @@
       ],
       "tags": [
         "builder",
+        "prompt-ide",
         "project",
         "devspace"
       ],
@@ -2658,6 +2725,20 @@
           ]
         },
         {
+          "id": "prompt-ide",
+          "title": "Prompt IDE",
+          "title_i18n": {
+            "en": "Prompt IDE",
+            "ru": "Prompt IDE"
+          },
+          "default": false,
+          "optional": true,
+          "components": [
+            "scenario:prompt_engineer_scenario",
+            "skill:prompt_engineer_skill"
+          ]
+        },
+        {
           "id": "skill-preview",
           "title": "Skill preview",
           "title_i18n": {
@@ -2673,12 +2754,14 @@
       ],
       "components": [
         "scenario:builder",
+        "scenario:prompt_engineer_scenario",
         "scenario:skill_preview",
         "skill:builder_skill",
         "skill:builder_sdk_control_skill",
-        "skill:builder_automation_skill"
+        "skill:builder_automation_skill",
+        "skill:prompt_engineer_skill"
       ],
-      "components_count": 5,
+      "components_count": 7,
       "profiles": [
         "adaos.builder.v1",
         "adaos.development.workbench.v1"
@@ -2686,18 +2769,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.19",
-        "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
         "primary_component": "scenario:builder",
-        "package_digest": "sha256:18f30e668e057eb3913034ddd13d892003f4b28af46cb4cb3eeb02563687c79b"
+        "package_digest": "sha256:0bc61280d319dfd1ed6862e801d7f4c4b87fe98f6d72e3ed60476e82bbce0746"
       },
       "channels": {
         "stable": {
-          "release": "adaos_builder@0.3.19",
-          "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-          "source_revision": "sha256:79f1e92adb6c137c43eb770003aef02a660fe7be83a964b028f5aa096c58763b",
-          "package_digest": "sha256:18f30e668e057eb3913034ddd13d892003f4b28af46cb4cb3eeb02563687c79b",
-          "version": "0.3.19"
+          "release": "adaos_builder@0.3.42",
+          "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+          "source_revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
+          "package_digest": "sha256:0bc61280d319dfd1ed6862e801d7f4c4b87fe98f6d72e3ed60476e82bbce0746",
+          "version": "0.3.42"
         }
       }
     },

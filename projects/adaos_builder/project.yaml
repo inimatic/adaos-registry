@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: adaos_builder
-version: 0.3.20
+version: 0.3.42
 profiles:
 - adaos.builder.v1
 - adaos.development.workbench.v1
@@ -10,6 +10,12 @@ components:
   - ref: scenario:builder
     role: primary
     exposure: application
+    lifecycle: bound
+    relations:
+    - presents
+  - ref: scenario:prompt_engineer_scenario
+    role: supporting
+    exposure: advanced
     lifecycle: bound
     relations:
     - presents
@@ -37,6 +43,12 @@ components:
     lifecycle: bound
     relations:
     - uses
+  - ref: skill:prompt_engineer_skill
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
+    relations:
+    - uses
   dependencies: []
 entrypoints:
 - id: builder
@@ -44,6 +56,10 @@ entrypoints:
   default: true
   bindings:
     workbench: builder
+- id: prompt-ide
+  presentation: scenario:prompt_engineer_scenario
+  bindings:
+    workbench: prompt
 - id: skill-preview
   presentation: scenario:skill_preview
   bindings:
@@ -65,6 +81,7 @@ catalog:
   - development
   tags:
   - builder
+  - prompt-ide
   - project
   - devspace
 publication:
@@ -94,6 +111,16 @@ install:
     optional: false
     components:
     - skill:builder_automation_skill
+  - id: prompt-ide
+    title: Prompt IDE
+    title_i18n:
+      en: Prompt IDE
+      ru: Prompt IDE
+    default: false
+    optional: true
+    components:
+    - scenario:prompt_engineer_scenario
+    - skill:prompt_engineer_skill
   - id: skill-preview
     title: Skill preview
     title_i18n:
@@ -111,11 +138,6 @@ compatibility:
   validation_profiles:
   - builder.local
 lifecycle:
-  upgrade:
-    retired_components:
-    - ref: skill:prompt_engineer_skill
-      data: retain
-      reason: Retain legacy Prompt IDE data after retiring its obsolete Application surface.
   uninstall:
     components: remove_if_unreferenced
     runtime_data: retain
@@ -136,6 +158,34 @@ permission_profile:
     purpose: Access configured model, source-control, and publication services during
       governed development operations.
     approval_policy: owner_only
+    sensitive: true
+  - id: ai.inference
+    purpose: Use admitted model resources for governed Builder development.
+    approval_policy: owner_only
+  - id: applications.develop
+    purpose: Develop the explicitly selected application.
+    approval_policy: owner_only
+  - id: applications.publish
+    purpose: Request governed application publication.
+    approval_policy: owner_only
+  - id: storage.relational
+    purpose: Keep owner-scoped Builder session state.
+    approval_policy: owner_only
+  - id: applications.read
+    approval_policy: owner_only
+    purpose: Observe and explicitly manage reviewed Core application lifecycle operations.
+    sensitive: false
+  - id: applications.plan
+    approval_policy: owner_only
+    purpose: Observe and explicitly manage reviewed Core application lifecycle operations.
+    sensitive: true
+  - id: applications.apply
+    approval_policy: owner_only
+    purpose: Observe and explicitly manage reviewed Core application lifecycle operations.
+    sensitive: true
+  - id: applications.recover
+    approval_policy: owner_only
+    purpose: Observe and explicitly manage reviewed Core application lifecycle operations.
     sensitive: true
   optional: []
   secrets: []

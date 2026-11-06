@@ -161,3 +161,41 @@ affordances:
       priority: 80
     output_refs:
       - builder_publication_started
+  - id: builder_output_routes_read
+    kind: skill_invocation
+    label: Show Builder output routes
+    description: Available Builder output routes.
+    workflow: null
+    skill_invocation:
+      skill_id: builder_skill
+      operation_id: get_output_routes
+    action_policy:
+      schema: adaos.conversation.action_policy.v1
+      risk_class: read
+      side_effect: none
+      confirmation: none
+    required_capabilities: []
+    presentation:
+      hint: button
+      priority: 90
+    output_refs:
+    - builder_output_routes_read
+  - id: builder_output_routes_select
+    kind: skill_invocation
+    label: Choose Builder output routes
+    description: Choose a route or disable external outputs.
+    workflow: null
+    skill_invocation:
+      skill_id: builder_skill
+      operation_id: request_output_routes
+    action_policy:
+      schema: adaos.conversation.action_policy.v1
+      risk_class: local_reversible
+      side_effect: reversible
+      confirmation: none
+    required_capabilities: []
+    presentation:
+      hint: button
+      priority: 100
+    output_refs:
+    - builder_output_routes_select

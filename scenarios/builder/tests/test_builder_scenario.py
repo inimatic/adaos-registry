@@ -276,7 +276,9 @@ def test_page_state_is_initialized_from_exact_builder_selection_projection() -> 
     assert page["initialStateSource"] == {
         "kind": "y",
         "path": "data/builder/selection",
-        "mapping": {
+        "required": True,
+        "identityKeys": ["selectedProjectKind", "selectedProjectId"],
+        "map": {
             "selectedProjectKind": "object_type",
             "selectedProjectId": "object_id",
             "selectedProjectRef": "ref",
@@ -288,6 +290,7 @@ def test_page_state_is_initialized_from_exact_builder_selection_projection() -> 
             "project.type": "object_type",
             "builderTopicId": "conversation_topic_id",
             "builderThreadId": "conversation_thread_id",
+            "applicationTitle": "title",
         },
     }
 
@@ -331,6 +334,7 @@ def test_project_picker_lists_installed_projects_and_selects_once(monkeypatch) -
         "cacheTtlMs": 0,
         "invalidationTags": ["builder.project.catalog"],
         "preserveLastValue": True,
+        "readPriority": "interactive",
     }
     assert picker["type"] == "ui.table"
     assert picker["inputs"]["refresh"] is True
@@ -463,6 +467,7 @@ def test_process_inspection_is_separate_from_the_canonical_conversation() -> Non
     assert lifecycle_buttons == {
         "show-preview", "make-current", "stabilize",
         "go-automation", "go-publication",
+        "history-next", "history-reset",
     }
     # Stage availability comes from the owner projection, not a client state machine.
     assert process["inputs"]["disabledKey"] == "disabled"
@@ -507,7 +512,13 @@ def test_durable_chat_abi_and_stage_surfaces_are_exact() -> None:
     }
     assert chat["inputs"]["sendCommand"] == "voice.chat.user"
     assert chat["inputs"]["meta"]["active_agent_id"] == "agent:builder_skill:builder"
-    assert chat["actions"] == []
+    assert chat["actions"] == [{
+        "on": "model.change", "type": "callSkill",
+        "target": "builder_sdk_control_skill.set_llm_profile",
+        "params": {"object_type": "$state.selectedProjectKind", "object_id": "$state.selectedProjectId",
+                   "_meta": {"current_scenario": "builder"}, "model": "$event.value"},
+        "invalidates": "builder.project.llm",
+    }]
     assert "$state.workbenchView === 'conversation'" in chat["visibleIf"]
     assert "$state.selectedLifecycleStage" not in chat["visibleIf"]
     assert widgets["design-current-work"]["dataSource"]["name"] == (
@@ -637,3 +648,71 @@ def test_creation_retains_template_flow_and_forwards_application_name() -> None:
     assert all(not {"current", "workbench", "commands", "builderConversationId", "builderThreadId"}
                .intersection(action.get("params", {})) for action in form["actions"]
                if action["type"] == "updateState")
+
+
+def test_communication_controls_write_supported_state_bindings() -> None:
+    widgets = _by_id(_load("webui.json"))
+    for identity in ("design-conversation-controls-side", "design-conversation-controls-full"):
+        widget = widgets[identity]
+        action = next(row for row in widget["actions"] if row["on"] == "select:conversation-mode")
+        assert action["type"] == "updateState"
+        assert action["params"] == {"conversationMode": "$event.value"}
+        button = next(row for row in widget["inputs"]["buttons"] if row["id"] == "conversation-mode")
+        assert [row["id"] for row in button["options"]] == ["task", "informal"]
+        assert [row["value"] for row in button["options"]] == ["task", "informal"]
+        # Replay every declared menu event in order through its state binding.
+        state = {"conversationMode": "task"}
+        for option in button["options"]:
+            state["conversationMode"] = option["value"]
+            assert state["conversationMode"] == option["id"]
+    form = widgets["new-project-form"]
+    action = next(row for row in form["actions"] if row["on"] == "change:object_type")
+    assert action["params"] == {"selectedTemplate": None, "newProjectKind": "$event.value"}
+    assert widgets["new-project-templates"]["dataSource"]["params"]["object_type"] == "$state.newProjectKind"
+    revision = next(row for row in widgets["project-tree"]["actions"] if row["on"] == "select")
+    assert revision["params"]["inspectedPrototypeRevision"] == "$event.item.revision"
+
+
+import json
+from pathlib import Path
+
+
+def walk(value):
+    if isinstance(value, dict):
+        yield value
+        for nested in value.values():
+            yield from walk(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            yield from walk(nested)
+
+
+def test_history_paging_is_modal_local_and_declarative():
+    source = Path(__file__).resolve().parents[1] / "webui.json"
+    ui = json.loads(source.read_text(encoding="utf-8"))
+    modal = next(n for n in walk(ui) if n.get("id") == "design-revisions" and "widgets" in n)
+    tree = modal["widgets"][0]
+    assert tree["type"] == "collection.tree"
+    assert tree["dataSource"]["name"] == "builder_sdk_control_skill.get_lifecycle"
+    assert tree["dataSource"]["params"]["cursor"] == "$state.revisionHistoryCursor"
+    assert tree["dataSource"]["params"]["cursor_project"] == "$state.revisionHistoryProject"
+    assert tree["dataSource"]["preserveLastValue"] is True
+    buttons = {b["id"]: b for b in tree["inputs"]["buttons"]}
+    assert buttons["history-next"]["whenKey"] == "canNextPage"
+    assert buttons["history-reset"]["whenKey"] == "canResetPage"
+    for name in ("history-next", "history-reset", "show-preview"):
+        assert set(buttons[name]["label_i18n"]["values"]) == {"ru", "en"}
+    actions = [a for a in tree["actions"] if a["on"] in {"click:history-next", "click:history-reset"}]
+    assert len(actions) == 2
+    for action in actions:
+        assert action["type"] == "updateState"
+        assert set(action["params"]) == {"revisionHistoryCursor", "revisionHistoryProject"}
+    assert actions[0]["params"]["revisionHistoryCursor"] == "$event.item.cursor"
+    assert actions[1]["params"]["revisionHistoryCursor"] == ""
+    # Project changes clear paging in the same update as the selected identity.
+    selectors = [n for n in walk(ui) if n.get("type") == "updateState"
+                 and "selectedProjectId" in n.get("params", {})]
+    assert selectors
+    for selector in selectors:
+        assert selector["params"]["revisionHistoryCursor"] == ""
+        assert selector["params"]["revisionHistoryProject"] == ""

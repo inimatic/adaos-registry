@@ -39,7 +39,7 @@
                             "id": "selected-skill-readme",
                             "type": "static.markdown",
                             "area": "main",
-                            "title": "Selected skill",
+                            "title": "What is selected?",
                             "dataSource": {
                                 "kind": "skill",
                                 "name": "builder_sdk_control_skill.get_skill_preview",
@@ -66,13 +66,30 @@
                             "inputs": {
                                 "content": "This is a read-only projection. Return to Builder to change the skill. A Project may declare a domain-specific scenario presentation instead of this fallback."
                             }
+                        },
+                        {
+                            "area": "main",
+                            "id": "what-is-selected-note",
+                            "type": "static.markdown",
+                            "title": "Answer",
+                            "title_i18n": "skill_preview.answer.title",
+                            "inputs": {
+                                "content": "This preview shows the currently selected skill from Builder. The \"Selected skill\" section above renders the skill's README content."
+                            }
                         }
                     ],
                     "meta": {
                         "builder": {
                             "generic_skill_preview": true,
-                            "read_only": true
+                            "read_only": true,
+                            "proto": "001",
+                            "ui_revision": "001",
+                            "scenario_id": "skill_preview"
                         }
+                    },
+                    "title_i18n": {
+                        "key": "scenario.skill_preview.title",
+                        "fallback": "Skill Preview"
                     }
                 }
             },
@@ -123,9 +140,27 @@
                         ]
                     }
                 }
+            },
+            "resources": {
+                "skill_preview.i18n.en": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "en",
+                    "path": "assets/i18n/en.json",
+                    "mime": "application/json",
+                    "delivery": "core"
+                },
+                "skill_preview.i18n.ru": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "ru",
+                    "path": "assets/i18n/ru.json",
+                    "mime": "application/json",
+                    "delivery": "core"
+                }
             }
         },
-        "version": "0.1.4",
+        "version": "0.1.8",
         "manifest": "webui.json"
     }
 }

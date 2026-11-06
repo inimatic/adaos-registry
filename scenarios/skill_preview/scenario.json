@@ -1,7 +1,7 @@
 {
     "id": "skill_preview",
     "name": "skill_preview",
-    "version": "0.1.4",
+    "version": "0.1.8",
     "title": "Skill Preview",
     "description": "Generic metadata and README projection for a Builder-selected skill without an explicit presentation.",
     "type": "desktop",
@@ -25,6 +25,35 @@
     },
     "trigger": "manual",
     "vars": {},
+    "guidance": {
+        "schema": "adaos.scenario.guidance.v1",
+        "readme": "README.md",
+        "overview": {
+            "en": "Read-only generic preview for a skill that does not declare a scenario presentation.",
+            "ru": "Универсальный read-only просмотр навыка без явно объявленного сценария представления."
+        },
+        "presentation": {
+            "channels": [
+                "web",
+                "text",
+                "voice"
+            ],
+            "modal_id": "skill_preview_help"
+        },
+        "workflow": {
+            "state_source": {
+                "kind": "skill",
+                "name": "builder_sdk_control_skill.get_skill_preview",
+                "params": {}
+            },
+            "state_path": "state",
+            "actions_path": "next_steps"
+        },
+        "conversational": {
+            "help_intent": "skill_preview.help",
+            "next_steps_intent": "skill_preview.next_steps"
+        }
+    },
     "llm_hints": {
         "description": "Read-only generic preview for skills without a declared Project presentation.",
         "aliases": [
@@ -59,35 +88,9 @@
         }
     },
     "steps": [],
-    "prototype": "scenario_default",
-    "updated_at": "2026-09-26T11:02:38+00:00",
-    "guidance": {
-        "schema": "adaos.scenario.guidance.v1",
-        "readme": "README.md",
-        "overview": {
-            "en": "Read-only generic preview for a skill that does not declare a scenario presentation.",
-            "ru": "Универсальный read-only просмотр навыка без явно объявленного сценария представления."
-        },
-        "presentation": {
-            "channels": [
-                "web",
-                "text",
-                "voice"
-            ],
-            "modal_id": "skill_preview_help"
-        },
-        "workflow": {
-            "state_source": {
-                "kind": "skill",
-                "name": "builder_sdk_control_skill.get_skill_preview",
-                "params": {}
-            },
-            "state_path": "state",
-            "actions_path": "next_steps"
-        },
-        "conversational": {
-            "help_intent": "skill_preview.help",
-            "next_steps_intent": "skill_preview.next_steps"
-        }
+    "updated_at": "2026-10-29T16:20:25+00:00",
+    "title_i18n": {
+        "key": "scenario.skill_preview.title",
+        "fallback": "Skill Preview"
     }
 }
