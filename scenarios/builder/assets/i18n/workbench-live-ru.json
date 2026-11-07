@@ -164,5 +164,6 @@
   "builder.data_profile.confirmation": "Этот профиль может читать внешний источник данных. Переключить данные текущего Preview?",
   "builder.data_profile.confirm": "Переключить профиль",
   "builder.data_profile.field": "Данные Preview",
-  "builder.data_profile.status": "Состояние данных"
+  "builder.data_profile.status": "Состояние данных",
+  "builder.data_profile.empty": "Для текущего проекта не настроены профили данных."
 }

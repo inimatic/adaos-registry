@@ -164,5 +164,6 @@
   "builder.data_profile.confirmation": "This profile can read an external data source. Switch this Preview?",
   "builder.data_profile.confirm": "Switch profile",
   "builder.data_profile.field": "Preview data",
-  "builder.data_profile.status": "Data status"
+  "builder.data_profile.status": "Data status",
+  "builder.data_profile.empty": "No data profiles are configured for this Project."
 }

@@ -2,7 +2,7 @@
     "schema": "adaos.webui.v1",
     "generated_by": "builder-owned-live-implementation",
     "ui": {
-        "version": "0.2.118",
+        "version": "0.2.119",
         "application": {
             "desktop": {
                 "pageSchema": {
@@ -268,7 +268,6 @@
                                         "label_i18n": "builder.data_profile.selector",
                                         "selectedStateKey": "selectedDataProfileId",
                                         "refreshOptionsOnOpen": true,
-                                        "loadOptionsOnOpen": true,
                                         "optionMetaPaths": [
                                             "mode",
                                             "status",
@@ -292,7 +291,9 @@
                                             ]
                                         },
                                         "displaySelectedLabel": true,
-                                        "title": "Data profile of the current Project Preview"
+                                        "title": "Data profile of the current Project Preview",
+                                        "emptyOptionsLabel": "No data profiles are configured for this Project.",
+                                        "emptyOptionsLabel_i18n": "builder.data_profile.empty"
                                     },
                                     {
                                         "id": "settings",
