@@ -648,6 +648,7 @@ def test_all_localized_payloads_are_valid_utf8_without_replacement_characters() 
     for path in paths:
         text = path.read_bytes().decode("utf-8")
         assert "\ufffd" not in text
+        assert "????" not in text
     assert {"en", "ru", "workbench-live-en", "workbench-live-ru"} <= {path.stem for path in (ROOT / "assets/i18n").glob("*.json")}
 
 

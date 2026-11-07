@@ -2,7 +2,7 @@
     "schema": "adaos.webui.v1",
     "generated_by": "builder-owned-live-implementation",
     "ui": {
-        "version": "0.2.117",
+        "version": "0.2.118",
         "application": {
             "desktop": {
                 "pageSchema": {
@@ -264,7 +264,7 @@
                                     {
                                         "id": "data-profile",
                                         "icon": "server-outline",
-                                        "label": "Data profile",
+                                        "label": "Data source",
                                         "label_i18n": "builder.data_profile.selector",
                                         "selectedStateKey": "selectedDataProfileId",
                                         "refreshOptionsOnOpen": true,
@@ -290,7 +290,9 @@
                                                 "builder.project.preview",
                                                 "builder.project.metadata"
                                             ]
-                                        }
+                                        },
+                                        "displaySelectedLabel": true,
+                                        "title": "Data profile of the current Project Preview"
                                     },
                                     {
                                         "id": "settings",
@@ -629,6 +631,11 @@
                                         "valueI18nPrefix": "builder.workbench.state.",
                                         "label": "Сейчас",
                                         "label_i18n": "builder.design.Сейчас"
+                                    },
+                                    {
+                                        "key": "data_profile.label",
+                                        "label": "Preview data",
+                                        "label_i18n": "builder.data_profile.field"
                                     }
                                 ],
                                 "stateBindings": {

@@ -162,5 +162,7 @@
   "builder.data_profile.selector": "Data profile",
   "builder.data_profile.pending": "Switching data?",
   "builder.data_profile.confirmation": "This profile can read an external data source. Switch this Preview?",
-  "builder.data_profile.confirm": "Switch profile"
+  "builder.data_profile.confirm": "Switch profile",
+  "builder.data_profile.field": "Preview data",
+  "builder.data_profile.status": "Data status"
 }

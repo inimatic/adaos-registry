@@ -4,7 +4,7 @@ type: desktop
 title: Builder — рабочее место разработки
 description: Safe local Builder prototype for the dependent Prototype, Automation,
   Trial, and Publication lifecycle.
-version: 0.2.117
+version: 0.2.118
 title_i18n:
   fallback: Builder
   key: scenario.builder.title
