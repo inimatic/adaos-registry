@@ -21,7 +21,7 @@ runtime:
       schema: adaos.skill.activation_assessment.v1
       assessor: builder.compiler
       classification: tool_only
-      handler_digest: sha256:2d99501cf730a5e3826ed48fb85c5ac405dd196a65b1d5185d16c8399a882e16
+      handler_digest: sha256:97f4c5ea6fe7e6af80103ffdd2847101fc1b67de335dfe78e7ae0e674e662136
       observed_subscriptions: []
       declared_subscriptions: []
       dynamic_subscription_count: 0
