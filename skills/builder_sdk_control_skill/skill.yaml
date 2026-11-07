@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.2.33
+version: 0.2.34
 description: SDK-only backend for the functional Builder DEV scenario.
 capabilities:
 - ai.inference
@@ -2354,6 +2354,16 @@ tools:
       verification_evidence:
         type: object
         description: Release-bound Builder Final Verification evidence.
+      beta_data_source:
+        type: string
+        enum:
+        - continue_beta
+        - stable_snapshot
+        - empty
+        description: Immutable source snapshot for the new isolated Beta dataset.
+      acknowledge_beta_data_reset:
+        type: boolean
+        description: Explicit acknowledgement when Stable replaces retained Beta writes.
       webspace_id:
         type: string
   output_schema:

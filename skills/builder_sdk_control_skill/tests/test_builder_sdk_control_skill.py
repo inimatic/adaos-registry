@@ -97,6 +97,26 @@ def test_replaying_existing_trial_still_reconciles_native_desktop(local_trial_sd
     assert all(call[1]["webspace_id"] == "desktop" for call in local_trial_sdk)
 
 
+def test_trial_placement_forwards_immutable_beta_data_decision(local_trial_sdk, monkeypatch):
+    module = _module()
+    state = {"generation": 7, "project": {"placements": [{
+        "kind": "trial", "status": "active", "result_ref": {"id": "candidate-example"},
+        "target": {"webspace_id": "desktop"}}]}, "delivery": {
+            "status": "trial", "candidate_id": "candidate-example",
+            "package_digest": "sha256:example", "release_digest": "sha256:release"}}
+    monkeypatch.setattr(module.workflow, "get_state", lambda *args: state)
+
+    module._ensure_trial_placement(
+        "scenario", "example", result={}, candidate_id="candidate-example",
+        release_data={"version": "0.1.0"}, package_digest="sha256:example",
+        trial_workflow=state, webspace_id="desktop-dev", meta=None,
+        beta_data_source="stable_snapshot", acknowledge_beta_data_reset=True,
+    )
+
+    assert local_trial_sdk[-1][1]["beta_data_source"] == "stable_snapshot"
+    assert local_trial_sdk[-1][1]["acknowledge_beta_data_reset"] is True
+
+
 @pytest.mark.parametrize("changed", [None, "status", "candidate_id", "package_digest", "release_digest"])
 def test_trial_placement_refreshes_generation_but_not_candidate(monkeypatch, local_trial_sdk, changed):
     module = _module()

@@ -5547,13 +5547,21 @@ def _ensure_trial_placement(
     trial_workflow: Mapping[str, Any],
     webspace_id: str | None,
     meta: Mapping[str, Any] | None,
+    beta_data_source: str | None = None,
+    acknowledge_beta_data_reset: bool = False,
 ) -> dict[str, Any]:
     from adaos.sdk.builder.applications import place_local_trial, production_webspace_id
 
     production = production_webspace_id(
         _webspace_id(webspace_id, meta)
     )
-    admitted = place_local_trial(candidate_id, webspace_id=production, actor_ref="builder.candidate")
+    admitted = place_local_trial(
+        candidate_id,
+        webspace_id=production,
+        actor_ref="builder.candidate",
+        beta_data_source=beta_data_source,
+        acknowledge_beta_data_reset=acknowledge_beta_data_reset,
+    )
     trial_activation = admitted["trial_activation"]
     # Runtime refresh can advance Preview selection while the effect runs.
     # Rebase only its projection, never a changed Candidate or delivery decision.
@@ -5975,6 +5983,8 @@ def publish_project(
     confirmed: bool = False,
     approve_permissions: bool = False,
     verification_evidence: Mapping[str, Any] | None = None,
+    beta_data_source: str = "continue_beta",
+    acknowledge_beta_data_reset: bool = False,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -5988,6 +5998,11 @@ def publish_project(
     )
     if bump not in {"major", "minor", "patch"}:
         raise ValueError("bump must be major, minor, or patch")
+    beta_data_source = str(beta_data_source or "").strip().lower().replace("-", "_")
+    if beta_data_source not in {"continue_beta", "stable_snapshot", "empty"}:
+        raise ValueError(
+            "beta_data_source must be continue_beta, stable_snapshot, or empty"
+        )
     workflow_before = workflow.get_state(workflow_kind, workflow_id)
     capabilities = (
         workflow_before.get("capabilities")
@@ -6152,6 +6167,7 @@ def publish_project(
                 trial_workflow=workflow_before,
                 webspace_id=webspace_id,
                 meta=_meta,
+                acknowledge_beta_data_reset=acknowledge_beta_data_reset,
             )
             return {
                 **dict(existing),
@@ -6398,6 +6414,8 @@ def publish_project(
                 trial_workflow=trial_workflow,
                 webspace_id=webspace_id,
                 meta=_meta,
+                beta_data_source=beta_data_source,
+                acknowledge_beta_data_reset=acknowledge_beta_data_reset,
             )
         trial_change_set = (
             trial_workflow.get("change_set")

@@ -2,7 +2,7 @@
     "schema": "adaos.webui.v1",
     "generated_by": "builder-owned-live-implementation",
     "ui": {
-        "version": "0.2.119",
+        "version": "0.2.120",
         "application": {
             "desktop": {
                 "pageSchema": {
@@ -186,7 +186,9 @@
                         "previewDataProfile": {},
                         "pendingDataProfileId": "",
                         "pendingDataProfileRequiresConfirmation": false,
-                        "dataProfileSwitch": {}
+                        "dataProfileSwitch": {},
+                        "betaDataSource": "continue_beta",
+                        "acknowledgeBetaDataReset": false
                     },
                     "meta": {
                         "builder": {
@@ -5289,6 +5291,88 @@
                             },
                             {
                                 "area": "main",
+                                "id": "trial-beta-data-source",
+                                "type": "ui.actions",
+                                "title": "Beta data source",
+                                "title_i18n": "builder.beta_data.title",
+                                "inputs": {
+                                    "variant": "stack",
+                                    "buttons": [
+                                        {
+                                            "id": "source",
+                                            "icon": "copy-outline",
+                                            "label": "Continue current Beta data",
+                                            "label_i18n": "builder.beta_data.selector",
+                                            "selectedStateKey": "betaDataSource",
+                                            "displaySelectedLabel": true,
+                                            "optionMetaPaths": [
+                                                "description"
+                                            ],
+                                            "options": [
+                                                {
+                                                    "id": "continue_beta",
+                                                    "label": "Continue current Beta data",
+                                                    "label_i18n": "builder.beta_data.continue",
+                                                    "description": "Copy the previous Beta snapshot and migrate it to this release."
+                                                },
+                                                {
+                                                    "id": "stable_snapshot",
+                                                    "label": "Copy Stable data",
+                                                    "label_i18n": "builder.beta_data.stable",
+                                                    "description": "Copy current Stable data and migrate it; previous Beta writes stay only in recovery."
+                                                },
+                                                {
+                                                    "id": "empty",
+                                                    "label": "Start empty",
+                                                    "label_i18n": "builder.beta_data.empty",
+                                                    "description": "Available only before the first Stable or retained Beta dataset."
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "id": "acknowledge-reset",
+                                            "label": "Acknowledge replacement of current Beta writes",
+                                            "label_i18n": "builder.beta_data.acknowledge",
+                                            "icon": "warning-outline",
+                                            "kind": "danger",
+                                            "visibleIf": "$state.betaDataSource === 'stable_snapshot' && $state.acknowledgeBetaDataReset !== true"
+                                        },
+                                        {
+                                            "id": "reset-acknowledged",
+                                            "label": "Beta write replacement acknowledged",
+                                            "label_i18n": "builder.beta_data.acknowledged",
+                                            "icon": "checkmark-circle-outline",
+                                            "visibleIf": "$state.betaDataSource === 'stable_snapshot' && $state.acknowledgeBetaDataReset === true"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "select:source",
+                                        "type": "updateState",
+                                        "params": {
+                                            "betaDataSource": "$event.id",
+                                            "acknowledgeBetaDataReset": false
+                                        }
+                                    },
+                                    {
+                                        "on": "click:acknowledge-reset",
+                                        "type": "updateState",
+                                        "params": {
+                                            "acknowledgeBetaDataReset": true
+                                        }
+                                    },
+                                    {
+                                        "on": "click:reset-acknowledged",
+                                        "type": "updateState",
+                                        "params": {
+                                            "acknowledgeBetaDataReset": false
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "area": "main",
                                 "id": "trial-access-actions",
                                 "type": "ui.actions",
                                 "inputs": {
@@ -5299,7 +5383,7 @@
                                             "label": "Approve access and prepare Beta",
                                             "icon": "shield-checkmark-outline",
                                             "kind": "danger",
-                                            "enabledIf": "$state.trialAccessApprovalRequired === true && !!$state.trialAccessProfileDigest"
+                                            "enabledIf": "$state.trialAccessApprovalRequired === true && !!$state.trialAccessProfileDigest && ($state.betaDataSource !== 'stable_snapshot' || $state.acknowledgeBetaDataReset === true)"
                                         },
                                         {
                                             "id": "cancel",
@@ -5324,7 +5408,9 @@
                                             "webspace_id": "$state.sourceWebspaceId",
                                             "_meta": {
                                                 "current_scenario": "builder"
-                                            }
+                                            },
+                                            "beta_data_source": "$state.betaDataSource",
+                                            "acknowledge_beta_data_reset": "$state.acknowledgeBetaDataReset"
                                         },
                                         "invalidates": [
                                             "builder.project.publication",
@@ -5392,6 +5478,12 @@
                                             "type": "staticContent",
                                             "content": "Будет опубликована новая версия выбранного проекта.",
                                             "content_i18n": "builder.text.a.new.version.of.the.selected.project.will.be.published"
+                                        },
+                                        {
+                                            "id": "stable-data-transition",
+                                            "type": "staticContent",
+                                            "content": "Stable data: adopt the reviewed Beta dataset, configuration and admitted Beta writes. No merge with a separately writable Stable dataset is performed.",
+                                            "content_i18n": "builder.stable_data.adopt_beta"
                                         }
                                     ]
                                 },

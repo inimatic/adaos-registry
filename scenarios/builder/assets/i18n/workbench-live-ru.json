@@ -165,5 +165,13 @@
   "builder.data_profile.confirm": "Переключить профиль",
   "builder.data_profile.field": "Данные Preview",
   "builder.data_profile.status": "Состояние данных",
-  "builder.data_profile.empty": "Для текущего проекта не настроены профили данных."
+  "builder.data_profile.empty": "Для текущего проекта не настроены профили данных.",
+  "builder.beta_data.title": "Данные для новой beta",
+  "builder.beta_data.selector": "Продолжить с данными текущей beta",
+  "builder.beta_data.continue": "Продолжить с данными текущей beta",
+  "builder.beta_data.stable": "Скопировать данные stable",
+  "builder.beta_data.empty": "Начать с пустых данных",
+  "builder.beta_data.acknowledge": "Подтвердить замену текущих данных beta",
+  "builder.beta_data.acknowledged": "Замена данных beta подтверждена",
+  "builder.stable_data.adopt_beta": "Данные stable: принять проверенные данные и настройки beta вместе с допущенными изменениями пользователей. Слияние с отдельно изменяемыми данными stable не выполняется."
 }

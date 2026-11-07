@@ -165,5 +165,13 @@
   "builder.data_profile.confirm": "Switch profile",
   "builder.data_profile.field": "Preview data",
   "builder.data_profile.status": "Data status",
-  "builder.data_profile.empty": "No data profiles are configured for this Project."
+  "builder.data_profile.empty": "No data profiles are configured for this Project.",
+  "builder.beta_data.title": "Data for the new Beta",
+  "builder.beta_data.selector": "Continue current Beta data",
+  "builder.beta_data.continue": "Continue current Beta data",
+  "builder.beta_data.stable": "Copy Stable data",
+  "builder.beta_data.empty": "Start empty",
+  "builder.beta_data.acknowledge": "Acknowledge replacement of current Beta writes",
+  "builder.beta_data.acknowledged": "Beta write replacement acknowledged",
+  "builder.stable_data.adopt_beta": "Stable data: adopt the reviewed Beta dataset, configuration and admitted Beta writes. No merge with a separately writable Stable dataset is performed."
 }
