@@ -406,7 +406,13 @@ def _messages_for_llm(
     return messages
 
 
-def _llm_reply(messages: list[Mapping[str, str]]) -> str | None:
+class LlmReplyUnavailable(RuntimeError):
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
+def _llm_reply(messages: list[Mapping[str, str]]) -> str:
     try:
         from adaos.sdk.llm.llm_client import send_response
 
@@ -415,14 +421,10 @@ def _llm_reply(messages: list[Mapping[str, str]]) -> str | None:
         if isinstance(text, str) and text.strip():
             return text.strip()
     except Exception as exc:
-        details = {
-            key: getattr(exc, key, None)
-            for key in ("status_code", "error_code", "payload")
-            if getattr(exc, key, None) not in (None, "")
-        }
-        _LOG.warning("conversation_companions LLM reply failed: %s details=%s", exc, details, exc_info=True)
-        return None
-    return None
+        status = getattr(exc, "status_code", None)
+        _LOG.warning("conversation_companions LLM reply failed status=%s error_type=%s", status, type(exc).__name__)
+        raise LlmReplyUnavailable("llm_busy" if status == 429 else "llm_unavailable") from exc
+    raise LlmReplyUnavailable("llm_empty_response")
 
 
 def _root_mcp_result(payload: Any) -> dict[str, Any]:
@@ -1399,6 +1401,7 @@ def talk(
         "capability_request": None,
     }
     reply = None
+    llm_error = None
     used_control_reply = False
     if selected == "sage" and not panel and not preview:
         reply, control_evidence = _sage_control_reply(user_text, ws)
@@ -1406,16 +1409,26 @@ def talk(
         if not reply and isinstance(control_evidence.get("context"), Mapping):
             system_prompt = f"{system_prompt}\n\n{_sage_context_prompt(control_evidence['context'])}"
     if not reply and not preview:
-        reply = _llm_reply(
-            _messages_for_llm(
-                user_text=user_text,
-                system_prompt=system_prompt,
-                history=history,
+        try:
+            reply = _llm_reply(
+                _messages_for_llm(
+                    user_text=user_text,
+                    system_prompt=system_prompt,
+                    history=history,
+                )
             )
-        )
+            if not reply:
+                llm_error = "llm_empty_response"
+        except LlmReplyUnavailable as exc:
+            llm_error = exc.reason
     used_llm = bool(reply) and not used_control_reply
     if not reply:
-        if panel:
+        if llm_error:
+            name = str(profiles[selected].get("name") or selected)
+            detail = ("Сервис языковой модели сейчас занят." if llm_error == "llm_busy"
+                      else "Не удалось получить ответ от языковой модели.")
+            reply = f"{name}: {detail} Ответ на вопрос не получен. Повтори запрос чуть позже."
+        elif panel:
             reply = (
                 "Арсений: сначала зафиксируй цель и критерий успеха.\n"
                 "Ника: отдельно проверь, где решение может сломаться.\n"
@@ -1440,6 +1453,8 @@ def talk(
         "message": reply,
         "chat_emit": {"mode": "receipt_only"},
         "used_llm": used_llm,
+        "status": "degraded" if llm_error else "preview" if preview else "completed",
+        "llm_error": {"code": llm_error, "retryable": True} if llm_error else None,
         "used_mcp": bool(control_evidence.get("used_mcp")),
         "action_receipt": control_evidence.get("receipt"),
         "capability_request": control_evidence.get("capability_request"),

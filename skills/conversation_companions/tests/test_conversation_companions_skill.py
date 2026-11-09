@@ -5,6 +5,7 @@ import uuid
 from pathlib import Path
 
 import yaml
+import pytest
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -381,3 +382,69 @@ def test_diagnostics_cache_is_bounded_and_disposable(monkeypatch) -> None:
     assert result["cleared"] == skill._DIAGNOSTICS_CACHE_MAX_ITEMS
     assert not skill._DIAGNOSTICS_CACHE
     assert not skill._DIAGNOSTICS_STREAM_FINGERPRINTS
+
+
+@pytest.mark.parametrize("failure,expected_code", [
+    ("busy", "llm_busy"), ("offline", "llm_unavailable"), ("empty", "llm_empty_response"),
+])
+def test_llm_failure_is_explicit_and_keeps_selected_agent(monkeypatch, caplog, failure, expected_code) -> None:
+    from adaos.sdk.llm import llm_client
+
+    skill = _load_module()
+    calls = []
+    emitted = []
+
+    class BusyError(RuntimeError):
+        status_code = 429
+        payload = {"private": "PRIVATE_PROVIDER_DETAIL"}
+
+    def send(messages, **options):
+        calls.append((messages, options))
+        if failure == "busy":
+            raise BusyError("PRIVATE_PROVIDER_DETAIL")
+        if failure == "offline":
+            raise ConnectionError("PRIVATE_PROVIDER_DETAIL")
+        return {"output_text": "   "}
+
+    def no_draft(*args, **kwargs):
+        raise AssertionError("An operational error must not become an invented answer")
+
+    monkeypatch.setattr(llm_client, "send_response", send)
+    monkeypatch.setattr(skill, "_draft_reply", no_draft)
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda message, **kwargs: emitted.append((message, kwargs)))
+    result = skill.talk("What is the capital of France?", character_id="arseni",
+                        webspace_id=f"test-llm-failure-{uuid.uuid4().hex}")
+
+    assert len(calls) == 1  # No replay of the user's request on capacity failures.
+    assert result["ok"] is True  # Router can deliver the operational message once.
+    assert result["used_llm"] is False
+    assert result["status"] == "degraded"
+    assert result["llm_error"] == {"code": expected_code, "retryable": True}
+    assert result["dialog"]["active_agent_id"] == "agent:conversation_companions:arseni"
+    assert result["message"].startswith("Арсений:")
+    assert "Ответ на вопрос не получен" in result["message"]
+    assert ("сейчас занят" in result["message"]) == (failure == "busy")
+    assert emitted[0][0] == result["message"]
+    assert "PRIVATE_PROVIDER_DETAIL" not in caplog.text + str(result)
+
+
+def test_successful_llm_response_and_preview_remain_distinct(monkeypatch) -> None:
+    from adaos.sdk.llm import llm_client
+
+    skill = _load_module()
+    calls = []
+
+    def send(messages, **options):
+        calls.append(messages)
+        return {"output_text": "Paris is the capital of France."}
+
+    monkeypatch.setattr(llm_client, "send_response", send)
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda *args, **kwargs: None)
+    ws = f"test-llm-success-{uuid.uuid4().hex}"
+    result = skill.talk("What is the capital of France?", character_id="arseni", webspace_id=ws)
+    assert result["used_llm"] is True
+    assert result["status"] == "completed" and result["llm_error"] is None
+    assert result["message"] == "Paris is the capital of France."
+    preview = skill.talk("What is the capital of France?", preview=True, webspace_id=ws)
+    assert len(calls) == 1
+    assert preview["status"] == "preview" and preview["used_llm"] is False
