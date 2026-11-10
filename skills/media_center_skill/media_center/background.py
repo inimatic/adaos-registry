@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextvars
 import logging
 import threading
+from collections import OrderedDict
 from collections.abc import Mapping
 from typing import Any, Callable, Protocol, TypeVar, cast
 
@@ -30,6 +31,44 @@ class MediaCenterBackgroundRuntime:
         self._agent_sync_worker: _Worker | None = None
         self._enrichment_path = ""
         self._enrichment_worker: _Worker | None = None
+        self._projection_condition = threading.Condition()
+        self._projections: OrderedDict[str, tuple[Any, Any]] = OrderedDict()
+        self._projection_thread: threading.Thread | None = None
+        self._projection_stopping = False
+        self._projection_error = ""
+
+    def queue_projection(self, key: str, callback: Callable[[], Any]) -> bool:
+        """Coalesce routes into one bounded, process-owned projection lane."""
+        context = contextvars.copy_context()
+        with self._projection_condition:
+            if self._projection_stopping:
+                return False
+            self._projections.pop(key, None)
+            self._projections[key] = (context, callback)
+            while len(self._projections) > 32:
+                self._projections.popitem(last=False)
+            if self._projection_thread is None or not self._projection_thread.is_alive():
+                self._projection_thread = threading.Thread(
+                    target=self._projection_loop, name="media-center-projection", daemon=True)
+                self._projection_thread.start()
+            self._projection_condition.notify_all()
+        return True
+
+    def _projection_loop(self) -> None:
+        while True:
+            with self._projection_condition:
+                while not self._projections and not self._projection_stopping:
+                    self._projection_condition.wait(1.0)
+                if self._projection_stopping:
+                    return
+                _key, (context, callback) = self._projections.popitem(last=False)
+            try:
+                context.run(callback)
+            except Exception as exc:
+                self._projection_error = type(exc).__name__
+                _log.warning("media projection failed: %s", self._projection_error)
+            else:
+                self._projection_error = ""
 
     def ensure_bootstrap_started(
         self,
@@ -171,6 +210,12 @@ class MediaCenterBackgroundRuntime:
             self._enrichment_path = ""
         return self._dispose_worker(worker, timeout=timeout)
 
+    def enrichment_status(self) -> dict[str, Any]:
+        with self._lock:
+            worker = self._enrichment_worker
+        status = getattr(worker, "status", None)
+        return dict(status()) if callable(status) else {"state": "stopped"}
+
     @staticmethod
     def _dispose_worker(worker: _Worker | None, *, timeout: float) -> dict[str, Any]:
         if worker is None:
@@ -181,6 +226,14 @@ class MediaCenterBackgroundRuntime:
         return {"stopped": True, "skipped": False}
 
     def dispose(self, *, timeout: float = 30.0) -> dict[str, Any]:
+        with self._projection_condition:
+            self._projection_stopping = True
+            self._projections.clear()
+            projection_thread = self._projection_thread
+            self._projection_condition.notify_all()
+        if projection_thread and projection_thread is not threading.current_thread():
+            projection_thread.join(timeout=max(0.0, timeout))
+        projection_stopped = projection_thread is None or not projection_thread.is_alive()
         self._bootstrap_stop.set()
         with self._lock:
             bootstrap_thread = self._bootstrap_thread
@@ -212,13 +265,18 @@ class MediaCenterBackgroundRuntime:
             self._enrichment_path = ""
         sync = self._dispose_worker(sync_worker, timeout=timeout)
         enrichment = self._dispose_worker(enrichment_worker, timeout=timeout)
-        stopped = bool(sync.get("stopped")) and bool(enrichment.get("stopped"))
+        stopped = bool(sync.get("stopped")) and bool(enrichment.get("stopped")) and projection_stopped
+        if projection_stopped:
+            with self._projection_condition:
+                self._projection_thread = None
+                self._projection_stopping = False
         return {
             "ok": stopped,
             "stopped": stopped,
             "bootstrap": {"stopped": True},
             "agent_sync": sync,
             "enrichment": enrichment,
+            "projection": {"stopped": projection_stopped},
         }
 
 

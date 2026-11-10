@@ -318,7 +318,7 @@ def rendition_limits() -> dict[str, Any]:
         ),
         "max_output_bytes": bounded(
             "MEDIA_LIBRARY_AGENT_RENDITION_MAX_OUTPUT_BYTES",
-            8 * 1024**3,
+            4 * 1024**3,
             1024**2,
             128 * 1024**3,
         ),

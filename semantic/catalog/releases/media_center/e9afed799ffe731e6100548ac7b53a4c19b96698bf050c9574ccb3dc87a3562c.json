@@ -1,0 +1,2724 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "media_center",
+    "legacy_project_id": "media_center",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "media_center",
+    "display": {
+      "title": "Media Center",
+      "summary": "Distributed in-place household media library, playback, and remote control."
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "embedded",
+        "presentation_ref": "scenario:media_center"
+      },
+      {
+        "entrypoint_id": "library",
+        "presentation_ref": "scenario:media_center"
+      },
+      {
+        "entrypoint_id": "remote",
+        "presentation_ref": "scenario:media_center"
+      },
+      {
+        "entrypoint_id": "tv",
+        "presentation_ref": "scenario:media_center"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 3,
+    "created_at": "2026-09-26T01:17:33+00:00",
+    "updated_at": "2026-09-27T22:17:11+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "media_center",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "media_center",
+    "version": "0.6.136",
+    "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "media_center",
+      "version": "0.6.136",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:a4cc8ad93e0c77fdfebd72f84072c80a7ee743fb3e4ca991a87848570e637ce5",
+        "path_scope": [
+          "projects/media_center/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "media_center",
+          "version": "0.6.55",
+          "digest": "sha256:5dfc7118608b49a18b962b9bf651896296fbcb81b39a73d5b56fbac6bc8ff0b3",
+          "manifest_digest": "sha256:c1cf0e0161dbb35704948da83b963e36f15325398b999a82458e6d8528594c82",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:a4cc8ad93e0c77fdfebd72f84072c80a7ee743fb3e4ca991a87848570e637ce5",
+            "path_scope": [
+              "scenarios/media_center/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/media_center",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "media_center_skill",
+          "version": "0.8.108",
+          "digest": "sha256:ccfbbfd997480f71ac4baa28278390c23b8e7cbbbd4ebe5f52f13f40238efc04",
+          "manifest_digest": "sha256:85bd51c93ea70f64fbf8644f00b9bcd9ca3b3527b9e7a92348208ae1212a263c",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:a4cc8ad93e0c77fdfebd72f84072c80a7ee743fb3e4ca991a87848570e637ce5",
+            "path_scope": [
+              "skills/media_center_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/media_center_skill",
+          "schema_locks": [
+            {
+              "lock_id": "skill:media_center_skill:schemas/catalog-correction.v1.schema.json",
+              "digest": "sha256:bc4a21966202e5a61152319d67cf1b7e3884c78b784a9a5deaeccdf0dc3ed773"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/collection-membership.v1.schema.json",
+              "digest": "sha256:8434092eb7db1c8e1288a5dc199d47662fdfeb822f071e526a1e52345ed39270"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/folder-node.v1.schema.json",
+              "digest": "sha256:519254c3d08a0d52b12145b1922a18e4107f27a364ad70fe98f5bcc032a56018"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/media-collection.v1.schema.json",
+              "digest": "sha256:d3a982d56ae8ed31e384794865ee86ece66be3992f830b5572dd9375fd40eb34"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/media-source.v1.schema.json",
+              "digest": "sha256:e100b430a04d07d4ec9e6c8acb740f5eacbc0a22851dff6e3d6f3393da65d3bd"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/media-variant.v1.schema.json",
+              "digest": "sha256:cfc7deff2354a3464e576161f423f46b261b514286b90c3ae8d5bf7857a2d600"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/media-work.v1.schema.json",
+              "digest": "sha256:f250d05a90a4ff40b5c03801d2356094129f1b1febd3a14ae4718b1534c87d29"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/metadata-claim.v1.schema.json",
+              "digest": "sha256:3a66ef10b385a8df8ff57d0ffef580ff448c0320cc80782dd1fd3a590ec60ae8"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/playback-plan.v2.schema.json",
+              "digest": "sha256:2e4b95fd59758849982ec3f304b484b41d561c906f8e62a9de5353d6f7c26f03"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/playback-route.v1.schema.json",
+              "digest": "sha256:9cf5f4b94ab66cf53cb0b1b022a28c95b9464c5163252c33384c6f3ddbc742df"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/playlist.v1.schema.json",
+              "digest": "sha256:7de59c37f56cf1e9a7323b60860469ddd89622eb3c373c4fe6a633cb9dbdb991"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/profile.v1.schema.json",
+              "digest": "sha256:4227072c05af5d6f89ee683a54fc16aede46813e01b27422d56d7a568c2e50aa"
+            },
+            {
+              "lock_id": "skill:media_center_skill:schemas/queue-source.v1.schema.json",
+              "digest": "sha256:eb56f22092f27f2431e60b5660d3a517fc2764d918cfbac88be67e8655402632"
+            }
+          ]
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "media_control_skill",
+          "version": "0.2.33",
+          "digest": "sha256:2704515567196974c13964f14bc4b5ff7b4b38848b1a4f2d3c9466540adc311f",
+          "manifest_digest": "sha256:dc0dc7331ac7a573c5ce1c33f6ee2c7107f70cc73ccb4f8b003e0fd0a74eb757",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:a4cc8ad93e0c77fdfebd72f84072c80a7ee743fb3e4ca991a87848570e637ce5",
+            "path_scope": [
+              "skills/media_control_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/media_control_skill",
+          "schema_locks": [
+            {
+              "lock_id": "skill:media_control_skill:schemas/endpoint-reconciliation.v1.schema.json",
+              "digest": "sha256:815c721b8d3846d28ec71a0b809e91b264fc56640f4b427e991f3ecab128c56b"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-checkpoint.v1.schema.json",
+              "digest": "sha256:c635f8ae1d717cd03f6c0c7625352dab85279360fc841a519b26ac545ab3950e"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-command.v1.schema.json",
+              "digest": "sha256:ffdc91fbb200c9c1d3f9cf81153c2b115310ef62d58d6022631f3136a065144a"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-queue.v1.schema.json",
+              "digest": "sha256:677f38e90e5c3b3854f4d542a36ef42575d27bd94d3f431f824838ef111e4fe4"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-session.v1.schema.json",
+              "digest": "sha256:708928fc7f7591b856086f529aeac1a4d4a6570a782ba88bcc67d60f5acee415"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/playback-target.v1.schema.json",
+              "digest": "sha256:2aa66631cadba05cb55e9bdd329c5af1cad4c8f61515fe95d2f3cc5a895a84dc"
+            },
+            {
+              "lock_id": "skill:media_control_skill:schemas/qoe-summary.v1.schema.json",
+              "digest": "sha256:827264b2105c8e2ceeda986a5954f1c3bc17ea5e17275cd52bc091e7432caa94"
+            }
+          ]
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "media_library_agent",
+          "version": "0.6.63",
+          "digest": "sha256:211be29c62ed43c42dfee1a9795987bd10dd313e864ea54f3535aa2b18da30fd",
+          "manifest_digest": "sha256:4944d3f7082fbeecd363cd7a725df6bd17909c1aa56d5774b260413c450798d8",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:a4cc8ad93e0c77fdfebd72f84072c80a7ee743fb3e4ca991a87848570e637ce5",
+            "path_scope": [
+              "skills/media_library_agent/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/media_library_agent",
+          "schema_locks": [
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-artwork-plan.v1.schema.json",
+              "digest": "sha256:64e9b387a68f0c2f32f3a547d8183497fa2a0b3d84aaff0edd0724cde4bdfe28"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-folder-node.v1.schema.json",
+              "digest": "sha256:f4fb70aa800ef0af396f67ba8727d7f3f8a040806ea6233a090cb8a0bf9c0147"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-rendition-job.v1.schema.json",
+              "digest": "sha256:1451419b221a3051ffa6c2194f902a340008055f8ff85b51674bc6518a59c1c3"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-rendition-plan.v2.schema.json",
+              "digest": "sha256:294a734b9942017f5c18ae67923be58b911dcd8c425e52aebc97fe0dacaa8208"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-root.v1.schema.json",
+              "digest": "sha256:2270e95bf115a336d391f31a2c202424ad295aca7e67a0f30e3bca62bff37d9e"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-scan-job.v1.schema.json",
+              "digest": "sha256:033c9914f2788f4c06a1f68972713578b25af92864c4b1bc0faa477d15807708"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-scan-progress.v1.schema.json",
+              "digest": "sha256:9d143c5b309c50c1f942cfbb52ddf284954388e67ea3fad0524e9df9efc7c8fa"
+            },
+            {
+              "lock_id": "skill:media_library_agent:schemas/media-library-source-delta.v1.schema.json",
+              "digest": "sha256:53e12d519eb580aa3ba86e2ad5a863ac69aeeb3d3c299b3eceedc7c192b25d28"
+            }
+          ]
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [
+        "devices.control",
+        "distributed.authority.handoff",
+        "distributed.replica.observe",
+        "distributed.replica.remove",
+        "distributed.service.drain",
+        "distributed.service.invoke",
+        "distributed.service.manage",
+        "distributed.service.register",
+        "distributed.service.renew",
+        "distributed.topology.apply",
+        "distributed.topology.inspect",
+        "distributed.topology.manage",
+        "distributed.topology.plan",
+        "media.catalog",
+        "media.playback_planning",
+        "media.rendition",
+        "network.egress",
+        "project.component.drain",
+        "project.component.install.remote",
+        "project.component.remove",
+        "project.deployment.apply",
+        "project.deployment.inspect",
+        "project.deployment.manage",
+        "secrets.read",
+        "secrets.write",
+        "skills.invoke",
+        "storage.relational",
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:a4cc8ad93e0c77fdfebd72f84072c80a7ee743fb3e4ca991a87848570e637ce5",
+          "builder": "adaos.dev.project.push"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:media_center",
+          "consumer_ref": "scenario:media_center",
+          "consumer_digest": "sha256:5dfc7118608b49a18b962b9bf651896296fbcb81b39a73d5b56fbac6bc8ff0b3",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": true,
+          "unresolved": [],
+          "source_artifacts": {
+            "assets/i18n/en.json": "sha256:e546a4e0b5bf1149d1f0b174164eec4d35db57bb5a49af300e247bd37d8fed8e",
+            "assets/i18n/ru.json": "sha256:3bb8dfb80474864523d1073025f72fac7de828c21c346cb19296807f99e5b3e2",
+            "webui.json": "sha256:624d53f60a225a6556b781870aa47f8a7ef9bc640de860f47e03d59c98856be2",
+            ".adaos/package-manifest.json": "sha256:c1cf0e0161dbb35704948da83b963e36f15325398b999a82458e6d8528594c82"
+          },
+          "edges": [
+            {
+              "contract_ref": "webui:input.selector",
+              "contract_digest": "sha256:b86c19f957949bf1af5b04b747408cc9062ef2a9e69207de9a9f2621aedcd354",
+              "surface": [
+                "webui.json.ui.application.modals.media_center_filters.schema.widgets[0]",
+                "webui.json.ui.application.modals.media_center_filters.schema.widgets[1]",
+                "webui.json.ui.application.modals.media_center_filters.schema.widgets[2]",
+                "webui.json.ui.application.modals.media_center_filters.schema.widgets[3]",
+                "webui.json.ui.application.modals.media_center_filters.schema.widgets[4]",
+                "webui.json.ui.application.modals.media_center_play_on.schema.widgets[0]",
+                "webui.json.ui.application.modals.media_center_remote.schema.widgets[0]",
+                "webui.json.ui.application.modals.media_center_storage_policy.schema.widgets[0]",
+                "webui.json.ui.application.modals.media_center_storage_policy.schema.widgets[1]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:input.toggle",
+              "contract_digest": "sha256:bf776985f8ed1a5b1fe2c280dd5e3dcab675a230b1d7ec7616e16b47655e8c77",
+              "surface": [
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[13]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[14]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[4]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[5]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[6]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:item.details",
+              "contract_digest": "sha256:6b35434a3583e3bc268dbbbb2766f578c5654383f6553f26d5a54dfa0f268933",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[1]",
+                "webui.json.ui.application.modals.media_center_item_details.schema.widgets[0]",
+                "webui.json.ui.application.modals.media_center_metadata.schema.widgets[0]",
+                "webui.json.ui.application.modals.media_center_metadata.schema.widgets[2]",
+                "webui.json.ui.application.modals.media_center_metadata.schema.widgets[3]",
+                "webui.json.ui.application.modals.media_center_metadata.schema.widgets[5]",
+                "webui.json.ui.application.modals.media_center_metadata.schema.widgets[6]",
+                "webui.json.ui.application.modals.media_center_metadata.schema.widgets[8]",
+                "webui.json.ui.application.modals.media_center_metadata_edit.schema.widgets[0]",
+                "webui.json.ui.application.modals.media_center_player.schema.widgets[2]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[10]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[15]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[16]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[17]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[18]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[1]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[26]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[2]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.actions",
+              "contract_digest": "sha256:b11889d561895633c7bb4f0fd286b2f3557ac4d2c9cce07adbbc4443c04ad543",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[0]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[3]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[4]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[9]",
+                "webui.json.ui.application.modals.media_center_add_to_playlist.schema.widgets[2]",
+                "webui.json.ui.application.modals.media_center_delete_root.schema.widgets[1]",
+                "webui.json.ui.application.modals.media_center_filters.schema.widgets[5]",
+                "webui.json.ui.application.modals.media_center_metadata.schema.widgets[10]",
+                "webui.json.ui.application.modals.media_center_metadata_edit.schema.widgets[10]",
+                "webui.json.ui.application.modals.media_center_metadata_edit.schema.widgets[11]",
+                "webui.json.ui.application.modals.media_center_play_on.schema.widgets[1]",
+                "webui.json.ui.application.modals.media_center_player.schema.widgets[0]",
+                "webui.json.ui.application.modals.media_center_player.schema.widgets[3]",
+                "webui.json.ui.application.modals.media_center_remote.schema.widgets[2]",
+                "webui.json.ui.application.modals.media_center_remote.schema.widgets[3]",
+                "webui.json.ui.application.modals.media_center_remote.schema.widgets[4]",
+                "webui.json.ui.application.modals.media_center_remote.schema.widgets[5]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[0]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[22]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[25]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[7]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[9]",
+                "webui.json.ui.application.modals.media_center_storage_policy.schema.widgets[3]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.form",
+              "contract_digest": "sha256:cf59070f1d7eec7646b0b1d18f4cbac43e32c8217a6fe52152b1432fb4565203",
+              "surface": [
+                "webui.json.ui.application.modals.media_center_remote.schema.widgets[6]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.list",
+              "contract_digest": "sha256:fc112730dc984329ecc6ab8bc7a26a9b770703564c8846b347a85a4fdfb6d6a6",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[10]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[11]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[12]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[13]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[14]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[15]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[2]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[6]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[7]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[8]",
+                "webui.json.ui.application.modals.media_center_add_to_playlist.schema.widgets[0]",
+                "webui.json.ui.application.modals.media_center_metadata.schema.widgets[1]",
+                "webui.json.ui.application.modals.media_center_metadata.schema.widgets[4]",
+                "webui.json.ui.application.modals.media_center_metadata.schema.widgets[7]",
+                "webui.json.ui.application.modals.media_center_metadata.schema.widgets[9]",
+                "webui.json.ui.application.modals.media_center_remote.schema.widgets[1]",
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[3]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.table",
+              "contract_digest": "sha256:c7d328ca61b335e3dfdd62f69274df7157c1a4400c58ffa8d7ff7af9f4ed3af8",
+              "surface": [
+                "webui.json.ui.application.modals.media_center_settings.schema.widgets[12]"
+              ],
+              "exposure": "compiled"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:f94299f19d70303a4ee35e362fab49f7bd3782b3803f099fde96a11caa9f4ad5",
+          "digest": "sha256:f94299f19d70303a4ee35e362fab49f7bd3782b3803f099fde96a11caa9f4ad5",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:media_center",
+          "consumer_ref": "skill:media_center_skill",
+          "consumer_digest": "sha256:ccfbbfd997480f71ac4baa28278390c23b8e7cbbbd4ebe5f52f13f40238efc04",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": false,
+          "unresolved": [
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:359"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.stream_variable_publish",
+              "location": "handlers/main.py:635"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.stream_variable_publish",
+              "location": "handlers/main.py:687"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.skills.invoke",
+              "location": "handlers/main.py:714"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.skills.invoke",
+              "location": "handlers/main.py:734"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.media.list_media_resources",
+              "location": "handlers/main.py:1004"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.media.register_media_file",
+              "location": "handlers/main.py:1044"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.media.unregister_media_references",
+              "location": "handlers/main.py:1698"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.i18n._",
+              "location": "handlers/main.py:982"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.subscribe",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.tool",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.i18n._",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.media.list_media_resources",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.media.register_media_file",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.media.unregister_media_references",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.stream_variable_publish",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.skills.invoke",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.media.register_media_file",
+              "location": "media_center/artwork_cache.py:87"
+            },
+            {
+              "code": "dynamic_sdk_arguments",
+              "location": "media_center/artwork_cache.py:87"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.media.register_media_file",
+              "location": "media_center/artwork_cache.py"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_center/background.py:203"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_center/background.py:216"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_center/background.py:193"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_center/background.py:180"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_center/enrichment.py:1423"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_center/enrichment.py:1438"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_center/enrichment.py:1684"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_center/enrichment.py:1483"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_center/enrichment.py:1705"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_center/enrichment.py:1655"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_center/enrichment.py:1669"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_center/topology.py:18"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.deployment.ProjectDeployment",
+              "location": "media_center/topology.py:277"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.distributed.ServiceDefinition.from_mapping",
+              "location": "media_center/topology.py:373"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.distributed.ServiceGroup.from_mapping",
+              "location": "media_center/topology.py:376"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.distributed.Partition.from_mapping",
+              "location": "media_center/topology.py:570"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.distributed.Replica.from_mapping",
+              "location": "media_center/topology.py:573"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_center/topology.py:38"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.deployment.ComponentPlacementPolicy",
+              "location": "media_center/topology.py:237"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.deployment.ComponentPlacementPolicy",
+              "location": "media_center/topology.py:245"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.deployment.ComponentPlacementPolicy",
+              "location": "media_center/topology.py:253"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.distributed.Dataset.from_mapping",
+              "location": "media_center/topology.py:378"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.distributed.ServiceInstance.from_mapping",
+              "location": "media_center/topology.py:517"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.distributed.Replica.from_mapping",
+              "location": "media_center/topology.py:605"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.deployment.ComponentPlacementPolicy",
+              "location": "media_center/topology.py:262"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.deployment.ComponentPlacementPolicy",
+              "location": "media_center/topology.py:270"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.deployment.DeploymentCompatibilityPolicy",
+              "location": "media_center/topology.py:297"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.deployment.RolloutPolicy",
+              "location": "media_center/topology.py:302"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.deployment.DataRetentionPolicy",
+              "location": "media_center/topology.py:308"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.distributed.Partition.from_mapping",
+              "location": "media_center/topology.py:581"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.deployment.ComponentPlacementPolicy",
+              "location": "media_center/topology.py:286"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.deployment.ComponentPlacementPolicy",
+              "location": "media_center/topology.py:291"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.distributed.Partition.from_mapping",
+              "location": "media_center/topology.py:595"
+            },
+            {
+              "code": "dynamic_sdk_arguments",
+              "location": "media_center/topology.py:725"
+            }
+          ],
+          "source_artifacts": {
+            "assets/i18n/en.json": "sha256:3fe29c530ee60f65ff46f7caf58039a9fe7e8a2f416fdfaab55969145ec97bef",
+            "assets/i18n/ru.json": "sha256:26429d6a66bcb52c8f708e19678bbe4d11b312ade2ddb591eeecbd6659c6d04c",
+            "schemas/catalog-correction.v1.schema.json": "sha256:43b7e518ad690bd47258e8c23e16ed971ccb1aad69a153abc7c6a5f52a8092c5",
+            "schemas/collection-membership.v1.schema.json": "sha256:89ae5d19608e1234cc94944e3d96aee64def998b557e1e6b532a7aa55075d1f3",
+            "schemas/folder-node.v1.schema.json": "sha256:724ec7557f98053414adb96277ffc9581afc0f429bc31d3c4875515a56918475",
+            "schemas/media-collection.v1.schema.json": "sha256:dcaca40bf82baaea4ae5ba3c6b11f29d4f28f45488e59aa34de3b2f1d6152983",
+            "schemas/media-source.v1.schema.json": "sha256:87cd3b87297004303903620e553afdad54077609b85ba7b1ae29b2807f3b7f6b",
+            "schemas/media-variant.v1.schema.json": "sha256:bc2638e0fc22da49d42853e92e41ef194551c56c56443d963c00cc79e8384b72",
+            "schemas/media-work.v1.schema.json": "sha256:ca931d6822e06b38efd71433c9072e5e6665891170f7e2248bd80d569bc465d1",
+            "schemas/metadata-claim.v1.schema.json": "sha256:5814e8dfd3af936423710ea668b0f0a243c37a0ffd254023928cba25ebea1817",
+            "schemas/playback-plan.v2.schema.json": "sha256:d4d8b1ef394e19ecfcb08773d218614e3dca24c346a51422f50138dbb7f298e6",
+            "schemas/playback-route.v1.schema.json": "sha256:b132dda9323813077d0452387479c1c921c4be6604ecabb2ed60e8a07e3c8f37",
+            "schemas/playlist.v1.schema.json": "sha256:ffe7cd322f152793b177456c4b5682099993e11e73ef7f0903bbc42873b90eb1",
+            "schemas/profile.v1.schema.json": "sha256:b9399ddcbbc953a3c41f2a45626b04093611208d5eacfa17a598b4a7e1c7c8c6",
+            "schemas/queue-source.v1.schema.json": "sha256:941fcaa38704c21fc3a6bc95ddebc9a2bf718b5bb1d9f9ce8cb6c413523c27f6",
+            "webui.json": "sha256:f81f9a9f9733853d090d3ff34322e827e149890c105ff7cd98b34b933f5b6d8b",
+            ".adaos/package-manifest.json": "sha256:85bd51c93ea70f64fbf8644f00b9bcd9ca3b3527b9e7a92348208ae1212a263c"
+          },
+          "edges": [
+            {
+              "contract_ref": "sdk:adaos.sdk.access.require",
+              "contract_digest": "sha256:4e4bc6a53b1bf3c808258429293dafcfa334aa72690c1d75021676748d87230f",
+              "surface": [
+                "handlers/main.py:1104",
+                "handlers/main.py:1106",
+                "handlers/main.py:1118",
+                "handlers/main.py:1120",
+                "handlers/main.py:1523",
+                "handlers/main.py:1525",
+                "handlers/main.py:1542",
+                "handlers/main.py:1544",
+                "handlers/main.py:1562",
+                "handlers/main.py:1564",
+                "handlers/main.py:1581",
+                "handlers/main.py:1583",
+                "handlers/main.py:1614",
+                "handlers/main.py:1616",
+                "handlers/main.py:1652",
+                "handlers/main.py:1654",
+                "handlers/main.py:1676",
+                "handlers/main.py:1678",
+                "handlers/main.py:1724",
+                "handlers/main.py:1726",
+                "handlers/main.py:1858",
+                "handlers/main.py:1860",
+                "handlers/main.py:1924",
+                "handlers/main.py:1926",
+                "handlers/main.py:2006",
+                "handlers/main.py:2008",
+                "handlers/main.py:2022",
+                "handlers/main.py:2024",
+                "handlers/main.py:2053",
+                "handlers/main.py:2055",
+                "handlers/main.py:2146",
+                "handlers/main.py:2148",
+                "handlers/main.py:2165",
+                "handlers/main.py:2167",
+                "handlers/main.py:2324",
+                "handlers/main.py:2326",
+                "handlers/main.py:2353",
+                "handlers/main.py:2355",
+                "handlers/main.py:2416",
+                "handlers/main.py:2418",
+                "handlers/main.py:2452",
+                "handlers/main.py:2454",
+                "handlers/main.py:2539",
+                "handlers/main.py:2541",
+                "handlers/main.py:2678",
+                "handlers/main.py:2680",
+                "handlers/main.py:2743",
+                "handlers/main.py:2745",
+                "handlers/main.py:2931",
+                "handlers/main.py:2933",
+                "handlers/main.py:2955",
+                "handlers/main.py:2957",
+                "handlers/main.py:3005",
+                "handlers/main.py:3007",
+                "handlers/main.py:3073",
+                "handlers/main.py:3075",
+                "handlers/main.py:3095",
+                "handlers/main.py:3097",
+                "handlers/main.py:3129",
+                "handlers/main.py:3131",
+                "handlers/main.py:3152",
+                "handlers/main.py:3154",
+                "handlers/main.py:3176",
+                "handlers/main.py:3178",
+                "handlers/main.py:3200",
+                "handlers/main.py:3202",
+                "handlers/main.py:3229",
+                "handlers/main.py:3231",
+                "handlers/main.py:3262",
+                "handlers/main.py:3264",
+                "handlers/main.py:3294",
+                "handlers/main.py:3296",
+                "handlers/main.py:3326",
+                "handlers/main.py:3328",
+                "handlers/main.py:3355",
+                "handlers/main.py:3357",
+                "handlers/main.py:3389",
+                "handlers/main.py:3391",
+                "handlers/main.py:3421",
+                "handlers/main.py:3423",
+                "handlers/main.py:3443",
+                "handlers/main.py:3445",
+                "handlers/main.py:3472",
+                "handlers/main.py:3474",
+                "handlers/main.py:3501",
+                "handlers/main.py:3503",
+                "handlers/main.py:3516",
+                "handlers/main.py:3518",
+                "handlers/main.py:3545",
+                "handlers/main.py:3547",
+                "handlers/main.py:3560",
+                "handlers/main.py:3562",
+                "handlers/main.py:3568",
+                "handlers/main.py:3570",
+                "handlers/main.py:3584",
+                "handlers/main.py:3586",
+                "handlers/main.py:3613",
+                "handlers/main.py:3615",
+                "handlers/main.py:3638",
+                "handlers/main.py:3640",
+                "handlers/main.py:3845",
+                "handlers/main.py:3847",
+                "handlers/main.py:4165",
+                "handlers/main.py:4167",
+                "handlers/main.py:4188",
+                "handlers/main.py:4190",
+                "handlers/main.py:4218",
+                "handlers/main.py:4220",
+                "handlers/main.py:4245",
+                "handlers/main.py:4247",
+                "handlers/main.py:4271",
+                "handlers/main.py:4273",
+                "handlers/main.py:4290",
+                "handlers/main.py:4292",
+                "handlers/main.py:4317",
+                "handlers/main.py:4319",
+                "handlers/main.py:4348",
+                "handlers/main.py:4350",
+                "handlers/main.py:4377",
+                "handlers/main.py:4379",
+                "handlers/main.py:4415",
+                "handlers/main.py:4417",
+                "handlers/main.py:4476",
+                "handlers/main.py:4478",
+                "handlers/main.py:4561",
+                "handlers/main.py:4563",
+                "handlers/main.py:4569",
+                "handlers/main.py:4571",
+                "handlers/main.py:4580",
+                "handlers/main.py:4582",
+                "handlers/main.py:4597",
+                "handlers/main.py:4599",
+                "handlers/main.py:4624",
+                "handlers/main.py:4626",
+                "handlers/main.py:4648",
+                "handlers/main.py:4650",
+                "handlers/main.py:4674",
+                "handlers/main.py:4676",
+                "handlers/main.py:4705",
+                "handlers/main.py:4707",
+                "handlers/main.py:4743",
+                "handlers/main.py:4745",
+                "handlers/main.py:4751",
+                "handlers/main.py:4753",
+                "handlers/main.py:4785",
+                "handlers/main.py:4787",
+                "handlers/main.py:4828",
+                "handlers/main.py:4830",
+                "media_center/preview.py:46",
+                "media_center/preview.py:47"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.preview_binding.preview_data_binding",
+              "contract_digest": "sha256:8e8679f5589bee83edf99b83035e041e483bb084347cc25e25896f313b1d1a2a",
+              "surface": [
+                "media_center/preview.py:15"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.secrets.delete",
+              "contract_digest": "sha256:5138f27b6250a1d9c4983217d32642ab1be2944c889873988bc138d109e01bc2",
+              "surface": [
+                "handlers/main.py:2056",
+                "handlers/main.py:2074"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.secrets.get",
+              "contract_digest": "sha256:370bd3201f8331904ada34f3b986316ffa2c155acae5021619a033110728c3fc",
+              "surface": [
+                "handlers/main.py:194",
+                "handlers/main.py:196"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.secrets.set",
+              "contract_digest": "sha256:25a93fb3faa34a90fea051dfef4076c4943ed8eabbe625b3f84c47bc8213a758",
+              "surface": [
+                "handlers/main.py:2057",
+                "handlers/main.py:2111"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.skill_env.skill_data_root",
+              "contract_digest": "sha256:9b5cc73082c590d636f7817c61da4ac9b20443a14d1f967fc5ac5cacf0377a61",
+              "surface": [
+                "handlers/main.py:173",
+                "handlers/main.py:175",
+                "media_center/catalog.py:57",
+                "media_center/catalog.py:59",
+                "media_center/preview.py:39"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.deployment.define",
+              "contract_digest": "sha256:cbd7faf26903d0eb1d22347513183625f44c9a2ac2c5ded161af3c4e2dde2765",
+              "surface": [
+                "media_center/topology.py:315"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.deployment.drain",
+              "contract_digest": "sha256:fa0e5af18137f4b81910c5940f8995cb5af02158b6f3aa476fd514fbe60d7b68",
+              "surface": [
+                "media_center/topology.py:351"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.deployment.get_operation",
+              "contract_digest": "sha256:a0d300ce36d8333aa0ae88278e33ccf89585883728a531469b2a3ee1045652f6",
+              "surface": [
+                "media_center/topology.py:343"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.deployment.inspect",
+              "contract_digest": "sha256:fba9329438c178c6fc30ff551f7ceb244acb78d102c164abd51fbc2348a57be8",
+              "surface": [
+                "media_center/topology.py:112",
+                "media_center/topology.py:133",
+                "media_center/topology.py:146",
+                "media_center/topology.py:387"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.deployment.plan",
+              "contract_digest": "sha256:7b5a032928173185e02032bb9992401cc0f2a8616ff6aafe73f0d597804d2e70",
+              "surface": [
+                "media_center/topology.py:320"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.deployment.remove",
+              "contract_digest": "sha256:fa0e5af18137f4b81910c5940f8995cb5af02158b6f3aa476fd514fbe60d7b68",
+              "surface": [
+                "media_center/topology.py:358"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.deployment.submit",
+              "contract_digest": "sha256:1da55102adf1e0301fe1be3a70d7779db1eecab1ff31752848361106dca64708",
+              "surface": [
+                "media_center/topology.py:330"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.apply_plan",
+              "contract_digest": "sha256:eb17a9d4f49a1101ce2771387a5bda1ea28947b423d0dc63f81b328c1448c58b",
+              "surface": [
+                "media_center/topology.py:680"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.define_dataset",
+              "contract_digest": "sha256:522c141f0f5754b780e9465f75f6ae9e2e2bf7311515f3521a655dd7cb79bdcd",
+              "surface": [
+                "media_center/topology.py:502"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.define_group",
+              "contract_digest": "sha256:abd492afbbcefc3fe45f2401bc71525600c2f1aafd17242b1e9c640a5ab57a10",
+              "surface": [
+                "media_center/topology.py:489"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.define_service",
+              "contract_digest": "sha256:83a05df8101615f234cef3a77eba09de9d27762e130327922c0d4ef215f28b61",
+              "surface": [
+                "media_center/topology.py:485"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.drain",
+              "contract_digest": "sha256:a8a7a0660f19c7765b5c258d746556c721f38b9e6106eaf87196706e716cdd4a",
+              "surface": [
+                "media_center/topology.py:546"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.explain_route",
+              "contract_digest": "sha256:77ba1c2c35715bebee326a39d00fdf9d00beb124c4d17596668691c60214b419",
+              "surface": [
+                "media_center/topology.py:759"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.get_operation",
+              "contract_digest": "sha256:05b9810b0e2275b34077f92c011b5f7b5b1b7d4f52ef249dd84b1617a89e6ef8",
+              "surface": [
+                "media_center/topology.py:689"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.get_plan",
+              "contract_digest": "sha256:2cbf6411754ebb0b6421267bae8bf60fc0b10ec749100e05875ed40e3b4a4321",
+              "surface": [
+                "media_center/topology.py:679"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.get_service_definition",
+              "contract_digest": "sha256:0a1aa3d7408ed232a37062b65f4420086d121bb74a44420477b0600264cb1cfc",
+              "surface": [
+                "media_center/topology.py:436",
+                "media_center/topology.py:725"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.handoff_authority",
+              "contract_digest": "sha256:e977f291447c93202e35359966207a294f2f68158e467e3f43bb79aa03cef185",
+              "surface": [
+                "media_center/topology.py:702"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.inspect",
+              "contract_digest": "sha256:9b6ef88612ec59cbd915f5425c63514433231e4d9aafdc5ec00199564d79cfe3",
+              "surface": [
+                "media_center/topology.py:34",
+                "media_center/topology.py:404",
+                "media_center/topology.py:463",
+                "media_center/topology.py:59",
+                "media_center/topology.py:619",
+                "media_center/topology.py:641",
+                "media_center/topology.py:715"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.invoke",
+              "contract_digest": "sha256:53ce47429fa6e3f56b9df9cb1f104ab726d002275ed026fffe3370e2f91cdd55",
+              "surface": [
+                "media_center/topology.py:98"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.observe_replica",
+              "contract_digest": "sha256:ed34bc62cb083a0ccf9d6df9d8b9766148a54880964d3e0d0d12106c8edec95a",
+              "surface": [
+                "media_center/topology.py:604"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.plan_replica_change",
+              "contract_digest": "sha256:4f98a0acd6c8e78fdd84132e2932fd6b8b82019c264589d48d2ddfae73acdbde",
+              "surface": [
+                "media_center/topology.py:664"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.put_partition",
+              "contract_digest": "sha256:265b3bb3965c0afbabdb4620afc506e2567092cc493b62dc11cd55ef444755ce",
+              "surface": [
+                "media_center/topology.py:580",
+                "media_center/topology.py:594"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.register",
+              "contract_digest": "sha256:920502dfe0374a6ef9dee22b8e08cd3e5dbb24cc3ad1336f1eeb917576bbd905",
+              "surface": [
+                "media_center/topology.py:516"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.distributed.renew",
+              "contract_digest": "sha256:99dbb33326810676aeebf53676a7a9acce826fe88184f0a0ad81cbc1ae277a8b",
+              "surface": [
+                "media_center/topology.py:534"
+              ],
+              "exposure": "static"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:186d3b0c928e0eaa85918289139b1a02361377377c38f7180a87a0d941d8f93f",
+          "digest": "sha256:186d3b0c928e0eaa85918289139b1a02361377377c38f7180a87a0d941d8f93f",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:media_center",
+          "consumer_ref": "skill:media_control_skill",
+          "consumer_digest": "sha256:2704515567196974c13964f14bc4b5ff7b4b38848b1a4f2d3c9466540adc311f",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": false,
+          "unresolved": [
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:379"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.events.publish",
+              "location": "handlers/main.py:56"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.events.publish",
+              "location": "handlers/main.py:111"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.stream_variable_publish",
+              "location": "handlers/main.py:309"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.i18n._",
+              "location": "handlers/main.py:141"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.i18n._",
+              "location": "handlers/main.py:193"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.devices.get_device_presence",
+              "location": "handlers/main.py:213"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.subscribe",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.tool",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.devices.get_device_presence",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.events.publish",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.i18n._",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.stream_variable_publish",
+              "location": "handlers/main.py"
+            }
+          ],
+          "source_artifacts": {
+            "assets/i18n/en.json": "sha256:c0d3e55e4d76ad3b1aeac6f16477ed146199db389c8ba196962cd4fefa45d142",
+            "assets/i18n/ru.json": "sha256:b2c7116f0732827cbdcbd2a7917cfdd4a8865a8ea7ed26443c96ae83ced3ec09",
+            "schemas/endpoint-reconciliation.v1.schema.json": "sha256:7942ac590555492eb4ee48cea19a4d5750b13f47d7fae4f9699b3b3b6662d8df",
+            "schemas/playback-checkpoint.v1.schema.json": "sha256:746c1a59d46a8b42fed328dd10a9ebaf0dc3115b04195fbabdbee1d3b39a86ba",
+            "schemas/playback-command.v1.schema.json": "sha256:14953c6e0bff8bec19c4115e4ddfa2a2c0c5cab31dbc54af7e3ec31e9b01d7b4",
+            "schemas/playback-queue.v1.schema.json": "sha256:f6bca17bf67cf52999c7ff92b701be055164b4ca9672d439055f3ede74dfda4a",
+            "schemas/playback-session.v1.schema.json": "sha256:0ae668a397303ea3eaa37b17c19ebb232e18e31f1527b7b08d4f53893791e062",
+            "schemas/playback-target.v1.schema.json": "sha256:5a06dbaa7bfd2310264cb97fee867a46380fba8d0bc2db64afeefb0a5e450112",
+            "schemas/qoe-summary.v1.schema.json": "sha256:164a5726e4ef349b93871fffeeb3ee0496b1909ef27f02c3f8dea490bbbfbce3",
+            "webui.json": "sha256:b2111a92d46749690ae8ad031cdbe546921a2029a587d04d653ab18636e7646a",
+            ".adaos/package-manifest.json": "sha256:dc0dc7331ac7a573c5ce1c33f6ee2c7107f70cc73ccb4f8b003e0fd0a74eb757"
+          },
+          "edges": [
+            {
+              "contract_ref": "sdk:adaos.sdk.access.require",
+              "contract_digest": "sha256:4e4bc6a53b1bf3c808258429293dafcfa334aa72690c1d75021676748d87230f",
+              "surface": [
+                "handlers/main.py:426",
+                "handlers/main.py:428",
+                "handlers/main.py:434",
+                "handlers/main.py:436",
+                "handlers/main.py:453",
+                "handlers/main.py:455",
+                "handlers/main.py:475",
+                "handlers/main.py:477",
+                "handlers/main.py:504",
+                "handlers/main.py:506",
+                "handlers/main.py:531",
+                "handlers/main.py:533",
+                "handlers/main.py:569",
+                "handlers/main.py:571",
+                "handlers/main.py:611",
+                "handlers/main.py:613",
+                "handlers/main.py:646",
+                "handlers/main.py:648",
+                "handlers/main.py:667",
+                "handlers/main.py:669",
+                "handlers/main.py:700",
+                "handlers/main.py:702",
+                "handlers/main.py:729",
+                "handlers/main.py:731",
+                "handlers/main.py:755",
+                "handlers/main.py:757",
+                "handlers/main.py:773",
+                "handlers/main.py:775",
+                "handlers/main.py:790",
+                "handlers/main.py:792",
+                "handlers/main.py:810",
+                "handlers/main.py:812",
+                "handlers/main.py:818",
+                "handlers/main.py:820",
+                "handlers/main.py:826",
+                "handlers/main.py:828",
+                "handlers/main.py:834",
+                "handlers/main.py:836",
+                "handlers/main.py:847",
+                "handlers/main.py:849",
+                "handlers/main.py:868",
+                "handlers/main.py:870",
+                "handlers/main.py:914",
+                "handlers/main.py:916"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.preview_binding.preview_data_binding",
+              "contract_digest": "sha256:8e8679f5589bee83edf99b83035e041e483bb084347cc25e25896f313b1d1a2a",
+              "surface": [
+                "media_control/repository.py:112",
+                "media_control/repository.py:114"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.skill_env.skill_data_root",
+              "contract_digest": "sha256:9b5cc73082c590d636f7817c61da4ac9b20443a14d1f967fc5ac5cacf0377a61",
+              "surface": [
+                "media_control/repository.py:122",
+                "media_control/repository.py:124"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "webui:input.selector",
+              "contract_digest": "sha256:b86c19f957949bf1af5b04b747408cc9062ef2a9e69207de9a9f2621aedcd354",
+              "surface": [
+                "webui.json.registry.modals.media_control_remote_modal.schema.widgets[0]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.actions",
+              "contract_digest": "sha256:b11889d561895633c7bb4f0fd286b2f3557ac4d2c9cce07adbbc4443c04ad543",
+              "surface": [
+                "webui.json.registry.modals.media_control_remote_modal.schema.widgets[2]",
+                "webui.json.registry.modals.media_control_remote_modal.schema.widgets[3]",
+                "webui.json.widgets[0]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.form",
+              "contract_digest": "sha256:cf59070f1d7eec7646b0b1d18f4cbac43e32c8217a6fe52152b1432fb4565203",
+              "surface": [
+                "webui.json.registry.modals.media_control_remote_modal.schema.widgets[4]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.list",
+              "contract_digest": "sha256:fc112730dc984329ecc6ab8bc7a26a9b770703564c8846b347a85a4fdfb6d6a6",
+              "surface": [
+                "webui.json.registry.modals.media_control_remote_modal.schema.widgets[1]"
+              ],
+              "exposure": "compiled"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:2a2f5ac3f20bdde296fe5ef3896ceaf4cfd8c54deb3af55d2d10f46ae84ff028",
+          "digest": "sha256:2a2f5ac3f20bdde296fe5ef3896ceaf4cfd8c54deb3af55d2d10f46ae84ff028",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:media_center",
+          "consumer_ref": "skill:media_library_agent",
+          "consumer_digest": "sha256:211be29c62ed43c42dfee1a9795987bd10dd313e864ea54f3535aa2b18da30fd",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": false,
+          "unresolved": [
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.stream_variable_publish",
+              "location": "handlers/main.py:136"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:214"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.events.publish",
+              "location": "handlers/main.py:166"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.core.runtime_identity",
+              "location": "handlers/main.py:242"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.i18n._",
+              "location": "handlers/main.py:59"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.subscribe",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.tool",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.runtime_identity",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.events.publish",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.i18n._",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.stream_variable_publish",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/contracts.py:86"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/rendition.py:460"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.media.register_media_file",
+              "location": "media_library_agent/rendition.py:885"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.media.publish_media_file",
+              "location": "media_library_agent/rendition.py:1406"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/rendition.py:471"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/rendition.py:499"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.media.publish_media_package",
+              "location": "media_library_agent/rendition.py:1393"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/rendition.py:459"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.media.publish_media_file",
+              "location": "media_library_agent/rendition.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.media.publish_media_package",
+              "location": "media_library_agent/rendition.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.media.register_media_file",
+              "location": "media_library_agent/rendition.py"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:262"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:263"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:96"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:278"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:329"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:270"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:271"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:279"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:279"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:293"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:294"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:341"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:265"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:267"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:269"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:272"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:349"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:342"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:284"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:285"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:286"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:287"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:332"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:351"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:297"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:298"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:299"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:300"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/technical.py:301"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.distributed.Partition.from_mapping",
+              "location": "media_library_agent/topology.py:28"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.distributed.Replica.from_mapping",
+              "location": "media_library_agent/topology.py:29"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.distributed.Replica",
+              "location": "media_library_agent/topology.py:525"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.distributed",
+              "location": "media_library_agent/topology.py"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.media.register_media_file",
+              "location": "media_library_agent/worker.py:1870"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.media.unregister_media_references",
+              "location": "media_library_agent/worker.py:1007"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "media_library_agent/worker.py:1350"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.media.register_media_file",
+              "location": "media_library_agent/worker.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.media.unregister_media_references",
+              "location": "media_library_agent/worker.py"
+            }
+          ],
+          "source_artifacts": {
+            "i18n/en.json": "sha256:220a2b4bf2ccca83103a1d41c14efd9d22e7e8f5c541e661e5320743fc545a6c",
+            "i18n/ru.json": "sha256:a49e94d220e8ee896ca34264ce80e28b01ea92f201ab1acb750ad2cf4a87548d",
+            "schemas/media-library-artwork-plan.v1.schema.json": "sha256:a9865410b1c3a3fc8958ebd4270e2bf0e82e67f6e1885b452ea4f0dc890d5323",
+            "schemas/media-library-folder-node.v1.schema.json": "sha256:13bf935855c18279e5fb2d4853cd9e0f471b77ff0b79739faff1b2f6142f700a",
+            "schemas/media-library-rendition-job.v1.schema.json": "sha256:b921ca2b7b5bd3862261544160e1bdadcce9d48cce7ad1fc917208cb92ba2650",
+            "schemas/media-library-rendition-plan.v2.schema.json": "sha256:f519eb7a7892e78503b6ca8db11e79c969df6ebf033b3f7deb9a5127b00cd0d3",
+            "schemas/media-library-root.v1.schema.json": "sha256:a86cd92cc46cfbcc73c14d94dbe66a5d168f52804d1e3fa8f0514351b3091932",
+            "schemas/media-library-scan-job.v1.schema.json": "sha256:2b682efb32f2d33984aa40d56a384a1019c1dd8b51f14f27e4ab4e322831f1ad",
+            "schemas/media-library-scan-progress.v1.schema.json": "sha256:829959e0abe5c21c20d84f49937563713c5c17f78722cba5e12077a9867d03da",
+            "schemas/media-library-source-delta.v1.schema.json": "sha256:2d6ff50c27de8df9ba441c485b425820d00d2c78a9d02b9c8bcf15a3e4b35341",
+            ".adaos/package-manifest.json": "sha256:4944d3f7082fbeecd363cd7a725df6bd17909c1aa56d5774b260413c450798d8"
+          },
+          "edges": [
+            {
+              "contract_ref": "sdk:adaos.sdk.access.require",
+              "contract_digest": "sha256:4e4bc6a53b1bf3c808258429293dafcfa334aa72690c1d75021676748d87230f",
+              "surface": [
+                "handlers/main.py:1000",
+                "handlers/main.py:1013",
+                "handlers/main.py:1015",
+                "handlers/main.py:1038",
+                "handlers/main.py:1040",
+                "handlers/main.py:1077",
+                "handlers/main.py:1079",
+                "handlers/main.py:1120",
+                "handlers/main.py:1122",
+                "handlers/main.py:1202",
+                "handlers/main.py:1204",
+                "handlers/main.py:1221",
+                "handlers/main.py:1223",
+                "handlers/main.py:1244",
+                "handlers/main.py:1246",
+                "handlers/main.py:1260",
+                "handlers/main.py:1262",
+                "handlers/main.py:277",
+                "handlers/main.py:279",
+                "handlers/main.py:289",
+                "handlers/main.py:291",
+                "handlers/main.py:437",
+                "handlers/main.py:439",
+                "handlers/main.py:477",
+                "handlers/main.py:479",
+                "handlers/main.py:492",
+                "handlers/main.py:494",
+                "handlers/main.py:506",
+                "handlers/main.py:508",
+                "handlers/main.py:529",
+                "handlers/main.py:531",
+                "handlers/main.py:550",
+                "handlers/main.py:552",
+                "handlers/main.py:567",
+                "handlers/main.py:569",
+                "handlers/main.py:639",
+                "handlers/main.py:641",
+                "handlers/main.py:666",
+                "handlers/main.py:668",
+                "handlers/main.py:687",
+                "handlers/main.py:689",
+                "handlers/main.py:698",
+                "handlers/main.py:700",
+                "handlers/main.py:719",
+                "handlers/main.py:721",
+                "handlers/main.py:742",
+                "handlers/main.py:744",
+                "handlers/main.py:769",
+                "handlers/main.py:771",
+                "handlers/main.py:792",
+                "handlers/main.py:794",
+                "handlers/main.py:818",
+                "handlers/main.py:820",
+                "handlers/main.py:839",
+                "handlers/main.py:841",
+                "handlers/main.py:861",
+                "handlers/main.py:863",
+                "handlers/main.py:928",
+                "handlers/main.py:930",
+                "handlers/main.py:980",
+                "handlers/main.py:982",
+                "handlers/main.py:998"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.preview_binding.preview_data_binding",
+              "contract_digest": "sha256:8e8679f5589bee83edf99b83035e041e483bb084347cc25e25896f313b1d1a2a",
+              "surface": [
+                "media_library_agent/repository.py:287",
+                "media_library_agent/repository.py:289"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.skill_env.skill_data_root",
+              "contract_digest": "sha256:9b5cc73082c590d636f7817c61da4ac9b20443a14d1f967fc5ac5cacf0377a61",
+              "surface": [
+                "media_library_agent/repository.py:297",
+                "media_library_agent/repository.py:299"
+              ],
+              "exposure": "static"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:ebe48029b2430124efbb5619a41c7de901d136add494bdd6603c42c333b27a3c",
+          "digest": "sha256:ebe48029b2430124efbb5619a41c7de901d136add494bdd6603c42c333b27a3c",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        }
+      ],
+      "schema_locks": [
+        {
+          "lock_id": "skill:media_center_skill:schemas/catalog-correction.v1.schema.json",
+          "digest": "sha256:bc4a21966202e5a61152319d67cf1b7e3884c78b784a9a5deaeccdf0dc3ed773"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/collection-membership.v1.schema.json",
+          "digest": "sha256:8434092eb7db1c8e1288a5dc199d47662fdfeb822f071e526a1e52345ed39270"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/folder-node.v1.schema.json",
+          "digest": "sha256:519254c3d08a0d52b12145b1922a18e4107f27a364ad70fe98f5bcc032a56018"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/media-collection.v1.schema.json",
+          "digest": "sha256:d3a982d56ae8ed31e384794865ee86ece66be3992f830b5572dd9375fd40eb34"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/media-source.v1.schema.json",
+          "digest": "sha256:e100b430a04d07d4ec9e6c8acb740f5eacbc0a22851dff6e3d6f3393da65d3bd"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/media-variant.v1.schema.json",
+          "digest": "sha256:cfc7deff2354a3464e576161f423f46b261b514286b90c3ae8d5bf7857a2d600"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/media-work.v1.schema.json",
+          "digest": "sha256:f250d05a90a4ff40b5c03801d2356094129f1b1febd3a14ae4718b1534c87d29"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/metadata-claim.v1.schema.json",
+          "digest": "sha256:3a66ef10b385a8df8ff57d0ffef580ff448c0320cc80782dd1fd3a590ec60ae8"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/playback-plan.v2.schema.json",
+          "digest": "sha256:2e4b95fd59758849982ec3f304b484b41d561c906f8e62a9de5353d6f7c26f03"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/playback-route.v1.schema.json",
+          "digest": "sha256:9cf5f4b94ab66cf53cb0b1b022a28c95b9464c5163252c33384c6f3ddbc742df"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/playlist.v1.schema.json",
+          "digest": "sha256:7de59c37f56cf1e9a7323b60860469ddd89622eb3c373c4fe6a633cb9dbdb991"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/profile.v1.schema.json",
+          "digest": "sha256:4227072c05af5d6f89ee683a54fc16aede46813e01b27422d56d7a568c2e50aa"
+        },
+        {
+          "lock_id": "skill:media_center_skill:schemas/queue-source.v1.schema.json",
+          "digest": "sha256:eb56f22092f27f2431e60b5660d3a517fc2764d918cfbac88be67e8655402632"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/endpoint-reconciliation.v1.schema.json",
+          "digest": "sha256:815c721b8d3846d28ec71a0b809e91b264fc56640f4b427e991f3ecab128c56b"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/playback-checkpoint.v1.schema.json",
+          "digest": "sha256:c635f8ae1d717cd03f6c0c7625352dab85279360fc841a519b26ac545ab3950e"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/playback-command.v1.schema.json",
+          "digest": "sha256:ffdc91fbb200c9c1d3f9cf81153c2b115310ef62d58d6022631f3136a065144a"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/playback-queue.v1.schema.json",
+          "digest": "sha256:677f38e90e5c3b3854f4d542a36ef42575d27bd94d3f431f824838ef111e4fe4"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/playback-session.v1.schema.json",
+          "digest": "sha256:708928fc7f7591b856086f529aeac1a4d4a6570a782ba88bcc67d60f5acee415"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/playback-target.v1.schema.json",
+          "digest": "sha256:2aa66631cadba05cb55e9bdd329c5af1cad4c8f61515fe95d2f3cc5a895a84dc"
+        },
+        {
+          "lock_id": "skill:media_control_skill:schemas/qoe-summary.v1.schema.json",
+          "digest": "sha256:827264b2105c8e2ceeda986a5954f1c3bc17ea5e17275cd52bc091e7432caa94"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-artwork-plan.v1.schema.json",
+          "digest": "sha256:64e9b387a68f0c2f32f3a547d8183497fa2a0b3d84aaff0edd0724cde4bdfe28"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-folder-node.v1.schema.json",
+          "digest": "sha256:f4fb70aa800ef0af396f67ba8727d7f3f8a040806ea6233a090cb8a0bf9c0147"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-rendition-job.v1.schema.json",
+          "digest": "sha256:1451419b221a3051ffa6c2194f902a340008055f8ff85b51674bc6518a59c1c3"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-rendition-plan.v2.schema.json",
+          "digest": "sha256:294a734b9942017f5c18ae67923be58b911dcd8c425e52aebc97fe0dacaa8208"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-root.v1.schema.json",
+          "digest": "sha256:2270e95bf115a336d391f31a2c202424ad295aca7e67a0f30e3bca62bff37d9e"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-scan-job.v1.schema.json",
+          "digest": "sha256:033c9914f2788f4c06a1f68972713578b25af92864c4b1bc0faa477d15807708"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-scan-progress.v1.schema.json",
+          "digest": "sha256:9d143c5b309c50c1f942cfbb52ddf284954388e67ea3fad0524e9df9efc7c8fa"
+        },
+        {
+          "lock_id": "skill:media_library_agent:schemas/media-library-source-delta.v1.schema.json",
+          "digest": "sha256:53e12d519eb580aa3ba86e2ad5a863ac69aeeb3d3c299b3eceedc7c192b25d28"
+        }
+      ],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:2d53e65cdfd5002b15f5d63d31e9bf2b559cc40b394a87369904088cf4462173",
+        "sha256:6f175736258a76d50c7cb85dd1455c58d1c49dff1b599f0852ba63c864b7c54d",
+        "sha256:af23595a2786e0f98f506a9b7f281b548d881165bcd00ea74d361c0df1a3706f",
+        "sha256:c7f236d422f55ca0272a313af68407ac0b17e9330f01ad8adf831ec53b1f6cdc",
+        "sha256:ffa5221a9c5ea3ee30a6d82923264dae3cb266b2e886ac13fc233bab90ee2b19"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:3861979588f266276f44e19b7e1cb8703aa003cabb955e5ae2167b0c00f092bf",
+        "profiles": [
+          "adaos.media_center.desktop.v1",
+          "adaos.media_center.embedded.v1",
+          "adaos.media_center.mobile_control.v1",
+          "adaos.media_center.tv.v1",
+          "adaos.media_center.v1"
+        ],
+        "members": [
+          {
+            "ref": "scenario:media_center",
+            "package_digest": "sha256:5dfc7118608b49a18b962b9bf651896296fbcb81b39a73d5b56fbac6bc8ff0b3",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "skill:media_center_skill",
+            "package_digest": "sha256:ccfbbfd997480f71ac4baa28278390c23b8e7cbbbd4ebe5f52f13f40238efc04",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          },
+          {
+            "ref": "skill:media_control_skill",
+            "package_digest": "sha256:2704515567196974c13964f14bc4b5ff7b4b38848b1a4f2d3c9466540adc311f",
+            "role": "supporting",
+            "exposure": "advanced",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          },
+          {
+            "ref": "skill:media_library_agent",
+            "package_digest": "sha256:211be29c62ed43c42dfee1a9795987bd10dd313e864ea54f3535aa2b18da30fd",
+            "role": "supporting",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "embedded",
+            "presentation": "scenario:media_center",
+            "bindings": {
+              "presentation_profile": "embedded",
+              "media_role": "compact",
+              "shared_surface": false
+            }
+          },
+          {
+            "id": "library",
+            "presentation": "scenario:media_center",
+            "default": true,
+            "bindings": {
+              "presentation_profile": "desktop",
+              "media_role": "library",
+              "shared_surface": false
+            }
+          },
+          {
+            "id": "remote",
+            "presentation": "scenario:media_center",
+            "bindings": {
+              "presentation_profile": "mobile_control",
+              "media_role": "controller",
+              "shared_surface": false
+            }
+          },
+          {
+            "id": "tv",
+            "presentation": "scenario:media_center",
+            "bindings": {
+              "presentation_profile": "tv",
+              "media_role": "playback_target",
+              "shared_surface": true
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "library",
+            "tv",
+            "remote"
+          ],
+          "required_contracts": [
+            "adaos.project.deployment.v1",
+            "adaos.distributed.service.v1",
+            "adaos.media.library_agent.v1",
+            "adaos.media.catalog.v1",
+            "adaos.media.playback_session.v1"
+          ],
+          "validation_profiles": [
+            "media_center.local",
+            "media_center.distributed",
+            "media_center.presentation"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "devices.control",
+              "purpose": "Control explicitly selected household playback endpoints.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "distributed.authority.handoff",
+              "purpose": "Transfer Media Center service authority during an explicit deployment operation.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "distributed.replica.observe",
+              "purpose": "Observe admitted Media Center replica health and readiness.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "distributed.replica.remove",
+              "purpose": "Remove selected Media Center replicas while retaining user media and data.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "distributed.service.drain",
+              "purpose": "Drain selected Media Center service replicas before a deployment change.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "distributed.service.invoke",
+              "purpose": "Invoke admitted library and playback services within the configured deployment.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "distributed.service.manage",
+              "purpose": "Manage service membership of the selected Media Center deployment.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "distributed.service.register",
+              "purpose": "Register admitted Media Center service replicas.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "distributed.service.renew",
+              "purpose": "Renew leases of admitted Media Center service replicas.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "distributed.topology.apply",
+              "purpose": "Apply an explicitly requested Media Center topology plan.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "distributed.topology.inspect",
+              "purpose": "Inspect Media Center topology and component readiness.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "distributed.topology.manage",
+              "purpose": "Manage the explicitly selected Media Center topology.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "distributed.topology.plan",
+              "purpose": "Prepare a Media Center placement plan without applying it automatically.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "media.catalog",
+              "purpose": "Read and synchronize the configured household media catalog.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "media.playback_planning",
+              "purpose": "Plan playback only for selected household endpoints and media.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "media.rendition",
+              "purpose": "Prepare admitted derived media without modifying original files.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "network.egress",
+              "purpose": "Coordinate configured subnet services and, when enabled, retrieve metadata and artwork from the selected external provider.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "project.component.drain",
+              "purpose": "Drain selected Media Center components before an explicit deployment change.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "project.component.install.remote",
+              "purpose": "Install admitted Media Center components on explicitly selected subnet nodes.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "project.component.remove",
+              "purpose": "Remove selected Media Center components without deleting retained user data.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "project.deployment.apply",
+              "purpose": "Apply an explicitly requested Media Center deployment plan.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "project.deployment.inspect",
+              "purpose": "Inspect Media Center component placement and deployment state.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "project.deployment.manage",
+              "purpose": "Manage the selected Media Center deployment within its subnet.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "skills.invoke",
+              "purpose": "Invoke admitted media coordinator, library, and playback components.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "storage.relational",
+              "purpose": "Maintain application-local catalog, playlist, and playback records in Core storage.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "workspace.read",
+              "purpose": "Inspect configured media roots, catalog metadata, and playback state.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Maintain the local media catalog, playlists, and playback state.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            }
+          ],
+          "optional": [
+            {
+              "id": "secrets.read",
+              "purpose": "Use the protected application-local TMDb credential for enabled metadata enrichment.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "secrets.write",
+              "purpose": "Set or clear the application-local TMDb credential in the metadata settings.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            }
+          ],
+          "secrets": [
+            {
+              "id": "tmdb_api_credential",
+              "provider": "tmdb",
+              "scopes": [
+                "metadata.read"
+              ],
+              "purpose": "Authenticate optional TMDb metadata requests without exposing the credential in the UI.",
+              "required": false,
+              "binding": "app"
+            }
+          ],
+          "data_practices": {
+            "collected": [
+              "media_metadata",
+              "playback_state",
+              "playlist"
+            ],
+            "sent_off_device": [
+              "normalized_media_titles",
+              "selected_media_tags"
+            ],
+            "linked_to_user": [
+              "playback_state",
+              "playlist"
+            ],
+            "tracking": false,
+            "retention": "Media remains at its configured source; local catalog and preferences are retained."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [
+            {
+              "id": "catalog_refresh",
+              "purpose": "Synchronize configured library agents and prepare bounded catalog projections while the installed Application is active, including without an open browser.",
+              "owner": "media_center_skill"
+            },
+            {
+              "id": "metadata_enrichment",
+              "purpose": "Apply configured metadata providers and artwork preparation in bounded background jobs. External providers require their explicit configuration.",
+              "owner": "media_center_skill"
+            },
+            {
+              "id": "source_index_and_derived_media",
+              "purpose": "Index explicitly configured roots and prepare admitted artwork or audio/video renditions without changing original files.",
+              "owner": "media_library_agent"
+            }
+          ],
+          "external_providers": [
+            {
+              "id": "musicbrainz",
+              "destination": "musicbrainz.org",
+              "purpose": "Look up normalized audio titles and artist tags only when enabled in metadata settings.",
+              "scopes": [
+                "metadata.read"
+              ]
+            },
+            {
+              "id": "tmdb",
+              "destination": "api.themoviedb.org",
+              "purpose": "Look up normalized video titles and selected tags only when enabled in metadata settings.",
+              "scopes": [
+                "metadata.read"
+              ]
+            }
+          ],
+          "privacy_labels": {
+            "collected": [
+              "media_metadata",
+              "playback_state",
+              "playlist"
+            ],
+            "sent_off_device": true,
+            "linked_to_user": true,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "Media Center",
+        "description": "Distributed in-place household media library, playback, and remote control.",
+        "categories": [
+          "home",
+          "media"
+        ],
+        "tags": [
+          "audio",
+          "distributed",
+          "remote-control",
+          "tv",
+          "video"
+        ],
+        "icon": "play-circle-outline",
+        "title_i18n": {
+          "en": "Media Center",
+          "ru": "Медиацентр"
+        },
+        "description_i18n": {
+          "en": "Distributed in-place household media library, playback, and remote control.",
+          "ru": "Распределённая домашняя медиатека, воспроизведение и дистанционное управление на месте."
+        }
+      },
+      "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c"
+    },
+    "accepted_candidate_id": "media_center-0-6-136-b3dc87a3562c",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "builder.release.preflight",
+        "checkpoint_package_digest": "sha256:9998ea3f8c92ff68176592530b2f5d061193d9b3ef4d41033aedbdbfddc3171d",
+        "checkpoint_source_revision": "0b4b8140f2ebefdc0414323ff9e8d2cf54090334",
+        "automation_task_id": "task.01M71YGHBN5NZ160RMFKT4185T",
+        "change_set_id": "builder_change_5b8d4c21",
+        "canonical_change_id": "builder_change_5b8d4c21",
+        "context_packet_digest": "sha256:013d29488a71dda4010dd4618eb676be50158833a88e8e070df6f94bb5e4a6ed",
+        "checkpoint_component_ref": "scenario:media_center"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "devices.control",
+          "purpose": "Control explicitly selected household playback endpoints.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "distributed.authority.handoff",
+          "purpose": "Transfer Media Center service authority during an explicit deployment operation.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "distributed.replica.observe",
+          "purpose": "Observe admitted Media Center replica health and readiness.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "distributed.replica.remove",
+          "purpose": "Remove selected Media Center replicas while retaining user media and data.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "distributed.service.drain",
+          "purpose": "Drain selected Media Center service replicas before a deployment change.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "distributed.service.invoke",
+          "purpose": "Invoke admitted library and playback services within the configured deployment.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "distributed.service.manage",
+          "purpose": "Manage service membership of the selected Media Center deployment.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "distributed.service.register",
+          "purpose": "Register admitted Media Center service replicas.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "distributed.service.renew",
+          "purpose": "Renew leases of admitted Media Center service replicas.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "distributed.topology.apply",
+          "purpose": "Apply an explicitly requested Media Center topology plan.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "distributed.topology.inspect",
+          "purpose": "Inspect Media Center topology and component readiness.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "distributed.topology.manage",
+          "purpose": "Manage the explicitly selected Media Center topology.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "distributed.topology.plan",
+          "purpose": "Prepare a Media Center placement plan without applying it automatically.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "media.catalog",
+          "purpose": "Read and synchronize the configured household media catalog.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "media.playback_planning",
+          "purpose": "Plan playback only for selected household endpoints and media.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "media.rendition",
+          "purpose": "Prepare admitted derived media without modifying original files.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "network.egress",
+          "purpose": "Coordinate configured subnet services and, when enabled, retrieve metadata and artwork from the selected external provider.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "project.component.drain",
+          "purpose": "Drain selected Media Center components before an explicit deployment change.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "project.component.install.remote",
+          "purpose": "Install admitted Media Center components on explicitly selected subnet nodes.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "project.component.remove",
+          "purpose": "Remove selected Media Center components without deleting retained user data.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "project.deployment.apply",
+          "purpose": "Apply an explicitly requested Media Center deployment plan.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "project.deployment.inspect",
+          "purpose": "Inspect Media Center component placement and deployment state.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "project.deployment.manage",
+          "purpose": "Manage the selected Media Center deployment within its subnet.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "skills.invoke",
+          "purpose": "Invoke admitted media coordinator, library, and playback components.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "storage.relational",
+          "purpose": "Maintain application-local catalog, playlist, and playback records in Core storage.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "workspace.read",
+          "purpose": "Inspect configured media roots, catalog metadata, and playback state.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Maintain the local media catalog, playlists, and playback state.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        }
+      ],
+      "optional": [
+        {
+          "id": "secrets.read",
+          "purpose": "Use the protected application-local TMDb credential for enabled metadata enrichment.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "secrets.write",
+          "purpose": "Set or clear the application-local TMDb credential in the metadata settings.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        }
+      ],
+      "secrets": [
+        {
+          "id": "tmdb_api_credential",
+          "provider": "tmdb",
+          "scopes": [
+            "metadata.read"
+          ],
+          "purpose": "Authenticate optional TMDb metadata requests without exposing the credential in the UI.",
+          "required": false,
+          "binding": "app"
+        }
+      ],
+      "data_practices": {
+        "collected": [
+          "media_metadata",
+          "playback_state",
+          "playlist"
+        ],
+        "sent_off_device": [
+          "normalized_media_titles",
+          "selected_media_tags"
+        ],
+        "linked_to_user": [
+          "playback_state",
+          "playlist"
+        ],
+        "tracking": false,
+        "retention": "Media remains at its configured source; local catalog and preferences are retained."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [
+        {
+          "id": "catalog_refresh",
+          "purpose": "Synchronize configured library agents and prepare bounded catalog projections while the installed Application is active, including without an open browser.",
+          "owner": "media_center_skill"
+        },
+        {
+          "id": "metadata_enrichment",
+          "purpose": "Apply configured metadata providers and artwork preparation in bounded background jobs. External providers require their explicit configuration.",
+          "owner": "media_center_skill"
+        },
+        {
+          "id": "source_index_and_derived_media",
+          "purpose": "Index explicitly configured roots and prepare admitted artwork or audio/video renditions without changing original files.",
+          "owner": "media_library_agent"
+        }
+      ],
+      "external_providers": [
+        {
+          "id": "musicbrainz",
+          "destination": "musicbrainz.org",
+          "purpose": "Look up normalized audio titles and artist tags only when enabled in metadata settings.",
+          "scopes": [
+            "metadata.read"
+          ]
+        },
+        {
+          "id": "tmdb",
+          "destination": "api.themoviedb.org",
+          "purpose": "Look up normalized video titles and selected tags only when enabled in metadata settings.",
+          "scopes": [
+            "metadata.read"
+          ]
+        }
+      ],
+      "privacy_labels": {
+        "collected": [
+          "media_metadata",
+          "playback_state",
+          "playlist"
+        ],
+        "sent_off_device": true,
+        "linked_to_user": true,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:04ee38b8f7036241747be597d399c74908c0882c5b9f6f478263ffd9e8a28faf",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "media_center",
+      "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [
+        {
+          "id": "musicbrainz",
+          "title": "musicbrainz",
+          "purpose": "Look up normalized audio titles and artist tags only when enabled in metadata settings.",
+          "required": true,
+          "scopes": [
+            "metadata.read"
+          ]
+        },
+        {
+          "id": "tmdb",
+          "title": "tmdb",
+          "purpose": "Look up normalized video titles and selected tags only when enabled in metadata settings.",
+          "required": true,
+          "scopes": [
+            "metadata.read"
+          ]
+        }
+      ],
+      "permissions": [
+        {
+          "id": "devices.control",
+          "title": "Devices.Control",
+          "purpose": "Control explicitly selected household playback endpoints.",
+          "required": true
+        },
+        {
+          "id": "distributed.authority.handoff",
+          "title": "Distributed.Authority.Handoff",
+          "purpose": "Transfer Media Center service authority during an explicit deployment operation.",
+          "required": true
+        },
+        {
+          "id": "distributed.replica.observe",
+          "title": "Distributed.Replica.Observe",
+          "purpose": "Observe admitted Media Center replica health and readiness.",
+          "required": true
+        },
+        {
+          "id": "distributed.replica.remove",
+          "title": "Distributed.Replica.Remove",
+          "purpose": "Remove selected Media Center replicas while retaining user media and data.",
+          "required": true
+        },
+        {
+          "id": "distributed.service.drain",
+          "title": "Distributed.Service.Drain",
+          "purpose": "Drain selected Media Center service replicas before a deployment change.",
+          "required": true
+        },
+        {
+          "id": "distributed.service.invoke",
+          "title": "Distributed.Service.Invoke",
+          "purpose": "Invoke admitted library and playback services within the configured deployment.",
+          "required": true
+        },
+        {
+          "id": "distributed.service.manage",
+          "title": "Distributed.Service.Manage",
+          "purpose": "Manage service membership of the selected Media Center deployment.",
+          "required": true
+        },
+        {
+          "id": "distributed.service.register",
+          "title": "Distributed.Service.Register",
+          "purpose": "Register admitted Media Center service replicas.",
+          "required": true
+        },
+        {
+          "id": "distributed.service.renew",
+          "title": "Distributed.Service.Renew",
+          "purpose": "Renew leases of admitted Media Center service replicas.",
+          "required": true
+        },
+        {
+          "id": "distributed.topology.apply",
+          "title": "Distributed.Topology.Apply",
+          "purpose": "Apply an explicitly requested Media Center topology plan.",
+          "required": true
+        },
+        {
+          "id": "distributed.topology.inspect",
+          "title": "Distributed.Topology.Inspect",
+          "purpose": "Inspect Media Center topology and component readiness.",
+          "required": true
+        },
+        {
+          "id": "distributed.topology.manage",
+          "title": "Distributed.Topology.Manage",
+          "purpose": "Manage the explicitly selected Media Center topology.",
+          "required": true
+        },
+        {
+          "id": "distributed.topology.plan",
+          "title": "Distributed.Topology.Plan",
+          "purpose": "Prepare a Media Center placement plan without applying it automatically.",
+          "required": true
+        },
+        {
+          "id": "media.catalog",
+          "title": "Media.Catalog",
+          "purpose": "Read and synchronize the configured household media catalog.",
+          "required": true
+        },
+        {
+          "id": "media.playback_planning",
+          "title": "Media.Playback Planning",
+          "purpose": "Plan playback only for selected household endpoints and media.",
+          "required": true
+        },
+        {
+          "id": "media.rendition",
+          "title": "Media.Rendition",
+          "purpose": "Prepare admitted derived media without modifying original files.",
+          "required": true
+        },
+        {
+          "id": "network.egress",
+          "title": "Network.Egress",
+          "purpose": "Coordinate configured subnet services and, when enabled, retrieve metadata and artwork from the selected external provider.",
+          "required": true
+        },
+        {
+          "id": "project.component.drain",
+          "title": "Project.Component.Drain",
+          "purpose": "Drain selected Media Center components before an explicit deployment change.",
+          "required": true
+        },
+        {
+          "id": "project.component.install.remote",
+          "title": "Project.Component.Install.Remote",
+          "purpose": "Install admitted Media Center components on explicitly selected subnet nodes.",
+          "required": true
+        },
+        {
+          "id": "project.component.remove",
+          "title": "Project.Component.Remove",
+          "purpose": "Remove selected Media Center components without deleting retained user data.",
+          "required": true
+        },
+        {
+          "id": "project.deployment.apply",
+          "title": "Project.Deployment.Apply",
+          "purpose": "Apply an explicitly requested Media Center deployment plan.",
+          "required": true
+        },
+        {
+          "id": "project.deployment.inspect",
+          "title": "Project.Deployment.Inspect",
+          "purpose": "Inspect Media Center component placement and deployment state.",
+          "required": true
+        },
+        {
+          "id": "project.deployment.manage",
+          "title": "Project.Deployment.Manage",
+          "purpose": "Manage the selected Media Center deployment within its subnet.",
+          "required": true
+        },
+        {
+          "id": "skills.invoke",
+          "title": "Skills.Invoke",
+          "purpose": "Invoke admitted media coordinator, library, and playback components.",
+          "required": true
+        },
+        {
+          "id": "storage.relational",
+          "title": "Storage.Relational",
+          "purpose": "Maintain application-local catalog, playlist, and playback records in Core storage.",
+          "required": true
+        },
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Inspect configured media roots, catalog metadata, and playback state.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Maintain the local media catalog, playlists, and playback state.",
+          "required": true
+        },
+        {
+          "id": "secrets.read",
+          "title": "Secrets.Read",
+          "purpose": "Use the protected application-local TMDb credential for enabled metadata enrichment.",
+          "required": false
+        },
+        {
+          "id": "secrets.write",
+          "title": "Secrets.Write",
+          "purpose": "Set or clear the application-local TMDb credential in the metadata settings.",
+          "required": false
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:645938813ccab5689f9129464111d358cbb47cfd838eeeef55ef0ce83724b6dd"
+  },
+  "channels": {
+    "stable": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c"
+  },
+  "semantic": {
+    "projection_digest": "sha256:ae066b7ad17b94ac53bef9650b5dbc29b4c0f1cb3bac813104fec3c1f48e176c",
+    "path": "semantic/applications/media_center/e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c.json"
+  },
+  "projection_digest": "sha256:5f474e3bf5d1f7f8079994a7cf331acc712492684e523f5b13505b155d799943"
+}

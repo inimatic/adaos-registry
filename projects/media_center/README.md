@@ -562,3 +562,33 @@ store, or regenerate disposable artifacts; it never makes a child folder a
 second authority. Migration from the current Media Server slot-local content
 store must copy and verify objects before switching descriptors, then reclaim
 the old slot data separately.
+
+Automation tools declare their individual workspace permission and enforce it
+through `adaos.sdk.access.require` before domain work. Application access uses
+Core grants; this project does not provision an application role registry.
+The three domain databases resolve through `skill_data_root()` and fail closed
+when Core has no runtime context, rather than creating package-local state.
+
+Cross-component checkpoints live in
+`scenarios/media_center/tests/test_application_contract.py` and
+`scenarios/media_center/tests/test_behavior_contract.py`. They exercise denied
+calls for every exported tool, persistence after repository recreation, and
+unchanged settings after denied writes. Their SDK doubles do not qualify HTTP
+ingress, installed grants, Core migration ledgers, or lifecycle cutover.
+The accepted revision 001 WebUI is preserved; its compiler-owned localization
+fallbacks remain explicitly covered by scenario tests.
+
+Development preview defaults to `demo-fixture`: eight deterministic demo-v1
+records, including Aurora Station. Fixture initialization requires the exact
+Core-verified binding, including its project owner, typed fixture mapping,
+readiness and isolated runtime source. It opens only `skill_data_root()` and
+does not discover providers or start background workers. Fixture and sandbox
+profiles ignore legacy database path overrides. `isolated-sandbox` is a separate
+writable store; `local-library-readonly` reads the scoped personal library with
+required redaction and never initializes an absent catalog. Core owns profile
+resolution, physical root separation, redaction, and policy rejection before
+tool execution (`preview_data_profile_read_denied` / `preview_data_profile_readonly`).
+Hermetic tests cover consumer binding validation, isolation, initial library
+projection, fixture count and denied tool delegation; they do not certify Core
+HTTP ingress. Release bookkeeping remains Forge-owned, with approved release
+targets Project 0.6.128 and media_center_skill 0.8.107.

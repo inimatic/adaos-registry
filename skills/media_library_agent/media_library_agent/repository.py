@@ -284,21 +284,19 @@ def _replace_legacy_identity(value: Any, *, node_id: str, agent_id: str) -> Any:
 
 
 def default_db_path() -> Path:
+    from adaos.sdk.data.preview_binding import preview_data_binding
+
+    verified = preview_data_binding()
+    if verified and verified.get("read_policy") == "none":
+        raise PermissionError("preview_data_profile_read_denied")
     override = text(os.environ.get("MEDIA_LIBRARY_AGENT_DB_PATH"))
-    if override:
+    if override and verified is None:
         path = Path(override).expanduser()
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
-    try:
-        from adaos.sdk.data.skill_env import skill_env_path
+    from adaos.sdk.data.skill_env import skill_data_root
 
-        env_path = Path(skill_env_path())
-        data_root = (
-            env_path.parents[1] if env_path.parent.name == "db" else env_path.parent
-        )
-        db_dir = data_root / "db"
-    except Exception:
-        db_dir = Path(__file__).resolve().parents[1] / ".skill_state" / "db"
+    db_dir = Path(skill_data_root()) / "db"
     db_dir.mkdir(parents=True, exist_ok=True)
     return db_dir / "media_library_agent.sqlite3"
 
@@ -334,7 +332,7 @@ class MediaLibraryAgentRepository:
             if "locked" not in str(exc).lower():
                 connection.close()
                 raise
-        connection.execute("PRAGMA busy_timeout=30000")
+        connection.execute("PRAGMA busy_timeout=2000")
         return connection
 
     def ensure_schema(self) -> dict[str, Any]:
@@ -1983,21 +1981,22 @@ class MediaLibraryAgentRepository:
                 "root_id": root["id"],
                 "schema": SCHEMA_VERSION,
             }
-        active = self.active_job_for_root(root["id"])
-        if active:
-            return {
-                "ok": True,
-                "schema": SCHEMA_VERSION,
-                "job": active,
-                "accepted": False,
-                "deduplicated": True,
-            }
         requested_at = now_iso()
         job_id = stable_id("scan", root["id"], requested_at, size=24)
         mode_token = text(mode).lower()
         if mode_token not in {"incremental", "reconcile", "full"}:
             mode_token = "incremental"
         with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            placeholders = ",".join("?" for _ in ACTIVE_JOB_STATUSES)
+            active = connection.execute(
+                f"SELECT * FROM scan_jobs WHERE root_id=? AND status IN ({placeholders}) ORDER BY requested_at LIMIT 1",
+                (root["id"], *ACTIVE_JOB_STATUSES),
+            ).fetchone()
+            if active:
+                return {"ok": True, "schema": SCHEMA_VERSION,
+                        "job": self._public_job(active), "accepted": False,
+                        "deduplicated": True}
             connection.execute(
                 "INSERT INTO scan_jobs(id, root_id, mode, status, requested_at, webspace_id) VALUES (?, ?, ?, 'queued', ?, ?)",
                 (job_id, root["id"], mode_token, requested_at, text(webspace_id)),
@@ -2165,21 +2164,21 @@ class MediaLibraryAgentRepository:
         profile_token = text(profile) or "browser-mp4-v1"
         target_json = json_dumps(dict(target))
         with self.connect() as connection:
+            # The decision and insertion are one serialized transaction across
+            # service/tool processes; a deferred read-to-write upgrade races.
+            connection.execute("BEGIN IMMEDIATE")
             if not force:
                 existing = connection.execute(
                     """
                     SELECT * FROM rendition_jobs
-                    WHERE source_id=? AND source_fingerprint=? AND profile=?
+                    WHERE source_id=? AND source_fingerprint=? AND source_revision=? AND profile=?
                         AND target_json=?
-                        AND status IN (
-                            'queued','running','waiting_resources','waiting_storage',
-                            'canceling','completed'
-                        )
                     ORDER BY requested_at DESC LIMIT 1
                     """,
                     (
                         text(source_id),
                         text(source.get("fingerprint")),
+                        int(source.get("revision") or 0),
                         profile_token,
                         target_json,
                     ),
@@ -2453,6 +2452,19 @@ class MediaLibraryAgentRepository:
             )
             connection.commit()
         return {"ok": True, "changed": True, "source": public_source}
+
+    def retry_storage_waiters(self, *, limit: int = 4) -> int:
+        """Bounded background-only readmission, not an automatic force retry."""
+        with self.connect() as connection:
+            changed = connection.execute(
+                """UPDATE rendition_jobs SET status='queued',revision=revision+1
+                   WHERE id IN (SELECT id FROM rendition_jobs
+                       WHERE status='waiting_storage' AND cancel_requested=0
+                       ORDER BY requested_at LIMIT ?)""",
+                (max(1, min(16, int(limit))),),
+            ).rowcount
+            connection.commit()
+        return changed
 
     def next_queued_rendition_job(
         self,

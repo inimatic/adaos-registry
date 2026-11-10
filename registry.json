@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-06T14:35:20+00:00",
+  "updated_at": "2026-11-10T06:22:27+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -647,8 +647,8 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.8.101",
-      "updated_at": "2026-09-28T00:19:52+00:00",
+      "version": "0.8.108",
+      "updated_at": "2026-11-10T06:22:27+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
       "source": {
@@ -663,21 +663,21 @@
       "description": "Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 74,
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.119",
-        "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-        "package_digest": "sha256:aad0bd1ff168ae47a33f2e21fe7fe6475c5b45b19e723fc71247b62111d7c316"
-      }
+        "release": "media_center@0.6.136",
+        "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+        "package_digest": "sha256:ccfbbfd997480f71ac4baa28278390c23b8e7cbbbd4ebe5f52f13f40238efc04"
+      },
+      "tools_count": 74
     },
     {
       "kind": "skill",
       "id": "media_control_skill",
       "name": "media_control_skill",
-      "version": "0.2.27",
-      "updated_at": "2026-09-28T00:20:12+00:00",
+      "version": "0.2.33",
+      "updated_at": "2026-11-10T06:22:27+00:00",
       "path": "skills/media_control_skill",
       "manifest": "skills/media_control_skill/skill.yaml",
       "source": {
@@ -692,14 +692,14 @@
       "description": "Persistent Media Center control plane for playback targets, sessions, queues, commands, checkpoints, and settings.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 22,
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.119",
-        "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-        "package_digest": "sha256:0e1ef12365424d00bec2f5848a074768ef479779ed7ca9b146462ba117f28630"
-      }
+        "release": "media_center@0.6.136",
+        "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+        "package_digest": "sha256:2704515567196974c13964f14bc4b5ff7b4b38848b1a4f2d3c9466540adc311f"
+      },
+      "tools_count": 22
     },
     {
       "kind": "skill",
@@ -731,8 +731,8 @@
       "kind": "skill",
       "id": "media_library_agent",
       "name": "media_library_agent",
-      "version": "0.6.57",
-      "updated_at": "2026-09-28T00:20:04+00:00",
+      "version": "0.6.63",
+      "updated_at": "2026-11-10T06:22:27+00:00",
       "path": "skills/media_library_agent",
       "manifest": "skills/media_library_agent/skill.yaml",
       "source": {
@@ -746,14 +746,14 @@
       },
       "description": "Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.",
       "runtime_python": "3.11",
-      "tools_count": 31,
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.119",
-        "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-        "package_digest": "sha256:96d6f252130a2f7ddc2938e5c09895f2b6695de3854b9a019c159444ea4b48c2"
-      }
+        "release": "media_center@0.6.136",
+        "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+        "package_digest": "sha256:211be29c62ed43c42dfee1a9795987bd10dd313e864ea54f3535aa2b18da30fd"
+      },
+      "tools_count": 31
     },
     {
       "kind": "skill",
@@ -2194,8 +2194,8 @@
       "kind": "scenario",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.6.46",
-      "updated_at": "2026-09-28T00:19:43+00:00",
+      "version": "0.6.55",
+      "updated_at": "2026-11-10T06:22:27+00:00",
       "path": "scenarios/media_center",
       "manifest": "scenarios/media_center/scenario.yaml",
       "source": {
@@ -2203,7 +2203,7 @@
         "manifest": "scenarios/media_center/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:26cc45e45b2d218b85ce95a89f38b0486057b3240b2ae9e8125cd0e119e161d7",
+        "revision": "sha256:a4cc8ad93e0c77fdfebd72f84072c80a7ee743fb3e4ca991a87848570e637ce5",
         "path_scope": [
           "projects/media_center/"
         ]
@@ -2230,17 +2230,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.119",
-        "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-        "package_digest": "sha256:50f4cf9c8c8185ad91b43f72671e5615fb28461a1b24dca5ac1b5edbe3f26b47"
+        "release": "media_center@0.6.136",
+        "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+        "package_digest": "sha256:5dfc7118608b49a18b962b9bf651896296fbcb81b39a73d5b56fbac6bc8ff0b3"
       },
       "channels": {
         "stable": {
-          "release": "media_center@0.6.119",
-          "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-          "source_revision": "sha256:26cc45e45b2d218b85ce95a89f38b0486057b3240b2ae9e8125cd0e119e161d7",
-          "package_digest": "sha256:50f4cf9c8c8185ad91b43f72671e5615fb28461a1b24dca5ac1b5edbe3f26b47",
-          "version": "0.6.46"
+          "release": "media_center@0.6.136",
+          "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+          "source_revision": "sha256:a4cc8ad93e0c77fdfebd72f84072c80a7ee743fb3e4ca991a87848570e637ce5",
+          "package_digest": "sha256:5dfc7118608b49a18b962b9bf651896296fbcb81b39a73d5b56fbac6bc8ff0b3",
+          "version": "0.6.55"
         }
       }
     },
@@ -3289,8 +3289,8 @@
       "kind": "project",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.6.119",
-      "updated_at": "2026-09-28T00:22:13+00:00",
+      "version": "0.6.136",
+      "updated_at": "2026-11-10T06:22:27+00:00",
       "path": "projects/media_center",
       "manifest": "projects/media_center/project.yaml",
       "source": {
@@ -3379,18 +3379,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.119",
-        "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
+        "release": "media_center@0.6.136",
+        "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
         "primary_component": "scenario:media_center",
-        "package_digest": "sha256:50f4cf9c8c8185ad91b43f72671e5615fb28461a1b24dca5ac1b5edbe3f26b47"
+        "package_digest": "sha256:5dfc7118608b49a18b962b9bf651896296fbcb81b39a73d5b56fbac6bc8ff0b3"
       },
       "channels": {
         "stable": {
-          "release": "media_center@0.6.119",
-          "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-          "source_revision": "sha256:26cc45e45b2d218b85ce95a89f38b0486057b3240b2ae9e8125cd0e119e161d7",
-          "package_digest": "sha256:50f4cf9c8c8185ad91b43f72671e5615fb28461a1b24dca5ac1b5edbe3f26b47",
-          "version": "0.6.119"
+          "release": "media_center@0.6.136",
+          "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+          "source_revision": "sha256:a4cc8ad93e0c77fdfebd72f84072c80a7ee743fb3e4ca991a87848570e637ce5",
+          "package_digest": "sha256:5dfc7118608b49a18b962b9bf651896296fbcb81b39a73d5b56fbac6bc8ff0b3",
+          "version": "0.6.136"
         }
       }
     },

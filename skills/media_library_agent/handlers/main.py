@@ -274,6 +274,9 @@ def _topology() -> LibraryAgentTopology:
     summary="Ensure the durable media-library agent schema.", side_effects="local_write"
 )
 def ensure_schema(**_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, _worker = _runtime()
     return repository.ensure_schema()
 
@@ -283,6 +286,9 @@ def ensure_schema(**_: Any) -> dict[str, Any]:
     side_effects="local_write",
 )
 def rehydrate(**payload: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     lifecycle_host_activation = (
         text(payload.get("skill")) == "media_library_agent"
         and text(payload.get("state")) == "active"
@@ -428,6 +434,9 @@ def add_root(
     storage_policy: Mapping[str, Any] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, _worker = _runtime()
     result = repository.add_root(
         path,
@@ -465,6 +474,9 @@ def add_root(
     side_effects="local_write",
 )
 def remove_root(root_id: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, _worker = _runtime()
     result = repository.disable_root(root_id)
     if result.get("ok"):
@@ -475,8 +487,11 @@ def remove_root(root_id: str = "", **_: Any) -> dict[str, Any]:
     }
 
 
-@tool(summary="List media roots owned by this node agent.", side_effects="none")
+@tool(summary="List media roots owned by this node agent.", side_effects="read_only")
 def list_roots(include_disabled: bool = False, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repository, _worker = _runtime()
     return repository.list_roots(include_disabled=bool(include_disabled))
 
@@ -488,6 +503,9 @@ def list_roots(include_disabled: bool = False, **_: Any) -> dict[str, Any]:
 def set_storage_policy(
     root_id: str = "", values: Mapping[str, Any] | None = None, **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, worker = _runtime()
     result = repository.set_root_storage_policy(root_id, dict(values or {}))
     if not result.get("ok"):
@@ -508,6 +526,9 @@ def set_storage_policy(
     side_effects="local_write",
 )
 def migrate_storage(root_id: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, worker = _runtime()
     result = repository.enqueue_storage_migration(root_id)
     if not result.get("ok"):
@@ -522,10 +543,13 @@ def migrate_storage(root_id: str = "", **_: Any) -> dict[str, Any]:
     return result
 
 
-@tool(summary="List bounded rendition storage migration history.", side_effects="none")
+@tool(summary="List bounded rendition storage migration history.", side_effects="read_only")
 def list_storage_migrations(
     root_id: str = "", limit: int = 20, **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repository, _worker = _runtime()
     return repository.list_storage_migrations(root_id=root_id, limit=limit)
 
@@ -540,6 +564,9 @@ def start_scan(
     webspace_id: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, worker = _runtime()
     root_ids = (
         [text(root_id)]
@@ -609,6 +636,9 @@ def import_folder(
     webspace_id: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     added = add_root(
         path=path,
         label=label,
@@ -631,8 +661,11 @@ def import_folder(
     }
 
 
-@tool(summary="Read one durable scan job and compact progress.", side_effects="none")
+@tool(summary="Read one durable scan job and compact progress.", side_effects="read_only")
 def scan_status(job_id: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repository, worker = _runtime()
     job = repository.get_job(job_id)
     if job is None:
@@ -649,8 +682,11 @@ def scan_status(job_id: str = "", **_: Any) -> dict[str, Any]:
     }
 
 
-@tool(summary="List recent bounded scan jobs.", side_effects="none")
+@tool(summary="List recent bounded scan jobs.", side_effects="read_only")
 def list_jobs(root_id: str = "", limit: int = 20, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repository, _worker = _runtime()
     return repository.list_jobs(root_id=root_id, limit=limit)
 
@@ -659,6 +695,9 @@ def list_jobs(root_id: str = "", limit: int = 20, **_: Any) -> dict[str, Any]:
     summary="Request cooperative cancellation of one scan.", side_effects="local_write"
 )
 def cancel_scan(job_id: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, worker = _runtime()
     result = repository.request_cancel(job_id)
     _ensure_worker_if_owned(worker)
@@ -672,11 +711,14 @@ def cancel_scan(job_id: str = "", **_: Any) -> dict[str, Any]:
 
 @tool(
     summary="Pull ordered idempotent source deltas through an opaque cursor.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def pull_deltas(
     cursor: str = "", limit: int = 250, root_id: str = "", **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repository, _worker = _runtime()
     try:
         return repository.pull_deltas(cursor=cursor, limit=limit, root_id=root_id)
@@ -688,7 +730,7 @@ def pull_deltas(
 
 @tool(
     summary="Browse indexed folders as an alternative library navigation.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def browse_folders(
     root_id: str = "",
@@ -697,6 +739,9 @@ def browse_folders(
     cursor: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repository, _worker = _runtime()
     try:
         return repository.browse_folders(
@@ -721,6 +766,9 @@ def configure_schedule(
     watch_poll_seconds: int = 30,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, worker = _runtime()
     result = repository.configure_schedule(
         root_id,
@@ -741,6 +789,9 @@ def configure_schedule(
 def set_resource_pressure(
     level: str = "normal", ttl_seconds: float = 0.0, **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, worker = _runtime()
     try:
         ttl = max(0.0, min(600.0, float(ttl_seconds or 0.0)))
@@ -761,9 +812,12 @@ def set_resource_pressure(
 
 @tool(
     summary="Inspect one indexed source without reading media bytes.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def inspect_source(source_id: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repository, _worker = _runtime()
     source = repository.get_source(source_id)
     if source is None:
@@ -777,11 +831,14 @@ def inspect_source(source_id: str = "", **_: Any) -> dict[str, Any]:
 
 @tool(
     summary="Search node-local filenames, folders, tags, and technical metadata.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def search_sources(
     query: str = "", limit: int = 30, cursor: str = "", **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repository, _worker = _runtime()
     try:
         return repository.search_sources(query=query, limit=limit, cursor=cursor)
@@ -801,6 +858,9 @@ def plan_artwork(
     force: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, worker = _runtime()
     source = repository.get_source(source_id)
     if source is None:
@@ -865,6 +925,9 @@ def plan_rendition(
     force: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, worker = _runtime()
     source = repository.get_source(source_id)
     if source is None:
@@ -912,8 +975,11 @@ def plan_rendition(
     }
 
 
-@tool(summary="Inspect one durable rendition job.", side_effects="none")
+@tool(summary="Inspect one durable rendition job.", side_effects="read_only")
 def rendition_status(job_id: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repository, _worker = _runtime()
     job = repository.get_rendition_job(job_id)
     if job is None:
@@ -925,10 +991,13 @@ def rendition_status(job_id: str = "", **_: Any) -> dict[str, Any]:
     return {"ok": True, "schema": SCHEMA_VERSION, "job": job}
 
 
-@tool(summary="List recent bounded rendition jobs.", side_effects="none")
+@tool(summary="List recent bounded rendition jobs.", side_effects="read_only")
 def list_rendition_jobs(
     source_id: str = "", limit: int = 20, **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repository, worker = _runtime()
     return {
         **repository.list_rendition_jobs(source_id=source_id, limit=limit),
@@ -941,6 +1010,9 @@ def list_rendition_jobs(
 
 @tool(summary="Cooperatively cancel one rendition job.", side_effects="local_write")
 def cancel_rendition(job_id: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, worker = _runtime()
     result = repository.request_rendition_cancel(job_id)
     _ensure_worker_if_owned(worker)
@@ -963,6 +1035,9 @@ def compact_storage(
     time_budget_seconds: float = 120.0,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, _worker = _runtime()
     bounded_batches = max(1, min(1000, int(max_batches or 100)))
     bounded_limit = max(1, min(2000, int(limit or 25)))
@@ -999,6 +1074,9 @@ def compact_storage(
     side_effects="local_write",
 )
 def optimize_storage(reclaim: bool = False, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, _worker = _runtime()
     storage = repository.storage_status()
     logical = dict(storage.get("logical_compaction") or {})
@@ -1037,8 +1115,11 @@ def optimize_storage(reclaim: bool = False, **_: Any) -> dict[str, Any]:
         repository.set_storage_maintenance(False)
 
 
-@tool(summary="Return compact agent health and capacity state.", side_effects="none")
+@tool(summary="Return compact agent health and capacity state.", side_effects="read_only")
 def status(compact: bool = False, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     if compact:
         return service_health_status()
     repository, worker = _runtime()
@@ -1111,13 +1192,16 @@ def service_health_status() -> dict[str, Any]:
 
 
 @tool(
-    summary="Validate and report one node-local partition replica.", side_effects="none"
+    summary="Validate and report one node-local partition replica.", side_effects="read_only"
 )
 def observe_topology(
     partition: Mapping[str, Any] | None = None,
     replica: Mapping[str, Any] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     try:
         repository, _worker = _runtime()
         return _topology().observe(repository, partition or {}, replica or {})
@@ -1134,6 +1218,9 @@ def observe_topology(
     side_effects="local_write",
 )
 def distributed_topology_phase(**payload: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, worker = _runtime()
     try:
         return _topology().execute_phase(
@@ -1154,6 +1241,9 @@ def distributed_topology_phase(**payload: Any) -> dict[str, Any]:
     side_effects="local_write",
 )
 def distributed_topology_transfer(**payload: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository, _worker = _runtime()
     try:
         return _topology().execute_transfer(repository, payload)
@@ -1167,6 +1257,9 @@ def distributed_topology_transfer(**payload: Any) -> dict[str, Any]:
 
 @tool(summary="Stop process-local media-library workers.", side_effects="local_write")
 def dispose(**_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     owner = "current_process" if _owns_background_worker() else "service_process"
     if owner == "current_process":
         _repository, worker = _runtime()

@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: media_center
-version: 0.6.119
+version: 0.6.136
 profiles:
 - adaos.media_center.v1
 - adaos.media_center.tv.v1
@@ -146,16 +146,144 @@ permission_profile:
     approval_policy: owner_only
     sensitive: true
   - id: network.egress
-    purpose: Coordinate explicitly requested deployment and topology operations with
-      configured subnet services.
+    purpose: Coordinate configured subnet services and, when enabled, retrieve metadata
+      and artwork from the selected external provider.
     approval_policy: owner_only
     sensitive: true
-  optional: []
-  secrets: []
-  external_providers: []
+  - id: storage.relational
+    purpose: Maintain application-local catalog, playlist, and playback records in
+      Core storage.
+    approval_policy: owner_only
+  - id: media.catalog
+    purpose: Read and synchronize the configured household media catalog.
+    approval_policy: owner_only
+  - id: media.playback_planning
+    purpose: Plan playback only for selected household endpoints and media.
+    approval_policy: owner_only
+  - id: media.rendition
+    purpose: Prepare admitted derived media without modifying original files.
+    approval_policy: owner_only
+  - id: skills.invoke
+    purpose: Invoke admitted media coordinator, library, and playback components.
+    approval_policy: owner_only
+  - id: project.deployment.manage
+    purpose: Manage the selected Media Center deployment within its subnet.
+    approval_policy: owner_only
+    sensitive: true
+  - id: project.deployment.inspect
+    purpose: Inspect Media Center component placement and deployment state.
+    approval_policy: owner_only
+  - id: project.deployment.apply
+    purpose: Apply an explicitly requested Media Center deployment plan.
+    approval_policy: owner_only
+    sensitive: true
+  - id: project.component.install.remote
+    purpose: Install admitted Media Center components on explicitly selected subnet
+      nodes.
+    approval_policy: owner_only
+    sensitive: true
+  - id: project.component.drain
+    purpose: Drain selected Media Center components before an explicit deployment
+      change.
+    approval_policy: owner_only
+    sensitive: true
+  - id: project.component.remove
+    purpose: Remove selected Media Center components without deleting retained user
+      data.
+    approval_policy: owner_only
+    sensitive: true
+  - id: distributed.service.manage
+    purpose: Manage service membership of the selected Media Center deployment.
+    approval_policy: owner_only
+    sensitive: true
+  - id: distributed.service.register
+    purpose: Register admitted Media Center service replicas.
+    approval_policy: owner_only
+    sensitive: true
+  - id: distributed.service.renew
+    purpose: Renew leases of admitted Media Center service replicas.
+    approval_policy: owner_only
+  - id: distributed.service.drain
+    purpose: Drain selected Media Center service replicas before a deployment change.
+    approval_policy: owner_only
+    sensitive: true
+  - id: distributed.service.invoke
+    purpose: Invoke admitted library and playback services within the configured deployment.
+    approval_policy: owner_only
+  - id: distributed.topology.manage
+    purpose: Manage the explicitly selected Media Center topology.
+    approval_policy: owner_only
+    sensitive: true
+  - id: distributed.topology.inspect
+    purpose: Inspect Media Center topology and component readiness.
+    approval_policy: owner_only
+  - id: distributed.topology.plan
+    purpose: Prepare a Media Center placement plan without applying it automatically.
+    approval_policy: owner_only
+  - id: distributed.topology.apply
+    purpose: Apply an explicitly requested Media Center topology plan.
+    approval_policy: owner_only
+    sensitive: true
+  - id: distributed.authority.handoff
+    purpose: Transfer Media Center service authority during an explicit deployment
+      operation.
+    approval_policy: owner_only
+    sensitive: true
+  - id: distributed.replica.remove
+    purpose: Remove selected Media Center replicas while retaining user media and
+      data.
+    approval_policy: owner_only
+    sensitive: true
+  - id: distributed.replica.observe
+    purpose: Observe admitted Media Center replica health and readiness.
+    approval_policy: owner_only
+  optional:
+  - id: secrets.read
+    purpose: Use the protected application-local TMDb credential for enabled metadata
+      enrichment.
+    approval_policy: owner_only
+    sensitive: true
+  - id: secrets.write
+    purpose: Set or clear the application-local TMDb credential in the metadata settings.
+    approval_policy: owner_only
+    sensitive: true
+  secrets:
+  - id: tmdb_api_credential
+    provider: tmdb
+    scopes:
+    - metadata.read
+    purpose: Authenticate optional TMDb metadata requests without exposing the credential
+      in the UI.
+    required: false
+    binding: app
+  external_providers:
+  - id: musicbrainz
+    destination: musicbrainz.org
+    purpose: Look up normalized audio titles and artist tags only when enabled in
+      metadata settings.
+    scopes:
+    - metadata.read
+  - id: tmdb
+    destination: api.themoviedb.org
+    purpose: Look up normalized video titles and selected tags only when enabled in
+      metadata settings.
+    scopes:
+    - metadata.read
   llm_model_use: []
   notifications: []
-  background_actions: []
+  background_actions:
+  - id: catalog_refresh
+    purpose: Synchronize configured library agents and prepare bounded catalog projections
+      while the installed Application is active, including without an open browser.
+    owner: media_center_skill
+  - id: source_index_and_derived_media
+    purpose: Index explicitly configured roots and prepare admitted artwork or audio/video
+      renditions without changing original files.
+    owner: media_library_agent
+  - id: metadata_enrichment
+    purpose: Apply configured metadata providers and artwork preparation in bounded
+      background jobs. External providers require their explicit configuration.
+    owner: media_center_skill
   data_practices:
     collected:
     - media_metadata
@@ -166,5 +294,60 @@ permission_profile:
     - playlist
     retention: Media remains at its configured source; local catalog and preferences
       are retained.
-    sent_off_device: []
+    sent_off_device:
+    - normalized_media_titles
+    - selected_media_tags
     tracking: false
+development:
+  preview_data:
+    default_profile_id: demo-fixture
+    profiles:
+    - schema: adaos.builder.binding_profile.v1
+      profile_id: demo-fixture
+      mode: fixture
+      logical_schema_ref: adaos.media.catalog.v1
+      source_ref: fixture:media_center:demo-v1
+      sensitivity: internal
+      capabilities: &id001
+      - media.catalog
+      read_policy: fixture
+      write_policy: none
+      owner: project:media_center
+      expires_at: null
+      redaction: none
+      implementation_mappings:
+      - logical_ref: media.catalog
+        implementation_ref: skill:media_center_skill:fixture
+        status: fixture_only
+    - schema: adaos.builder.binding_profile.v1
+      profile_id: isolated-sandbox
+      mode: sandbox
+      logical_schema_ref: adaos.media.catalog.v1
+      source_ref: sandbox:media_center:local
+      sensitivity: internal
+      capabilities: *id001
+      read_policy: sandbox
+      write_policy: sandbox
+      owner: project:media_center
+      expires_at: null
+      redaction: none
+      implementation_mappings:
+      - logical_ref: media.catalog
+        implementation_ref: skill:media_center_skill
+        status: mapped
+    - schema: adaos.builder.binding_profile.v1
+      profile_id: local-library-readonly
+      mode: live_readonly
+      logical_schema_ref: adaos.media.catalog.v1
+      source_ref: skill-data:media_center_skill:workspace
+      sensitivity: personal
+      capabilities: *id001
+      read_policy: scoped_live
+      write_policy: none
+      owner: project:media_center
+      expires_at: null
+      redaction: required
+      implementation_mappings:
+      - logical_ref: media.catalog
+        implementation_ref: skill:media_center_skill
+        status: mapped

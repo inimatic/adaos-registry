@@ -45,9 +45,9 @@
       "application_id": "media_center",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 3,
-      "stable_release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-      "release_key": "media_center@sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-      "projection_digest": "sha256:a7fcd260585d30d02b3d25fe37610ac37e1924c14c6277c12ccc063161d05948"
+      "stable_release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+      "release_key": "media_center@sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+      "projection_digest": "sha256:5f474e3bf5d1f7f8079994a7cf331acc712492684e523f5b13505b155d799943"
     },
     "adaos_drive": {
       "application_id": "adaos_drive",
@@ -866,7 +866,15 @@
       "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
       "path": "semantic/catalog/releases/gmail_mail_client/8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06.json",
       "projection_digest": "sha256:9356190b4b4bcdf7d2e0ea1bda989f06e80fac8d9aa7cb8e34933cf1f04119a6"
+    },
+    "media_center@sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c": {
+      "application_id": "media_center",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.6.136",
+      "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+      "path": "semantic/catalog/releases/media_center/e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c.json",
+      "projection_digest": "sha256:5f474e3bf5d1f7f8079994a7cf331acc712492684e523f5b13505b155d799943"
     }
   },
-  "index_digest": "sha256:ebc4f98542dd2992f6ebe4c66e648001bcdadd1f0c16a905cfe4f5f28f08c723"
+  "index_digest": "sha256:d4e9ce90f12d779b59d689de52dadf546f43612d41175aa13fa49c9274e600a7"
 }

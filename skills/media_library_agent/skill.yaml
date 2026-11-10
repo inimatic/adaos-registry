@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.57
+version: 0.6.63
 description: Distributed node-local media discovery and bounded rendition agent with
   durable jobs and ordered catalog deltas.
 supported_locales:
@@ -8,6 +8,26 @@ supported_locales:
 runtime:
   kind: service
   python: '3.11'
+  activation:
+    mode: eager
+    startup_allowed: true
+    background_refresh: true
+    assessment:
+      schema: adaos.skill.activation_assessment.v1
+      assessor: builder.compiler
+      classification: startup_event_subscriber
+      handler_digest: sha256:4c2c36d1ba59615448d4699a9f3716f359ea58aa6a15f731d50e4f0f63e751bf
+      observed_subscriptions:
+      - sys.ready
+      - webio.stream.snapshot.requested
+      declared_subscriptions:
+      - sys.ready
+      - webio.stream.snapshot.requested
+      dynamic_subscription_count: 0
+      tool_count: 31
+      reasons:
+      - startup_subscription_requires_early_handler_registration
+      - declared_activation_policy_retained
   env:
     mode: venv
 service:
@@ -62,6 +82,8 @@ data_lifecycle:
   databases:
   - path: db/media_library_agent.sqlite3
     migrations: []
+  - path: db/storage_admission.sqlite3
+    migrations: []
   coordination_files:
   - db/media_library_agent.schema.lock
 default_tool: status
@@ -100,6 +122,10 @@ exports:
   - dispose
 tools:
 - name: ensure_schema
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:ensure_schema
   description: Ensure the durable agent schema.
   side_effects: local_write
@@ -109,6 +135,10 @@ tools:
   output_schema:
     type: object
 - name: rehydrate
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:rehydrate
   description: Resume queued agent work after activation.
   side_effects: local_write
@@ -118,6 +148,10 @@ tools:
   output_schema:
     type: object
 - name: add_root
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:add_root
   description: Add a node-local media root without copying media bytes.
   side_effects: local_write
@@ -152,6 +186,10 @@ tools:
   output_schema:
     type: object
 - name: remove_root
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:remove_root
   description: Disable a root while retaining its external files and indexed evidence.
   side_effects: local_write
@@ -166,9 +204,13 @@ tools:
   output_schema:
     type: object
 - name: list_roots
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:list_roots
   description: List roots owned by this node agent.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -179,6 +221,10 @@ tools:
   output_schema:
     type: object
 - name: set_storage_policy
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:set_storage_policy
   description: Configure where source-root renditions and artwork are retained.
   side_effects: local_write
@@ -211,6 +257,10 @@ tools:
   output_schema:
     type: object
 - name: migrate_storage
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:migrate_storage
   description: Queue resumable migration of legacy renditions to source-root storage.
   side_effects: local_write
@@ -225,9 +275,13 @@ tools:
   output_schema:
     type: object
 - name: list_storage_migrations
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:list_storage_migrations
   description: List bounded rendition storage migration history.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -242,6 +296,10 @@ tools:
   output_schema:
     type: object
 - name: start_scan
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:start_scan
   description: Queue incremental root scans and return durable job identifiers immediately.
   side_effects: local_write
@@ -264,6 +322,10 @@ tools:
   output_schema:
     type: object
 - name: import_folder
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:import_folder
   description: Add a folder and queue its first asynchronous in-place scan.
   side_effects: local_write
@@ -301,9 +363,13 @@ tools:
   output_schema:
     type: object
 - name: scan_status
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:scan_status
   description: Return one bounded durable scan progress record.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -315,9 +381,13 @@ tools:
   output_schema:
     type: object
 - name: list_jobs
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:list_jobs
   description: List recent bounded scan jobs.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -332,6 +402,10 @@ tools:
   output_schema:
     type: object
 - name: cancel_scan
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:cancel_scan
   description: Cooperatively cancel one scan.
   side_effects: local_write
@@ -346,9 +420,13 @@ tools:
   output_schema:
     type: object
 - name: pull_deltas
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:pull_deltas
   description: Pull ordered idempotent source deltas through an opaque cursor.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -365,9 +443,13 @@ tools:
   output_schema:
     type: object
 - name: browse_folders
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:browse_folders
   description: Browse indexed folder hierarchy.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -386,6 +468,10 @@ tools:
   output_schema:
     type: object
 - name: configure_schedule
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:configure_schedule
   description: Configure periodic root reconciliation.
   side_effects: local_write
@@ -421,6 +507,10 @@ tools:
   output_schema:
     type: object
 - name: set_resource_pressure
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:set_resource_pressure
   description: Pause or resume background scans according to playback pressure.
   side_effects: local_write
@@ -444,9 +534,13 @@ tools:
   output_schema:
     type: object
 - name: inspect_source
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:inspect_source
   description: Inspect one source descriptor without reading media bytes.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -458,9 +552,13 @@ tools:
   output_schema:
     type: object
 - name: search_sources
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:search_sources
   description: Search one node-local shard including technical metadata.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -481,6 +579,10 @@ tools:
   output_schema:
     type: object
 - name: plan_rendition
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:plan_rendition
   description: Plan and queue a bounded browser-compatible derived rendition when
     required.
@@ -514,6 +616,10 @@ tools:
   output_schema:
     type: object
 - name: plan_artwork
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:plan_artwork
   description: Resolve embedded or folder artwork and queue one bounded derived JPEG.
   side_effects: local_write
@@ -538,9 +644,13 @@ tools:
   output_schema:
     type: object
 - name: rendition_status
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:rendition_status
   description: Return one bounded durable rendition job.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -553,9 +663,13 @@ tools:
   output_schema:
     type: object
 - name: list_rendition_jobs
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:list_rendition_jobs
   description: List recent bounded rendition jobs.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -570,6 +684,10 @@ tools:
   output_schema:
     type: object
 - name: cancel_rendition
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:cancel_rendition
   description: Cooperatively cancel one queued or running rendition.
   side_effects: local_write
@@ -585,6 +703,10 @@ tools:
   output_schema:
     type: object
 - name: optimize_storage
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:optimize_storage
   description: Compact node-local catalog storage and optionally reclaim free pages.
   side_effects: local_write
@@ -599,6 +721,10 @@ tools:
   output_schema:
     type: object
 - name: compact_storage
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:compact_storage
   description: Run bounded resumable logical compaction without blocking scans.
   side_effects: local_write
@@ -625,9 +751,13 @@ tools:
   output_schema:
     type: object
 - name: status
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:status
   description: Return compact agent health, progress, and capacity.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -638,10 +768,14 @@ tools:
   output_schema:
     type: object
 - name: observe_topology
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:observe_topology
   description: Validate and report one node-local partition replica to the authority
     plane.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -656,6 +790,10 @@ tools:
   output_schema:
     type: object
 - name: distributed_topology_phase
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:distributed_topology_phase
   description: Execute one reviewed idempotent topology adapter phase.
   side_effects: local_write
@@ -706,6 +844,10 @@ tools:
   output_schema:
     type: object
 - name: distributed_topology_transfer
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:distributed_topology_transfer
   description: Read or write one bounded reviewed derived-catalog transfer chunk.
   side_effects: local_write
@@ -765,6 +907,10 @@ tools:
   output_schema:
     type: object
 - name: dispose
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:dispose
   description: Stop process-local background workers.
   side_effects: local_write
@@ -893,7 +1039,7 @@ llm_hints:
     intent: media_center.scan
     tool: start_scan
     side_effect_class: local_write
-updated_at: '2026-09-28T00:20:04+00:00'
+updated_at: '2026-11-08T15:17:48+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.939+5685.a8e1dfd0

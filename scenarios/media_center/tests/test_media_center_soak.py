@@ -11,9 +11,27 @@ if str(BENCHMARK_ROOT) not in sys.path:
     sys.path.insert(0, str(BENCHMARK_ROOT))
 
 from run_media_center_soak import _rss_window_summary, _warmup_duration, run  # noqa: E402
+import run_media_center_soak as soak  # noqa: E402
 
 
-def test_short_soak_exercises_reads_during_agent_deltas() -> None:
+@pytest.fixture
+def deterministic_latency(monkeypatch):
+    # Keep real concurrent SQLite operations and error recording. Timing budget
+    # qualification belongs to the benchmark on its measured host; these unit
+    # tests inject samples to verify both sides of the unchanged budget gate.
+    original = soak._record_call
+    agent_ms = [1.0]
+
+    def record(name, call, timings, errors):
+        result = original(name, call, timings, errors)
+        timings[name][-1] = agent_ms[0] if name == "agent_delta" else 1.0
+        return result
+
+    monkeypatch.setattr(soak, "_record_call", record)
+    return agent_ms
+
+
+def test_short_soak_exercises_reads_during_agent_deltas(deterministic_latency) -> None:
     result = run(count=500, duration_seconds=5, enforce=True)
 
     assert result["passed"] is True
@@ -24,6 +42,12 @@ def test_short_soak_exercises_reads_during_agent_deltas() -> None:
         result["latency_ms"][name]["samples"] > 0
         for name in ("fts", "catalog_page", "playback_plan", "agent_delta")
     )
+
+
+def test_soak_enforces_agent_delta_latency_budget(deterministic_latency) -> None:
+    deterministic_latency[0] = 251.0
+    with pytest.raises(SystemExit, match="agent_delta.p95"):
+        run(count=100, duration_seconds=1, enforce=True)
 
 
 def test_acceptance_mode_rejects_short_or_small_runs() -> None:
