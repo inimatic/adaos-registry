@@ -442,3 +442,22 @@ def test_release_picker_uses_core_eligibility_and_review_has_no_generic_commands
     assert not {'preview', 'builder', 'dev-tickets', 'open', 'release-notes'} & {b['id'] for b in menu['inputs']['buttons']}
     assert all('applicationInstalled == true' in b.get('visibleIf','') for b in WIDGETS['shared-dev-tickets']['inputs']['buttons'] if b['id'] != 'dev-tickets')
     assert 'localBetaActive' not in WIDGETS['shared-dev-tickets']['visibleIf']
+
+
+def test_pre_activation_refusal_uses_authoritative_error_without_replaying_deployment():
+    bindings = WIDGETS['application-details']['inputs']['stateBindings']
+    assert bindings['deliveryOperationError']['path'] == 'lifecycle.operation.error'
+    assert bindings['deliveryOperationMessage']['path'] == 'lifecycle.operation.message'
+    error = WIDGETS['delivery-admission-error']
+    assert "detailApplicationId == $state.selectedApplicationId" in error['visibleIf']
+    assert "deliveryOperationStatus == 'failed'" in error['visibleIf']
+    assert "deliveryOperationStatus == 'unknown'" in error['visibleIf']
+    assert error['dataSource']['kind'] == 'static'
+    assert error['dataSource']['value']['message'] == '$state.deliveryOperationMessage'
+    help_widget = WIDGETS['delivery-contract-conflict']
+    assert "PortableContractConflict" in help_widget['visibleIf']
+    assert help_widget['inputs']['content']
+    details = WIDGETS['delivery-contract-details']
+    assert "dashboardSection == 'details'" in details['visibleIf']
+    assert details['dataSource']['value'] == '$state.deliveryOperationError.conflict'
+    assert not error.get('actions') and not help_widget.get('actions') and not details.get('actions')

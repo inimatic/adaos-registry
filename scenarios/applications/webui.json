@@ -136,7 +136,10 @@
                         "updateEligibleCount": 0,
                         "updatePolicy": "auto_compatible",
                         "updateTrack": "stable",
-                        "usersAccessTab": "people"
+                        "usersAccessTab": "people",
+                        "deliveryOperationStatus": "",
+                        "deliveryOperationError": {},
+                        "deliveryOperationMessage": ""
                     },
                     "layout": {
                         "version": 2,
@@ -1725,6 +1728,18 @@
                                     "usePrerelease": {
                                         "default": false,
                                         "path": "use_prerelease"
+                                    },
+                                    "deliveryOperationStatus": {
+                                        "path": "lifecycle.operation.status",
+                                        "default": ""
+                                    },
+                                    "deliveryOperationError": {
+                                        "path": "lifecycle.operation.error",
+                                        "default": {}
+                                    },
+                                    "deliveryOperationMessage": {
+                                        "path": "lifecycle.operation.message",
+                                        "default": ""
                                     }
                                 },
                                 "stateOnly": true
@@ -1940,7 +1955,7 @@
                                     "type": "openDevTickets"
                                 },
                                 {
-                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                     "on": "click:disable-auto-update",
                                     "params": {
                                         "reviewedPlan": {},
@@ -1954,7 +1969,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                     "idempotencyKey": "auto",
                                     "invalidates": [
                                         "applications.catalog",
@@ -1976,7 +1991,7 @@
                                     "type": "callMcp"
                                 },
                                 {
-                                    "enabledIf": "($state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                    "enabledIf": "($state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                     "on": "click:disable-auto-update",
                                     "params": {
                                         "modalId": "review-lifecycle-operation"
@@ -1984,7 +1999,7 @@
                                     "type": "openModal"
                                 },
                                 {
-                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                     "on": "click:enable-auto-update",
                                     "params": {
                                         "reviewedPlan": {},
@@ -1998,7 +2013,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                     "idempotencyKey": "auto",
                                     "invalidates": [
                                         "applications.catalog",
@@ -2020,7 +2035,7 @@
                                     "type": "callMcp"
                                 },
                                 {
-                                    "enabledIf": "($state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                    "enabledIf": "($state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                     "on": "click:enable-auto-update",
                                     "params": {
                                         "modalId": "review-lifecycle-operation"
@@ -2028,7 +2043,7 @@
                                     "type": "openModal"
                                 },
                                 {
-                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                     "on": "click:use-prerelease",
                                     "params": {
                                         "reviewedPlan": {},
@@ -2042,7 +2057,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                     "idempotencyKey": "auto",
                                     "invalidates": [
                                         "applications.catalog",
@@ -2064,7 +2079,7 @@
                                     "type": "callMcp"
                                 },
                                 {
-                                    "enabledIf": "($state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                    "enabledIf": "($state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                     "on": "click:use-prerelease",
                                     "params": {
                                         "modalId": "review-lifecycle-operation"
@@ -2072,7 +2087,7 @@
                                     "type": "openModal"
                                 },
                                 {
-                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                     "on": "click:use-stable",
                                     "params": {
                                         "reviewedPlan": {},
@@ -2086,7 +2101,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                    "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                     "idempotencyKey": "auto",
                                     "invalidates": [
                                         "applications.catalog",
@@ -2108,7 +2123,7 @@
                                     "type": "callMcp"
                                 },
                                 {
-                                    "enabledIf": "($state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                    "enabledIf": "($state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                     "on": "click:use-stable",
                                     "params": {
                                         "modalId": "review-lifecycle-operation"
@@ -2154,7 +2169,7 @@
                                         "label_i18n": "dashboard.alpha.dev-tickets"
                                     },
                                     {
-                                        "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                        "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                         "icon": "sync-outline",
                                         "id": "disable-auto-update",
                                         "label": "Auto update on",
@@ -2162,7 +2177,7 @@
                                         "visibleIf": "($state.automaticUpdates == true) && $state.applicationInstalled == true"
                                     },
                                     {
-                                        "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                        "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                         "icon": "sync-outline",
                                         "id": "enable-auto-update",
                                         "label": "Auto update off",
@@ -2170,7 +2185,7 @@
                                         "visibleIf": "($state.automaticUpdates != true) && $state.applicationInstalled == true"
                                     },
                                     {
-                                        "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                        "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                         "icon": "git-branch-outline",
                                         "id": "use-prerelease",
                                         "label": "Stable channel",
@@ -2178,7 +2193,7 @@
                                         "visibleIf": "($state.prereleaseFollowing != true) && $state.applicationInstalled == true"
                                     },
                                     {
-                                        "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionIntentKey && !$state.positionReview.operation.operation_id) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
+                                        "enabledIf": "(true && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId)) && !$state.dashboardBusy && !($state.finalizeSubmitted && $state.finalizeContext.application_id == $state.selectedApplicationId && $state.finalizeContext.release_digest == $state.dashboardRuntimeReleaseDigest && !$state.finalizeError.message && !($state.dashboardOperationReleaseDigest == $state.finalizeContext.release_digest && $state.dashboardOperationTask.id))",
                                         "icon": "git-branch-outline",
                                         "id": "use-stable",
                                         "label": "Pre-release channel",
@@ -2583,7 +2598,7 @@
                                 ]
                             },
                             "type": "ui.actions",
-                            "visibleIf": "$state.positionApplicationId && ($state.positionPlanning == true || $state.positionReview.operation.operation_id) && !($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled')"
+                            "visibleIf": "$state.positionApplicationId == $state.selectedApplicationId && ($state.positionApplicationId && ($state.positionPlanning == true || $state.positionReview.operation.operation_id) && !($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))"
                         },
                         {
                             "actions": [
@@ -2618,9 +2633,90 @@
                             "visibleIf": "$state.publicationMayHaveRun"
                         },
                         {
+                            "id": "delivery-admission-error",
+                            "type": "item.details",
+                            "area": "workspace",
+                            "title": "Release could not be activated",
+                            "title_i18n": "applications.delivery.refused",
+                            "visibleIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.deliveryOperationError.phase == 'admission' && ($state.deliveryOperationStatus == 'failed' || $state.deliveryOperationStatus == 'unknown' || $state.deliveryOperationStatus == 'reconciling')",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": {
+                                    "message": "$state.deliveryOperationMessage"
+                                }
+                            },
+                            "inputs": {
+                                "presentation": "section",
+                                "fields": [
+                                    {
+                                        "label": "Reason",
+                                        "label_i18n": "applications.delivery.reason",
+                                        "path": "message"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "delivery-contract-conflict",
+                            "type": "static.markdown",
+                            "area": "workspace",
+                            "visibleIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.deliveryOperationError.phase == 'admission' && ($state.deliveryOperationStatus == 'failed' || $state.deliveryOperationStatus == 'unknown' || $state.deliveryOperationStatus == 'reconciling') && $state.deliveryOperationError.code == 'PortableContractConflict'",
+                            "inputs": {
+                                "content": "The installed release remains available. Two different contracts use the same identity and version. The publisher must reuse the original contract or publish a distinct identity or version. Open Dev tickets above to report this issue.",
+                                "content_i18n": "applications.delivery.contract_help"
+                            }
+                        },
+                        {
+                            "id": "delivery-contract-details",
+                            "type": "item.details",
+                            "area": "workspace",
+                            "title": "Contract conflict",
+                            "title_i18n": "applications.delivery.conflict",
+                            "visibleIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.deliveryOperationError.phase == 'admission' && ($state.deliveryOperationStatus == 'failed' || $state.deliveryOperationStatus == 'unknown' || $state.deliveryOperationStatus == 'reconciling') && $state.dashboardSection == 'details' && $state.deliveryOperationError.conflict.identity",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": "$state.deliveryOperationError.conflict"
+                            },
+                            "inputs": {
+                                "presentation": "section",
+                                "fields": [
+                                    {
+                                        "label": "Contract",
+                                        "label_i18n": "applications.delivery.identity",
+                                        "path": "identity"
+                                    },
+                                    {
+                                        "label": "Version",
+                                        "label_i18n": "applications.delivery.version",
+                                        "path": "revision"
+                                    },
+                                    {
+                                        "label": "Installed digest",
+                                        "label_i18n": "applications.delivery.existing",
+                                        "path": "existing_digest"
+                                    },
+                                    {
+                                        "label": "Incoming digest",
+                                        "label_i18n": "applications.delivery.incoming",
+                                        "path": "incoming_digest"
+                                    },
+                                    {
+                                        "label": "Installed operations",
+                                        "label_i18n": "applications.delivery.existing_ops",
+                                        "path": "existing_operations"
+                                    },
+                                    {
+                                        "label": "Incoming operations",
+                                        "label_i18n": "applications.delivery.incoming_ops",
+                                        "path": "incoming_operations"
+                                    }
+                                ]
+                            }
+                        },
+                        {
                             "actions": [
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.open.eligible == true && $event.actions.open.mode == 'open' && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.open.eligible == true && $event.actions.open.mode == 'open' && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:position-open",
                                     "params": {
                                         "positionApplicationId": "$state.selectedApplicationId",
@@ -2647,7 +2743,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.open.eligible == true && $event.actions.open.mode == 'open' && $state.effectiveTarget && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.open.eligible == true && $event.actions.open.mode == 'open' && $state.effectiveTarget && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:position-open",
                                     "params": {
                                         "expectedScenarioId": "$state.effectiveTarget.expected_scenario_id",
@@ -2657,7 +2753,7 @@
                                     "type": "openWorkspace"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.open.eligible == true && $event.actions.open.mode == 'switch_and_open' && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.open.eligible == true && $event.actions.open.mode == 'switch_and_open' && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:position-switch-open",
                                     "params": {
                                         "positionApplicationId": "$state.selectedApplicationId",
@@ -2684,7 +2780,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.open.eligible == true && $event.actions.open.mode == 'switch_and_open' && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.open.eligible == true && $event.actions.open.mode == 'switch_and_open' && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:position-switch-open",
                                     "params": {
                                         "modalId": "position-actions"
@@ -2815,7 +2911,7 @@
                                     "type": "openDevTickets"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.update.eligible == true && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.update.eligible == true && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:update",
                                     "params": {
                                         "positionApplicationId": "$state.selectedApplicationId",
@@ -2842,7 +2938,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.update.eligible == true && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.update.eligible == true && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:update",
                                     "params": {
                                         "modalId": "position-actions"
@@ -2877,7 +2973,7 @@
                                     "type": "navigateModal"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.remove_beta.eligible == true && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.remove_beta.eligible == true && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:remove_beta",
                                     "params": {
                                         "positionApplicationId": "$state.selectedApplicationId",
@@ -2904,7 +3000,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.remove_beta.eligible == true && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.remove_beta.eligible == true && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:remove_beta",
                                     "params": {
                                         "modalId": "position-actions"
@@ -2912,7 +3008,7 @@
                                     "type": "navigateModal"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.renew_beta.eligible == true && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.renew_beta.eligible == true && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:renew_beta",
                                     "params": {
                                         "positionApplicationId": "$state.selectedApplicationId",
@@ -2939,7 +3035,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.renew_beta.eligible == true && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.renew_beta.eligible == true && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:renew_beta",
                                     "params": {
                                         "modalId": "position-actions"
@@ -2947,7 +3043,7 @@
                                     "type": "navigateModal"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.restore_stable.eligible == true && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.restore_stable.eligible == true && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:restore_stable",
                                     "params": {
                                         "positionApplicationId": "$state.selectedApplicationId",
@@ -2974,7 +3070,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.restore_stable.eligible == true && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.restore_stable.eligible == true && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:restore_stable",
                                     "params": {
                                         "modalId": "position-actions"
@@ -2982,7 +3078,7 @@
                                     "type": "navigateModal"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && ($event.id == 'public_beta' || $event.id == 'public_stable') && $event.actions.select_release.eligible == true && $event.actions.select_release.tool_id == 'applications.list_releases' && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && ($event.id == 'public_beta' || $event.id == 'public_stable') && $event.actions.select_release.eligible == true && $event.actions.select_release.tool_id == 'applications.list_releases' && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:select-release",
                                     "params": {
                                         "positionApplicationId": "$state.selectedApplicationId",
@@ -3007,7 +3103,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && ($event.id == 'public_beta' || $event.id == 'public_stable') && $event.actions.select_release.eligible == true && $event.actions.select_release.tool_id == 'applications.list_releases' && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && ($event.id == 'public_beta' || $event.id == 'public_stable') && $event.actions.select_release.eligible == true && $event.actions.select_release.tool_id == 'applications.list_releases' && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:select-release",
                                     "params": {
                                         "releaseSelectorOpen": true,
@@ -3016,7 +3112,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && ($event.id == 'public_beta' || $event.id == 'public_stable') && $event.actions.select_release.eligible == true && $event.actions.select_release.tool_id == 'applications.list_releases' && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && ($event.id == 'public_beta' || $event.id == 'public_stable') && $event.actions.select_release.eligible == true && $event.actions.select_release.tool_id == 'applications.list_releases' && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:select-release",
                                     "params": {
                                         "modalId": "position-actions"
@@ -3024,7 +3120,7 @@
                                     "type": "navigateModal"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.release_digest && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.release_digest && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:release-notes",
                                     "params": {
                                         "positionApplicationId": "$state.selectedApplicationId",
@@ -3051,7 +3147,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.release_digest && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.release_digest && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:release-notes",
                                     "params": {
                                         "notesRelease": {}
@@ -3059,7 +3155,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.release_digest && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.release_digest && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:release-notes",
                                     "params": {
                                         "modalId": "release-notes"
@@ -3067,7 +3163,7 @@
                                     "type": "navigateModal"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.publish_initial_stable.eligible == true && (!$state.publicationMayHaveRun || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && (!$state.publicationIntentKey || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled')) && $event.actions.publish_initial_stable.tool_id == 'applications.development.publish_to_registry'",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.publish_initial_stable.eligible == true && ((!$state.publicationMayHaveRun || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && ((!$state.publicationIntentKey || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled')) && $event.actions.publish_initial_stable.tool_id == 'applications.development.publish_to_registry'",
                                     "on": "click:publish_initial_stable",
                                     "params": {
                                         "positionApplicationId": "$state.selectedApplicationId",
@@ -3096,7 +3192,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.publish_initial_stable.eligible == true && (!$state.publicationMayHaveRun || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && (!$state.publicationIntentKey || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && $event.actions.publish_initial_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.publish_initial_stable.eligible == true && ((!$state.publicationMayHaveRun || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && ((!$state.publicationIntentKey || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && $event.actions.publish_initial_stable.tool_id == 'applications.development.publish_to_registry' && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:publish_initial_stable",
                                     "params": {
                                         "publicationConfirmed": false,
@@ -3120,7 +3216,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.publish_initial_stable.eligible == true && (!$state.publicationMayHaveRun || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && (!$state.publicationIntentKey || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && $event.actions.publish_initial_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.publish_initial_stable.eligible == true && ((!$state.publicationMayHaveRun || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && ((!$state.publicationIntentKey || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && $event.actions.publish_initial_stable.tool_id == 'applications.development.publish_to_registry' && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:publish_initial_stable",
                                     "params": {
                                         "modalId": "publication-actions"
@@ -3128,7 +3224,7 @@
                                     "type": "navigateModal"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.publish_beta.eligible == true && (!$state.publicationMayHaveRun || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && (!$state.publicationIntentKey || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled')) && $event.actions.publish_beta.tool_id == 'applications.development.publish_prerelease'",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.publish_beta.eligible == true && ((!$state.publicationMayHaveRun || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && ((!$state.publicationIntentKey || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled')) && $event.actions.publish_beta.tool_id == 'applications.development.publish_prerelease'",
                                     "on": "click:publish_beta",
                                     "params": {
                                         "positionApplicationId": "$state.selectedApplicationId",
@@ -3157,7 +3253,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.publish_beta.eligible == true && (!$state.publicationMayHaveRun || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && (!$state.publicationIntentKey || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && $event.actions.publish_beta.tool_id == 'applications.development.publish_prerelease' && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.publish_beta.eligible == true && ((!$state.publicationMayHaveRun || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && ((!$state.publicationIntentKey || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && $event.actions.publish_beta.tool_id == 'applications.development.publish_prerelease' && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:publish_beta",
                                     "params": {
                                         "publicationConfirmed": false,
@@ -3181,7 +3277,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.publish_beta.eligible == true && (!$state.publicationMayHaveRun || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && (!$state.publicationIntentKey || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && $event.actions.publish_beta.tool_id == 'applications.development.publish_prerelease' && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.publish_beta.eligible == true && ((!$state.publicationMayHaveRun || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && ((!$state.publicationIntentKey || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && $event.actions.publish_beta.tool_id == 'applications.development.publish_prerelease' && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:publish_beta",
                                     "params": {
                                         "modalId": "publication-actions"
@@ -3189,7 +3285,7 @@
                                     "type": "navigateModal"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.promote_public_stable.eligible == true && (!$state.publicationMayHaveRun || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && (!$state.publicationIntentKey || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled')) && $event.actions.promote_public_stable.tool_id == 'applications.development.publish_to_registry'",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.promote_public_stable.eligible == true && ((!$state.publicationMayHaveRun || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && ((!$state.publicationIntentKey || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled')) && $event.actions.promote_public_stable.tool_id == 'applications.development.publish_to_registry'",
                                     "on": "click:promote_public_stable",
                                     "params": {
                                         "positionApplicationId": "$state.selectedApplicationId",
@@ -3218,7 +3314,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.promote_public_stable.eligible == true && (!$state.publicationMayHaveRun || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && (!$state.publicationIntentKey || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && $event.actions.promote_public_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.promote_public_stable.eligible == true && ((!$state.publicationMayHaveRun || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && ((!$state.publicationIntentKey || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && $event.actions.promote_public_stable.tool_id == 'applications.development.publish_to_registry' && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:promote_public_stable",
                                     "params": {
                                         "publicationConfirmed": false,
@@ -3242,7 +3338,7 @@
                                     "type": "updateState"
                                 },
                                 {
-                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionMayHaveRun && $event.actions.promote_public_stable.eligible == true && (!$state.publicationMayHaveRun || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && (!$state.publicationIntentKey || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && $event.actions.promote_public_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionIntentKey && (!$state.positionReview.operation.operation_id || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
+                                    "enabledIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && (!$state.positionMayHaveRun || $state.positionApplicationId != $state.selectedApplicationId) && $event.actions.promote_public_stable.eligible == true && ((!$state.publicationMayHaveRun || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && ((!$state.publicationIntentKey || $state.publicationContext.application_id != $state.selectedApplicationId) || ($state.publicationResult.application_id == $state.publicationContext.application_id && $state.publicationResult.idempotency_key == $state.publicationIntentKey && $state.publicationResult.action == $state.publicationContext.action && ($state.publicationResult.status == 'succeeded' || $state.publicationResult.status == 'failed'))) && $event.actions.promote_public_stable.tool_id == 'applications.development.publish_to_registry' && (!$state.positionPlanning || $state.positionApplicationId != $state.selectedApplicationId) && (!$state.positionIntentKey || $state.positionApplicationId != $state.selectedApplicationId) && ((!$state.positionReview.operation.operation_id || $state.positionApplicationId != $state.selectedApplicationId) || ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled'))",
                                     "on": "click:promote_public_stable",
                                     "params": {
                                         "modalId": "publication-actions"
@@ -10159,7 +10255,7 @@
                 }
             }
         },
-        "version": "0.1.88",
+        "version": "0.1.89",
         "manifest": "webui.json"
     },
     "generated_by": "builder_skill"

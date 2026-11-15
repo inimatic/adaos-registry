@@ -324,5 +324,15 @@
   "dashboard.publication.reason.ExactBetaCandidateRequired": "Выбранная Beta не совпадает с проверенной версией. Обновите список версий.",
   "dashboard.publication.reason.AlreadyPublicBeta": "Эта Beta уже опубликована.",
   "dashboard.publication.reason.ExactStableCandidateRequired": "Не найдена запись принятия этой Stable. Подробности — в Runtime placement.",
-  "dashboard.publication.reason.candidate_source_unavailable": "Для публикации нужно восстановить исходный снимок именно этой версии."
+  "dashboard.publication.reason.candidate_source_unavailable": "Для публикации нужно восстановить исходный снимок именно этой версии.",
+  "applications.delivery.refused": "Не удалось активировать релиз",
+  "applications.delivery.reason": "Причина",
+  "applications.delivery.conflict": "Конфликт контрактов",
+  "applications.delivery.identity": "Контракт",
+  "applications.delivery.version": "Версия",
+  "applications.delivery.existing": "Digest установленного контракта",
+  "applications.delivery.incoming": "Digest нового контракта",
+  "applications.delivery.existing_ops": "Установленные операции",
+  "applications.delivery.incoming_ops": "Новые операции",
+  "applications.delivery.contract_help": "Установленный релиз остаётся доступным. Два разных контракта используют одну идентичность и версию. Издателю нужно переиспользовать исходный контракт либо выпустить контракт с другой идентичностью или версией. Сообщить о проблеме можно через Dev tickets выше."
 }

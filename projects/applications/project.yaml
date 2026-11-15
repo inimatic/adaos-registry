@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: applications
-version: 0.1.58
+version: 0.1.59
 profiles:
 - adaos.system.applications.v1
 components:
@@ -19,13 +19,7 @@ components:
     relations:
     - realizes
     - uses
-  dependencies:
-  - ref: skill:automation_manager_prototype_skill
-    version: ==0.1.6
-    lifecycle: shared
-    relations:
-    - realizes
-    - uses
+  dependencies: []
 entrypoints:
 - id: main
   presentation: scenario:applications

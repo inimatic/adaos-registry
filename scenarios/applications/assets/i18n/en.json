@@ -558,5 +558,15 @@
   "dashboard.publication.reason.ExactBetaCandidateRequired": "The selected Beta does not match the reviewed candidate. Refresh its versions.",
   "dashboard.publication.reason.AlreadyPublicBeta": "This exact Beta is already public.",
   "dashboard.publication.reason.ExactStableCandidateRequired": "The acceptance record for this Stable is unavailable. Open Runtime placement for details.",
-  "dashboard.publication.reason.candidate_source_unavailable": "The source snapshot of this exact release must be restored before publication."
+  "dashboard.publication.reason.candidate_source_unavailable": "The source snapshot of this exact release must be restored before publication.",
+  "applications.delivery.refused": "Release could not be activated",
+  "applications.delivery.reason": "Reason",
+  "applications.delivery.conflict": "Contract conflict",
+  "applications.delivery.identity": "Contract",
+  "applications.delivery.version": "Version",
+  "applications.delivery.existing": "Installed digest",
+  "applications.delivery.incoming": "Incoming digest",
+  "applications.delivery.existing_ops": "Installed operations",
+  "applications.delivery.incoming_ops": "Incoming operations",
+  "applications.delivery.contract_help": "The installed release remains available. Two different contracts use the same identity and version. The publisher must reuse the original contract or publish a distinct identity or version. Open Dev tickets above to report this issue."
 }
