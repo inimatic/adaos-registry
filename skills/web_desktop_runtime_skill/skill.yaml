@@ -1,5 +1,5 @@
 name: web_desktop_runtime_skill
-version: 0.1.64
+version: 0.1.71
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -11,7 +11,7 @@ runtime:
       schema: adaos.skill.activation_assessment.v1
       assessor: builder.compiler
       classification: event_subscriber
-      handler_digest: sha256:f5ab8a625aef939e6f3792c9553da266b6a6e1b2fb856d9c203b13fbbc2f1d98
+      handler_digest: sha256:26b124b88367d84cff75c9201da0126a37bb8146b814a6f2874af792084ada05
       observed_subscriptions:
       - economic.subscription.changed
       - root.subscription.changed
@@ -25,11 +25,11 @@ runtime:
       - webio.stream.snapshot.requested
       - webio.stream.subscription.changed
       dynamic_subscription_count: 0
-      tool_count: 26
+      tool_count: 35
       reasons:
       - event_subscriptions_require_early_handler_registration
-description: Project-owned runtime actions for opening Web Desktop applications, managing Home, and preparing
-  browser, Telegram, and node connection flows.
+description: Project-owned runtime actions for opening Web Desktop applications, managing
+  Home, and preparing browser, Telegram, and node connection flows.
 dependencies:
 - httpx>=0.27
 memory_budget:
@@ -306,7 +306,8 @@ tools:
       applied:
         type: boolean
 - name: get_subscription_usage
-  description: Read authorized rolling subscription token usage without inferring monetary cost.
+  description: Read authorized rolling subscription token usage without inferring
+    monetary cost.
   entry: handlers.main:get_subscription_usage
   side_effects: read_only
   permissions:
@@ -544,7 +545,8 @@ tools:
       message:
         type: string
 - name: list_devices
-  description: List real node devices and browser sessions from the control-plane SDK.
+  description: List real node devices and browser sessions from the control-plane
+    SDK.
   entry: handlers.main:list_devices
   side_effects: read_only
   permissions:
@@ -604,8 +606,8 @@ tools:
       message:
         type: string
 - name: rename_device
-  description: Rename a managed device or durable browser endpoint through the Management-owned local
-    contract.
+  description: Rename a managed device or durable browser endpoint through the Management-owned
+    local contract.
   entry: handlers.main:rename_device
   side_effects: local_write
   permissions:
@@ -1075,7 +1077,8 @@ tools:
       message:
         type: string
 - name: upload_profile_avatar
-  description: Persist one authenticated profile avatar in the Desktop-owned blob store.
+  description: Persist one authenticated profile avatar in the Desktop-owned blob
+    store.
   entry: handlers.main:upload_profile_avatar
   side_effects: local_write
   permissions:
@@ -1112,7 +1115,8 @@ tools:
   output_schema:
     type: object
 - name: read_profile_avatar
-  description: Authorize an authenticated reader to retrieve a Desktop-owned profile avatar.
+  description: Authorize an authenticated reader to retrieve a Desktop-owned profile
+    avatar.
   entry: handlers.main:read_profile_avatar
   side_effects: read_only
   permissions:
@@ -1206,8 +1210,8 @@ tools:
       message:
         type: string
 - name: prepare_connection
-  description: Prepare browser, Telegram, or node connection data for a Desktop device action without
-    relying on the legacy AdaOS Connect skill.
+  description: Prepare browser, Telegram, or node connection data for a Desktop device
+    action without relying on the legacy AdaOS Connect skill.
   entry: handlers.main:prepare_connection
   side_effects: external_write
   permissions:
@@ -1250,7 +1254,8 @@ tools:
       current:
         type: object
 - name: unlink_node
-  description: Detach a paired member node from the current subnet. The node can be paired again later.
+  description: Detach a paired member node from the current subnet. The node can be
+    paired again later.
   entry: handlers.main:unlink_node
   side_effects: external_write
   permissions:
@@ -1331,6 +1336,248 @@ tools:
         type: string
       applied:
         type: boolean
+- name: get_node_maintenance
+  description: Selected-node maintenance through the Core owner.
+  entry: handlers.main:get_node_maintenance
+  side_effects: read_only
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      section:
+        type: string
+        enum:
+        - storage
+        - recovery
+        - testing
+    required:
+    - target_node_id
+  output_schema:
+    type: object
+- name: plan_storage_location
+  description: Selected-node maintenance through the Core owner.
+  entry: handlers.main:plan_storage_location
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      role:
+        type: string
+      desired_path:
+        type: string
+      expected_revision:
+        type: integer
+        minimum: 0
+    required:
+    - target_node_id
+    - role
+    - desired_path
+    - expected_revision
+  output_schema:
+    type: object
+- name: save_storage_location
+  description: Selected-node maintenance through the Core owner.
+  entry: handlers.main:save_storage_location
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      plan_digest:
+        type: string
+        pattern: ^[a-f0-9]{64}$
+    required:
+    - target_node_id
+    - plan_digest
+  output_schema:
+    type: object
+- name: advance_storage_inventory
+  description: Selected-node maintenance through the Core owner.
+  entry: handlers.main:advance_storage_inventory
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      role:
+        type: string
+      restart:
+        type: boolean
+    required:
+    - target_node_id
+    - role
+  output_schema:
+    type: object
+- name: plan_validation_campaign
+  description: Selected-node maintenance through the Core owner.
+  entry: handlers.main:plan_validation_campaign
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      suite_id:
+        type: string
+      node_id:
+        type: string
+      target_build:
+        type: string
+    required:
+    - target_node_id
+    - suite_id
+    - node_id
+  output_schema:
+    type: object
+- name: start_validation_campaign
+  description: Selected-node maintenance through the Core owner.
+  entry: handlers.main:start_validation_campaign
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      plan_digest:
+        type: string
+        pattern: ^[a-f0-9]{64}$
+    required:
+    - target_node_id
+    - plan_digest
+  output_schema:
+    type: object
+- name: plan_storage_migration
+  description: Governed selected-node data migration; review precedes execution.
+  entry: handlers.main:plan_storage_migration
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      role:
+        type: string
+      expected_revision:
+        type: integer
+        minimum: 0
+      desired_path:
+        type: string
+    required:
+    - target_node_id
+    - role
+    - expected_revision
+    - desired_path
+  output_schema:
+    type: object
+- name: start_storage_migration
+  description: Governed selected-node data migration; review precedes execution.
+  entry: handlers.main:start_storage_migration
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      plan_digest:
+        type: string
+        pattern: ^[a-f0-9]{64}$
+    required:
+    - target_node_id
+    - plan_digest
+  output_schema:
+    type: object
+- name: control_storage_migration
+  description: Governed selected-node data migration; review precedes execution.
+  entry: handlers.main:control_storage_migration
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      job_id:
+        type: string
+        pattern: ^[a-f0-9]{64}$
+      action:
+        type: string
+        enum:
+        - status
+        - resume
+        - cancel
+    required:
+    - target_node_id
+    - job_id
+    - action
+  output_schema:
+    type: object
 exports:
   tools:
   - web_desktop_runtime_drain
@@ -1359,6 +1606,15 @@ exports:
   - prepare_connection
   - unlink_node
   - rename_subnet
+  - get_node_maintenance
+  - plan_storage_location
+  - save_storage_location
+  - advance_storage_inventory
+  - plan_validation_campaign
+  - start_validation_campaign
+  - plan_storage_migration
+  - start_storage_migration
+  - control_storage_migration
 data_routes:
 - surface: system-hardware
   route: stream
@@ -1407,7 +1663,8 @@ data_routes:
   tool: get_subscription_usage
   first_paint: Usage is unknown until the authorized snapshot arrives.
   recovery: Explicit refresh; preserve timestamped stale usage on provider failure.
-  guard_visibility: Show unavailable on denied or unavailable reads, never fabricated zero usage.
+  guard_visibility: Show unavailable on denied or unavailable reads, never fabricated
+    zero usage.
   budget:
     max_payload_bytes: 4096
   read_policy:
@@ -1423,9 +1680,11 @@ data_routes:
 - surface: widget:web_desktop.applications
   route: tool
   tool: list_applications
-  first_paint: Empty application collection until the authorized registry projection arrives.
+  first_paint: Empty application collection until the authorized registry projection
+    arrives.
   recovery: Explicit retry preserves the last successful application projection.
-  guard_visibility: Show an authorization or read error without reporting an empty registry as success.
+  guard_visibility: Show an authorization or read error without reporting an empty
+    registry as success.
   budget:
     max_payload_bytes: 32768
     max_items: 40
@@ -1444,7 +1703,8 @@ data_routes:
   tool: list_home_widgets
   first_paint: Empty widget collection until the authorized Home projection arrives.
   recovery: Explicit retry preserves the last successful Home widget projection.
-  guard_visibility: Show an authorization or read error without reporting widget state as current.
+  guard_visibility: Show an authorization or read error without reporting widget state
+    as current.
   budget:
     max_payload_bytes: 32768
     max_items: 40
@@ -1461,9 +1721,11 @@ data_routes:
 - surface: widget:web_desktop.devices
   route: tool
   tool: list_devices
-  first_paint: Empty device collection until the authorized control-plane projection arrives.
+  first_paint: Empty device collection until the authorized control-plane projection
+    arrives.
   recovery: Explicit retry preserves the last successful device projection.
-  guard_visibility: Show an authorization or read error without reporting stale device state as current.
+  guard_visibility: Show an authorization or read error without reporting stale device
+    state as current.
   budget:
     max_payload_bytes: 32768
     max_items: 40
@@ -1482,9 +1744,10 @@ data_routes:
   route: tool
   tool: get_system_overview
   first_paint: Unknown system state until the requested authorized projection arrives.
-  recovery: Explicit retry preserves the last successful section and never treats an unqueried section
-    as healthy.
-  guard_visibility: Show unavailable diagnostics without turning missing observations into a healthy status.
+  recovery: Explicit retry preserves the last successful section and never treats
+    an unqueried section as healthy.
+  guard_visibility: Show unavailable diagnostics without turning missing observations
+    into a healthy status.
   budget:
     max_payload_bytes: 65536
     max_items: 40
@@ -1502,9 +1765,11 @@ data_routes:
 - surface: widget:web_desktop.runtime-controls
   route: tool
   tool: get_runtime_controls
-  first_paint: Unknown runtime-control state until the authorized local projection arrives.
+  first_paint: Unknown runtime-control state until the authorized local projection
+    arrives.
   recovery: Explicit retry preserves the last successful operator-control projection.
-  guard_visibility: Keep controls unavailable when the governed workspace read is denied.
+  guard_visibility: Keep controls unavailable when the governed workspace read is
+    denied.
   budget:
     max_payload_bytes: 16384
     max_items: 1
@@ -1523,7 +1788,8 @@ data_routes:
   tool: list_developments
   first_paint: Empty development collection until the authorized project index arrives.
   recovery: Explicit retry preserves the last successful development projection.
-  guard_visibility: Show an authorization or read error without exposing local source paths.
+  guard_visibility: Show an authorization or read error without exposing local source
+    paths.
   budget:
     max_payload_bytes: 32768
     max_items: 40
@@ -1542,7 +1808,8 @@ data_routes:
   tool: get_preferences
   first_paint: Default form state until the authorized profile preferences arrive.
   recovery: Explicit retry preserves the last successful preference projection.
-  guard_visibility: Keep preference forms unavailable when the governed profile read is denied.
+  guard_visibility: Keep preference forms unavailable when the governed profile read
+    is denied.
   budget:
     max_payload_bytes: 16384
     max_items: 1
@@ -1558,4 +1825,4 @@ data_routes:
     invalidation_tags:
     - web_desktop.preferences
 prototype: default
-updated_at: '2026-10-08T21:26:33+00:00'
+updated_at: '2026-11-15T09:23:30+00:00'

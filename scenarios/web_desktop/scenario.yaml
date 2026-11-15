@@ -1,7 +1,8 @@
 id: web_desktop
-version: 0.3.102
+version: 0.3.111
 title: Управление
-description: Desktop shell scenario that defines the main UI layout, registry and base catalog.
+description: Desktop shell scenario that defines the main UI layout, registry and
+  base catalog.
 type: desktop
 supported_locales:
 - en
@@ -13,7 +14,7 @@ depends:
 - pair_new_device_skill
 - voice_chat_skill
 - browsers_skill
-updated_at: '2026-10-13T15:19:36+00:00'
+updated_at: '2026-11-15T09:22:37+00:00'
 data_projections:
 - scope: current_user
   slot: profile.settings

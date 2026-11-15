@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-10T06:22:27+00:00",
+  "updated_at": "2026-11-15T11:56:44+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -129,7 +129,7 @@
       "id": "browsers_skill",
       "name": "browsers_skill",
       "version": "0.15.26",
-      "updated_at": "2026-11-02T12:02:11+00:00",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/browsers_skill",
       "manifest": "skills/browsers_skill/skill.yaml",
       "source": {
@@ -147,8 +147,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.94",
-        "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "package_digest": "sha256:58fa06163cd062a7a5748342be175328e542f9b4d514699b8487cce03779df56"
       }
     },
@@ -294,7 +294,7 @@
       "id": "conversation_companions",
       "name": "conversation_companions",
       "version": "0.3.2",
-      "updated_at": "2026-11-02T12:02:11+00:00",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/conversation_companions",
       "manifest": "skills/conversation_companions/skill.yaml",
       "source": {
@@ -312,8 +312,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.94",
-        "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "package_digest": "sha256:1012970a54a84651267c434cfacc48a3b5f6b1c9685285e63114791be3381d47"
       },
       "tools_count": 16
@@ -499,7 +499,7 @@
       "id": "greet_on_boot_skill",
       "name": "greet_on_boot_skill",
       "version": "0.2.4",
-      "updated_at": "2026-11-02T12:02:11+00:00",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/greet_on_boot_skill",
       "manifest": "skills/greet_on_boot_skill/skill.yaml",
       "source": {
@@ -517,8 +517,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.94",
-        "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "package_digest": "sha256:eb695ac298aed7839c2cb7ac4d098b8313cdcd8887073e4fad8b645304e3feae"
       }
     },
@@ -595,7 +595,7 @@
       "id": "infrastate_skill",
       "name": "infrastate_skill",
       "version": "0.75.94",
-      "updated_at": "2026-11-02T12:02:11+00:00",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/infrastate_skill",
       "manifest": "skills/infrastate_skill/skill.yaml",
       "source": {
@@ -612,8 +612,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.94",
-        "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "package_digest": "sha256:b6869dd1f060f8f08c871fc208369a2c9ad77e2afce4b6ededbfc29248741a8b"
       },
       "tools_count": 8
@@ -967,7 +967,7 @@
       "id": "pair_new_device_skill",
       "name": "pair_new_device_skill",
       "version": "0.1.0",
-      "updated_at": "2026-11-02T12:02:11+00:00",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/pair_new_device_skill",
       "manifest": "skills/pair_new_device_skill/skill.yaml",
       "source": {
@@ -986,8 +986,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.94",
-        "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "package_digest": "sha256:ddac2904f52eea9e23a1b13cf530ae5dc6e4a8f33a44374685ca90df110a4ded"
       }
     },
@@ -1549,7 +1549,7 @@
       "id": "voice_chat_skill",
       "name": "voice_chat_skill",
       "version": "0.7.8",
-      "updated_at": "2026-11-06T03:41:03+00:00",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/voice_chat_skill",
       "manifest": "skills/voice_chat_skill/skill.yaml",
       "source": {
@@ -1566,9 +1566,9 @@
       "tools_count": 8,
       "activation": {
         "mode": "package_lock",
-        "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.42",
-        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c"
       }
     },
@@ -1641,8 +1641,8 @@
       "kind": "skill",
       "id": "web_desktop_runtime_skill",
       "name": "web_desktop_runtime_skill",
-      "version": "0.1.64",
-      "updated_at": "2026-11-02T12:02:11+00:00",
+      "version": "0.1.71",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/web_desktop_runtime_skill",
       "manifest": "skills/web_desktop_runtime_skill/skill.yaml",
       "source": {
@@ -1660,18 +1660,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.94",
-        "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
-        "package_digest": "sha256:6f10723641c9f39194bd45cdf9def680f5369e95f23ee23d4d27813c9483ca1c"
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
+        "package_digest": "sha256:4c949cec939d027733d47ff2a7d2d33caad76654a54b9d14eb48cff629e7260b"
       },
-      "tools_count": 26
+      "tools_count": 35
     },
     {
       "kind": "skill",
       "id": "web_desktop_skill",
       "name": "web_desktop_skill",
       "version": "0.2.5",
-      "updated_at": "2026-11-02T12:02:11+00:00",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/web_desktop_skill",
       "manifest": "skills/web_desktop_skill/skill.yaml",
       "source": {
@@ -1690,8 +1690,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.94",
-        "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "package_digest": "sha256:a06afbebe11e168fe97b3f1a44f4848cad1a8bd554715d9dd54ae015d084df55"
       }
     },
@@ -2646,16 +2646,16 @@
       "kind": "scenario",
       "id": "web_desktop",
       "name": "web_desktop",
-      "version": "0.3.102",
-      "updated_at": "2026-11-02T12:02:11+00:00",
+      "version": "0.3.111",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "scenarios/web_desktop",
       "manifest": "scenarios/web_desktop/scenario.yaml",
       "source": {
         "path": "scenarios/web_desktop",
         "manifest": "scenarios/web_desktop/scenario.yaml",
         "forge": "content-addressed-dev",
-        "repository": "adaos-dev:applications-beta-reconciliation-20261025",
-        "revision": "sha256:24142d242e08f2f75a5a98bd4f3adf69fe17819cc8d53a6d7d502a7be7083a53",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:798e166fc01a77c4f69e3e7dbc24416e311f912dea3e283857df643b7fc46bab",
         "path_scope": [
           "projects/web_desktop/"
         ]
@@ -2684,17 +2684,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.94",
-        "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
-        "package_digest": "sha256:7eb88ae8198c99b334a6af526d737a201057b8e56ca268033daab5b5b62df6d8"
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
+        "package_digest": "sha256:1f80b67715db42177db2d81fc11fbad69297672679d4ef569ab86ae526a46331"
       },
       "channels": {
         "stable": {
-          "release": "web_desktop@0.3.94",
-          "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
-          "source_revision": "sha256:24142d242e08f2f75a5a98bd4f3adf69fe17819cc8d53a6d7d502a7be7083a53",
-          "package_digest": "sha256:7eb88ae8198c99b334a6af526d737a201057b8e56ca268033daab5b5b62df6d8",
-          "version": "0.3.102"
+          "release": "web_desktop@0.3.99",
+          "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
+          "source_revision": "sha256:798e166fc01a77c4f69e3e7dbc24416e311f912dea3e283857df643b7fc46bab",
+          "package_digest": "sha256:1f80b67715db42177db2d81fc11fbad69297672679d4ef569ab86ae526a46331",
+          "version": "0.3.111"
         }
       }
     },
@@ -4059,8 +4059,8 @@
       "kind": "project",
       "id": "web_desktop",
       "name": "web_desktop",
-      "version": "0.3.94",
-      "updated_at": "2026-11-02T12:02:11+00:00",
+      "version": "0.3.99",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "projects/web_desktop",
       "manifest": "projects/web_desktop/project.yaml",
       "source": {
@@ -4130,18 +4130,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.94",
-        "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "primary_component": "scenario:web_desktop",
-        "package_digest": "sha256:7eb88ae8198c99b334a6af526d737a201057b8e56ca268033daab5b5b62df6d8"
+        "package_digest": "sha256:1f80b67715db42177db2d81fc11fbad69297672679d4ef569ab86ae526a46331"
       },
       "channels": {
         "stable": {
-          "release": "web_desktop@0.3.94",
-          "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
-          "source_revision": "sha256:24142d242e08f2f75a5a98bd4f3adf69fe17819cc8d53a6d7d502a7be7083a53",
-          "package_digest": "sha256:7eb88ae8198c99b334a6af526d737a201057b8e56ca268033daab5b5b62df6d8",
-          "version": "0.3.94"
+          "release": "web_desktop@0.3.99",
+          "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
+          "source_revision": "sha256:798e166fc01a77c4f69e3e7dbc24416e311f912dea3e283857df643b7fc46bab",
+          "package_digest": "sha256:1f80b67715db42177db2d81fc11fbad69297672679d4ef569ab86ae526a46331",
+          "version": "0.3.99"
         }
       }
     }
