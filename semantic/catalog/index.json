@@ -21,17 +21,9 @@
       "application_id": "applications",
       "publisher_ref": "subnet:sn_6acf0c01",
       "application_revision": 3,
-      "stable_release_digest": "sha256:3153bba9825c94608490e67d116c10e3f6cb50a962d18ffc335c85fe94d052f5",
-      "release_key": "applications@sha256:3153bba9825c94608490e67d116c10e3f6cb50a962d18ffc335c85fe94d052f5",
-      "projection_digest": "sha256:1403bd843af918026df08b4efe125629731fa89465ff36cf18ca3c906f0dc842",
-      "prerelease": {
-        "application_id": "applications",
-        "publisher_ref": "subnet:sn_6acf0c01",
-        "application_revision": 3,
-        "prerelease_release_digest": "sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8",
-        "release_key": "applications@sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8:prerelease",
-        "projection_digest": "sha256:163d0539db523d35f7bd090e5ede8fd2b109cf71ecfcbf747432c701a8f3e580"
-      }
+      "stable_release_digest": "sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8",
+      "release_key": "applications@sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8",
+      "projection_digest": "sha256:408473fbb997678be0c677d1fcc9bc3010d75b5ce13e77f4d66ede444aff5c19"
     },
     "web_desktop": {
       "application_id": "web_desktop",
@@ -970,7 +962,15 @@
       "release_digest": "sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8",
       "path": "semantic/catalog/releases/applications/03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8.prerelease.json",
       "projection_digest": "sha256:163d0539db523d35f7bd090e5ede8fd2b109cf71ecfcbf747432c701a8f3e580"
+    },
+    "applications@sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8": {
+      "application_id": "applications",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.67",
+      "release_digest": "sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8",
+      "path": "semantic/catalog/releases/applications/03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8.json",
+      "projection_digest": "sha256:408473fbb997678be0c677d1fcc9bc3010d75b5ce13e77f4d66ede444aff5c19"
     }
   },
-  "index_digest": "sha256:a7f6e8eef6f7b5cccbccfd9730bfcdb7a07e87ae8e72b87d8b8c74ed45b087d9"
+  "index_digest": "sha256:43e3969dda679588d6cba490fa3547880a1b31846b0a9621da7bc5cf8fb3fda1"
 }

@@ -372,5 +372,6 @@
   "dashboard.details.command.manage-access": "Доступ",
   "dashboard.details.command.remove": "Удалить приложение",
   "dashboard.details.command.delete-development": "Удалить разработку",
-  "widgets.review-actions.buttons.cancel-review.label": "Отмена"
+  "widgets.review-actions.buttons.cancel-review.label": "Отмена",
+  "dashboard.beta.expires_at": "Beta доступна до"
 }

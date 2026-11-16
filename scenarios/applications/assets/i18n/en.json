@@ -604,5 +604,6 @@
   "dashboard.details.command.manage-access": "Manage access",
   "dashboard.details.command.remove": "Uninstall",
   "dashboard.details.command.delete-development": "Delete development",
-  "widgets.review-actions.buttons.cancel-review.label": "Cancel"
+  "widgets.review-actions.buttons.cancel-review.label": "Cancel",
+  "dashboard.beta.expires_at": "Beta access until"
 }
