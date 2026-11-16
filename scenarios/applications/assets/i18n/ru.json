@@ -366,5 +366,11 @@
   "widgets.review-actions.buttons.confirm-select-track.label": "Сохранить настройки",
   "modals.review-lifecycle-operation.title": "Подтверждение изменения",
   "dashboard.runtime.edition": "Редакция",
-  "dashboard.position.distribution.installed_only": "Установлена; больше не распространяется"
+  "dashboard.position.distribution.installed_only": "Установлена локально; отсутствует в каталоге",
+  "dashboard.details.command.configure": "Настроить",
+  "dashboard.details.command.manage-placement": "Размещение",
+  "dashboard.details.command.manage-access": "Доступ",
+  "dashboard.details.command.remove": "Удалить приложение",
+  "dashboard.details.command.delete-development": "Удалить разработку",
+  "widgets.review-actions.buttons.cancel-review.label": "Отмена"
 }

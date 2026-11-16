@@ -598,5 +598,11 @@
   "dashboard.settings.track.stable": "Off",
   "dashboard.settings.track.prerelease": "On",
   "dashboard.runtime.edition": "Edition",
-  "dashboard.position.distribution.installed_only": "Installed; no longer offered"
+  "dashboard.position.distribution.installed_only": "Installed locally; absent from the catalog",
+  "dashboard.details.command.configure": "Configure",
+  "dashboard.details.command.manage-placement": "Runtime placement",
+  "dashboard.details.command.manage-access": "Manage access",
+  "dashboard.details.command.remove": "Uninstall",
+  "dashboard.details.command.delete-development": "Delete development",
+  "widgets.review-actions.buttons.cancel-review.label": "Cancel"
 }

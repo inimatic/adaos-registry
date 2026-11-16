@@ -2337,7 +2337,7 @@
                                         "id": "open-installed",
                                         "kind": "primary",
                                         "label": "Open",
-                                        "label_i18n": "widgets.lifecycle-actions.buttons.open.label",
+                                        "label_i18n": "dashboard.position.open",
                                         "visibleIf": "$state.applicationInstalled == true && !($state.trialAccepted == true && $state.trialTarget)"
                                     },
                                     {
@@ -2346,7 +2346,7 @@
                                         "id": "open",
                                         "kind": "primary",
                                         "label": "Open",
-                                        "label_i18n": "widgets.lifecycle-actions.buttons.open.label",
+                                        "label_i18n": "dashboard.position.open",
                                         "visibleIf": "$state.trialAccepted == true && $state.trialTarget"
                                     },
                                     {
@@ -2535,21 +2535,24 @@
                                         "id": "configure",
                                         "kind": "secondary",
                                         "label": "Configure",
-                                        "visibleIf": "$state.applicationInstalled == true && $state.setupSupported == true"
+                                        "visibleIf": "$state.applicationInstalled == true && $state.setupSupported == true",
+                                        "label_i18n": "dashboard.details.command.configure"
                                     },
                                     {
                                         "icon": "git-network-outline",
                                         "id": "manage-placement",
                                         "kind": "secondary",
                                         "label": "Runtime placement",
-                                        "visibleIf": "$state.applicationInstalled == true"
+                                        "visibleIf": "$state.applicationInstalled == true",
+                                        "label_i18n": "dashboard.details.command.manage-placement"
                                     },
                                     {
                                         "icon": "people-outline",
                                         "id": "manage-access",
                                         "kind": "secondary",
                                         "label": "Manage access",
-                                        "visibleIf": "$state.applicationInstalled == true"
+                                        "visibleIf": "$state.applicationInstalled == true",
+                                        "label_i18n": "dashboard.details.command.manage-access"
                                     },
                                     {
                                         "enabledIf": "true",
@@ -2557,7 +2560,7 @@
                                         "id": "remove",
                                         "kind": "danger",
                                         "label": "Uninstall",
-                                        "label_i18n": "widgets.lifecycle-actions.buttons.remove.label",
+                                        "label_i18n": "dashboard.details.command.remove",
                                         "visibleIf": "$state.applicationInstalled == true && $state.applicationRemovable == true"
                                     },
                                     {
@@ -2565,7 +2568,7 @@
                                         "id": "delete-development",
                                         "kind": "danger",
                                         "label": "Delete development",
-                                        "label_i18n": "widgets.lifecycle-actions.buttons.delete-development.label",
+                                        "label_i18n": "dashboard.details.command.delete-development",
                                         "visibleIf": "$state.localDevelopmentAvailable == true && $state.developmentDeletionAllowed == true && $state.developmentManifestDigest && $state.developmentPrimaryRef"
                                     }
                                 ],
@@ -10760,7 +10763,7 @@
                 }
             }
         },
-        "version": "0.1.94",
+        "version": "0.1.95",
         "manifest": "webui.json"
     },
     "generated_by": "builder_skill"
