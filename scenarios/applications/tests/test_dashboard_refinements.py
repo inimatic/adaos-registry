@@ -240,7 +240,8 @@ def test_position_review_shows_permission_and_data_implications():
     assert conflicts['dataSource']['value'] == '$state.positionReview.operation.plan.conflicts'
     permissions = next(w for w in widgets if w['id'] == 'position-permission-review')
     assert permissions['dataSource']['value'] == '$state.positionReview.operation.plan.permission_review.items'
-    assert permissions['visibleIf'] == '$state.positionReview.operation.plan.permission_review.items'
+    assert 'permission_review.approval_required == true' in permissions['visibleIf']
+    assert 'plan.conflicts.length > 0' in permissions['visibleIf']
 
 
 def test_public_release_selector_uses_authoritative_public_positions():

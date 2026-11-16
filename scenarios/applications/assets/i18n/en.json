@@ -584,5 +584,7 @@
   "dashboard.health.shared_component_changed": "A shared component was updated by another Application. A compatible release is required; inspect the components in Details.",
   "dashboard.health.component_not_running": "A required component is not running. Inspect runtime placement or review restoring the installed release.",
   "dashboard.health.identity_unverified": "The installed component identities could not be verified. Inspect runtime placement before making changes.",
-  "action.mcp.transport_unavailable": "Connection interrupted. The request result could not be confirmed. Check its status before submitting changes again."
+  "action.mcp.transport_unavailable": "Connection interrupted. The request result could not be confirmed. Check its status before submitting changes again.",
+  "dashboard.runtime.restoration_help": "The version stays the same. Restoration returns the runtime components to the installed release.",
+  "applications.data_policy.retain": "Keep data"
 }
