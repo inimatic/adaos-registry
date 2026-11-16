@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-16T03:40:43+00:00",
+  "updated_at": "2026-11-16T04:00:02+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -70,8 +70,8 @@
       "kind": "skill",
       "id": "applications_skill",
       "name": "applications_skill",
-      "version": "0.1.13",
-      "updated_at": "2026-11-16T03:40:43+00:00",
+      "version": "0.1.14",
+      "updated_at": "2026-11-16T04:00:02+00:00",
       "path": "skills/applications_skill",
       "manifest": "skills/applications_skill/skill.yaml",
       "source": {
@@ -89,9 +89,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "applications",
-        "release": "applications@0.1.61",
-        "release_digest": "sha256:71fd9e3b689f35185222172e9bd8c9f94df5468633b554e5f1f31cad587f8813",
-        "package_digest": "sha256:7a14048b704ed8b664a83558bc48d1cb74bb2045f80659df8ac7ea126a196733"
+        "release": "applications@0.1.62",
+        "release_digest": "sha256:98fca5da55fee147f74f08e4f30dcf318e45d1d9398aed8ca267bfd0fdd89a52",
+        "package_digest": "sha256:b589831eb6dbc85cbe40433458473c8744fb6eb82c6aeb51452ba9bcee02edc2"
       },
       "tools_count": 8
     },
@@ -1771,8 +1771,8 @@
       "kind": "scenario",
       "id": "applications",
       "name": "applications",
-      "version": "0.1.91",
-      "updated_at": "2026-11-16T03:40:43+00:00",
+      "version": "0.1.92",
+      "updated_at": "2026-11-16T04:00:02+00:00",
       "path": "scenarios/applications",
       "manifest": "scenarios/applications/scenario.yaml",
       "source": {
@@ -1780,7 +1780,7 @@
         "manifest": "scenarios/applications/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:e9e68cb596eea3808b048e5cdaf37e2a0624ba2713a022297fd5f35170a01d4c",
+        "revision": "sha256:cb892da80761babe1ba97e9f35681b17294a66161a465887fbf0261700f8cf4a",
         "path_scope": [
           "projects/applications/"
         ]
@@ -1815,17 +1815,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "applications",
-        "release": "applications@0.1.61",
-        "release_digest": "sha256:71fd9e3b689f35185222172e9bd8c9f94df5468633b554e5f1f31cad587f8813",
-        "package_digest": "sha256:5d73859112b0047e3fc601c0081781471c9df8a2d350f4db19b32366e7d24acb"
+        "release": "applications@0.1.62",
+        "release_digest": "sha256:98fca5da55fee147f74f08e4f30dcf318e45d1d9398aed8ca267bfd0fdd89a52",
+        "package_digest": "sha256:5eaca521e5b9e6243e27d23957897d8e25219e1d1a048aae50487ffaefe5a668"
       },
       "channels": {
         "stable": {
-          "release": "applications@0.1.61",
-          "release_digest": "sha256:71fd9e3b689f35185222172e9bd8c9f94df5468633b554e5f1f31cad587f8813",
-          "source_revision": "sha256:e9e68cb596eea3808b048e5cdaf37e2a0624ba2713a022297fd5f35170a01d4c",
-          "package_digest": "sha256:5d73859112b0047e3fc601c0081781471c9df8a2d350f4db19b32366e7d24acb",
-          "version": "0.1.91"
+          "release": "applications@0.1.62",
+          "release_digest": "sha256:98fca5da55fee147f74f08e4f30dcf318e45d1d9398aed8ca267bfd0fdd89a52",
+          "source_revision": "sha256:cb892da80761babe1ba97e9f35681b17294a66161a465887fbf0261700f8cf4a",
+          "package_digest": "sha256:5eaca521e5b9e6243e27d23957897d8e25219e1d1a048aae50487ffaefe5a668",
+          "version": "0.1.92"
         }
       }
     },
@@ -2897,8 +2897,8 @@
       "kind": "project",
       "id": "applications",
       "name": "applications",
-      "version": "0.1.61",
-      "updated_at": "2026-11-16T03:40:43+00:00",
+      "version": "0.1.62",
+      "updated_at": "2026-11-16T04:00:02+00:00",
       "path": "projects/applications",
       "manifest": "projects/applications/project.yaml",
       "source": {
@@ -2941,18 +2941,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "applications",
-        "release": "applications@0.1.61",
-        "release_digest": "sha256:71fd9e3b689f35185222172e9bd8c9f94df5468633b554e5f1f31cad587f8813",
+        "release": "applications@0.1.62",
+        "release_digest": "sha256:98fca5da55fee147f74f08e4f30dcf318e45d1d9398aed8ca267bfd0fdd89a52",
         "primary_component": "scenario:applications",
-        "package_digest": "sha256:5d73859112b0047e3fc601c0081781471c9df8a2d350f4db19b32366e7d24acb"
+        "package_digest": "sha256:5eaca521e5b9e6243e27d23957897d8e25219e1d1a048aae50487ffaefe5a668"
       },
       "channels": {
         "stable": {
-          "release": "applications@0.1.61",
-          "release_digest": "sha256:71fd9e3b689f35185222172e9bd8c9f94df5468633b554e5f1f31cad587f8813",
-          "source_revision": "sha256:e9e68cb596eea3808b048e5cdaf37e2a0624ba2713a022297fd5f35170a01d4c",
-          "package_digest": "sha256:5d73859112b0047e3fc601c0081781471c9df8a2d350f4db19b32366e7d24acb",
-          "version": "0.1.61"
+          "release": "applications@0.1.62",
+          "release_digest": "sha256:98fca5da55fee147f74f08e4f30dcf318e45d1d9398aed8ca267bfd0fdd89a52",
+          "source_revision": "sha256:cb892da80761babe1ba97e9f35681b17294a66161a465887fbf0261700f8cf4a",
+          "package_digest": "sha256:5eaca521e5b9e6243e27d23957897d8e25219e1d1a048aae50487ffaefe5a668",
+          "version": "0.1.62"
         }
       }
     },

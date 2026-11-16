@@ -8330,17 +8330,10 @@
                                     "kind": "static",
                                     "value": {
                                         "id": "position-request",
-                                        "status": "running",
-                                        "title": "Checking request",
-                                        "steps": []
+                                        "status": "running"
                                     }
                                 },
-                                "inputs": {
-                                    "labels": {
-                                        "running": "Waiting for the server",
-                                        "running_i18n": "dashboard.runtime.waiting"
-                                    }
-                                }
+                                "inputs": {}
                             },
                             {
                                 "area": "main",
@@ -9031,7 +9024,7 @@
                                         "type": "updateState"
                                     },
                                     {
-                                        "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.status == 'planned' && $state.positionMayHaveRun == true && $state.positionReview.operation.plan.required_apply_capability == 'applications.apply' && $state.positionReview.operation.kind != 'install' && $state.positionReview.operation.kind != 'update') && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)",
+                                        "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.status == 'planned' && $state.positionMayHaveRun == true && $state.positionReview.operation.plan.required_apply_capability == 'applications.apply' && $state.positionReview.operation.kind != 'install' && $state.positionReview.operation.kind != 'update') && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)",
                                         "errorStateKey": "positionError",
                                         "invalidates": [
                                             "applications.catalog",
@@ -9250,7 +9243,7 @@
                                         "type": "updateState"
                                     },
                                     {
-                                        "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.status == 'planned' && $state.positionMayHaveRun == true && ($state.positionReview.operation.kind == 'install' || $state.positionReview.operation.kind == 'update') && (!$state.positionReview.operation.plan.permission_review.approval_required || $state.positionPermissionApproved == true) && ($state.positionPlanIntent != 'select-release' || ($state.positionReview.operation.plan.release_digest == $state.positionPlanArgs.release_digest && $state.positionReview.operation.kind == $state.positionPlanArgs.kind && $state.positionReview.operation.idempotency_key == $state.positionIntentKey && $state.positionReview.operation.expected_revision == $state.positionPlanArgs.expected_revision))) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)",
+                                        "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.status == 'planned' && $state.positionMayHaveRun == true && ($state.positionReview.operation.kind == 'install' || $state.positionReview.operation.kind == 'update') && (!$state.positionReview.operation.plan.permission_review.approval_required || $state.positionPermissionApproved == true) && ($state.positionPlanIntent != 'select-release' || ($state.positionReview.operation.plan.release_digest == $state.positionPlanArgs.release_digest && $state.positionReview.operation.kind == $state.positionPlanArgs.kind && $state.positionReview.operation.idempotency_key == $state.positionIntentKey && $state.positionReview.operation.expected_revision == $state.positionPlanArgs.expected_revision))) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)",
                                         "errorStateKey": "positionError",
                                         "invalidates": [
                                             "applications.catalog",
@@ -9657,7 +9650,7 @@
                                 "inputs": {
                                     "buttons": [
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "switch-public",
                                             "kind": "primary",
                                             "label": "Switch and open",
@@ -9665,7 +9658,7 @@
                                             "visibleIf": "$state.positionRow.actions.open.eligible == true && $state.positionRow.actions.open.tool_id == 'applications.plan' && !$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "update",
                                             "kind": "primary",
                                             "label": "Update",
@@ -9673,7 +9666,7 @@
                                             "visibleIf": "$state.positionRow.actions.update.eligible == true && !$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "remove_beta",
                                             "kind": "secondary",
                                             "label": "Remove Beta",
@@ -9681,7 +9674,7 @@
                                             "visibleIf": "$state.positionRow.actions.remove_beta.eligible == true && !$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "renew_beta",
                                             "kind": "secondary",
                                             "label": "Renew Beta",
@@ -9689,7 +9682,7 @@
                                             "visibleIf": "$state.positionRow.actions.renew_beta.eligible == true && !$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "restore_stable",
                                             "kind": "secondary",
                                             "label": "Restore Stable",
@@ -9697,7 +9690,7 @@
                                             "visibleIf": "$state.positionRow.actions.restore_stable.eligible == true && !$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "switch-runtime",
                                             "kind": "secondary",
                                             "label": "Switch and open",
@@ -9705,7 +9698,7 @@
                                             "visibleIf": "$state.positionRow.actions.open.eligible == true && $state.positionRow.actions.open.tool_id == 'applications.lifecycle.plan' && !$state.positionReview.operation.operation_id && !$state.positionRow.actions.open.arguments.candidate_id"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "switch-runtime-candidate",
                                             "kind": "secondary",
                                             "label": "Switch and open",
@@ -9713,7 +9706,7 @@
                                             "visibleIf": "$state.positionRow.actions.open.eligible == true && $state.positionRow.actions.open.tool_id == 'applications.lifecycle.plan' && !$state.positionReview.operation.operation_id && $state.positionRow.actions.open.arguments.candidate_id"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)",
                                             "id": "confirm-apply",
                                             "kind": "primary",
                                             "label": "Confirm",
@@ -9721,7 +9714,7 @@
                                             "visibleIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.application_id == $state.positionApplicationId && $state.positionReview.operation.status == 'planned' && !$state.positionMayHaveRun && $state.positionReview.operation.plan.required_apply_capability == 'applications.apply' && $state.positionReview.operation.kind != 'install' && $state.positionReview.operation.kind != 'update'"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "observe",
                                             "kind": "secondary",
                                             "label": "Check operation",
@@ -9729,7 +9722,7 @@
                                             "visibleIf": "$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "recover",
                                             "kind": "secondary",
                                             "label": "Recover operation",
@@ -9737,7 +9730,7 @@
                                             "visibleIf": "$state.positionMayHaveRun == true && ($state.positionReview.operation.status == 'unknown' || $state.positionReview.operation.status == 'applying' || $state.positionReview.operation.status == 'reconciling') && ($state.positionReview.operation.plan.required_apply_capability == 'applications.apply' || $state.positionReview.operation.plan.required_apply_capability == 'applications.publish')"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "cancel-plan",
                                             "kind": "secondary",
                                             "label": "Cancel plan",
@@ -9745,21 +9738,21 @@
                                             "visibleIf": "$state.positionReview.operation.status == 'planned'"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled')) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled')) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "refresh-result",
                                             "label": "Refresh result",
                                             "label_i18n": "dashboard.position.refresh",
                                             "visibleIf": "($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled')"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled') && $state.positionObserved == true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled') && $state.positionObserved == true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "dismiss-result",
                                             "label": "Done",
                                             "label_i18n": "dashboard.position.done",
                                             "visibleIf": "($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled') && $state.positionObserved == true"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.application_id == $state.positionApplicationId && $state.positionReview.operation.status == 'planned' && !$state.positionMayHaveRun && ($state.positionReview.operation.kind == 'install' || $state.positionReview.operation.kind == 'update') && (!$state.positionReview.operation.plan.permission_review.approval_required || $state.positionPermissionApproved == true) && ($state.positionPlanIntent != 'select-release' || ($state.positionReview.operation.plan.release_digest == $state.positionPlanArgs.release_digest && $state.positionReview.operation.kind == $state.positionPlanArgs.kind && $state.positionReview.operation.idempotency_key == $state.positionIntentKey && $state.positionReview.operation.expected_revision == $state.positionPlanArgs.expected_revision))) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.application_id == $state.positionApplicationId && $state.positionReview.operation.status == 'planned' && !$state.positionMayHaveRun && ($state.positionReview.operation.kind == 'install' || $state.positionReview.operation.kind == 'update') && (!$state.positionReview.operation.plan.permission_review.approval_required || $state.positionPermissionApproved == true) && ($state.positionPlanIntent != 'select-release' || ($state.positionReview.operation.plan.release_digest == $state.positionPlanArgs.release_digest && $state.positionReview.operation.kind == $state.positionPlanArgs.kind && $state.positionReview.operation.idempotency_key == $state.positionIntentKey && $state.positionReview.operation.expected_revision == $state.positionPlanArgs.expected_revision))) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)",
                                             "id": "confirm-install-position",
                                             "kind": "primary",
                                             "label": "Confirm",
@@ -9767,7 +9760,7 @@
                                             "visibleIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.application_id == $state.positionApplicationId && $state.positionReview.operation.status == 'planned' && !$state.positionMayHaveRun && ($state.positionReview.operation.kind == 'install' || $state.positionReview.operation.kind == 'update') && (!$state.positionReview.operation.plan.permission_review.approval_required || $state.positionPermissionApproved == true) && ($state.positionPlanIntent != 'select-release' || ($state.positionReview.operation.plan.release_digest == $state.positionPlanArgs.release_digest && $state.positionReview.operation.kind == $state.positionPlanArgs.kind && $state.positionReview.operation.idempotency_key == $state.positionIntentKey && $state.positionReview.operation.expected_revision == $state.positionPlanArgs.expected_revision))"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "close",
                                             "kind": "secondary",
                                             "label": "Close",
@@ -9780,7 +9773,7 @@
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
                                             "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'remove_beta' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
-                                            "enabledIf": "(((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
+                                            "enabledIf": "((((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
                                             "id": "retry-plan-renew_beta",
@@ -9788,7 +9781,7 @@
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
                                             "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'renew_beta' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
-                                            "enabledIf": "(((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
+                                            "enabledIf": "((((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
                                             "id": "retry-plan-restore_stable",
@@ -9796,7 +9789,7 @@
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
                                             "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'restore_stable' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
-                                            "enabledIf": "(((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
+                                            "enabledIf": "((((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
                                             "id": "retry-plan-switch-runtime",
@@ -9804,7 +9797,7 @@
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
                                             "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'switch-runtime' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
-                                            "enabledIf": "(((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
+                                            "enabledIf": "((((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
                                             "id": "retry-plan-update",
@@ -9812,7 +9805,7 @@
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
                                             "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'update' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
-                                            "enabledIf": "(((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
+                                            "enabledIf": "((((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
                                             "id": "retry-plan-switch-runtime-candidate",
@@ -9820,7 +9813,7 @@
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
                                             "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'switch-runtime-candidate' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
-                                            "enabledIf": "(((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
+                                            "enabledIf": "((((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
                                             "id": "retry-plan-switch-public",
@@ -9828,10 +9821,10 @@
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
                                             "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'switch-public' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
-                                            "enabledIf": "(((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
+                                            "enabledIf": "((((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "select-release",
                                             "kind": "secondary",
                                             "label": "Select release",
@@ -9839,7 +9832,7 @@
                                             "visibleIf": "($state.positionRow.id == 'public_beta' || $state.positionRow.id == 'public_stable') && $state.positionRow.actions.select_release.eligible == true && $state.positionRow.actions.select_release.tool_id == 'applications.list_releases' && !$state.releaseSelectorOpen && !$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && $state.releaseSelectorOpen == true && $state.selectedPublicRelease.application_id == $state.positionApplicationId && $state.selectedPublicRelease.release_digest && $state.selectedPublicRelease.available == true && (($state.positionRow.id == 'public_beta' && $state.selectedPublicRelease.update_track == 'prerelease') || ($state.positionRow.id == 'public_stable' && $state.selectedPublicRelease.update_track == 'stable')) && ($state.selectedPublicRelease.kind == 'install' || $state.selectedPublicRelease.kind == 'update')) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && $state.releaseSelectorOpen == true && $state.selectedPublicRelease.application_id == $state.positionApplicationId && $state.selectedPublicRelease.release_digest && $state.selectedPublicRelease.available == true && (($state.positionRow.id == 'public_beta' && $state.selectedPublicRelease.update_track == 'prerelease') || ($state.positionRow.id == 'public_stable' && $state.selectedPublicRelease.update_track == 'stable')) && ($state.selectedPublicRelease.kind == 'install' || $state.selectedPublicRelease.kind == 'update')) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "review-selected-release",
                                             "kind": "primary",
                                             "label": "Review installation",
@@ -9852,10 +9845,10 @@
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
                                             "visibleIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'select-release' && !$state.positionReview.operation.operation_id",
-                                            "enabledIf": "(((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
+                                            "enabledIf": "((((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.publish_initial_stable.eligible == true && $state.positionRow.actions.publish_initial_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.publish_initial_stable.eligible == true && $state.positionRow.actions.publish_initial_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "publish_initial_stable",
                                             "kind": "secondary",
                                             "label": "Publish Stable",
@@ -9863,7 +9856,7 @@
                                             "visibleIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.publish_initial_stable.eligible == true && $state.positionRow.actions.publish_initial_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.publish_beta.eligible == true && $state.positionRow.actions.publish_beta.tool_id == 'applications.development.publish_prerelease' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.publish_beta.eligible == true && $state.positionRow.actions.publish_beta.tool_id == 'applications.development.publish_prerelease' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "publish_beta",
                                             "kind": "secondary",
                                             "label": "Publish Beta",
@@ -9871,7 +9864,7 @@
                                             "visibleIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.publish_beta.eligible == true && $state.positionRow.actions.publish_beta.tool_id == 'applications.development.publish_prerelease' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey"
                                         },
                                         {
-                                            "enabledIf": "((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.promote_public_stable.eligible == true && $state.positionRow.actions.promote_public_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
+                                            "enabledIf": "(((((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.promote_public_stable.eligible == true && $state.positionRow.actions.promote_public_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "promote_public_stable",
                                             "kind": "secondary",
                                             "label": "Publish as Stable",
@@ -9883,7 +9876,7 @@
                                             "label": "Check restoration plan",
                                             "label_i18n": "dashboard.runtime.operation",
                                             "visibleIf": "$state.positionPlanIntent == 'repair' && $state.positionPlanning && !$state.positionReview.operation.operation_id",
-                                            "enabledIf": "(((!$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
+                                            "enabledIf": "((((!$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
                                             "id": "component-details",
@@ -9891,7 +9884,7 @@
                                             "label_i18n": "dashboard.runtime.components",
                                             "icon": "information-circle-outline",
                                             "visibleIf": "$state.positionReview.operation.operation_id",
-                                            "enabledIf": "((true) && !$state.positionRequestPending) && !$state.positionRequestPending"
+                                            "enabledIf": "(((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         }
                                     ],
                                     "variant": "autoOverflow"
@@ -10751,7 +10744,7 @@
                 }
             }
         },
-        "version": "0.1.91",
+        "version": "0.1.92",
         "manifest": "webui.json"
     },
     "generated_by": "builder_skill"
