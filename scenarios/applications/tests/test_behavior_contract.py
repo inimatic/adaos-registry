@@ -97,7 +97,7 @@ def test_catalog_response_selects_exact_application_and_discards_previous_contex
     arguments = resolve(detail['arguments'], state)
     jsonschema.validate(arguments, CONTRACTS[detail['toolId']]['input_schema'])
     assert arguments == {'application_id': 'consumer-beta', 'view': 'dashboard', 'webspace_id': '$client.webspaceId'}
-    assert not enabled(command('lifecycle-actions', 'click:install'), state)
+    assert not any(a['on']=='click:install' for a in WIDGETS['lifecycle-actions']['actions'])
 
 
 @pytest.mark.parametrize('status,reason,message', [
@@ -155,11 +155,11 @@ def test_pending_remove_and_cancel_do_not_apply_or_keep_a_review():
     assert payload['expected_revision'] == 9
     assert payload['kind'] == 'remove'
     assert review['target'] == 'applications.plan'
-    cancel = command('modal-review-actions', 'click:cancel-review', 'updateState')
-    state.update(resolve(cancel['params'], state))
-    assert state['pendingLifecycleKind'] == ''
-    assert state['reviewedPlan'] == {}
-    assert state['permissionApproved'] is False
+    cancel = command('modal-review-actions', 'click:cancel-review', 'callMcp')
+    assert cancel['target']=='applications.cancel_operation'
+    assert not enabled(cancel,state)  # No durable plan has been prepared yet.
+    close=command('modal-review-actions','click:cancel-review','closeModal')
+    assert enabled(close,state)
 
 
 def test_changing_removal_policy_invalidates_previously_reviewed_digest():
@@ -182,7 +182,8 @@ def test_row_event_is_guarded_before_and_during_chain_with_old_capture():
            'arguments': {'action': 'update', 'candidate_id': 'candidate-2', 'release_digest': DIGEST,
                          'target_position_id': 'private_beta'}}}}
     steps = [a for a in WIDGETS['dashboard-positions']['actions'] if a['on'] == 'click:update']
-    assert all(enabled(a, state, row) for a in steps)
+    assert all(enabled(a, state, row) for a in steps[:2])
+    assert not any(enabled(a,state,row) for a in steps[2:])  # Private Candidates use lifecycle.plan.
     state.update(resolve(steps[0]['params'], state, row))
     assert state['positionRow']['id'] == 'private_beta'
     assert state['positionRow']['actions']['update']['arguments']['candidate_id'] == 'candidate-2'

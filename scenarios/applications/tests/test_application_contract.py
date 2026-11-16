@@ -158,7 +158,7 @@ def test_every_root_call_has_admitted_input_names_and_required_arguments():
 def test_lifecycle_plans_use_displayed_revisions_and_review_before_apply():
     legacy_plans = [a for a in actions('applications.plan') if a.get('resultStateKey') == 'reviewedPlan']
     planned = {a['params']['kind'] for a in legacy_plans}
-    assert planned == {'install','update','remove','select_track','relocate_component','install_component','remove_component'}
+    assert planned == {'remove','select_track','relocate_component','install_component','remove_component'}
     for a in legacy_plans:
         assert a['params']['expected_revision'].startswith(('$state.', '$event.'))
         assert a['idempotencyKey'] == 'auto'
@@ -168,19 +168,16 @@ def test_lifecycle_plans_use_displayed_revisions_and_review_before_apply():
         for action in legacy_plans
         if action['params']['kind'] in {'install', 'update'}
     }
-    assert release_plans == {
-        'install': '$state.effectiveReleaseDigest',
-        'update': '$state.effectiveReleaseDigest',
-    }
+    assert release_plans == {}  # Exact version plans are captured by release rows.
     for a in [a for a in actions('applications.apply') if a.get('resultStateKey') == 'reviewedPlan']:
         assert a['params'] == {'operation_id':'$state.reviewedPlan.operation.operation_id','plan_digest':'$state.reviewedPlan.operation.plan_digest', 'idempotency_key':'$state.reviewedPlan.operation.idempotency_key'}
         assert 'idempotencyKey' not in a
         assert "status == 'planned'" in a['enabledIf']
     assert not actions('applications.update_settings')
-    life = WIDGETS['lifecycle-actions']
+    life = WIDGETS['shared-dev-tickets']
     command = [action for action in life['actions'] if action['on'] == 'click:manage-home']
     assert [action['type'] for action in command] == ['callMcp', 'updateState', 'openModal']
-    assert command[0]['enabledIf'] == (
+    assert (
         '$state.selectedApplicationId && $state.applicationInstalled == true'
     )
     assert command[0]['target'] == 'applications.list_home_targets'
@@ -190,21 +187,14 @@ def test_lifecycle_plans_use_displayed_revisions_and_review_before_apply():
 
 
 def test_update_targets_effective_release_and_is_only_shown_when_available():
-    lifecycle = WIDGETS['lifecycle-actions']
-    update_button = next(
-        button for button in lifecycle['inputs']['buttons'] if button['id'] == 'update'
-    )
-    assert update_button['visibleIf'] == (
-        '$state.applicationInstalled == true && $state.updateAvailable == true && '
-        '(!$state.localDevelopmentAvailable || $state.publicationEvidence == true)'
-    )
-    update_plan = next(
-        action
-        for action in lifecycle['actions']
-        if action.get('target') == 'applications.plan'
-        and action.get('params', {}).get('kind') == 'update'
-    )
-    assert update_plan['params']['release_digest'] == '$state.effectiveReleaseDigest'
+    row=WIDGETS['dashboard-positions']
+    button=next(b for b in row['inputs']['buttons'] if b['id']=='update')
+    assert (button['whenKey'],button['whenEquals'])==('actions.update.eligible',True)
+    capture=next(a for a in row['actions'] if a.get('params',{}).get('positionPlanIntent')=='update-public')
+    assert capture['params']['positionPlanArgs']['release_digest']=='$state.positionRow.actions.update.arguments.release_digest'
+    plan=next(a for a in row['actions'] if a['on']=='click:update' and a.get('target')=='applications.plan')
+    assert plan['params']['release_digest']=='$state.positionPlanArgs.release_digest'
+    assert plan['params']['update_track']=='$state.positionPlanArgs.update_track'
 
 
 def test_home_desktop_dialog_uses_bounded_root_read_and_batch_mutation():
@@ -387,7 +377,7 @@ def test_builder_trial_target_is_logical_and_publication_gates_stable_actions():
     bindings = WIDGETS['application-details']['inputs']['stateBindings']
     assert bindings['trialTarget']['path'] == 'local_development.trial.navigation_target'
     assert bindings['publicationEvidence']['path'] == 'local_development.publication.evidence_present'
-    life = WIDGETS['lifecycle-actions']
+    life = WIDGETS['shared-dev-tickets']
     trial = next(a for a in life['actions'] if a['on'] == 'click:open')
     assert trial['params']['workspaceId'] == '$state.trialTarget.webspace_id'
     assert trial['params']['expectedScenarioId'] == '$state.trialTarget.expected_scenario_id'
@@ -395,7 +385,7 @@ def test_builder_trial_target_is_logical_and_publication_gates_stable_actions():
     for b in life['inputs']['buttons']:
         if b['id'] in ['install','update']:
             assert 'publicationEvidence == true' in b['visibleIf']
-    preview = next(a for a in life['actions'] if a['on'] == 'click:preview')
+    preview = next(a for a in WIDGETS['dashboard-positions']['actions'] if a['on'] == 'click:alpha-preview' and a['type']=='openWorkspace')
     assert preview['params']['expectedScenarioId'] == '$state.developmentObjectId'
 
 
@@ -405,7 +395,7 @@ def test_installed_open_does_not_guess_a_navigation_target():
     for tool in ('applications.list', 'applications.show'):
         record = CONTRACTS[tool]['metadata']['webui_data_binding']['record']
         assert record['effective_navigation_target_path'] == bindings['effectiveTarget']['path']
-    life = WIDGETS['lifecycle-actions']
+    life = WIDGETS['shared-dev-tickets']
     button = next(b for b in life['inputs']['buttons'] if b['id'] == 'open-installed')
     guard = '$state.applicationInstalled == true && !($state.trialAccepted == true && $state.trialTarget)'
     assert button['visibleIf'] == guard

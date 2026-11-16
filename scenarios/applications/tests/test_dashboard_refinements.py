@@ -445,7 +445,7 @@ def test_release_picker_uses_core_eligibility_and_review_has_no_generic_commands
     assert button['whenKey'] == 'actions.select_release.eligible' and button['whenEquals'] is True
     menu = next(w for w in APPLICATION['modals']['position-actions']['schema']['widgets'] if w['id'] == 'position-menu-actions')
     assert not {'preview', 'builder', 'dev-tickets', 'open', 'release-notes'} & {b['id'] for b in menu['inputs']['buttons']}
-    assert all('applicationInstalled == true' in b.get('visibleIf','') for b in WIDGETS['shared-dev-tickets']['inputs']['buttons'] if b['id'] != 'dev-tickets')
+    assert all('applicationInstalled == true' in b.get('visibleIf','') for b in WIDGETS['shared-dev-tickets']['inputs']['buttons'] if b['id'] in {'disable-auto-update','enable-auto-update','use-prerelease','use-stable','manage-home'})
     assert 'localBetaActive' not in WIDGETS['shared-dev-tickets']['visibleIf']
 
 

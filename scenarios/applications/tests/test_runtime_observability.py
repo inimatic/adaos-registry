@@ -20,8 +20,8 @@ def test_runtime_commands_use_the_existing_adaptive_toolbar():
     assert W['dashboard-runtime-actions']['inputs']['variant']=='autoOverflow'
     assert W['dashboard-runtime-actions']['inputs']['compactIconOnly'] is True
 def test_operation_check_opens_progress_surface_before_transport_and_retains_receipt():
-    actions=W['dashboard-runtime-actions']['actions']
-    selected=[a for a in actions if a['on']=='click:operation']
+    actions=W['shared-dev-tickets']['actions']
+    selected=[a for a in actions if a['on']=='click:review-operation']
     assert [a['type'] for a in selected]==['updateState','openModal','callMcp']
     assert selected[-1]['target']=='applications.get_operation'
     assert selected[-1]['pendingStateKey']=='positionRequestPending'

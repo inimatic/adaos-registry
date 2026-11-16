@@ -329,7 +329,7 @@
   "widgets.review-actions.buttons.cancel.label": "Cancel",
   "widgets.review-actions.buttons.confirm-install.label": "Install",
   "widgets.review-actions.buttons.confirm-remove.label": "Uninstall",
-  "widgets.review-actions.buttons.confirm-select-track.label": "Apply settings",
+  "widgets.review-actions.buttons.confirm-select-track.label": "Save settings",
   "widgets.review-actions.buttons.confirm-update.label": "Update",
   "widgets.reviewed-plan.emptyText": "No details available.",
   "widgets.reviewed-plan.fields.access.label": "Access",
@@ -586,5 +586,17 @@
   "dashboard.health.identity_unverified": "The installed component identities could not be verified. Inspect runtime placement before making changes.",
   "action.mcp.transport_unavailable": "Connection interrupted. The request result could not be confirmed. Check its status before submitting changes again.",
   "dashboard.runtime.restoration_help": "The version stays the same. Restoration returns the runtime components to the installed release.",
-  "applications.data_policy.retain": "Keep data"
+  "applications.data_policy.retain": "Keep data",
+  "dashboard.settings.pending": "Review pending settings",
+  "dashboard.settings.checking": "Checking settings",
+  "dashboard.settings.review": "Application settings",
+  "dashboard.settings.auto_update": "Automatic updates",
+  "dashboard.settings.receive_beta": "Receive Beta",
+  "dashboard.settings.policy.auto_compatible": "On",
+  "dashboard.settings.policy.notify": "Off",
+  "dashboard.settings.policy.manual": "Off",
+  "dashboard.settings.track.stable": "Off",
+  "dashboard.settings.track.prerelease": "On",
+  "dashboard.runtime.edition": "Edition",
+  "dashboard.position.distribution.installed_only": "Installed; no longer offered"
 }

@@ -352,5 +352,19 @@
   "dashboard.health.identity_unverified": "Идентичность установленных компонентов не подтверждена. Проверьте размещение перед изменениями.",
   "action.mcp.transport_unavailable": "Соединение прервано. Результат запроса не подтверждён. Проверьте его статус перед повторной отправкой изменений.",
   "dashboard.runtime.restoration_help": "Версия приложения не изменится. Восстановление приводит компоненты к составу установленного релиза.",
-  "applications.data_policy.retain": "Сохранить данные"
+  "applications.data_policy.retain": "Сохранить данные",
+  "dashboard.settings.pending": "Проверить настройки",
+  "dashboard.settings.checking": "Проверяем настройки",
+  "dashboard.settings.review": "Настройки приложения",
+  "dashboard.settings.auto_update": "Автообновление",
+  "dashboard.settings.receive_beta": "Получать Beta",
+  "dashboard.settings.policy.auto_compatible": "Включено",
+  "dashboard.settings.policy.notify": "Выключено",
+  "dashboard.settings.policy.manual": "Выключено",
+  "dashboard.settings.track.stable": "Выключено",
+  "dashboard.settings.track.prerelease": "Включено",
+  "widgets.review-actions.buttons.confirm-select-track.label": "Сохранить настройки",
+  "modals.review-lifecycle-operation.title": "Подтверждение изменения",
+  "dashboard.runtime.edition": "Редакция",
+  "dashboard.position.distribution.installed_only": "Установлена; больше не распространяется"
 }
