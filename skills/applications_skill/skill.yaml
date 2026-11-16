@@ -1,5 +1,5 @@
 name: applications_skill
-version: 0.1.11
+version: 0.1.12
 description: Project-owned resource implementation for project:applications. Realize
   the accepted Prototype according to the separate Automation brief.
 supported_locales:
@@ -489,7 +489,7 @@ nlu_hints:
   slot_schemas: {}
   entities: []
 prototype: skill_default
-updated_at: '2026-11-15T20:30:02+00:00'
+updated_at: '2026-11-16T03:14:24+00:00'
 capabilities:
 - applications.develop
 - applications.read

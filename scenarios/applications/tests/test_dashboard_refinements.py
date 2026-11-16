@@ -232,8 +232,12 @@ def test_position_review_shows_permission_and_data_implications():
     widgets = APPLICATION['modals']['position-actions']['schema']['widgets']
     review = next(w for w in widgets if w['id'] == 'position-review')
     paths = {field['path'] for field in review['inputs']['fields']}
-    assert {'plan.review_summary', 'plan.components', 'plan.conflicts', 'plan.compatibility',
+    assert {'plan.review_summary', 'plan.compatibility',
             'plan.snapshot', 'plan.access', 'plan.migration_required'} <= paths
+    component_details = next(w for w in widgets if w['id'] == 'position-component-details')
+    assert component_details['dataSource']['value'] == '$state.positionReview.operation.plan.components'
+    conflicts = next(w for w in widgets if w['id'] == 'position-blocked-components')
+    assert conflicts['dataSource']['value'] == '$state.positionReview.operation.plan.conflicts'
     permissions = next(w for w in widgets if w['id'] == 'position-permission-review')
     assert permissions['dataSource']['value'] == '$state.positionReview.operation.plan.permission_review.items'
     assert permissions['visibleIf'] == '$state.positionReview.operation.plan.permission_review.items'

@@ -139,7 +139,16 @@
                         "usersAccessTab": "people",
                         "deliveryOperationStatus": "",
                         "deliveryOperationError": {},
-                        "deliveryOperationMessage": ""
+                        "deliveryOperationMessage": "",
+                        "runtimeInstalledDigest": "",
+                        "dashboardRuntimeUsage": {},
+                        "dashboardRuntimeIssues": [],
+                        "dashboardDiagnostic": "",
+                        "dashboardRepair": {},
+                        "dashboardLatestOperation": {},
+                        "dashboardPlanReview": {},
+                        "positionRequestPending": false,
+                        "positionShowTechnical": false
                     },
                     "layout": {
                         "version": 2,
@@ -1740,6 +1749,34 @@
                                     "deliveryOperationMessage": {
                                         "path": "lifecycle.operation.message",
                                         "default": ""
+                                    },
+                                    "runtimeInstalledDigest": {
+                                        "path": "installed_release.release_digest",
+                                        "default": ""
+                                    },
+                                    "dashboardRuntimeUsage": {
+                                        "path": "dashboard.runtime",
+                                        "default": {}
+                                    },
+                                    "dashboardRuntimeIssues": {
+                                        "path": "dashboard.runtime_issues",
+                                        "default": []
+                                    },
+                                    "dashboardDiagnostic": {
+                                        "path": "dashboard.diagnostic",
+                                        "default": ""
+                                    },
+                                    "dashboardRepair": {
+                                        "path": "dashboard.actions.review_repair",
+                                        "default": {}
+                                    },
+                                    "dashboardLatestOperation": {
+                                        "path": "lifecycle.operation",
+                                        "default": {}
+                                    },
+                                    "dashboardPlanReview": {
+                                        "path": "dashboard.plan_review",
+                                        "default": {}
                                     }
                                 },
                                 "stateOnly": true
@@ -1892,6 +1929,16 @@
                                         "label": "Publisher",
                                         "label_i18n": "dashboard.publisher",
                                         "path": "application.publisher.display_name"
+                                    },
+                                    {
+                                        "label": "Installed",
+                                        "label_i18n": "dashboard.runtime.installed",
+                                        "path": "dashboard.runtime.installed_version"
+                                    },
+                                    {
+                                        "label": "In use",
+                                        "label_i18n": "dashboard.runtime.selected",
+                                        "path": "dashboard.runtime.selected_version"
                                     }
                                 ],
                                 "presentation": "header"
@@ -2709,6 +2756,212 @@
                                         "label": "Incoming operations",
                                         "label_i18n": "applications.delivery.incoming_ops",
                                         "path": "incoming_operations"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "dashboard-runtime-health",
+                            "type": "item.details",
+                            "area": "workspace",
+                            "visibleIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.dashboardDiagnostic",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": {
+                                    "reason": "$state.dashboardDiagnostic"
+                                }
+                            },
+                            "inputs": {
+                                "presentation": "section",
+                                "fields": [
+                                    {
+                                        "path": "reason",
+                                        "label": "Runtime",
+                                        "label_i18n": "dashboard.runtime.health",
+                                        "valueI18nPrefix": "dashboard.health."
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "dashboard-runtime-actions",
+                            "type": "ui.actions",
+                            "area": "workspace",
+                            "visibleIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && ($state.dashboardDiagnostic || $state.dashboardLatestOperation.status == 'planned' || $state.dashboardLatestOperation.status == 'unknown' || $state.dashboardLatestOperation.status == 'reconciling')",
+                            "inputs": {
+                                "buttons": [
+                                    {
+                                        "id": "placement",
+                                        "label": "Runtime placement",
+                                        "label_i18n": "widgets.lifecycle-actions.buttons.manage-placement.label",
+                                        "icon": "git-network-outline",
+                                        "enabledIf": "!$state.positionRequestPending"
+                                    },
+                                    {
+                                        "id": "details",
+                                        "label": "Details",
+                                        "label_i18n": "dashboard.details",
+                                        "icon": "information-circle-outline",
+                                        "enabledIf": "!$state.positionRequestPending"
+                                    },
+                                    {
+                                        "id": "operation",
+                                        "label": "Review operation",
+                                        "label_i18n": "dashboard.runtime.operation",
+                                        "icon": "list-outline",
+                                        "visibleIf": "$state.dashboardLatestOperation.operation_id && ($state.dashboardLatestOperation.status == 'planned' || $state.dashboardLatestOperation.status == 'unknown' || $state.dashboardLatestOperation.status == 'reconciling')",
+                                        "enabledIf": "!$state.positionRequestPending"
+                                    },
+                                    {
+                                        "id": "repair",
+                                        "label": "Restore installed release",
+                                        "label_i18n": "dashboard.runtime.restore",
+                                        "icon": "construct-outline",
+                                        "visibleIf": "$state.dashboardRepair.eligible == true",
+                                        "enabledIf": "!$state.positionRequestPending && !$state.positionPlanning"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:placement",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "manage-runtime-placement"
+                                    }
+                                },
+                                {
+                                    "on": "click:details",
+                                    "type": "updateState",
+                                    "params": {
+                                        "dashboardSection": "details"
+                                    }
+                                },
+                                {
+                                    "on": "click:operation",
+                                    "type": "updateState",
+                                    "params": {
+                                        "positionApplicationId": "$state.selectedApplicationId",
+                                        "positionRow": {},
+                                        "positionReview": {
+                                            "operation": {
+                                                "operation_id": "$state.dashboardLatestOperation.operation_id",
+                                                "application_id": "$state.selectedApplicationId",
+                                                "status": "$state.dashboardLatestOperation.status"
+                                            }
+                                        },
+                                        "positionError": {},
+                                        "positionPlanIntent": "existing",
+                                        "positionMayHaveRun": false,
+                                        "positionPlanning": false
+                                    }
+                                },
+                                {
+                                    "on": "click:operation",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "position-actions"
+                                    }
+                                },
+                                {
+                                    "on": "click:operation",
+                                    "type": "callMcp",
+                                    "target": "applications.get_operation",
+                                    "dryRun": true,
+                                    "params": {
+                                        "operation_id": "$state.positionReview.operation.operation_id"
+                                    },
+                                    "pendingStateKey": "positionRequestPending",
+                                    "errorStateKey": "positionError",
+                                    "resultStateKey": "positionReview",
+                                    "followups": [
+                                        {
+                                            "type": "updateState",
+                                            "enabledIf": "$state.positionReview.operation.status != 'planned'",
+                                            "params": {
+                                                "positionMayHaveRun": true
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "on": "click:repair",
+                                    "type": "updateState",
+                                    "params": {
+                                        "positionApplicationId": "$state.selectedApplicationId",
+                                        "positionRow": {},
+                                        "positionReview": {},
+                                        "positionError": {},
+                                        "positionPlanIntent": "repair",
+                                        "positionMayHaveRun": false,
+                                        "positionPlanning": true,
+                                        "positionIntentKey": "",
+                                        "positionPlanArgs": {
+                                            "application_id": "$state.selectedApplicationId",
+                                            "kind": "update",
+                                            "release_digest": "$state.runtimeInstalledDigest",
+                                            "expected_revision": "$state.installationRevision"
+                                        }
+                                    }
+                                },
+                                {
+                                    "on": "click:repair",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "position-actions"
+                                    }
+                                },
+                                {
+                                    "on": "click:repair",
+                                    "type": "callMcp",
+                                    "target": "applications.plan",
+                                    "idempotencyKey": "auto",
+                                    "idempotencyKeyStateKey": "positionIntentKey",
+                                    "params": {
+                                        "application_id": "$state.positionPlanArgs.application_id",
+                                        "kind": "$state.positionPlanArgs.kind",
+                                        "release_digest": "$state.positionPlanArgs.release_digest",
+                                        "expected_revision": "$state.positionPlanArgs.expected_revision"
+                                    },
+                                    "enabledIf": "$state.dashboardRepair.eligible == true",
+                                    "pendingStateKey": "positionRequestPending",
+                                    "errorStateKey": "positionError",
+                                    "resultStateKey": "positionReview",
+                                    "followups": [
+                                        {
+                                            "type": "updateState",
+                                            "params": {
+                                                "positionPlanning": false
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "id": "dashboard-runtime-issues",
+                            "type": "ui.list",
+                            "area": "workspace",
+                            "title": "Runtime components",
+                            "title_i18n": "dashboard.runtime.components",
+                            "visibleIf": "$state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.dashboardSection == 'details' && $state.dashboardDiagnostic",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": "$state.dashboardRuntimeIssues"
+                            },
+                            "inputs": {
+                                "titleKey": "component_ref",
+                                "itemIdKey": "component_ref",
+                                "meta": [
+                                    {
+                                        "key": "expected_version",
+                                        "label": "Required",
+                                        "label_i18n": "dashboard.runtime.required"
+                                    },
+                                    {
+                                        "key": "observed_version",
+                                        "label": "Active",
+                                        "label_i18n": "dashboard.runtime.active"
                                     }
                                 ]
                             }
@@ -8065,6 +8318,29 @@
                         },
                         "widgets": [
                             {
+                                "id": "position-request-progress",
+                                "type": "feedback.taskProgress",
+                                "area": "main",
+                                "visibleIf": "$state.positionRequestPending == true",
+                                "title": "Checking request",
+                                "title_i18n": "dashboard.runtime.checking",
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": {
+                                        "id": "position-request",
+                                        "status": "running",
+                                        "title": "Checking request",
+                                        "steps": []
+                                    }
+                                },
+                                "inputs": {
+                                    "labels": {
+                                        "running": "Waiting for the server",
+                                        "running_i18n": "dashboard.runtime.waiting"
+                                    }
+                                }
+                            },
+                            {
                                 "area": "main",
                                 "dataSource": {
                                     "kind": "static",
@@ -8107,6 +8383,29 @@
                                 ]
                             },
                             {
+                                "id": "position-blocked-components",
+                                "type": "ui.list",
+                                "area": "main",
+                                "title": "Shared component conflict",
+                                "title_i18n": "dashboard.runtime.conflict",
+                                "visibleIf": "$state.positionReview.operation.plan.conflicts.length > 0",
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.positionReview.operation.plan.conflicts"
+                                },
+                                "inputs": {
+                                    "titleKey": "component_ref",
+                                    "itemIdKey": "component_ref",
+                                    "meta": [
+                                        {
+                                            "key": "active_application_id",
+                                            "label": "Used by",
+                                            "label_i18n": "dashboard.runtime.used_by"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
                                 "id": "position-review",
                                 "type": "item.details",
                                 "area": "main",
@@ -8116,7 +8415,7 @@
                                     "kind": "static",
                                     "value": "$state.positionReview.operation"
                                 },
-                                "visibleIf": "$state.positionReview.operation.operation_id",
+                                "visibleIf": "$state.positionReview.operation.operation_id && !($state.positionReview.operation.kind == 'update' && $state.positionReview.operation.plan.release_digest == $state.runtimeInstalledDigest)",
                                 "inputs": {
                                     "fields": [
                                         {
@@ -8163,16 +8462,6 @@
                                             "path": "plan.review_summary",
                                             "label": "Summary",
                                             "label_i18n": "widgets.reviewed-plan.fields.summary.label"
-                                        },
-                                        {
-                                            "path": "plan.components",
-                                            "label": "Components",
-                                            "label_i18n": "widgets.reviewed-plan.fields.components.label"
-                                        },
-                                        {
-                                            "path": "plan.conflicts",
-                                            "label": "Conflicts",
-                                            "label_i18n": "widgets.reviewed-plan.fields.conflicts.label"
                                         },
                                         {
                                             "path": "plan.compatibility",
@@ -8456,6 +8745,134 @@
                                 }
                             },
                             {
+                                "id": "position-restore-review",
+                                "type": "item.details",
+                                "area": "main",
+                                "title": "Restore installed release",
+                                "title_i18n": "dashboard.runtime.restore",
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.positionReview.operation"
+                                },
+                                "visibleIf": "$state.positionReview.operation.operation_id && ($state.positionReview.operation.kind == 'update' && $state.positionReview.operation.plan.release_digest == $state.runtimeInstalledDigest)",
+                                "inputs": {
+                                    "fields": [
+                                        {
+                                            "path": "plan.target_version",
+                                            "label": "Version",
+                                            "label_i18n": "dashboard.position.version"
+                                        },
+                                        {
+                                            "path": "plan.summary",
+                                            "label": "Summary",
+                                            "label_i18n": "dashboard.position.summary"
+                                        },
+                                        {
+                                            "path": "plan.data_disposition",
+                                            "label": "Data",
+                                            "label_i18n": "dashboard.position.data"
+                                        },
+                                        {
+                                            "path": "plan.affected_webspace_ids",
+                                            "label": "Affected desktops",
+                                            "label_i18n": "dashboard.position.desktops"
+                                        },
+                                        {
+                                            "path": "status",
+                                            "label": "Status",
+                                            "label_i18n": "dashboard.position.status"
+                                        },
+                                        {
+                                            "path": "recovery_reason",
+                                            "label": "Reason",
+                                            "label_i18n": "dashboard.position.reason"
+                                        },
+                                        {
+                                            "path": "result.message",
+                                            "label": "Result",
+                                            "label_i18n": "dashboard.position.result"
+                                        },
+                                        {
+                                            "path": "plan.review_summary",
+                                            "label": "Summary",
+                                            "label_i18n": "widgets.reviewed-plan.fields.summary.label"
+                                        },
+                                        {
+                                            "path": "plan.compatibility",
+                                            "label": "Compatibility",
+                                            "label_i18n": "widgets.reviewed-plan.fields.compatibility.label"
+                                        },
+                                        {
+                                            "path": "plan.snapshot",
+                                            "label": "Data snapshot",
+                                            "label_i18n": "widgets.reviewed-plan.fields.snapshot.label"
+                                        },
+                                        {
+                                            "path": "plan.access",
+                                            "label": "Access",
+                                            "label_i18n": "widgets.reviewed-plan.fields.access.label"
+                                        },
+                                        {
+                                            "path": "plan.migration_required",
+                                            "label": "Migration required",
+                                            "label_i18n": "dashboard.position.migration_required"
+                                        },
+                                        {
+                                            "path": "plan.compatibility.migration.required",
+                                            "label": "Migration required",
+                                            "label_i18n": "dashboard.position.migration_required"
+                                        },
+                                        {
+                                            "path": "plan.compatibility.migration.count",
+                                            "label": "Migrations",
+                                            "label_i18n": "dashboard.release.migration_count"
+                                        },
+                                        {
+                                            "path": "plan.compatibility.migration.rollback_mode",
+                                            "label": "Rollback",
+                                            "label_i18n": "dashboard.release.rollback"
+                                        },
+                                        {
+                                            "path": "plan.runtime_target",
+                                            "label": "Runtime placement",
+                                            "label_i18n": "dashboard.release.runtime_target"
+                                        },
+                                        {
+                                            "path": "plan.removal",
+                                            "label": "Removal",
+                                            "label_i18n": "dashboard.release.removal"
+                                        },
+                                        {
+                                            "path": "plan.permissions",
+                                            "label": "Permissions",
+                                            "label_i18n": "dashboard.release.permissions"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "position-component-details",
+                                "type": "ui.list",
+                                "area": "main",
+                                "title": "Components",
+                                "title_i18n": "widgets.reviewed-plan.fields.components.label",
+                                "visibleIf": "$state.positionShowTechnical == true && $state.positionReview.operation.operation_id",
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.positionReview.operation.plan.components"
+                                },
+                                "inputs": {
+                                    "titleKey": "component_ref",
+                                    "itemIdKey": "component_ref",
+                                    "meta": [
+                                        {
+                                            "key": "package_digest",
+                                            "label": "Package"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
                                 "actions": [
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.remove_beta.eligible == true && $state.dashboardLifecycleRevision && $state.positionWriteLossAcknowledged == true && $state.positionRow.actions.remove_beta.tool_id == 'applications.lifecycle.plan' && !$state.positionReview.operation.operation_id && !$state.positionMayHaveRun && !$state.positionPlanning",
@@ -8489,7 +8906,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.renew_beta.eligible == true && $state.dashboardLifecycleRevision && $state.positionRow.actions.renew_beta.tool_id == 'applications.lifecycle.plan' && !$state.positionReview.operation.operation_id && !$state.positionMayHaveRun && !$state.positionPlanning",
@@ -8521,7 +8939,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.restore_stable.eligible == true && $state.dashboardLifecycleRevision && $state.positionWriteLossAcknowledged == true && $state.positionRow.actions.restore_stable.tool_id == 'applications.lifecycle.plan' && !$state.positionReview.operation.operation_id && !$state.positionMayHaveRun && !$state.positionPlanning",
@@ -8555,7 +8974,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.open.eligible == true && $state.positionRow.actions.open.tool_id == 'applications.lifecycle.plan' && !$state.positionRow.actions.open.arguments.candidate_id",
@@ -8597,7 +9017,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.application_id == $state.positionApplicationId && $state.positionReview.operation.status == 'planned' && !$state.positionMayHaveRun && $state.positionReview.operation.plan.required_apply_capability == 'applications.apply' && $state.positionReview.operation.kind != 'install' && $state.positionReview.operation.kind != 'update'",
@@ -8608,7 +9029,7 @@
                                         "type": "updateState"
                                     },
                                     {
-                                        "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.status == 'planned' && $state.positionMayHaveRun == true && $state.positionReview.operation.plan.required_apply_capability == 'applications.apply' && $state.positionReview.operation.kind != 'install' && $state.positionReview.operation.kind != 'update'",
+                                        "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.status == 'planned' && $state.positionMayHaveRun == true && $state.positionReview.operation.plan.required_apply_capability == 'applications.apply' && $state.positionReview.operation.kind != 'install' && $state.positionReview.operation.kind != 'update') && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)",
                                         "errorStateKey": "positionError",
                                         "invalidates": [
                                             "applications.catalog",
@@ -8625,7 +9046,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.apply",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.operation_id",
@@ -8637,7 +9059,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.get_operation",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionMayHaveRun == true && ($state.positionReview.operation.status == 'unknown' || $state.positionReview.operation.status == 'applying' || $state.positionReview.operation.status == 'reconciling') && ($state.positionReview.operation.plan.required_apply_capability == 'applications.apply' || $state.positionReview.operation.plan.required_apply_capability == 'applications.publish')",
@@ -8657,7 +9080,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.recover",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.application_id == $state.positionApplicationId && $state.positionReview.operation.status == 'planned' && !$state.positionMayHaveRun",
@@ -8682,7 +9106,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.cancel_operation",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "on": "click:close",
@@ -8705,7 +9130,8 @@
                                         },
                                         "resultStateKey": "positionObservation",
                                         "target": "applications.show",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "on": "click:refresh-result",
@@ -8767,7 +9193,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.open.eligible == true && $state.positionRow.actions.open.tool_id == 'applications.plan'",
@@ -8809,7 +9236,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.application_id == $state.positionApplicationId && $state.positionReview.operation.status == 'planned' && !$state.positionMayHaveRun && ($state.positionReview.operation.kind == 'install' || $state.positionReview.operation.kind == 'update') && (!$state.positionReview.operation.plan.permission_review.approval_required || $state.positionPermissionApproved == true) && ($state.positionPlanIntent != 'select-release' || ($state.positionReview.operation.plan.release_digest == $state.positionPlanArgs.release_digest && $state.positionReview.operation.kind == $state.positionPlanArgs.kind && $state.positionReview.operation.idempotency_key == $state.positionIntentKey && $state.positionReview.operation.expected_revision == $state.positionPlanArgs.expected_revision))",
@@ -8820,7 +9248,7 @@
                                         "type": "updateState"
                                     },
                                     {
-                                        "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.status == 'planned' && $state.positionMayHaveRun == true && ($state.positionReview.operation.kind == 'install' || $state.positionReview.operation.kind == 'update') && (!$state.positionReview.operation.plan.permission_review.approval_required || $state.positionPermissionApproved == true) && ($state.positionPlanIntent != 'select-release' || ($state.positionReview.operation.plan.release_digest == $state.positionPlanArgs.release_digest && $state.positionReview.operation.kind == $state.positionPlanArgs.kind && $state.positionReview.operation.idempotency_key == $state.positionIntentKey && $state.positionReview.operation.expected_revision == $state.positionPlanArgs.expected_revision))",
+                                        "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.status == 'planned' && $state.positionMayHaveRun == true && ($state.positionReview.operation.kind == 'install' || $state.positionReview.operation.kind == 'update') && (!$state.positionReview.operation.plan.permission_review.approval_required || $state.positionPermissionApproved == true) && ($state.positionPlanIntent != 'select-release' || ($state.positionReview.operation.plan.release_digest == $state.positionPlanArgs.release_digest && $state.positionReview.operation.kind == $state.positionPlanArgs.kind && $state.positionReview.operation.idempotency_key == $state.positionIntentKey && $state.positionReview.operation.expected_revision == $state.positionPlanArgs.expected_revision))) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)",
                                         "errorStateKey": "positionError",
                                         "invalidates": [
                                             "applications.catalog",
@@ -8837,7 +9265,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.apply",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionOpenAfter == true && $state.positionReview.operation.status == 'succeeded' && $state.positionObservation.application.dashboard.active_position_id == $state.positionRow.id && $state.positionObservation.application.effective_navigation.target",
@@ -8891,7 +9320,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'remove_beta' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id && $state.positionPlanning == true",
@@ -8909,7 +9339,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'renew_beta' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id && $state.positionPlanning == true",
@@ -8926,7 +9357,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'restore_stable' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id && $state.positionPlanning == true",
@@ -8944,7 +9376,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'switch-runtime' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id && $state.positionPlanning == true",
@@ -8962,7 +9395,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'update' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id && $state.positionPlanning == true",
@@ -8981,7 +9415,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'switch-runtime-candidate' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id && $state.positionPlanning == true",
@@ -9000,7 +9435,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.lifecycle.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'switch-public' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
@@ -9018,7 +9454,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && ($state.positionRow.id == 'public_beta' || $state.positionRow.id == 'public_stable') && $state.positionRow.actions.select_release.eligible == true && $state.positionRow.actions.select_release.tool_id == 'applications.list_releases'",
@@ -9062,7 +9499,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'select-release' && !$state.positionReview.operation.operation_id",
@@ -9080,7 +9518,8 @@
                                         },
                                         "resultStateKey": "positionReview",
                                         "target": "applications.plan",
-                                        "type": "callMcp"
+                                        "type": "callMcp",
+                                        "pendingStateKey": "positionRequestPending"
                                     },
                                     {
                                         "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.publish_initial_stable.eligible == true && $state.positionRow.actions.publish_initial_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey",
@@ -9177,6 +9616,38 @@
                                             "modalId": "publication-actions"
                                         },
                                         "type": "navigateModal"
+                                    },
+                                    {
+                                        "on": "click:retry-plan-repair",
+                                        "type": "callMcp",
+                                        "target": "applications.plan",
+                                        "idempotencyKey": "auto",
+                                        "idempotencyKeyStateKey": "positionIntentKey",
+                                        "params": {
+                                            "application_id": "$state.positionPlanArgs.application_id",
+                                            "kind": "$state.positionPlanArgs.kind",
+                                            "release_digest": "$state.positionPlanArgs.release_digest",
+                                            "expected_revision": "$state.positionPlanArgs.expected_revision"
+                                        },
+                                        "enabledIf": "$state.positionApplicationId == $state.selectedApplicationId && $state.positionIntentKey && $state.positionPlanIntent == 'repair' && $state.positionPlanning && !$state.positionReview.operation.operation_id",
+                                        "pendingStateKey": "positionRequestPending",
+                                        "errorStateKey": "positionError",
+                                        "resultStateKey": "positionReview",
+                                        "followups": [
+                                            {
+                                                "type": "updateState",
+                                                "params": {
+                                                    "positionPlanning": false
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "on": "click:component-details",
+                                        "type": "updateState",
+                                        "params": {
+                                            "positionShowTechnical": true
+                                        }
                                     }
                                 ],
                                 "area": "main",
@@ -9184,7 +9655,7 @@
                                 "inputs": {
                                     "buttons": [
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "switch-public",
                                             "kind": "primary",
                                             "label": "Switch and open",
@@ -9192,7 +9663,7 @@
                                             "visibleIf": "$state.positionRow.actions.open.eligible == true && $state.positionRow.actions.open.tool_id == 'applications.plan' && !$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "update",
                                             "kind": "primary",
                                             "label": "Update",
@@ -9200,7 +9671,7 @@
                                             "visibleIf": "$state.positionRow.actions.update.eligible == true && !$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "remove_beta",
                                             "kind": "secondary",
                                             "label": "Remove Beta",
@@ -9208,7 +9679,7 @@
                                             "visibleIf": "$state.positionRow.actions.remove_beta.eligible == true && !$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "renew_beta",
                                             "kind": "secondary",
                                             "label": "Renew Beta",
@@ -9216,7 +9687,7 @@
                                             "visibleIf": "$state.positionRow.actions.renew_beta.eligible == true && !$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "restore_stable",
                                             "kind": "secondary",
                                             "label": "Restore Stable",
@@ -9224,7 +9695,7 @@
                                             "visibleIf": "$state.positionRow.actions.restore_stable.eligible == true && !$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "switch-runtime",
                                             "kind": "secondary",
                                             "label": "Switch and open",
@@ -9232,7 +9703,7 @@
                                             "visibleIf": "$state.positionRow.actions.open.eligible == true && $state.positionRow.actions.open.tool_id == 'applications.lifecycle.plan' && !$state.positionReview.operation.operation_id && !$state.positionRow.actions.open.arguments.candidate_id"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "switch-runtime-candidate",
                                             "kind": "secondary",
                                             "label": "Switch and open",
@@ -9240,7 +9711,7 @@
                                             "visibleIf": "$state.positionRow.actions.open.eligible == true && $state.positionRow.actions.open.tool_id == 'applications.lifecycle.plan' && !$state.positionReview.operation.operation_id && $state.positionRow.actions.open.arguments.candidate_id"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)",
                                             "id": "confirm-apply",
                                             "kind": "primary",
                                             "label": "Confirm",
@@ -9248,15 +9719,15 @@
                                             "visibleIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.application_id == $state.positionApplicationId && $state.positionReview.operation.status == 'planned' && !$state.positionMayHaveRun && $state.positionReview.operation.plan.required_apply_capability == 'applications.apply' && $state.positionReview.operation.kind != 'install' && $state.positionReview.operation.kind != 'update'"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "observe",
                                             "kind": "secondary",
                                             "label": "Check operation",
                                             "label_i18n": "dashboard.position.observe",
-                                            "visibleIf": "$state.positionReview.operation.operation_id && $state.positionMayHaveRun == true"
+                                            "visibleIf": "$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "recover",
                                             "kind": "secondary",
                                             "label": "Recover operation",
@@ -9264,29 +9735,29 @@
                                             "visibleIf": "$state.positionMayHaveRun == true && ($state.positionReview.operation.status == 'unknown' || $state.positionReview.operation.status == 'applying' || $state.positionReview.operation.status == 'reconciling') && ($state.positionReview.operation.plan.required_apply_capability == 'applications.apply' || $state.positionReview.operation.plan.required_apply_capability == 'applications.publish')"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "cancel-plan",
                                             "kind": "secondary",
                                             "label": "Cancel plan",
                                             "label_i18n": "dashboard.position.cancel-plan",
-                                            "visibleIf": "$state.positionReview.operation.status == 'planned' && !$state.positionMayHaveRun"
+                                            "visibleIf": "$state.positionReview.operation.status == 'planned'"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled')",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled')) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "refresh-result",
                                             "label": "Refresh result",
                                             "label_i18n": "dashboard.position.refresh",
                                             "visibleIf": "($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled')"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled') && $state.positionObserved == true",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && ($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled') && $state.positionObserved == true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "dismiss-result",
                                             "label": "Done",
                                             "label_i18n": "dashboard.position.done",
                                             "visibleIf": "($state.positionReview.operation.status == 'succeeded' || $state.positionReview.operation.status == 'failed' || $state.positionReview.operation.status == 'cancelled') && $state.positionObserved == true"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.application_id == $state.positionApplicationId && $state.positionReview.operation.status == 'planned' && !$state.positionMayHaveRun && ($state.positionReview.operation.kind == 'install' || $state.positionReview.operation.kind == 'update') && (!$state.positionReview.operation.plan.permission_review.approval_required || $state.positionPermissionApproved == true) && ($state.positionPlanIntent != 'select-release' || ($state.positionReview.operation.plan.release_digest == $state.positionPlanArgs.release_digest && $state.positionReview.operation.kind == $state.positionPlanArgs.kind && $state.positionReview.operation.idempotency_key == $state.positionIntentKey && $state.positionReview.operation.expected_revision == $state.positionPlanArgs.expected_revision))",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.application_id == $state.positionApplicationId && $state.positionReview.operation.status == 'planned' && !$state.positionMayHaveRun && ($state.positionReview.operation.kind == 'install' || $state.positionReview.operation.kind == 'update') && (!$state.positionReview.operation.plan.permission_review.approval_required || $state.positionPermissionApproved == true) && ($state.positionPlanIntent != 'select-release' || ($state.positionReview.operation.plan.release_digest == $state.positionPlanArgs.release_digest && $state.positionReview.operation.kind == $state.positionPlanArgs.kind && $state.positionReview.operation.idempotency_key == $state.positionIntentKey && $state.positionReview.operation.expected_revision == $state.positionPlanArgs.expected_revision))) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)) && !$state.positionRequestPending && !($state.positionReview.operation.plan.can_apply == false || $state.positionReview.operation.plan.conflicts.length > 0)",
                                             "id": "confirm-install-position",
                                             "kind": "primary",
                                             "label": "Confirm",
@@ -9294,7 +9765,7 @@
                                             "visibleIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionReview.operation.application_id == $state.positionApplicationId && $state.positionReview.operation.status == 'planned' && !$state.positionMayHaveRun && ($state.positionReview.operation.kind == 'install' || $state.positionReview.operation.kind == 'update') && (!$state.positionReview.operation.plan.permission_review.approval_required || $state.positionPermissionApproved == true) && ($state.positionPlanIntent != 'select-release' || ($state.positionReview.operation.plan.release_digest == $state.positionPlanArgs.release_digest && $state.positionReview.operation.kind == $state.positionPlanArgs.kind && $state.positionReview.operation.idempotency_key == $state.positionIntentKey && $state.positionReview.operation.expected_revision == $state.positionPlanArgs.expected_revision))"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "close",
                                             "kind": "secondary",
                                             "label": "Close",
@@ -9306,52 +9777,59 @@
                                             "kind": "primary",
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
-                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'remove_beta' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id"
+                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'remove_beta' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
+                                            "enabledIf": "((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
                                             "id": "retry-plan-renew_beta",
                                             "kind": "primary",
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
-                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'renew_beta' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id"
+                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'renew_beta' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
+                                            "enabledIf": "((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
                                             "id": "retry-plan-restore_stable",
                                             "kind": "primary",
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
-                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'restore_stable' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id"
+                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'restore_stable' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
+                                            "enabledIf": "((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
                                             "id": "retry-plan-switch-runtime",
                                             "kind": "primary",
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
-                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'switch-runtime' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id"
+                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'switch-runtime' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
+                                            "enabledIf": "((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
                                             "id": "retry-plan-update",
                                             "kind": "primary",
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
-                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'update' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id"
+                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'update' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
+                                            "enabledIf": "((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
                                             "id": "retry-plan-switch-runtime-candidate",
                                             "kind": "primary",
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
-                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'switch-runtime-candidate' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id"
+                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'switch-runtime-candidate' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
+                                            "enabledIf": "((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
                                             "id": "retry-plan-switch-public",
                                             "kind": "primary",
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
-                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'switch-public' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id"
+                                            "visibleIf": "$state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'switch-public' && $state.positionApplicationId == $state.selectedApplicationId && !$state.positionReview.operation.operation_id",
+                                            "enabledIf": "((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "select-release",
                                             "kind": "secondary",
                                             "label": "Select release",
@@ -9359,7 +9837,7 @@
                                             "visibleIf": "($state.positionRow.id == 'public_beta' || $state.positionRow.id == 'public_stable') && $state.positionRow.actions.select_release.eligible == true && $state.positionRow.actions.select_release.tool_id == 'applications.list_releases' && !$state.releaseSelectorOpen && !$state.positionReview.operation.operation_id"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && $state.releaseSelectorOpen == true && $state.selectedPublicRelease.application_id == $state.positionApplicationId && $state.selectedPublicRelease.release_digest && $state.selectedPublicRelease.available == true && (($state.positionRow.id == 'public_beta' && $state.selectedPublicRelease.update_track == 'prerelease') || ($state.positionRow.id == 'public_stable' && $state.selectedPublicRelease.update_track == 'stable')) && ($state.selectedPublicRelease.kind == 'install' || $state.selectedPublicRelease.kind == 'update')",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && $state.releaseSelectorOpen == true && $state.selectedPublicRelease.application_id == $state.positionApplicationId && $state.selectedPublicRelease.release_digest && $state.selectedPublicRelease.available == true && (($state.positionRow.id == 'public_beta' && $state.selectedPublicRelease.update_track == 'prerelease') || ($state.positionRow.id == 'public_stable' && $state.selectedPublicRelease.update_track == 'stable')) && ($state.selectedPublicRelease.kind == 'install' || $state.selectedPublicRelease.kind == 'update')) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "review-selected-release",
                                             "kind": "primary",
                                             "label": "Review installation",
@@ -9371,10 +9849,11 @@
                                             "kind": "primary",
                                             "label": "Check plan",
                                             "label_i18n": "dashboard.position.check-plan",
-                                            "visibleIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'select-release' && !$state.positionReview.operation.operation_id"
+                                            "visibleIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionPlanning == true && $state.positionIntentKey && $state.positionPlanIntent == 'select-release' && !$state.positionReview.operation.operation_id",
+                                            "enabledIf": "((((true) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.publish_initial_stable.eligible == true && $state.positionRow.actions.publish_initial_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.publish_initial_stable.eligible == true && $state.positionRow.actions.publish_initial_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "publish_initial_stable",
                                             "kind": "secondary",
                                             "label": "Publish Stable",
@@ -9382,7 +9861,7 @@
                                             "visibleIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.publish_initial_stable.eligible == true && $state.positionRow.actions.publish_initial_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.publish_beta.eligible == true && $state.positionRow.actions.publish_beta.tool_id == 'applications.development.publish_prerelease' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.publish_beta.eligible == true && $state.positionRow.actions.publish_beta.tool_id == 'applications.development.publish_prerelease' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "publish_beta",
                                             "kind": "secondary",
                                             "label": "Publish Beta",
@@ -9390,12 +9869,27 @@
                                             "visibleIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.publish_beta.eligible == true && $state.positionRow.actions.publish_beta.tool_id == 'applications.development.publish_prerelease' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey"
                                         },
                                         {
-                                            "enabledIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.promote_public_stable.eligible == true && $state.positionRow.actions.promote_public_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey",
+                                            "enabledIf": "(((($state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.promote_public_stable.eligible == true && $state.positionRow.actions.promote_public_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending",
                                             "id": "promote_public_stable",
                                             "kind": "secondary",
                                             "label": "Publish as Stable",
                                             "label_i18n": "dashboard.publication.promote_public_stable",
                                             "visibleIf": "$state.positionApplicationId && $state.positionApplicationId == $state.selectedApplicationId && $state.detailApplicationId == $state.selectedApplicationId && $state.positionRow.actions.promote_public_stable.eligible == true && $state.positionRow.actions.promote_public_stable.tool_id == 'applications.development.publish_to_registry' && !$state.positionPlanning && !$state.positionMayHaveRun && !$state.positionReview.operation.operation_id && !$state.publicationMayHaveRun && !$state.publicationIntentKey"
+                                        },
+                                        {
+                                            "id": "retry-plan-repair",
+                                            "label": "Check restoration plan",
+                                            "label_i18n": "dashboard.runtime.operation",
+                                            "visibleIf": "$state.positionPlanIntent == 'repair' && $state.positionPlanning && !$state.positionReview.operation.operation_id",
+                                            "enabledIf": "((!$state.positionRequestPending) && !$state.positionRequestPending) && !$state.positionRequestPending"
+                                        },
+                                        {
+                                            "id": "component-details",
+                                            "label": "Component details",
+                                            "label_i18n": "dashboard.runtime.components",
+                                            "icon": "information-circle-outline",
+                                            "visibleIf": "$state.positionReview.operation.operation_id",
+                                            "enabledIf": "(true) && !$state.positionRequestPending"
                                         }
                                     ],
                                     "variant": "autoOverflow"
@@ -10255,7 +10749,7 @@
                 }
             }
         },
-        "version": "0.1.89",
+        "version": "0.1.90",
         "manifest": "webui.json"
     },
     "generated_by": "builder_skill"

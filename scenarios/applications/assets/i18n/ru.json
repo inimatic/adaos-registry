@@ -334,5 +334,21 @@
   "applications.delivery.incoming": "Digest нового контракта",
   "applications.delivery.existing_ops": "Установленные операции",
   "applications.delivery.incoming_ops": "Новые операции",
-  "applications.delivery.contract_help": "Установленный релиз остаётся доступным. Два разных контракта используют одну идентичность и версию. Издателю нужно переиспользовать исходный контракт либо выпустить контракт с другой идентичностью или версией. Сообщить о проблеме можно через Dev tickets выше."
+  "applications.delivery.contract_help": "Установленный релиз остаётся доступным. Два разных контракта используют одну идентичность и версию. Издателю нужно переиспользовать исходный контракт либо выпустить контракт с другой идентичностью или версией. Сообщить о проблеме можно через Dev tickets выше.",
+  "dashboard.runtime.installed": "Установлено",
+  "dashboard.runtime.selected": "Используется",
+  "dashboard.runtime.health": "Работа приложения",
+  "dashboard.runtime.components": "Компоненты приложения",
+  "dashboard.runtime.required": "Требуется",
+  "dashboard.runtime.active": "Активно",
+  "dashboard.runtime.restore": "Восстановить установленный релиз",
+  "dashboard.runtime.operation": "Проверить операцию",
+  "dashboard.runtime.checking": "Проверяем запрос",
+  "dashboard.runtime.waiting": "Ожидаем ответ сервера",
+  "dashboard.runtime.conflict": "Общий компонент уже используется в другой версии. Нужна совместимая редакция приложения.",
+  "dashboard.runtime.used_by": "Использует приложение",
+  "dashboard.health.shared_component_changed": "Общий компонент обновлён другим приложением. Нужна совместимая редакция; состав и версии доступны в деталях.",
+  "dashboard.health.component_not_running": "Обязательный компонент не запущен. Проверьте размещение или восстановите установленный релиз.",
+  "dashboard.health.identity_unverified": "Идентичность установленных компонентов не подтверждена. Проверьте размещение перед изменениями.",
+  "action.mcp.transport_unavailable": "Соединение прервано. Результат запроса не подтверждён. Проверьте его статус перед повторной отправкой изменений."
 }

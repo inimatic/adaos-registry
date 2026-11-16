@@ -568,5 +568,21 @@
   "applications.delivery.incoming": "Incoming digest",
   "applications.delivery.existing_ops": "Installed operations",
   "applications.delivery.incoming_ops": "Incoming operations",
-  "applications.delivery.contract_help": "The installed release remains available. Two different contracts use the same identity and version. The publisher must reuse the original contract or publish a distinct identity or version. Open Dev tickets above to report this issue."
+  "applications.delivery.contract_help": "The installed release remains available. Two different contracts use the same identity and version. The publisher must reuse the original contract or publish a distinct identity or version. Open Dev tickets above to report this issue.",
+  "dashboard.runtime.installed": "Installed",
+  "dashboard.runtime.selected": "In use",
+  "dashboard.runtime.health": "Runtime",
+  "dashboard.runtime.components": "Runtime components",
+  "dashboard.runtime.required": "Required",
+  "dashboard.runtime.active": "Active",
+  "dashboard.runtime.restore": "Restore installed release",
+  "dashboard.runtime.operation": "Review operation",
+  "dashboard.runtime.checking": "Checking request",
+  "dashboard.runtime.waiting": "Waiting for the server",
+  "dashboard.runtime.conflict": "A shared component is already used with another version. A compatible release is required.",
+  "dashboard.runtime.used_by": "Used by",
+  "dashboard.health.shared_component_changed": "A shared component was updated by another Application. A compatible release is required; inspect the components in Details.",
+  "dashboard.health.component_not_running": "A required component is not running. Inspect runtime placement or review restoring the installed release.",
+  "dashboard.health.identity_unverified": "The installed component identities could not be verified. Inspect runtime placement before making changes.",
+  "action.mcp.transport_unavailable": "Connection interrupted. The request result could not be confirmed. Check its status before submitting changes again."
 }
