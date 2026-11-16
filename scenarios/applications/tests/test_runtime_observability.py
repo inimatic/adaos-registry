@@ -16,6 +16,9 @@ def find(x,identity):
 def test_header_preserves_installed_and_selected_version_independently_of_public_position():
     fields={f['path'] for f in W['application-header']['inputs']['fields']}
     assert {'dashboard.runtime.installed_version','dashboard.runtime.selected_version'}<=fields
+def test_runtime_commands_use_the_existing_adaptive_toolbar():
+    assert W['dashboard-runtime-actions']['inputs']['variant']=='autoOverflow'
+    assert W['dashboard-runtime-actions']['inputs']['compactIconOnly'] is True
 def test_operation_check_opens_progress_surface_before_transport_and_retains_receipt():
     actions=W['dashboard-runtime-actions']['actions']
     selected=[a for a in actions if a['on']=='click:operation']
