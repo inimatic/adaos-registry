@@ -23,7 +23,15 @@
       "application_revision": 3,
       "stable_release_digest": "sha256:3153bba9825c94608490e67d116c10e3f6cb50a962d18ffc335c85fe94d052f5",
       "release_key": "applications@sha256:3153bba9825c94608490e67d116c10e3f6cb50a962d18ffc335c85fe94d052f5",
-      "projection_digest": "sha256:1403bd843af918026df08b4efe125629731fa89465ff36cf18ca3c906f0dc842"
+      "projection_digest": "sha256:1403bd843af918026df08b4efe125629731fa89465ff36cf18ca3c906f0dc842",
+      "prerelease": {
+        "application_id": "applications",
+        "publisher_ref": "subnet:sn_6acf0c01",
+        "application_revision": 3,
+        "prerelease_release_digest": "sha256:b581b8cce7967da38a21289cc7cfb70fc5b02b87c6b68b8e1245a2a0b18e94e7",
+        "release_key": "applications@sha256:b581b8cce7967da38a21289cc7cfb70fc5b02b87c6b68b8e1245a2a0b18e94e7:prerelease",
+        "projection_digest": "sha256:c5f2ad3f8388238bd723c8f9fe99860c1dd3b97ea2bb468eccb5a2c34277aa83"
+      }
     },
     "web_desktop": {
       "application_id": "web_desktop",
@@ -946,7 +954,15 @@
       "release_digest": "sha256:3153bba9825c94608490e67d116c10e3f6cb50a962d18ffc335c85fe94d052f5",
       "path": "semantic/catalog/releases/applications/3153bba9825c94608490e67d116c10e3f6cb50a962d18ffc335c85fe94d052f5.json",
       "projection_digest": "sha256:1403bd843af918026df08b4efe125629731fa89465ff36cf18ca3c906f0dc842"
+    },
+    "applications@sha256:b581b8cce7967da38a21289cc7cfb70fc5b02b87c6b68b8e1245a2a0b18e94e7:prerelease": {
+      "application_id": "applications",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.66",
+      "release_digest": "sha256:b581b8cce7967da38a21289cc7cfb70fc5b02b87c6b68b8e1245a2a0b18e94e7",
+      "path": "semantic/catalog/releases/applications/b581b8cce7967da38a21289cc7cfb70fc5b02b87c6b68b8e1245a2a0b18e94e7.prerelease.json",
+      "projection_digest": "sha256:c5f2ad3f8388238bd723c8f9fe99860c1dd3b97ea2bb468eccb5a2c34277aa83"
     }
   },
-  "index_digest": "sha256:01b097f5e1f52684f3e9007340d9e78fb6912de90d3a589ff2a413163ae299d4"
+  "index_digest": "sha256:7585f59d5324d2759746692fba6eda2caf0f02237ce83ce0c8b347d6f75e2f59"
 }
