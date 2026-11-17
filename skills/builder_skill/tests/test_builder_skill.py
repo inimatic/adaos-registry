@@ -19196,7 +19196,7 @@ def test_change_intake_honors_automation_only_directive_for_ambiguous_clauses() 
     )
 
 
-def test_chat_owns_single_sync_update_result_emit(monkeypatch) -> None:
+def test_chat_keeps_update_result_emission_owned_by_core(monkeypatch) -> None:
     skill = _load_module()
     session = {"scenario_id": "builder", "artifact_root": "/dev/scenarios/builder"}
     binding = {"runtime_scenario_id": "builder", "dev_webspace_id": "desktop-dev"}
@@ -19213,11 +19213,11 @@ def test_chat_owns_single_sync_update_result_emit(monkeypatch) -> None:
         "get_state",
         lambda *_args: {"governed": {"state": "published"}},
     )
-    monkeypatch.setattr(
-        skill,
-        "_safe_emit_chat",
-        lambda text, **_kwargs: emitted.append(str(text)),
-    )
+    def emit(text, **kwargs):
+        if kwargs.get("from_", "hub") == "hub":
+            emitted.append(str(text))
+        return True  # The current ingress contract requires a persisted user turn.
+    monkeypatch.setattr(skill, "_safe_emit_chat", emit)
 
     def _update(**kwargs):
         if skill._should_emit_api_tool_chat(kwargs["_meta"]):
@@ -19233,7 +19233,9 @@ def test_chat_owns_single_sync_update_result_emit(monkeypatch) -> None:
     )
 
     assert result["status"] == "llm_repaired"
-    assert emitted == ["Updated once."]
+    assert emitted == []
+    assert result["message"] == "Updated once."
+    assert result["chat_emit"]["mode"] == "core_materialization"
 
 
 
@@ -19266,8 +19268,8 @@ def test_explicit_tool_confirmation_is_discoverable_and_uses_the_same_identity_g
 
 def test_compact_provider_outputs_match_the_discoverable_tool_manifest():
     from adaos.services.artifact_pipeline.cbs_authoring import compile_cbs_provider_files
-    names = ("skill.yaml", "handlers/main.py", "contracts/provider.cbs.yaml",
-        "contracts/capability.contract.json", "contracts/binding.definition.json")
+    # Generated contracts are compiled from compact authoring, not source files.
+    names = ("skill.yaml", "handlers/main.py", "contracts/provider.cbs.yaml")
     compiled = compile_cbs_provider_files({name: (SKILL_ROOT / name).read_bytes() for name in names},
         kind="skill", allow_generated_outputs=True)
     operation = next(item for item in compiled.capability.to_dict()["operations"] if item["operation_id"] == "create_application_draft")
@@ -19305,9 +19307,12 @@ def test_safe_emit_chat_does_not_wait_for_stuck_append(monkeypatch) -> None:
     monkeypatch.setattr(io_out, "chat_append", _slow_chat_append)
 
     started = time.perf_counter()
-    skill._safe_emit_chat("hello", webspace_id="desktop")
+    acknowledged = skill._safe_emit_chat(
+        "hello", webspace_id="desktop", _meta={"message_id": "test-legacy-actions"},
+        actions=[{"id": "confirm", "label": "Confirm"}])
     elapsed = time.perf_counter() - started
 
     assert elapsed < 0.5
-    assert calls
+    assert calls == ["hello"]
+    assert acknowledged is False  # A timeout must never manufacture a write receipt.
 
