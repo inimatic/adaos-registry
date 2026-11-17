@@ -218,6 +218,7 @@
               ]
             },
             {
+
               "id": "media-indexer-directory",
               "type": "input.text",
               "area": "main",
@@ -280,6 +281,11 @@
                     "id": "scan_selected",
                     "label": "Scan directory",
                     "icon": "scan-outline"
+                  },
+                  {
+                    "id": "view_library",
+                    "label": "Open library",
+                    "icon": "albums-outline"
                   }
                 ]
               },
@@ -308,6 +314,13 @@
                       "scope": "node",
                       "timeout_ms": 600000
                     }
+                  }
+                },
+                {
+                  "on": "click:view_library",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "media_indexer_library_modal"
                   }
                 }
               ]
@@ -563,6 +576,7 @@
         "implements": [
           "media_indexer_skill.media_indexer_modal"
         ]
+
       }
     },
     "widgets": {}
@@ -654,6 +668,7 @@
           ]
         }
       },
+
       "library": [],
       "results": []
     }

@@ -16,8 +16,13 @@ natural-language search across videos, audio files, and images.
   operation status. The skill republishes the last operation on
   `webio.stream.snapshot.requested`.
 - Private durable settings live in skill memory under `media_indexer.settings`.
-- The FAISS index is a derived cache stored under the skill runtime data
-  directory, with metadata mirrored in skill memory under `media_indexer.index`.
+- Durable metadata lives in the skill runtime DB under
+  `data/db/media_indexer/manifest.json` and `data/db/media_indexer/library.json`.
+  Library records include SHA-256 fingerprints, file paths, extracted technical
+  metadata, NER fields, enrichment payloads, and index text.
+- The FAISS index is a derived cache stored under `data/internal/media_indexer/faiss`.
+  It can be rebuilt from the library and source files; its summary is mirrored
+  in skill memory under `media_indexer.index`.
 
 ## Model Storage
 
