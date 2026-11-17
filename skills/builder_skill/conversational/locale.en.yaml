@@ -11,3 +11,11 @@ messages:
   builder_trial_accepted.summary: Builder trial accepted for publication.
   builder_publication_started.summary: Builder publication started.
   builder_repair_no_match.summary: Please rephrase the Builder workflow request.
+  builder_output_routes.prompt: Choose one route for future outputs, or disable external
+    outputs.
+  builder_output_routes.enable: Enable {transport} ({route_id})
+  builder_output_routes.disable: Disable external outputs
+  builder_output_routes_read.summary: Available Builder output routes.
+  builder_output_routes_read.label: Show Builder output routes
+  builder_output_routes_select.summary: Choose a route or disable external outputs.
+  builder_output_routes_select.label: Choose Builder output routes

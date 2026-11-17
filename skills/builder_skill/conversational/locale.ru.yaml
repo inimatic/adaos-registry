@@ -11,3 +11,11 @@ messages:
   builder_trial_accepted.summary: Пробный запуск Builder принят для публикации.
   builder_publication_started.summary: Публикация Builder начата.
   builder_repair_no_match.summary: Переформулируйте workflow-запрос к Builder.
+  builder_output_routes.prompt: Выберите маршрут будущих ответов или отключите внешние
+    ответы.
+  builder_output_routes.enable: Включить {transport} ({route_id})
+  builder_output_routes.disable: Отключить внешние ответы
+  builder_output_routes_read.summary: Доступные маршруты ответов Builder.
+  builder_output_routes_read.label: Покажи маршруты ответов Builder
+  builder_output_routes_select.summary: Выберите маршрут или отключите внешние ответы.
+  builder_output_routes_select.label: Выбери маршруты ответов Builder

@@ -193,3 +193,51 @@ matchers:
     source: authored
     provenance:
       source: builder_skill
+  - id: builder_output_routes_read.matcher.en.1
+    kind: regex
+    intent_id: builder_output_routes_read
+    locale: en
+    pattern: ^Show Builder output routes$
+    flags:
+    - ignore_case
+    - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_output_routes_read.matcher.ru.1
+    kind: regex
+    intent_id: builder_output_routes_read
+    locale: ru
+    pattern: ^Покажи маршруты ответов Builder$
+    flags:
+    - ignore_case
+    - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_output_routes_select.matcher.en.1
+    kind: regex
+    intent_id: builder_output_routes_select
+    locale: en
+    pattern: ^Choose Builder output routes$
+    flags:
+    - ignore_case
+    - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_output_routes_select.matcher.ru.1
+    kind: regex
+    intent_id: builder_output_routes_select
+    locale: ru
+    pattern: ^Покажи маршруты ответов Builder$
+    flags:
+    - ignore_case
+    - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill

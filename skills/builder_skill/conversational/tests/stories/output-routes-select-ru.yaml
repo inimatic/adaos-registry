@@ -1,0 +1,47 @@
+schema: adaos.conversational.story.v1
+id: builder_output_routes_select.ru
+title: Выбери маршруты ответов Builder
+story_kind: dialog
+locale: ru
+channel: web
+actor:
+  id: user:local
+  permissions: []
+  roles:
+  - registered
+steps:
+- user: Выбери маршруты ответов Builder
+  given:
+    proposal:
+      kind: skill_invocation
+      intent_id: builder_output_routes_select
+      command: null
+      skill_id: builder_skill
+      operation_id: request_output_routes
+      arguments: {}
+      confidence: 0.99
+      action_policy:
+        schema: adaos.conversation.action_policy.v1
+        risk_class: local_reversible
+        side_effect: reversible
+        confirmation: none
+    event: null
+    skill_result: null
+    output_ref: builder_output_routes_select
+  expect:
+    proposal:
+      kind: skill_invocation
+      command: null
+      confidence_at_least: 0.99
+    output:
+      kind: result
+      output_ref: builder_output_routes_select
+      summary: Choose a route or disable external outputs.
+      actions: []
+      next_expected_input: none
+    command: null
+    reason_code: null
+    state: null
+    transition_id: null
+start: null
+workflow_type: null
