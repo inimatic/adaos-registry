@@ -100,6 +100,79 @@ class MediaCenterRepository:
         self.db_path = Path(db_path) if db_path is not None else default_db_path()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.ensure_schema()
+        self._ensure_declared_preview_fixture()
+
+    def _ensure_declared_preview_fixture(self) -> None:
+        """Seed only the explicit Builder fixture profile, once per data root."""
+
+        try:
+            from adaos.sdk.data.preview_binding import preview_data_binding
+
+            binding = preview_data_binding() or {}
+        except Exception:
+            return
+        if str(binding.get("source_ref") or "") != "fixture:media_center:demo-v1":
+            return
+        with self.connect() as connection:
+            seeded = connection.execute(
+                "SELECT value FROM meta WHERE key='builder_fixture_revision'"
+            ).fetchone()
+            if seeded and str(seeded[0]) == "demo-v1":
+                return
+            count = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM catalog_items WHERE missing=0"
+                ).fetchone()[0]
+            )
+        if count == 0:
+            timestamp = "2026-11-01T12:00:00+00:00"
+            samples = [
+                ("fixture-video-1", "Aurora Station", "video/mp4", "Movies/Science Fiction", 1080),
+                ("fixture-video-2", "The Quiet Harbor", "video/mp4", "Movies/Drama", 2160),
+                ("fixture-series-1", "Northern Signals S01E01", "video/mp4", "Series/Northern Signals", 1080),
+                ("fixture-series-2", "Northern Signals S01E02", "video/mp4", "Series/Northern Signals", 1080),
+                ("fixture-audio-1", "Glass City", "audio/flac", "Music/Example Ensemble", 0),
+                ("fixture-audio-2", "Morning Lines", "audio/flac", "Music/Example Ensemble", 0),
+                ("fixture-book-1", "A Short History of Light", "audio/mpeg", "Audiobooks/Science", 0),
+                ("fixture-video-3", "Open Source Documentary", "video/webm", "Documentaries/Technology", 720),
+            ]
+            resources = []
+            for index, (resource_id, title, mime_type, folder, height) in enumerate(samples):
+                extension = ".flac" if mime_type == "audio/flac" else ".mp3" if mime_type == "audio/mpeg" else ".webm" if mime_type == "video/webm" else ".mp4"
+                name = f"{title.replace(' ', '-')}{extension}"
+                resources.append(
+                    {
+                        "schema": "adaos.media.resource.v1",
+                        "source": "builder_fixture",
+                        "id": resource_id,
+                        "resource_id": resource_id,
+                        "name": name,
+                        "title": title,
+                        "mime_type": mime_type,
+                        "size_bytes": 10_000_000 + index * 1_000_000,
+                        "modified_at": timestamp,
+                        "source_path": f"/fixture/{folder}/{name}",
+                        "metadata": {
+                            "folder_path": folder,
+                            "folder_segments": folder.split("/"),
+                            "technical": {
+                                "codec": "flac" if mime_type == "audio/flac" else "h264",
+                                "height": height,
+                            },
+                            "tags": ["builder-fixture", "demo"],
+                        },
+                    }
+                )
+            self.scan_resources(
+                resources,
+                source="builder_fixture",
+                mark_missing=False,
+            )
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO meta(key,value) VALUES('builder_fixture_revision','demo-v1')"
+            )
+            connection.commit()
 
     def connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(

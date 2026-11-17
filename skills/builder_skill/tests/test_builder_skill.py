@@ -1163,6 +1163,45 @@ def test_change_intake_splits_user_remarks_and_routes_each_lane() -> None:
     assert all(item["acceptance_criteria"] for item in issues)
 
 
+def test_change_intake_routes_russian_project_and_data_work_to_automation() -> None:
+    skill = _load_module()
+    issues = skill._builder_change_issues(
+        "Перенеси кнопку в правую панель.\n"
+        "Добавь в project.yaml профиль demo-fixture и write_policy none.\n"
+        "Реализуй в media_center_skill воспроизводимую фикстуру и проверь Alpha.",
+        change_id="builder_change_project_data",
+    )
+
+    assert [item["lane"] for item in issues] == [
+        "prototype",
+        "automation",
+        "automation",
+    ]
+    assert "Prototype visibly" in issues[0]["acceptance_criteria"][0]
+    assert all(
+        "implementation and its tests" in item["acceptance_criteria"][0]
+        for item in issues[1:]
+    )
+
+
+def test_change_intake_honors_automation_only_directive_for_ambiguous_clauses() -> None:
+    skill = _load_module()
+    issues = skill._builder_change_issues(
+        "Every requirement below is implementation work for Automation.\n"
+        "UI 001 has already been accepted.\n"
+        "Keep the current layout.\n"
+        "Implement the project data profiles and tests.",
+        change_id="builder_change_automation_only",
+    )
+
+    assert issues
+    assert {item["lane"] for item in issues} == {"automation"}
+    assert all(
+        "implementation and its tests" in item["acceptance_criteria"][0]
+        for item in issues
+    )
+
+
 def test_change_intake_appends_followup_to_active_change_set(monkeypatch) -> None:
     skill = _load_module()
     transitions: list[tuple[str, dict]] = []

@@ -4525,6 +4525,13 @@
                                             "label": "Утверждённый implementation brief",
                                             "required": true,
                                             "label_i18n": "builder.text.approved.implementation.brief"
+                                        },
+                                        {
+                                            "id": "confirmed_technical_application_id",
+                                            "type": "text",
+                                            "label": "Technical Application ID",
+                                            "required": true,
+                                            "help": "Enter the exact technical ID shown for the selected Application."
                                         }
                                     ],
                                     "submitLabel_i18n": "builder.text.start"
@@ -4536,6 +4543,7 @@
                                         "target": "builder_sdk_control_skill.start_automation",
                                         "params": {
                                             "implementation_brief": "$event.values.implementation_brief",
+                                            "confirmed_technical_application_id": "$event.values.confirmed_technical_application_id",
                                             "object_type": "$state.selectedProjectKind",
                                             "object_id": "$state.selectedProjectId",
                                             "_meta": {

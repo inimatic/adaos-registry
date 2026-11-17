@@ -10947,60 +10947,34 @@ def _active_workflow_change_id(
 
 
 _PROTOTYPE_REQUEST_MARKERS = (
-    "ui",
-    "ux",
-    "interface",
-    "layout",
-    "screen",
-    "button",
-    "field",
-    "form",
-    "table",
-    "list",
-    "card",
-    "panel",
-    "modal",
-    "drawer",
-    "label",
-    "title",
-    "интерф",
-    "экран",
-    "кноп",
-    "поле",
-    "форм",
-    "таблиц",
-    "спис",
-    "карточ",
-    "панел",
-    "окно",
-    "назван",
-    "текст",
-    "отступ",
-    "размер",
-    "скры",
-    "показ",
-    "перестав",
-    "раздел",
+    "ui", "ux", "interface", "layout", "screen", "button", "field", "form",
+    "table", "list", "card", "panel", "modal", "drawer", "label", "title",
+    "\u0438\u043d\u0442\u0435\u0440\u0444", "\u044d\u043a\u0440\u0430\u043d", "\u043a\u043d\u043e\u043f", "\u043f\u043e\u043b\u0435", "\u0444\u043e\u0440\u043c", "\u0442\u0430\u0431\u043b\u0438\u0446",
+    "\u0441\u043f\u0438\u0441", "\u043a\u0430\u0440\u0442\u043e\u0447", "\u043f\u0430\u043d\u0435\u043b", "\u043e\u043a\u043d\u043e", "\u043d\u0430\u0437\u0432\u0430\u043d", "\u0442\u0435\u043a\u0441\u0442", "\u043e\u0442\u0441\u0442\u0443\u043f",
+    "\u0440\u0430\u0437\u043c\u0435\u0440", "\u0441\u043a\u0440\u044b", "\u043f\u043e\u043a\u0430\u0437", "\u043f\u0435\u0440\u0435\u0441\u0442\u0430\u0432", "\u0440\u0430\u0437\u0434\u0435\u043b",
 )
 _AUTOMATION_REQUEST_MARKERS = (
-    "api",
-    "integration",
-    "sync",
-    "persist",
-    "database",
-    "authorization",
-    "authentication",
-    "notification",
-    "payment",
-    "интеграц",
-    "синхрон",
-    "сохран",
-    "баз",
-    "авториз",
-    "уведом",
-    "оплат",
-    "вычисл",
-    "автомат",
+    "api", "integration", "sync", "persist", "database", "authorization",
+    "authentication", "notification", "payment", "\u0438\u043d\u0442\u0435\u0433\u0440\u0430\u0446", "\u0441\u0438\u043d\u0445\u0440\u043e\u043d",
+    "\u0441\u043e\u0445\u0440\u0430\u043d", "\u0431\u0430\u0437", "\u0430\u0432\u0442\u043e\u0440\u0438\u0437", "\u0443\u0432\u0435\u0434\u043e\u043c", "\u043e\u043f\u043b\u0430\u0442", "\u0432\u044b\u0447\u0438\u0441\u043b", "\u0430\u0432\u0442\u043e\u043c\u0430\u0442",
+)
+_IMPLEMENTATION_REQUEST_MARKERS = (
+    "project.yaml", "skill.yaml", "scenario.yaml", "webui.json", "source_ref",
+    "read_policy", "write_policy", "implementation_ref", "schema", "contract",
+    "fixture", "sandbox", "profile", "core", "backend", "runtime", "version",
+    "release", "alpha", "beta", "stable", "automation", "implement", "migration",
+    "test", "\u0440\u0435\u0430\u043b\u0438\u0437", "\u0444\u0438\u043a\u0441\u0442\u0443\u0440", "\u043f\u0440\u043e\u0444\u0438\u043b", "\u043a\u043e\u043d\u0442\u0440\u0430\u043a\u0442", "\u043c\u0438\u0433\u0440\u0430\u0446",
+    "\u0432\u0435\u0440\u0441\u0438", "\u0434\u0430\u043d\u043d", "\u0438\u0441\u0442\u043e\u0447\u043d\u0438\u043a", "\u043f\u0440\u043e\u0432\u0435\u0440",
+)
+_AUTOMATION_ONLY_DIRECTIVES = (
+    "every requirement below is implementation work",
+    "all requirements below are implementation work",
+    "implementation-only",
+    "implementation only",
+    "all requirements are for automation",
+    "every requirement is for automation",
+    "\u0432\u0441\u0435 \u043f\u0443\u043d\u043a\u0442\u044b \u043d\u0438\u0436\u0435 \u044f\u0432\u043b\u044f\u044e\u0442\u0441\u044f implementation",
+    "\u0432\u0441\u0435 \u0442\u0440\u0435\u0431\u043e\u0432\u0430\u043d\u0438\u044f \u0434\u043b\u044f automation",
 )
 
 
@@ -11028,12 +11002,12 @@ def _builder_change_issue_clauses(request_text: str) -> list[str]:
     if not normalized:
         return []
     chunks = re.split(
-        r"(?:\r?\n|;\s+|(?<=[.!?])\s+(?=(?:[-*]\s+|\d+[.)]\s+|[A-ZА-ЯЁ])))",
+        r"(?:\r?\n|;\s+|(?<=[.!?])\s+(?=(?:[-*]\s+|\d+[.)]\s+|[A-Z\u0410-\u042f\u0401])))",
         normalized,
     )
     clauses: list[str] = []
     for chunk in chunks:
-        clause = re.sub(r"^\s*(?:[-*•]+|\d+[.)])\s*", "", chunk).strip()
+        clause = re.sub(r"^\s*(?:[-*\u2022]+|\d+[.)])\s*", "", chunk).strip()
         clause = " ".join(clause.split())
         if clause and clause not in clauses:
             clauses.append(clause)
@@ -11049,6 +11023,12 @@ def _builder_change_issue_lane(clause: str) -> str:
     # reinterpret a definition correction as a visible workflow mock-up.
     if any(marker in lowered for marker in _WORKFLOW_DEFINITION_REQUEST_MARKERS):
         return "automation"
+    # Files, contracts, data bindings, runtime behavior and lifecycle work are
+    # executable obligations even when requested from the Prototype chat.
+    # Check them before visual vocabulary so a mixed clause keeps its
+    # implementation obligation for Automation.
+    if any(marker in lowered for marker in _IMPLEMENTATION_REQUEST_MARKERS):
+        return "automation"
     if any(marker in lowered for marker in _PROTOTYPE_REQUEST_MARKERS):
         return "prototype"
     if any(marker in lowered for marker in _AUTOMATION_REQUEST_MARKERS):
@@ -11056,6 +11036,13 @@ def _builder_change_issue_lane(clause: str) -> str:
     # This classifier runs inside the Prototype conversation. Ambiguous work
     # remains in the safer declarative lane instead of silently starting Codex.
     return "prototype"
+
+
+def _builder_change_default_lane(request_text: str) -> str | None:
+    lowered = " ".join(str(request_text or "").split()).casefold()
+    if any(directive in lowered for directive in _AUTOMATION_ONLY_DIRECTIVES):
+        return "automation"
+    return None
 
 
 def _normalized_change_request(value: Any) -> str:
@@ -11082,8 +11069,9 @@ def _builder_change_issues(
     request_text: str, *, change_id: str
 ) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
+    default_lane = _builder_change_default_lane(request_text)
     for clause in _builder_change_issue_clauses(request_text):
-        lane = _builder_change_issue_lane(clause)
+        lane = default_lane or _builder_change_issue_lane(clause)
         criterion_prefix = (
             "The Prototype visibly and coherently satisfies"
             if lane == "prototype"

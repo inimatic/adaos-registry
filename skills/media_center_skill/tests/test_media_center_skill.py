@@ -38,6 +38,32 @@ from media_center.sync import MediaAgentSyncWorker  # noqa: E402
 from media_center.topology import MediaCenterTopology  # noqa: E402
 
 
+def test_declared_builder_fixture_seeds_an_isolated_representative_catalog(
+    tmp_path: Path,
+) -> None:
+    from adaos.sdk.data.preview_binding import _bind_preview_data_binding
+
+    db_path = tmp_path / "fixture" / "media-center.sqlite3"
+    with _bind_preview_data_binding(
+        {
+            "profile_id": "demo-fixture",
+            "mode": "fixture",
+            "source_ref": "fixture:media_center:demo-v1",
+            "_data_root": str(tmp_path / "fixture"),
+        }
+    ):
+        repository = MediaCenterRepository(db_path)
+        items = repository.list_items(limit=20)
+
+    assert items["total_count"] == 8
+    assert {item["title"] for item in items["items"]} >= {
+        "Aurora Station",
+        "Northern Signals S01E01",
+        "Glass City",
+    }
+    assert all(item["source"] == "builder_fixture" for item in items["items"])
+
+
 _HANDLER_SPEC = importlib.util.spec_from_file_location(
     "media_center_skill_handlers_main", SKILL_ROOT / "handlers" / "main.py"
 )

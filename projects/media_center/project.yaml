@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: media_center
-version: 0.6.119
+version: 0.6.120
 profiles:
 - adaos.media_center.v1
 - adaos.media_center.tv.v1
@@ -124,6 +124,61 @@ compatibility:
   - media_center.local
   - media_center.distributed
   - media_center.presentation
+development:
+  preview_data:
+    default_profile_id: demo-fixture
+    profiles:
+    - schema: adaos.builder.binding_profile.v1
+      profile_id: demo-fixture
+      mode: fixture
+      logical_schema_ref: adaos.media.catalog.v1
+      source_ref: fixture:media_center:demo-v1
+      sensitivity: internal
+      capabilities:
+      - media.catalog
+      read_policy: fixture
+      write_policy: none
+      owner: project:media_center
+      expires_at: null
+      redaction: none
+      implementation_mappings:
+      - logical_ref: media.catalog
+        implementation_ref: skill:media_center_skill:fixture
+        status: fixture_only
+    - schema: adaos.builder.binding_profile.v1
+      profile_id: isolated-sandbox
+      mode: sandbox
+      logical_schema_ref: adaos.media.catalog.v1
+      source_ref: sandbox:media_center:local
+      sensitivity: internal
+      capabilities:
+      - media.catalog
+      read_policy: sandbox
+      write_policy: sandbox
+      owner: project:media_center
+      expires_at: null
+      redaction: policy
+      implementation_mappings:
+      - logical_ref: media.catalog
+        implementation_ref: skill:media_center_skill:sandbox
+        status: mapped
+    - schema: adaos.builder.binding_profile.v1
+      profile_id: local-library-readonly
+      mode: live_readonly
+      logical_schema_ref: adaos.media.catalog.v1
+      source_ref: skill-data:media_center_skill:workspace
+      sensitivity: personal
+      capabilities:
+      - media.catalog
+      read_policy: scoped_live
+      write_policy: none
+      owner: project:media_center
+      expires_at: null
+      redaction: required
+      implementation_mappings:
+      - logical_ref: media.catalog
+        implementation_ref: skill:media_center_skill:workspace
+        status: mapped
 lifecycle:
   uninstall:
     components: remove_if_unreferenced
