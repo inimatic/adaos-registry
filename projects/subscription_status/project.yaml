@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: subscription_status
-version: 0.1.18
+version: 0.1.20
 profiles:
 - adaos.builder.component_project.v1
 components:
@@ -15,7 +15,7 @@ components:
   dependencies: []
 entrypoints:
 - id: subscriptions
-  presentation: subscription_status_app
+  presentation: skill:subscription_status_skill
   default: true
   bindings:
     surface: subscription_status
@@ -63,9 +63,15 @@ permission_profile:
   - id: workspace.write
     purpose: Refresh and persist the local subscription projection and explicit plan-change requests.
     approval_policy: grant_on_install
+  - id: network.egress
+    purpose: Request official ChatGPT sign-in and explicit personal-plan verification through Core AI; credentials remain in Core.
+    approval_policy: grant_on_install
   optional: []
   secrets: []
-  external_providers: []
+  external_providers:
+  - id: openai.chatgpt
+    purpose: Owner-consented sign-in and a short explicit access check through Core AI.
+    credential_custody: core
   llm_model_use: []
   notifications: []
   background_actions: []
@@ -73,5 +79,5 @@ permission_profile:
     collected: [subscription_status, usage_summary, plan_change_request]
     linked_to_user: [subscription_status, plan_change_request]
     retention: The current local entitlement projection and explicit requests are retained.
-    sent_off_device: []
+    sent_off_device: [chatgpt_sign_in, explicit_verification_prompt]
     tracking: false

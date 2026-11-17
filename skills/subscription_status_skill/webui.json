@@ -28,14 +28,6 @@
       "items": [],
       "generated_at": ""
     },
-    "data/subscription_status/codex_applications": {
-      "items": [],
-      "generated_at": ""
-    },
-    "data/subscription_status/codex_iterations": {
-      "items": [],
-      "generated_at": ""
-    },
     "data/subscription_status/plan_change": {
       "value": "none",
       "label": "Plan request",
@@ -128,6 +120,30 @@
         "schema": {
           "id": "subscription_status_modal",
           "title": "Subscription",
+          "autoActions": [
+            {
+              "id": "subscription-initial-status",
+              "intervalMs": 1000,
+              "once": true,
+              "action": {
+                "on": "mount",
+                "type": "callSkill",
+                "target": "subscription_status_skill.get_status",
+                "params": {"webspace_id": "$client.webspaceId", "refresh_root_if_missing": false}
+              }
+            },
+            {
+              "id": "subscription-initial-connection",
+              "intervalMs": 1000,
+              "once": true,
+              "action": {
+                "on": "mount",
+                "type": "callSkill",
+                "target": "subscription_status_skill.chatgpt_status",
+                "params": {"webspace_id": "$client.webspaceId"}
+              }
+            }
+          ],
           "interface": {
             "schema": "adaos.ui.modal.interface.v1",
             "routes": {
@@ -180,19 +196,153 @@
               },
               "actions": [
                 {
-                  "on": "mount",
-                  "type": "callSkill",
-                  "target": "subscription_status_skill.refresh_status",
-                  "params": {
-                    "webspace_id": "$client.webspaceId"
-                  }
-                },
-                {
                   "on": "click:refresh",
                   "type": "callSkill",
                   "target": "subscription_status_skill.refresh_status",
                   "params": {
                     "webspace_id": "$client.webspaceId"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "subscription-chatgpt",
+              "type": "item.details",
+              "area": "main",
+              "title": "Personal ChatGPT · Core connection",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/subscription_ai_connection",
+                "scope": "shared"
+              },
+              "inputs": {
+                "presentation": "section",
+                "fields": [
+                  {
+                    "label": "Connected",
+                    "path": "connected"
+                  },
+                  {
+                    "label": "Plan enabled",
+                    "path": "plan_enabled"
+                  },
+                  {
+                    "label": "Verified inference",
+                    "path": "inference_verified"
+                  },
+                  {
+                    "label": "Pending sign-in",
+                    "path": "pending"
+                  },
+                  {
+                    "label": "Migration available",
+                    "path": "legacy_migration_available"
+                  },
+                  {
+                    "label": "Connection guidance",
+                    "path": "guidance"
+                  },
+                  {
+                    "label": "Error",
+                    "path": "error"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "subscription-chatgpt-actions",
+              "type": "ui.actions",
+              "area": "main",
+              "inputs": {
+                "variant": "adaptiveToolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "status",
+                    "label": "Refresh ChatGPT"
+                  },
+                  {
+                    "id": "connect",
+                    "label": "Continue with ChatGPT ↗"
+                  },
+                  {
+                    "id": "verify",
+                    "label": "Verify access (uses plan)"
+                  },
+                  {
+                    "id": "cancel",
+                    "label": "Cancel sign-in"
+                  },
+                  {
+                    "id": "adopt",
+                    "label": "Move Context Chat connection to Core"
+                  },
+                  {
+                    "id": "disconnect",
+                    "label": "Disconnect ChatGPT for all apps"
+                  },
+                  {
+                    "id": "usage",
+                    "label": "ChatGPT usage ↗"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:status",
+                  "type": "callSkill",
+                  "target": "subscription_status_skill.chatgpt_status",
+                  "params": {
+                    "webspace_id": "$client.webspaceId"
+                  }
+                },
+                {
+                  "on": "click:connect",
+                  "type": "callSkill",
+                  "target": "subscription_status_skill.connect_chatgpt",
+                  "openResultUrl": true,
+                  "resultUrlPath": "url"
+                },
+                {
+                  "on": "click:verify",
+                  "type": "callSkill",
+                  "target": "subscription_status_skill.verify_chatgpt"
+                },
+                {
+                  "on": "click:cancel",
+                  "type": "callSkill",
+                  "target": "subscription_status_skill.cancel_chatgpt_sign_in"
+                },
+                {
+                  "on": "click:adopt",
+                  "type": "callSkill",
+                  "target": "subscription_status_skill.adopt_chatgpt",
+                  "params": {
+                    "confirmed": true
+                  },
+                  "confirmation": {
+                    "message": "Move the existing personal Context Chat connection into Core so Chat and other explicitly selected applications can use it? Chat history stays in Chat.",
+                    "confirmLabel": "Move connection"
+                  }
+                },
+                {
+                  "on": "click:disconnect",
+                  "type": "callSkill",
+                  "target": "subscription_status_skill.disconnect_chatgpt",
+                  "params": {
+                    "confirmed": true
+                  },
+                  "confirmation": {
+                    "message": "Disconnect the shared personal ChatGPT connection for all applications? Local projects and history are preserved.",
+                    "confirmLabel": "Disconnect all apps"
+                  }
+                },
+                {
+                  "on": "click:usage",
+                  "type": "openUrl",
+                  "params": {
+                    "url": "https://chatgpt.com/settings/usage",
+                    "target": "_blank"
                   }
                 }
               ]
@@ -466,56 +616,6 @@
                     "label": "Unpriced runs",
                     "width": "115px"
                   }
-                ]
-              }
-            },
-            {
-              "id": "subscription-status-codex-applications",
-              "type": "ui.table",
-              "area": "main",
-              "title": "Codex by application / 24h",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/subscription_status/codex_applications",
-                "scope": "shared"
-              },
-              "inputs": {
-                "emptyText": "No application-attributed usage receipts",
-                "columns": [
-                  {"key": "application_id", "label": "Application", "width": "220px"},
-                  {"key": "application_type", "label": "Type", "width": "90px"},
-                  {"key": "iteration_count", "label": "Iterations", "width": "85px"},
-                  {"key": "runs", "label": "Calls", "width": "70px"},
-                  {"key": "fresh_input_tokens", "label": "Fresh input", "width": "110px"},
-                  {"key": "cached_input_tokens", "label": "Cached input", "width": "110px"},
-                  {"key": "output_tokens", "label": "Output", "width": "90px"},
-                  {"key": "billable_tokens", "label": "Provider total", "width": "115px"},
-                  {"key": "last_seen_at", "label": "Last seen", "width": "190px"}
-                ]
-              }
-            },
-            {
-              "id": "subscription-status-codex-iterations",
-              "type": "ui.table",
-              "area": "main",
-              "title": "Codex by Builder iteration / 24h",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/subscription_status/codex_iterations",
-                "scope": "shared"
-              },
-              "inputs": {
-                "emptyText": "No iteration-attributed usage receipts",
-                "columns": [
-                  {"key": "application_id", "label": "Application", "width": "220px"},
-                  {"key": "iteration", "label": "Iteration", "width": "85px"},
-                  {"key": "runs", "label": "Calls", "width": "70px"},
-                  {"key": "fresh_input_tokens", "label": "Fresh input", "width": "110px"},
-                  {"key": "cached_input_tokens", "label": "Cached input", "width": "110px"},
-                  {"key": "output_tokens", "label": "Output", "width": "90px"},
-                  {"key": "reasoning_tokens", "label": "Reasoning", "width": "100px"},
-                  {"key": "billable_tokens", "label": "Provider total", "width": "115px"},
-                  {"key": "last_seen_at", "label": "Last seen", "width": "190px"}
                 ]
               }
             },

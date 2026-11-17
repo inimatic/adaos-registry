@@ -36,10 +36,10 @@
     "subscription_status": {
       "application_id": "subscription_status",
       "publisher_ref": "subnet:sn_6acf0c01",
-      "application_revision": 3,
-      "stable_release_digest": "sha256:8510b66f85cf0837766fd7550bb534c9bff38d21962a3b5d3906fdedcda0ff30",
-      "release_key": "subscription_status@sha256:8510b66f85cf0837766fd7550bb534c9bff38d21962a3b5d3906fdedcda0ff30",
-      "projection_digest": "sha256:61fa38de77d751ea53fff5b882d03f7b030378f45e6bd31f72ade7a9c711b64d"
+      "application_revision": 4,
+      "stable_release_digest": "sha256:ac91ef3c4bc91bece7a8e3d43a67cacbc8ed9249079dbce4a57879d254d5f744",
+      "release_key": "subscription_status@sha256:ac91ef3c4bc91bece7a8e3d43a67cacbc8ed9249079dbce4a57879d254d5f744",
+      "projection_digest": "sha256:4662084ec09d27e83d599e4cbcdb7163f117dc3780f1291abc7b6279a22a147a"
     },
     "media_center": {
       "application_id": "media_center",
@@ -970,7 +970,15 @@
       "release_digest": "sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8",
       "path": "semantic/catalog/releases/applications/03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8.json",
       "projection_digest": "sha256:408473fbb997678be0c677d1fcc9bc3010d75b5ce13e77f4d66ede444aff5c19"
+    },
+    "subscription_status@sha256:ac91ef3c4bc91bece7a8e3d43a67cacbc8ed9249079dbce4a57879d254d5f744": {
+      "application_id": "subscription_status",
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "version": "0.1.20",
+      "release_digest": "sha256:ac91ef3c4bc91bece7a8e3d43a67cacbc8ed9249079dbce4a57879d254d5f744",
+      "path": "semantic/catalog/releases/subscription_status/ac91ef3c4bc91bece7a8e3d43a67cacbc8ed9249079dbce4a57879d254d5f744.json",
+      "projection_digest": "sha256:4662084ec09d27e83d599e4cbcdb7163f117dc3780f1291abc7b6279a22a147a"
     }
   },
-  "index_digest": "sha256:43e3969dda679588d6cba490fa3547880a1b31846b0a9621da7bc5cf8fb3fda1"
+  "index_digest": "sha256:a2eae33ca41a570f1a3aa544ed296a914be0461bb61bf552ad2037c7785ff53e"
 }

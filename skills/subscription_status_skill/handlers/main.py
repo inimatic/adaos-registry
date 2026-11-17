@@ -10,6 +10,50 @@ from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import ctx_current_user
 from adaos.sdk.skill_env import skill_state_dir
 from adaos.sdk.subscriptions import project_codex_usage_window
+from adaos.sdk import ai
+
+
+@tool('chatgpt_status')
+def chatgpt_status(webspace_id: str | None = None) -> dict[str, Any]:
+    """Owner-only management; project only non-identifying connection state."""
+    value = ai.status()
+    projection = {key: value.get(key) for key in ('connected', 'plan_enabled', 'pending',
+        'inference_verified', 'legacy_migration_available', 'error')}
+    projection['guidance'] = ('Use an eligible personal ChatGPT plan. Sign in on the computer running AdaOS. '
+        'Only the current AdaOS owner can use this connection; family sharing is not enabled. '
+        'ChatGPT conversations and memory are not imported. Verification uses plan resources. '
+        'Refresh this view after sign-in. No automatic paid fallback.')
+    ctx_current_user.set('subscription_status.ai_connection', projection,
+                         webspace_id=_webspace_id(webspace_id))
+    return {'ok': True, **value}
+
+
+@tool('connect_chatgpt')
+def connect_chatgpt() -> dict[str, Any]:
+    """Return the official sign-in URL; passwords/tokens never enter this app."""
+    return {'ok': True, **ai.connect()}
+
+
+@tool('verify_chatgpt')
+def verify_chatgpt() -> dict[str, Any]:
+    return ai.verify()
+
+
+@tool('cancel_chatgpt_sign_in')
+def cancel_chatgpt_sign_in() -> dict[str, Any]:
+    return ai.cancel_sign_in()
+
+
+@tool('disconnect_chatgpt')
+def disconnect_chatgpt(confirmed: bool = False) -> dict[str, Any]:
+    if confirmed is not True:
+        raise ValueError('Confirm disconnecting ChatGPT for all consuming applications')
+    return ai.disconnect()
+
+
+@tool('adopt_chatgpt')
+def adopt_chatgpt(confirmed: bool = False) -> dict[str, Any]:
+    return ai.adopt_context_chat_connection(confirmed=confirmed)
 
 ROOT_GOVERNED_RESOURCES: tuple[str, ...] = (
     "llm.requests",
@@ -104,9 +148,6 @@ def _write_json_file(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 def _read_plan_change_request() -> dict[str, Any]:
-    # Read projections must remain available before the on-demand runtime has
-    # attached its versioned state root (and in isolated contract tests).  The
-    # request is optional state, so absence is equivalent to no request.
     try:
         path = _plan_change_request_path()
     except Exception:
@@ -364,37 +405,6 @@ def _projection_payload(status: Mapping[str, Any]) -> dict[str, Any]:
                            "cost_status": cost["status"],
                            "estimated_usd": f"{amount:.6f}" if amount is not None else "",
                            "unpriced_runs": cost.get("unpriced_runs")})
-    application_rows = []
-    iteration_rows = []
-    for application in codex["by_application"][:100]:
-        application_id = _text(application.get("application_id")) or "Unattributed"
-        application_rows.append(
-            {
-                **{
-                    key: value
-                    for key, value in application.items()
-                    if key != "iterations"
-                },
-                "application_id": application_id,
-                "application_type": _text(application.get("application_type")) or "legacy",
-                "iteration_count": len(application.get("iterations") or []),
-            }
-        )
-        for iteration in list(application.get("iterations") or [])[:20]:
-            if len(iteration_rows) >= 200:
-                break
-            iteration_rows.append(
-                {
-                    **iteration,
-                    "application_id": application_id,
-                    "application_type": _text(application.get("application_type")) or "legacy",
-                    "iteration": (
-                        iteration.get("builder_iteration")
-                        if iteration.get("builder_iteration") is not None
-                        else "legacy"
-                    ),
-                }
-            )
     return {
         "current": _current_tile(status, rows),
         "usage_arc": _usage_arc(status, rows),
@@ -403,10 +413,6 @@ def _projection_payload(status: Mapping[str, Any]) -> dict[str, Any]:
         "usage_history": {"items": _usage_history_rows(rows), "generated_at": status.get("generated_at")},
         "codex_models": {"items": model_rows, "cost": codex["cost"],
                          "generated_at": status.get("generated_at")},
-        "codex_applications": {"items": application_rows,
-                               "generated_at": status.get("generated_at")},
-        "codex_iterations": {"items": iteration_rows,
-                             "generated_at": status.get("generated_at")},
         "plan_change": _plan_change_projection(status),
         "raw": dict(status),
     }
