@@ -64,7 +64,6 @@ def test_webui_declares_compact_yjs_and_stream_receiver() -> None:
     assert defaults["overview"]["label"] == "Library overview"
     assert defaults["diagnostics"]["label"] == "Model diagnostics"
     assert defaults["diagnostics"]["summary"]["label"] == "Indexed media"
-    assert defaults["library_preview"] == []
     assert defaults["library"] == []
     receiver = webui["webio"]["receivers"]["media_indexer.operations"]
     assert receiver["mode"] == "replace"
@@ -74,15 +73,8 @@ def test_webui_declares_compact_yjs_and_stream_receiver() -> None:
     library_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-library")
     assert library_widget["type"] == "ui.table"
     assert [button["id"] for button in library_widget["inputs"]["buttons"]] == ["play"]
-
     actions_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-controls")
-    assert [button["id"] for button in actions_widget["inputs"]["buttons"]] == ["scan_selected", "view_library"]
-    assert any(action["type"] == "openModal" and action["params"]["modalId"] == "media_indexer_library_modal" for action in actions_widget["actions"])
-    library_schema = webui["registry"]["modals"]["media_indexer_library_modal"]["schema"]
-    library_widget = next(widget for widget in library_schema["widgets"] if widget["id"] == "media-indexer-library-table")
-    assert library_widget["type"] == "ui.table"
-    assert library_widget["inputs"]["pagination"] is True
-    assert library_widget["inputs"]["pageSize"] == 25
+    assert [button["id"] for button in actions_widget["inputs"]["buttons"]] == ["scan_selected"]
     results_widget = next(
         widget
         for widget in schema["widgets"]
@@ -100,6 +92,7 @@ def test_webui_declares_compact_yjs_and_stream_receiver() -> None:
     search_action = query_widget["actions"][0]
     assert search_action["feedback"]["observe"]["path"] == "data/media_indexer/status"
     assert search_action["params"]["_observe"]["path"] == "data/media_indexer/status"
+
 
 
 def test_scanner_finds_supported_media_without_hashing(tmp_path: pathlib.Path) -> None:
