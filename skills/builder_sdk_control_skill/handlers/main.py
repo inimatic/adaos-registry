@@ -1682,6 +1682,7 @@ def get_project(
             "can_prepare_candidate": False,
             "can_decide_candidate": False,
             "can_publish": False,
+            "can_checkpoint": False,
             "can_start_implementation": False,
         }
     state = _context(kind, project_id)
@@ -1796,6 +1797,7 @@ def get_project(
         "can_prepare_candidate": bool(capabilities.get("can_prepare_candidate")),
         "can_decide_candidate": bool(capabilities.get("can_decide_candidate")),
         "can_publish": bool(capabilities.get("can_publish")),
+        "can_checkpoint": bool(capabilities.get("can_checkpoint")),
         "can_start_implementation": bool(
             active_phase == "prototype" and change_gate == "automation" and change_id
         ),
@@ -2663,6 +2665,13 @@ def get_model_settings(object_type: str = DEFAULT_PROJECT_KIND, object_id: str =
             "codex_model": codex.get("model"), "codex_effort": codex.get("reasoning_effort"),
             "codex_provider": codex.get("provider"),
             "execution_ref": f"{execution_kind}:{execution_id}"}
+
+
+@tool("set_prototype_generation_profile", summary="Select an explicit DEV Prototype qualification profile for this project only.", side_effects="local_write")
+def set_prototype_generation_profile(profile: str, object_type: str = DEFAULT_PROJECT_KIND,
+                                     object_id: str = DEFAULT_PROJECT_ID) -> dict[str, Any]:
+    kind, project_id = _execution_identity(*_identity(object_type, object_id))
+    return prototype.configure_generation_profile(kind, project_id, profile=profile)
 
 
 @tool(
@@ -3718,6 +3727,61 @@ def get_preview(
     }
 
 
+@tool(
+    "get_data_profiles",
+    summary="List Project data profiles and the active profile of this Preview Webspace.",
+    side_effects="none",
+)
+def get_data_profiles(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    execution_kind, scenario_id = _execution_identity(kind, project_id)
+    if execution_kind != "scenario":
+        return {
+            "items": [],
+            "profile_id": "",
+            "generation": 0,
+            "status": "unavailable",
+            "error": "selected project has no scenario Preview",
+        }
+    projection = preview.get_data_profile(
+        scenario_id,
+        source_webspace_id=_preview_source_webspace_id(webspace_id, _meta),
+    )
+    return {**projection, "items": list(projection.get("options") or [])}
+
+
+@tool(
+    "select_data_profile",
+    summary="Switch this Webspace Preview to one Project data profile and rematerialize its pinned UI revision.",
+    side_effects="local_write",
+)
+def select_data_profile(
+    profile_id: str,
+    expected_generation: int,
+    confirmed: bool = False,
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    execution_kind, scenario_id = _execution_identity(kind, project_id)
+    if execution_kind != "scenario":
+        raise ValueError("selected project has no scenario Preview")
+    return preview.select_data_profile(
+        scenario_id,
+        profile_id,
+        expected_generation=expected_generation,
+        confirmed=confirmed,
+        source_webspace_id=_preview_source_webspace_id(webspace_id, _meta),
+    )
+
+
 @tool("open_preview", summary="Open the selected application's preview, retaining its chosen revision.", side_effects="ui_navigation")
 def open_preview(
     object_type: str,
@@ -4598,7 +4662,7 @@ def get_lifecycle(
             "canResetPage": bool(cursor), "canPreview": False,
         })
 
-    return [
+    roots = [
         {
             "id": "stage-proto",
             "kind": "stage",
@@ -4622,6 +4686,8 @@ def get_lifecycle(
             "publicationUpdatedAt": publication_updated_at,
         }
     ]
+    runtime = applications.get_lifecycle_for_source(kind, project_id, webspace_id=publication_source_webspace)
+    return workflow.project_release_lineage(roots, lifecycle=runtime, workflow=workflow_projection)
 
 
 @tool(
@@ -5481,13 +5547,21 @@ def _ensure_trial_placement(
     trial_workflow: Mapping[str, Any],
     webspace_id: str | None,
     meta: Mapping[str, Any] | None,
+    beta_data_source: str | None = None,
+    acknowledge_beta_data_reset: bool = False,
 ) -> dict[str, Any]:
     from adaos.sdk.builder.applications import place_local_trial, production_webspace_id
 
     production = production_webspace_id(
         _webspace_id(webspace_id, meta)
     )
-    admitted = place_local_trial(candidate_id, webspace_id=production, actor_ref="builder.candidate")
+    admitted = place_local_trial(
+        candidate_id,
+        webspace_id=production,
+        actor_ref="builder.candidate",
+        beta_data_source=beta_data_source,
+        acknowledge_beta_data_reset=acknowledge_beta_data_reset,
+    )
     trial_activation = admitted["trial_activation"]
     # Runtime refresh can advance Preview selection while the effect runs.
     # Rebase only its projection, never a changed Candidate or delivery decision.
@@ -5909,6 +5983,8 @@ def publish_project(
     confirmed: bool = False,
     approve_permissions: bool = False,
     verification_evidence: Mapping[str, Any] | None = None,
+    beta_data_source: str = "continue_beta",
+    acknowledge_beta_data_reset: bool = False,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -5922,6 +5998,11 @@ def publish_project(
     )
     if bump not in {"major", "minor", "patch"}:
         raise ValueError("bump must be major, minor, or patch")
+    beta_data_source = str(beta_data_source or "").strip().lower().replace("-", "_")
+    if beta_data_source not in {"continue_beta", "stable_snapshot", "empty"}:
+        raise ValueError(
+            "beta_data_source must be continue_beta, stable_snapshot, or empty"
+        )
     workflow_before = workflow.get_state(workflow_kind, workflow_id)
     capabilities = (
         workflow_before.get("capabilities")
@@ -6086,6 +6167,7 @@ def publish_project(
                 trial_workflow=workflow_before,
                 webspace_id=webspace_id,
                 meta=_meta,
+                acknowledge_beta_data_reset=acknowledge_beta_data_reset,
             )
             return {
                 **dict(existing),
@@ -6332,6 +6414,8 @@ def publish_project(
                 trial_workflow=trial_workflow,
                 webspace_id=webspace_id,
                 meta=_meta,
+                beta_data_source=beta_data_source,
+                acknowledge_beta_data_reset=acknowledge_beta_data_reset,
             )
         trial_change_set = (
             trial_workflow.get("change_set")
@@ -6877,6 +6961,20 @@ def get_workbench(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFA
         return {**payload, "view": dict(payload)}
     execution_kind, execution_id = _execution_identity(kind, project_id)
     state = workflow.get_state(execution_kind, execution_id)
+    try:
+        data_profile = preview.get_data_profile(
+            execution_id,
+            source_webspace_id=_preview_source_webspace_id(webspace_id, _meta),
+        ) if execution_kind == "scenario" else {}
+    except Exception as exc:
+        data_profile = {
+            "profile_id": "",
+            "generation": 0,
+            "status": "unavailable",
+            "ready": False,
+            "error": f"{type(exc).__name__}: {exc}",
+            "options": [],
+        }
     change = state.get("change") or state.get("change_set") or {}
     prototype = state.get("prototype") or {}
     implementation = dict(state.get("automation") or {})
@@ -6952,6 +7050,7 @@ def get_workbench(object_type: str = DEFAULT_PROJECT_KIND, object_id: str = DEFA
             "initiator": development.get("initiator_ref"),
             "context_digest": (state.get("context_packet") or {}).get("digest"),
             "source_message_ids": change.get("source_message_ids") or []}
+    payload["data_profile"] = data_profile
     return {**payload, "view": dict(payload)}
 
 
@@ -7153,9 +7252,9 @@ __all__ = [
     "generate_icon", "get_icon_generation",
     "get_clarification", "answer_clarification", "resume_clarification",
     "generate_readme", "get_readme_generation",
-    "get_process_stages",
+    "get_process_stages", "get_data_profiles", "select_data_profile",
     "get_workbench", "get_review", "get_workbench_messages", "append_discussion", "save_specification_delta",
-    "get_codex_options", "get_model_settings", "set_codex_profile",
+    "get_codex_options", "get_model_settings", "set_codex_profile", "set_prototype_generation_profile",
     "get_prototype_model_choices", "read_readme", "save_readme",
     "accept_prototype",
     "add_change_issues",

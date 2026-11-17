@@ -1121,6 +1121,11 @@ def _cumulative_prototype_brief(
     current: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     prior = session.get("accepted_prototype_brief")
+    if isinstance(prior, Mapping) and prior.get("task_contract") and current:
+        # Core's task pipeline admits the new source against the retained
+        # lifecycle ledger before inference. Do not reactivate old requirements
+        # through the legacy union while constructing its preliminary context.
+        return copy.deepcopy(dict(current))
     briefs = [
         value
         for value in (prior, current)
@@ -1228,13 +1233,22 @@ def _builder_llm_model(_meta: Mapping[str, Any] | None = None) -> str | None:
     return _builder_llm_model_from_meta(_meta) or _builder_llm_env_model()
 
 
+def _builder_prompt_state(session: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(session, Mapping):
+        return {}
+    target = _chat_project_ref(topic=None, session=session, binding=None)
+    if target is None:
+        return {}
+    state = developer_prompt_context.get(*target)
+    if not isinstance(state, Mapping) or state.get('ok') is False:
+        raise ValueError('Builder project preferences are unavailable; source-file fallback is forbidden')
+    return dict(state)
+
+
 def _builder_llm_model_from_session(session: Mapping[str, Any] | None) -> str | None:
     if not isinstance(session, Mapping):
         return None
-    root = _project_artifact_root(session)
-    if root is None:
-        return None
-    state = _load_json_file(root / "prompt_state.json")
+    state = _builder_prompt_state(session)
     if not isinstance(state, Mapping):
         return None
     for key in ("builder_llm_model", "llm_model", "llm_profile_id"):
@@ -1257,8 +1271,7 @@ def _builder_llm_model_for_session(
 
 def _personal_turn_metadata(session, metadata):
     meta = dict(metadata or {})
-    root = _project_artifact_root(session) if session else None
-    state = _load_json_file(root / 'prompt_state.json') if root else {}
+    state = _builder_prompt_state(session)
     profile = (state or {}).get('llm_profile') or {}
     if not meta.get('builder_ai_resource_ref') and profile.get('resource_ref'):
         meta.update(builder_ai_resource_ref=profile['resource_ref'],
@@ -1275,10 +1288,24 @@ def _personal_turn_metadata(session, metadata):
             meta['builder_ai_expected_binding'] = ai.status().get('binding_ref')
         if not meta.get('builder_ai_expected_binding') or not meta.get('builder_llm_model'):
             raise ValueError('Connect ChatGPT in Subscription and explicitly select an available model')
+    selected_profile = (state or {}).get('prototype_generation_profile')
+    if selected_profile not in (None, 'default'):
+        resolver = getattr(sdk_builder_prototype, 'generation_profile_metadata', None)
+        if not callable(resolver):
+            raise ValueError('Selected Prototype generation profile requires an updated Core SDK')
+        controls = resolver(selected_profile)
+        if any(key in meta and meta[key] != value for key, value in controls.items()):
+            raise ValueError('Invocation metadata conflicts with the selected project generation profile')
+        meta.update(controls)
     return meta
 
 
-def _builder_job_transport(metadata):
+def _builder_job_transport(metadata, *, session=None):
+    selector = getattr(sdk_builder_prototype, 'provider_jobs', None)
+    if callable(selector):
+        parameters = inspect.signature(selector).parameters
+        return selector(metadata, **({'journal_dir': _llm_job_journal_dir(session)}
+            if session and 'journal_dir' in parameters else {}))
     if (metadata or {}).get('builder_ai_resource_ref'):
         return sdk_builder_prototype.personal_provider_jobs(metadata)
     from adaos.sdk.llm import llm_client
@@ -1286,6 +1313,60 @@ def _builder_job_transport(metadata):
         'submit': staticmethod(llm_client.submit_response_job),
         'wait': staticmethod(llm_client.wait_response_job),
         'send': staticmethod(llm_client.send_response)})()
+
+
+def _prepare_native_prototype_task(request, session, metadata):
+    if (metadata or {}).get('builder_generation_run_protocol') == 'v1':
+        if (metadata or {}).get('builder_ai_resource_ref') != 'ai-resource:personal-chatgpt':
+            raise ValueError('Generation v1 qualification requires the explicitly selected ChatGPT account; API fallback is forbidden')
+        if not all(callable(getattr(sdk_builder_prototype, name, None)) for name in (
+                'prepare_generation_publication', 'commit_generation_publication',
+                'finish_generation_failure', 'prepare_generation_journal',
+                'generation_journal_dir', 'generation_publication_projection',
+                'resolve_generation_candidate')):
+            raise ValueError('Generation v1 requires the updated Core publication SDK')
+        if not callable(getattr(builder_preview, 'deliver_generation_publication', None)):
+            raise ValueError('Generation v1 requires the updated Core Preview delivery SDK')
+        source = request.get('task_source') or {}
+        project_ref = ((source.get('intent') or {}).get('scope') or {}).get('project_ref')
+        if not isinstance(project_ref, str) or not project_ref:
+            raise ValueError('Generation v1 requires an explicit source-owned authoring target')
+        if not isinstance(session, dict):
+            raise ValueError('Generation v1 requires a durable mutable session')
+        old_ref = session.get('generation_journal_ref')
+        if not old_ref:
+            legacy = _llm_job_journal_dir(session)
+            if legacy is not None and legacy.exists() and any(legacy.iterdir()):
+                raise ValueError('Generation v1 requires explicit legacy journal migration; source fallback is forbidden')
+        owner = sdk_builder_prototype.prepare_generation_journal(project_ref=project_ref)
+        if old_ref and old_ref != owner['journal_ref']:
+            raise ValueError('Generation journal owner changed; explicit recovery or a new session is required')
+        session['generation_journal_ref'] = owner['journal_ref']
+        session['generation_run_protocol'] = 'v1'
+    prepare = getattr(sdk_builder_prototype, 'prepare_generation_request', None)
+    if not callable(prepare):
+        switch = (metadata or {}).get('builder_task_pipeline', os.getenv('ADAOS_BUILDER_TASK_PIPELINE_ENABLED', '0'))
+        if switch not in {True, False, '0', '1'}:
+            raise ValueError('Builder task pipeline switch must be 0 or 1')
+        if switch in {True, '1'} or (session.get('accepted_prototype_brief') or {}).get('task_contract'):
+            raise RuntimeError('Admitted TaskSpec execution requires an updated Core SDK; legacy fallback is forbidden')
+        return request, metadata
+    model = _builder_llm_model_for_session(session, metadata)
+    try:
+        prepared = prepare(request, metadata=dict(metadata or {}), model=model,
+            reasoning=_builder_llm_reasoning_for_model(model, metadata),
+            provider=_builder_job_transport(metadata, session=session), journal_dir=_llm_job_journal_dir(session),
+            previous_brief=None if _semantic_context_mode(metadata) == 'replace' else session.get('accepted_prototype_brief'),
+            timeout=_builder_llm_timeout_s())
+    except Exception as exc:
+        projector = getattr(sdk_builder_prototype, 'task_admission_failure', None)
+        failure = projector(exc, locale=(metadata or {}).get('locale', 'en')) if callable(projector) else None
+        if failure is None:
+            raise
+        return {**request, 'task_admission_failure': failure}, metadata
+    if not prepared.get('generation_plan'):
+        return prepared, metadata
+    return prepared, {**dict(metadata or {}), 'builder_generation_plan': prepared['generation_plan']}
 
 
 def _prototype_mcp_sdk_call(name: str) -> Any:
@@ -1313,7 +1394,7 @@ def _redact_generation_credentials(value: Any) -> Any:
     return value
 
 
-def _development_profile_kwargs(callable_obj: Any) -> dict[str, Any]:
+def _development_profile_kwargs(callable_obj: Any, *, retrieval_enabled: bool = True, generation_plan=None) -> dict[str, Any]:
     """Keep Builder compatible while core and a runtime skill update independently."""
     try:
         parameters = inspect.signature(callable_obj).parameters.values()
@@ -1327,7 +1408,8 @@ def _development_profile_kwargs(callable_obj: Any) -> dict[str, Any]:
     result = {"profile_scope": "development"} if supports_keyword else {}
     if "provider_timeout_s" in inspect.signature(callable_obj).parameters:
         result["provider_timeout_s"] = min(900.0, max(30.0, _builder_llm_job_timeout_s() - 30.0))
-    mcp_options = _prototype_mcp_sdk_call("mcp_generation_options") or {}
+    use_mcp = retrieval_enabled and (not generation_plan or generation_plan['retrieval'] == 'model_mcp')
+    mcp_options = (_prototype_mcp_sdk_call("mcp_generation_options") or {}) if use_mcp else {}
     if mcp_options and not any(parameter.name == "tools" or parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters):
         raise ValueError("This Core cannot deliver the enabled Prototype MCP tools")
     result.update(mcp_options)
@@ -4963,6 +5045,7 @@ def _llm_job_telemetry(
             provider_payload[target_key] = value
 
     telemetry: dict[str, Any] = {
+        "provider_calls": envelope.get("provider_calls", protocol.get("provider_calls")),
         "funding_source": job.get('funding_source') or envelope.get('funding_source'),
         "provider_job_id": str(job.get('job_id') or '') if job.get('funding_source') == 'personal_subscription' else None,
         "root_job_id": str(job.get("job_id") or "").strip() or None,
@@ -5035,7 +5118,7 @@ def _combine_llm_job_telemetry(
     combined["repair"] = copy.deepcopy(dict(repair_telemetry))
     def observation(value):
         return {key: copy.deepcopy(value[key]) for key in
-                ("root_job_id", "usage", "cost", "provider", "model", "timing") if key in value}
+                ("root_job_id", "usage", "cost", "provider", "model", "timing", "provider_calls") if key in value}
     combined["attempt_observations"] = copy.deepcopy(primary.get("attempt_observations") or [observation(primary)])
     combined["attempt_observations"].append(observation(repair_telemetry))
     return combined
@@ -7894,9 +7977,29 @@ def _latest_ui_revision_delta(session: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _accepted_generation_projection(session: Mapping[str, Any]) -> dict[str, Any] | None:
+    reference = session.get('prototype_publication_ref')
+    if reference is None:
+        return None
+    read = getattr(sdk_builder_prototype, 'generation_publication_projection', None)
+    if not callable(read):
+        raise ValueError('Committed Core projection is unavailable; source fallback is forbidden')
+    value = read(publication_ref=reference)
+    expected_owner = 'scenario:' + str(session.get('scenario_id') or '')
+    logical_owner = (value.get('source_scope') or {}).get('project_ref') or value.get('project_ref')
+    if (value.get('publication_ref') != reference or value.get('is_current') is not True
+            or value.get('project_ref') != expected_owner
+            or logical_owner != (session.get('project_ref') or expected_owner)):
+        raise ValueError('Committed Core projection is stale or belongs to another authoring scope')
+    return dict(value)
+
+
 def _current_webui_payload(
     session: Mapping[str, Any], preview_state: Mapping[str, Any]
 ) -> dict[str, Any]:
+    accepted = _accepted_generation_projection(session)
+    if accepted is not None:
+        return copy.deepcopy(accepted['webui'])
     artifact_root = _project_artifact_root(session)
     payload: dict[str, Any] = {}
     runtime_page_schema: dict[str, Any] = {}
@@ -8270,6 +8373,15 @@ def _current_semantic_context(
     payload: Mapping[str, Any],
     brief: Mapping[str, Any],
 ) -> dict[str, Any] | None:
+    accepted = _accepted_generation_projection(session)
+    if accepted is not None:
+        if payload != accepted['webui']:
+            raise ValueError('Current UI differs from its committed Core publication')
+        document = accepted['semantic_document']
+        if len(json.dumps(document, ensure_ascii=False).encode('utf-8')) > 128 * 1024:
+            raise ValueError('Current semantic Prototype exceeds the bounded context size; a scoped change is required')
+        return sdk_builder_prototype.semantic_revision_context(document, brief,
+            source_ref=accepted['publication_ref'], revision=accepted['revision'])
     if not str(payload.get("generated_by") or "").startswith("builder.semantic_compiler."):
         return None
     root = _project_artifact_root(session)
@@ -8953,11 +9065,15 @@ def _builder_llm_webui_transform_request(
             }
         )
     )
+    source_admitter = getattr(sdk_builder_prototype, 'admit_task_source', None)
+    task_source = (source_admitter(instruction, metadata=_meta)
+                   if callable(source_admitter) and not _session_ui_domain_packs(session) else None)
     try:
         capability_selection = developer_ui.select(
             instruction,
             limit=12,
             domain_packs=_session_ui_domain_packs(session),
+            **({'intent': task_source['intent'], 'prototype_brief': task_source['brief']} if task_source else {}),
             source_webui=current_payload,
         )
         if targeted_context:
@@ -9006,7 +9122,7 @@ def _builder_llm_webui_transform_request(
         if isinstance(qualification.get("prototype_brief"), Mapping)
         else {}
     )
-    admitted_prototype_brief = _admitted_prototype_brief(_meta)
+    admitted_prototype_brief = task_source['brief'] if task_source else _admitted_prototype_brief(_meta)
     semantic_context_mode = _semantic_context_mode(_meta)
     if semantic_context_mode == "replace":
         if not admitted_prototype_brief:
@@ -9088,6 +9204,7 @@ def _builder_llm_webui_transform_request(
             },
             "dynamic_request": semantic_dynamic_request,
             "prototype_brief": copy.deepcopy(dict(prototype_brief)),
+            "task_source": task_source,
         }
     brief_operation_kinds = {
         str(item.get("kind") or "").strip()
@@ -9508,11 +9625,12 @@ def _builder_llm_messages(
             }
         )
         purposes.append("active_turn_recap")
-    if os.getenv("ADAOS_BUILDER_PROTOTYPE_CONTEXT_STRATEGY", "full") != "full":
+    planned_strategy = 'full' if request.get('context_stage') == 'repair' else (request.get('generation_plan') or {}).get('context_strategy')
+    if (planned_strategy or os.getenv("ADAOS_BUILDER_PROTOTYPE_CONTEXT_STRATEGY", "full")) != "full":
         compiler = getattr(sdk_builder_prototype, "compile_generation_messages", None)
         if not callable(compiler):
             raise RuntimeError("Prototype context strategy requires the current Builder SDK")
-        messages, _delivery = compiler(messages)
+        messages, _delivery = compiler(messages, **({'strategy': planned_strategy} if planned_strategy else {}))
     return messages, purposes
 
 
@@ -11382,6 +11500,33 @@ def _builder_change_issue_clauses(request_text: str) -> list[str]:
     return clauses or [" ".join(normalized.split())]
 
 
+_IMPLEMENTATION_REQUEST_MARKERS = (
+    "project.yaml", "skill.yaml", "scenario.yaml", "webui.json", "source_ref",
+    "read_policy", "write_policy", "implementation_ref", "schema", "contract",
+    "fixture", "sandbox", "profile", "core", "backend", "runtime", "version",
+    "release", "alpha", "beta", "stable", "automation", "implement", "migration",
+    "test", "\u0440\u0435\u0430\u043b\u0438\u0437", "\u0444\u0438\u043a\u0441\u0442\u0443\u0440", "\u043f\u0440\u043e\u0444\u0438\u043b", "\u043a\u043e\u043d\u0442\u0440\u0430\u043a\u0442", "\u043c\u0438\u0433\u0440\u0430\u0446",
+    "\u0432\u0435\u0440\u0441\u0438", "\u0434\u0430\u043d\u043d", "\u0438\u0441\u0442\u043e\u0447\u043d\u0438\u043a", "\u043f\u0440\u043e\u0432\u0435\u0440",
+)
+
+_AUTOMATION_ONLY_DIRECTIVES = (
+    "every requirement below is implementation work",
+    "all requirements below are implementation work",
+    "implementation-only",
+    "implementation only",
+    "all requirements are for automation",
+    "every requirement is for automation",
+    "\u0432\u0441\u0435 \u043f\u0443\u043d\u043a\u0442\u044b \u043d\u0438\u0436\u0435 \u044f\u0432\u043b\u044f\u044e\u0442\u0441\u044f implementation",
+    "\u0432\u0441\u0435 \u0442\u0440\u0435\u0431\u043e\u0432\u0430\u043d\u0438\u044f \u0434\u043b\u044f automation",
+)
+
+def _builder_change_default_lane(request_text: str) -> str | None:
+    lowered = " ".join(str(request_text or "").split()).casefold()
+    if any(directive in lowered for directive in _AUTOMATION_ONLY_DIRECTIVES):
+        return "automation"
+    return None
+
+
 def _builder_change_issue_lane(clause: str) -> str:
     lowered = str(clause or "").casefold()
     # A governed workflow definition is executable control-plane data.  Its
@@ -11390,6 +11535,12 @@ def _builder_change_issue_lane(clause: str) -> str:
     # prototype transformer is intentionally limited to webui.json and must not
     # reinterpret a definition correction as a visible workflow mock-up.
     if any(marker in lowered for marker in _WORKFLOW_DEFINITION_REQUEST_MARKERS):
+        return "automation"
+    # Files, contracts, data bindings, runtime behavior and lifecycle work are
+    # executable obligations even when requested from the Prototype chat.
+    # Check them before visual vocabulary so a mixed clause keeps its
+    # implementation obligation for Automation.
+    if any(marker in lowered for marker in _IMPLEMENTATION_REQUEST_MARKERS):
         return "automation"
     if any(marker in lowered for marker in _PROTOTYPE_REQUEST_MARKERS):
         return "prototype"
@@ -11424,8 +11575,9 @@ def _builder_change_issues(
     request_text: str, *, change_id: str
 ) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
+    default_lane = _builder_change_default_lane(request_text)
     for clause in _builder_change_issue_clauses(request_text):
-        lane = _builder_change_issue_lane(clause)
+        lane = default_lane or _builder_change_issue_lane(clause)
         criterion_prefix = (
             "The Prototype visibly and coherently satisfies"
             if lane == "prototype"
@@ -13022,6 +13174,9 @@ def _apply_llm_webui_transform(
         preview_state=preview_state,
         _meta=_meta,
     )
+    request, _meta = _prepare_native_prototype_task(request, session, _meta)
+    if request.get('task_admission_failure'):
+        return request['task_admission_failure']
     current_payload = request["current_payload"]
     user_prompt = str(request["user_prompt"])
     dynamic_request = request["dynamic_request"]
@@ -13048,7 +13203,7 @@ def _apply_llm_webui_transform(
     last_response = ""
     last_error: dict[str, Any] | None = None
     try:
-        transport = _builder_job_transport(_meta)
+        transport = _builder_job_transport(_meta, session=session)
         send_response, submit_response_job, wait_response_job = transport.send, transport.submit, transport.wait
 
         timeout_s = _builder_llm_timeout_s()
@@ -13083,6 +13238,7 @@ def _apply_llm_webui_transform(
                 attempt=attempt,
                 request_context=messages,
             )
+            terminal_completion = None
             try:
                 response_temperature = (
                     temperature
@@ -13093,7 +13249,7 @@ def _apply_llm_webui_transform(
                 if _builder_llm_sync_jobs_enabled():
                     prompt_profile = _builder_llm_prompt_profile(selected_model, _meta)
                     generation_options = {
-                        **_development_profile_kwargs(submit_response_job),
+                        **_development_profile_kwargs(submit_response_job, generation_plan=request.get('generation_plan')),
                         "temperature": response_temperature,
                         "max_tokens": max_tokens,
                         "reasoning": reasoning,
@@ -13116,7 +13272,7 @@ def _apply_llm_webui_transform(
                                     "type": "json_schema",
                                     "name": "adaos_builder_semantic_prototype_candidate",
                                     "strict": True,
-                                    "schema": sdk_builder_prototype.semantic_provider_contract(
+                                    "schema": request.get('provider_output_schema') or sdk_builder_prototype.semantic_provider_contract(
                                         version=_semantic_contract_version(
                                             request_output_mode
                                         ), locales=tuple(request.get("output_locales") or ("en", "ru")), brief=request.get("prototype_brief")
@@ -13175,12 +13331,14 @@ def _apply_llm_webui_transform(
                             str(response.get("status") or "").strip().lower()
                         )
                     if response_status != "succeeded":
+                        terminal_completion = _finish_core_generation_failure(
+                            session, request_id=request_id, status=response_status)
                         raise RuntimeError(
                             f"LLM job did not succeed: {response.get('error') or response_status or 'unknown'}"
                         )
                 else:
                     generation_options = {
-                        **_development_profile_kwargs(send_response),
+                        **_development_profile_kwargs(send_response, generation_plan=request.get('generation_plan')),
                         "temperature": response_temperature,
                         "max_tokens": max_tokens,
                         "reasoning": reasoning,
@@ -13192,7 +13350,7 @@ def _apply_llm_webui_transform(
                                     "type": "json_schema",
                                     "name": "adaos_builder_semantic_prototype_candidate",
                                     "strict": True,
-                                    "schema": sdk_builder_prototype.semantic_provider_contract(
+                                    "schema": request.get('provider_output_schema') or sdk_builder_prototype.semantic_provider_contract(
                                         version=_semantic_contract_version(
                                             request_output_mode
                                         ), locales=tuple(request.get("output_locales") or ("en", "ru")), brief=request.get("prototype_brief")
@@ -13227,6 +13385,10 @@ def _apply_llm_webui_transform(
                         **generation_options,
                         **_builder_spend_options(session),
                     )
+                    if session.get('generation_run_protocol') == 'v1' and response.get('status') in {'failed', 'cancelled'}:
+                        terminal_completion = _finish_core_generation_failure(
+                            session, request_id=request_id, status=response['status'])
+                        raise RuntimeError('Generation provider returned ' + response['status'])
             except Exception as exc:
                 detail = f"{type(exc).__name__}: {exc}"
                 last_error = {
@@ -13238,6 +13400,8 @@ def _apply_llm_webui_transform(
                     "request_id": request_id,
                     "timeout_s": timeout_s,
                 }
+                if terminal_completion is not None:
+                    last_error['canonical_completion'] = terminal_completion
                 attempts.append(
                     {"attempt": attempt, **last_error, "input_artifact": input_artifact}
                 )
@@ -13260,8 +13424,10 @@ def _apply_llm_webui_transform(
                     ),
                     project_ref=str(session.get("project_ref") or "").strip()
                     or None,
-                    previous_semantic=(request.get("dynamic_request", {}).get("current_semantic") or {}).get("document"),
+                    previous_semantic=request.get("dynamic_request", {}).get("current_semantic") or None,
                 )
+                result = _attach_core_generation_result(result, response,
+                    session=session, request_id=request_id)
                 if not result.get("ok"):
                     validation = (
                         result.get("validation")
@@ -14712,6 +14878,8 @@ def _parse_llm_webui_transform_output(
             ),
             "validation": validation,
             "semantic_document": copy.deepcopy(semantic_document),
+            "semantic_evaluation_brief": copy.deepcopy(prototype_brief)
+                if isinstance(prototype_brief, Mapping) and prototype_brief.get("task_contract") else None,
             "semantic_digest": compiled.get("semantic_digest"),
             "source_map": copy.deepcopy(compiled.get("source_map") or {}),
             "requirement_runtime_map": copy.deepcopy(
@@ -14858,6 +15026,16 @@ def _validate_llm_request_postconditions(
     value = copy.deepcopy(dict(result))
     if not value.get("ok") or not isinstance(value.get("payload"), Mapping):
         return value
+    # Only the semantic parser above constructs this context from the exact
+    # Core-prepared brief after compilation. Direct ABI/model payloads never
+    # supply it. Keep postconditions on the same meaning as G3/G7/G8 rather
+    # than reinterpreting negative or preservation words as new capabilities.
+    evaluation_context = {}
+    semantic_brief = value.get("semantic_evaluation_brief")
+    if isinstance(value.get("semantic_document"), Mapping) and isinstance(semantic_brief, Mapping):
+        contract = semantic_brief.get("task_contract") or {}
+        if contract:
+            evaluation_context = {"intent": contract["source"], "prototype_brief": semantic_brief}
     payload = copy.deepcopy(dict(value["payload"]))
     misplaced_locale_dictionaries = payload.pop(
         "complete.locale_dictionaries",
@@ -14922,6 +15100,7 @@ def _validate_llm_request_postconditions(
         ),
         locale_dictionaries=locale_dictionaries,
         domain_packs=domain_packs,
+        **evaluation_context,
     )
     repaired_payload, localization_repairs = _repair_reported_localization(
         value["payload"],
@@ -14948,6 +15127,7 @@ def _validate_llm_request_postconditions(
             ),
             locale_dictionaries=locale_dictionaries,
             domain_packs=domain_packs,
+            **evaluation_context,
         )
     if deterministic_localization_repairs:
         existing_normalizations = (
@@ -15936,6 +16116,8 @@ def _repair_llm_semantic_transform_output(**kwargs: Any) -> dict[str, Any]:
                     **kwargs,
                     "output_text": _compact_json(merged),
                     "validation_error": next_validation,
+                    "job_id": first_repair.get('job_id') or kwargs.get('job_id'),
+                    "request_id": first_repair.get('request_id') or kwargs.get('request_id'),
                 },
                 attempt_number=3,
             )
@@ -15991,7 +16173,7 @@ def _repair_llm_semantic_transform_once(
     attempt_number: int = 2,
     previous_semantic: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    if any(item.get("code") == "semantic.compiler_contract_invalid" for item in validation_error.get("findings") or []):
+    if not prototype_brief.get('task_contract') and any(item.get("code") == "semantic.compiler_contract_invalid" for item in validation_error.get("findings") or []):
         return {"ok": False, "error": "prototype_compiler_contract_invalid", "validation": dict(validation_error),
                 "repair_skipped": True, "last_response": output_text, "output_mode": output_mode}
     resolved_output_mode = (
@@ -16003,6 +16185,11 @@ def _repair_llm_semantic_transform_once(
     try:
         candidate = _extract_json_object(output_text)
         expected_schema = f"adaos.builder.semantic_prototype_candidate.{semantic_version}"
+        if semantic_version=='v2' and candidate.get('schema')==expected_schema and 'preserve_baseline' in candidate:
+            return {'ok':False,'error':'baseline_preservation_context_invalid',
+                'detail':str(validation_error.get('detail') or 'The exact Core preservation context must be restored; model repair cannot rewrite it'),
+                'validation':dict(validation_error),'repair_skipped':True,
+                'last_response':output_text,'output_mode':resolved_output_mode}
         if candidate.get("schema") != expected_schema or not isinstance(candidate.get("title"), Mapping):
             raise ValueError(f"semantic repair requires a complete {expected_schema} candidate, not a partial repair envelope")
     except Exception as exc:
@@ -16016,7 +16203,9 @@ def _repair_llm_semantic_transform_once(
     selected_model = _builder_llm_model_for_session(session, _meta)
     prompt_profile = _builder_llm_prompt_profile(selected_model, _meta)
     stable_context = _semantic_prototype_stable_context(version=semantic_version)
+    stable_context.pop('prototype_retrieval', None)
     request = {
+        'context_stage': 'repair',
         "system_prompt": _builder_llm_system_prompt(
             prompt_profile=prompt_profile, output_mode=resolved_output_mode
         ),
@@ -16046,10 +16235,42 @@ def _repair_llm_semantic_transform_once(
         if isinstance(structured_findings, list) and structured_findings
         else [validation_summary]
     )
-    repair_kind, scoped_repair = (
-        _semantic_scoped_repair(candidate, validation_findings)
-        if semantic_version == "v2" else ("semantic_candidate", None)
-    )
+    context_preparer = getattr(sdk_builder_prototype, 'prepare_repair_context', None)
+    if semantic_version=='v2' and prototype_brief.get('task_contract') and not callable(context_preparer):
+        return {'ok':False,'error':'prototype_repair_admission_missing',
+            'detail':'An admitted TaskSpec requires Core repair admission; upgrade Core before repair.',
+            'last_response':output_text,'output_mode':resolved_output_mode,'paid_repair_calls':0}
+    repair_context = context_preparer(job_id=job_id,candidate=candidate,findings=validation_findings,
+        brief=prototype_brief,journal_dir=_llm_job_journal_dir(session)) if callable(context_preparer) and semantic_version=='v2' else None
+    if semantic_version=='v2' and prototype_brief.get('task_contract') and (
+            not repair_context or repair_context.get('status') not in {'admitted','blocked'}):
+        return {'ok':False,'error':'prototype_repair_admission_missing',
+            'detail':'Core did not admit repair of this TaskSpec; legacy fallback is forbidden.',
+            'last_response':output_text,'output_mode':resolved_output_mode,'paid_repair_calls':0}
+    if repair_context and repair_context.get('status')=='blocked':
+        return {'ok':False,'error':'prototype_repair_not_admitted','detail':repair_context['detail'],
+            'repair_diagnosis':repair_context['diagnosis'],
+            'validation':{'ok':False,'findings':validation_findings},
+            'last_response':output_text,'output_mode':resolved_output_mode,'paid_repair_calls':0}
+    if (semantic_version=='v2' and prototype_brief.get('task_contract')
+            and not repair_context.get('parent_request_id')):
+        return {'ok':False,'error':'prototype_repair_admission_missing',
+            'detail':'Core must retain the original request identity before repair.',
+            'last_response':output_text,'output_mode':resolved_output_mode,'paid_repair_calls':0}
+    if repair_context:
+        repair_kind, scoped_repair = repair_context['kind'], repair_context['scope']
+        previous_semantic = repair_context['preservation_baseline']
+    else:
+        repair_kind, scoped_repair = (
+            _semantic_scoped_repair(candidate, validation_findings)
+            if semantic_version == "v2" else ("semantic_candidate", None)
+        )
+    repair_plan = repair_context['generation_plan'] if repair_context else None
+    if (repair_plan or {}).get('execution_run_required'):
+        repair_seed['execution_binding_ref'] = repair_context['execution_run_binding']['binding_id']
+    repair_schema = repair_context['output_schema'] if repair_context else (
+        scoped_repair['output_schema'] if scoped_repair else sdk_builder_prototype.semantic_provider_contract(
+            version=semantic_version,locales=tuple(locale for locale in ('en','ru') if locale in candidate['title']),brief=prototype_brief))
     if scoped_repair:
         repair_seed["repair_contract_sha256"] = hashlib.sha256(
             _compact_json(
@@ -16078,6 +16299,8 @@ def _repair_llm_semantic_transform_once(
             "Preserve the user's intended behavior; do not evade a finding by weakening its meaning. "
             "Use the supplied semantic invariants and exact allowed IDs."
         )
+    if repair_context:
+        request['system_prompt'] = repair_context['system_prompt']
     repair_prompt = _compact_json(
         {
             "semantic_repair": {
@@ -16088,8 +16311,14 @@ def _repair_llm_semantic_transform_once(
                 ),
                 "instruction": instruction,
                 "prototype_brief": brief_context,
-                "output_locales": [locale for locale in ("en", "ru") if locale in candidate.get("title", {})],
+                "output_locales": repair_plan.get('output_locales') if repair_plan else [locale for locale in ("en", "ru") if locale in candidate.get("title", {})],
                 "validation_findings": validation_findings,
+                "generation_plan_ref": repair_plan['generation_plan_id'] if repair_plan else None,
+                'repair_diagnosis_ref':repair_plan.get('repair_diagnosis_ref') if repair_plan else None,
+                "write_scope": repair_plan.get('write_scope') if repair_plan else None,
+                "preservation_baseline": copy.deepcopy(previous_semantic) if (
+                    repair_plan and repair_plan.get('write_scope') and not scoped_repair) or any(
+                    item.get('code') == 'semantic.task_write_scope_exceeded' for item in validation_findings) else None,
                 "candidate": candidate,
                 "repair_scope": {key: value for key, value in scoped_repair.items() if key != "output_schema"} if scoped_repair else None,
                 "invariant_checklist": [
@@ -16103,7 +16332,7 @@ def _repair_llm_semantic_transform_once(
     )
     messages, message_purposes = _builder_llm_messages(request, repair_prompt)
     repair_options = {
-        **_development_profile_kwargs(None),
+        **_development_profile_kwargs(None, retrieval_enabled=False),
         "temperature": _builder_llm_temperature_for_model(selected_model, repair=True),
         "max_tokens": _builder_llm_max_tokens_for_model(
             selected_model, output_mode=resolved_output_mode, _meta=_meta
@@ -16125,9 +16354,7 @@ def _repair_llm_semantic_transform_once(
                 "type": "json_schema",
                 "name": "adaos_builder_semantic_prototype_candidate",
                 "strict": True,
-                "schema": scoped_repair["output_schema"] if scoped_repair else sdk_builder_prototype.semantic_provider_contract(
-                    version=semantic_version, locales=tuple(locale for locale in ("en", "ru") if locale in candidate["title"]), brief=prototype_brief
-                ),
+                "schema": repair_schema,
             },
         },
         "timeout": _builder_llm_job_submit_timeout_s(),
@@ -16135,16 +16362,19 @@ def _repair_llm_semantic_transform_once(
     repair_job_id = ""
     repair_base_url = ""
     repair_input_artifact: dict[str, Any] | None = None
+    terminal_completion = None
     repair_telemetry: dict[str, Any] = {}
     repaired_output = ""
     repair_candidate_artifact: dict[str, Any] | None = None
     merged = None
     merged_artifact = None
     try:
-        transport = _builder_job_transport(_meta)
+        transport = _builder_job_transport(_meta, session=session)
         submit_response_job, wait_response_job = transport.submit, transport.wait
 
-        repair_options.update(_development_profile_kwargs(submit_response_job))
+        repair_options.update(_development_profile_kwargs(submit_response_job, retrieval_enabled=False))
+        if repair_plan:
+            repair_options.update(generation_plan=repair_plan,tools=[],tool_choice='none')
         capability_selection = (
             request.get("base_request", {}).get("selected_ui_capabilities")
             if isinstance(request.get("base_request"), Mapping)
@@ -16164,7 +16394,7 @@ def _repair_llm_semantic_transform_once(
             generation_options=repair_options,
             output_mode=resolved_output_mode,
             route="prototype.transform.async_semantic_repair",
-            parent_request_id=request_id,
+            parent_request_id=(repair_context or {}).get('parent_request_id') or request_id,
             parent_job_id=job_id,
             stage="semantic_repair",
             attempt=attempt_number,
@@ -16193,6 +16423,8 @@ def _repair_llm_semantic_transform_once(
             )
             status = str(response.get("status") or "").strip().lower()
         if status != "succeeded":
+            terminal_completion = _finish_core_generation_failure(
+                session, request_id=repair_request_id, status=status)
             raise RuntimeError(
                 f"semantic repair job did not succeed: {response.get('error') or status}"
             )
@@ -16209,7 +16441,15 @@ def _repair_llm_semantic_transform_once(
             output_mode=resolved_output_mode,
         )
         compile_output = repaired_output
-        if scoped_repair:
+        if session.get('generation_run_protocol') == 'v1':
+            resolved = _resolve_core_generation_candidate(
+                session=session, response=response, request_id=repair_request_id)
+            merged = resolved['candidate']
+            compile_output = _compact_json(merged)
+            merged_artifact = _write_llm_job_raw_candidate_artifact(
+                session=session, job_id=repair_job_id, request_id=repair_request_id,
+                stage='semantic-repair-core-replayed', output_text=compile_output, output_mode=resolved_output_mode)
+        elif scoped_repair:
             apply_repair = getattr(sdk_builder_prototype, "apply_" + repair_kind.removeprefix("semantic_"))
             merged = apply_repair(candidate, _extract_json_object(repaired_output), validation_findings)
             compile_output = _compact_json(merged)
@@ -16231,6 +16471,8 @@ def _repair_llm_semantic_transform_once(
             project_ref=project_ref,
             previous_semantic=previous_semantic,
         )
+        result = _attach_core_generation_result(result, response,
+            session=session, request_id=repair_request_id)
     except Exception as exc:
         result = {
             "ok": False,
@@ -16245,6 +16487,8 @@ def _repair_llm_semantic_transform_once(
             "last_response": repaired_output or output_text,
             "output_mode": resolved_output_mode,
         }
+    if terminal_completion is not None:
+        result['canonical_completion'] = terminal_completion
     if merged is not None:
         result["repair_candidate"] = merged
     result["attempts"] = [
@@ -16661,7 +16905,7 @@ def _repair_llm_webui_transform_output(
     repair_telemetry: dict[str, Any] = {}
     repair_input_artifact: dict[str, Any] | None = None
     try:
-        transport = _builder_job_transport(_meta)
+        transport = _builder_job_transport(_meta, session=session)
         submit_response_job, wait_response_job = transport.submit, transport.wait
 
         repair_started_at = _now()
@@ -17347,6 +17591,33 @@ def _ensure_session_artifact_root(
     return False
 
 
+def _sync_session_from_core_publication(session):
+    scenario_id = str(session.get('scenario_id') or '').strip()
+    if not scenario_id:
+        return False, False
+    from adaos.sdk.core.errors import SdkRuntimeNotInitialized
+    try:
+        state = sdk_builder_workflow.get_state('scenario', scenario_id)
+    except (SdkRuntimeNotInitialized, FileNotFoundError, RuntimeError):
+        return False, False
+    head = state.get('prototype') or {}
+    reference = head.get('publication_ref')
+    if not reference:
+        return False, False
+    accepted = _accepted_generation_projection({**session, 'prototype_publication_ref': reference})
+    if accepted['revision'] != head.get('head_revision'):
+        raise ValueError('Core Prototype head and committed projection disagree')
+    preview = {**dict(session.get('preview_state') or {}),
+        'session_id': session['id'], 'scenario_id': scenario_id,
+        'page_schema': _extract_webui_page_schema(accepted['webui']), 'version': accepted['revision']}
+    values = {'prototype_publication_ref': reference, 'ui_revision': accepted['revision'],
+        'version': accepted['revision'], 'webui_payload': copy.deepcopy(accepted['webui']),
+        'accepted_prototype_brief': copy.deepcopy(accepted['prototype_brief']), 'preview_state': preview}
+    changed = any(session.get(key) != value for key, value in values.items())
+    session.update(values)
+    return True, changed
+
+
 def _sync_session_from_artifacts(
     session: dict[str, Any], binding: Mapping[str, Any] | None = None
 ) -> bool:
@@ -17368,6 +17639,9 @@ def _sync_session_from_artifacts(
                     session["project_ref"] = project_ref
                     changed = True
         changed = _ensure_session_artifact_root(session, binding) or changed
+    core_owned, core_changed = _sync_session_from_core_publication(session)
+    if core_owned:
+        return changed or core_changed
     root = _project_artifact_root(session)
     if root is None:
         return changed
@@ -17401,6 +17675,56 @@ def _sync_session_from_artifacts(
                 changed = True
 
     webui = _read_json_file(root / "webui.json")
+    if webui and not revision:
+        page_schema = _extract_webui_page_schema(webui)
+        page_meta = (
+            page_schema.get("meta")
+            if isinstance(page_schema, Mapping)
+            and isinstance(page_schema.get("meta"), Mapping)
+            else {}
+        )
+        builder_meta = (
+            page_meta.get("builder")
+            if isinstance(page_meta.get("builder"), Mapping)
+            else {}
+        )
+        retained_revision = str(
+            builder_meta.get("ui_revision") or builder_meta.get("proto") or ""
+        ).strip()
+        if re.fullmatch(r"\d{3,}", retained_revision):
+            try:
+                workflow = sdk_builder_workflow.get_state(
+                    "scenario", str(session.get("scenario_id") or "").strip()
+                )
+            except Exception:
+                workflow = {}
+            prototype = (
+                workflow.get("prototype")
+                if isinstance(workflow.get("prototype"), Mapping)
+                else {}
+            )
+            automation = (
+                workflow.get("automation")
+                if isinstance(workflow.get("automation"), Mapping)
+                else {}
+            )
+            workflow_revision = str(
+                prototype.get("head_revision")
+                or automation.get("source_prototype_revision")
+                or ""
+            ).strip()
+            if workflow_revision and workflow_revision != retained_revision:
+                raise ValueError(
+                    "Retained WebUI revision and Core Prototype head disagree"
+                )
+            if workflow_revision == retained_revision:
+                revision = retained_revision
+                if str(session.get("ui_revision") or "").strip() != revision:
+                    session["ui_revision"] = revision
+                    changed = True
+                if str(session.get("version") or "").strip() != revision:
+                    session["version"] = revision
+                    changed = True
     if webui:
         if session.get("webui_payload") != webui:
             session["webui_payload"] = copy.deepcopy(webui)
@@ -22966,6 +23290,119 @@ def _revision_locale_dictionaries(
     return None
 
 
+def _finish_core_generation_failure(session, *, request_id, status):
+    if session.get('generation_run_protocol') != 'v1' or status not in {'failed', 'cancelled'}:
+        return None
+    try:
+        return sdk_builder_prototype.finish_generation_failure(
+            journal_dir=_llm_job_journal_dir(session), request_id=request_id, outcome=status)
+    except Exception as exc:
+        return {'ok': False, 'reconciliation_pending': True,
+            'error': 'core_generation_completion_pending', 'error_type': type(exc).__name__}
+
+
+def _attach_core_generation_result(result, response, *, session, request_id):
+    if session.get('generation_run_protocol') != 'v1':
+        return result
+    output = response.get('generation_output') or {}
+    binding = response.get('execution_run_binding') or {}
+    if (not output.get('output_ref') or not binding.get('binding_id')
+            or not session.get('generation_journal_ref') or not request_id
+            or response.get('request_id') not in {None, request_id}):
+        raise ValueError('Generation v1 lost its retained output or invocation binding; legacy finalization is forbidden')
+    return {**result, 'core_generation_result': {
+        'journal_ref': session['generation_journal_ref'], 'request_id': request_id,
+        'output_ref': output['output_ref'], 'binding_ref': binding['binding_id']}}
+
+
+def _resolve_core_generation_candidate(*, session, response, request_id):
+    # The facade attachment validates protected refs, not model-owned fields.
+    source = _attach_core_generation_result({}, response,
+        session=session, request_id=request_id)['core_generation_result']
+    return sdk_builder_prototype.resolve_generation_candidate(
+        journal_dir=_llm_job_journal_dir(session), request_id=request_id,
+        output_ref=source['output_ref'])
+
+
+def _finalize_core_generation_publication(*, ws, session, patch, llm_result):
+    source = (llm_result or {}).get('core_generation_result') or {}
+    if (not source.get('request_id') or not source.get('output_ref')
+            or not source.get('journal_ref')
+            or source['journal_ref'] != session.get('generation_journal_ref')):
+        raise ValueError('Generation v1 needs its exact retained generation result; source-first finalization is forbidden')
+    arguments = {'journal_dir': _llm_job_journal_dir(session),
+        'request_id': source['request_id'], 'output_ref': source['output_ref']}
+    prepared = sdk_builder_prototype.prepare_generation_publication(**arguments)
+    scope = prepared.get('source_scope') or {}
+    expected_logical = session.get('project_ref') or 'scenario:' + str(session.get('scenario_id') or '')
+    if (scope.get('object_type') != 'scenario'
+            or scope.get('object_id') != session.get('scenario_id')
+            or scope.get('project_ref') != expected_logical):
+        raise ValueError('Prepared generation belongs to another frozen authoring scope')
+    committed = sdk_builder_prototype.commit_generation_publication(
+        **arguments, publication_ref=prepared['publication_ref'])
+    if committed.get('committed') is not True:
+        raise RuntimeError('Core publication did not commit; source-first fallback is forbidden')
+    result = {'ok': True, 'committed': True, 'projection_pending': True, 'delivery_pending': True,
+        'status': 'prototype_committed_delivery_pending', 'session_id': session.get('id'),
+        'scenario_id': session.get('scenario_id'), 'publication_ref': prepared['publication_ref'],
+        'ui_revision': {'revision': prepared['revision'], 'publication_ref': prepared['publication_ref']},
+        'workflow_revision': committed, 'patch': patch,
+        'message': 'Прототип сохранён в Core. Доставка принятой версии в Preview ещё не подтверждена.',
+        'message_actions': [], 'follow_active_preview': {'ok': False, 'skipped': 'projection_pending'}}
+    try:
+        accepted = sdk_builder_prototype.generation_publication_projection(
+            publication_ref=prepared['publication_ref'])
+        if accepted.get('is_current') is not True:
+            result['projection_error'] = 'publication_no_longer_current'
+            return result
+        if (accepted.get('publication_ref') != prepared['publication_ref']
+                or accepted.get('source_scope') != scope):
+            raise ValueError('Accepted generation projection differs from its frozen scope')
+        payload = copy.deepcopy(accepted['webui'])
+        _, preview = _normalise_llm_webui_payload(payload,
+            previous_preview=session.get('preview_state') or {})
+        preview.update(version=accepted['revision'], scenario_id=session.get('scenario_id'))
+        patch.update(revision=accepted['revision'], publication_ref=prepared['publication_ref'])
+        session.update(webui_payload=payload, preview_state=preview,
+            ui_revision=accepted['revision'], version=accepted['revision'],
+            prototype_publication_ref=accepted['publication_ref'],
+            accepted_prototype_brief=copy.deepcopy(accepted['prototype_brief']))
+        if not any(item.get('publication_ref') == accepted['publication_ref']
+                for item in session.get('patches', []) if isinstance(item, Mapping)):
+            session.setdefault('patches', []).append(patch)
+        _save_session(ws, session)
+        result['preview_state'] = preview
+        result['projection_pending'] = False
+    except Exception as exc:
+        # Head and original Run already committed. Projection failure cannot
+        # become failed generation, source rollback or paid resubmission.
+        result['projection_error'] = type(exc).__name__
+        return result
+    try:
+        delivery = builder_preview.deliver_generation_publication(
+            publication_ref=prepared['publication_ref'], source_webspace_id=ws)
+        result['follow_active_preview'] = delivery
+        if (delivery.get('ok') is True and delivery.get('delivered') is True
+                and delivery.get('publication_ref') == prepared['publication_ref']
+                and delivery.get('revision') == prepared['revision']
+                and delivery.get('scenario_id') == session.get('scenario_id')):
+            result.update(status='prototype_committed', delivery_pending=False,
+                message='Прототип сохранён в Core и доставлен в Alpha Preview. Результат в браузере ещё требует проверки.')
+    except Exception as exc:
+        # Delivery retries the committed publication; it is not a model retry.
+        result['delivery_error'] = type(exc).__name__
+    # Source-first finalization used to emit these invalidations. The Core-only
+    # early return must not leave the author's open Workbench on the old head.
+    # These are read/projection notifications, never another selection or model
+    # request; a later user selection must remain the current one.
+    result['project_refresh'] = _publish_prompt_project_changed(
+        ws, session=session, reason='builder_core_publication_committed')
+    result['workbench_refresh'] = _request_workbench_refresh(
+        {'webspace_id': ws, 'scenario_id': session.get('scenario_id')})
+    return result
+
+
 def _finalize_scenario_update(
     *,
     ws: str,
@@ -22978,6 +23415,10 @@ def _finalize_scenario_update(
     auto_apply: bool,
     _meta: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    if (session.get('generation_run_protocol') == 'v1'
+            or (_meta or {}).get('builder_generation_run_protocol') == 'v1'):
+        return _finalize_core_generation_publication(
+            ws=ws, session=session, patch=patch, llm_result=llm_result)
     finalize_started_at = time.perf_counter()
     session_before_finalize = copy.deepcopy(session)
     _ensure_session_artifact_root(session, binding)
@@ -23459,6 +23900,9 @@ def _submit_llm_webui_transform_job(
         preview_state=preview_state,
         _meta=_meta,
     )
+    request, _meta = _prepare_native_prototype_task(request, session, _meta)
+    if request.get('task_admission_failure'):
+        return request['task_admission_failure']
     context_ready_at = _now()
     current_payload = request["current_payload"]
     request_id = _builder_llm_job_request_id(
@@ -23500,7 +23944,7 @@ def _submit_llm_webui_transform_job(
         user_prompt_bytes,
     )
     try:
-        submit_response_job = _builder_job_transport(_meta).submit
+        submit_response_job = _builder_job_transport(_meta, session=session).submit
     except Exception as exc:
         failed_at = _now()
         detail = f"{type(exc).__name__}: {exc}"
@@ -23540,7 +23984,7 @@ def _submit_llm_webui_transform_job(
     )
     semantic_mode = _semantic_output_mode(request_output_mode)
     submit_options = {
-        **_development_profile_kwargs(submit_response_job),
+        **_development_profile_kwargs(submit_response_job, generation_plan=request.get('generation_plan')),
         "temperature": _builder_llm_temperature_for_model(selected_model),
         "max_tokens": _builder_llm_max_tokens_for_model(
             selected_model, output_mode=request_output_mode, _meta=_meta
@@ -23562,7 +24006,7 @@ def _submit_llm_webui_transform_job(
                     "type": "json_schema",
                     "name": "adaos_builder_semantic_prototype_candidate",
                     "strict": True,
-                    "schema": sdk_builder_prototype.semantic_provider_contract(
+                    "schema": request.get('provider_output_schema') or sdk_builder_prototype.semantic_provider_contract(
                         version=_semantic_contract_version(request_output_mode), locales=tuple(request.get("output_locales") or ("en", "ru")), brief=request.get("prototype_brief")
                     ),
                 }
@@ -23918,6 +24362,14 @@ _TERMINAL_LLM_JOB_STATUSES = frozenset({"succeeded", "failed", "cancelled", "can
 
 
 def _llm_job_journal_dir(session: Mapping[str, Any]) -> Path | None:
+    journal_ref = session.get('generation_journal_ref')
+    if journal_ref:
+        resolve = getattr(sdk_builder_prototype, 'generation_journal_dir', None)
+        if not callable(resolve):
+            raise ValueError('Core generation journal resolution is unavailable; source fallback is forbidden')
+        return Path(resolve(journal_ref))
+    if session.get('generation_run_protocol') == 'v1':
+        raise ValueError('Generation v1 lost its journal owner; source fallback is forbidden')
     root = _project_artifact_root(session)
     return root / "llm_jobs" if root is not None else None
 
@@ -23993,8 +24445,11 @@ def _write_llm_job_request_artifact(
         context_capacity_tokens=context_capacity_tokens,
     )
     source_inputs = {}
+    source_root = _project_artifact_root(session)
+    if source_root is None:
+        raise RuntimeError("builder_source_evidence_unavailable_before_model_submit")
     for name in ("webui.json", "semantic.webui.json", "prototype.brief.json", "prompt_state.json"):
-        source_path = journal_dir.parent / name
+        source_path = source_root / name
         if source_path.is_file():
             raw = source_path.read_bytes()
             source_inputs[name] = {"sha256": hashlib.sha256(raw).hexdigest(), "content": raw.decode("utf-8")}
@@ -24394,6 +24849,36 @@ def _llm_job_diagnostic(
     }
 
 
+def _prototype_replay_base_ref(session):
+    revision=str(session.get('ui_revision') or session.get('version') or '').strip()
+    if revision:
+        return revision
+    identify=getattr(sdk_builder_prototype,'replay_base_ref',None)
+    root=_project_artifact_root(session)
+    if not callable(identify) or root is None:
+        return ''
+    return identify(project_ref=session.get('project_ref') or 'scenario:'+str(session['scenario_id']),
+        artifact_root=root)
+
+
+def _initial_prototype_replay_context(session,job_id,request_text,expected_base_ref):
+    if not str(expected_base_ref).startswith('prototype-initial-base:'):
+        if session.get('generation_run_protocol') == 'v1':
+            read = getattr(sdk_builder_prototype, 'retained_generation_meaning', None)
+            if not callable(read):
+                raise RuntimeError('Generation replay requires the retained Core meaning SDK')
+            return read(project_ref=session.get('project_ref') or 'scenario:'+str(session['scenario_id']),
+                journal_dir=_llm_job_journal_dir(session), job_id=job_id,
+                request_text=request_text, expected_revision=expected_base_ref)
+        return None
+    prepare=getattr(sdk_builder_prototype,'prepare_initial_replay',None)
+    if not callable(prepare):
+        raise RuntimeError('Initial Prototype replay requires Core source-base admission')
+    return prepare(project_ref=session.get('project_ref') or 'scenario:'+str(session['scenario_id']),
+        artifact_root=_project_artifact_root(session),journal_dir=_llm_job_journal_dir(session),
+        job_id=job_id,request_text=request_text,expected_base_ref=expected_base_ref)
+
+
 def _replay_failed_llm_webui_result(
     *,
     session: Mapping[str, Any],
@@ -24406,9 +24891,7 @@ def _replay_failed_llm_webui_result(
 ) -> dict[str, Any]:
     token = str(job_id or "").strip()
     expected_revision = str(expected_ui_revision or "").strip()
-    current_revision = str(
-        session.get("ui_revision") or session.get("version") or ""
-    ).strip()
+    current_revision = _prototype_replay_base_ref(session)
     if not token or not expected_revision:
         return {
             "ok": False,
@@ -24421,6 +24904,10 @@ def _replay_failed_llm_webui_result(
             "error": "llm_replay_stale_revision",
             "detail": f"expected UI revision {expected_revision}, current {current_revision or 'unknown'}",
         }
+    try:
+        initial_replay_context=_initial_prototype_replay_context(session,token,request_text,expected_revision)
+    except Exception as exc:
+        return {'ok':False,'error':'llm_replay_initial_context_invalid','detail':f'{type(exc).__name__}: {exc}'}
     pending = (
         session.get("pending_llm_jobs")
         if isinstance(session.get("pending_llm_jobs"), Mapping)
@@ -24583,7 +25070,7 @@ def _replay_failed_llm_webui_result(
                     raise ValueError(
                         "authoritative replay context requires an original replace-mode request"
                     )
-                brief = replacement or session.get("accepted_prototype_brief") or {}
+                brief = replacement or (initial_replay_context or {}).get('brief') or session.get("accepted_prototype_brief") or {}
                 if replacement is None and (
                     brief.get("digest") != brief_ref.get("brief_digest")
                     or brief.get("brief_id") != brief_ref.get("brief_ref")
@@ -24599,11 +25086,12 @@ def _replay_failed_llm_webui_result(
                     raise ValueError("original semantic source digest mismatch")
                 authoritative_context_recompile = replacement is not None
                 source_context.update(prototype_brief=brief, project_ref=session.get("project_ref"),
-                    previous_semantic=(_current_semantic_context(session, before_webui or {}, brief) or {}).get("document"))
+                    previous_semantic=(initial_replay_context or {}).get('baseline')
+                        or _current_semantic_context(session, before_webui or {}, brief) or None)
         except Exception as exc:
             return {"ok": False, "error": "llm_replay_source_context_unavailable", "detail": str(exc)}
 
-    def validate_output(candidate_output: str, source: str) -> None:
+    def validate_output(candidate_output: str, source: str, source_job_id: str | None = None) -> None:
         nonlocal best_semantic_result, result, last_result, replay_source
         if not candidate_output or result is not None:
             return
@@ -24623,7 +25111,7 @@ def _replay_failed_llm_webui_result(
                 previous_preview=previous_preview,
                 before_webui=before_webui,
                 request_id=f"replay:{token}",
-                job_id=token,
+                job_id=source_job_id or root_job_id,
                 **source_context,
             )
             parsed = _validate_llm_request_postconditions(
@@ -24641,6 +25129,7 @@ def _replay_failed_llm_webui_result(
                 "validation": {"findings": copy.deepcopy(getattr(exc, "findings", []))},
                 "semantic_replay_input": {
                     **source_context, "output_text": candidate_output,
+                    "source_job_id": source_job_id or root_job_id,
                 } if _semantic_output_mode(str(source_context.get("output_mode") or "")) else None,
             }
             findings = last_result["validation"]["findings"]
@@ -24672,6 +25161,7 @@ def _replay_failed_llm_webui_result(
     # resume the job with zero new model tokens while keeping both artifact
     # digests, the source revision, and the original validation scope bound.
     retained_raw: dict[str, tuple[dict[str, Any], Path]] = {}
+    retained_job_ids: dict[str, str] = {}
     if result is None and journal_dir is not None:
         for candidate_ref in candidate_refs:
             if (
@@ -24706,6 +25196,7 @@ def _replay_failed_llm_webui_result(
                 copy.deepcopy(dict(candidate_artifact["structured_candidate"])),
                 candidate_path,
             )
+            retained_job_ids[str(candidate_path)] = str(candidate_artifact.get("job_id") or root_job_id)
     primary_checkpoint = next(
         (value for stage, value in retained_raw.items() if stage == "primary-received"),
         None,
@@ -24754,7 +25245,7 @@ def _replay_failed_llm_webui_result(
                     primary_candidate, repair_candidate, original_findings
                 )
                 validate_output(
-                    _compact_json(reapplied), "retained_bounded_repair"
+                    _compact_json(reapplied), "retained_bounded_repair", retained_job_ids.get(str(repair_path))
                 )
                 if result is not None:
                     replay_candidate_path = repair_path
@@ -24797,7 +25288,8 @@ def _replay_failed_llm_webui_result(
             if candidate_ref.get("kind") == "raw_model_output":
                 structured = candidate_artifact.get("structured_candidate")
                 if isinstance(structured, Mapping) and expected_digest:
-                    validate_output(_compact_json(structured), "retained_semantic_candidate")
+                    validate_output(_compact_json(structured), "retained_semantic_candidate",
+                                    str(candidate_artifact.get("job_id") or root_job_id))
                     if result is not None:
                         replay_candidate_path = candidate_path
                         break
@@ -24887,7 +25379,8 @@ def _replay_failed_llm_webui_result(
         else ""
     )
     if result is None and terminal_output != output_text:
-        validate_output(terminal_output, "terminal_response")
+        validate_output(terminal_output, "terminal_response",
+                        str((diagnostic_result.get("repair") or {}).get("job_id") or root_job_id))
     if result is None:
         if best_semantic_result is not None:
             return {
@@ -24978,9 +25471,7 @@ def _failed_llm_replay_preflight(
 
     token = str(job_id or "").strip()
     expected_revision = str(expected_ui_revision or "").strip()
-    current_revision = str(
-        session.get("ui_revision") or session.get("version") or ""
-    ).strip()
+    current_revision = _prototype_replay_base_ref(session)
     if not token or not expected_revision:
         return {
             "ok": False,
@@ -24993,6 +25484,12 @@ def _failed_llm_replay_preflight(
             "error": "llm_replay_stale_revision",
             "detail": f"expected UI revision {expected_revision}, current {current_revision or 'unknown'}",
         }
+    try:
+        initial_context=_initial_prototype_replay_context(session,token,request_text,expected_revision)
+        if initial_context:
+            return {'ok':True,'source':'core_initial_base','base_ref':initial_context['base_ref']}
+    except Exception as exc:
+        return {'ok':False,'error':'llm_replay_initial_context_invalid','detail':f'{type(exc).__name__}: {exc}'}
     pending = (
         session.get("pending_llm_jobs")
         if isinstance(session.get("pending_llm_jobs"), Mapping)
@@ -25764,7 +26261,7 @@ def _complete_llm_webui_job(
 
     try:
         from adaos.sdk.llm.llm_client import LlmJobWaitTimeout
-        wait_response_job = _builder_job_transport(_meta).wait
+        wait_response_job = _builder_job_transport(_meta, session=session).wait
 
         job = wait_response_job(
             job_id,
@@ -25860,6 +26357,8 @@ def _complete_llm_webui_job(
     # The root LLM proxy already meters this job. Only the later autonomous
     # implementation worker may report usage as Codex.
     if status != "succeeded":
+        terminal_completion = _finish_core_generation_failure(
+            session, request_id=request_id, status=status)
         _LOG.warning(
             "builder LLM job returned non-success scenario=%s job_id=%s request_id=%s status=%s error=%s",
             str(session.get("scenario_id") or ""),
@@ -25868,7 +26367,14 @@ def _complete_llm_webui_job(
             status,
             str(job.get("error") or ""),
         )
-        _mark_llm_job_failed(
+        diagnostic = _llm_job_diagnostic(
+            result={"ok": False, "error": job.get("error") or status},
+            output_text=output_text, telemetry=job_telemetry)
+        if terminal_completion is not None:
+            diagnostic = {**dict(diagnostic or {}), 'canonical_completion': terminal_completion}
+        finish = (_finish_llm_job_observation if session.get('generation_run_protocol') == 'v1'
+            and status == 'cancelled' else _mark_llm_job_failed)
+        finish(
             ws=ws,
             session=session,
             job_id=job_id,
@@ -25876,11 +26382,8 @@ def _complete_llm_webui_job(
             binding=binding,
             topic_ref=topic,
             _meta=_meta,
-            diagnostic=_llm_job_diagnostic(
-                result={"ok": False, "error": job.get("error") or status},
-                output_text=output_text,
-                telemetry=job_telemetry,
-            ),
+            diagnostic=diagnostic,
+            **({'status': 'cancelled'} if session.get('generation_run_protocol') == 'v1' and status == 'cancelled' else {}),
         )
         return
     try:
@@ -25950,8 +26453,10 @@ def _complete_llm_webui_job(
                 prototype_brief=prototype_brief,
                 project_ref=str(session.get("project_ref") or "").strip()
                 or None,
-                previous_semantic=(_current_semantic_context(session, before_webui or {}, prototype_brief or {}) or {}).get("document") if semantic_mode else None,
+                previous_semantic=(_current_semantic_context(session, before_webui or {}, prototype_brief or {}) or None) if semantic_mode else None,
             )
+            llm_result = _attach_core_generation_result(llm_result, job,
+                session=session, request_id=request_id)
             llm_result = _validate_llm_request_postconditions(
                 llm_result,
                 instruction=request_text,
@@ -25997,7 +26502,7 @@ def _complete_llm_webui_job(
                     job_id=job_id,
                     output_mode=llm_output_mode,
                     _meta=_meta,
-                    previous_semantic=(_current_semantic_context(session, before_webui or {}, prototype_brief or {}) or {}).get("document"),
+                    previous_semantic=_current_semantic_context(session, before_webui or {}, prototype_brief or {}) or None,
                 )
                 repair_attempted = not bool(llm_result.get("repair_skipped"))
                 for artifact in llm_result.get("candidate_artifacts") or []:
@@ -26958,14 +27463,15 @@ def update_current_scenario(
                 "candidate_locale_dictionaries": replay_locale_dictionaries,
                 "candidate_prototype_records": replay_prototype_records,
             }
+            repair_source_job_id = str(repair_input.pop("source_job_id", None) or retry_job_id).strip()
             repaired_result = repair_function(
                 session=session,
                 instruction=text,
                 previous_preview=base_preview,
                 validation_error=dict(replay_validation),
                 **repair_input,
-                request_id=f"replay:{str(retry_job_id).strip()}",
-                job_id=str(retry_job_id).strip(),
+                request_id=f"replay:{repair_source_job_id}",
+                job_id=repair_source_job_id,
                 _meta=_meta,
             )
             if repaired_result.get("ok"):
@@ -27823,6 +28329,7 @@ def get_session(
     return {
         "ok": bool(session),
         "session": session,
+        'replay_base_ref':_prototype_replay_base_ref(session) if session else None,
         "developer_evidence": _developer_evidence(
             webspace_id=ws,
             session=session,

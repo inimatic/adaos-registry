@@ -1138,6 +1138,21 @@ def test_runtime_prefers_sdk_node_identity(monkeypatch, tmp_path):
     assert repository.node_id == "node-from-sdk"
 
 
+def _assert_initial_discovery_deltas(items):
+    # Scan completion and the independent artwork worker can race. Require the
+    # same ordered source revision with one pending and at most one terminal
+    # artwork event, irrespective of whether the terminal event already arrived.
+    assert [item["operation"] for item in items] in (
+        ["added", "updated"], ["added", "updated", "updated"])
+    source = items[0]["source"]
+    assert all(item["source"]["id"] == source["id"]
+               and item["source"]["fingerprint"] == source["fingerprint"] for item in items)
+    states = [item["source"]["metadata"]["artwork"]["state"] for item in items[1:]]
+    assert states[0] == "pending"
+    if len(states) == 2:
+        assert states[1] in {"ready", "unavailable", "failed"}
+
+
 def test_import_is_async_reference_only_and_excludes_images(tmp_path):
     library = tmp_path / "library"
     album = library / "Artist" / "Album"
@@ -1159,10 +1174,8 @@ def test_import_is_async_reference_only_and_excludes_images(tmp_path):
     assert job["status"] == "completed"
     assert job["progress"]["processed_count"] == 1
     deltas = main.pull_deltas(limit=10)
-    assert [item["source"]["name"] for item in deltas["items"]] == [
-        "01.mp3",
-        "01.mp3",
-    ]
+    _assert_initial_discovery_deltas(deltas["items"])
+    assert all(item["source"]["name"] == "01.mp3" for item in deltas["items"])
     added = deltas["items"][0]
     artwork_update = deltas["items"][1]
     assert added["operation"] == "added"
@@ -1192,10 +1205,9 @@ def test_incremental_scan_emits_only_changes_and_tombstones(tmp_path):
     imported = main.import_folder(path=str(library))
     _wait(imported["job"]["id"])
     first = main.pull_deltas(limit=10)
-    assert [item["operation"] for item in first["items"]] == ["added", "updated"]
+    _assert_initial_discovery_deltas(first["items"])
     assert first["items"][-1]["source"]["metadata"]["artwork"]["state"] in {
-        "pending",
-        "unavailable",
+        "pending", "ready", "unavailable", "failed",
     }
 
     unchanged = main.start_scan(root_id=imported["root"]["id"])
@@ -2397,6 +2409,8 @@ def test_worker_removes_only_stale_orphan_rendition_partials(monkeypatch, tmp_pa
     old = time.time() - 3600
     os.utime(stale, (old, old))
     monkeypatch.setenv("MEDIA_LIBRARY_AGENT_PARTIAL_CLEANUP_GRACE_SECONDS", "900")
+    clock = [10.0]  # A fresh Linux runner may have less than ten minutes uptime.
+    monkeypatch.setattr(worker_module.time, "monotonic", lambda: clock[0])
     worker = MediaLibraryAgentWorker(repository)
 
     removed = worker._cleanup_orphan_rendition_partials()
@@ -2405,6 +2419,15 @@ def test_worker_removes_only_stale_orphan_rendition_partials(monkeypatch, tmp_pa
     assert not stale.exists()
     assert recent.exists()
     assert regular.exists()
+    second = root / "second.mp4.partial"
+    second.write_bytes(b"stale")
+    os.utime(second, (old, old))
+    clock[0] += 1
+    assert worker._cleanup_orphan_rendition_partials() == 0
+    assert second.exists()
+    clock[0] += 600
+    assert worker._cleanup_orphan_rendition_partials() == 1
+    assert not second.exists()
 
 
 def test_ffmpeg_capabilities_selects_hardware_with_software_fallback(

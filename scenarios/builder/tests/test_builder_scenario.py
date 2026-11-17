@@ -103,6 +103,44 @@ def test_ui_preserves_accepted_two_area_surface_and_operational_modals() -> None
     assert page["meta"]["builder"]["binding_mode"] == "skill"
 
 
+def test_beta_publication_separates_preview_profile_from_release_data_transition() -> None:
+    webui = _load("webui.json")
+    page = webui["ui"]["application"]["desktop"]["pageSchema"]
+    widgets = _by_id(webui)
+
+    assert page["initialState"]["betaDataSource"] == "continue_beta"
+    selector = widgets["trial-beta-data-source"]
+    source = next(row for row in selector["inputs"]["buttons"] if row["id"] == "source")
+    assert source["selectedStateKey"] == "betaDataSource"
+    assert {row["id"] for row in source["options"]} == {
+        "continue_beta", "stable_snapshot", "empty"
+    }
+    confirm = widgets["trial-access-actions"]
+    call = next(row for row in confirm["actions"] if row.get("type") == "callSkill")
+    assert call["params"]["beta_data_source"] == "$state.betaDataSource"
+    assert call["params"]["acknowledge_beta_data_reset"] == (
+        "$state.acknowledgeBetaDataReset"
+    )
+    button = next(row for row in confirm["inputs"]["buttons"] if row["id"] == "confirm")
+    assert "acknowledgeBetaDataReset" in button["enabledIf"]
+    stable_notice = next(
+        row for row in widgets["publish-warning"]["inputs"]["fields"]
+        if row["id"] == "stable-data-transition"
+    )
+    assert "adopt the reviewed Beta dataset" in stable_notice["content"]
+
+    for locale in ("en", "ru"):
+        strings = _load(f"assets/i18n/workbench-live-{locale}.json")
+        assert {
+            "builder.beta_data.title",
+            "builder.beta_data.continue",
+            "builder.beta_data.stable",
+            "builder.beta_data.empty",
+            "builder.beta_data.acknowledge",
+            "builder.stable_data.adopt_beta",
+        } <= set(strings)
+
+
 def test_automation_diagnostics_use_managed_search_instead_of_local_paths() -> None:
     webui = _load("webui.json")
     widgets = _by_id(webui)
@@ -558,6 +596,38 @@ def test_long_project_title_has_a_full_text_surface_besides_the_compact_menu() -
     assert len(widgets["design-current-work"]["inputs"]["fields"]) <= 3
 
 
+def test_workbench_projects_a_webspace_scoped_data_profile_selector() -> None:
+    page = _load("webui.json")["ui"]["application"]["desktop"]["pageSchema"]
+    widgets = _by_id(page)
+    header = widgets["design-workbench-header"]
+    selector = next(
+        button for button in header["inputs"]["buttons"]
+        if button["id"] == "data-profile"
+    )
+
+    assert selector["selectedStateKey"] == "selectedDataProfileId"
+    assert selector["optionsDataSource"]["name"] == (
+        "builder_sdk_control_skill.get_data_profiles"
+    )
+    actions = [
+        action for action in header["actions"]
+        if action.get("on") == "select:data-profile"
+    ]
+    calls = [action for action in actions if action.get("type") == "callSkill"]
+    assert len(calls) == 2
+    assert {action["params"]["confirmed"] for action in calls} == {False, True}
+    assert next(action for action in calls if action["params"]["confirmed"])[
+        "confirmation"
+    ]
+    assert all(
+        action["target"] == "builder_sdk_control_skill.select_data_profile"
+        for action in calls
+    )
+    bindings = widgets["design-current-work"]["inputs"]["stateBindings"]
+    assert bindings["selectedDataProfileId"] == "data_profile.profile_id"
+    assert bindings["dataProfileGeneration"] == "data_profile.generation"
+
+
 def test_no_deprecated_update_or_automatic_state_change_retry_surface() -> None:
     webui = _load("webui.json")
     calls = [node for node in _walk(webui) if node.get("type") == "callSkill"]
@@ -616,6 +686,7 @@ def test_all_localized_payloads_are_valid_utf8_without_replacement_characters() 
     for path in paths:
         text = path.read_bytes().decode("utf-8")
         assert "\ufffd" not in text
+        assert "????" not in text
     assert {"en", "ru", "workbench-live-en", "workbench-live-ru"} <= {path.stem for path in (ROOT / "assets/i18n").glob("*.json")}
 
 

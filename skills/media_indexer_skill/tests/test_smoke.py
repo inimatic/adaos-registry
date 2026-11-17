@@ -94,6 +94,7 @@ def test_webui_declares_compact_yjs_and_stream_receiver() -> None:
     assert search_action["params"]["_observe"]["path"] == "data/media_indexer/status"
 
 
+
 def test_scanner_finds_supported_media_without_hashing(tmp_path: pathlib.Path) -> None:
     media_dir = tmp_path / "media"
     media_dir.mkdir()
@@ -756,6 +757,7 @@ def test_rehydrate_restores_index_metadata_from_skill_data(monkeypatch, tmp_path
     assert result["index"]["index_dir"] == str(index_dir)
     stored = json.loads((tmp_path / "skill_env.json").read_text(encoding="utf-8"))
     assert stored["media_indexer.index"]["index_dir"] == str(index_dir)
+    assert stored["media_indexer.index"]["db_dir"] == str(tmp_path / "data" / "db" / "media_indexer")
 
 
 def test_yjs_demand_projects_compact_persisted_state_without_loading_index(monkeypatch) -> None:
@@ -815,6 +817,7 @@ def test_empty_scan_clears_stale_skill_data_index(monkeypatch, tmp_path: pathlib
     assert result["indexed_count"] == 0
     assert result["index"]["cleared"] is True
     assert not (index_dir / "metadata.json").exists()
+    assert not (tmp_path / "data" / "db" / "media_indexer" / "library.json").exists()
     assert reset_seen["called"] is True
     stored = json.loads((tmp_path / "skill_env.json").read_text(encoding="utf-8"))
     assert stored["media_indexer.index"]["indexed_count"] == 0
@@ -874,6 +877,16 @@ def test_scan_resets_loaded_vector_index_before_reindexing(monkeypatch, tmp_path
 
     assert fake_vector.reset_called is True
     assert result["index"]["text_count"] == 1
+    db_dir = tmp_path / "data" / "db" / "media_indexer"
+    library = json.loads((db_dir / "library.json").read_text(encoding="utf-8"))
+    manifest = json.loads((db_dir / "manifest.json").read_text(encoding="utf-8"))
+    record = library["items"][0]
+    assert record["checksum_sha256"]
+    assert record["fingerprint"]["algorithm"] == "sha256"
+    assert record["path"] == str(media_path)
+    assert manifest["checksum_algorithm"] == "sha256"
+    assert manifest["record_count"] == 1
+    assert result["index"]["db_dir"] == str(db_dir)
     assert result["diagnostics"]["by_type"] == {"video": 1}
     assert result["diagnostics"]["ner_parsed"] == 1
     assert result["diagnostics"]["indexed_count"] == 1

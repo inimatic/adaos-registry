@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ast
 import copy
 from contextvars import ContextVar
 import importlib.util
@@ -84,6 +85,12 @@ def _load_module():
     module.sdk_access = types.SimpleNamespace(
         require=lambda capability: None,
         invocation=lambda: {"request_id": "test-request"},
+    )
+    module.developer_prompt_context = types.SimpleNamespace(
+        **{name: getattr(module.developer_prompt_context, name)
+           for name in dir(module.developer_prompt_context)
+           if not name.startswith("_") and name != "get"},
+        get=lambda *args: {},
     )
 
     # Runtime self-tests receive the active skill memory path. Keep every
@@ -1861,6 +1868,107 @@ def test_sync_session_from_artifacts_refreshes_stale_current_revision(tmp_path) 
     assert session["preview_state"]["title"] == "Updated Prototype"
     assert session["preview_state"]["page_schema"]["widgets"][0]["type"] == "ui.form"
     assert session["ui_revisions"][-1]["revision"] == "024"
+
+
+def test_sync_session_from_artifacts_recovers_retained_revision_from_core_head(
+    tmp_path, monkeypatch
+) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "retained_prototype"
+    artifact_root.mkdir(parents=True)
+    (artifact_root / "webui.json").write_text(
+        json.dumps(
+            {
+                "schema": "adaos.webui.v1",
+                "ui": {
+                    "application": {
+                        "desktop": {
+                            "pageSchema": {
+                                "id": "retained-prototype",
+                                "title": "Retained Prototype",
+                                "layout": {"type": "single"},
+                                "widgets": [],
+                                "meta": {
+                                    "builder": {
+                                        "proto": "008",
+                                        "ui_revision": "008",
+                                    }
+                                },
+                            }
+                        }
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *_args: {
+            "prototype": {"head_revision": None},
+            "automation": {"source_prototype_revision": "008"},
+        },
+    )
+    session = {
+        "id": "scenario.retained",
+        "scenario_id": "retained",
+        "artifact_root": str(artifact_root),
+        "ui_revisions": [],
+        "preview_state": {},
+    }
+
+    assert skill._sync_session_from_artifacts(session) is True
+    assert session["ui_revision"] == "008"
+    assert session["version"] == "008"
+    assert session["preview_state"]["version"] == "008"
+    assert skill._next_ui_revision_label(session) == "009"
+
+
+def test_sync_session_from_artifacts_rejects_retained_revision_head_mismatch(
+    tmp_path, monkeypatch
+) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "retained_prototype"
+    artifact_root.mkdir(parents=True)
+    (artifact_root / "webui.json").write_text(
+        json.dumps(
+            {
+                "schema": "adaos.webui.v1",
+                "ui": {
+                    "application": {
+                        "desktop": {
+                            "pageSchema": {
+                                "id": "retained-prototype",
+                                "title": "Retained Prototype",
+                                "layout": {"type": "single"},
+                                "widgets": [],
+                                "meta": {
+                                    "builder": {"ui_revision": "008"}
+                                },
+                            }
+                        }
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *_args: {"prototype": {"head_revision": "009"}},
+    )
+    session = {
+        "id": "scenario.retained",
+        "scenario_id": "retained",
+        "artifact_root": str(artifact_root),
+        "ui_revisions": [],
+        "preview_state": {},
+    }
+
+    with pytest.raises(ValueError, match="Prototype head disagree"):
+        skill._sync_session_from_artifacts(session)
 
 
 def test_create_generic_scenario_draft_writes_declarative_webui(
@@ -3929,6 +4037,19 @@ def test_local_ui_edit_rejects_preexisting_rendering_critical_debt(
 
     assert result["ok"] is False
     assert "validation_mode" not in result["capability_validation"]
+
+
+def test_llm_task_telemetry_retains_provider_continuations_and_missing_is_unknown() -> None:
+    skill = _load_module()
+    primary = skill._llm_job_telemetry({"job_id": "primary", "telemetry": {"provider_calls": 2}})
+    repair = skill._llm_job_telemetry({"job_id": "repair", "telemetry": {"provider_calls": 1}})
+    assert primary["provider_calls"] == 2
+    assert "provider_calls" not in skill._llm_job_telemetry({"job_id": "unknown"})
+    combined = skill._combine_llm_job_telemetry(primary, {"repair": {"telemetry": repair}})
+    assert [row["provider_calls"] for row in combined["attempt_observations"]] == [2, 1]
+    metrics = skill.sdk_builder_observability.execution_metrics_from_llm({"telemetry": combined})
+    assert metrics["llm_calls"] == 2
+    assert metrics["provider_calls"] == 3 and metrics["provider_calls_complete"]
 
 
 def test_llm_task_telemetry_includes_repair_usage() -> None:
@@ -8149,6 +8270,27 @@ def test_semantic_output_compiles_against_exact_prototype_brief() -> None:
         {"id": "work-1", "title": "Calibrate sensor"}
     ]
     assert result["requirement_runtime_map"]["job:01"]
+    assert result["semantic_evaluation_brief"] is None  # Legacy Brief is not model-assisted authority.
+
+
+@pytest.mark.parametrize('semantic', [True, False])
+def test_postconditions_receive_admitted_meaning_only_from_semantic_compilation(monkeypatch, semantic):
+    skill = _load_module()
+    observed = []
+    def evaluate(*args, **kwargs):
+        observed.append(kwargs)
+        return {'ok': True, 'qualification': {'requirements': {}}, 'postconditions': []}
+    monkeypatch.setattr(skill.developer_ui, 'evaluate', evaluate)
+    intent = {'statement': 'Add a read-only board. Do not enable dragging or editing.'}
+    brief = {'task_contract': {'source': intent}}
+    value = {'ok': True, 'payload': {'schema': 'adaos.webui.v1', 'ui': {'application': {}}},
+             'validation': {'ok': True}, 'semantic_evaluation_brief': brief}
+    if semantic:value['semantic_document'] = {'schema': 'adaos.webui.semantic.v2'}
+    result = skill._validate_llm_request_postconditions(value, instruction=intent['statement'], before_webui={})
+    assert result['ok'] is True and observed
+    for kwargs in observed:
+        if semantic:assert kwargs['intent'] == intent and kwargs['prototype_brief'] == brief
+        else:assert 'intent' not in kwargs and 'prototype_brief' not in kwargs
 
 
 def test_reasoning_profile_override_preserves_default_and_other_models():
@@ -19014,3 +19156,191 @@ def test_resumed_completion_uses_only_its_durable_job_binding(monkeypatch, has_t
         assert "original-task" in published[0]["publication_key"]
     else:
         assert published == []
+
+
+def test_change_intake_routes_russian_project_and_data_work_to_automation() -> None:
+    skill = _load_module()
+    issues = skill._builder_change_issues(
+        "Перенеси кнопку в правую панель.\n"
+        "Добавь в project.yaml профиль demo-fixture и write_policy none.\n"
+        "Реализуй в media_center_skill воспроизводимую фикстуру и проверь Alpha.",
+        change_id="builder_change_project_data",
+    )
+
+    assert [item["lane"] for item in issues] == [
+        "prototype",
+        "automation",
+        "automation",
+    ]
+    assert "Prototype visibly" in issues[0]["acceptance_criteria"][0]
+    assert all(
+        "implementation and its tests" in item["acceptance_criteria"][0]
+        for item in issues[1:]
+    )
+
+
+def test_change_intake_honors_automation_only_directive_for_ambiguous_clauses() -> None:
+    skill = _load_module()
+    issues = skill._builder_change_issues(
+        "Every requirement below is implementation work for Automation.\n"
+        "UI 001 has already been accepted.\n"
+        "Keep the current layout.\n"
+        "Implement the project data profiles and tests.",
+        change_id="builder_change_automation_only",
+    )
+
+    assert issues
+    assert {item["lane"] for item in issues} == {"automation"}
+    assert all(
+        "implementation and its tests" in item["acceptance_criteria"][0]
+        for item in issues
+    )
+
+
+def test_chat_keeps_update_result_emission_owned_by_core(monkeypatch) -> None:
+    skill = _load_module()
+    session = {"scenario_id": "builder", "artifact_root": "/dev/scenarios/builder"}
+    binding = {"runtime_scenario_id": "builder", "dev_webspace_id": "desktop-dev"}
+    emitted: list[str] = []
+
+    monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
+    monkeypatch.setattr(
+        skill.developer_prompt_context,
+        "get",
+        lambda *_args: {"workflow_state": "automation"},
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *_args: {"governed": {"state": "published"}},
+    )
+    def emit(text, **kwargs):
+        if kwargs.get("from_", "hub") == "hub":
+            emitted.append(str(text))
+        return True  # The current ingress contract requires a persisted user turn.
+    monkeypatch.setattr(skill, "_safe_emit_chat", emit)
+
+    def _update(**kwargs):
+        if skill._should_emit_api_tool_chat(kwargs["_meta"]):
+            skill._safe_emit_chat("Updated once.")
+        return {"ok": True, "status": "llm_repaired", "message": "Updated once."}
+
+    monkeypatch.setattr(skill, "update_current_scenario", _update)
+
+    result = skill.chat(
+        "Repair the saved candidate.",
+        webspace_id="desktop",
+        _meta={"action_source": "api_tool_call"},
+    )
+
+    assert result["status"] == "llm_repaired"
+    assert emitted == []
+    assert result["message"] == "Updated once."
+    assert result["chat_emit"]["mode"] == "core_materialization"
+
+
+
+def test_explicit_desktop_scenario_creation_does_not_edit_selected_project() -> None:
+    skill = _load_module()
+    text = (
+        'Create a new desktop scenario named "E2E Notes" for keeping short '
+        'personal notes. Keep it in Prototype and do not publish it.'
+    )
+
+    parsed = skill._parse_builder_command(text, has_session=True)
+
+    assert parsed["intent"] == "project.create"
+
+
+
+def test_explicit_tool_confirmation_is_discoverable_and_uses_the_same_identity_guard(monkeypatch):
+    skill = _load_module()
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    declaration = next(item for item in manifest["tools"] if item["name"] == "create_application_draft")
+    assert "confirmed_technical_application_id" in declaration["input_schema"]["properties"]
+    calls = []
+    monkeypatch.setattr(skill.sdk_builder_applications, "publisher_context", lambda: {"publisher_ref": "publisher:test"})
+    monkeypatch.setattr(skill, "create_scenario_draft", lambda **kw: calls.append(kw) or {"ok": False, "status": "draft_creation_failed"})
+    result = skill.create_application_draft("Create an Application with exact technical id owned_confirmed_app.",
+        confirmed_technical_application_id="owned_confirmed_app", webspace_id="owned-test")
+    assert result["application_id"] == calls[0]["scenario_id"] == "owned_confirmed_app"
+
+
+
+def test_compact_provider_outputs_match_the_discoverable_tool_manifest():
+    from adaos.services.artifact_pipeline.cbs_authoring import compile_cbs_provider_files
+    # Generated contracts are compiled from compact authoring, not source files.
+    names = ("skill.yaml", "handlers/main.py", "contracts/provider.cbs.yaml")
+    compiled = compile_cbs_provider_files({name: (SKILL_ROOT / name).read_bytes() for name in names},
+        kind="skill", allow_generated_outputs=True)
+    operation = next(item for item in compiled.capability.to_dict()["operations"] if item["operation_id"] == "create_application_draft")
+    assert "confirmed_technical_application_id" in operation["input_schema"]["properties"]
+
+
+
+@pytest.mark.parametrize("conflict", ["idea", "argument", "legacy_confirmation"])
+def test_explicit_tool_confirmation_conflicts_fail_before_publisher_or_creation(monkeypatch, conflict):
+    skill = _load_module()
+    monkeypatch.setattr(skill.sdk_builder_applications, "publisher_context", lambda: pytest.fail("conflict must fail before publisher"))
+    monkeypatch.setattr(skill, "create_scenario_draft", lambda **kw: pytest.fail("conflict must fail before creation"))
+    kwargs = {"idea": "Create an Application with exact technical id owned_confirmed_app.",
+        "confirmed_technical_application_id": "owned_confirmed_app", "webspace_id": "owned-test"}
+    if conflict == "idea": kwargs["idea"] = "Create an Application with exact technical id other_app."
+    if conflict == "argument": kwargs["application_id"] = "other_app"
+    if conflict == "legacy_confirmation": kwargs["_meta"] = {"application_id": "other_app", "technical_application_id_confirmed": True}
+    result = skill.create_application_draft(**kwargs)
+    assert result["ok"] is False and result["status"] == "application_identity_confirmation_invalid"
+
+
+
+def test_safe_emit_chat_does_not_wait_for_stuck_append(monkeypatch) -> None:
+    skill = _load_module()
+
+    import adaos.sdk.io.out as io_out
+
+    calls: list[str] = []
+
+    def _slow_chat_append(text, **_kwargs):
+        calls.append(text)
+        time.sleep(1.0)
+
+    monkeypatch.setattr(skill, "CHAT_APPEND_TIMEOUT_S", 0.02)
+    monkeypatch.setattr(io_out, "chat_append", _slow_chat_append)
+
+    started = time.perf_counter()
+    acknowledged = skill._safe_emit_chat(
+        "hello", webspace_id="desktop", _meta={"message_id": "test-legacy-actions"},
+        actions=[{"id": "confirm", "label": "Confirm"}])
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < 0.5
+    assert calls == ["hello"]
+    assert acknowledged is False  # A timeout must never manufacture a write receipt.
+
+
+
+def test_runtime_sources_use_only_public_adaos_sdk_imports() -> None:
+    violations = []
+    for path in SKILL_ROOT.rglob("*.py"):
+        if "tests" in path.relative_to(SKILL_ROOT).parts:
+            continue
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            modules = ([node.module] if isinstance(node, ast.ImportFrom)
+                       else [alias.name for alias in node.names]
+                       if isinstance(node, ast.Import) else [])
+            violations.extend((str(path.relative_to(SKILL_ROOT)), node.lineno, module)
+                              for module in modules if module and module.startswith("adaos.")
+                              and not module.startswith("adaos.sdk"))
+    assert not violations, violations
+
+
+def test_manifest_admits_read_tools_without_weakening_capability_policy(tmp_path):
+    from adaos.services.policy.skill_capabilities import decide_skill_capability
+
+    ctx = types.SimpleNamespace(
+        skill_ctx=ContextVar('builder_manifest_capability_regression', default=types.SimpleNamespace(name='builder_skill', path=SKILL_ROOT)),
+        paths=types.SimpleNamespace(state_dir=lambda: tmp_path),
+    )
+    assert decide_skill_capability(ctx, 'workspace.read').allowed
+    assert decide_skill_capability(ctx, 'workspace.write').allowed
+    assert not decide_skill_capability(ctx, 'credentials.admin').allowed

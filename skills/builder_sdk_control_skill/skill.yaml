@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.2.29
+version: 0.2.34
 description: SDK-only backend for the functional Builder DEV scenario.
 capabilities:
 - ai.inference
@@ -21,11 +21,11 @@ runtime:
       schema: adaos.skill.activation_assessment.v1
       assessor: builder.compiler
       classification: tool_only
-      handler_digest: sha256:548d1b80b71ae79ff5c137ea0168b170ded6dcf6591da3ccdcb2c48543bb7b25
+      handler_digest: sha256:97f4c5ea6fe7e6af80103ffdd2847101fc1b67de335dfe78e7ae0e674e662136
       observed_subscriptions: []
       declared_subscriptions: []
       dynamic_subscription_count: 0
-      tool_count: 87
+      tool_count: 90
       reasons:
       - tool_invocation_can_import_handler_on_demand
 default_tool: get_state
@@ -960,6 +960,33 @@ tools:
       model:
         type: string
         minLength: 1
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: set_prototype_generation_profile
+  description: Select an explicit DEV Prototype qualification profile for this project
+    only.
+  entry: handlers.main:set_prototype_generation_profile
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - profile
+    properties:
+      profile:
+        type: string
+        enum:
+        - default
+        - s2-inline-typed-v1
+        - s2-inline-json-envelope-v1
       object_type:
         type: string
         enum:
@@ -2327,6 +2354,16 @@ tools:
       verification_evidence:
         type: object
         description: Release-bound Builder Final Verification evidence.
+      beta_data_source:
+        type: string
+        enum:
+        - continue_beta
+        - stable_snapshot
+        - empty
+        description: Immutable source snapshot for the new isolated Beta dataset.
+      acknowledge_beta_data_reset:
+        type: boolean
+        description: Explicit acknowledgement when Stable replaces retained Beta writes.
       webspace_id:
         type: string
   output_schema:
@@ -2502,7 +2539,85 @@ tools:
     - ok
     - selected
     - content
+- name: get_data_profiles
+  description: List Project data profiles and the active profile of this Preview Webspace.
+  entry: handlers.main:get_data_profiles
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: select_data_profile
+  description: Switch this Webspace Preview to one Project data profile and rematerialize its pinned UI revision.
+  entry: handlers.main:select_data_profile
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      profile_id:
+        type: string
+        minLength: 1
+      expected_generation:
+        type: integer
+        minimum: 0
+      confirmed:
+        type: boolean
+        default: false
+      object_type:
+        type: string
+        enum:
+        - project
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+    required:
+    - profile_id
+    - expected_generation
+  output_schema:
+    type: object
 data_routes:
+- surface: scenario:builder.data-profile-selector
+  route: tool/collection
+  owner: skill:builder_sdk_control_skill
+  tool: get_data_profiles
+  first_paint: Project default profile until the Webspace preference is resolved
+  recovery: reopen the selector after profile or Preview invalidation
+  budget:
+    max_payload_bytes: 65536
+    max_items: 100
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 1
+    preserve_last_value: false
+    invalidation_tags:
+    - builder.project.preview-data
+    - builder.project.preview
+    - builder.project.metadata
+  guard_visibility:
+    degraded_state: data profiles are unavailable for the selected Project
+    metric: data_route.builder_data_profiles_read
 - surface: scenario:builder.runtime-revisions
   route: tool/details
   owner: skill:builder_sdk_control_skill
@@ -2628,10 +2743,13 @@ data_routes:
     invalidation_tags:
     - builder.project.metadata
     - builder.project.lifecycle
+    - builder.project.preview
+    - builder.project.preview-data
     - builder.project.automation
+    - builder.project.publication
+    - builder.project.change
     - builder.project.files
     - builder.project.llm
-    - builder.project.change
   guard_visibility:
     degraded_state: current project data is unavailable
     metric: data_route.builder_get_workbench
@@ -3355,7 +3473,7 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-10-29T16:21:00+00:00'
+updated_at: '2026-11-06T21:38:00+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.1002+6139.cdc1a0cfc

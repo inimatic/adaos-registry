@@ -22,8 +22,39 @@ def _module():
     return module
 
 
+def test_prototype_generation_profile_uses_existing_project_primary_and_governed_sdk(monkeypatch):
+    module = _module()
+    calls = []
+    monkeypatch.setattr(module, '_execution_identity', lambda kind, identity: ('scenario', 'primary'))
+    monkeypatch.setattr(module.prototype, 'configure_generation_profile', lambda *args, **kwargs:
+        calls.append((args, kwargs)) or {'ok': True, 'profile': kwargs['profile']})
+    result = module.set_prototype_generation_profile('s2-inline-typed-v1', object_type='project', object_id='owned')
+    assert result['ok']
+    assert calls == [(('scenario', 'primary'), {'profile': 's2-inline-typed-v1'})]
+
+
+def test_prototype_generation_profile_is_declared_in_package_permission_contract():
+    from adaos.services.applications.access_management import ApplicationAccessManagementService
+    from jsonschema import Draft202012Validator
+
+    manifest = yaml.safe_load((Path(__file__).resolve().parents[1] / 'skill.yaml').read_text(encoding='utf-8'))
+    tool = next(row for row in manifest['tools'] if row['name'] == 'set_prototype_generation_profile')
+    assert tool['entry'] == 'handlers.main:set_prototype_generation_profile'
+    assert tool['side_effects'] == 'local_write'
+    assert ApplicationAccessManagementService.runtime_permission(side_effects=tool['side_effects'],
+        application_access=tool.get('application_access', {}),
+        component_capabilities=manifest['capabilities']) == ('workspace.write', 'workspace.write')
+    validator = Draft202012Validator(tool['input_schema'])
+    for profile in ('default', 's2-inline-typed-v1', 's2-inline-json-envelope-v1'):
+        validator.validate({'profile': profile, 'object_type': 'project', 'object_id': 'owned'})
+    assert not validator.is_valid({})
+    assert not validator.is_valid({'profile': 'automatic-api-fallback'})
+
+
 @pytest.fixture(autouse=True)
 def local_trial_sdk(monkeypatch):
+    from adaos.sdk import applications as catalog
+    monkeypatch.setattr(catalog, "get_lifecycle_for_source", lambda *args, **kwargs: {"available": False})
     from adaos.sdk.builder import applications
     from adaos.sdk.developer import compositions
 
@@ -64,6 +95,26 @@ def test_replaying_existing_trial_still_reconciles_native_desktop(local_trial_sd
         assert result == state
     assert len(local_trial_sdk) == 2
     assert all(call[1]["webspace_id"] == "desktop" for call in local_trial_sdk)
+
+
+def test_trial_placement_forwards_immutable_beta_data_decision(local_trial_sdk, monkeypatch):
+    module = _module()
+    state = {"generation": 7, "project": {"placements": [{
+        "kind": "trial", "status": "active", "result_ref": {"id": "candidate-example"},
+        "target": {"webspace_id": "desktop"}}]}, "delivery": {
+            "status": "trial", "candidate_id": "candidate-example",
+            "package_digest": "sha256:example", "release_digest": "sha256:release"}}
+    monkeypatch.setattr(module.workflow, "get_state", lambda *args: state)
+
+    module._ensure_trial_placement(
+        "scenario", "example", result={}, candidate_id="candidate-example",
+        release_data={"version": "0.1.0"}, package_digest="sha256:example",
+        trial_workflow=state, webspace_id="desktop-dev", meta=None,
+        beta_data_source="stable_snapshot", acknowledge_beta_data_reset=True,
+    )
+
+    assert local_trial_sdk[-1][1]["beta_data_source"] == "stable_snapshot"
+    assert local_trial_sdk[-1][1]["acknowledge_beta_data_reset"] is True
 
 
 @pytest.mark.parametrize("changed", [None, "status", "candidate_id", "package_digest", "release_digest"])
@@ -191,7 +242,8 @@ def test_workbench_tools_manifest_matches_python_parameters() -> None:
     manifest = yaml.safe_load((Path(__file__).resolve().parents[1] / "skill.yaml").read_text(encoding="utf-8"))
     names = {"get_workbench", "get_review", "get_codex_options", "set_codex_profile", "get_model_settings",
              "get_prototype_model_choices", "save_specification_delta", "get_workbench_messages",
-             "append_discussion", "read_readme", "save_readme", "get_about", "list_icon_drafts"}
+             "append_discussion", "read_readme", "save_readme", "get_about", "list_icon_drafts",
+             "get_data_profiles", "select_data_profile"}
     for entry in manifest["tools"]:
         if entry["name"] in names:
             signature = inspect.signature(getattr(module, entry["name"]))
@@ -207,6 +259,47 @@ def test_builder_declares_application_lifecycle_capabilities() -> None:
         "applications.develop",
         "applications.publish",
     }
+
+
+def test_data_profile_tools_use_the_selected_projects_scenario_and_builder_host(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "_execution_identity", lambda *_args: ("scenario", "primary"))
+    monkeypatch.setattr(module, "_preview_source_webspace_id", lambda *_args: "desktop")
+    monkeypatch.setattr(
+        module.preview,
+        "get_data_profile",
+        lambda scenario_id, **kwargs: {
+            "scenario_id": scenario_id,
+            "profile_id": "fixture",
+            "generation": 2,
+            "options": [{"id": "fixture", "label": "Fixture"}],
+            **kwargs,
+        },
+    )
+    selected = []
+    monkeypatch.setattr(
+        module.preview,
+        "select_data_profile",
+        lambda *args, **kwargs: selected.append((args, kwargs)) or {"ok": True},
+    )
+
+    listed = module.get_data_profiles("project", "application", webspace_id="desktop-dev")
+    switched = module.select_data_profile(
+        "fixture",
+        2,
+        object_type="project",
+        object_id="application",
+        webspace_id="desktop-dev",
+    )
+
+    assert listed["items"] == [{"id": "fixture", "label": "Fixture"}]
+    assert listed["source_webspace_id"] == "desktop"
+    assert switched == {"ok": True}
+    assert selected == [(('primary', 'fixture'), {
+        "expected_generation": 2,
+        "confirmed": False,
+        "source_webspace_id": "desktop",
+    })]
 
 
 def test_workbench_projects_canonical_state_without_fixture_or_inferred_actor(monkeypatch) -> None:
@@ -2284,6 +2377,7 @@ def test_project_display_returns_terminal_not_found_projection(
         "can_prepare_candidate": False,
         "can_decide_candidate": False,
         "can_publish": False,
+        "can_checkpoint": False,
         "can_start_implementation": False,
     }
 
@@ -4946,7 +5040,9 @@ def harness():
         _automation_execution_status=lambda value: value.get("status", "not_started"),
         _automation_children=lambda *args, **kwargs: [],
         _publication_children=lambda *args: [], _version_title=lambda v: f"v {v}",
-        prototype=SimpleNamespace(history=history), workflow=SimpleNamespace(get_lifecycle_state=compact, get_state=forbidden),
+        prototype=SimpleNamespace(history=history), workflow=SimpleNamespace(get_lifecycle_state=compact, get_state=forbidden,
+            project_release_lineage=lambda nodes, **kwargs: nodes),
+        applications=SimpleNamespace(get_lifecycle_for_source=lambda *args, **kwargs: {"available": False}),
         automation=SimpleNamespace(get_state=saved_session),
         projects=SimpleNamespace(ProjectNotFoundError=LookupError, list_files=forbidden),
         compositions=SimpleNamespace(ProjectCompositionNotFound=LookupError),

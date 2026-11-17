@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: adaos_builder
-version: 0.3.42
+version: 0.3.48
 profiles:
 - adaos.builder.v1
 - adaos.development.workbench.v1
@@ -10,12 +10,6 @@ components:
   - ref: scenario:builder
     role: primary
     exposure: application
-    lifecycle: bound
-    relations:
-    - presents
-  - ref: scenario:prompt_engineer_scenario
-    role: supporting
-    exposure: advanced
     lifecycle: bound
     relations:
     - presents
@@ -43,23 +37,17 @@ components:
     lifecycle: bound
     relations:
     - uses
-  - ref: skill:prompt_engineer_skill
-    role: supporting
-    exposure: advanced
-    lifecycle: bound
+  dependencies:
+  - ref: skill:voice_chat_skill
+    version: '>=0.7.8,<0.8'
     relations:
     - uses
-  dependencies: []
 entrypoints:
 - id: builder
   presentation: scenario:builder
   default: true
   bindings:
     workbench: builder
-- id: prompt-ide
-  presentation: scenario:prompt_engineer_scenario
-  bindings:
-    workbench: prompt
 - id: skill-preview
   presentation: scenario:skill_preview
   bindings:
@@ -81,7 +69,6 @@ catalog:
   - development
   tags:
   - builder
-  - prompt-ide
   - project
   - devspace
 publication:
@@ -111,16 +98,6 @@ install:
     optional: false
     components:
     - skill:builder_automation_skill
-  - id: prompt-ide
-    title: Prompt IDE
-    title_i18n:
-      en: Prompt IDE
-      ru: Prompt IDE
-    default: false
-    optional: true
-    components:
-    - scenario:prompt_engineer_scenario
-    - skill:prompt_engineer_skill
   - id: skill-preview
     title: Skill preview
     title_i18n:
@@ -138,6 +115,12 @@ compatibility:
   validation_profiles:
   - builder.local
 lifecycle:
+  upgrade:
+    retired_components:
+    - ref: skill:prompt_engineer_skill
+      data: retain
+      reason: Retain legacy Prompt IDE data after retiring its obsolete Application
+        surface.
   uninstall:
     components: remove_if_unreferenced
     runtime_data: retain

@@ -1,4 +1,5 @@
 import json
+import yaml
 from pathlib import Path
 
 
@@ -49,6 +50,20 @@ def test_automation_correction_remains_accessible_after_checkpoint():
     assert widgets["implement"]["visibleIf"] == "$state.commands.start_automation || " + correction
 
 
+def test_automation_start_collects_required_technical_application_identity():
+    document = json.loads((Path(__file__).resolve().parents[1] / "webui.json").read_text(encoding="utf-8"))
+    widgets = {item["id"]: item for item in objects(document) if item.get("id")}
+    start = widgets["automation-start"]
+    fields = {field["id"]: field for field in start["inputs"]["fields"]}
+    identity = fields["confirmed_technical_application_id"]
+    assert identity["type"] == "text"
+    assert identity["required"] is True
+    action = next(item for item in start["actions"] if item.get("on") == "submit")
+    assert action["params"]["confirmed_technical_application_id"] == (
+        "$event.values.confirmed_technical_application_id"
+    )
+
+
 def test_existing_trial_projection_can_be_reconciled_from_native_form():
     document = json.loads((Path(__file__).resolve().parents[1] / "webui.json").read_text(encoding="utf-8"))
     items = list(objects(document))
@@ -71,3 +86,14 @@ def test_existing_trial_projection_can_be_reconciled_from_native_form():
     assert publish["params"]["confirmed"] is True
     assert publish["params"]["approve_permissions"] is True
     assert publish["params"]["verification_evidence"] == "$state.trialVerificationEvidence"
+
+
+def test_project_retains_required_voice_package_as_shared_dependency():
+    root = Path(__file__).resolve().parents[3]
+    project = yaml.safe_load((root / 'projects/adaos_builder/project.yaml').read_text(encoding='utf-8'))
+    dependency = next(item for item in project['components']['dependencies']
+                      if item['ref'] == 'skill:voice_chat_skill')
+    assert dependency['version'] == '>=0.7.8,<0.8'
+    assert dependency['relations'] == ['uses']
+    assert all(item['ref'] != 'skill:voice_chat_skill'
+               for item in project['components']['owned'])
