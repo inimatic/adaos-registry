@@ -39,16 +39,30 @@ from media_center.topology import MediaCenterTopology  # noqa: E402
 
 
 def test_declared_builder_fixture_seeds_an_isolated_representative_catalog(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch,
 ) -> None:
     from adaos.sdk.data.preview_binding import _bind_preview_data_binding
 
-    db_path = tmp_path / "fixture" / "media-center.sqlite3"
+    from adaos.sdk.data import skill_env
+    monkeypatch.setattr(skill_env, "skill_data_root", lambda: tmp_path / "fixture")
+    db_path = tmp_path / "fixture" / "db" / "media_center.sqlite3"
     with _bind_preview_data_binding(
         {
+            "schema": "adaos.builder.materialized_data_binding.v1",
             "profile_id": "demo-fixture",
             "mode": "fixture",
             "source_ref": "fixture:media_center:demo-v1",
+            "owner": "project:media_center",
+            "read_policy": "fixture", "write_policy": "none",
+            "capabilities": ["media.catalog"],
+            "logical_schema_ref": "adaos.media.catalog.v1",
+            "implementation_mappings": [{
+                "logical_ref": "media.catalog",
+                "implementation_ref": "skill:media_center_skill:fixture",
+                "status": "fixture_only"}],
+            "sensitivity": "internal", "redaction": "none", "expires_at": None,
+            "runtime_source": "isolated_preview", "provider_opened": False,
+            "ready": True,
             "_data_root": str(tmp_path / "fixture"),
         }
     ):
@@ -58,10 +72,11 @@ def test_declared_builder_fixture_seeds_an_isolated_representative_catalog(
     assert items["total_count"] == 8
     assert {item["title"] for item in items["items"]} >= {
         "Aurora Station",
-        "Northern Signals S01E01",
-        "Glass City",
+        "Northern Lights",
+        "Glass Harbor",
     }
-    assert all(item["source"] == "builder_fixture" for item in items["items"])
+    assert all(item["source"] == "demo_fixture" for item in items["items"])
+
 
 
 _HANDLER_SPEC = importlib.util.spec_from_file_location(
