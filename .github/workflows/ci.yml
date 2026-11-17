@@ -40,7 +40,7 @@ jobs:
           for suite in skills/builder_skill skills/builder_sdk_control_skill skills/media_center_skill skills/media_control_skill skills/media_library_agent skills/media_indexer_skill skills/slideshow_skill skills/infrastate_skill projects/media_center scenarios/builder scenarios/media_center; do
             if [ -d "$suite/tests" ]; then
               name="${suite//\//-}"
-              .tmp/core/.venv/bin/python -m pytest "$suite/tests" -q --import-mode=importlib \
+              .tmp/core/.venv/bin/python -m pytest "$suite/tests" -q \
                 --basetemp=".tmp/pytest-$name" --junitxml=".tmp/$name.xml"
             fi
           done
