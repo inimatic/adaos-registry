@@ -19316,3 +19316,30 @@ def test_safe_emit_chat_does_not_wait_for_stuck_append(monkeypatch) -> None:
     assert calls == ["hello"]
     assert acknowledged is False  # A timeout must never manufacture a write receipt.
 
+
+
+def test_runtime_sources_use_only_public_adaos_sdk_imports() -> None:
+    violations = []
+    for path in SKILL_ROOT.rglob("*.py"):
+        if "tests" in path.relative_to(SKILL_ROOT).parts:
+            continue
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            modules = ([node.module] if isinstance(node, ast.ImportFrom)
+                       else [alias.name for alias in node.names]
+                       if isinstance(node, ast.Import) else [])
+            violations.extend((str(path.relative_to(SKILL_ROOT)), node.lineno, module)
+                              for module in modules if module and module.startswith("adaos.")
+                              and not module.startswith("adaos.sdk"))
+    assert not violations, violations
+
+
+def test_manifest_admits_read_tools_without_weakening_capability_policy(tmp_path):
+    from adaos.services.policy.skill_capabilities import decide_skill_capability
+
+    ctx = types.SimpleNamespace(
+        skill_ctx=ContextVar('builder_manifest_capability_regression', default=types.SimpleNamespace(name='builder_skill', path=SKILL_ROOT)),
+        paths=types.SimpleNamespace(state_dir=lambda: tmp_path),
+    )
+    assert decide_skill_capability(ctx, 'workspace.read').allowed
+    assert decide_skill_capability(ctx, 'workspace.write').allowed
+    assert not decide_skill_capability(ctx, 'credentials.admin').allowed

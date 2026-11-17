@@ -85,3 +85,14 @@ def test_existing_trial_projection_can_be_reconciled_from_native_form():
     assert publish["params"]["confirmed"] is True
     assert publish["params"]["approve_permissions"] is True
     assert publish["params"]["verification_evidence"] == "$state.trialVerificationEvidence"
+
+
+def test_project_retains_required_voice_package_as_shared_dependency():
+    root = Path(__file__).resolve().parents[3]
+    project = yaml.safe_load((root / 'projects/adaos_builder/project.yaml').read_text(encoding='utf-8'))
+    dependency = next(item for item in project['components']['dependencies']
+                      if item['ref'] == 'skill:voice_chat_skill')
+    assert dependency['version'] == '>=0.7.8,<0.8'
+    assert dependency['relations'] == ['uses']
+    assert all(item['ref'] != 'skill:voice_chat_skill'
+               for item in project['components']['owned'])
