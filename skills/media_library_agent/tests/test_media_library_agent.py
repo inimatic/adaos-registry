@@ -2397,6 +2397,8 @@ def test_worker_removes_only_stale_orphan_rendition_partials(monkeypatch, tmp_pa
     old = time.time() - 3600
     os.utime(stale, (old, old))
     monkeypatch.setenv("MEDIA_LIBRARY_AGENT_PARTIAL_CLEANUP_GRACE_SECONDS", "900")
+    clock = [10.0]  # A fresh Linux runner may have less than ten minutes uptime.
+    monkeypatch.setattr(worker_module.time, "monotonic", lambda: clock[0])
     worker = MediaLibraryAgentWorker(repository)
 
     removed = worker._cleanup_orphan_rendition_partials()
@@ -2405,6 +2407,15 @@ def test_worker_removes_only_stale_orphan_rendition_partials(monkeypatch, tmp_pa
     assert not stale.exists()
     assert recent.exists()
     assert regular.exists()
+    second = root / "second.mp4.partial"
+    second.write_bytes(b"stale")
+    os.utime(second, (old, old))
+    clock[0] += 1
+    assert worker._cleanup_orphan_rendition_partials() == 0
+    assert second.exists()
+    clock[0] += 600
+    assert worker._cleanup_orphan_rendition_partials() == 1
+    assert not second.exists()
 
 
 def test_ffmpeg_capabilities_selects_hardware_with_software_fallback(

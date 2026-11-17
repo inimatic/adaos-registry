@@ -99,7 +99,7 @@ class MediaLibraryAgentWorker:
         self._watch_pending: dict[str, tuple[float, bool]] = {}
         self._embedded_metadata_backfill_complete = False
         self._storage_migrations_enqueued = False
-        self._last_partial_cleanup_monotonic = 0.0
+        self._last_partial_cleanup_monotonic: float | None = None
         self._job_retention_complete = False
         self._last_job_retention_monotonic = 0.0
         self._artwork_queue_saturated = False
@@ -935,7 +935,8 @@ class MediaLibraryAgentWorker:
 
     def _cleanup_orphan_rendition_partials(self) -> int:
         now_monotonic = time.monotonic()
-        if now_monotonic - self._last_partial_cleanup_monotonic < 600.0:
+        if (self._last_partial_cleanup_monotonic is not None
+                and now_monotonic - self._last_partial_cleanup_monotonic < 600.0):
             return 0
         self._last_partial_cleanup_monotonic = now_monotonic
         if self.repository.active_rendition_job_count() > 0:
