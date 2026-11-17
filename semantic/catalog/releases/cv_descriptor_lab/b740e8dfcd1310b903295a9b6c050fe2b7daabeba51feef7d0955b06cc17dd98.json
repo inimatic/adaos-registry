@@ -1,0 +1,447 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "cv_descriptor_lab",
+    "legacy_project_id": "cv_descriptor_lab",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "cv_descriptor_lab",
+    "display": {
+      "title": "CV Descriptor Lab",
+      "summary": "Browser-side visual object descriptor pilot for embeddings, signatures, thumbnails, and descriptions."
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "descriptors",
+        "presentation_ref": "cv_descriptor_app"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 3,
+    "created_at": "2026-09-26T01:53:56+00:00",
+    "updated_at": "2026-09-27T22:03:43+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "cv_descriptor_lab",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "cv_descriptor_lab",
+    "version": "0.1.23",
+    "release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "cv_descriptor_lab",
+      "version": "0.1.23",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:applications-beta-reconciliation-20261025",
+        "revision": "sha256:9e1ab44f35f3809c034f332a85d7ee4fbfa81217ebd46e2a6ddb80eb6f811081",
+        "path_scope": [
+          "projects/cv_descriptor_lab/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "cv_descriptor",
+          "version": "0.1.14",
+          "digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21",
+          "manifest_digest": "sha256:02244e7e63b1551cfea16f4e6a949be226c5e63a0909a5d20d517ac246f2f329",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:applications-beta-reconciliation-20261025",
+            "revision": "sha256:9e1ab44f35f3809c034f332a85d7ee4fbfa81217ebd46e2a6ddb80eb6f811081",
+            "path_scope": [
+              "skills/cv_descriptor/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/cv_descriptor",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:9e1ab44f35f3809c034f332a85d7ee4fbfa81217ebd46e2a6ddb80eb6f811081",
+          "builder": "adaos.dev.project.push"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:cv_descriptor_lab",
+          "consumer_ref": "skill:cv_descriptor",
+          "consumer_digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": false,
+          "unresolved": [
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.skill_env.skill_state_dir",
+              "location": "handlers/main.py:128"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:253"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.ctx_subnet.set",
+              "location": "handlers/main.py:451"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.events.publish",
+              "location": "handlers/main.py:479"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.stream_publish",
+              "location": "handlers/main.py:500"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.context.set_current_skill",
+              "location": "handlers/main.py:461"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.context.clear_current_skill",
+              "location": "handlers/main.py:472"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.subscribe",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.tool",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.context.clear_current_skill",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.context.set_current_skill",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.ctx_subnet",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.events.publish",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.stream_publish",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.skill_env.skill_state_dir",
+              "location": "handlers/main.py"
+            }
+          ],
+          "source_artifacts": {
+            "contracts/binding.definition.json": "sha256:eff73d88e4527d44f625a3e899d08c03b31584f84c89602522f1864f24b83ad9",
+            "contracts/capability.contract.json": "sha256:d3f094e743f503b31321b030c81b785a9e85b050835b53ac1c33cfc9fede8877",
+            "webui.json": "sha256:e4114d95001c1598ba5217f00dc23f0cac88f16a097f90faeeb4505e3b4c1f64",
+            ".adaos/package-manifest.json": "sha256:02244e7e63b1551cfea16f4e6a949be226c5e63a0909a5d20d517ac246f2f329"
+          },
+          "edges": [
+            {
+              "contract_ref": "webui:input.selector",
+              "contract_digest": "sha256:b86c19f957949bf1af5b04b747408cc9062ef2a9e69207de9a9f2621aedcd354",
+              "surface": [
+                "webui.json.registry.modals.cv_descriptor_setup_modal.schema.widgets[0]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:item.details",
+              "contract_digest": "sha256:6b35434a3583e3bc268dbbbb2766f578c5654383f6553f26d5a54dfa0f268933",
+              "surface": [
+                "webui.json.registry.modals.cv_descriptor_work_modal.schema.widgets[2]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.list",
+              "contract_digest": "sha256:79d56efa97d78bf2d5cb7a5130cc8b9d13422b43e52eca0372729d76c4a0439d",
+              "surface": [
+                "webui.json.registry.modals.cv_descriptor_setup_modal.schema.widgets[3]",
+                "webui.json.registry.modals.cv_descriptor_setup_modal.schema.widgets[7]",
+                "webui.json.registry.modals.cv_descriptor_work_modal.schema.widgets[3]",
+                "webui.json.registry.modals.cv_descriptor_work_modal.schema.widgets[4]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:visual.metricTile",
+              "contract_digest": "sha256:90cd62868f55844e8894cc6e413bf7ef9fdfc72545f9c1329127b017db1c37ab",
+              "surface": [
+                "webui.json.registry.modals.cv_descriptor_setup_modal.schema.widgets[4]",
+                "webui.json.registry.modals.cv_descriptor_setup_modal.schema.widgets[5]",
+                "webui.json.widgets[0]"
+              ],
+              "exposure": "compiled"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:168894055ee7526cfb1d4be6285a86f58f0dca2a7871836d6cfe92e4050b4296",
+          "digest": "sha256:168894055ee7526cfb1d4be6285a86f58f0dca2a7871836d6cfe92e4050b4296",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:12d04668625cdc8e370efa7e8a2fde80c6d8ee719a2d0537eb48472460dc9e0e",
+        "sha256:81b9746b7f7abc652fe2e11da3f7503bae7e736a76cb8e6da4fa8de2eb783e6a"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:9ecabfc27a42f7ee42877b5a26dc526546672795b808f0f3a1b2bac45d603a4f",
+        "profiles": [
+          "adaos.cv.descriptor_lab.v1"
+        ],
+        "members": [
+          {
+            "ref": "skill:cv_descriptor",
+            "package_digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21",
+            "role": "primary",
+            "exposure": "advanced",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "descriptors",
+            "presentation": "cv_descriptor_app",
+            "default": true,
+            "bindings": {
+              "descriptor_store": "local"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "descriptors"
+          ],
+          "required_contracts": [
+            "capability:vision.descriptors.manage@^1.0.0"
+          ],
+          "validation_profiles": [
+            "cv.descriptor.local"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "workspace.read",
+              "purpose": "Read selected images and existing descriptor records.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Persist generated descriptors and explicit runtime commands.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "image_metadata",
+              "visual_descriptor"
+            ],
+            "sent_off_device": [],
+            "linked_to_user": [],
+            "tracking": false,
+            "retention": "Descriptor records remain in local Application state."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [
+              "image_metadata",
+              "visual_descriptor"
+            ],
+            "sent_off_device": false,
+            "linked_to_user": false,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "CV Descriptor Lab",
+        "description": "Browser-side visual object descriptor pilot for embeddings, signatures, thumbnails, and descriptions.",
+        "categories": [
+          "demo",
+          "vision"
+        ],
+        "tags": [
+          "alpha",
+          "cv",
+          "descriptors",
+          "lab"
+        ],
+        "title_i18n": {
+          "en": "CV Descriptor Lab",
+          "ru": "Лаборатория CV-дескрипторов"
+        },
+        "description_i18n": {
+          "en": "Browser-side visual object descriptor pilot for embeddings, signatures, thumbnails, and descriptions.",
+          "ru": "Пилот браузерных CV-дескрипторов для эмбеддингов, сигнатур, миниатюр и описаний."
+        }
+      },
+      "release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98"
+    },
+    "accepted_candidate_id": "cv_descriptor_lab-0-1-23-5b06cc17dd98",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "immutable-package-and-consumer-preflight",
+        "refs": [
+          "e2e\\artifacts\\applications\\20261025-beta-reconciliation\\platform-contract-tests.xml"
+        ],
+        "browser_workflow_status": "pending",
+        "live_inference_tested": false
+      }
+    ],
+    "provenance_refs": [
+      "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "workspace.read",
+          "purpose": "Read selected images and existing descriptor records.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Persist generated descriptors and explicit runtime commands.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "image_metadata",
+          "visual_descriptor"
+        ],
+        "sent_off_device": [],
+        "linked_to_user": [],
+        "tracking": false,
+        "retention": "Descriptor records remain in local Application state."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [
+          "image_metadata",
+          "visual_descriptor"
+        ],
+        "sent_off_device": false,
+        "linked_to_user": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:426c4912bab900be970426051e4aef311c92e713df9fdcd8e26b66c536eda259",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "cv_descriptor_lab",
+      "release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Read selected images and existing descriptor records.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Persist generated descriptors and explicit runtime commands.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:f7d8fa4cbecbb9949370922be2edcd6c6f900a1796d5b53be5b927e75e7291e7"
+  },
+  "channels": {
+    "stable": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98"
+  },
+  "semantic": {
+    "projection_digest": "sha256:6b29e5f10936c3d204ab11f69463a864f2b39e46f0635139118263c4546bb0e1",
+    "path": "semantic/applications/cv_descriptor_lab/b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98.json"
+  },
+  "projection_digest": "sha256:49686df4d41acd7e382fd38a2a41af614e9ec542c2725863f65f6b580d00ab59"
+}

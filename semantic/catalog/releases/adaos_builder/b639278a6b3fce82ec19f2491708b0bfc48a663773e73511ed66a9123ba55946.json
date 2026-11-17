@@ -1,0 +1,3684 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "adaos_builder",
+    "legacy_project_id": "adaos_builder",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "adaos_builder",
+    "display": {
+      "title": "AdaOS Builder",
+      "summary": "Project-scoped development workbench for prototypes, automation, trials, and publication."
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "builder",
+        "presentation_ref": "scenario:builder"
+      },
+      {
+        "entrypoint_id": "prompt-ide",
+        "presentation_ref": "scenario:prompt_engineer_scenario"
+      },
+      {
+        "entrypoint_id": "skill-preview",
+        "presentation_ref": "scenario:skill_preview"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 4,
+    "created_at": "2026-09-26T02:46:33+00:00",
+    "updated_at": "2026-11-06T11:27:34+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "adaos_builder",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "adaos_builder",
+    "version": "0.3.42",
+    "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "adaos_builder",
+      "version": "0.3.42",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
+        "path_scope": [
+          "projects/adaos_builder/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "builder",
+          "version": "0.2.115",
+          "digest": "sha256:0bc61280d319dfd1ed6862e801d7f4c4b87fe98f6d72e3ed60476e82bbce0746",
+          "manifest_digest": "sha256:0867a9074c4753b8bd0bc05468b027ba662e2e966206585e6b6ab03d95ffe463",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
+            "path_scope": [
+              "scenarios/builder/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/builder",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "prompt_engineer_scenario",
+          "version": "0.3.15",
+          "digest": "sha256:dc96cb929cd446e01a062758f1b319ee8ca3f7bf33c5924c82eda2787e3d3e97",
+          "manifest_digest": "sha256:f4a38aacdc794d20ce39597363f2673c935d580a21f106169f783869d7340bf9",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
+            "path_scope": [
+              "scenarios/prompt_engineer_scenario/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/prompt_engineer_scenario",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "skill_preview",
+          "version": "0.1.8",
+          "digest": "sha256:4cb1ad036097bd975874877090d5789482e6a4f77a760438f529796de0b5c546",
+          "manifest_digest": "sha256:69628473d1d9b0f342d65ff7705dde5d9d854e233b87386a20bba857b448f39e",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
+            "path_scope": [
+              "scenarios/skill_preview/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/skill_preview",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "builder_automation_skill",
+          "version": "0.2.10",
+          "digest": "sha256:9d4a342f78a7f7069cc9766e60f845f4c9cd0f3fc8187af1a55c1d318cf50fd1",
+          "manifest_digest": "sha256:ecb6a0b092da6289a02021f6ba37392fd5173cf6a628e0b351947d4d707fce51",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
+            "path_scope": [
+              "skills/builder_automation_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/builder_automation_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "builder_sdk_control_skill",
+          "version": "0.2.29",
+          "digest": "sha256:0eef8cd6506e84969ef9a43c84974f7b7a3ff52c1d7874de5f15d5a361ff2739",
+          "manifest_digest": "sha256:b0d2abc03ab65be3cb14c3cac1cdbe4d40a9030f438985481a07f54a5e266f14",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
+            "path_scope": [
+              "skills/builder_sdk_control_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/builder_sdk_control_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "builder_skill",
+          "version": "0.4.50",
+          "digest": "sha256:0cba00832b1f979901b3d374672639dad9b79c7690b20cd59a013938d2e46e75",
+          "manifest_digest": "sha256:026fedfe946159afb81c6925b8371b5c8a1091af08c0428fc5bce7f2ffc53c25",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
+            "path_scope": [
+              "skills/builder_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/builder_skill",
+          "schema_locks": [],
+          "workflow_lock": {
+            "lock_id": "workflow:builder.change@1.2.0",
+            "digest": "sha256:d68f723e09b06dda8c230dad3cb06dedf0499aa3028f36e10613fbd401d99f0b"
+          },
+          "conversational_lock": {
+            "lock_id": "conversational:skill:builder_skill@0.4.50",
+            "digest": "sha256:e855318e1a9c5b53569054402058ed25d588c80d84b8901d25ede0f1b1921edc"
+          },
+          "workflow_validation_lock": {
+            "lock_id": "workflow-validation:builder.change@1.2.0",
+            "digest": "sha256:fec9a56678f78ce30399991f546d7a2806b617e18e8a984250b264cd8ae7b3c6"
+          },
+          "workflow_adapter_locks": [
+            {
+              "adapter_id": "builder.codex.run",
+              "kind": "activity",
+              "contract_digest": "sha256:c07d9f814b09188d725b6c37068b92f5be929964ca73a7d01b6222cb2a1409d0",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            },
+            {
+              "adapter_id": "builder.prototype.derive",
+              "kind": "activity",
+              "contract_digest": "sha256:cd3a8aa84471ccab0ad36f4633c030f8584f5ba7d7ca6879a3b0ae1da5f9a001",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            },
+            {
+              "adapter_id": "builder.publication.publish",
+              "kind": "activity",
+              "contract_digest": "sha256:836ca401d6a83e6bc00fa53e83964028c6677cdabf637c076837d2d736ab7547",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            },
+            {
+              "adapter_id": "builder.trial.activate",
+              "kind": "activity",
+              "contract_digest": "sha256:d2327f261f701fbbf4ed8d7ef7109b9c984e25fbac6c979a63ede2b34b593069",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            },
+            {
+              "adapter_id": "builder.codex.run.compensate",
+              "kind": "compensation",
+              "contract_digest": "sha256:c1eddb452242a913abd8a64be8e6600d6526ca5341699c6dac01015fc3378d3c",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            },
+            {
+              "adapter_id": "builder.prototype.derive.compensate",
+              "kind": "compensation",
+              "contract_digest": "sha256:3b0edfb5e5e4ac6a4c98d54b76d60f0fa1bea7af03828c52e5284fc3a4ae9d12",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            },
+            {
+              "adapter_id": "always",
+              "kind": "guard",
+              "contract_digest": "sha256:ffb915119cad9dd771564b8ec46785c0f52ce58b5e443b4de64c8c4d598f7545",
+              "owner": {
+                "scope": "platform",
+                "package": null
+              }
+            }
+          ],
+          "workflow_binding_digest": "sha256:f92bdd2a0b2e60c77806da141bd1dec28312b981adbf11c6b78a2a54f240d8ae",
+          "workflow_role_policy_digest": "sha256:04b4065a68510522b05963a2180253dbbe860538fe1d88416f959b58d6df82a4"
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "prompt_engineer_skill",
+          "version": "0.7.11",
+          "digest": "sha256:40e66e3e02ccb865fc0dbc069b1a0103ab66bf29dde36a1bb696f80340168be0",
+          "manifest_digest": "sha256:bdd037d8349dd66f44f1c07916971e7ccb4193120eef53897172851eaa9a9197",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
+            "path_scope": [
+              "skills/prompt_engineer_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/prompt_engineer_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [
+        {
+          "kind": "skill",
+          "artifact_id": "voice_chat_skill",
+          "version": "0.7.8",
+          "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c",
+          "optional": false
+        }
+      ],
+      "permissions": [
+        "ai.inference",
+        "applications.apply",
+        "applications.develop",
+        "applications.plan",
+        "applications.publish",
+        "applications.read",
+        "applications.recover",
+        "network.egress",
+        "storage.relational",
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
+          "builder": "adaos.dev.project.push"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:adaos_builder",
+          "consumer_ref": "scenario:builder",
+          "consumer_digest": "sha256:0bc61280d319dfd1ed6862e801d7f4c4b87fe98f6d72e3ed60476e82bbce0746",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": true,
+          "unresolved": [],
+          "source_artifacts": {
+            "assets/builder_functional_parity.json": "sha256:f41f4f9cf0083037a6363bf9c2a341e64dbf8fe064779ad890c331ac0928e814",
+            "assets/i18n/design-063-en.json": "sha256:503cd1166d770fc1d631a2ce42036e299d343051a89857382e8ce0c74ee34c6a",
+            "assets/i18n/design-063-ru.json": "sha256:7ceb10443c48fef5ff0a2a4b8dcfb3ec1f7259e9830cc3a116f17de961ee9a4d",
+            "assets/i18n/design-064-en.json": "sha256:591b354ec375d51a0c3688248b43c8949396d7c698fd66430ff1db49afcd4853",
+            "assets/i18n/design-064-ru.json": "sha256:bd9fac1e3bf86843fbf10252c96d4d05696846c932ea764d8bd30b6282f4aaf7",
+            "assets/i18n/design-065-en.json": "sha256:1de707803f8452ea6fdb7912c611720efed93a30f2972845ba0a26b8ac49f907",
+            "assets/i18n/design-065-ru.json": "sha256:17e46fccfc53370ef7572e9b6db363b5262f802163c47745d0aa5598aedcb098",
+            "assets/i18n/design-066-en.json": "sha256:d2727e53b311e1893083ad6acf5976b21199bfb8110ebdd888853ec9265ad3e3",
+            "assets/i18n/design-066-ru.json": "sha256:731c4610ea135a9785e05d3d8f4732d6b8329e48ec0ee9e08d3ba7c4a8bcc8db",
+            "assets/i18n/design-067-en.json": "sha256:54f5d241d7ac2ba58dc9ead273cdafda9604bc7e4dde196003b45ca965a90523",
+            "assets/i18n/design-067-ru.json": "sha256:6af01904bc1115344c765a649197c36ccf1e8fa934fba5616f2c4fd0f6f3d01e",
+            "assets/i18n/design-068-en.json": "sha256:ff6e95eb4e8882e7cdee117df93cfcd42365f3a345684eeb85e60a484f2e0045",
+            "assets/i18n/design-068-ru.json": "sha256:280770a71de09ad15337739ac62374c009aec9762f963b45ea86ced93c4c371b",
+            "assets/i18n/design-069-en.json": "sha256:ff0b2973aef4663f686fbca0f30575b99afbf7b6cd8d0b1f74127594bd90763d",
+            "assets/i18n/design-069-ru.json": "sha256:9bbb5c51ceac8e06507fda426141fcdf7a1c29d087ff4cde65cf7c94c9948816",
+            "assets/i18n/design-070-en.json": "sha256:2f8e128553efb4e7c9e20c335ab891d62ef7a78ee9879ddf8205fb66138dad60",
+            "assets/i18n/design-070-ru.json": "sha256:78aebe4656c134bb0eb3549a4f32fc512d8b08bdf936dd5e2cace09ff524d6ca",
+            "assets/i18n/design-071-en.json": "sha256:607243e9567bddd8242d26cf40955427af1f987d3c780b842a78abcce820d92f",
+            "assets/i18n/design-071-ru.json": "sha256:88b2108a2b54eee86364e732e9d1b743ef64bdb01a15e036d9c74129a9c2b80f",
+            "assets/i18n/design-en.json": "sha256:fcb1b3df0ae50dfb9ce69fe1a0e6ad3240a4151bc7acf15d4ea19b3248ea6a70",
+            "assets/i18n/design-ru.json": "sha256:1cfbb29328a22af9f4e7347f95657c98ebb8c1e4a086d7f46fc81a7227275153",
+            "assets/i18n/en.json": "sha256:83ecf948f7b50419911efa33a98158df9357b17aa095486d0ce21ba34eaca35b",
+            "assets/i18n/ru.json": "sha256:e970e608be1e9764b782182cb51da99730b8fd2387f756670adc96df9fdbfcf2",
+            "assets/i18n/workbench-live-en.json": "sha256:a4019c31ffa58238d0ea2a8fe3e9c7df4c20d8269c5d2a8e9b583f75395ae642",
+            "assets/i18n/workbench-live-ru.json": "sha256:0fcf289e3b4f815f41ee67ca53accd7e8c01f0d5ad0269466b9c7c5f1e580a92",
+            "scenario.json": "sha256:2b73df0ad2148de25cb2becabafd5ca79083a8865d3270583f42e56e320bc4cc",
+            "webui.json": "sha256:7cf32dd22af481984161a274768650cf8c18916ec2ae5cf3fa18a6ea6bfa316b",
+            ".adaos/package-manifest.json": "sha256:0867a9074c4753b8bd0bc05468b027ba662e2e966206585e6b6ab03d95ffe463"
+          },
+          "edges": [
+            {
+              "contract_ref": "mcp:applications.lifecycle.operations",
+              "contract_digest": "sha256:d81c9f45613f71479f1d54f8fb5d8307956eb10464295df133194a41d4fe6ff0",
+              "surface": [
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[8].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.lifecycle.show",
+              "contract_digest": "sha256:692185633bc73fc8f98df1725c58778301fb3b8296caf529ca0419ed07723dab",
+              "surface": [
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[0].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.lifecycle.source",
+              "contract_digest": "sha256:9e43d488b5c1fe14b5ffb1230d027223675680e77d6aa27796bfa8390ebf41d1",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[40].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.lifecycle.trials",
+              "contract_digest": "sha256:ee06b2d8ec7a8aa635962ff732bfa90201ecb7305b45e104e883751ca823ea70",
+              "surface": [
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[6].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:action.type:openModal",
+              "contract_digest": "sha256:4821d1cbc2df9415a1eb8b0dd540846f25ae6fc9e2daa40d8772a0fd0eef6e8a",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[0].actions[0]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[0].actions[2]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[0].actions[3]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[10].actions[0]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[10].actions[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[10].actions[2]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[11].actions[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[12].actions[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[15].actions[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[16].actions[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[19].actions[0]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[22].actions[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[22].actions[2]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[22].actions[3]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[25].actions[0]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[30].actions[0]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[30].actions[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[31].actions[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[31].actions[2]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[35].actions[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[35].actions[2]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[3].actions[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[3].actions[2]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[3].actions[3]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[3].actions[4]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[3].actions[5]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[41].actions[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[6].actions[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[6].actions[2]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[6].actions[4]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[9].actions[1]",
+                "webui.json.ui.application.modals.design-revisions.schema.widgets[0].actions[2]",
+                "webui.json.ui.application.modals.design-revisions.schema.widgets[0].actions[3]",
+                "webui.json.ui.application.modals.design-revisions.schema.widgets[0].actions[4]",
+                "webui.json.ui.application.modals.design-settings.schema.widgets[6].actions[0]",
+                "webui.json.ui.application.modals.project-picker.schema.widgets[2].actions[0]",
+                "webui.json.ui.application.modals.publication.schema.widgets[1].actions[1]",
+                "webui.json.ui.application.modals.publication.schema.widgets[1].actions[2]",
+                "webui.json.ui.application.modals.publication.schema.widgets[1].actions[3]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:collection.tree",
+              "contract_digest": "sha256:bc694ccdaaeb94c065ec1212a78b15db7c5b3ded811f4ece3157979601af321b",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[15]",
+                "webui.json.ui.application.modals.design-revisions.schema.widgets[0]",
+                "webui.json.ui.application.modals.file-picker.schema.widgets[1]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:input.selector",
+              "contract_digest": "sha256:b86c19f957949bf1af5b04b747408cc9062ef2a9e69207de9a9f2621aedcd354",
+              "surface": [
+                "webui.json.ui.application.modals.new-project.schema.widgets[0]",
+                "webui.json.ui.application.modals.project-picker.schema.widgets[0]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:input.toggle",
+              "contract_digest": "sha256:bf776985f8ed1a5b1fe2c280dd5e3dcab675a230b1d7ec7616e16b47655e8c77",
+              "surface": [
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[1]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[5]",
+                "webui.json.ui.application.modals.project-picker.schema.widgets[1]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:item.details",
+              "contract_digest": "sha256:6b35434a3583e3bc268dbbbb2766f578c5654383f6553f26d5a54dfa0f268933",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[20]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[21]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[24]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[28]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[29]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[2]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[39]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[40]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[5]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[7]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[8]",
+                "webui.json.ui.application.modals.about-icon-drafts.schema.widgets[0]",
+                "webui.json.ui.application.modals.automation.schema.widgets[2]",
+                "webui.json.ui.application.modals.confirm-subscription-update.schema.widgets[0]",
+                "webui.json.ui.application.modals.confirm-trial-access.schema.widgets[0]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[0]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[3]",
+                "webui.json.ui.application.modals.design-context.schema.widgets[0]",
+                "webui.json.ui.application.modals.design-conversation-channels.schema.widgets[0]",
+                "webui.json.ui.application.modals.design-file-viewer.schema.widgets[0]",
+                "webui.json.ui.application.modals.design-readme-editor.schema.widgets[2]",
+                "webui.json.ui.application.modals.design-run-details.schema.widgets[0]",
+                "webui.json.ui.application.modals.design-run-details.schema.widgets[1]",
+                "webui.json.ui.application.modals.design-run-details.schema.widgets[2]",
+                "webui.json.ui.application.modals.design-semantic-inspector.schema.widgets[0]",
+                "webui.json.ui.application.modals.design-settings.schema.widgets[0]",
+                "webui.json.ui.application.modals.design-settings.schema.widgets[4]",
+                "webui.json.ui.application.modals.design-specification.schema.widgets[0]",
+                "webui.json.ui.application.modals.design-trace.schema.widgets[0]",
+                "webui.json.ui.application.modals.model-clarification-answer.schema.widgets[0]",
+                "webui.json.ui.application.modals.publication.schema.widgets[0]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.actions",
+              "contract_digest": "sha256:b11889d561895633c7bb4f0fd286b2f3557ac4d2c9cce07adbbc4443c04ad543",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[0]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[10]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[17]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[19]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[22]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[25]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[30]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[31]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[35]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[3]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[41]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[4]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[6]",
+                "webui.json.ui.application.modals.automation.schema.widgets[5]",
+                "webui.json.ui.application.modals.confirm-archive.schema.widgets[1]",
+                "webui.json.ui.application.modals.confirm-delete.schema.widgets[1]",
+                "webui.json.ui.application.modals.confirm-publish.schema.widgets[1]",
+                "webui.json.ui.application.modals.confirm-subscription-update.schema.widgets[1]",
+                "webui.json.ui.application.modals.confirm-trial-access.schema.widgets[1]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[2]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[4]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[7]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[9]",
+                "webui.json.ui.application.modals.design-return.schema.widgets[0]",
+                "webui.json.ui.application.modals.design-settings.schema.widgets[6]",
+                "webui.json.ui.application.modals.design-settings.schema.widgets[7]",
+                "webui.json.ui.application.modals.new-project.schema.widgets[2]",
+                "webui.json.ui.application.modals.preview-qr.schema.widgets[1]",
+                "webui.json.ui.application.modals.project-picker.schema.widgets[2]",
+                "webui.json.ui.application.modals.publication.schema.widgets[1]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.chat",
+              "contract_digest": "sha256:5b02fb6676892a0e06473ad29ec8866d28a7ad591d375dcf14a77c5677d6f93c",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[32]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[33]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[36]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[37]",
+                "webui.json.ui.application.modals.design-trace-messages.schema.widgets[0]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.form",
+              "contract_digest": "sha256:b5cc0b5f87908980b433525b03fd59da750ca7b44a5648c830ce7aef6c224e59",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[26]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[34]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[38]",
+                "webui.json.ui.application.modals.about-icon-drafts.schema.widgets[1]",
+                "webui.json.ui.application.modals.automation.schema.widgets[0]",
+                "webui.json.ui.application.modals.automation.schema.widgets[1]",
+                "webui.json.ui.application.modals.automation.schema.widgets[3]",
+                "webui.json.ui.application.modals.confirm-archive.schema.widgets[0]",
+                "webui.json.ui.application.modals.confirm-delete.schema.widgets[0]",
+                "webui.json.ui.application.modals.confirm-publish.schema.widgets[0]",
+                "webui.json.ui.application.modals.design-checkpoint.schema.widgets[0]",
+                "webui.json.ui.application.modals.design-delta.schema.widgets[0]",
+                "webui.json.ui.application.modals.design-readme-editor.schema.widgets[0]",
+                "webui.json.ui.application.modals.design-readme-editor.schema.widgets[1]",
+                "webui.json.ui.application.modals.design-readme-editor.schema.widgets[3]",
+                "webui.json.ui.application.modals.design-settings.schema.widgets[1]",
+                "webui.json.ui.application.modals.design-settings.schema.widgets[2]",
+                "webui.json.ui.application.modals.design-settings.schema.widgets[3]",
+                "webui.json.ui.application.modals.model-clarification-answer.schema.widgets[1]",
+                "webui.json.ui.application.modals.new-project.schema.widgets[1]",
+                "webui.json.ui.application.modals.prototype-review.schema.widgets[0]",
+                "webui.json.ui.application.modals.technical-addendum.schema.widgets[0]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.list",
+              "contract_digest": "sha256:79d56efa97d78bf2d5cb7a5130cc8b9d13422b43e52eca0372729d76c4a0439d",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[13]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[14]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[23]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[27]",
+                "webui.json.ui.application.modals.about-icon-drafts.schema.widgets[2]",
+                "webui.json.ui.application.modals.automation.schema.widgets[4]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[6]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[8]",
+                "webui.json.ui.application.modals.file-picker.schema.widgets[0]",
+                "webui.json.ui.application.modals.process.schema.widgets[0]",
+                "webui.json.ui.application.modals.publication.schema.widgets[2]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.table",
+              "contract_digest": "sha256:c7d328ca61b335e3dfdd62f69274df7157c1a4400c58ffa8d7ff7af9f4ed3af8",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[11]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[12]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[16]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[9]",
+                "webui.json.ui.application.modals.design-semantic-inspector.schema.widgets[1]",
+                "webui.json.ui.application.modals.design-semantic-inspector.schema.widgets[2]",
+                "webui.json.ui.application.modals.project-picker.schema.widgets[3]"
+              ],
+              "exposure": "compiled"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:ec0fd2e8ccecea8884b9d6658a9edf209253d1b260cabb5827e2fd1822e7a939",
+          "digest": "sha256:ec0fd2e8ccecea8884b9d6658a9edf209253d1b260cabb5827e2fd1822e7a939",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:adaos_builder",
+          "consumer_ref": "scenario:prompt_engineer_scenario",
+          "consumer_digest": "sha256:dc96cb929cd446e01a062758f1b319ee8ca3f7bf33c5924c82eda2787e3d3e97",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": true,
+          "unresolved": [],
+          "source_artifacts": {
+            "scenario.json": "sha256:5dbb0f4b0963e1c8a45ee240cbf4e06fc3bc178fcf14922dd977e962c5142787",
+            ".adaos/package-manifest.json": "sha256:f4a38aacdc794d20ce39597363f2673c935d580a21f106169f783869d7340bf9"
+          },
+          "edges": [
+            {
+              "contract_ref": "webui:collection.grid",
+              "contract_digest": "sha256:81d69c2cc16321a6d74050c040b41c7e77208af8d7bf5e465854ae3856a809b6",
+              "surface": [
+                "scenario.json.ui.application.desktop.pageSchema.widgets[1]",
+                "scenario.json.ui.application.modals.project_selector.schema.widgets[0]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:collection.tree",
+              "contract_digest": "sha256:bc694ccdaaeb94c065ec1212a78b15db7c5b3ded811f4ece3157979601af321b",
+              "surface": [
+                "scenario.json.ui.application.desktop.pageSchema.widgets[2]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:input.selector",
+              "contract_digest": "sha256:b86c19f957949bf1af5b04b747408cc9062ef2a9e69207de9a9f2621aedcd354",
+              "surface": [
+                "scenario.json.ui.application.modals.llm_profile_modal.schema.widgets[0]",
+                "scenario.json.ui.application.modals.project_meta_modal.schema.widgets[3]",
+                "scenario.json.ui.application.modals.project_selector.schema.widgets[1]",
+                "scenario.json.ui.application.modals.project_selector.schema.widgets[3]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:item.details",
+              "contract_digest": "sha256:6b35434a3583e3bc268dbbbb2766f578c5654383f6553f26d5a54dfa0f268933",
+              "surface": [
+                "scenario.json.ui.application.desktop.pageSchema.widgets[4]",
+                "scenario.json.ui.application.desktop.pageSchema.widgets[5]",
+                "scenario.json.ui.application.modals.llm_profile_modal.schema.widgets[1]",
+                "scenario.json.ui.application.modals.llm_status_modal.schema.widgets[0]",
+                "scenario.json.ui.application.modals.project_git_modal.schema.widgets[0]",
+                "scenario.json.ui.application.modals.project_git_modal.schema.widgets[2]",
+                "scenario.json.ui.application.modals.project_meta_modal.schema.widgets[0]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.chat",
+              "contract_digest": "sha256:5b02fb6676892a0e06473ad29ec8866d28a7ad591d375dcf14a77c5677d6f93c",
+              "surface": [
+                "scenario.json.ui.application.desktop.pageSchema.widgets[10]"
+              ],
+              "exposure": "compiled"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:a6320685728f265d88df6f897118a0bf28d90882be4f94ee2ca61c75da2e82ac",
+          "digest": "sha256:a6320685728f265d88df6f897118a0bf28d90882be4f94ee2ca61c75da2e82ac",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:adaos_builder",
+          "consumer_ref": "scenario:skill_preview",
+          "consumer_digest": "sha256:4cb1ad036097bd975874877090d5789482e6a4f77a760438f529796de0b5c546",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": true,
+          "unresolved": [],
+          "source_artifacts": {
+            "assets/i18n/en.json": "sha256:a8cec18df9fd7b8e0e8d7fa5b87d4506c9ae1cef4693456155eaef6ca3f0c2d7",
+            "assets/i18n/ru.json": "sha256:fbc153f2b6f7d9f9e075356c58261d9cc76d6ddfc0a8866248583b8faf7e0036",
+            "scenario.json": "sha256:73dd4226d3b11db89b5f31c538ea8f0895e9a4f16818613c4d70b7879104c12a",
+            "webui.json": "sha256:174da85a5f8136dd47efbeb338acaac1e760c889b3800bd4505d4a051e9189b1",
+            ".adaos/package-manifest.json": "sha256:69628473d1d9b0f342d65ff7705dde5d9d854e233b87386a20bba857b448f39e"
+          },
+          "edges": [],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:30c04f30947a8ac4ac4c7e2d360728eadd022173b0183e01bdded48d09eb6ab4",
+          "digest": "sha256:30c04f30947a8ac4ac4c7e2d360728eadd022173b0183e01bdded48d09eb6ab4",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:adaos_builder",
+          "consumer_ref": "skill:builder_automation_skill",
+          "consumer_digest": "sha256:9d4a342f78a7f7069cc9766e60f845f4c9cd0f3fc8187af1a55c1d318cf50fd1",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": false,
+          "unresolved": [
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.start",
+              "location": "handlers/main.py:82"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.submit",
+              "location": "handlers/main.py:101"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.get_state",
+              "location": "handlers/main.py:124"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.get_state",
+              "location": "handlers/main.py:108"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.automation",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.tool",
+              "location": "handlers/main.py"
+            }
+          ],
+          "source_artifacts": {
+            ".adaos/package-manifest.json": "sha256:ecb6a0b092da6289a02021f6ba37392fd5173cf6a628e0b351947d4d707fce51"
+          },
+          "edges": [],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:b9b11e45ae7f8f0cb61ed0d9b7f388469a116ec09755e408568e6449be746c36",
+          "digest": "sha256:b9b11e45ae7f8f0cb61ed0d9b7f388469a116ec09755e408568e6449be746c36",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:adaos_builder",
+          "consumer_ref": "skill:builder_sdk_control_skill",
+          "consumer_digest": "sha256:0eef8cd6506e84969ef9a43c84974f7b7a3ff52c1d7874de5f15d5a361ff2739",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": false,
+          "unresolved": [
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.get_binding",
+              "location": "handlers/main.py:385"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.development_sessions.binding_for_selection",
+              "location": "handlers/main.py:399"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.development_sessions.review_changes",
+              "location": "handlers/main.py:485"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.development_sessions.request_scope_expansion",
+              "location": "handlers/main.py:508"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.get_binding",
+              "location": "handlers/main.py:526"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.describe",
+              "location": "handlers/main.py:551"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.trial_verification_evidence",
+              "location": "handlers/main.py:1880"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.list_files",
+              "location": "handlers/main.py:2104"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.list_templates",
+              "location": "handlers/main.py:2175"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.read_file",
+              "location": "handlers/main.py:2212"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.context_inspector",
+              "location": "handlers/main.py:2295"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prompt_context.save_base",
+              "location": "handlers/main.py:2480"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prompt_context.append_addendum",
+              "location": "handlers/main.py:2507"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prompt_context.set_preferences",
+              "location": "handlers/main.py:2632"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.model_settings.codex_options",
+              "location": "handlers/main.py:2644"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.model_settings.set_codex_profile",
+              "location": "handlers/main.py:2652"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prompt_context.get",
+              "location": "handlers/main.py:2659"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.update_metadata",
+              "location": "handlers/main.py:2709"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.issues.split",
+              "location": "handlers/main.py:3126"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.issues.merge",
+              "location": "handlers/main.py:3151"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.review.register_constraint",
+              "location": "handlers/main.py:3359"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.review.evaluate_current",
+              "location": "handlers/main.py:3381"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prompt_context.set_preferences",
+              "location": "handlers/main.py:3561"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.select_target",
+              "location": "handlers/main.py:3589"
+            },
+            {
+              "code": "dynamic_sdk_arguments",
+              "location": "handlers/main.py:3589"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.select_project",
+              "location": "handlers/main.py:3635"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.get_binding",
+              "location": "handlers/main.py:3680"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.get_binding",
+              "location": "handlers/main.py:3731"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.navigation_link",
+              "location": "handlers/main.py:3747"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.get_state",
+              "location": "handlers/main.py:3797"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.get_diagnostics",
+              "location": "handlers/main.py:3853"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.delete",
+              "location": "handlers/main.py:5077"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.push",
+              "location": "handlers/main.py:5310"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.lifecycle.decide_trial",
+              "location": "handlers/main.py:6765"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.get_clarification",
+              "location": "handlers/main.py:6835"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.answer_clarification",
+              "location": "handlers/main.py:6847"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.resume_clarification",
+              "location": "handlers/main.py:6855"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.get_state",
+              "location": "handlers/main.py:6967"
+            },
+            {
+              "code": "dynamic_sdk_arguments",
+              "location": "handlers/main.py:6993"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.canonical_source_webspace_id",
+              "location": "handlers/main.py:67"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.dev_webspace_id",
+              "location": "handlers/main.py:75"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.navigation.runtime_scope",
+              "location": "handlers/main.py:433"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.navigation.webspace_destination",
+              "location": "handlers/main.py:434"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.navigation.build_url",
+              "location": "handlers/main.py:441"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prompt_context.get",
+              "location": "handlers/main.py:586"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.read_file",
+              "location": "handlers/main.py:1096"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.read_file",
+              "location": "handlers/main.py:1128"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.project_catalog.list_projects",
+              "location": "handlers/main.py:1475"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.get_binding",
+              "location": "handlers/main.py:1739"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.write_file",
+              "location": "handlers/main.py:2257"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.llm.llm_client.list_llm_models",
+              "location": "handlers/main.py:2580"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.get_binding",
+              "location": "handlers/main.py:2881"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.navigation_link",
+              "location": "handlers/main.py:3682"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.ensure_selected_target",
+              "location": "handlers/main.py:3746"
+            },
+            {
+              "code": "sdk_alias_dataflow_unknown",
+              "location": "handlers/main.py:3748"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.list_files",
+              "location": "handlers/main.py:3955"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:4404"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.inspect_subscription_update",
+              "location": "handlers/main.py:4891"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.apply_subscription_update",
+              "location": "handlers/main.py:4937"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.get_candidate",
+              "location": "handlers/main.py:5422"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.decide_candidate",
+              "location": "handlers/main.py:6385"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.promote_candidate",
+              "location": "handlers/main.py:6494"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.read_file",
+              "location": "handlers/main.py:7043"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.action_source_webspace_id",
+              "location": "handlers/main.py:63"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.resolve_root",
+              "location": "handlers/main.py:608"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.describe",
+              "location": "handlers/main.py:1077"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.describe",
+              "location": "handlers/main.py:1974"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.open_workspace",
+              "location": "handlers/main.py:3685"
+            },
+            {
+              "code": "sdk_callback_usage_unknown",
+              "location": "handlers/main.py:3711"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.select_project",
+              "location": "handlers/main.py:3739"
+            },
+            {
+              "code": "sdk_alias_dataflow_unknown",
+              "location": "handlers/main.py:3748"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:4404"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.submit",
+              "location": "handlers/main.py:4757"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.retry_failed",
+              "location": "handlers/main.py:4795"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.return_to_prototype",
+              "location": "handlers/main.py:4827"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.recover_validated_result",
+              "location": "handlers/main.py:4849"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.reconcile_checkpoint",
+              "location": "handlers/main.py:4870"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.push",
+              "location": "handlers/main.py:5159"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.push",
+              "location": "handlers/main.py:5303"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.get_candidate",
+              "location": "handlers/main.py:6048"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.public_app_base",
+              "location": "handlers/main.py:442"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.describe",
+              "location": "handlers/main.py:1986"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.list_files",
+              "location": "handlers/main.py:2068"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.read_file",
+              "location": "handlers/main.py:2195"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.write_file",
+              "location": "handlers/main.py:2236"
+            },
+            {
+              "code": "sdk_alias_dataflow_unknown",
+              "location": "handlers/main.py:3709"
+            },
+            {
+              "code": "sdk_alias_dataflow_unknown",
+              "location": "handlers/main.py:3710"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.start",
+              "location": "handlers/main.py:4700"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:6907"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:6911"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.prepare_rebased_candidate",
+              "location": "handlers/main.py:6190"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.prepare_candidate",
+              "location": "handlers/main.py:6198"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prompt_context.get",
+              "location": "handlers/main.py:4769"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prompt_context.get",
+              "location": "handlers/main.py:4804"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.read_file",
+              "location": "handlers/main.py:554"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prompt_context.get",
+              "location": "handlers/main.py:4714"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.automation",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.development_sessions",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.issues",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.lifecycle",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.model_settings",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.preview",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.project_catalog",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.review",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.tool",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.developer.projects",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.developer.prompt_context",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.llm.llm_client.list_llm_models",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.navigation",
+              "location": "handlers/main.py"
+            }
+          ],
+          "source_artifacts": {
+            ".adaos/package-manifest.json": "sha256:b0d2abc03ab65be3cb14c3cac1cdbe4d40a9030f438985481a07f54a5e266f14"
+          },
+          "edges": [
+            {
+              "contract_ref": "sdk:adaos.sdk.ai.models",
+              "contract_digest": "sha256:38dea79b7dce1572a1923071ad828a8fbee2a1cd27f9aa67f73cd46f9bb5d24a",
+              "surface": [
+                "handlers/main.py:2594"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.ai.status",
+              "contract_digest": "sha256:ccc70835c281229c45175f92d521e8fce1d809577b3843289eb8e85abfec2afb",
+              "surface": [
+                "handlers/main.py:2591"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.applications.get_identity",
+              "contract_digest": "sha256:7c75df98df6dc2050b769bcc65b8ce61304b400351b31764ba78c77ff4a51fc0",
+              "surface": [
+                "handlers/main.py:7003"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.applications.get_lifecycle",
+              "contract_digest": "sha256:79e2697b355b944f5a083b931abb75cb2c7837f95394b15b8b0c5b09791c7006",
+              "surface": [
+                "handlers/main.py:1643"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.applications.get_runtime_revisions",
+              "contract_digest": "sha256:4a6d00034bc34d1444a05605f14295e8b7a68bed3f62d807920ba291668cee4d",
+              "surface": [
+                "handlers/main.py:1642"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.applications.get_runtime_selection",
+              "contract_digest": "sha256:984d439ec432dc18961cd6912d3b9f2cef3dc462b73da86d3847af724f8f0393",
+              "surface": [
+                "handlers/main.py:1387"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.applications.list_releases",
+              "contract_digest": "sha256:092d45cc216ca09f80b8fc3ee511307107699fa7c9ed75d8a5a4b32fe71f3f06",
+              "surface": [
+                "handlers/main.py:1394"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.open_trial_placement",
+              "contract_digest": "sha256:d6d51c14a2fcc69371f6f7a8ecf236906710ec64ca80cc5bf695b10f26d2cf07",
+              "surface": [
+                "handlers/main.py:4246",
+                "handlers/main.py:4248"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.place_local_stable",
+              "contract_digest": "sha256:cc77e0528bdd6763498ca9bd862d5fb3addede2c4d081c20d8d1caa979a88481",
+              "surface": [
+                "handlers/main.py:5597",
+                "handlers/main.py:5606"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.place_local_trial",
+              "contract_digest": "sha256:373f2c42b071867eb350a5eee5dfc5531d70dcb776312135e18d770f3b920989",
+              "surface": [
+                "handlers/main.py:5485",
+                "handlers/main.py:5490"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.production_webspace_id",
+              "contract_digest": "sha256:ccf5ab615cc168634cf36cf6f7b16114c67d3e03c8f6a16cca7a3358d72bb30b",
+              "surface": [
+                "handlers/main.py:5485",
+                "handlers/main.py:5487",
+                "handlers/main.py:5597",
+                "handlers/main.py:5602",
+                "handlers/main.py:6030",
+                "handlers/main.py:6032"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.project_access_contract",
+              "contract_digest": "sha256:e7f88d9e1077f097f2b6c7669eb4db3279aa585a08685fe4af317540327acef0",
+              "surface": [
+                "handlers/main.py:1834"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.verify_candidate_access",
+              "contract_digest": "sha256:83e5db23b32a93694c9201994dedf61c31739f9a87eae39fd53b2e7b1978a3ec",
+              "surface": [
+                "handlers/main.py:5990",
+                "handlers/main.py:6073",
+                "handlers/main.py:6256",
+                "handlers/main.py:6378"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.observability.project_run",
+              "contract_digest": "sha256:ba7c73a0481154a6864201c0b4585d4b100b17214588cd6afbfc4f2f1287b17b",
+              "surface": [
+                "handlers/main.py:6899",
+                "handlers/main.py:6900"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.history",
+              "contract_digest": "sha256:7793b61ebdd321b97215c88a9e1de7be6f0360be1aceb801dac5f4228fd5e237",
+              "surface": [
+                "handlers/main.py:4295"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.semantic_ui.apply",
+              "contract_digest": "sha256:e7b912fa5c59e0cc4dd271128c34c56b544288e8b1b2339253dcb8f02db6a77a",
+              "surface": [
+                "handlers/main.py:3309"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.semantic_ui.inspect",
+              "contract_digest": "sha256:4c22fa71574711d2b82c8762ed5de801fb9314be3dd2754875d4e8f041c473fa",
+              "surface": [
+                "handlers/main.py:3288"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.accept_prototype",
+              "contract_digest": "sha256:409afe47a3f767a7c698c013b2a08d268c985266e4f62157d3f2ba31e7e5e5bd",
+              "surface": [
+                "handlers/main.py:2824"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.build_context_packet",
+              "contract_digest": "sha256:3f7a951f56ea1486885a88dee545b93a0bf923dd6ca666547d522453a304b3bd",
+              "surface": [
+                "handlers/main.py:2995",
+                "handlers/main.py:3084",
+                "handlers/main.py:3257"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.get_interaction_frame",
+              "contract_digest": "sha256:ce9d6449e46a5df4f997a0f55304247632b9fbbbd2a62a2bcbbbdd052a03eb4a",
+              "surface": [
+                "handlers/main.py:2800",
+                "handlers/main.py:2860"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.get_lifecycle_state",
+              "contract_digest": "sha256:6a026eb9a2337b670d47bd4996a0d70f9bd224f4203554c5012e61fc824bc435",
+              "surface": [
+                "handlers/main.py:4286"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.get_process_stages",
+              "contract_digest": "sha256:4645e39cec841d265cb4adedc8e4e3ac2ad57871e8e27137d8e613c57618ea5a",
+              "surface": [
+                "handlers/main.py:4153"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.get_project_placement_navigation",
+              "contract_digest": "sha256:0980408c8bcac7aa687edef9261ee44e936dcb088c11e6a3957a0fd060dae56b",
+              "surface": [
+                "handlers/main.py:4186",
+                "handlers/main.py:4219"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.get_state",
+              "contract_digest": "sha256:6a026eb9a2337b670d47bd4996a0d70f9bd224f4203554c5012e61fc824bc435",
+              "surface": [
+                "handlers/main.py:2761",
+                "handlers/main.py:2794",
+                "handlers/main.py:2911",
+                "handlers/main.py:3045",
+                "handlers/main.py:3173",
+                "handlers/main.py:3423",
+                "handlers/main.py:3439",
+                "handlers/main.py:3597",
+                "handlers/main.py:3901",
+                "handlers/main.py:4198",
+                "handlers/main.py:4655",
+                "handlers/main.py:4688",
+                "handlers/main.py:5103",
+                "handlers/main.py:5494",
+                "handlers/main.py:5708",
+                "handlers/main.py:5769",
+                "handlers/main.py:5925",
+                "handlers/main.py:647",
+                "handlers/main.py:6755",
+                "handlers/main.py:6775",
+                "handlers/main.py:6879",
+                "handlers/main.py:822"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.record_project_placement",
+              "contract_digest": "sha256:c252c7006cc5d7536b24735ae6829ec55b15a91fa87ebc8ac120b7b52bcc0a7c",
+              "surface": [
+                "handlers/main.py:5531",
+                "handlers/main.py:5658"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.require_current_prototype_acceptance",
+              "contract_digest": "sha256:277cb1d062f5eb2d7c92e1b48d52be0edbdc033dcf79459bc78a0560416fb68c",
+              "surface": [
+                "handlers/main.py:4695"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.save_specification_delta",
+              "contract_digest": "sha256:d6bddf0d178411ff15073fd508085954ebf87dc744d16a852a3cec8ade6c8b09",
+              "surface": [
+                "handlers/main.py:7114"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.transition",
+              "contract_digest": "sha256:115fa645f2de9919c992bc99b84952583367e8b285598223f90beb297c259440",
+              "surface": [
+                "handlers/main.py:2733",
+                "handlers/main.py:2737",
+                "handlers/main.py:2781",
+                "handlers/main.py:2961",
+                "handlers/main.py:3055",
+                "handlers/main.py:3463",
+                "handlers/main.py:3522",
+                "handlers/main.py:5241",
+                "handlers/main.py:5348",
+                "handlers/main.py:5732",
+                "handlers/main.py:5789",
+                "handlers/main.py:6143",
+                "handlers/main.py:6208",
+                "handlers/main.py:6220",
+                "handlers/main.py:6286",
+                "handlers/main.py:6396",
+                "handlers/main.py:6479",
+                "handlers/main.py:6499",
+                "handlers/main.py:6525",
+                "handlers/main.py:6535",
+                "handlers/main.py:6572",
+                "handlers/main.py:6598",
+                "handlers/main.py:6653"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.update_interaction_context",
+              "contract_digest": "sha256:3b18575c2c46c76dc1d60279dca945162de394e7b5c32d6aa8a493a01185d235",
+              "surface": [
+                "handlers/main.py:2914",
+                "handlers/main.py:3598"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.append",
+              "contract_digest": "sha256:3313abaca8f553db59ce95c5336fcb8fe5951d78ce29713b7afd2ea119c6e544",
+              "surface": [
+                "handlers/main.py:7142"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.ensure_builder_topic",
+              "contract_digest": "sha256:89f604cbf4a4d77b876be187b2edf8d719837cc7f9958cffa92b2f96c0d6db8b",
+              "surface": [
+                "handlers/main.py:93"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.get",
+              "contract_digest": "sha256:02de9a95847b9e11b1091fd05745deb1333398c82880b7f9b2e4e7d37fb963d9",
+              "surface": [
+                "handlers/main.py:7131"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.get_development_change",
+              "contract_digest": "sha256:1796b60cc00a85468a5bec84ccc2e07f4f7d0b223f63c16fbddd14229fb1fbb3",
+              "surface": [
+                "handlers/main.py:3208",
+                "handlers/main.py:883"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.list_development_changes",
+              "contract_digest": "sha256:e1626aea3cd0c22631984b1a0cf9c6da50b72b08ce6a2e2a513ae804da147a2c",
+              "surface": [
+                "handlers/main.py:1333",
+                "handlers/main.py:3762"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.upsert_development_change",
+              "contract_digest": "sha256:2869854a3ab95e68ca2498cf235b7282d9fed542e1721caf09001c4166e42830",
+              "surface": [
+                "handlers/main.py:859",
+                "handlers/main.py:957"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.upsert_development_run",
+              "contract_digest": "sha256:9d0d31d7c1825b6f91bcf2e093d4ba90785225a8b354f64d3ad45f7cda8da21c",
+              "surface": [
+                "handlers/main.py:903"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.developer.compositions.advance_version",
+              "contract_digest": "sha256:24333c50292c1baa77b28c8eb032d1a013b9066bdc746bae2226ca20e73b242d",
+              "surface": [
+                "handlers/main.py:5148"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.developer.compositions.create_with_primary_component",
+              "contract_digest": "sha256:4a378192bdc637fcf2dc4dbba8e0aae48178baa1d543bf01bd694709bd962e56",
+              "surface": [
+                "handlers/main.py:4985"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.developer.compositions.get",
+              "contract_digest": "sha256:a8664da1ebd5cf5a690fd0ad83221085c01b67c6633c4add237cfc9947068803",
+              "surface": [
+                "handlers/main.py:122",
+                "handlers/main.py:127",
+                "handlers/main.py:6905"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.developer.compositions.prepare_candidate",
+              "contract_digest": "sha256:cd85f752b825ece418aa680f3aab9a89c3aae889143036a7e371294e471d40b3",
+              "surface": [
+                "handlers/main.py:6166"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.developer.compositions.project_for_component",
+              "contract_digest": "sha256:d920bf574d1031c36de8b02aa965ba6cebf09862554c8f2e0fce8088e1a0306b",
+              "surface": [
+                "handlers/main.py:129",
+                "handlers/main.py:214",
+                "handlers/main.py:6905"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.developer.compositions.release_versions",
+              "contract_digest": "sha256:5321eed7eb5e1a775b12375bf09ad229a6b0d3dcafe748efdd4687812d927472",
+              "surface": [
+                "handlers/main.py:5147"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.developer.compositions.replace",
+              "contract_digest": "sha256:e282fc4fb2f78499e47c5cab4b5a3c5d8a011559f7b0cd30bccea6dd93717a7b",
+              "surface": [
+                "handlers/main.py:2703"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.developer.compositions.resolve_presentation",
+              "contract_digest": "sha256:c6d62e37ceda7365f5f56e14616cf755a8356a52e5688acc74c94313892da788",
+              "surface": [
+                "handlers/main.py:558"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.developer.compositions.resolve_root",
+              "contract_digest": "sha256:6adb351fc2b524ec72320aed8be051cdf49db7a629a4d567d003504fd33eb0e2",
+              "surface": [
+                "handlers/main.py:2032",
+                "handlers/main.py:293",
+                "handlers/main.py:316",
+                "handlers/main.py:606"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.developer.documents.read",
+              "contract_digest": "sha256:63d638bdc7eb8343e8301ed51ae0a9ca216fc5ee1cb5ba6420fe3aaa5b468a10",
+              "surface": [
+                "handlers/main.py:6993",
+                "handlers/main.py:7006",
+                "handlers/main.py:7035"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.developer.documents.write",
+              "contract_digest": "sha256:57288e458703639d5f17f6ea50110e5bf3ecff8f2f32d57259bfd86bfb6983b5",
+              "surface": [
+                "handlers/main.py:7019"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.llm.content.generate",
+              "contract_digest": "sha256:1b7d673718927e939e7f8b53aa7f5102b37a378318fe73fba5af6d0234a98094",
+              "surface": [
+                "handlers/main.py:7051"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.llm.content.get",
+              "contract_digest": "sha256:e4fd8a1e1458386a462ab58e1ee1cc81c17b86cd2bae7f44702d20d7bbb24908",
+              "surface": [
+                "handlers/main.py:7070"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.llm.images.generate",
+              "contract_digest": "sha256:65967587fd84840619bad6a7b7ecb5a17fd1d9aaec8ad9484580b02fde59a179",
+              "surface": [
+                "handlers/main.py:7084"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.llm.images.get",
+              "contract_digest": "sha256:e4fd8a1e1458386a462ab58e1ee1cc81c17b86cd2bae7f44702d20d7bbb24908",
+              "surface": [
+                "handlers/main.py:7098"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.llm.images.list_drafts",
+              "contract_digest": "sha256:a6632fe5e7da44b43a46d40432d9f168409f1fca07c00754d59a4aa92e1afed4",
+              "surface": [
+                "handlers/main.py:7105"
+              ],
+              "exposure": "static"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:662dfca782589f2eb37d91075a06e42d545c6aefd0201c986bbdea661f94aa17",
+          "digest": "sha256:662dfca782589f2eb37d91075a06e42d545c6aefd0201c986bbdea661f94aa17",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:adaos_builder",
+          "consumer_ref": "skill:builder_skill",
+          "consumer_digest": "sha256:0cba00832b1f979901b3d374672639dad9b79c7690b20cd59a013938d2e46e75",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": false,
+          "unresolved": [
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.relational.RelationalMigration",
+              "location": "handlers/main.py:150"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.domain_pack_receipts",
+              "location": "handlers/main.py:1078"
+            },
+            {
+              "code": "dynamic_sdk_arguments",
+              "location": "handlers/main.py:1131"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:1293"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:1305"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:1510"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:2700"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.expression_findings",
+              "location": "handlers/main.py:11125"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.validate_authoring_interfaces",
+              "location": "handlers/main.py:12509"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.migrate_deprecated_interfaces",
+              "location": "handlers/main.py:12626"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.evaluate",
+              "location": "handlers/main.py:14910"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.validate",
+              "location": "handlers/main.py:15351"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.validate",
+              "location": "handlers/main.py:15558"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.validate",
+              "location": "handlers/main.py:15658"
+            },
+            {
+              "code": "sdk_alias_dataflow_unknown",
+              "location": "handlers/main.py:17075"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.canonical_source_webspace_id",
+              "location": "handlers/main.py:19058"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:19059"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:19725"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.trial_verification_evidence",
+              "location": "handlers/main.py:22337"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prototypes.materialize_resources",
+              "location": "handlers/main.py:22890"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.migrate_deprecated_interfaces",
+              "location": "handlers/main.py:28212"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.migrate_deprecated_interfaces",
+              "location": "handlers/main.py:28391"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.canonical_source_webspace_id",
+              "location": "handlers/main.py:191"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.dev_webspace_id",
+              "location": "handlers/main.py:335"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.relational.database",
+              "location": "handlers/main.py:351"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.resolve_builder_context",
+              "location": "handlers/main.py:538"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.invalidate_scenario_caches",
+              "location": "handlers/main.py:1031"
+            },
+            {
+              "code": "sdk_callback_usage_unknown",
+              "location": "handlers/main.py:1293"
+            },
+            {
+              "code": "sdk_callback_usage_unknown",
+              "location": "handlers/main.py:1305"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prompt_context.get",
+              "location": "handlers/main.py:1929"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.get_state",
+              "location": "handlers/main.py:1956"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.select",
+              "location": "handlers/main.py:8957"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:9512"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.validate",
+              "location": "handlers/main.py:12532"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.validate_contract",
+              "location": "handlers/main.py:12533"
+            },
+            {
+              "code": "dynamic_sdk_arguments",
+              "location": "handlers/main.py:14665"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.evaluate",
+              "location": "handlers/main.py:14936"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:15860"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.events.publish",
+              "location": "handlers/main.py:17082"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.events.publish",
+              "location": "handlers/main.py:17135"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.events.publish",
+              "location": "handlers/main.py:17167"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.projects.find_scenario_root",
+              "location": "handlers/main.py:17301"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.project_catalog.list_projects",
+              "location": "handlers/main.py:18063"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.review.context_for_next_request",
+              "location": "handlers/main.py:18720"
+            },
+            {
+              "code": "sdk_callback_usage_unknown",
+              "location": "handlers/main.py:19059"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.navigation_link",
+              "location": "handlers/main.py:19070"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.review.evaluate_current",
+              "location": "handlers/main.py:19831"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.refresh_follow_active_target",
+              "location": "handlers/main.py:19867"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.artifacts.create_draft",
+              "location": "handlers/main.py:21278"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.artifacts.checkpoint",
+              "location": "handlers/main.py:22205"
+            },
+            {
+              "code": "dynamic_sdk_arguments",
+              "location": "handlers/main.py:22577"
+            },
+            {
+              "code": "dynamic_sdk_arguments",
+              "location": "handlers/main.py:22584"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prototypes.derive_resource_specs",
+              "location": "handlers/main.py:22886"
+            },
+            {
+              "code": "sdk_alias_dataflow_unknown",
+              "location": "handlers/main.py:25776"
+            },
+            {
+              "code": "dynamic_sdk_arguments",
+              "location": "handlers/main.py:26501"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.canonical_source_webspace_id",
+              "location": "handlers/main.py:507"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.domain_packs_for_recipes",
+              "location": "handlers/main.py:1102"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:1982"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.out.chat_message_receipt",
+              "location": "handlers/main.py:2625"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.expression_contract",
+              "location": "handlers/main.py:4214"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.get",
+              "location": "handlers/main.py:8451"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.evaluate",
+              "location": "handlers/main.py:9357"
+            },
+            {
+              "code": "sdk_callback_usage_unknown",
+              "location": "handlers/main.py:9512"
+            },
+            {
+              "code": "sdk_callback_usage_unknown",
+              "location": "handlers/main.py:15860"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:16213"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.artifacts.get_draft",
+              "location": "handlers/main.py:17274"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.review.submit",
+              "location": "handlers/main.py:18694"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.select_target",
+              "location": "handlers/main.py:19295"
+            },
+            {
+              "code": "sdk_alias_dataflow_unknown",
+              "location": "handlers/main.py:19720"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.resolve_builder_context",
+              "location": "handlers/main.py:20346"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.select_target",
+              "location": "handlers/main.py:20670"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prototypes.derive_resource_spec",
+              "location": "handlers/main.py:22888"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prototypes.carry_forward_resources",
+              "location": "handlers/main.py:23068"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.llm.llm_client.get_response_job",
+              "location": "handlers/main.py:24861"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prototypes.carry_forward_resources",
+              "location": "handlers/main.py:26633"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.relational.RelationalStorageRequirements",
+              "location": "handlers/main.py:353"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.list_builder_hosts",
+              "location": "handlers/main.py:486"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.resolve_builder_context",
+              "location": "handlers/main.py:514"
+            },
+            {
+              "code": "sdk_callback_usage_unknown",
+              "location": "handlers/main.py:1982"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prototypes.derive_resource_specs",
+              "location": "handlers/main.py:15071"
+            },
+            {
+              "code": "sdk_callback_usage_unknown",
+              "location": "handlers/main.py:16213"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.events.publish",
+              "location": "handlers/main.py:20144"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:24750"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prototypes.carry_forward_resources",
+              "location": "handlers/main.py:26526"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:1507"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.out.chat_append",
+              "location": "handlers/main.py:2495"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.prototypes.validate_resource_spec",
+              "location": "handlers/main.py:15093"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.events.publish",
+              "location": "handlers/main.py:17101"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.web.webspace.webspace_list",
+              "location": "handlers/main.py:20486"
+            },
+            {
+              "code": "sdk_callback_usage_unknown",
+              "location": "handlers/main.py:24751"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:25971"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.automation.submit",
+              "location": "handlers/main.py:1990"
+            },
+            {
+              "code": "dynamic_sdk_arguments",
+              "location": "handlers/main.py:1990"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.io.out.chat_append",
+              "location": "handlers/main.py:2504"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.get",
+              "location": "handlers/main.py:8491"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.get",
+              "location": "handlers/main.py:8783"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.get",
+              "location": "handlers/main.py:12371"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.events.publish",
+              "location": "handlers/main.py:20059"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:10828"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:10832"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:10834"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:16243"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.ensure_dev_webspace_via_owner",
+              "location": "handlers/main.py:19993"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.materialize_revision_via_owner",
+              "location": "handlers/main.py:20007"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:24641"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:10843"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.qualify",
+              "location": "handlers/main.py:24457"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.developer.ui.qualify",
+              "location": "handlers/main.py:25045"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.artifacts",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.automation",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.preview",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.project_catalog",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.review",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.subscribe",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.tool",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.events",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.relational.RelationalMigration",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.relational.RelationalStorageRequirements",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.relational.database",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.developer.projects",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.developer.prompt_context",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.developer.prototypes",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.developer.ui",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.out.chat_append",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.out.chat_message_receipt",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.llm.llm_client",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.llm.llm_client.LlmJobWaitTimeout",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.llm.llm_client.get_response_job",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.web.ui_contract",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.web.webspace",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "conversational_usage_not_indexed",
+              "location": "skill.yaml"
+            }
+          ],
+          "source_artifacts": {
+            "contracts/binding.definition.json": "sha256:610754312dff8bcf50ca9dfb899074e5fbf46955590be48015f7476eb5fa9359",
+            "contracts/capability.contract.json": "sha256:073152a9b1dbab90a6beae4a77243d9f258a0057dcea1a415d1b1bd79db24890",
+            "workflow.json": "sha256:d68f723e09b06dda8c230dad3cb06dedf0499aa3028f36e10613fbd401d99f0b",
+            ".adaos/package-manifest.json": "sha256:026fedfe946159afb81c6925b8371b5c8a1091af08c0428fc5bce7f2ffc53c25"
+          },
+          "edges": [
+            {
+              "contract_ref": "sdk:adaos.sdk.access.invocation",
+              "contract_digest": "sha256:8e8679f5589bee83edf99b83035e041e483bb084347cc25e25896f313b1d1a2a",
+              "surface": [
+                "handlers/main.py:2349",
+                "handlers/main.py:2424",
+                "handlers/main.py:2434"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.access.require",
+              "contract_digest": "sha256:4e4bc6a53b1bf3c808258429293dafcfa334aa72690c1d75021676748d87230f",
+              "surface": [
+                "handlers/main.py:20794",
+                "handlers/main.py:20804",
+                "handlers/main.py:20855"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.ai.status",
+              "contract_digest": "sha256:ccc70835c281229c45175f92d521e8fce1d809577b3843289eb8e85abfec2afb",
+              "surface": [
+                "handlers/main.py:1275"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.applications.get_application",
+              "contract_digest": "sha256:9e72a606666cf238a8a7d3353f046c6e302201c6977ae2db8cd8be2e304a1302",
+              "surface": [
+                "handlers/main.py:21839",
+                "handlers/main.py:21866"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.create_application",
+              "contract_digest": "sha256:4d1ad215251ab9d7dadbe64caa4f44a630c9b23e61cafdfd8094b5f5d84bacd2",
+              "surface": [
+                "handlers/main.py:21667",
+                "handlers/main.py:21771"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.create_trial",
+              "contract_digest": "sha256:5986074e4bf63433362c4419983817527796410f9766f4a98a088e7be9820d6e",
+              "surface": [
+                "handlers/main.py:22485"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.decide_trial",
+              "contract_digest": "sha256:ea452be369e5bb31517d87f71e34e675622c6879fbac2b4b5e2e889c560c1192",
+              "surface": [
+                "handlers/main.py:22526"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.list_development_operations",
+              "contract_digest": "sha256:73ea98460f6808097ea57cbba3078fd8edab458d1e34f1434e1cd33dd50ba4ff",
+              "surface": [
+                "handlers/main.py:22016"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.materialize_application",
+              "contract_digest": "sha256:2a3a4ce23c0db8bd97bb1eaef7f856835c1b13e661cce1a760a932a3d2c07bc4",
+              "surface": [
+                "handlers/main.py:22087"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.project_access_contract",
+              "contract_digest": "sha256:e7f88d9e1077f097f2b6c7669eb4db3279aa585a08685fe4af317540327acef0",
+              "surface": [
+                "handlers/main.py:22345"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.promote_stable",
+              "contract_digest": "sha256:02b53822defe2460bd2bd0059ccfa43f5518411f11f665ddfbb35d49af0c0417",
+              "surface": [
+                "handlers/main.py:22618"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.publish_link_trial",
+              "contract_digest": "sha256:0ea8ada9e06e988caa17a95722fe2bce15311471bc24a7574775343479f21e0d",
+              "surface": [
+                "handlers/main.py:22584"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.publish_prerelease",
+              "contract_digest": "sha256:acd718f2b97aeb805d04a22eee1b8e2bb8d1b1cc9dab3c92096014e2b18e7691",
+              "surface": [
+                "handlers/main.py:22577"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.publish_stable_source",
+              "contract_digest": "sha256:e2bc4389516c927e46ad3b42f1988ef2f7a2267747e97b46d91aa4d84f483ff7",
+              "surface": [
+                "handlers/main.py:22671"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.publisher_context",
+              "contract_digest": "sha256:9e0baaea9ce524468423400defcd549c33b6e201506b0e0643d98b59b8947d9d",
+              "surface": [
+                "handlers/main.py:21621",
+                "handlers/main.py:21770",
+                "handlers/main.py:21875"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.applications.update_application_metadata",
+              "contract_digest": "sha256:a5ec367f9feedeb51f474865f6c66ad461a63e40ec795767f7afc291a7e15065",
+              "surface": [
+                "handlers/main.py:22045"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.observability.execution_metrics_from_llm",
+              "contract_digest": "sha256:98c5b7b18e40bc7c0f793ebcf096a4579a49cadc2de19205dceff6055279e17b",
+              "surface": [
+                "handlers/main.py:19792"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.observability.llm_input_attribution",
+              "contract_digest": "sha256:694d6319d6853f31a35f611b6b91069e89af84c34196ae60d28efb60107b036a",
+              "surface": [
+                "handlers/main.py:23983"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.observability.read_llm_evidence",
+              "contract_digest": "sha256:473b72bff6287a8edacb36fed7fbe2a52d11ce479d45b4951c259a57576d58d8",
+              "surface": [
+                "handlers/main.py:24012"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.observability.retain_llm_evidence",
+              "contract_digest": "sha256:20927a3639df105f2fed716885ca86f20779536bd1daa8db18b9e5b7ce0dc89f",
+              "surface": [
+                "handlers/main.py:24045",
+                "handlers/main.py:24140",
+                "handlers/main.py:24219"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.observability.usd_budget",
+              "contract_digest": "sha256:2a1f9318febab3392276837c6db14b7cf9299a04c4e79b0efa7e7f38445543c1",
+              "surface": [
+                "handlers/main.py:23930",
+                "handlers/main.py:2413"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.add_reference",
+              "contract_digest": "sha256:180f87dc9218158778fcd59cb815e88232be2fe78ce94592640daf77f445734d",
+              "surface": [
+                "handlers/main.py:20898"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.compile_semantic",
+              "contract_digest": "sha256:51bbe694a3eb47ed7bab9397070d1c2e334f9cb19095272d05937416adfa2630",
+              "surface": [
+                "handlers/main.py:28019"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.compile_semantic_candidate",
+              "contract_digest": "sha256:532d7a6ba96896c661297f4a6a3a16c6b68b76583df3e539f9187d58becbc3b5",
+              "surface": [
+                "handlers/main.py:14665"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.expand_requirement_aliases",
+              "contract_digest": "sha256:fead39c85b8836e1fc73017e1f27855cc7afb419d87e86be764161065c126edf",
+              "surface": [
+                "handlers/main.py:14662"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.merge_briefs",
+              "contract_digest": "sha256:08e2d4e83e2255501382ebe6a73d0900455f2259ec2c01e31ae667ccef3355af",
+              "surface": [
+                "handlers/main.py:1112",
+                "handlers/main.py:1131"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.model_context",
+              "contract_digest": "sha256:28c415487fb8c079c598e8717feca64764874cd071444c763a979448d102d959",
+              "surface": [
+                "handlers/main.py:16029",
+                "handlers/main.py:9050",
+                "handlers/main.py:9417"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.model_reasoning",
+              "contract_digest": "sha256:41ca2c4b98709234ed41aebe3c78389e9fa8e9fbb1fec4996335509535ea4dbf",
+              "surface": [
+                "handlers/main.py:1210"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.model_supports_sampling",
+              "contract_digest": "sha256:1c21653dcb59bf5048d0c4cac0966c061fcbb6451b270d285d682e3420b91f0a",
+              "surface": [
+                "handlers/main.py:1203"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.output_locales",
+              "contract_digest": "sha256:f0e2cd7319e75560f9ca5f1a8df67e03b2678233d9783f665b33d09ec270e789",
+              "surface": [
+                "handlers/main.py:9040"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.personal_provider_jobs",
+              "contract_digest": "sha256:569ee72c4a201b05b056ccad9e31d3bcdf28349d188fdf60bb84e8b6fbd563d4",
+              "surface": [
+                "handlers/main.py:1283"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.reference_context",
+              "contract_digest": "sha256:0ccbaa645a9fd335d47a501b260723033eb45c3d905d0f51c6d0d5b5a82879ce",
+              "surface": [
+                "handlers/main.py:8808"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.semantic_generation_guidance",
+              "contract_digest": "sha256:9e0baaea9ce524468423400defcd549c33b6e201506b0e0643d98b59b8947d9d",
+              "surface": [
+                "handlers/main.py:8321"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.semantic_provider_contract",
+              "contract_digest": "sha256:90e18dc3318f1850fe63dd08cde45ee750e30dc3fd915934d7057583246b6c71",
+              "surface": [
+                "handlers/main.py:13119",
+                "handlers/main.py:13195",
+                "handlers/main.py:16128",
+                "handlers/main.py:23565"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.semantic_revision_context",
+              "contract_digest": "sha256:2707a5265ef9c67698e8c0dd904bbad6a0bd53658c0af99c7344a804ea34270e",
+              "surface": [
+                "handlers/main.py:8294"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.prototype.verify_semantic_source",
+              "contract_digest": "sha256:a557c8bc5824028ed05c5ab7259defe5d7992af902a4908280b96a5eaf3c04a8",
+              "surface": [
+                "handlers/main.py:8291"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.semantic_ui.admit",
+              "contract_digest": "sha256:ef987e0cd5abcc6c81944eb4d2e01fbcc45ccfab95b04ba26775ef058fee0fd2",
+              "surface": [
+                "handlers/main.py:26491"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.semantic_ui.apply",
+              "contract_digest": "sha256:e7b912fa5c59e0cc4dd271128c34c56b544288e8b1b2339253dcb8f02db6a77a",
+              "surface": [
+                "handlers/main.py:26520",
+                "handlers/main.py:26618"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.semantic_ui.prepare_request",
+              "contract_digest": "sha256:b0c2475ce6c8abdd94566514ac7ba15d06f62833efc330c1603ad592d90ef1ae",
+              "surface": [
+                "handlers/main.py:26590"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.semantic_ui.proposal_observation",
+              "contract_digest": "sha256:900816be55dba75716e24e678e7aa3d3f1df61700dadea4d64ded820a35157c6",
+              "surface": [
+                "handlers/main.py:26544"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.semantic_ui.propose",
+              "contract_digest": "sha256:ea4cba569548524e90399c6d39faf3a3ebc87b5756bda96c7c45d837738f23fa",
+              "surface": [
+                "handlers/main.py:26501"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.semantic_ui.recognizes_label_request",
+              "contract_digest": "sha256:4a5957b7432527a6f6cbc8a06d19227c1597dee5154873ecb2b0418c63dfc1df",
+              "surface": [
+                "handlers/main.py:26564"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.semantic_ui.recognizes_request",
+              "contract_digest": "sha256:4a5957b7432527a6f6cbc8a06d19227c1597dee5154873ecb2b0418c63dfc1df",
+              "surface": [
+                "handlers/main.py:258",
+                "handlers/main.py:26562"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.semantic_ui.record_turn_timing",
+              "contract_digest": "sha256:8b3db7bc14b68684f90ac34f854259f3cf3ddd230ed8110d037107b3d5c7134b",
+              "surface": [
+                "handlers/main.py:21227"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.build_context_packet",
+              "contract_digest": "sha256:3f7a951f56ea1486885a88dee545b93a0bf923dd6ca666547d522453a304b3bd",
+              "surface": [
+                "handlers/main.py:11762"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.create_conversation_input_interaction",
+              "contract_digest": "sha256:bf0163cdb50756b9c90af8d77526be26e6ec1b91e1f83dbdb0032ed46375c595",
+              "surface": [
+                "handlers/main.py:18358"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.create_conversation_interaction",
+              "contract_digest": "sha256:8f4bbbe5d6a6717c45f12c45ed916e5006374e19c4c56cbae2829c8e6017fc13",
+              "surface": [
+                "handlers/main.py:18294"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.get_interaction_frame",
+              "contract_digest": "sha256:ce9d6449e46a5df4f997a0f55304247632b9fbbbd2a62a2bcbbbdd052a03eb4a",
+              "surface": [
+                "handlers/main.py:19275",
+                "handlers/main.py:20630"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.get_process_explanation",
+              "contract_digest": "sha256:ce9d6449e46a5df4f997a0f55304247632b9fbbbd2a62a2bcbbbdd052a03eb4a",
+              "surface": [
+                "handlers/main.py:19280",
+                "handlers/main.py:20634"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.get_project_placement_navigation",
+              "contract_digest": "sha256:0980408c8bcac7aa687edef9261ee44e936dcb088c11e6a3957a0fd060dae56b",
+              "surface": [
+                "handlers/main.py:20525",
+                "handlers/main.py:20595"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.get_prototype_edit_context",
+              "contract_digest": "sha256:6a026eb9a2337b670d47bd4996a0d70f9bd224f4203554c5012e61fc824bc435",
+              "surface": [
+                "handlers/main.py:26612"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.get_prototype_intake_context",
+              "contract_digest": "sha256:6a026eb9a2337b670d47bd4996a0d70f9bd224f4203554c5012e61fc824bc435",
+              "surface": [
+                "handlers/main.py:11557"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.get_state",
+              "contract_digest": "sha256:6a026eb9a2337b670d47bd4996a0d70f9bd224f4203554c5012e61fc824bc435",
+              "surface": [
+                "handlers/main.py:11274",
+                "handlers/main.py:11558",
+                "handlers/main.py:1935",
+                "handlers/main.py:20469",
+                "handlers/main.py:20499",
+                "handlers/main.py:21897",
+                "handlers/main.py:22002",
+                "handlers/main.py:22147",
+                "handlers/main.py:22256",
+                "handlers/main.py:22282",
+                "handlers/main.py:22329"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.invoke_command",
+              "contract_digest": "sha256:dcba2cb0ba7f3851378517a4578a81e3f8b4151629eb9b2973c4e9efebaf5f75",
+              "surface": [
+                "handlers/main.py:22238",
+                "handlers/main.py:22259"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.invoke_interaction_response",
+              "contract_digest": "sha256:a0e2c4dff272a8a0c45660375c277610d554eb0491832625b6c678fef4901cc6",
+              "surface": [
+                "handlers/main.py:20704"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.record_project_placement",
+              "contract_digest": "sha256:c252c7006cc5d7536b24735ae6829ec55b15a91fa87ebc8ac120b7b52bcc0a7c",
+              "surface": [
+                "handlers/main.py:20510"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.builder.workflow.transition",
+              "contract_digest": "sha256:115fa645f2de9919c992bc99b84952583367e8b285598223f90beb297c259440",
+              "surface": [
+                "handlers/main.py:11597",
+                "handlers/main.py:11611",
+                "handlers/main.py:11625",
+                "handlers/main.py:19793"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.chat.present",
+              "contract_digest": "sha256:4cc3c691f22b4ca8a8600adf0f77fa4f6eb2f9e1c429f89672fb437eb10d8176",
+              "surface": [
+                "handlers/main.py:18310",
+                "handlers/main.py:18376"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.chat.request",
+              "contract_digest": "sha256:2a40f4985c7cc8b8909e276d405453c002d1de18dad9c8c14f4d821d744e99cf",
+              "surface": [
+                "handlers/main.py:18468",
+                "handlers/main.py:18869",
+                "handlers/main.py:20831"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.classify_action_risk",
+              "contract_digest": "sha256:1d211c799fd143e2261cba5c8d6441374e92f83ef03f6153f0adf66ced4b11f9",
+              "surface": [
+                "handlers/main.py:2262"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.communication_context",
+              "contract_digest": "sha256:5cd9b5d4622591c3a4debcaaafe671d47067dae38d5b65129f1f7915691f77c4",
+              "surface": [
+                "handlers/main.py:1626",
+                "handlers/main.py:20784",
+                "handlers/main.py:2355",
+                "handlers/main.py:2379"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.ensure_builder_topic",
+              "contract_digest": "sha256:89f604cbf4a4d77b876be187b2edf8d719837cc7f9958cffa92b2f96c0d6db8b",
+              "surface": [
+                "handlers/main.py:1632",
+                "handlers/main.py:1785"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.get_development_change",
+              "contract_digest": "sha256:1796b60cc00a85468a5bec84ccc2e07f4f7d0b223f63c16fbddd14229fb1fbb3",
+              "surface": [
+                "handlers/main.py:11839",
+                "handlers/main.py:5377"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.output_routes",
+              "contract_digest": "sha256:5be330e0581f6a5324b48ce1a68abeaf08a05b3361707abc6aeffdbfa29a8a2c",
+              "surface": [
+                "handlers/main.py:20798",
+                "handlers/main.py:20808"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.publish",
+              "contract_digest": "sha256:8c1323ba848f609052e18165d2ada70d8d18f230cd23574a57b332a890577615",
+              "surface": [
+                "handlers/main.py:2440",
+                "handlers/main.py:2517",
+                "handlers/main.py:2644"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.select_output_routes",
+              "contract_digest": "sha256:c075c829c413020f9da36adc6f4c65a94002f6ddc613922faaebb4e2ea1e6295",
+              "surface": [
+                "handlers/main.py:20865"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.upsert_development_change",
+              "contract_digest": "sha256:2869854a3ab95e68ca2498cf235b7282d9fed542e1721caf09001c4166e42830",
+              "surface": [
+                "handlers/main.py:11887"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.pending_actions.list_pending_actions",
+              "contract_digest": "sha256:a622d4c398da519f991e2364ada240d191d4b091a77b30007e727fc9b5cac285",
+              "surface": [
+                "handlers/main.py:11690"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.pending_actions.publish_pending_action",
+              "contract_digest": "sha256:006c4b3586b349484b1135040f84ff4b0425bfdaa66b7a6bbcb95859eb4b2266",
+              "surface": [
+                "handlers/main.py:2278"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.skill_env.read_env",
+              "contract_digest": "sha256:9e0baaea9ce524468423400defcd549c33b6e201506b0e0643d98b59b8947d9d",
+              "surface": [
+                "handlers/main.py:373"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.skill_env.skill_data_root_path",
+              "contract_digest": "sha256:9b5cc73082c590d636f7817c61da4ac9b20443a14d1f967fc5ac5cacf0377a61",
+              "surface": [
+                "handlers/main.py:347",
+                "handlers/main.py:368",
+                "handlers/main.py:41"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.developer.compositions.create_for_existing_component",
+              "contract_digest": "sha256:9b0de421ce6dc8f3b46cac9a2fe1a2f1ed9cd686b5d59f494d31e38777aa443b",
+              "surface": [
+                "handlers/main.py:21324"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.developer.compositions.get",
+              "contract_digest": "sha256:a8664da1ebd5cf5a690fd0ad83221085c01b67c6633c4add237cfc9947068803",
+              "surface": [
+                "handlers/main.py:1089",
+                "handlers/main.py:17358",
+                "handlers/main.py:1882",
+                "handlers/main.py:22188",
+                "handlers/main.py:264",
+                "handlers/main.py:26465"
+              ],
+              "exposure": "static"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:63b1ba3565c30a5233d4461f7626e5242faa9e302d2f9837dbf2c16c5c86be60",
+          "digest": "sha256:63b1ba3565c30a5233d4461f7626e5242faa9e302d2f9837dbf2c16c5c86be60",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:adaos_builder",
+          "consumer_ref": "skill:prompt_engineer_skill",
+          "consumer_digest": "sha256:40e66e3e02ccb865fc0dbc069b1a0103ab66bf29dde36a1bb696f80340168be0",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": false,
+          "unresolved": [
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.core.ctx.require_ctx",
+              "location": "handlers/main.py:86"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.llm.llm_client.request_ts_draft",
+              "location": "handlers/main.py:777"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.root.developer.RootDeveloperService",
+              "location": "handlers/main.py:1625"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.root.developer.RootDeveloperService",
+              "location": "handlers/main.py:1711"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.root.developer.RootDeveloperService",
+              "location": "handlers/main.py:1898"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.root.developer.RootDeveloperService",
+              "location": "handlers/main.py:1988"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.root.developer.RootDeveloperService",
+              "location": "handlers/main.py:2084"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.root.developer.RootDeveloperService",
+              "location": "handlers/main.py:2178"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.core.ctx.require_ctx",
+              "location": "handlers/main.py:117"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.builder.preview.select_project",
+              "location": "handlers/main.py:238"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.events.publish",
+              "location": "handlers/main.py:585"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.llm.llm_client.list_llm_models",
+              "location": "handlers/main.py:799"
+            },
+            {
+              "code": "sdk_alias_dataflow_unknown",
+              "location": "handlers/main.py:1720"
+            },
+            {
+              "code": "sdk_alias_dataflow_unknown",
+              "location": "handlers/main.py:1723"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.builder.preview",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.ctx.require_ctx",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.tool",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.events.publish",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.llm.llm_client.list_llm_models",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.llm.llm_client.request_ts_draft",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.root.developer.RootDeveloperService",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.root.developer.RootServiceError",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.root.developer.TemplateResolutionError",
+              "location": "handlers/main.py"
+            }
+          ],
+          "source_artifacts": {
+            "config.json": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "i18n/en.json": "sha256:6f7c2dd5f52732ea7c39a6ca419959760d1fa8b5a6f390e557c181c4ec43a23c",
+            "webui.json": "sha256:020c461b486aa3fad8643c1fdaa73e6c8aeeecc21a01249c04da2707872c0264",
+            ".adaos/package-manifest.json": "sha256:bdd037d8349dd66f44f1c07916971e7ccb4193120eef53897172851eaa9a9197"
+          },
+          "edges": [
+            {
+              "contract_ref": "webui:visual.metricTile",
+              "contract_digest": "sha256:90cd62868f55844e8894cc6e413bf7ef9fdfc72545f9c1329127b017db1c37ab",
+              "surface": [
+                "webui.json.registry.modals.prompt_ide_modal.schema.widgets[0]"
+              ],
+              "exposure": "compiled"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:9216ce51efada626f96a3091496096d378027774ecf4353f6f8df9b494a9979a",
+          "digest": "sha256:9216ce51efada626f96a3091496096d378027774ecf4353f6f8df9b494a9979a",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:006b56162d9f27c155088e6b8d13d4460c5c2343135a66ef491fa1b396b8f8d0",
+        "sha256:04be1a4ffd9807c99017b3c4acd1750e3b78828ab3c5b9700057b73616d4fcaa",
+        "sha256:0bbb48813c3ff8f10de8f97f75ade777c2057287c03927e35bd2c026da348b66",
+        "sha256:24b86dbf2c0f28ca45b35cbed88f110749b1222e4fcaad70784ce415e4a2cae5",
+        "sha256:47940b904337667c587ae7a771bbab31da6a7874ab1e3b9f4a10130107c8b2ef",
+        "sha256:908c3f2958e175df76f74f62f0558e460d1bc3e5de543d00ef001efe7c620121",
+        "sha256:f08f8a824218740a41d4c4e986a0f61e525012e437e1ddf3d5f5a3aa949cbabc",
+        "sha256:fc2c0703dc32f21897b0636cae457e79499f057083fef9faf7a2fb4476b4501b"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:7e9649dab2939448af55fedc5a3057f9281df0efcf8b7a61553dabf51558f56d",
+        "profiles": [
+          "adaos.builder.v1",
+          "adaos.development.workbench.v1"
+        ],
+        "members": [
+          {
+            "ref": "scenario:builder",
+            "package_digest": "sha256:0bc61280d319dfd1ed6862e801d7f4c4b87fe98f6d72e3ed60476e82bbce0746",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "scenario:prompt_engineer_scenario",
+            "package_digest": "sha256:dc96cb929cd446e01a062758f1b319ee8ca3f7bf33c5924c82eda2787e3d3e97",
+            "role": "supporting",
+            "exposure": "advanced",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "scenario:skill_preview",
+            "package_digest": "sha256:4cb1ad036097bd975874877090d5789482e6a4f77a760438f529796de0b5c546",
+            "role": "supporting",
+            "exposure": "advanced",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "skill:builder_automation_skill",
+            "package_digest": "sha256:9d4a342f78a7f7069cc9766e60f845f4c9cd0f3fc8187af1a55c1d318cf50fd1",
+            "role": "supporting",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          },
+          {
+            "ref": "skill:builder_sdk_control_skill",
+            "package_digest": "sha256:0eef8cd6506e84969ef9a43c84974f7b7a3ff52c1d7874de5f15d5a361ff2739",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          },
+          {
+            "ref": "skill:builder_skill",
+            "package_digest": "sha256:0cba00832b1f979901b3d374672639dad9b79c7690b20cd59a013938d2e46e75",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          },
+          {
+            "ref": "skill:prompt_engineer_skill",
+            "package_digest": "sha256:40e66e3e02ccb865fc0dbc069b1a0103ab66bf29dde36a1bb696f80340168be0",
+            "role": "supporting",
+            "exposure": "advanced",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "builder",
+            "presentation": "scenario:builder",
+            "default": true,
+            "bindings": {
+              "workbench": "builder"
+            }
+          },
+          {
+            "id": "prompt-ide",
+            "presentation": "scenario:prompt_engineer_scenario",
+            "bindings": {
+              "workbench": "prompt"
+            }
+          },
+          {
+            "id": "skill-preview",
+            "presentation": "scenario:skill_preview",
+            "bindings": {
+              "preview": "skill"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "builder"
+          ],
+          "required_contracts": [
+            "capability:applications.build@^1.0.0"
+          ],
+          "validation_profiles": [
+            "builder.local"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "ai.inference",
+              "purpose": "Use admitted model resources for governed Builder development.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "applications.apply",
+              "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "applications.develop",
+              "purpose": "Develop the explicitly selected application.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "applications.plan",
+              "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "applications.publish",
+              "purpose": "Request governed application publication.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "applications.read",
+              "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "applications.recover",
+              "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "network.egress",
+              "purpose": "Access configured model, source-control, and publication services during governed development operations.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "storage.relational",
+              "purpose": "Keep owner-scoped Builder session state.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "workspace.read",
+              "purpose": "Inspect project sources, tickets, build state, and validation evidence.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Create and update explicitly selected development projects and artifacts.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "build_evidence",
+              "development_ticket",
+              "project_source"
+            ],
+            "sent_off_device": [
+              "explicit_model_or_registry_request"
+            ],
+            "linked_to_user": [],
+            "tracking": false,
+            "retention": "Development artifacts remain in the selected project workspace."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [
+              "build_evidence",
+              "development_ticket",
+              "project_source"
+            ],
+            "sent_off_device": true,
+            "linked_to_user": false,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "AdaOS Builder",
+        "description": "Project-scoped development workbench for prototypes, automation, trials, and publication.",
+        "categories": [
+          "development"
+        ],
+        "tags": [
+          "builder",
+          "devspace",
+          "project",
+          "prompt-ide"
+        ],
+        "icon": "construct-outline",
+        "title_i18n": {
+          "en": "AdaOS Builder",
+          "ru": "Конструктор AdaOS"
+        },
+        "description_i18n": {
+          "en": "Project-scoped development workbench for prototypes, automation, trials, and publication.",
+          "ru": "Проектная рабочая среда разработки для прототипов, автоматизации, испытаний и публикации."
+        }
+      },
+      "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946"
+    },
+    "accepted_candidate_id": "adaos_builder-0-3-42-a9123ba55946",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "adaos.dev.project.trial",
+        "refs": [
+          "test:builder-lifecycle-projection",
+          "test:addressable-revision-restore:5-passed",
+          "test:dev-dependency-preflight:passed",
+          "live:infra_ops-skill-auto-mounted"
+        ],
+        "checkpoint_source_revision": "573ca5d38df5c3a588aa9f3a31c459770c5ce2aa",
+        "checkpoint_component_ref": "scenario:builder"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "ai.inference",
+          "purpose": "Use admitted model resources for governed Builder development.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "applications.apply",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "applications.develop",
+          "purpose": "Develop the explicitly selected application.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "applications.plan",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "applications.publish",
+          "purpose": "Request governed application publication.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "applications.read",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "applications.recover",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "network.egress",
+          "purpose": "Access configured model, source-control, and publication services during governed development operations.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "storage.relational",
+          "purpose": "Keep owner-scoped Builder session state.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "workspace.read",
+          "purpose": "Inspect project sources, tickets, build state, and validation evidence.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Create and update explicitly selected development projects and artifacts.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "build_evidence",
+          "development_ticket",
+          "project_source"
+        ],
+        "sent_off_device": [
+          "explicit_model_or_registry_request"
+        ],
+        "linked_to_user": [],
+        "tracking": false,
+        "retention": "Development artifacts remain in the selected project workspace."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [
+          "build_evidence",
+          "development_ticket",
+          "project_source"
+        ],
+        "sent_off_device": true,
+        "linked_to_user": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:a757448bb7b259801979b6bd3d4590b2657775ece95042cf8e1e66eb56951af6",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "adaos_builder",
+      "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [
+        {
+          "id": "ai.inference",
+          "title": "Ai.Inference",
+          "purpose": "Use admitted model resources for governed Builder development.",
+          "required": true
+        },
+        {
+          "id": "applications.apply",
+          "title": "Applications.Apply",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "required": true
+        },
+        {
+          "id": "applications.develop",
+          "title": "Applications.Develop",
+          "purpose": "Develop the explicitly selected application.",
+          "required": true
+        },
+        {
+          "id": "applications.plan",
+          "title": "Applications.Plan",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "required": true
+        },
+        {
+          "id": "applications.publish",
+          "title": "Applications.Publish",
+          "purpose": "Request governed application publication.",
+          "required": true
+        },
+        {
+          "id": "applications.read",
+          "title": "Applications.Read",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "required": true
+        },
+        {
+          "id": "applications.recover",
+          "title": "Applications.Recover",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "required": true
+        },
+        {
+          "id": "network.egress",
+          "title": "Network.Egress",
+          "purpose": "Access configured model, source-control, and publication services during governed development operations.",
+          "required": true
+        },
+        {
+          "id": "storage.relational",
+          "title": "Storage.Relational",
+          "purpose": "Keep owner-scoped Builder session state.",
+          "required": true
+        },
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Inspect project sources, tickets, build state, and validation evidence.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Create and update explicitly selected development projects and artifacts.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:603e5da10857dc9e1d85e5aeea3d546084d97d381e71736a6f296e63931a000b"
+  },
+  "channels": {
+    "stable": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946"
+  },
+  "semantic": {
+    "projection_digest": "sha256:1e0a97ae28282f4420785048d48f66a27acd70b66c4fec42f518cd234f8d1588",
+    "path": "semantic/applications/adaos_builder/b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946.json"
+  },
+  "projection_digest": "sha256:c6589f09eb345da44dffb2bb0e3dcf54eb3986566e616d3ae70bb520886e200f"
+}

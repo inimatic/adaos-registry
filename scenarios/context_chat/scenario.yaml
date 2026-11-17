@@ -1,0 +1,33 @@
+id: context_chat
+name: context_chat
+version: 0.3.2
+title: Context Chat
+title_i18n:
+  key: scenario.context_chat.title
+  fallback: Context Chat
+description: 'Личный чат с ChatGPT: проекты, контекст, файлы и управляемая память.'
+type: desktop
+supported_locales:
+- en
+- ru
+depends:
+- context_chat_service
+runtime:
+  skills:
+    required:
+    - context_chat_service
+    optional: []
+ui:
+  manifest: webui.json
+trigger: manual
+vars: {}
+nlu:
+  nlu_hints:
+    aliases: []
+    examples: []
+    slot_schemas: {}
+    entities: []
+steps: []
+prototype: scenario_default
+updated_at: '2026-10-21T20:12:10+00:00'
+resources: {}

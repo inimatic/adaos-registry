@@ -50,10 +50,10 @@ def resolve(value, state, event):
 
 
 def test_layout_keeps_collection_detail_and_scrollable_compact_modals():
-    assert PAGE['layout']['pattern'] == 'collection-detail'
+    assert PAGE['layout']['pattern'] == 'workbench'
     regions = {r['id']: r for r in PAGE['layout']['regions']}
-    assert regions['detail']['presentation']['compact'] == 'sheet'
-    assert regions['metadata']['optional'] is True
+    assert regions['workspace']['presentation']['compact'] == 'route'
+    assert regions['inspector']['presentation']['compact'] == 'sheet'
     for modal in APP['modals'].values():
         assert modal['schema']['layout']['scroll'] == 'page'
     assert {'application-header', 'application-setup-summary', 'runtime-placement-summary',
@@ -64,7 +64,7 @@ def test_layout_keeps_collection_detail_and_scrollable_compact_modals():
 def test_cbs_lifecycle_is_a_compact_ordered_non_authoritative_projection():
     widget = WIDGETS['cbs-lifecycle']
     assert widget['type'] == 'item.details'
-    assert widget['area'] == 'detail'
+    assert widget['area'] == 'workspace'
     assert widget['dataSource']['toolId'] == 'applications.show'
     assert widget['dataSource']['dryRun'] is True
     assert widget['dataSource']['resultPath'] == 'response.result.application'
@@ -90,13 +90,14 @@ def test_catalog_complete_bounded_reads_and_local_query_selection():
     for id, flag in [('applications-list','installed_only'), ('marketplace-list','catalog_only'), ('developments-list','developed_only')]:
         w = WIDGETS[id]
         assert w['dataSource']['toolId'] == 'applications.list'
-        assert w['dataSource']['arguments'] == {flag: True}
+        assert w['dataSource']['arguments'][flag] is True
+        assert w['dataSource']['arguments']['view'] == 'summary'
         assert w['dataSource']['resultPath'] == 'response.result.applications'
         assert w['inputs']['pagination'] and w['inputs']['filters']
         assert w['inputs']['selectedStateKey'] == 'selectedApplicationId'
         assert w['inputs']['iconKey'] == 'application.icon'
         assert w['inputs']['fallbackIcon']
-        assert w['actions'][1]['params']['selectedApplicationId'] == '$event.application.application_id'
+        assert next(a for a in w['actions'] if a.get('on') == 'select' and a['type'] == 'updateState')['params']['selectedApplicationId'] == '$event.application.application_id'
 
 
 @pytest.mark.parametrize('widget', ['applications-list', 'marketplace-list', 'developments-list'])
@@ -125,14 +126,14 @@ def test_selection_clears_prior_application_revision_and_editor_contexts():
         for key in ['reviewedPlan', 'accessContext', 'accountContext', 'selectedApplication']:
             assert clear[key] == {}
         assert clear['selectedSetupId'] == ''
-        assert clear['selectedReleaseDigest'] == ''
+        assert clear['installedReleaseDigest'] == ''
         assert clear['publicationEvidence'] is False
         assert clear['trialTarget'] is None
         assert clear['effectiveTarget'] is None
     detail = WIDGETS['application-details']
     assert detail['dataSource']['toolId'] == 'applications.show'
     bindings = detail['inputs']['stateBindings']
-    for key, path in [('applicationDefinitionRevision','application.revision'),('installationRevision','installation.revision'),('subscriptionRevision','subscription.revision'),('selectedReleaseDigest','installation_summary.release_digest')]:
+    for key, path in [('applicationDefinitionRevision','application.revision'),('installationRevision','installation.revision'),('subscriptionRevision','subscription.revision'),('installedReleaseDigest','installation_summary.release_digest')]:
         assert bindings[key]['path'] == path
 
 
@@ -155,27 +156,45 @@ def test_every_root_call_has_admitted_input_names_and_required_arguments():
 
 
 def test_lifecycle_plans_use_displayed_revisions_and_review_before_apply():
-    planned = {a['params']['kind'] for a in actions('applications.plan')}
-    assert planned == {'install','update','remove','select_track','relocate_component','install_component','remove_component'}
-    for a in actions('applications.plan'):
+    legacy_plans = [a for a in actions('applications.plan') if a.get('resultStateKey') == 'reviewedPlan']
+    planned = {a['params']['kind'] for a in legacy_plans}
+    assert planned == {'remove','select_track','relocate_component','install_component','remove_component'}
+    for a in legacy_plans:
         assert a['params']['expected_revision'].startswith(('$state.', '$event.'))
         assert a['idempotencyKey'] == 'auto'
         assert a['resultStateKey'] == 'reviewedPlan'
-    for a in actions('applications.apply'):
+    release_plans = {
+        action['params']['kind']: action['params']['release_digest']
+        for action in legacy_plans
+        if action['params']['kind'] in {'install', 'update'}
+    }
+    assert release_plans == {}  # Exact version plans are captured by release rows.
+    for a in [a for a in actions('applications.apply') if a.get('resultStateKey') == 'reviewedPlan']:
         assert a['params'] == {'operation_id':'$state.reviewedPlan.operation.operation_id','plan_digest':'$state.reviewedPlan.operation.plan_digest', 'idempotency_key':'$state.reviewedPlan.operation.idempotency_key'}
         assert 'idempotencyKey' not in a
         assert "status == 'planned'" in a['enabledIf']
     assert not actions('applications.update_settings')
-    life = WIDGETS['lifecycle-actions']
+    life = WIDGETS['shared-dev-tickets']
     command = [action for action in life['actions'] if action['on'] == 'click:manage-home']
     assert [action['type'] for action in command] == ['callMcp', 'updateState', 'openModal']
-    assert command[0]['enabledIf'] == (
+    assert (
         '$state.selectedApplicationId && $state.applicationInstalled == true'
     )
     assert command[0]['target'] == 'applications.list_home_targets'
     assert command[0]['dryRun'] is True
     assert command[1]['params']['homePinSelection'] == '$state.homeTargets.home_targets.pinned_webspace_ids'
     assert command[2]['params']['modalId'] == 'manage-home-desktops'
+
+
+def test_update_targets_effective_release_and_is_only_shown_when_available():
+    row=WIDGETS['dashboard-positions']
+    button=next(b for b in row['inputs']['buttons'] if b['id']=='update')
+    assert (button['whenKey'],button['whenEquals'])==('actions.update.eligible',True)
+    capture=next(a for a in row['actions'] if a.get('params',{}).get('positionPlanIntent')=='update-public')
+    assert capture['params']['positionPlanArgs']['release_digest']=='$state.positionRow.actions.update.arguments.release_digest'
+    plan=next(a for a in row['actions'] if a['on']=='click:update' and a.get('target')=='applications.plan')
+    assert plan['params']['release_digest']=='$state.positionPlanArgs.release_digest'
+    assert plan['params']['update_track']=='$state.positionPlanArgs.update_track'
 
 
 def test_home_desktop_dialog_uses_bounded_root_read_and_batch_mutation():
@@ -358,7 +377,7 @@ def test_builder_trial_target_is_logical_and_publication_gates_stable_actions():
     bindings = WIDGETS['application-details']['inputs']['stateBindings']
     assert bindings['trialTarget']['path'] == 'local_development.trial.navigation_target'
     assert bindings['publicationEvidence']['path'] == 'local_development.publication.evidence_present'
-    life = WIDGETS['lifecycle-actions']
+    life = WIDGETS['shared-dev-tickets']
     trial = next(a for a in life['actions'] if a['on'] == 'click:open')
     assert trial['params']['workspaceId'] == '$state.trialTarget.webspace_id'
     assert trial['params']['expectedScenarioId'] == '$state.trialTarget.expected_scenario_id'
@@ -366,7 +385,7 @@ def test_builder_trial_target_is_logical_and_publication_gates_stable_actions():
     for b in life['inputs']['buttons']:
         if b['id'] in ['install','update']:
             assert 'publicationEvidence == true' in b['visibleIf']
-    preview = next(a for a in life['actions'] if a['on'] == 'click:preview')
+    preview = next(a for a in WIDGETS['dashboard-positions']['actions'] if a['on'] == 'click:alpha-preview' and a['type']=='openWorkspace')
     assert preview['params']['expectedScenarioId'] == '$state.developmentObjectId'
 
 
@@ -376,17 +395,13 @@ def test_installed_open_does_not_guess_a_navigation_target():
     for tool in ('applications.list', 'applications.show'):
         record = CONTRACTS[tool]['metadata']['webui_data_binding']['record']
         assert record['effective_navigation_target_path'] == bindings['effectiveTarget']['path']
-    life = WIDGETS['lifecycle-actions']
+    life = WIDGETS['shared-dev-tickets']
     button = next(b for b in life['inputs']['buttons'] if b['id'] == 'open-installed')
     guard = '$state.applicationInstalled == true && !($state.trialAccepted == true && $state.trialTarget)'
     assert button['visibleIf'] == guard
-    assert button['enabledIf'] == guard + ' && $state.effectiveTarget'
-    actions = [a for a in life['actions'] if a['on'] == 'click:open-installed']
-    action = next(a for a in actions if a['type'] == 'openWorkspace')
-    modal_action = next(a for a in actions if a['type'] == 'openModal')
-    assert action['enabledIf'] == guard + " && $state.effectiveTarget.intent == 'webspace.open'"
-    assert modal_action['enabledIf'] == guard + " && $state.effectiveTarget.intent == 'desktop.open_modal'"
-    assert modal_action['params']['modalId'] == '$state.effectiveTarget.modal_id'
+    action = next(a for a in life['actions'] if a['on'] == 'click:open-installed')
+    assert action['enabledIf'] == button['enabledIf'] == guard + ' && $state.effectiveTarget'
+    assert action['type'] == 'openWorkspace'
     target = {'intent': 'webspace.open', 'expected_scenario_id': 'different-scenario',
               'webspace_id': 'selected-workspace', 'space_kind': 'workspace',
               'application_id': 'synthetic-app', 'release_digest': 'sha256:' + 'a' * 64}
@@ -395,7 +410,7 @@ def test_installed_open_does_not_guess_a_navigation_target():
     trial = next(b for b in life['inputs']['buttons'] if b['id'] == 'open')
     assert trial['visibleIf'] == '$state.trialAccepted == true && $state.trialTarget'
     unavailable = WIDGETS['application-open-unavailable']
-    assert unavailable['visibleIf'] == guard + ' && !$state.effectiveTarget'
+    assert unavailable['visibleIf'] == "($state.dashboardSection == 'details') && (" + guard + ' && !$state.effectiveTarget)'
     assert unavailable['dataSource']['toolId'] == 'applications.show'
     assert unavailable['dataSource']['resultPath'] == 'response.result.application'
     assert STATE['effectiveTarget'] is None
@@ -419,7 +434,7 @@ def test_setup_summary_read_preserves_exact_release_and_root_authority():
     assert source['resultPath'] == 'response.result.setup'
     for digest in [None, 'sha256:' + 'a' * 64]:
         arguments = resolve(source['arguments'], {
-            'selectedApplicationId': 'synthetic-app', 'selectedReleaseDigest': digest,
+            'selectedApplicationId': 'synthetic-app', 'installedReleaseDigest': digest,
         }, {})
         assert arguments == {'application_id': 'synthetic-app', 'release_digest': digest}
         jsonschema.validate(arguments, CONTRACTS[source['toolId']]['input_schema'])
@@ -430,9 +445,11 @@ def test_root_authorization_delegation_has_no_local_role_store():
         contract = CONTRACTS[a['target']]
         assert contract['required_capability'].startswith('applications.')
         assert not {'actor_ref','issuer_ref','platform_role','owner'} & set(a.get('params',{}))
-    assert not any(x.get('type') == 'callSkill' for x in walk(APP))
+    skill_calls = [x for x in walk(APP) if x.get('type') == 'callSkill']
+    assert not skill_calls  # The shared Dev Tickets window owns ticket commands.
+    assert all(not {'actor', 'caller', 'role'} & set(x.get('params', {})) for x in skill_calls)
     scenario = yaml.safe_load((PACKAGE / 'scenario.yaml').read_text(encoding='utf-8'))
-    assert scenario['runtime']['skills']['required'] == []
+    assert scenario['runtime']['skills']['required'] == ['applications_skill']
 
 
 @pytest.mark.parametrize('installed,available', [(True, False), (True, True), (False, True)])
@@ -459,9 +476,9 @@ def test_access_reads_follow_installed_release_after_versions_section_removal():
     bindings = WIDGETS['application-details']['inputs']['stateBindings']
     state = copy.deepcopy(STATE)
     state['selectedApplicationId'] = 'synthetic-app'
-    for key in ['selectedReleaseDigest', 'effectiveReleaseDigest']:
+    for key in ['installedReleaseDigest', 'effectiveReleaseDigest']:
         state[key] = resolve('$event.' + bindings[key]['path'], {}, record)
-    assert state['selectedReleaseDigest'] == installed
+    assert state['installedReleaseDigest'] == installed
     assert state['effectiveReleaseDigest'] == candidate
     modal = APP['modals']['manage-application-access']
     reads = [n for n in walk(modal) if n.get('kind') == 'mcp'
@@ -484,7 +501,7 @@ def test_access_without_declared_roles_submits_empty_array(operation):
     roles = next(f for f in form['inputs']['fields'] if f['id'] == 'application_roles')
     assert roles['required'] is False
     assert roles['defaultValue'] == []
-    state = {'selectedApplicationId': 'synthetic-app', 'selectedReleaseDigest': 'sha256:' + 'a' * 64,
+    state = {'selectedApplicationId': 'synthetic-app', 'installedReleaseDigest': 'sha256:' + 'a' * 64,
              'accessContext': {'grant_id': 'grant.synthetic', 'revision': 3, 'release_digest': 'sha256:' + 'a' * 64}}
     event = {'values': {'subject_ref': 'user.synthetic', 'application_roles': roles['defaultValue'],
                         'permission_ceiling': ['applications.read'], 'explicit_denies': [], 'expires_at': None}}

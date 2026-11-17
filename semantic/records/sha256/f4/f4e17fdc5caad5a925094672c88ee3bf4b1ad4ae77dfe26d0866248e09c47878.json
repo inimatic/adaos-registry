@@ -1,0 +1,54 @@
+{
+  "claim_ref": "evidence-claim:application-release/b5c5d43dd8c42ce3da863ee4",
+  "claim_kind": "capability_conformance",
+  "subjects": [
+    {
+      "kind": "capability_contract",
+      "ref": "capability:resource.records.manage",
+      "digest": "sha256:d6b03ddd8819d4d4eb86c38e1b11fb20fa36891d27c8e862103fb1061f74c71e"
+    },
+    {
+      "kind": "binding_definition",
+      "ref": "binding-definition:resource.records.application-owned",
+      "digest": "sha256:e01fd2659dbdb5199765ad08a5b66abccf99fbc7d850b2265558c20285ef51eb"
+    }
+  ],
+  "environment": {
+    "profile_ref": "profile:local/default",
+    "profile_digest": "sha256:d421403a6dadc89addb64bed94aeed71fd5e3d3d176edd627ff0b6f79f2bbd3b"
+  },
+  "dependencies": [
+    {
+      "ref": "project-release:applications",
+      "observed_version": "0.1.58",
+      "fingerprint": "sha256:65f3ccceab9a8c60858646ad43463fe47d98d8754bc097073ea5bd6382234039"
+    }
+  ],
+  "suite_digest": "sha256:3a0a75aa1de71e996fb22e070480b106f7a2e334e64762e15707c68cad8416ee",
+  "evidence_digest": "sha256:5352120338716d052ed9f2d0d1b084448d6e315bf57377c826055c5007561962",
+  "provenance": {
+    "issuer": "adaos:application-release-admission",
+    "runner": "trusted-release-validation",
+    "run_id": "sha256:65f3ccceab9a8c60858646ad43463fe47d98d8754bc097073ea5bd6382234039"
+  },
+  "issued_at": "2026-11-05T23:35:42+00:00",
+  "freshness": {
+    "max_age_seconds": 2592000,
+    "invalidated_by": [
+      "dependency_change",
+      "environment_change",
+      "revocation"
+    ]
+  },
+  "result": "verified",
+  "redaction": {
+    "portable": true,
+    "omitted_fields": [
+      "credentials",
+      "local_evidence_context"
+    ]
+  },
+  "portability_scope": "portable",
+  "schema": "adaos.evidence.claim.v1",
+  "claim_digest": "sha256:f4e17fdc5caad5a925094672c88ee3bf4b1ad4ae77dfe26d0866248e09c47878"
+}

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import fnmatch
+import errno
 import hashlib
 import logging
 import mimetypes
 import os
 import shutil
+import sqlite3
 import subprocess
 import threading
 import time
@@ -39,6 +41,7 @@ from .rendition import (
     transcode_with_ffmpeg,
 )
 from .repository import MediaLibraryAgentRepository
+from .storage import StorageAdmission
 from .sidecars import nfo_witness, read_local_nfo
 from .technical import (
     EMBEDDED_METADATA_REVISION,
@@ -103,6 +106,7 @@ class MediaLibraryAgentWorker:
         self._last_artwork_backfill_admission_monotonic = 0.0
         self._last_search_backfill_monotonic = 0.0
         self._last_storage_maintenance_monotonic = 0.0
+        self._storage_retry_at = time.monotonic()
 
     def ensure_started(self) -> bool:
         with self._lock:
@@ -152,6 +156,9 @@ class MediaLibraryAgentWorker:
     def run_once(self) -> dict[str, Any] | None:
         if self.repository.storage_maintenance_active():
             return None
+        if time.monotonic() - self._storage_retry_at >= 30.0:
+            self.repository.retry_storage_waiters(limit=4)
+            self._storage_retry_at = time.monotonic()
         self._refresh_resource_pressure(force=True)
         maintenance_batch = max(
             1,
@@ -622,20 +629,16 @@ class MediaLibraryAgentWorker:
             if packaging == "hls_cmaf_vod" and requested_storage_mode == "source_root"
             else requested_storage_mode
         )
+        # Reserve worst-case encoder output, never the compressed input size.
         estimated = (
             int((job.get("target") or {}).get("max_output_bytes") or 4 * 1024**2)
             if is_artwork
-            else min(
-                int(limits["max_output_bytes"]),
-                max(1, int(source.get("size_bytes") or 0)),
-            )
+            else int(limits["max_output_bytes"])
         )
         if current_disk_usage(self.repository.db_path) + estimated > int(
             limits["disk_quota_bytes"]
         ):
-            return self._finish_rendition_failed(
-                job_id, "rendition_disk_quota_exceeded"
-            )
+            return self._wait_storage(job_id, "rendition_disk_quota_exceeded")
         if storage_mode == "source_root" and not is_artwork:
             quota = max(
                 1024**3,
@@ -645,9 +648,23 @@ class MediaLibraryAgentWorker:
                 text(root.get("id")), "source_root"
             )
             if used + estimated > quota:
-                return self._finish_rendition_failed(
-                    job_id, "rendition_storage_quota_exceeded"
-                )
+                return self._wait_storage(job_id, "rendition_storage_quota_exceeded")
+        try:
+            admission = StorageAdmission(self.repository.db_path.parent / "storage_admission.sqlite3")
+        except (OSError, sqlite3.Error):
+            return self._wait_storage(job_id, "capacity_unknown")
+        permanent_path = (Path(text(root.get("path")))
+                          if storage_mode == "source_root" and not is_artwork
+                          else target_path.parent)
+        decision = admission.reserve(job_id, [
+            {"path": permanent_path, "category": "image" if is_artwork else "av", "bytes": estimated},
+            {"path": target_path.parent, "category": "staging", "bytes": estimated},
+        ])
+        if not decision.get("ok"):
+            return self._wait_storage(job_id, text(decision.get("reason")))
+        committed_storage = False
+        publication_started = False
+        descriptor: dict[str, Any] | None = None
         self._publish_rendition(job_id)
         try:
             self._wait_for_rendition_resources(job_id)
@@ -680,6 +697,9 @@ class MediaLibraryAgentWorker:
                 job,
                 cancelled=cancelled,
             )
+            actual_bytes = self._rendition_output_bytes(target_path)
+            if actual_bytes <= 0 or actual_bytes > estimated:
+                raise RuntimeError("storage_output_exceeds_reservation")
             current = self.repository.get_source(text(job.get("source_id")))
             if (
                 current is None
@@ -691,6 +711,7 @@ class MediaLibraryAgentWorker:
                 return self._finish_rendition_failed(
                     job_id, "source_changed", status="invalidated"
                 )
+            publication_started = True
             descriptor = dict(
                 self._publish_derived(target_path, job)
                 if self._publish_derived_custom or storage_mode == "node_cache"
@@ -743,6 +764,9 @@ class MediaLibraryAgentWorker:
                 }
             )
             descriptor["metadata"] = descriptor_metadata
+            # Charge verified output before making it discoverable. An admission
+            # failure must not turn an already advertised job into a failed load.
+            admission.commit(job_id, output_bytes=actual_bytes)
             completed = self.repository.complete_rendition_job(
                 job_id,
                 descriptor=descriptor,
@@ -755,6 +779,8 @@ class MediaLibraryAgentWorker:
             )
             if not completed.get("advertised"):
                 self._cleanup_published_descriptor(descriptor)
+            else:
+                committed_storage = True
             self._publish_rendition(job_id)
             return dict(
                 completed.get("job")
@@ -762,6 +788,10 @@ class MediaLibraryAgentWorker:
                 or completed
             )
         except Exception as exc:
+            if descriptor is not None:
+                self._cleanup_published_descriptor(descriptor)
+            if isinstance(exc, OSError) and exc.errno == errno.ENOSPC:
+                return self._wait_storage(job_id, "capacity_exhausted")
             code, _, detail = text(exc).partition(":")
             return self._finish_rendition_failed(
                 job_id, code or "rendition_failed", detail
@@ -774,6 +804,22 @@ class MediaLibraryAgentWorker:
                 target_path.with_suffix(target_path.suffix + ".partial").unlink(
                     missing_ok=True
                 )
+            temporary_gone = not target_path.exists() and not target_path.with_suffix(target_path.suffix + ".partial").exists()
+            if target_path.name == "master.m3u8":
+                temporary_gone = not target_path.parent.exists()
+            output_paths = ([descriptor.get("path")] if descriptor else [])
+            if descriptor:
+                output_paths += [item.get("path") for item in (descriptor.get("metadata") or {}).get("resources") or [] if isinstance(item, Mapping)]
+            published_gone = (not publication_started or
+                              bool(output_paths) and all(value and not Path(value).exists() for value in output_paths))
+            if not committed_storage and temporary_gone and published_gone:
+                admission.release(job_id)
+
+    def _wait_storage(self, job_id: str, reason: str) -> dict[str, Any]:
+        waiting = self.repository.update_rendition_job(
+            job_id, status="waiting_storage", error_code=reason, error_detail="")
+        self._publish_rendition(job_id)
+        return dict(waiting or {})
 
     @staticmethod
     def _rendition_output_bytes(target_path: Path) -> int:

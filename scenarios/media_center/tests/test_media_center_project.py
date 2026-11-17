@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 import jsonschema
+import pytest
 import yaml
 
 
@@ -84,6 +85,8 @@ def test_media_control_declares_application_access_capabilities() -> None:
 
 
 def test_registry_index_matches_media_center_distribution_manifests() -> None:
+    if not (REGISTRY_ROOT / "registry.json").is_file():
+        pytest.skip("Source-scoped immutable closure has no aggregate registry index")
     registry = json.loads(
         (REGISTRY_ROOT / "registry.json").read_text(encoding="utf-8")
     )

@@ -1,0 +1,1044 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "applications",
+    "legacy_project_id": "applications",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "applications",
+    "display": {
+      "title": "Applications",
+      "summary": "Manage installed applications, available releases, update tracks, and local developments.",
+      "categories": [
+        "System",
+        "Management"
+      ]
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "main",
+        "presentation_ref": "scenario:applications"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": true,
+      "bootstrap_capable": true,
+      "active_installation_removable": false,
+      "recovery_surfaces": [
+        "cli",
+        "mcp"
+      ]
+    },
+    "lifecycle": "active",
+    "revision": 3,
+    "created_at": "2026-09-06T05:29:12+00:00",
+    "updated_at": "2026-09-25T15:34:27+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "applications",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "applications",
+    "version": "0.1.58",
+    "release_digest": "sha256:65f3ccceab9a8c60858646ad43463fe47d98d8754bc097073ea5bd6382234039",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "applications",
+      "version": "0.1.58",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:f461d05a330c2a1a81ed9001817953bea0298ea000c1bd4c02051a78779d0e8d",
+        "path_scope": [
+          "projects/applications/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "applications",
+          "version": "0.1.88",
+          "digest": "sha256:43b643213e72e6e2eb07f6b3a3b0eea0da4157ed45b9bfc83058fb7a9dc81e96",
+          "manifest_digest": "sha256:0fe9b3cd047f3724a001b082d9aed6fc3e14f4ed2332ba484d1b5f6bb379b65a",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:f461d05a330c2a1a81ed9001817953bea0298ea000c1bd4c02051a78779d0e8d",
+            "path_scope": [
+              "scenarios/applications/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/applications",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "applications_skill",
+          "version": "0.1.10",
+          "digest": "sha256:c9c3ce4f6242eecf1bc6fd6f96dac7f813ebf8b379ac85f33223d1e04bfe2150",
+          "manifest_digest": "sha256:0581a9ba77053adc35e60d4c8e752550fd45e3d5d9df3c4aab6637f2a250d4e9",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:f461d05a330c2a1a81ed9001817953bea0298ea000c1bd4c02051a78779d0e8d",
+            "path_scope": [
+              "skills/applications_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/applications_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [
+        {
+          "kind": "skill",
+          "artifact_id": "automation_manager_prototype_skill",
+          "version": "0.1.6",
+          "package_digest": "sha256:56688ee94ae3e6a8f72a791ba87f8f1aaedbbe255454cc05c721cc1c1e8c6d0b",
+          "optional": false,
+          "version_spec": "==0.1.6"
+        }
+      ],
+      "permissions": [
+        "applications.apply",
+        "applications.develop",
+        "applications.plan",
+        "applications.publish",
+        "applications.read",
+        "applications.recover",
+        "applications.report",
+        "development.read.tickets",
+        "development.write.tickets"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:f461d05a330c2a1a81ed9001817953bea0298ea000c1bd4c02051a78779d0e8d",
+          "builder": "adaos.dev.project.push"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:applications",
+          "consumer_ref": "scenario:applications",
+          "consumer_digest": "sha256:43b643213e72e6e2eb07f6b3a3b0eea0da4157ed45b9bfc83058fb7a9dc81e96",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": true,
+          "unresolved": [],
+          "source_artifacts": {
+            "assets/i18n/en.json": "sha256:85bf3c4a45cf3dbe8dd8abf6a48f94cbfaa8be844bb557f87928148aa0425c6f",
+            "assets/i18n/ru.json": "sha256:a068e67ebda59f6537b5c833154e369a7d04e374eae9274fbc482035ccd29e7e",
+            "scenario.json": "sha256:9242849c76f0a52fe8ad29244b340cff517fa3956c1b407e98a0067eb6c231d6",
+            "semantic.webui.json": "sha256:675591927e1536cae889a67d3e00ab41b1271b5f2d0750f80a4f152e6c8ae40d",
+            "webui.json": "sha256:bbd4f064582f2f724bd6ac97e1f1ef691f7f78de8d80e79c978f30b75c79ebd1",
+            ".adaos/package-manifest.json": "sha256:0fe9b3cd047f3724a001b082d9aed6fc3e14f4ed2332ba484d1b5f6bb379b65a"
+          },
+          "edges": [
+            {
+              "contract_ref": "mcp:applications.access.privacy",
+              "contract_digest": "sha256:1f91004d8b1391534e72cb8bcd81f072ea572152977aa0bc322c038e3b3ee828",
+              "surface": [
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[1].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.access.profile",
+              "contract_digest": "sha256:6023853deb4ec1302aee6d907a43fbc56f1afca1af0bba81603a5ef77eeb3c81",
+              "surface": [
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[2].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.access.reviews",
+              "contract_digest": "sha256:bb19b30f423879426698b376261c8ca16e0b0d76840bfcfd1fb85d3d036eb8f3",
+              "surface": [
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[0].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.access.show",
+              "contract_digest": "sha256:e3eca1832fea48fbccdf2eba9b6136ddf5b332c064f154fff347e3989667f8a7",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[29].dataSource",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[7].dataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[10].dataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[11].inputs.fields[1].optionsDataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[11].inputs.fields[2].optionsDataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[11].inputs.fields[3].optionsDataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[12].inputs.fields[0].optionsDataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[12].inputs.fields[1].optionsDataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[12].inputs.fields[2].optionsDataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[3].dataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[4].dataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[5].dataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[6].dataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[7].dataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[8].dataSource",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[9].dataSource",
+                "webui.json.ui.application.modals.simulate-application-access.schema.widgets[0].inputs.fields[1].optionsDataSource",
+                "webui.json.ui.application.modals.simulate-application-access.schema.widgets[0].inputs.fields[3].optionsDataSource",
+                "webui.json.ui.application.modals.simulate-application-access.schema.widgets[0].inputs.fields[4].optionsDataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.access.users",
+              "contract_digest": "sha256:549e32c513a1bd8d77051c7c3ed300fbf76477826293718689c3a4d8a61b3503",
+              "surface": [
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[11].inputs.fields[0].optionsDataSource",
+                "webui.json.ui.application.modals.manage-connected-account.schema.widgets[0].inputs.fields[2].optionsDataSource",
+                "webui.json.ui.application.modals.simulate-application-access.schema.widgets[0].inputs.fields[0].optionsDataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.list",
+              "contract_digest": "sha256:e663e7a20688a99e69b2bfa533727be7ec26308d302161ea7c796a2f5dea82a3",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[3].dataSource",
+                "webui.json.ui.application.desktop.pageSchema.widgets[5].dataSource",
+                "webui.json.ui.application.desktop.pageSchema.widgets[7].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.list_components",
+              "contract_digest": "sha256:e393efa4654602e220740e2452a243ecb5ce46db3ac94bac37ccdde16be4e619",
+              "surface": [
+                "webui.json.ui.application.modals.manage-runtime-placement.schema.widgets[1].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.list_development_reports",
+              "contract_digest": "sha256:8c44c2d0a08dd7a344841f70afd2cd95bbee9ba267f18fc8f0e3d7f42c5bbdb1",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[34].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.list_operations",
+              "contract_digest": "sha256:fa26b8d7116188d802e85473be89af7aa6dd9223e0ff85a3ba4f96a5b96e3dbf",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[33].dataSource",
+                "webui.json.ui.application.desktop.pageSchema.widgets[8].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.list_placements",
+              "contract_digest": "sha256:afefac0fd28c497db7686f5265337494dbe06419bdb9038e773d5707283a09e0",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[26].dataSource",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[8].dataSource",
+                "webui.json.ui.application.modals.manage-runtime-placement.schema.widgets[0].inputs.fields[0].optionsDataSource",
+                "webui.json.ui.application.modals.manage-runtime-placement.schema.widgets[2].inputs.fields[0].optionsDataSource",
+                "webui.json.ui.application.modals.manage-runtime-placement.schema.widgets[4].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.list_releases",
+              "contract_digest": "sha256:3e17ba8cf33b4d11ff38223c6391b367b655f26d6e94a949966d9761030198ac",
+              "surface": [
+                "webui.json.ui.application.modals.position-actions.schema.widgets[6].dataSource",
+                "webui.json.ui.application.modals.position-actions.schema.widgets[7].dataSource",
+                "webui.json.ui.application.modals.release-notes.schema.widgets[0].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.setup.show",
+              "contract_digest": "sha256:5e952b48d75c4317360fed1af6dc52999cd3999ee819a43e48261bd4ae6446c6",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[25].dataSource",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[0].dataSource",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[2].dataSource",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[3].dataSource",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[4].dataSource",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[5].dataSource",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[6].dataSource",
+                "webui.json.ui.application.modals.provide-application-credential.schema.widgets[0].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.show",
+              "contract_digest": "sha256:91399d13540d8d04c18a6616736fd92f08562763fffdc17a0743f496a190e8de",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[10].dataSource",
+                "webui.json.ui.application.desktop.pageSchema.widgets[12].dataSource",
+                "webui.json.ui.application.desktop.pageSchema.widgets[20].dataSource",
+                "webui.json.ui.application.desktop.pageSchema.widgets[22].dataSource",
+                "webui.json.ui.application.desktop.pageSchema.widgets[23].dataSource",
+                "webui.json.ui.application.desktop.pageSchema.widgets[24].dataSource",
+                "webui.json.ui.application.desktop.pageSchema.widgets[28].dataSource",
+                "webui.json.ui.application.desktop.pageSchema.widgets[30].dataSource",
+                "webui.json.ui.application.desktop.pageSchema.widgets[9].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:action.type:openModal",
+              "contract_digest": "sha256:4821d1cbc2df9415a1eb8b0dd540846f25ae6fc9e2daa40d8772a0fd0eef6e8a",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[14].actions[12]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[14].actions[15]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[14].actions[3]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[14].actions[6]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[14].actions[9]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[17].actions[10]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[17].actions[13]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[17].actions[14]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[17].actions[15]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[17].actions[16]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[17].actions[2]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[17].actions[5]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[17].actions[7]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[2].actions[1]",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[4].actions[1]",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[9].actions[0]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[15].actions[1]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[15].actions[2]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[5].actions[1]",
+                "webui.json.ui.application.modals.manage-runtime-placement.schema.widgets[0].actions[1]",
+                "webui.json.ui.application.modals.manage-runtime-placement.schema.widgets[1].actions[2]",
+                "webui.json.ui.application.modals.manage-runtime-placement.schema.widgets[2].actions[1]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:feedback.taskProgress",
+              "contract_digest": "sha256:9a9817e28a093da463c581a7dc75d80f862def9b10775dec6772aa8896ff1012",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[15]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[16]",
+                "webui.json.ui.application.modals.finalize-application.schema.widgets[2]",
+                "webui.json.ui.application.modals.finalize-application.schema.widgets[3]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:input.selector",
+              "contract_digest": "sha256:b86c19f957949bf1af5b04b747408cc9062ef2a9e69207de9a9f2621aedcd354",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[31]",
+                "webui.json.ui.application.modals.review-lifecycle-operation.schema.widgets[0]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:input.toggle",
+              "contract_digest": "sha256:bf776985f8ed1a5b1fe2c280dd5e3dcab675a230b1d7ec7616e16b47655e8c77",
+              "surface": [
+                "webui.json.ui.application.modals.position-actions.schema.widgets[1]",
+                "webui.json.ui.application.modals.position-actions.schema.widgets[4]",
+                "webui.json.ui.application.modals.publication-actions.schema.widgets[3]",
+                "webui.json.ui.application.modals.review-lifecycle-operation.schema.widgets[3]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:item.details",
+              "contract_digest": "sha256:6b35434a3583e3bc268dbbbb2766f578c5654383f6553f26d5a54dfa0f268933",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[10]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[12]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[22]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[23]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[24]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[25]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[26]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[27]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[28]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[29]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[30]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[9]",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[0]",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[8]",
+                "webui.json.ui.application.modals.finalize-application.schema.widgets[0]",
+                "webui.json.ui.application.modals.finalize-application.schema.widgets[1]",
+                "webui.json.ui.application.modals.finalize-application.schema.widgets[4]",
+                "webui.json.ui.application.modals.finalize-application.schema.widgets[5]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[10]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[1]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[2]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[4]",
+                "webui.json.ui.application.modals.manage-connected-account.schema.widgets[2]",
+                "webui.json.ui.application.modals.position-actions.schema.widgets[0]",
+                "webui.json.ui.application.modals.position-actions.schema.widgets[2]",
+                "webui.json.ui.application.modals.position-actions.schema.widgets[5]",
+                "webui.json.ui.application.modals.position-actions.schema.widgets[8]",
+                "webui.json.ui.application.modals.publication-actions.schema.widgets[0]",
+                "webui.json.ui.application.modals.publication-actions.schema.widgets[1]",
+                "webui.json.ui.application.modals.publication-actions.schema.widgets[4]",
+                "webui.json.ui.application.modals.publication-actions.schema.widgets[5]",
+                "webui.json.ui.application.modals.publication-actions.schema.widgets[6]",
+                "webui.json.ui.application.modals.publication-actions.schema.widgets[7]",
+                "webui.json.ui.application.modals.review-application-updates.schema.widgets[0]",
+                "webui.json.ui.application.modals.review-component-uninstall.schema.widgets[0]",
+                "webui.json.ui.application.modals.review-lifecycle-operation.schema.widgets[1]",
+                "webui.json.ui.application.modals.review-runtime-relocation.schema.widgets[0]",
+                "webui.json.ui.application.modals.simulate-application-access.schema.widgets[2]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:navigation.tabs",
+              "contract_digest": "sha256:effdfc57c291163b1ef2fdcd9b3defa1e300f69dbf69a00ed71d93bfcf55a84b",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[0]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[13]",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[1]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.actions",
+              "contract_digest": "sha256:b11889d561895633c7bb4f0fd286b2f3557ac4d2c9cce07adbbc4443c04ad543",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[11]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[14]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[17]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[18]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[19]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[2]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[32]",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[10]",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[9]",
+                "webui.json.ui.application.modals.confirm-delete-development.schema.widgets[1]",
+                "webui.json.ui.application.modals.finalize-application.schema.widgets[6]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[13]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[14]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[15]",
+                "webui.json.ui.application.modals.manage-connected-account.schema.widgets[3]",
+                "webui.json.ui.application.modals.manage-home-desktops.schema.widgets[1]",
+                "webui.json.ui.application.modals.manage-runtime-placement.schema.widgets[3]",
+                "webui.json.ui.application.modals.position-actions.schema.widgets[9]",
+                "webui.json.ui.application.modals.publication-actions.schema.widgets[9]",
+                "webui.json.ui.application.modals.review-application-updates.schema.widgets[2]",
+                "webui.json.ui.application.modals.review-component-uninstall.schema.widgets[1]",
+                "webui.json.ui.application.modals.review-lifecycle-operation.schema.widgets[4]",
+                "webui.json.ui.application.modals.review-runtime-relocation.schema.widgets[1]",
+                "webui.json.ui.application.modals.simulate-application-access.schema.widgets[1]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.form",
+              "contract_digest": "sha256:cf59070f1d7eec7646b0b1d18f4cbac43e32c8217a6fe52152b1432fb4565203",
+              "surface": [
+                "webui.json.ui.application.modals.configure-application.schema.widgets[3]",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[6]",
+                "webui.json.ui.application.modals.confirm-delete-development.schema.widgets[0]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[11]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[12]",
+                "webui.json.ui.application.modals.manage-connected-account.schema.widgets[0]",
+                "webui.json.ui.application.modals.manage-connected-account.schema.widgets[1]",
+                "webui.json.ui.application.modals.manage-home-desktops.schema.widgets[0]",
+                "webui.json.ui.application.modals.manage-runtime-placement.schema.widgets[0]",
+                "webui.json.ui.application.modals.manage-runtime-placement.schema.widgets[2]",
+                "webui.json.ui.application.modals.provide-application-credential.schema.widgets[0]",
+                "webui.json.ui.application.modals.publication-actions.schema.widgets[2]",
+                "webui.json.ui.application.modals.simulate-application-access.schema.widgets[0]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.list",
+              "contract_digest": "sha256:fc112730dc984329ecc6ab8bc7a26a9b770703564c8846b347a85a4fdfb6d6a6",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[20]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[33]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[34]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[3]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[5]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[7]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[8]",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[2]",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[4]",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[5]",
+                "webui.json.ui.application.modals.configure-application.schema.widgets[7]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[0]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[3]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[5]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[6]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[7]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[8]",
+                "webui.json.ui.application.modals.manage-application-access.schema.widgets[9]",
+                "webui.json.ui.application.modals.manage-runtime-placement.schema.widgets[4]",
+                "webui.json.ui.application.modals.position-actions.schema.widgets[3]",
+                "webui.json.ui.application.modals.position-actions.schema.widgets[6]",
+                "webui.json.ui.application.modals.position-actions.schema.widgets[7]",
+                "webui.json.ui.application.modals.publication-actions.schema.widgets[8]",
+                "webui.json.ui.application.modals.release-notes.schema.widgets[0]",
+                "webui.json.ui.application.modals.review-application-updates.schema.widgets[1]",
+                "webui.json.ui.application.modals.review-lifecycle-operation.schema.widgets[2]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.queryToolbar",
+              "contract_digest": "sha256:4e9a3386820eadff8e89b8e065770b2dad9e0f9dc14cd4bf72e59a769dd59e20",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[1]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[4]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[6]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.table",
+              "contract_digest": "sha256:c7d328ca61b335e3dfdd62f69274df7157c1a4400c58ffa8d7ff7af9f4ed3af8",
+              "surface": [
+                "webui.json.ui.application.modals.manage-runtime-placement.schema.widgets[1]"
+              ],
+              "exposure": "compiled"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:be523703da66bf6a4a5b481934068fc59acb87fb7b11fb81e5b3283ffe3116bf",
+          "digest": "sha256:be523703da66bf6a4a5b481934068fc59acb87fb7b11fb81e5b3283ffe3116bf",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:applications",
+          "consumer_ref": "skill:applications_skill",
+          "consumer_digest": "sha256:c9c3ce4f6242eecf1bc6fd6f96dac7f813ebf8b379ac85f33223d1e04bfe2150",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": false,
+          "unresolved": [
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.memory.propose_write",
+              "location": "handlers/main.py:364"
+            },
+            {
+              "code": "dynamic_sdk_arguments",
+              "location": "handlers/main.py:119"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.tool",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.i18n._",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.memory",
+              "location": "handlers/main.py"
+            }
+          ],
+          "source_artifacts": {
+            "config.json": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "i18n/en.json": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            ".adaos/package-manifest.json": "sha256:0581a9ba77053adc35e60d4c8e752550fd45e3d5d9df3c4aab6637f2a250d4e9"
+          },
+          "edges": [
+            {
+              "contract_ref": "sdk:adaos.sdk.access.caller",
+              "contract_digest": "sha256:5289fd6f9c05144e2992c40ebfd0c3c2e757c51f144d8cb31613ab32eb6b5bb6",
+              "surface": [
+                "handlers/main.py:83"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.access.require",
+              "contract_digest": "sha256:4e4bc6a53b1bf3c808258429293dafcfa334aa72690c1d75021676748d87230f",
+              "surface": [
+                "handlers/main.py:108",
+                "handlers/main.py:134",
+                "handlers/main.py:157",
+                "handlers/main.py:17",
+                "handlers/main.py:171",
+                "handlers/main.py:172",
+                "handlers/main.py:33"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.applications.get_application",
+              "contract_digest": "sha256:81173544be98eeec21f2b8346a7d2d02e149c6f6ed108ac6cced46e2f4794654",
+              "surface": [
+                "handlers/main.py:18",
+                "handlers/main.py:34"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.chat.ask",
+              "contract_digest": "sha256:0ed9dc9086a0f487f31100a188565f92c641eac24955d03625adb0bc02323a77",
+              "surface": [
+                "handlers/main.py:327"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.chat.context",
+              "contract_digest": "sha256:2a8c1f49e3267b612558e8f777eea6d2a8212daa113e7292254f79a11c8672ca",
+              "surface": [
+                "handlers/main.py:280"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.chat.send",
+              "contract_digest": "sha256:f8a2645848c5b23d21247eff2d3ef6885ba83c8ba7ebe48f366638d0bbd92f8d",
+              "surface": [
+                "handlers/main.py:288"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.conversation.open",
+              "contract_digest": "sha256:773fa1049b614e2acd901ce851740ab1a4b6688cb2211d473e8e1139e2c248f0",
+              "surface": [
+                "handlers/main.py:247"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.development_tickets.create_ticket",
+              "contract_digest": "sha256:8dd1bb42d8cbbb11bc44de4c30fd19179705470bdcfc27570e0ef1fe2f454a05",
+              "surface": [
+                "handlers/main.py:163"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.development_tickets.get_ticket",
+              "contract_digest": "sha256:d482b209ce536e6118c03ea6efdcbda39928496ee77d55a351dc1f5ef1f87d70",
+              "surface": [
+                "handlers/main.py:94"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.development_tickets.list_events",
+              "contract_digest": "sha256:3738a2cbed9c56147d4d50904e71f1210026d867efac8f8a8d6ae8aa876a9fa9",
+              "surface": [
+                "handlers/main.py:136"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.development_tickets.list_tickets",
+              "contract_digest": "sha256:3738a2cbed9c56147d4d50904e71f1210026d867efac8f8a8d6ae8aa876a9fa9",
+              "surface": [
+                "handlers/main.py:119"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.development_tickets.operate_ticket",
+              "contract_digest": "sha256:57f0193da39afbfc2e961d57b25b64f6d47a61c819722a9771668326e162bbe8",
+              "surface": [
+                "handlers/main.py:179"
+              ],
+              "exposure": "static"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:abc50f4522db64a13ed98b431f14a40fda5614c2251c517027f4e1bf4aaa47de",
+          "digest": "sha256:abc50f4522db64a13ed98b431f14a40fda5614c2251c517027f4e1bf4aaa47de",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:56178d0168428d744191a3fe423e12e727d69892537b5a9617bedc057346bdce",
+        "sha256:92aeba56a09cb1d49c34319a814ddca0e0aa1b1e62e4945e108cb10cc61d6b28",
+        "sha256:b57a166f238d38fc30b3f45f33c96d42be2ce35f999fd6446182953483ad7848"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:1d817a3ec65d8426698905986456611bbb62591514ab82a7af13bdb52e623f10",
+        "profiles": [
+          "adaos.system.applications.v1"
+        ],
+        "members": [
+          {
+            "ref": "scenario:applications",
+            "package_digest": "sha256:43b643213e72e6e2eb07f6b3a3b0eea0da4157ed45b9bfc83058fb7a9dc81e96",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          },
+          {
+            "ref": "skill:applications_skill",
+            "package_digest": "sha256:c9c3ce4f6242eecf1bc6fd6f96dac7f813ebf8b379ac85f33223d1e04bfe2150",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes",
+              "uses"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "main",
+            "presentation": "scenario:applications",
+            "default": true,
+            "bindings": {}
+          }
+        ],
+        "compatibility": {},
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "applications.apply",
+              "purpose": "Apply exact reviewed lifecycle plans and manage access for the selected Application.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "applications.develop",
+              "purpose": "Manage this publisher's unpublished local Application development.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "applications.plan",
+              "purpose": "Prepare reviewable lifecycle plans and release-readiness checks without applying them.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "applications.publish",
+              "purpose": "Promote an accepted Application release and publish its exact source and portable CBS projection to the shared registry.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "applications.read",
+              "purpose": "Read the Application catalog, installed state, releases, permissions, roles, access grants, and operation history.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "applications.recover",
+              "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "applications.report",
+              "purpose": "Read Root-owned Application development reports.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "development.read.tickets",
+              "purpose": "Read development tickets for the selected Application and its components.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "development.write.tickets",
+              "purpose": "Submit development requests and comments for the selected Application.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "access_metadata",
+              "application_metadata",
+              "user_content"
+            ],
+            "sent_off_device": [],
+            "linked_to_user": [
+              "access_metadata",
+              "user_content"
+            ],
+            "tracking": false,
+            "retention": "Development requests and comments remain with the canonical development ticket and audit history."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [
+              "application_metadata",
+              "access_metadata",
+              "user_content"
+            ],
+            "linked_to_user": true,
+            "sent_off_device": false,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "Applications",
+        "description": "Manage installed applications, Marketplace discovery, releases, updates, permissions, runtime placement, and development status.",
+        "categories": [
+          "system"
+        ],
+        "tags": [
+          "applications",
+          "marketplace",
+          "permissions"
+        ],
+        "icon": "apps-outline"
+      },
+      "release_digest": "sha256:65f3ccceab9a8c60858646ad43463fe47d98d8754bc097073ea5bd6382234039"
+    },
+    "accepted_candidate_id": "applications-0-1-58-bd6382234039",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "builder.release.preflight",
+        "checkpoint_package_digest": "sha256:964f3472773aef6bf845a95c3033afb58e3f982c1f4a1b1f8f2d155ff1917c40",
+        "checkpoint_source_revision": "42366c046388c9257836b8f4d3f9e77e0cd967fa",
+        "automation_task_id": "task.01M6PX7F4XEA5YV5DCRVPVJKYM",
+        "change_set_id": "change:applications-publication-followup-20261106",
+        "canonical_change_id": "change:applications-publication-followup-20261106",
+        "context_packet_digest": "sha256:47c65b894b95679f230fc5967c54ac512bf216489439c0c2c3028fa184906116",
+        "replaces_candidate_id": "applications-0-1-57-ca27874bdd73",
+        "checkpoint_component_ref": "scenario:applications"
+      }
+    ],
+    "provenance_refs": [
+      "sha256:65f3ccceab9a8c60858646ad43463fe47d98d8754bc097073ea5bd6382234039"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "applications.apply",
+          "purpose": "Apply exact reviewed lifecycle plans and manage access for the selected Application.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "applications.develop",
+          "purpose": "Manage this publisher's unpublished local Application development.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "applications.plan",
+          "purpose": "Prepare reviewable lifecycle plans and release-readiness checks without applying them.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "applications.publish",
+          "purpose": "Promote an accepted Application release and publish its exact source and portable CBS projection to the shared registry.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "applications.read",
+          "purpose": "Read the Application catalog, installed state, releases, permissions, roles, access grants, and operation history.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "applications.recover",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "applications.report",
+          "purpose": "Read Root-owned Application development reports.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "development.read.tickets",
+          "purpose": "Read development tickets for the selected Application and its components.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "development.write.tickets",
+          "purpose": "Submit development requests and comments for the selected Application.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "access_metadata",
+          "application_metadata",
+          "user_content"
+        ],
+        "sent_off_device": [],
+        "linked_to_user": [
+          "access_metadata",
+          "user_content"
+        ],
+        "tracking": false,
+        "retention": "Development requests and comments remain with the canonical development ticket and audit history."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [
+          "application_metadata",
+          "access_metadata",
+          "user_content"
+        ],
+        "linked_to_user": true,
+        "sent_off_device": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:818e339adb9d2f3c638eb0e824f6d2ab7b628397ee7b8bdcaade6fa13afb6e0b",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "applications",
+      "release_digest": "sha256:65f3ccceab9a8c60858646ad43463fe47d98d8754bc097073ea5bd6382234039",
+      "version": 1,
+      "components": [
+        {
+          "component_ref": "skill:automation_manager_prototype_skill",
+          "settings": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "production",
+                    "local_development"
+                  ]
+                }
+              },
+              "required": [
+                "provider"
+              ],
+              "additionalProperties": false
+            },
+            "defaults": {
+              "provider": "auto"
+            }
+          },
+          "credentials": []
+        }
+      ],
+      "connected_accounts": [],
+      "permissions": [
+        {
+          "id": "applications.apply",
+          "title": "Applications.Apply",
+          "purpose": "Apply exact reviewed lifecycle plans and manage access for the selected Application.",
+          "required": true
+        },
+        {
+          "id": "applications.develop",
+          "title": "Applications.Develop",
+          "purpose": "Manage this publisher's unpublished local Application development.",
+          "required": true
+        },
+        {
+          "id": "applications.plan",
+          "title": "Applications.Plan",
+          "purpose": "Prepare reviewable lifecycle plans and release-readiness checks without applying them.",
+          "required": true
+        },
+        {
+          "id": "applications.publish",
+          "title": "Applications.Publish",
+          "purpose": "Promote an accepted Application release and publish its exact source and portable CBS projection to the shared registry.",
+          "required": true
+        },
+        {
+          "id": "applications.read",
+          "title": "Applications.Read",
+          "purpose": "Read the Application catalog, installed state, releases, permissions, roles, access grants, and operation history.",
+          "required": true
+        },
+        {
+          "id": "applications.recover",
+          "title": "Applications.Recover",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "required": true
+        },
+        {
+          "id": "applications.report",
+          "title": "Applications.Report",
+          "purpose": "Read Root-owned Application development reports.",
+          "required": true
+        },
+        {
+          "id": "development.read.tickets",
+          "title": "Development.Read.Tickets",
+          "purpose": "Read development tickets for the selected Application and its components.",
+          "required": true
+        },
+        {
+          "id": "development.write.tickets",
+          "title": "Development.Write.Tickets",
+          "purpose": "Submit development requests and comments for the selected Application.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:36fbc293b10e8556ba8c690328cc20e6b88fd885add1792d5fe961cf526a9d4c"
+  },
+  "channels": {
+    "stable": "sha256:65f3ccceab9a8c60858646ad43463fe47d98d8754bc097073ea5bd6382234039"
+  },
+  "semantic": {
+    "projection_digest": "sha256:2c56eef491ffb76d51d6f08fd9169fa50849d987e0a68ecabf1c77c8442eb484",
+    "path": "semantic/applications/applications/65f3ccceab9a8c60858646ad43463fe47d98d8754bc097073ea5bd6382234039.json"
+  },
+  "projection_digest": "sha256:6b05fb03a7380cf28a3fd20a163a53a04abd3d9e4326120a3ef7b6abb4cdb1d6"
+}

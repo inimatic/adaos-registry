@@ -394,6 +394,16 @@
                                         "priority": 100,
                                         "role": "main",
                                         "scroll": "page"
+                                    },
+                                    {
+                                        "id": "system-dashboard",
+                                        "presentation": {
+                                            "compact": "stack",
+                                            "wide": "pane"
+                                        },
+                                        "priority": 99,
+                                        "role": "status",
+                                        "scroll": "page"
                                     }
                                 ],
                                 "scroll": "page",
@@ -5952,6 +5962,1176 @@
                                 }
                             ],
                             "visibleIf": "$state.activeTab === 'dev' && $state.developmentAccess === true"
+                        },
+                        {
+                            "id": "system-core-lifecycle-inventory",
+                            "type": "ui.list",
+                            "area": "system-dashboard",
+                            "title": "Local installed applications — Core lifecycle",
+                            "visibleIf": "$state.activeTab == 'system' && $state.isOwnerOrAdministrator === true",
+                            "dataSource": {
+                                "kind": "mcp",
+                                "toolId": "applications.list",
+                                "arguments": {
+                                    "installed_only": true,
+                                    "view": "summary"
+                                },
+                                "dryRun": true,
+                                "resultPath": "response.result.applications",
+                                "cacheTtlMs": 1000,
+                                "invalidationTags": [
+                                    "applications.lifecycle",
+                                    "applications.runtime",
+                                    "applications.detail",
+                                    "applications.catalog",
+                                    "builder.runtime",
+                                    "web_desktop.applications",
+                                    "applications.lifecycle.clock"
+                                ]
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "application.application_id",
+                                "titleKey": "application.display.title",
+                                "subtitleKey": "runtime_admission.reason",
+                                "pagination": true,
+                                "pageSize": 6,
+                                "meta": [
+                                    {
+                                        "key": "runtime_admission.admission",
+                                        "label": "Admission",
+                                        "kind": "badge"
+                                    },
+                                    {
+                                        "key": "runtime_admission.expires_at",
+                                        "label": "Execution lease expires"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "lifecycleApplicationId": "$event.application.application_id",
+                                        "coreLifecyclePlan": {},
+                                        "coreWriteLossAcknowledged": false
+                                    }
+                                },
+                                {
+                                    "on": "select",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "core-application-lifecycle",
+                                        "statePatch": {
+                                            "lifecycleApplicationId": "$event.application.application_id",
+                                            "coreLifecyclePlan": {},
+                                            "coreWriteLossAcknowledged": false
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "maintenance-navigation",
+                            "type": "navigation.tabs",
+                            "area": "system-dashboard",
+                            "title": "Node maintenance",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true",
+                            "inputs": {
+                                "selectedStateKey": "maintenanceSection",
+                                "buttons": [
+                                    {
+                                        "id": "storage",
+                                        "label": "Storage locations"
+                                    },
+                                    {
+                                        "id": "recovery",
+                                        "label": "Recovery"
+                                    },
+                                    {
+                                        "id": "testing",
+                                        "label": "Testing"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:storage",
+                                    "type": "updateState",
+                                    "params": {
+                                        "maintenanceSection": "storage"
+                                    }
+                                },
+                                {
+                                    "on": "click:recovery",
+                                    "type": "updateState",
+                                    "params": {
+                                        "maintenanceSection": "recovery"
+                                    }
+                                },
+                                {
+                                    "on": "click:testing",
+                                    "type": "updateState",
+                                    "params": {
+                                        "maintenanceSection": "testing"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "maintenance-volumes",
+                            "type": "ui.list",
+                            "area": "system-dashboard",
+                            "title": "Storage volumes",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceSection === 'storage'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_node_maintenance",
+                                "params": {
+                                    "section": "storage",
+                                    "target_node_id": "$state.selectedSystemNodeId"
+                                },
+                                "resultPath": "volumes",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "node.maintenance"
+                                ],
+                                "preserveLastValue": false,
+                                "startPolicy": "materialization_ready"
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "mount",
+                                "subtitleKey": "display_free",
+                                "pagination": true,
+                                "pageSize": 6,
+                                "emptyText": "No records observed for this node.",
+                                "meta": [
+                                    {
+                                        "key": "display_total",
+                                        "label": "Total"
+                                    },
+                                    {
+                                        "key": "write_access",
+                                        "label": "Write check"
+                                    }
+                                ]
+                            },
+                            "actions": []
+                        },
+                        {
+                            "id": "maintenance-locations",
+                            "type": "ui.list",
+                            "area": "system-dashboard",
+                            "title": "Storage locations",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceSection === 'storage'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_node_maintenance",
+                                "params": {
+                                    "section": "storage",
+                                    "target_node_id": "$state.selectedSystemNodeId"
+                                },
+                                "resultPath": "locations",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "node.maintenance"
+                                ],
+                                "preserveLastValue": false,
+                                "startPolicy": "materialization_ready"
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "title",
+                                "subtitleKey": "display_path",
+                                "pagination": true,
+                                "pageSize": 6,
+                                "emptyText": "No records observed for this node.",
+                                "meta": [
+                                    {
+                                        "key": "desired_path",
+                                        "label": "Desired location"
+                                    },
+                                    {
+                                        "key": "measured_display",
+                                        "label": "Measured"
+                                    },
+                                    {
+                                        "key": "measurement_status",
+                                        "label": "Measurement"
+                                    },
+                                    {
+                                        "key": "status",
+                                        "label": "Placement"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "maintenanceRole": "$event.id",
+                                        "maintenancePath": "$event.proposed_path",
+                                        "maintenanceRevision": "$event.settings_revision",
+                                        "storageLocationPlan": {},
+                                        "storageLocationReceipt": {},
+                                        "storageMigrationPlan": {},
+                                        "storageMigrationJob": {}
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "maintenance-location-form",
+                            "type": "ui.form",
+                            "area": "system-dashboard",
+                            "title": "Desired storage location",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceRole !== '' && $state.maintenanceSection === 'storage'",
+                            "inputs": {
+                                "layout": "stack",
+                                "fields": [
+                                    {
+                                        "id": "location_note",
+                                        "type": "staticContent",
+                                        "content": "Save a desired directory, complete measurement, then review and start data migration below. Saving the path alone keeps data in place."
+                                    },
+                                    {
+                                        "id": "desired_path",
+                                        "type": "shortText",
+                                        "label": "Absolute directory on this node",
+                                        "stateKey": "maintenancePath",
+                                        "required": true
+                                    }
+                                ],
+                                "buttons": [
+                                    {
+                                        "id": "review_location",
+                                        "label": "Review location",
+                                        "kind": "primary"
+                                    },
+                                    {
+                                        "id": "save_location",
+                                        "label": "Save desired location",
+                                        "kind": "secondary",
+                                        "enabledIf": "$state.storageLocationPlan.target_node_id === $state.selectedSystemNodeId && $state.storageLocationPlan.requested_path === $state.maintenancePath && $state.storageLocationPlan.capacity_admitted === true"
+                                    },
+                                    {
+                                        "id": "measure_location",
+                                        "label": "Continue measurement",
+                                        "kind": "secondary"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "change:desired_path",
+                                    "type": "updateState",
+                                    "params": {
+                                        "maintenancePath": "$event.value",
+                                        "storageLocationPlan": {},
+                                        "storageLocationReceipt": {},
+                                        "storageMigrationPlan": {},
+                                        "storageMigrationJob": {}
+                                    }
+                                },
+                                {
+                                    "id": "review_location",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.plan_storage_location",
+                                    "params": {
+                                        "target_node_id": "$state.selectedSystemNodeId",
+                                        "role": "$state.maintenanceRole",
+                                        "desired_path": "$state.maintenancePath",
+                                        "expected_revision": "$state.maintenanceRevision"
+                                    },
+                                    "resultStateKey": "storageLocationPlan",
+                                    "invalidates": [
+                                        "node.maintenance"
+                                    ]
+                                },
+                                {
+                                    "id": "save_location",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.save_storage_location",
+                                    "params": {
+                                        "target_node_id": "$state.selectedSystemNodeId",
+                                        "plan_digest": "$state.storageLocationPlan.plan_digest"
+                                    },
+                                    "resultStateKey": "storageLocationReceipt",
+                                    "invalidates": [
+                                        "node.maintenance"
+                                    ]
+                                },
+                                {
+                                    "id": "save_location",
+                                    "on": "submit",
+                                    "type": "updateState",
+                                    "params": {
+                                        "maintenanceRevision": "$state.storageLocationReceipt.revision",
+                                        "storageLocationPlan": {},
+                                        "storageMigrationPlan": {},
+                                        "storageMigrationJob": {}
+                                    }
+                                },
+                                {
+                                    "id": "measure_location",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.advance_storage_inventory",
+                                    "params": {
+                                        "target_node_id": "$state.selectedSystemNodeId",
+                                        "role": "$state.maintenanceRole"
+                                    },
+                                    "resultStateKey": "storageInventoryProgress",
+                                    "invalidates": [
+                                        "node.maintenance"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "id": "maintenance-location-review",
+                            "type": "item.details",
+                            "area": "system-dashboard",
+                            "title": "Placement review",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.storageLocationPlan.target_node_id === $state.selectedSystemNodeId && $state.maintenanceSection === 'storage'",
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "key": "active_path",
+                                        "label": "Current location"
+                                    },
+                                    {
+                                        "key": "desired_path",
+                                        "label": "Desired location"
+                                    },
+                                    {
+                                        "key": "destination_volume.mount",
+                                        "label": "Destination volume"
+                                    },
+                                    {
+                                        "key": "capacity_admitted",
+                                        "label": "Free-space check"
+                                    },
+                                    {
+                                        "key": "moves_data",
+                                        "label": "Moves existing data"
+                                    }
+                                ]
+                            },
+                            "dataSource": {
+                                "kind": "static",
+                                "value": "$state.storageLocationPlan"
+                            }
+                        },
+                        {
+                            "id": "maintenance-location-receipt",
+                            "type": "item.details",
+                            "area": "system-dashboard",
+                            "title": "Saved placement setting",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.storageLocationReceipt.target_node_id === $state.selectedSystemNodeId && $state.maintenanceSection === 'storage'",
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "key": "status",
+                                        "label": "Status"
+                                    },
+                                    {
+                                        "key": "revision",
+                                        "label": "Saved revision"
+                                    },
+                                    {
+                                        "key": "active_path",
+                                        "label": "Current location"
+                                    },
+                                    {
+                                        "key": "desired_path",
+                                        "label": "Desired location"
+                                    }
+                                ]
+                            },
+                            "dataSource": {
+                                "kind": "static",
+                                "value": "$state.storageLocationReceipt"
+                            }
+                        },
+                        {
+                            "id": "maintenance-cleanup",
+                            "type": "ui.list",
+                            "area": "system-dashboard",
+                            "title": "Cleanup jobs",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceSection === 'storage'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_node_maintenance",
+                                "params": {
+                                    "section": "storage",
+                                    "target_node_id": "$state.selectedSystemNodeId"
+                                },
+                                "resultPath": "cleanup_jobs",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "node.maintenance"
+                                ],
+                                "preserveLastValue": false,
+                                "startPolicy": "materialization_ready"
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "job_id",
+                                "subtitleKey": "status",
+                                "pagination": true,
+                                "pageSize": 6,
+                                "emptyText": "No records observed for this node.",
+                                "meta": [
+                                    {
+                                        "key": "updated_at",
+                                        "label": "Updated"
+                                    },
+                                    {
+                                        "key": "item_count",
+                                        "label": "Items"
+                                    }
+                                ]
+                            },
+                            "actions": []
+                        },
+                        {
+                            "id": "maintenance-recovery-tools",
+                            "type": "ui.list",
+                            "area": "system-dashboard",
+                            "title": "Recovery tools",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceSection === 'recovery'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_node_maintenance",
+                                "params": {
+                                    "section": "recovery",
+                                    "target_node_id": "$state.selectedSystemNodeId"
+                                },
+                                "resultPath": "roots",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "node.maintenance"
+                                ],
+                                "preserveLastValue": false,
+                                "startPolicy": "materialization_ready"
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "adapter",
+                                "subtitleKey": "restore_guidance",
+                                "pagination": true,
+                                "pageSize": 6,
+                                "emptyText": "No records observed for this node.",
+                                "meta": [
+                                    {
+                                        "key": "adapter_installed",
+                                        "label": "Tool installed"
+                                    },
+                                    {
+                                        "key": "status",
+                                        "label": "Storage"
+                                    },
+                                    {
+                                        "key": "complete",
+                                        "label": "Inventory complete"
+                                    }
+                                ]
+                            },
+                            "actions": []
+                        },
+                        {
+                            "id": "maintenance-recovery-points",
+                            "type": "ui.list",
+                            "area": "system-dashboard",
+                            "title": "Recovery inventory",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceSection === 'recovery'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_node_maintenance",
+                                "params": {
+                                    "section": "recovery",
+                                    "target_node_id": "$state.selectedSystemNodeId"
+                                },
+                                "resultPath": "points",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "node.maintenance"
+                                ],
+                                "preserveLastValue": false,
+                                "startPolicy": "materialization_ready"
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "name",
+                                "subtitleKey": "restore_guidance",
+                                "pagination": true,
+                                "pageSize": 6,
+                                "emptyText": "No records observed for this node.",
+                                "meta": [
+                                    {
+                                        "key": "status",
+                                        "label": "Classification"
+                                    },
+                                    {
+                                        "key": "integrity",
+                                        "label": "Integrity"
+                                    },
+                                    {
+                                        "key": "restore_rehearsal",
+                                        "label": "Restore rehearsal"
+                                    },
+                                    {
+                                        "key": "application_id",
+                                        "label": "Application"
+                                    }
+                                ]
+                            },
+                            "actions": []
+                        },
+                        {
+                            "id": "maintenance-test-suites",
+                            "type": "ui.list",
+                            "area": "system-dashboard",
+                            "title": "Test suites",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceSection === 'testing'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_node_maintenance",
+                                "params": {
+                                    "section": "testing",
+                                    "target_node_id": "$state.selectedSystemNodeId"
+                                },
+                                "resultPath": "suites",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "node.maintenance"
+                                ],
+                                "preserveLastValue": false,
+                                "startPolicy": "materialization_ready"
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "suite_id",
+                                "titleKey": "display_name",
+                                "subtitleKey": "suite_id",
+                                "pagination": true,
+                                "pageSize": 6,
+                                "emptyText": "No records observed for this node.",
+                                "meta": [
+                                    {
+                                        "key": "version",
+                                        "label": "Version"
+                                    },
+                                    {
+                                        "key": "profile",
+                                        "label": "Profile"
+                                    },
+                                    {
+                                        "key": "timeout_s",
+                                        "label": "Timeout, seconds"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "maintenanceSuite": "$event.suite_id",
+                                        "validationPlan": {}
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "maintenance-test-nodes",
+                            "type": "ui.list",
+                            "area": "system-dashboard",
+                            "title": "Test nodes",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceSection === 'testing'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_node_maintenance",
+                                "params": {
+                                    "section": "testing",
+                                    "target_node_id": "$state.selectedSystemNodeId"
+                                },
+                                "resultPath": "nodes",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "node.maintenance"
+                                ],
+                                "preserveLastValue": false,
+                                "startPolicy": "materialization_ready"
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "node_id",
+                                "titleKey": "display_name",
+                                "subtitleKey": "node_id",
+                                "pagination": true,
+                                "pageSize": 6,
+                                "emptyText": "No records observed for this node.",
+                                "meta": [
+                                    {
+                                        "key": "enabled",
+                                        "label": "Enabled"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "maintenanceTestNode": "$event.node_id",
+                                        "validationPlan": {}
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "maintenance-validation-form",
+                            "type": "ui.form",
+                            "area": "system-dashboard",
+                            "title": "Observe-only validation",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceSuite !== '' && $state.maintenanceTestNode !== '' && $state.maintenanceSection === 'testing'",
+                            "inputs": {
+                                "layout": "stack",
+                                "fields": [
+                                    {
+                                        "id": "validation_note",
+                                        "type": "staticContent",
+                                        "content": "Select a registered suite and test node. This runs observation checks without deploying or rolling back software. Leave build empty to observe the installed build."
+                                    },
+                                    {
+                                        "id": "target_build",
+                                        "type": "shortText",
+                                        "label": "Exact build (optional)",
+                                        "stateKey": "maintenanceTargetBuild"
+                                    }
+                                ],
+                                "buttons": [
+                                    {
+                                        "id": "review_validation",
+                                        "label": "Review validation",
+                                        "kind": "primary"
+                                    },
+                                    {
+                                        "id": "start_validation",
+                                        "label": "Start reviewed validation",
+                                        "kind": "secondary",
+                                        "enabledIf": "$state.validationPlan.target_node_id === $state.selectedSystemNodeId && $state.validationPlan.suite.suite_id === $state.maintenanceSuite && $state.validationPlan.test_node_id === $state.maintenanceTestNode"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "change:target_build",
+                                    "type": "updateState",
+                                    "params": {
+                                        "maintenanceTargetBuild": "$event.value",
+                                        "validationPlan": {}
+                                    }
+                                },
+                                {
+                                    "id": "review_validation",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.plan_validation_campaign",
+                                    "params": {
+                                        "target_node_id": "$state.selectedSystemNodeId",
+                                        "suite_id": "$state.maintenanceSuite",
+                                        "node_id": "$state.maintenanceTestNode",
+                                        "target_build": "$state.maintenanceTargetBuild"
+                                    },
+                                    "resultStateKey": "validationPlan",
+                                    "invalidates": [
+                                        "node.maintenance"
+                                    ]
+                                },
+                                {
+                                    "id": "start_validation",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.start_validation_campaign",
+                                    "params": {
+                                        "target_node_id": "$state.selectedSystemNodeId",
+                                        "plan_digest": "$state.validationPlan.plan_digest"
+                                    },
+                                    "resultStateKey": "validationReceipt",
+                                    "invalidates": [
+                                        "node.maintenance"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "id": "maintenance-test-campaigns",
+                            "type": "ui.list",
+                            "area": "system-dashboard",
+                            "title": "Validation campaigns",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceSection === 'testing'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_node_maintenance",
+                                "params": {
+                                    "section": "testing",
+                                    "target_node_id": "$state.selectedSystemNodeId"
+                                },
+                                "resultPath": "campaigns",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "node.maintenance"
+                                ],
+                                "preserveLastValue": false,
+                                "startPolicy": "materialization_ready"
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "campaign_id",
+                                "titleKey": "campaign_id",
+                                "subtitleKey": "state",
+                                "pagination": true,
+                                "pageSize": 6,
+                                "emptyText": "No records observed for this node.",
+                                "meta": [
+                                    {
+                                        "key": "suite_id",
+                                        "label": "Suite"
+                                    },
+                                    {
+                                        "key": "target_build",
+                                        "label": "Build"
+                                    },
+                                    {
+                                        "key": "created_at",
+                                        "label": "Created"
+                                    }
+                                ]
+                            },
+                            "actions": []
+                        },
+                        {
+                            "id": "maintenance-e2e-runs",
+                            "type": "ui.list",
+                            "area": "system-dashboard",
+                            "title": "E2E executions",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceSection === 'testing'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_node_maintenance",
+                                "params": {
+                                    "section": "testing",
+                                    "target_node_id": "$state.selectedSystemNodeId"
+                                },
+                                "resultPath": "e2e_runs",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "node.maintenance"
+                                ],
+                                "preserveLastValue": false,
+                                "startPolicy": "materialization_ready"
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "id",
+                                "titleKey": "run_id",
+                                "subtitleKey": "status",
+                                "pagination": true,
+                                "pageSize": 6,
+                                "emptyText": "No records observed for this node.",
+                                "meta": [
+                                    {
+                                        "key": "kind",
+                                        "label": "Runner"
+                                    },
+                                    {
+                                        "key": "suite_id",
+                                        "label": "Suite"
+                                    },
+                                    {
+                                        "key": "started_at",
+                                        "label": "Started"
+                                    }
+                                ]
+                            },
+                            "actions": []
+                        },
+                        {
+                            "id": "maintenance-migration-form",
+                            "type": "ui.form",
+                            "area": "system-dashboard",
+                            "title": "Data migration",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceRole !== '' && $state.maintenanceSection === 'storage'",
+                            "inputs": {
+                                "layout": "stack",
+                                "fields": [
+                                    {
+                                        "id": "migration_note",
+                                        "type": "staticContent",
+                                        "content": "E2E evidence: copy, byte verification, switch active location, preserve old report paths. New managed E2E runs pause during migration. Originals are retained on the source disk; this step does not reclaim their space. Recovery transfer awaits its writer/restore adapters. Core continues the saved job while this page is closed and after restart. Execution and heartbeat show worker activity; Refresh reads the latest committed progress."
+                                    }
+                                ],
+                                "buttons": [
+                                    {
+                                        "id": "review_migration",
+                                        "label": "Review data migration",
+                                        "kind": "secondary"
+                                    },
+                                    {
+                                        "id": "start_migration",
+                                        "label": "Start reviewed migration",
+                                        "kind": "primary",
+                                        "enabledIf": "$state.storageMigrationPlan.target_node_id === $state.selectedSystemNodeId && $state.storageMigrationPlan.role === $state.maintenanceRole && $state.storageMigrationPlan.requested_path === $state.maintenancePath && $state.storageMigrationPlan.expected_revision === $state.maintenanceRevision && $state.storageMigrationPlan.admitted === true"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "id": "review_migration",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.plan_storage_migration",
+                                    "params": {
+                                        "target_node_id": "$state.selectedSystemNodeId",
+                                        "role": "$state.maintenanceRole",
+                                        "expected_revision": "$state.maintenanceRevision",
+                                        "desired_path": "$state.maintenancePath"
+                                    },
+                                    "resultStateKey": "storageMigrationPlan",
+                                    "invalidates": [
+                                        "node.maintenance"
+                                    ]
+                                },
+                                {
+                                    "id": "start_migration",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.start_storage_migration",
+                                    "params": {
+                                        "target_node_id": "$state.selectedSystemNodeId",
+                                        "plan_digest": "$state.storageMigrationPlan.plan_digest"
+                                    },
+                                    "resultStateKey": "storageMigrationJob",
+                                    "invalidates": [
+                                        "node.maintenance"
+                                    ]
+                                },
+                                {
+                                    "id": "start_migration",
+                                    "on": "submit",
+                                    "type": "updateState",
+                                    "params": {
+                                        "storageMigrationPlan": {}
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "maintenance-migration-review",
+                            "type": "item.details",
+                            "area": "system-dashboard",
+                            "title": "Data migration review",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceRole !== '' && $state.maintenanceSection === 'storage' && $state.storageMigrationPlan.target_node_id === $state.selectedSystemNodeId",
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "key": "source",
+                                        "label": "Current directory"
+                                    },
+                                    {
+                                        "key": "destination",
+                                        "label": "Destination"
+                                    },
+                                    {
+                                        "key": "estimated_bytes",
+                                        "label": "Measured bytes"
+                                    },
+                                    {
+                                        "key": "admitted",
+                                        "label": "Ready to start"
+                                    },
+                                    {
+                                        "key": "reasons",
+                                        "label": "Required before starting"
+                                    },
+                                    {
+                                        "key": "effect",
+                                        "label": "Operation"
+                                    },
+                                    {
+                                        "key": "retains_original",
+                                        "label": "Retain originals"
+                                    },
+                                    {
+                                        "key": "source_space_reclaimed",
+                                        "label": "Reclaims source space"
+                                    }
+                                ]
+                            },
+                            "dataSource": {
+                                "kind": "static",
+                                "value": "$state.storageMigrationPlan"
+                            }
+                        },
+                        {
+                            "id": "maintenance-migration-jobs",
+                            "type": "ui.list",
+                            "area": "system-dashboard",
+                            "title": "Data migration jobs",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceSection === 'storage'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "web_desktop_runtime_skill.get_node_maintenance",
+                                "params": {
+                                    "section": "storage",
+                                    "target_node_id": "$state.selectedSystemNodeId"
+                                },
+                                "resultPath": "migrations",
+                                "cacheTtlMs": 0,
+                                "maxRequestHz": 0.2,
+                                "invalidationTags": [
+                                    "node.maintenance"
+                                ],
+                                "preserveLastValue": false,
+                                "startPolicy": "materialization_ready"
+                            },
+                            "inputs": {
+                                "variant": "list",
+                                "itemIdKey": "job_id",
+                                "titleKey": "role",
+                                "subtitleKey": "execution_status",
+                                "pagination": true,
+                                "pageSize": 6,
+                                "emptyText": "No data migration has been started.",
+                                "meta": [
+                                    {
+                                        "key": "phase",
+                                        "label": "Stage"
+                                    },
+                                    {
+                                        "key": "execution_status",
+                                        "label": "Execution"
+                                    },
+                                    {
+                                        "key": "files",
+                                        "label": "Scanned files"
+                                    },
+                                    {
+                                        "key": "bytes",
+                                        "label": "Scanned bytes"
+                                    },
+                                    {
+                                        "key": "pending_directories",
+                                        "label": "Pending directories"
+                                    },
+                                    {
+                                        "key": "updated_at",
+                                        "label": "Last progress"
+                                    },
+                                    {
+                                        "key": "worker_heartbeat_at",
+                                        "label": "Worker heartbeat"
+                                    },
+                                    {
+                                        "key": "copied_bytes",
+                                        "label": "Copied bytes"
+                                    },
+                                    {
+                                        "key": "verified_bytes",
+                                        "label": "Verified bytes"
+                                    },
+                                    {
+                                        "key": "error",
+                                        "label": "Resume information"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "storageMigrationJob": "$event",
+                                        "maintenanceRole": "$event.role",
+                                        "maintenancePath": "$event.destination",
+                                        "maintenanceRevision": "$event.expected_revision"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "maintenance-migration-progress",
+                            "type": "item.details",
+                            "area": "system-dashboard",
+                            "title": "Migration progress",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceRole !== '' && $state.maintenanceSection === 'storage' && $state.storageMigrationJob.target_node_id === $state.selectedSystemNodeId",
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "key": "status",
+                                        "label": "Status"
+                                    },
+                                    {
+                                        "key": "execution_status",
+                                        "label": "Execution"
+                                    },
+                                    {
+                                        "key": "files",
+                                        "label": "Scanned files"
+                                    },
+                                    {
+                                        "key": "bytes",
+                                        "label": "Scanned bytes"
+                                    },
+                                    {
+                                        "key": "pending_directories",
+                                        "label": "Pending directories"
+                                    },
+                                    {
+                                        "key": "updated_at",
+                                        "label": "Last progress"
+                                    },
+                                    {
+                                        "key": "worker_heartbeat_at",
+                                        "label": "Worker heartbeat"
+                                    },
+                                    {
+                                        "key": "phase",
+                                        "label": "Stage"
+                                    },
+                                    {
+                                        "key": "source",
+                                        "label": "Original location"
+                                    },
+                                    {
+                                        "key": "destination",
+                                        "label": "Destination"
+                                    },
+                                    {
+                                        "key": "copied_bytes",
+                                        "label": "Copied bytes"
+                                    },
+                                    {
+                                        "key": "verified_bytes",
+                                        "label": "Verified bytes"
+                                    },
+                                    {
+                                        "key": "retained_source",
+                                        "label": "Retained originals"
+                                    },
+                                    {
+                                        "key": "revision",
+                                        "label": "Saved revision"
+                                    },
+                                    {
+                                        "key": "error",
+                                        "label": "Resume information"
+                                    }
+                                ]
+                            },
+                            "dataSource": {
+                                "kind": "static",
+                                "value": "$state.storageMigrationJob"
+                            }
+                        },
+                        {
+                            "id": "maintenance-migration-controls",
+                            "type": "ui.form",
+                            "area": "system-dashboard",
+                            "title": "Migration controls",
+                            "visibleIf": "$state.activeTab === 'system' && $state.isOwnerOrAdministrator === true && $state.selectedSystemNode.active === true && $state.maintenanceRole !== '' && $state.maintenanceSection === 'storage' && $state.storageMigrationJob.target_node_id === $state.selectedSystemNodeId",
+                            "inputs": {
+                                "layout": "stack",
+                                "fields": [],
+                                "buttons": [
+                                    {
+                                        "id": "migration_status",
+                                        "label": "Refresh migration progress",
+                                        "kind": "secondary"
+                                    },
+                                    {
+                                        "id": "migration_resume",
+                                        "label": "Resume migration",
+                                        "kind": "secondary",
+                                        "enabledIf": "$state.storageMigrationJob.status !== 'completed' && $state.storageMigrationJob.status !== 'cancelled'"
+                                    },
+                                    {
+                                        "id": "migration_cancel",
+                                        "label": "Cancel and retain copies",
+                                        "kind": "secondary",
+                                        "enabledIf": "$state.storageMigrationJob.status !== 'completed' && $state.storageMigrationJob.status !== 'cancelled'"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "id": "migration_status",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.control_storage_migration",
+                                    "params": {
+                                        "target_node_id": "$state.selectedSystemNodeId",
+                                        "job_id": "$state.storageMigrationJob.job_id",
+                                        "action": "status"
+                                    },
+                                    "resultStateKey": "storageMigrationJob",
+                                    "invalidates": [
+                                        "node.maintenance"
+                                    ]
+                                },
+                                {
+                                    "id": "migration_resume",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.control_storage_migration",
+                                    "params": {
+                                        "target_node_id": "$state.selectedSystemNodeId",
+                                        "job_id": "$state.storageMigrationJob.job_id",
+                                        "action": "resume"
+                                    },
+                                    "resultStateKey": "storageMigrationJob",
+                                    "invalidates": [
+                                        "node.maintenance"
+                                    ]
+                                },
+                                {
+                                    "id": "migration_cancel",
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "web_desktop_runtime_skill.control_storage_migration",
+                                    "params": {
+                                        "target_node_id": "$state.selectedSystemNodeId",
+                                        "job_id": "$state.storageMigrationJob.job_id",
+                                        "action": "cancel"
+                                    },
+                                    "resultStateKey": "storageMigrationJob",
+                                    "invalidates": [
+                                        "node.maintenance"
+                                    ]
+                                }
+                            ]
                         }
                     ],
                     "title_i18n": {
@@ -6118,7 +7298,25 @@
                         "prefAvatarRef": "",
                         "lastAccountAction": "",
                         "selectedActivityApplicationId": "",
-                        "developmentDeliveryStatus": "Development reports unavailable"
+                        "developmentDeliveryStatus": "Development reports unavailable",
+                        "lifecycleApplicationId": "",
+                        "coreLifecyclePlan": {},
+                        "coreWriteLossAcknowledged": false,
+                        "coreObserveStorage": false,
+                        "coreTrialCandidateId": "",
+                        "coreTrialReviewAvailable": false,
+                        "maintenanceRole": "",
+                        "maintenancePath": "",
+                        "maintenanceRevision": 0,
+                        "storageLocationPlan": {},
+                        "storageLocationReceipt": {},
+                        "validationPlan": {},
+                        "maintenanceSuite": "",
+                        "maintenanceTestNode": "",
+                        "maintenanceTargetBuild": "",
+                        "maintenanceSection": "storage",
+                        "storageMigrationPlan": {},
+                        "storageMigrationJob": {}
                     },
                     "meta": {
                         "builder": {
@@ -6126,7 +7324,26 @@
                             "ui_revision": "015",
                             "scenario_id": "web_desktop"
                         }
-                    }
+                    },
+                    "autoActions": [
+                        {
+                            "id": "core-lifecycle-observation-clock",
+                            "intervalMs": 15000,
+                            "action": {
+                                "on": "auto:core-lifecycle-clock",
+                                "type": "callMcp",
+                                "target": "applications.lifecycle.events",
+                                "params": {
+                                    "limit": 1
+                                },
+                                "dryRun": true,
+                                "resultStateKey": "coreLifecycleObservationClock",
+                                "invalidates": [
+                                    "applications.lifecycle.clock"
+                                ]
+                            }
+                        }
+                    ]
                 }
             },
             "resources": {
@@ -6478,10 +7695,851 @@
                             }
                         ]
                     }
+                },
+                "core-application-lifecycle": {
+                    "title": "Application runtime and Trials — Core",
+                    "presentation": {
+                        "kind": "modal"
+                    },
+                    "schema": {
+                        "id": "core-application-lifecycle",
+                        "title": "Core-owned application lifecycle",
+                        "autoActions": [
+                            {
+                                "id": "core-lifecycle-observation-clock",
+                                "intervalMs": 15000,
+                                "action": {
+                                    "on": "auto:core-lifecycle-clock",
+                                    "type": "callMcp",
+                                    "target": "applications.lifecycle.events",
+                                    "params": {
+                                        "limit": 1
+                                    },
+                                    "dryRun": true,
+                                    "resultStateKey": "coreLifecycleObservationClock",
+                                    "invalidates": [
+                                        "applications.lifecycle.clock"
+                                    ]
+                                }
+                            }
+                        ],
+                        "layout": {
+                            "version": 2,
+                            "pattern": "task-flow",
+                            "density": "comfortable",
+                            "contentWidth": "bounded",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "wide": "pane",
+                                        "compact": "stack"
+                                    }
+                                }
+                            ],
+                            "interaction": {
+                                "selection": "single",
+                                "rowActivation": "select",
+                                "actions": "adaptive"
+                            }
+                        },
+                        "widgets": [
+                            {
+                                "id": "core-lifecycle-identity",
+                                "type": "item.details",
+                                "area": "main",
+                                "title": "Core runtime authority",
+                                "dataSource": {
+                                    "kind": "mcp",
+                                    "toolId": "applications.lifecycle.show",
+                                    "arguments": {
+                                        "application_id": "$state.lifecycleApplicationId",
+                                        "webspace_id": "$client.webspaceId"
+                                    },
+                                    "dryRun": true,
+                                    "resultPath": "response.result.lifecycle",
+                                    "cacheTtlMs": 1000,
+                                    "invalidationTags": [
+                                        "applications.lifecycle",
+                                        "applications.runtime",
+                                        "applications.detail",
+                                        "applications.catalog",
+                                        "builder.runtime",
+                                        "web_desktop.applications",
+                                        "applications.lifecycle.clock"
+                                    ]
+                                },
+                                "inputs": {
+                                    "presentation": "section",
+                                    "fields": [
+                                        {
+                                            "label": "Application",
+                                            "path": "application_id"
+                                        },
+                                        {
+                                            "label": "State",
+                                            "path": "summary"
+                                        },
+                                        {
+                                            "label": "Version",
+                                            "path": "runtime.version"
+                                        },
+                                        {
+                                            "label": "Admission",
+                                            "path": "runtime.admission"
+                                        },
+                                        {
+                                            "label": "Reason",
+                                            "path": "runtime.reason"
+                                        },
+                                        {
+                                            "label": "Admission kind",
+                                            "path": "runtime.admission_kind"
+                                        },
+                                        {
+                                            "label": "Execution lease expires",
+                                            "path": "runtime.expires_at"
+                                        },
+                                        {
+                                            "label": "Original temporary Trial expiry",
+                                            "path": "runtime.trial_expires_at"
+                                        },
+                                        {
+                                            "label": "Remaining seconds",
+                                            "path": "runtime.remaining_seconds"
+                                        },
+                                        {
+                                            "label": "Stable baseline",
+                                            "path": "installation.stable_release_digest"
+                                        },
+                                        {
+                                            "label": "Candidate",
+                                            "path": "candidate.candidate_id"
+                                        },
+                                        {
+                                            "label": "Candidate decision",
+                                            "path": "candidate.status"
+                                        },
+                                        {
+                                            "label": "Data",
+                                            "path": "data.disposition"
+                                        },
+                                        {
+                                            "label": "Transition pending",
+                                            "path": "data.transition_pending"
+                                        },
+                                        {
+                                            "label": "Materialization",
+                                            "path": "materialization.status"
+                                        },
+                                        {
+                                            "label": "Operation phase",
+                                            "path": "operation.phase"
+                                        }
+                                    ],
+                                    "stateBindings": {
+                                        "coreLifecycleRevision": {
+                                            "path": "revision",
+                                            "default": ""
+                                        },
+                                        "coreCandidateId": {
+                                            "path": "candidate.candidate_id",
+                                            "default": ""
+                                        },
+                                        "coreCandidateDigest": {
+                                            "path": "candidate.candidate_digest",
+                                            "default": ""
+                                        },
+                                        "coreRecoveryCandidateId": {
+                                            "path": "data.recovery_candidate_id",
+                                            "default": ""
+                                        },
+                                        "coreRetainEligible": {
+                                            "path": "actions.retain_local_beta.eligible",
+                                            "default": false
+                                        },
+                                        "coreRestoreEligible": {
+                                            "path": "actions.restore_stable.eligible",
+                                            "default": false
+                                        },
+                                        "coreDeactivateEligible": {
+                                            "path": "actions.deactivate_beta.eligible",
+                                            "default": false
+                                        },
+                                        "coreUninstallEligible": {
+                                            "path": "actions.uninstall.eligible",
+                                            "default": false
+                                        },
+                                        "coreRecoverEligible": {
+                                            "path": "actions.recover.eligible",
+                                            "default": false
+                                        },
+                                        "coreAcceptEligible": {
+                                            "path": "actions.accept_candidate.eligible",
+                                            "default": false
+                                        },
+                                        "coreRejectEligible": {
+                                            "path": "actions.reject_candidate.eligible",
+                                            "default": false
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "id": "core-write-loss-consent",
+                                "type": "input.toggle",
+                                "area": "main",
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.coreWriteLossAcknowledged"
+                                },
+                                "inputs": {
+                                    "label": "I understand: Beta writes stay retained and are not copied back to the restored runtime."
+                                },
+                                "actions": [
+                                    {
+                                        "on": "change",
+                                        "type": "updateState",
+                                        "params": {
+                                            "coreWriteLossAcknowledged": "$event.checked"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-lifecycle-review-actions",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "variant": "toolbar",
+                                    "buttons": [
+                                        {
+                                            "id": "retain-beta",
+                                            "label": "Install this local Beta",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreRetainEligible == true"
+                                        },
+                                        {
+                                            "id": "restore-stable",
+                                            "label": "Return to verified Stable",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreRestoreEligible == true && $state.coreWriteLossAcknowledged == true"
+                                        },
+                                        {
+                                            "id": "deactivate-beta",
+                                            "label": "Restore previous runtime",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreDeactivateEligible == true && $state.coreWriteLossAcknowledged == true"
+                                        },
+                                        {
+                                            "id": "uninstall",
+                                            "label": "Uninstall application; retain data",
+                                            "kind": "danger",
+                                            "enabledIf": "$state.coreUninstallEligible == true"
+                                        },
+                                        {
+                                            "id": "recover",
+                                            "label": "Review preparation recovery",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreRecoverEligible == true"
+                                        },
+                                        {
+                                            "id": "accept-candidate",
+                                            "label": "Accept exact Candidate",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreAcceptEligible == true"
+                                        },
+                                        {
+                                            "id": "reject-candidate",
+                                            "label": "Reject exact Candidate",
+                                            "kind": "danger",
+                                            "enabledIf": "$state.coreRejectEligible == true && $state.coreWriteLossAcknowledged == true"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:retain-beta",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.plan",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "action": "retain_local_beta",
+                                            "expected_revision": "$state.coreLifecycleRevision",
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreRetainEligible == true",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:restore-stable",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.plan",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "action": "restore_stable",
+                                            "expected_revision": "$state.coreLifecycleRevision",
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreRestoreEligible == true && $state.coreWriteLossAcknowledged == true",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:deactivate-beta",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.plan",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "action": "deactivate_beta",
+                                            "expected_revision": "$state.coreLifecycleRevision",
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreDeactivateEligible == true && $state.coreWriteLossAcknowledged == true",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:uninstall",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.plan",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "action": "uninstall",
+                                            "expected_revision": "$state.coreLifecycleRevision",
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreUninstallEligible == true",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:recover",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.plan",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "action": "recover_runtime",
+                                            "expected_revision": "$state.coreLifecycleRevision",
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged",
+                                            "candidate_id": "$state.coreRecoveryCandidateId"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreRecoverEligible == true",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:accept-candidate",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.decide",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "candidate_id": "$state.coreCandidateId",
+                                            "expected_candidate_digest": "$state.coreCandidateDigest",
+                                            "accepted": true,
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreAcceptEligible == true",
+                                        "resultStateKey": "coreCandidateDecision"
+                                    },
+                                    {
+                                        "on": "click:reject-candidate",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.decide",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "candidate_id": "$state.coreCandidateId",
+                                            "expected_candidate_digest": "$state.coreCandidateDigest",
+                                            "accepted": false,
+                                            "acknowledge_write_loss": "$state.coreWriteLossAcknowledged"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreRejectEligible == true && $state.coreWriteLossAcknowledged == true",
+                                        "resultStateKey": "coreCandidateDecision"
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-lifecycle-plan",
+                                "type": "item.details",
+                                "area": "main",
+                                "title": "Review exact operation before applying",
+                                "dataSource": {
+                                    "kind": "static",
+                                    "value": "$state.coreLifecyclePlan"
+                                },
+                                "inputs": {
+                                    "presentation": "section",
+                                    "fields": [
+                                        {
+                                            "label": "Operation",
+                                            "path": "operation.operation_id"
+                                        },
+                                        {
+                                            "label": "Application",
+                                            "path": "operation.application_id"
+                                        },
+                                        {
+                                            "label": "Action",
+                                            "path": "operation.plan.action"
+                                        },
+                                        {
+                                            "label": "Summary",
+                                            "path": "operation.plan.summary"
+                                        },
+                                        {
+                                            "label": "Installation review",
+                                            "path": "operation.plan.review_summary"
+                                        },
+                                        {
+                                            "label": "Release",
+                                            "path": "operation.plan.release_digest"
+                                        },
+                                        {
+                                            "label": "Affected desktops",
+                                            "path": "operation.plan.affected_webspace_ids"
+                                        },
+                                        {
+                                            "label": "Data policy",
+                                            "path": "operation.plan.data_policy"
+                                        },
+                                        {
+                                            "label": "Plan expiry",
+                                            "path": "operation.plan.expires_at"
+                                        },
+                                        {
+                                            "label": "Status",
+                                            "path": "operation.status"
+                                        },
+                                        {
+                                            "label": "Recovery reason",
+                                            "path": "operation.recovery_reason"
+                                        },
+                                        {
+                                            "label": "Result",
+                                            "path": "operation.result.status"
+                                        }
+                                    ]
+                                },
+                                "visibleIf": "$state.coreLifecyclePlan.operation.operation_id"
+                            },
+                            {
+                                "id": "core-lifecycle-confirm",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "variant": "toolbar",
+                                    "buttons": [
+                                        {
+                                            "id": "apply",
+                                            "label": "Apply reviewed operation",
+                                            "kind": "primary",
+                                            "enabledIf": "$state.coreLifecyclePlan.operation.status == 'planned' && $state.coreLifecyclePlan.operation.application_id == $state.lifecycleApplicationId",
+                                            "visibleIf": "$state.coreLifecyclePlan.operation.plan.required_apply_capability != 'applications.recover'"
+                                        },
+                                        {
+                                            "id": "recover",
+                                            "label": "Recover exact operation",
+                                            "kind": "primary",
+                                            "enabledIf": "$state.coreLifecyclePlan.operation.status == 'planned' && $state.coreLifecyclePlan.operation.application_id == $state.lifecycleApplicationId",
+                                            "visibleIf": "$state.coreLifecyclePlan.operation.plan.required_apply_capability == 'applications.recover'"
+                                        },
+                                        {
+                                            "id": "cancel-plan",
+                                            "label": "Cancel saved plan",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreLifecyclePlan.operation.status == 'planned' && $state.coreLifecyclePlan.operation.application_id == $state.lifecycleApplicationId"
+                                        }
+                                    ]
+                                },
+                                "visibleIf": "$state.coreLifecyclePlan.operation.operation_id",
+                                "actions": [
+                                    {
+                                        "on": "click:apply",
+                                        "type": "callMcp",
+                                        "target": "applications.apply",
+                                        "params": {
+                                            "operation_id": "$state.coreLifecyclePlan.operation.operation_id",
+                                            "plan_digest": "$state.coreLifecyclePlan.operation.plan_digest",
+                                            "idempotency_key": "$state.coreLifecyclePlan.operation.idempotency_key"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreLifecyclePlan.operation.status == 'planned' && $state.coreLifecyclePlan.operation.application_id == $state.lifecycleApplicationId",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:recover",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.recover",
+                                        "params": {
+                                            "operation_id": "$state.coreLifecyclePlan.operation.operation_id",
+                                            "plan_digest": "$state.coreLifecyclePlan.operation.plan_digest",
+                                            "idempotency_key": "$state.coreLifecyclePlan.operation.idempotency_key"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreLifecyclePlan.operation.status == 'planned' && $state.coreLifecyclePlan.operation.application_id == $state.lifecycleApplicationId",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    },
+                                    {
+                                        "on": "click:cancel-plan",
+                                        "type": "callMcp",
+                                        "target": "applications.cancel_operation",
+                                        "params": {
+                                            "operation_id": "$state.coreLifecyclePlan.operation.operation_id",
+                                            "plan_digest": "$state.coreLifecyclePlan.operation.plan_digest",
+                                            "idempotency_key": "$state.coreLifecyclePlan.operation.idempotency_key"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreLifecyclePlan.operation.status == 'planned' && $state.coreLifecyclePlan.operation.application_id == $state.lifecycleApplicationId",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-observe-storage",
+                                "type": "input.toggle",
+                                "area": "main",
+                                "inputs": {
+                                    "label": "Measure Trial storage (bounded; unknown is not zero)"
+                                },
+                                "actions": [
+                                    {
+                                        "on": "change",
+                                        "type": "updateState",
+                                        "params": {
+                                            "coreObserveStorage": "$event.checked"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-trial-inventory",
+                                "type": "ui.list",
+                                "area": "main",
+                                "title": "Trials, expired and retained editions",
+                                "dataSource": {
+                                    "kind": "mcp",
+                                    "toolId": "applications.lifecycle.trials",
+                                    "arguments": {
+                                        "application_id": "$state.lifecycleApplicationId",
+                                        "webspace_id": "$client.webspaceId",
+                                        "include_storage": "$state.coreObserveStorage"
+                                    },
+                                    "dryRun": true,
+                                    "resultPath": "response.result.trials",
+                                    "cacheTtlMs": 1000,
+                                    "invalidationTags": [
+                                        "applications.lifecycle",
+                                        "applications.runtime",
+                                        "applications.detail",
+                                        "applications.catalog",
+                                        "builder.runtime",
+                                        "web_desktop.applications",
+                                        "applications.lifecycle.clock"
+                                    ]
+                                },
+                                "inputs": {
+                                    "variant": "list",
+                                    "itemIdKey": "candidate_id",
+                                    "titleKey": "candidate_id",
+                                    "subtitleKey": "version",
+                                    "pagination": true,
+                                    "pageSize": 6,
+                                    "meta": [
+                                        {
+                                            "key": "status",
+                                            "label": "State",
+                                            "kind": "badge"
+                                        },
+                                        {
+                                            "key": "selected",
+                                            "label": "Selected",
+                                            "kind": "boolean"
+                                        },
+                                        {
+                                            "key": "candidate_status",
+                                            "label": "Decision",
+                                            "kind": "badge"
+                                        },
+                                        {
+                                            "key": "expires_at",
+                                            "label": "Temporary Trial lease"
+                                        },
+                                        {
+                                            "key": "deletion_reason",
+                                            "label": "Deletion review"
+                                        },
+                                        {
+                                            "key": "storage_bytes",
+                                            "label": "Bytes"
+                                        },
+                                        {
+                                            "key": "storage_reason",
+                                            "label": "Storage observation"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "select",
+                                        "type": "updateState",
+                                        "params": {
+                                            "coreTrialCandidateId": "$event.candidate_id",
+                                            "coreTrialReviewAvailable": "$event.deletion_review_available",
+                                            "coreLifecyclePlan": {}
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-trial-delete",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "review-delete",
+                                            "label": "Review recoverable deletion of selected row",
+                                            "kind": "danger",
+                                            "enabledIf": "$state.coreTrialCandidateId && $state.coreTrialReviewAvailable == true"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:review-delete",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.plan",
+                                        "params": {
+                                            "application_id": "$state.lifecycleApplicationId",
+                                            "webspace_id": "$client.webspaceId",
+                                            "action": "delete_trial",
+                                            "candidate_id": "$state.coreTrialCandidateId",
+                                            "expected_revision": "$state.coreLifecycleRevision"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreTrialCandidateId && $state.coreTrialReviewAvailable == true",
+                                        "resultStateKey": "coreLifecyclePlan"
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-lifecycle-operations",
+                                "type": "ui.list",
+                                "area": "main",
+                                "title": "Core lifecycle history",
+                                "dataSource": {
+                                    "kind": "mcp",
+                                    "toolId": "applications.lifecycle.operations",
+                                    "arguments": {
+                                        "application_id": "$state.lifecycleApplicationId",
+                                        "webspace_id": "$client.webspaceId"
+                                    },
+                                    "dryRun": true,
+                                    "resultPath": "response.result.operations",
+                                    "cacheTtlMs": 1000,
+                                    "invalidationTags": [
+                                        "applications.lifecycle",
+                                        "applications.runtime",
+                                        "applications.detail",
+                                        "applications.catalog",
+                                        "builder.runtime",
+                                        "web_desktop.applications",
+                                        "applications.lifecycle.clock"
+                                    ]
+                                },
+                                "inputs": {
+                                    "variant": "list",
+                                    "itemIdKey": "operation_id",
+                                    "titleKey": "action",
+                                    "subtitleKey": "operation_id",
+                                    "pagination": true,
+                                    "pageSize": 6,
+                                    "meta": [
+                                        {
+                                            "key": "source",
+                                            "label": "Journal",
+                                            "kind": "badge"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "label": "Status",
+                                            "kind": "badge"
+                                        },
+                                        {
+                                            "key": "recovery_reason",
+                                            "label": "Recovery"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "select",
+                                        "type": "updateState",
+                                        "params": {
+                                            "coreHistoryOperationId": "$event.operation_id",
+                                            "coreHistoryPlanDigest": "$event.plan_digest",
+                                            "coreHistoryRecoverable": "$event.recoverable"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "core-history-recovery",
+                                "type": "ui.actions",
+                                "area": "main",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "recover-history",
+                                            "label": "Recover selected exact operation",
+                                            "kind": "secondary",
+                                            "enabledIf": "$state.coreHistoryOperationId && $state.coreHistoryPlanDigest && $state.coreHistoryRecoverable == true"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:recover-history",
+                                        "type": "callMcp",
+                                        "target": "applications.lifecycle.recover",
+                                        "params": {
+                                            "operation_id": "$state.coreHistoryOperationId",
+                                            "plan_digest": "$state.coreHistoryPlanDigest"
+                                        },
+                                        "idempotencyKey": "auto",
+                                        "invalidates": [
+                                            "applications.lifecycle",
+                                            "applications.runtime",
+                                            "applications.detail",
+                                            "applications.catalog",
+                                            "builder.runtime",
+                                            "web_desktop.applications",
+                                            "applications.lifecycle.clock"
+                                        ],
+                                        "enabledIf": "$state.coreHistoryOperationId && $state.coreHistoryPlanDigest && $state.coreHistoryRecoverable == true",
+                                        "resultStateKey": "coreHistoryRecoveryResult"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
                 }
             }
         },
-        "version": "0.3.99",
+        "version": "0.3.111",
         "manifest": "webui.json"
     },
     "locale_dictionaries": {

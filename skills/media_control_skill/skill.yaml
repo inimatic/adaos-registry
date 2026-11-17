@@ -1,5 +1,5 @@
 name: media_control_skill
-version: 0.2.27
+version: 0.2.33
 description: Persistent Media Center control plane for playback targets, sessions,
   queues, commands, checkpoints, and settings.
 supported_locales:
@@ -10,6 +10,27 @@ webui:
   file: webui.json
 runtime:
   python: '3.11'
+  activation:
+    mode: lazy
+    startup_allowed: true
+    background_refresh: false
+    assessment:
+      schema: adaos.skill.activation_assessment.v1
+      assessor: builder.compiler
+      classification: startup_event_subscriber
+      handler_digest: sha256:24fd91155a1c28b67c72a317913f206da62bb6ba70282522a3692fd10950a521
+      observed_subscriptions:
+      - sys.ready
+      - webio.stream.snapshot.requested
+      - webio.stream.subscription.changed
+      declared_subscriptions:
+      - sys.ready
+      - webio.stream.snapshot.requested
+      - webio.stream.subscription.changed
+      dynamic_subscription_count: 0
+      tool_count: 22
+      reasons:
+      - startup_subscription_requires_early_handler_registration
 capabilities:
 - media.playback_planning
 - storage.relational
@@ -62,6 +83,10 @@ exports:
   - status
 tools:
 - name: ensure_schema
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:ensure_schema
   description: Ensure the durable control-plane schema.
   side_effects: local_write
@@ -71,9 +96,13 @@ tools:
   output_schema:
     type: object
 - name: rehydrate
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:rehydrate
   description: Rehydrate bounded now-playing state.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -83,6 +112,10 @@ tools:
   output_schema:
     type: object
 - name: drain_runtime
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:drain_runtime
   description: Quiesce the request-scoped control plane before an Application data
     cutover.
@@ -93,6 +126,10 @@ tools:
   output_schema:
     type: object
 - name: register_target
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:register_target
   description: Register a browser, TV, phone, speaker, or native playback endpoint.
   side_effects: local_write
@@ -125,6 +162,10 @@ tools:
   output_schema:
     type: object
 - name: endpoint_inbox
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:endpoint_inbox
   description: Refresh an endpoint heartbeat and return its active assignment with
     a bounded queue window.
@@ -165,9 +206,13 @@ tools:
   output_schema:
     type: object
 - name: list_targets
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:list_targets
   description: List bounded playback targets.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -189,6 +234,10 @@ tools:
   output_schema:
     type: object
 - name: create_session
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:create_session
   description: Create a persistent playback session and bounded queue.
   side_effects: local_write
@@ -230,6 +279,10 @@ tools:
   output_schema:
     type: object
 - name: open_endpoint_session
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:open_endpoint_session
   description: Register an endpoint and atomically replace its active playback session.
   side_effects: local_write
@@ -287,9 +340,13 @@ tools:
   output_schema:
     type: object
 - name: get_session
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:get_session
   description: Read one session and a bounded queue page.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -308,6 +365,10 @@ tools:
   output_schema:
     type: object
 - name: command
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:command
   description: Send one revision-safe idempotent playback command.
   side_effects: local_write
@@ -358,6 +419,10 @@ tools:
   output_schema:
     type: object
 - name: update_queue
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:update_queue
   description: Replace a queue under optimistic revision control.
   side_effects: local_write
@@ -390,6 +455,10 @@ tools:
   output_schema:
     type: object
 - name: checkpoint
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:checkpoint
   description: Persist an endpoint checkpoint for interruption recovery.
   side_effects: local_write
@@ -420,9 +489,13 @@ tools:
   output_schema:
     type: object
 - name: pull_commands
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:pull_commands
   description: Pull ordered endpoint commands through an opaque cursor.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -443,6 +516,10 @@ tools:
   output_schema:
     type: object
 - name: acknowledge_command
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:acknowledge_command
   description: Acknowledge endpoint application of one command.
   side_effects: local_write
@@ -466,6 +543,10 @@ tools:
   output_schema:
     type: object
 - name: reconcile_endpoint
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:reconcile_endpoint
   description: Reconcile endpoint state and pending commands idempotently after reconnect.
   side_effects: local_write
@@ -531,9 +612,13 @@ tools:
   output_schema:
     type: object
 - name: get_settings
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:get_settings
   description: Read effective profile and endpoint playback settings.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -546,6 +631,10 @@ tools:
   output_schema:
     type: object
 - name: set_settings
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:set_settings
   description: Update profile and endpoint playback settings.
   side_effects: local_write
@@ -565,9 +654,13 @@ tools:
   output_schema:
     type: object
 - name: now_playing
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:now_playing
   description: Return bounded now-playing sessions for remote controls.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -584,6 +677,10 @@ tools:
   output_schema:
     type: object
 - name: record_qoe
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:record_qoe
   description: Record one bounded playback quality metric.
   side_effects: local_write
@@ -614,9 +711,13 @@ tools:
   output_schema:
     type: object
 - name: qoe_summary
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:qoe_summary
   description: Return bounded aggregate and recent playback QoE evidence.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -633,6 +734,10 @@ tools:
   output_schema:
     type: object
 - name: voice_command
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   entry: handlers.main:voice_command
   description: Resolve a voice transport command against current playback context.
   side_effects: local_write
@@ -675,9 +780,13 @@ tools:
   output_schema:
     type: object
 - name: status
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   entry: handlers.main:status
   description: Return compact control-plane diagnostics.
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     additionalProperties: true
@@ -821,7 +930,7 @@ llm_hints:
     intent: media.playback.control
     tool: voice_command
     side_effect_class: local_write
-updated_at: '2026-09-28T00:20:12+00:00'
+updated_at: '2026-11-08T15:18:37+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.950+5768.9e817addc

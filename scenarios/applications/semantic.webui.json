@@ -1,0 +1,2301 @@
+{
+  "schema": "adaos.webui.semantic.v2",
+  "document_id": "applications",
+  "brief_ref": "brief:ed77fbb963bde710f3cd0951",
+  "brief_digest": "sha256:ed77fbb963bde710f3cd0951d51b05ffac9ad63f931c7416223f1f37dbda243e",
+  "title": {
+    "key": "prototype.applications.title",
+    "ru": "Applications"
+  },
+  "layout": {
+    "content_width": "fluid",
+    "density": "compact",
+    "pattern": "workbench",
+    "scroll": "regions",
+    "regions": [
+      {
+        "compact": "route",
+        "grow": 0,
+        "id": "catalog",
+        "max_px": 300,
+        "min_px": 260,
+        "preferred_px": 280,
+        "priority": 100,
+        "role": "navigation",
+        "scroll": "region",
+        "wide": "pane"
+      },
+      {
+        "compact": "route",
+        "grow": 1,
+        "id": "workspace",
+        "max_px": null,
+        "min_px": 480,
+        "preferred_px": 760,
+        "priority": 90,
+        "role": "main",
+        "scroll": "region",
+        "wide": "pane"
+      },
+      {
+        "compact": "sheet",
+        "grow": 0,
+        "id": "inspector",
+        "max_px": 420,
+        "min_px": 280,
+        "preferred_px": 320,
+        "priority": 20,
+        "role": "inspector",
+        "scroll": "region",
+        "wide": "stack"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "id": "applications",
+      "item_label": {
+        "key": "resource.applications.item",
+        "ru": "Приложение"
+      },
+      "item_semantics": "Сохранённый каталог демонстрационных приложений; выбор определяет связанные релизы и обращения.",
+      "records": [
+        {
+          "name": "Студия — локальная разработка",
+          "source": "Установлено",
+          "details": "Readme: редактор документов.\nПоследние изменения: совместное редактирование.\nВерсии: 2.1 Beta, 2.0 Stable.\nRuntime placement: локально.\nТехнические детали: сценарий 12, навыки 4, registry commit demo-a; проверки демонстрационные.",
+          "id": "local"
+        },
+        {
+          "name": "Просмотр — получатель Public Beta",
+          "source": "Установлено",
+          "details": "Readme: просмотр документов.\nДоступны Public Beta 3.1 и Stable 3.0; Alpha отсутствует.\nRuntime placement: локально.\nВыбор предварительной версии требует подключения Core.",
+          "id": "recipient"
+        },
+        {
+          "name": "Заметки — неполный набор позиций",
+          "source": "Marketplace",
+          "details": "Readme: заметки.\nДоступна только Public Stable 1.0.\nRuntime placement: не назначен.",
+          "id": "minimal"
+        },
+        {
+          "name": "Отчёты — ошибка Finalize",
+          "source": "Установлено",
+          "details": "Readme: отчёты.\nFinalize 4.1 не выполнен: проверка пакета отклонена.\nПрежняя Stable 4.0 сохранена.\nПодробности демонстрации: пакет не прошёл проверку совместимости; реальная диагностика Core не подключена.",
+          "id": "failure"
+        }
+      ],
+      "identity_field_refs": [
+        "id"
+      ],
+      "fields": [
+        {
+          "editable": false,
+          "id": "name",
+          "label": {
+            "key": "field.name.label",
+            "ru": "Приложение"
+          },
+          "required": false,
+          "value_type": "short_text"
+        },
+        {
+          "editable": false,
+          "id": "source",
+          "label": {
+            "key": "field.source.label",
+            "ru": "Каталог"
+          },
+          "required": false,
+          "value_type": "short_text"
+        },
+        {
+          "editable": false,
+          "id": "details",
+          "label": {
+            "key": "field.details.label",
+            "ru": "Сведения"
+          },
+          "required": false,
+          "value_type": "long_text"
+        }
+      ]
+    },
+    {
+      "id": "positions",
+      "item_label": {
+        "key": "resource.positions.item",
+        "ru": "Релиз"
+      },
+      "item_semantics": "Только существующие позиции; сохранённые версии и результаты демонстрационные. Обзоры действий не изменяют данные.",
+      "records": [
+        {
+          "positions.app": "local",
+          "group": "Private",
+          "position": "Alpha",
+          "version": "2.2-dev",
+          "age": "сегодня",
+          "desktop": "Нет",
+          "actions": "Preview; Builder; Dev tickets — внешние инструменты не подключены.",
+          "id": "la"
+        },
+        {
+          "positions.app": "local",
+          "group": "Private",
+          "position": "Beta",
+          "version": "2.1",
+          "age": "2 часа",
+          "desktop": "Выбрана",
+          "actions": "Изменения; Update до 2.1.1; Remove Beta; Finalize с подтверждением — требуется Core.",
+          "id": "lb"
+        },
+        {
+          "positions.app": "local",
+          "group": "Private",
+          "position": "Stable",
+          "version": "2.0",
+          "age": "3 дня",
+          "desktop": "Скрыта: выбрана Beta",
+          "actions": "Выбор версии; публикация Public Beta — требуется Core.",
+          "id": "ls"
+        },
+        {
+          "positions.app": "recipient",
+          "group": "Public",
+          "position": "Beta",
+          "version": "3.1",
+          "age": "1 день",
+          "desktop": "Предлагается явный выбор",
+          "actions": "Получатель: выбрать предварительную версию — требуется Core.",
+          "id": "rb"
+        },
+        {
+          "positions.app": "recipient",
+          "group": "Public",
+          "position": "Stable",
+          "version": "3.0",
+          "age": "неделя",
+          "desktop": "Выбрана",
+          "actions": "Опубликована; выбор релиза; Update — требуется Core.",
+          "id": "rs"
+        },
+        {
+          "positions.app": "minimal",
+          "group": "Public",
+          "position": "Stable",
+          "version": "1.0",
+          "age": "5 дней",
+          "desktop": "Не выбрана",
+          "actions": "Опубликована; выбор релиза — требуется Core.",
+          "id": "ms"
+        },
+        {
+          "positions.app": "failure",
+          "group": "Private",
+          "position": "Beta",
+          "version": "4.1",
+          "age": "час",
+          "desktop": "Нет",
+          "actions": "Finalize: ошибка проверки пакета; успех не подтверждён. Подробности — в сведениях приложения.",
+          "id": "fb"
+        },
+        {
+          "positions.app": "failure",
+          "group": "Private",
+          "position": "Stable",
+          "version": "4.0",
+          "age": "неделя",
+          "desktop": "Выбрана, сохранена",
+          "actions": "Предыдущая версия не изменена.",
+          "id": "fs"
+        }
+      ],
+      "identity_field_refs": [
+        "id"
+      ],
+      "fields": [
+        {
+          "editable": false,
+          "id": "positions.app",
+          "label": {
+            "key": "field.positions.app.label",
+            "ru": "Приложение"
+          },
+          "options": [
+            {
+              "value": "local",
+              "label": {
+                "key": "relationship.position_app.option.local",
+                "ru": "Студия — локальная разработка"
+              }
+            },
+            {
+              "value": "recipient",
+              "label": {
+                "key": "relationship.position_app.option.recipient",
+                "ru": "Просмотр — получатель Public Beta"
+              }
+            },
+            {
+              "value": "minimal",
+              "label": {
+                "key": "relationship.position_app.option.minimal",
+                "ru": "Заметки — неполный набор позиций"
+              }
+            },
+            {
+              "value": "failure",
+              "label": {
+                "key": "relationship.position_app.option.failure",
+                "ru": "Отчёты — ошибка Finalize"
+              }
+            }
+          ],
+          "required": false,
+          "value_type": "choice"
+        },
+        {
+          "editable": false,
+          "id": "group",
+          "label": {
+            "key": "field.group.label",
+            "ru": "Группа"
+          },
+          "required": false,
+          "value_type": "short_text"
+        },
+        {
+          "editable": false,
+          "id": "position",
+          "label": {
+            "key": "field.position.label",
+            "ru": "Релиз"
+          },
+          "required": false,
+          "value_type": "short_text"
+        },
+        {
+          "editable": false,
+          "id": "version",
+          "label": {
+            "key": "field.version.label",
+            "ru": "Версия"
+          },
+          "required": false,
+          "value_type": "short_text"
+        },
+        {
+          "editable": false,
+          "id": "age",
+          "label": {
+            "key": "field.age.label",
+            "ru": "Давность"
+          },
+          "required": false,
+          "value_type": "short_text"
+        },
+        {
+          "editable": false,
+          "id": "desktop",
+          "label": {
+            "key": "field.desktop.label",
+            "ru": "Рабочий стол"
+          },
+          "required": false,
+          "value_type": "short_text"
+        },
+        {
+          "editable": false,
+          "id": "actions",
+          "label": {
+            "key": "field.actions.label",
+            "ru": "Подробности действий"
+          },
+          "required": false,
+          "value_type": "long_text"
+        }
+      ]
+    },
+    {
+      "id": "tickets",
+      "item_label": {
+        "key": "resource.tickets.item",
+        "ru": "Обращение"
+      },
+      "item_semantics": "Локальные заявки выбранного приложения; отправка в существующий Dev tickets не подключена.",
+      "records": [
+        {
+          "tickets.app": "local",
+          "subject": "Добавить экспорт PDF",
+          "status": "open",
+          "id": "t1"
+        },
+        {
+          "tickets.app": "recipient",
+          "subject": "Улучшить предварительный просмотр",
+          "status": "closed",
+          "id": "t2"
+        }
+      ],
+      "identity_field_refs": [
+        "id"
+      ],
+      "fields": [
+        {
+          "editable": true,
+          "id": "tickets.app",
+          "label": {
+            "key": "field.tickets.app.label",
+            "ru": "Приложение"
+          },
+          "options": [
+            {
+              "value": "local",
+              "label": {
+                "key": "relationship.ticket_app.option.local",
+                "ru": "Студия — локальная разработка"
+              }
+            },
+            {
+              "value": "recipient",
+              "label": {
+                "key": "relationship.ticket_app.option.recipient",
+                "ru": "Просмотр — получатель Public Beta"
+              }
+            },
+            {
+              "value": "minimal",
+              "label": {
+                "key": "relationship.ticket_app.option.minimal",
+                "ru": "Заметки — неполный набор позиций"
+              }
+            },
+            {
+              "value": "failure",
+              "label": {
+                "key": "relationship.ticket_app.option.failure",
+                "ru": "Отчёты — ошибка Finalize"
+              }
+            }
+          ],
+          "required": false,
+          "value_type": "choice"
+        },
+        {
+          "editable": true,
+          "id": "subject",
+          "label": {
+            "key": "field.subject.label",
+            "ru": "Доработка"
+          },
+          "placeholder": {
+            "key": "field.subject.placeholder",
+            "ru": "Опишите требуемое изменение"
+          },
+          "required": false,
+          "value_type": "short_text"
+        },
+        {
+          "editable": false,
+          "id": "status",
+          "label": {
+            "key": "field.status.label",
+            "ru": "Состояние"
+          },
+          "options": [
+            {
+              "label": {
+                "key": "field.status.option.open",
+                "ru": "Открыто"
+              },
+              "value": "open"
+            },
+            {
+              "label": {
+                "key": "field.status.option.closed",
+                "ru": "Закрыто"
+              },
+              "value": "closed"
+            }
+          ],
+          "required": false,
+          "value_type": "choice"
+        }
+      ]
+    },
+    {
+      "id": "comments",
+      "item_label": {
+        "key": "resource.comments.item",
+        "ru": "Комментарий"
+      },
+      "item_semantics": "Локальная история обращения; внешняя синхронизация не выполняется.",
+      "records": [
+        {
+          "ticket": "t1",
+          "text": "Заявка создана. Автор: демонстрационный пользователь.",
+          "id": "c1"
+        },
+        {
+          "ticket": "t2",
+          "text": "Закрыто после проверки получателем.",
+          "id": "c2"
+        }
+      ],
+      "identity_field_refs": [
+        "id"
+      ],
+      "fields": [
+        {
+          "editable": true,
+          "id": "ticket",
+          "label": {
+            "key": "field.ticket.label",
+            "ru": "Обращение"
+          },
+          "options": [
+            {
+              "value": "t1",
+              "label": {
+                "key": "relationship.comment_ticket.option.t1",
+                "ru": "Добавить экспорт PDF"
+              }
+            },
+            {
+              "value": "t2",
+              "label": {
+                "key": "relationship.comment_ticket.option.t2",
+                "ru": "Улучшить предварительный просмотр"
+              }
+            }
+          ],
+          "required": false,
+          "value_type": "choice"
+        },
+        {
+          "editable": true,
+          "id": "text",
+          "label": {
+            "key": "field.text.label",
+            "ru": "Комментарий / событие"
+          },
+          "required": false,
+          "value_type": "long_text"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "many_to_one",
+      "from_field_ref": "positions.app",
+      "from_resource_ref": "positions",
+      "id": "position_app",
+      "label_field_refs": [
+        "name"
+      ],
+      "to_field_ref": "id",
+      "to_resource_ref": "applications"
+    },
+    {
+      "cardinality": "many_to_one",
+      "from_field_ref": "tickets.app",
+      "from_resource_ref": "tickets",
+      "id": "ticket_app",
+      "label_field_refs": [
+        "name"
+      ],
+      "to_field_ref": "id",
+      "to_resource_ref": "applications"
+    },
+    {
+      "cardinality": "many_to_one",
+      "from_field_ref": "ticket",
+      "from_resource_ref": "comments",
+      "id": "comment_ticket",
+      "label_field_refs": [
+        "subject"
+      ],
+      "to_field_ref": "id",
+      "to_resource_ref": "tickets"
+    }
+  ],
+  "views": [
+    {
+      "empty_state": {
+        "title": {
+          "key": "view.apps.empty.title",
+          "ru": "Приложения не найдены"
+        }
+      },
+      "field_refs": [
+        "name",
+        "source"
+      ],
+      "id": "apps",
+      "presentation": "list",
+      "query_controls": [
+        {
+          "field_ref": "name",
+          "id": "app_search",
+          "kind": "search",
+          "label": {
+            "key": "query.app_search.label",
+            "ru": "Найти приложение"
+          }
+        },
+        {
+          "field_ref": "source",
+          "id": "catalog_source",
+          "kind": "filter",
+          "label": {
+            "key": "query.catalog_source.label",
+            "ru": "Установлено / Marketplace"
+          }
+        }
+      ],
+      "region_role": "catalog",
+      "role": "collection",
+      "title": {
+        "key": "view.apps.title",
+        "ru": "Демоданные · внешние действия требуют подключения"
+      },
+      "resource_ref": "applications",
+      "media": null,
+      "scope_filters": [],
+      "selection_filter": null,
+      "compact_presentation": null,
+      "selection": {
+        "indicator": "radio",
+        "mode": "single",
+        "row_activation": "open_details"
+      },
+      "field_display": [],
+      "initial_selection_id": "local",
+      "presentation_options": null,
+      "preview_actions": [
+        {
+          "description": {
+            "key": "preview.apps.open_app.description",
+            "ru": "Операция не выполнена. Открытие выбранной версии либо переключение и открытие другой требует Core."
+          },
+          "id": "open_app",
+          "label": {
+            "key": "preview.apps.open_app.label",
+            "ru": "Открыть / переключить"
+          },
+          "primary": true,
+          "requirement_ref": "req:864b5bd52df8805e9f5ed2c7"
+        },
+        {
+          "description": {
+            "key": "preview.apps.pin_app.description",
+            "ru": "Операция не выполнена. Закрепление или снятие с главной требует Core."
+          },
+          "id": "pin_app",
+          "label": {
+            "key": "preview.apps.pin_app.label",
+            "ru": "На главной"
+          },
+          "primary": false,
+          "requirement_ref": "req:189468af7a7f03399710073f"
+        },
+        {
+          "description": {
+            "key": "preview.apps.settings_app.description",
+            "ru": "Операция не выполнена. Настройки требуют Core."
+          },
+          "id": "settings_app",
+          "label": {
+            "key": "preview.apps.settings_app.label",
+            "ru": "Настройки"
+          },
+          "primary": false,
+          "requirement_ref": "req:189468af7a7f03399710073f"
+        },
+        {
+          "description": {
+            "key": "preview.apps.access_app.description",
+            "ru": "Операция не выполнена. Управление доступом требует Core."
+          },
+          "id": "access_app",
+          "label": {
+            "key": "preview.apps.access_app.label",
+            "ru": "Доступ"
+          },
+          "primary": false,
+          "requirement_ref": "req:189468af7a7f03399710073f"
+        },
+        {
+          "description": {
+            "key": "preview.apps.runtime_app.description",
+            "ru": "Операция не выполнена. Выбор среды выполнения независим от продвижения разработки; требуется Core."
+          },
+          "id": "runtime_app",
+          "label": {
+            "key": "preview.apps.runtime_app.label",
+            "ru": "Среда выполнения"
+          },
+          "primary": false,
+          "requirement_ref": "req:9d7b060e2353472b02363400"
+        }
+      ],
+      "surface": "inline",
+      "activation_source_view_ref": null,
+      "section": null
+    },
+    {
+      "field_refs": [
+        "name",
+        "details"
+      ],
+      "id": "app_details",
+      "region_role": "inspector",
+      "role": "details",
+      "title": {
+        "key": "view.app_details.title",
+        "ru": "О приложении"
+      },
+      "resource_ref": "applications",
+      "media": null,
+      "scope_filters": [],
+      "selection_filter": null,
+      "compact_presentation": null,
+      "selection": null,
+      "field_display": [],
+      "initial_selection_id": null,
+      "presentation_options": null,
+      "preview_actions": [],
+      "surface": "inline",
+      "activation_source_view_ref": "apps",
+      "section": null
+    },
+    {
+      "empty_state": {
+        "title": {
+          "key": "view.private_alpha.empty.title",
+          "ru": "Alpha отсутствует"
+        }
+      },
+      "field_refs": [
+        "position",
+        "version",
+        "age",
+        "desktop"
+      ],
+      "id": "private_alpha",
+      "presentation": "cards",
+      "region_role": "workspace",
+      "role": "collection",
+      "title": {
+        "key": "view.private_alpha.title",
+        "ru": "Разработка"
+      },
+      "resource_ref": "positions",
+      "media": null,
+      "scope_filters": [
+        {
+          "field_ref": "group",
+          "value": "Private"
+        },
+        {
+          "field_ref": "position",
+          "value": "Alpha"
+        }
+      ],
+      "selection_filter": {
+        "field_ref": "positions.app",
+        "source_view_ref": "apps",
+        "effect": "filter",
+        "empty_selection": "show_all",
+        "source_field_ref": null
+      },
+      "compact_presentation": null,
+      "selection": {
+        "indicator": "none",
+        "mode": "none",
+        "row_activation": "none"
+      },
+      "field_display": [],
+      "initial_selection_id": null,
+      "presentation_options": null,
+      "preview_actions": [
+        {
+          "description": {
+            "key": "preview.private_alpha.alpha_preview.description",
+            "ru": "Операция не выполнена. Preview выбранной Alpha требует Core."
+          },
+          "id": "alpha_preview",
+          "label": {
+            "key": "preview.private_alpha.alpha_preview.label",
+            "ru": "Preview"
+          },
+          "primary": true,
+          "requirement_ref": "req:3dcd0f02d1580c34eaa11c3a"
+        },
+        {
+          "description": {
+            "key": "preview.private_alpha.alpha_builder.description",
+            "ru": "Операция не выполнена. Builder требует Core."
+          },
+          "id": "alpha_builder",
+          "label": {
+            "key": "preview.private_alpha.alpha_builder.label",
+            "ru": "Builder"
+          },
+          "primary": true,
+          "requirement_ref": "req:3dcd0f02d1580c34eaa11c3a"
+        },
+        {
+          "description": {
+            "key": "preview.private_alpha.alpha_tickets.description",
+            "ru": "Операция не выполнена. Внешний Dev tickets требует Core. Локальные обращения доступны во вкладке Dev tickets."
+          },
+          "id": "alpha_tickets",
+          "label": {
+            "key": "preview.private_alpha.alpha_tickets.label",
+            "ru": "Dev tickets"
+          },
+          "primary": false,
+          "requirement_ref": "req:3dcd0f02d1580c34eaa11c3a"
+        }
+      ],
+      "surface": "inline",
+      "activation_source_view_ref": null,
+      "section": {
+        "id": "private_tab",
+        "kind": "tab",
+        "title": {
+          "key": "section.private_tab",
+          "ru": "Private"
+        }
+      }
+    },
+    {
+      "empty_state": {
+        "title": {
+          "key": "view.private.empty.title",
+          "ru": "Private Beta отсутствует"
+        }
+      },
+      "field_refs": [
+        "position",
+        "version",
+        "age",
+        "desktop",
+        "actions"
+      ],
+      "id": "private",
+      "presentation": "cards",
+      "region_role": "workspace",
+      "role": "collection",
+      "title": {
+        "key": "view.private.title",
+        "ru": "Проверка · открыть карточку для подробностей"
+      },
+      "resource_ref": "positions",
+      "media": null,
+      "scope_filters": [
+        {
+          "field_ref": "group",
+          "value": "Private"
+        },
+        {
+          "field_ref": "position",
+          "value": "Beta"
+        }
+      ],
+      "selection_filter": {
+        "field_ref": "positions.app",
+        "source_view_ref": "apps",
+        "effect": "filter",
+        "empty_selection": "show_all",
+        "source_field_ref": null
+      },
+      "compact_presentation": null,
+      "selection": {
+        "indicator": "radio",
+        "mode": "single",
+        "row_activation": "open_details"
+      },
+      "field_display": [
+        {
+          "align": "start",
+          "field_ref": "actions",
+          "overflow": "wrap"
+        }
+      ],
+      "initial_selection_id": null,
+      "presentation_options": null,
+      "preview_actions": [
+        {
+          "description": {
+            "key": "preview.private.beta_update.description",
+            "ru": "Операция не выполнена. Доступность Update определяет Core. Для Студии показано обновление до 2.1.1; для Отчётов доступность не подтверждена."
+          },
+          "id": "beta_update",
+          "label": {
+            "key": "preview.private.beta_update.label",
+            "ru": "Обзор Update"
+          },
+          "primary": true,
+          "requirement_ref": "req:4218886275ba832177f4fd7f"
+        },
+        {
+          "description": {
+            "key": "preview.private.beta_finalize.description",
+            "ru": "Операция не выполнена. Finalize требует явного подтверждения в Core. Только после успеха Beta исчезает, Stable получает ту же версию. Пример ошибки: Отчёты 4.1 отклонены, Stable 4.0 сохранена. Откройте карточку для подробностей."
+          },
+          "id": "beta_finalize",
+          "label": {
+            "key": "preview.private.beta_finalize.label",
+            "ru": "Обзор Finalize"
+          },
+          "primary": true,
+          "requirement_ref": "req:4218886275ba832177f4fd7f"
+        },
+        {
+          "description": {
+            "key": "preview.private.beta_remove.description",
+            "ru": "Операция не выполнена. Remove Beta требует Core; версии не изменены."
+          },
+          "id": "beta_remove",
+          "label": {
+            "key": "preview.private.beta_remove.label",
+            "ru": "Remove Beta"
+          },
+          "primary": false,
+          "requirement_ref": "req:4218886275ba832177f4fd7f"
+        },
+        {
+          "description": {
+            "key": "preview.private.beta_changes.description",
+            "ru": "Операция не выполнена. Последние изменения поступают из Core. В примере Студии: совместное редактирование."
+          },
+          "id": "beta_changes",
+          "label": {
+            "key": "preview.private.beta_changes.label",
+            "ru": "Последние изменения"
+          },
+          "primary": false,
+          "requirement_ref": "req:4218886275ba832177f4fd7f"
+        }
+      ],
+      "surface": "inline",
+      "activation_source_view_ref": null,
+      "section": {
+        "id": "private_tab",
+        "kind": "tab",
+        "title": {
+          "key": "section.private_tab",
+          "ru": "Private"
+        }
+      }
+    },
+    {
+      "field_refs": [
+        "position",
+        "version",
+        "actions"
+      ],
+      "id": "release_details",
+      "region_role": "inspector",
+      "role": "details",
+      "title": {
+        "key": "view.release_details.title",
+        "ru": "Подробности релиза и ошибки"
+      },
+      "resource_ref": "positions",
+      "media": null,
+      "scope_filters": [],
+      "selection_filter": null,
+      "compact_presentation": null,
+      "selection": null,
+      "field_display": [],
+      "initial_selection_id": null,
+      "presentation_options": null,
+      "preview_actions": [],
+      "surface": "inline",
+      "activation_source_view_ref": "private",
+      "section": {
+        "id": "private_tab",
+        "kind": "tab",
+        "title": {
+          "key": "section.private_tab",
+          "ru": "Private"
+        }
+      }
+    },
+    {
+      "empty_state": {
+        "title": {
+          "key": "view.private_stable.empty.title",
+          "ru": "Private Stable отсутствует"
+        }
+      },
+      "field_refs": [
+        "position",
+        "version",
+        "age",
+        "desktop"
+      ],
+      "id": "private_stable",
+      "presentation": "cards",
+      "region_role": "workspace",
+      "role": "collection",
+      "title": {
+        "key": "view.private_stable.title",
+        "ru": "Сохранённая версия"
+      },
+      "resource_ref": "positions",
+      "media": null,
+      "scope_filters": [
+        {
+          "field_ref": "group",
+          "value": "Private"
+        },
+        {
+          "field_ref": "position",
+          "value": "Stable"
+        }
+      ],
+      "selection_filter": {
+        "field_ref": "positions.app",
+        "source_view_ref": "apps",
+        "effect": "filter",
+        "empty_selection": "show_all",
+        "source_field_ref": null
+      },
+      "compact_presentation": null,
+      "selection": {
+        "indicator": "none",
+        "mode": "none",
+        "row_activation": "none"
+      },
+      "field_display": [],
+      "initial_selection_id": null,
+      "presentation_options": null,
+      "preview_actions": [
+        {
+          "description": {
+            "key": "preview.private_stable.stable_version.description",
+            "ru": "Операция не выполнена. Явный выбор версии Private Stable требует Core."
+          },
+          "id": "stable_version",
+          "label": {
+            "key": "preview.private_stable.stable_version.label",
+            "ru": "Выбрать версию"
+          },
+          "primary": true,
+          "requirement_ref": "req:e2ffb6cd623bd94a17c801a2"
+        },
+        {
+          "description": {
+            "key": "preview.private_stable.publish_beta.description",
+            "ru": "Операция не выполнена. Публикация выбранной версии как Public Beta требует Core и подтверждения."
+          },
+          "id": "publish_beta",
+          "label": {
+            "key": "preview.private_stable.publish_beta.label",
+            "ru": "Обзор Public Beta"
+          },
+          "primary": true,
+          "requirement_ref": "req:e2ffb6cd623bd94a17c801a2"
+        }
+      ],
+      "surface": "inline",
+      "activation_source_view_ref": null,
+      "section": {
+        "id": "private_tab",
+        "kind": "tab",
+        "title": {
+          "key": "section.private_tab",
+          "ru": "Private"
+        }
+      }
+    },
+    {
+      "empty_state": {
+        "title": {
+          "key": "view.public.empty.title",
+          "ru": "Public Beta отсутствует"
+        }
+      },
+      "field_refs": [
+        "position",
+        "version",
+        "age",
+        "desktop"
+      ],
+      "id": "public",
+      "presentation": "cards",
+      "region_role": "workspace",
+      "role": "collection",
+      "title": {
+        "key": "view.public.title",
+        "ru": "Предварительная версия"
+      },
+      "resource_ref": "positions",
+      "media": null,
+      "scope_filters": [
+        {
+          "field_ref": "group",
+          "value": "Public"
+        },
+        {
+          "field_ref": "position",
+          "value": "Beta"
+        }
+      ],
+      "selection_filter": {
+        "field_ref": "positions.app",
+        "source_view_ref": "apps",
+        "effect": "filter",
+        "empty_selection": "show_all",
+        "source_field_ref": null
+      },
+      "compact_presentation": null,
+      "selection": {
+        "indicator": "none",
+        "mode": "none",
+        "row_activation": "none"
+      },
+      "field_display": [],
+      "initial_selection_id": null,
+      "presentation_options": null,
+      "preview_actions": [
+        {
+          "description": {
+            "key": "preview.public.choose_public_beta.description",
+            "ru": "Операция не выполнена. Получатель явно выбирает предварительную версию через Core. Пример: Просмотр 3.1 без Alpha."
+          },
+          "id": "choose_public_beta",
+          "label": {
+            "key": "preview.public.choose_public_beta.label",
+            "ru": "Выбрать Beta"
+          },
+          "primary": true,
+          "requirement_ref": "req:bde4e0cdbc5c062ad7a96b4e"
+        },
+        {
+          "description": {
+            "key": "preview.public.promote_public_beta.description",
+            "ru": "Операция не выполнена. Только издатель с разрешением Core может подтвердить выпуск проверенной Beta как Public Stable."
+          },
+          "id": "promote_public_beta",
+          "label": {
+            "key": "preview.public.promote_public_beta.label",
+            "ru": "Обзор выпуска издателем"
+          },
+          "primary": false,
+          "requirement_ref": "req:bde4e0cdbc5c062ad7a96b4e"
+        }
+      ],
+      "surface": "inline",
+      "activation_source_view_ref": null,
+      "section": {
+        "id": "public_tab",
+        "kind": "tab",
+        "title": {
+          "key": "section.public_tab",
+          "ru": "Public"
+        }
+      }
+    },
+    {
+      "empty_state": {
+        "title": {
+          "key": "view.public_stable.empty.title",
+          "ru": "Public Stable отсутствует"
+        }
+      },
+      "field_refs": [
+        "position",
+        "version",
+        "age",
+        "desktop"
+      ],
+      "id": "public_stable",
+      "presentation": "cards",
+      "region_role": "workspace",
+      "role": "collection",
+      "title": {
+        "key": "view.public_stable.title",
+        "ru": "Опубликованный релиз"
+      },
+      "resource_ref": "positions",
+      "media": null,
+      "scope_filters": [
+        {
+          "field_ref": "group",
+          "value": "Public"
+        },
+        {
+          "field_ref": "position",
+          "value": "Stable"
+        }
+      ],
+      "selection_filter": {
+        "field_ref": "positions.app",
+        "source_view_ref": "apps",
+        "effect": "filter",
+        "empty_selection": "show_all",
+        "source_field_ref": null
+      },
+      "compact_presentation": null,
+      "selection": {
+        "indicator": "none",
+        "mode": "none",
+        "row_activation": "none"
+      },
+      "field_display": [],
+      "initial_selection_id": null,
+      "presentation_options": null,
+      "preview_actions": [
+        {
+          "description": {
+            "key": "preview.public_stable.choose_release.description",
+            "ru": "Операция не выполнена. Выбор опубликованного релиза требует Core."
+          },
+          "id": "choose_release",
+          "label": {
+            "key": "preview.public_stable.choose_release.label",
+            "ru": "Выбрать релиз"
+          },
+          "primary": true,
+          "requirement_ref": "req:552eecc0219f6d1702626b7c"
+        },
+        {
+          "description": {
+            "key": "preview.public_stable.public_update.description",
+            "ru": "Операция не выполнена. Доступность Update и актуальное состояние публикации поступают из Core."
+          },
+          "id": "public_update",
+          "label": {
+            "key": "preview.public_stable.public_update.label",
+            "ru": "Обзор обновления"
+          },
+          "primary": true,
+          "requirement_ref": "req:552eecc0219f6d1702626b7c"
+        }
+      ],
+      "surface": "inline",
+      "activation_source_view_ref": null,
+      "section": {
+        "id": "public_tab",
+        "kind": "tab",
+        "title": {
+          "key": "section.public_tab",
+          "ru": "Public"
+        }
+      }
+    },
+    {
+      "empty_state": {
+        "title": {
+          "key": "view.tickets.empty.title",
+          "ru": "Обращений нет"
+        }
+      },
+      "field_refs": [
+        "subject",
+        "status"
+      ],
+      "id": "tickets",
+      "presentation": "list",
+      "query_controls": [
+        {
+          "field_ref": "subject",
+          "id": "ticket_search",
+          "kind": "search",
+          "label": {
+            "key": "query.ticket_search.label",
+            "ru": "Поиск обращений"
+          }
+        },
+        {
+          "field_ref": "status",
+          "id": "ticket_status",
+          "kind": "filter",
+          "label": {
+            "key": "query.ticket_status.label",
+            "ru": "Состояние"
+          }
+        }
+      ],
+      "region_role": "workspace",
+      "role": "collection",
+      "title": {
+        "key": "view.tickets.title",
+        "ru": "Обращения выбранного приложения"
+      },
+      "resource_ref": "tickets",
+      "media": null,
+      "scope_filters": [],
+      "selection_filter": {
+        "field_ref": "tickets.app",
+        "source_view_ref": "apps",
+        "effect": "filter",
+        "empty_selection": "show_all",
+        "source_field_ref": null
+      },
+      "compact_presentation": null,
+      "selection": {
+        "indicator": "radio",
+        "mode": "single",
+        "row_activation": "open_details"
+      },
+      "field_display": [],
+      "initial_selection_id": null,
+      "presentation_options": null,
+      "preview_actions": [
+        {
+          "description": {
+            "key": "preview.tickets.tickets_connection.description",
+            "ru": "Операция не выполнена. Подключение к существующему Dev tickets требует Core; здесь заявки и комментарии сохраняются локально."
+          },
+          "id": "tickets_connection",
+          "label": {
+            "key": "preview.tickets.tickets_connection.label",
+            "ru": "Подключение Dev tickets"
+          },
+          "primary": false,
+          "requirement_ref": "req:d8a67eae0380a92c0e3b187b"
+        }
+      ],
+      "surface": "inline",
+      "activation_source_view_ref": null,
+      "section": {
+        "id": "tickets_tab",
+        "kind": "tab",
+        "title": {
+          "key": "section.tickets_tab",
+          "ru": "Dev tickets"
+        }
+      }
+    },
+    {
+      "field_refs": [
+        "tickets.app",
+        "subject",
+        "status"
+      ],
+      "id": "ticket_details",
+      "region_role": "inspector",
+      "role": "details",
+      "title": {
+        "key": "view.ticket_details.title",
+        "ru": "Детали обращения"
+      },
+      "resource_ref": "tickets",
+      "media": null,
+      "scope_filters": [],
+      "selection_filter": null,
+      "compact_presentation": null,
+      "selection": null,
+      "field_display": [],
+      "initial_selection_id": null,
+      "presentation_options": null,
+      "preview_actions": [],
+      "surface": "inline",
+      "activation_source_view_ref": "tickets",
+      "section": {
+        "id": "tickets_tab",
+        "kind": "tab",
+        "title": {
+          "key": "section.tickets_tab",
+          "ru": "Dev tickets"
+        }
+      }
+    },
+    {
+      "field_refs": [
+        "tickets.app",
+        "subject"
+      ],
+      "id": "ticket_editor",
+      "region_role": "inspector",
+      "role": "editor",
+      "title": {
+        "key": "view.ticket_editor.title",
+        "ru": "Новая локальная заявка"
+      },
+      "resource_ref": "tickets",
+      "media": null,
+      "scope_filters": [],
+      "selection_filter": null,
+      "compact_presentation": null,
+      "selection": null,
+      "field_display": [],
+      "initial_selection_id": null,
+      "presentation_options": null,
+      "preview_actions": [],
+      "surface": "modal",
+      "activation_source_view_ref": null,
+      "section": {
+        "id": "tickets_tab",
+        "kind": "tab",
+        "title": {
+          "key": "section.tickets_tab",
+          "ru": "Dev tickets"
+        }
+      }
+    },
+    {
+      "empty_state": {
+        "title": {
+          "key": "view.comments.empty.title",
+          "ru": "История пуста"
+        }
+      },
+      "field_refs": [
+        "text"
+      ],
+      "id": "comments",
+      "presentation": "list",
+      "region_role": "inspector",
+      "role": "collection",
+      "title": {
+        "key": "view.comments.title",
+        "ru": "История и комментарии"
+      },
+      "resource_ref": "comments",
+      "media": null,
+      "scope_filters": [],
+      "selection_filter": {
+        "field_ref": "ticket",
+        "source_view_ref": "tickets",
+        "effect": "filter",
+        "empty_selection": "show_all",
+        "source_field_ref": null
+      },
+      "compact_presentation": null,
+      "selection": {
+        "indicator": "none",
+        "mode": "none",
+        "row_activation": "none"
+      },
+      "field_display": [],
+      "initial_selection_id": null,
+      "presentation_options": null,
+      "preview_actions": [],
+      "surface": "inline",
+      "activation_source_view_ref": null,
+      "section": {
+        "id": "tickets_tab",
+        "kind": "tab",
+        "title": {
+          "key": "section.tickets_tab",
+          "ru": "Dev tickets"
+        }
+      }
+    },
+    {
+      "field_refs": [
+        "ticket",
+        "text"
+      ],
+      "id": "comment_editor",
+      "region_role": "inspector",
+      "role": "editor",
+      "title": {
+        "key": "view.comment_editor.title",
+        "ru": "Локальный комментарий"
+      },
+      "resource_ref": "comments",
+      "media": null,
+      "scope_filters": [],
+      "selection_filter": null,
+      "compact_presentation": null,
+      "selection": null,
+      "field_display": [],
+      "initial_selection_id": null,
+      "presentation_options": null,
+      "preview_actions": [],
+      "surface": "modal",
+      "activation_source_view_ref": null,
+      "section": {
+        "id": "tickets_tab",
+        "kind": "tab",
+        "title": {
+          "key": "section.tickets_tab",
+          "ru": "Dev tickets"
+        }
+      }
+    }
+  ],
+  "capability_surfaces": [],
+  "commands": [
+    {
+      "fixed_values": {
+        "status": "open"
+      },
+      "guard": {
+        "require_nonempty": [
+          "tickets.app",
+          "subject"
+        ],
+        "when": {
+          "field_ref": "subject",
+          "operator": "nonempty",
+          "value": null
+        }
+      },
+      "id": "create_ticket",
+      "input_field_refs": [
+        "tickets.app",
+        "subject"
+      ],
+      "kind": "create",
+      "label": {
+        "key": "command.create_ticket.label",
+        "ru": "Новая заявка — локально"
+      },
+      "view_ref": "ticket_editor",
+      "exposure": {
+        "collection_view_ref": "tickets",
+        "placement": "collection_header",
+        "presentation": "button"
+      }
+    },
+    {
+      "guard": {
+        "require_nonempty": [
+          "ticket",
+          "text"
+        ],
+        "when": {
+          "field_ref": "text",
+          "operator": "nonempty",
+          "value": null
+        }
+      },
+      "id": "comment",
+      "input_field_refs": [
+        "ticket",
+        "text"
+      ],
+      "kind": "create",
+      "label": {
+        "key": "command.comment.label",
+        "ru": "Добавить комментарий — локально"
+      },
+      "view_ref": "comment_editor",
+      "exposure": {
+        "collection_view_ref": "comments",
+        "placement": "collection_header",
+        "presentation": "button"
+      }
+    }
+  ],
+  "representative_states": [],
+  "requirement_bindings": [
+    {
+      "requirement_ref": "req:00a2329896e9e293efaf54d5",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:03ddd29f63b52c6cc4da2692",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:comments",
+        "resource:positions",
+        "resource:tickets"
+      ]
+    },
+    {
+      "requirement_ref": "req:0fe5873a99701463365a090d",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:comments",
+        "resource:positions",
+        "resource:tickets",
+        "view:apps",
+        "view:comment_editor",
+        "view:private",
+        "view:ticket_editor"
+      ]
+    },
+    {
+      "requirement_ref": "req:11f5ac037c1037777d42c23d",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:138389381384077de4b94353",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private"
+      ]
+    },
+    {
+      "requirement_ref": "req:189468af7a7f03399710073f",
+      "semantic_refs": [
+        "resource:applications",
+        "view:apps"
+      ]
+    },
+    {
+      "requirement_ref": "req:26516fb17ae8e035a38e1932",
+      "semantic_refs": [
+        "resource:applications",
+        "view:app_details"
+      ]
+    },
+    {
+      "requirement_ref": "req:26a71f6bd8fe8bc89c481ffd",
+      "semantic_refs": [
+        "resource:applications",
+        "view:app_details"
+      ]
+    },
+    {
+      "requirement_ref": "req:27b12df411ea564f0766c49a",
+      "semantic_refs": [
+        "relationship:ticket_app",
+        "resource:tickets",
+        "view:tickets"
+      ]
+    },
+    {
+      "requirement_ref": "req:341d8b34a9d9e20ef4459b3a",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:tickets",
+        "view:app_details",
+        "view:ticket_details",
+        "view:tickets"
+      ]
+    },
+    {
+      "requirement_ref": "req:34720a12223dc6776ff1f1e1",
+      "semantic_refs": [
+        "resource:comments",
+        "resource:tickets",
+        "view:comments",
+        "view:ticket_details"
+      ]
+    },
+    {
+      "requirement_ref": "req:3dcd0f02d1580c34eaa11c3a",
+      "semantic_refs": [
+        "resource:positions",
+        "resource:tickets",
+        "view:private_alpha",
+        "view:tickets"
+      ]
+    },
+    {
+      "requirement_ref": "req:3e8801466dcee7580dfdd6d6",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:comments",
+        "resource:positions",
+        "resource:tickets"
+      ]
+    },
+    {
+      "requirement_ref": "req:4055b6350b08a3dd1a19f354",
+      "semantic_refs": [
+        "relationship:position_app",
+        "resource:positions",
+        "view:private",
+        "view:public"
+      ]
+    },
+    {
+      "requirement_ref": "req:4218886275ba832177f4fd7f",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private"
+      ]
+    },
+    {
+      "requirement_ref": "req:4a95881f7526513d0ec2f777",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:positions",
+        "view:apps",
+        "view:private",
+        "view:public"
+      ]
+    },
+    {
+      "requirement_ref": "req:4cf8ad9f59dafa6a8b05ed70",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:4e10e0d7632e57b78b866764",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:positions",
+        "view:apps",
+        "view:private",
+        "view:public"
+      ]
+    },
+    {
+      "requirement_ref": "req:4e4bba4fcb63914c7943aa6f",
+      "semantic_refs": [
+        "query:ticket_status"
+      ]
+    },
+    {
+      "requirement_ref": "req:528a5bb9452e271847ea9b50",
+      "semantic_refs": [
+        "resource:applications",
+        "view:apps"
+      ]
+    },
+    {
+      "requirement_ref": "req:552eecc0219f6d1702626b7c",
+      "semantic_refs": [
+        "resource:positions",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:62cd2a0279bcd7c9828ba807",
+      "semantic_refs": [
+        "resource:applications",
+        "view:app_details"
+      ]
+    },
+    {
+      "requirement_ref": "req:7430ec47ba569fa4a76f5602",
+      "semantic_refs": [
+        "query:catalog_source",
+        "resource:comments",
+        "resource:tickets",
+        "view:comment_editor",
+        "view:ticket_editor"
+      ]
+    },
+    {
+      "requirement_ref": "req:79c10c89009b9380763d7b25",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:827cd1d1a411db2e12796265",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:positions",
+        "view:apps",
+        "view:private",
+        "view:public"
+      ]
+    },
+    {
+      "requirement_ref": "req:864b5bd52df8805e9f5ed2c7",
+      "semantic_refs": [
+        "resource:applications",
+        "view:apps"
+      ]
+    },
+    {
+      "requirement_ref": "req:876c17abf3f459f16b44010a",
+      "semantic_refs": [
+        "query:app_search",
+        "query:catalog_source",
+        "resource:applications",
+        "view:apps"
+      ]
+    },
+    {
+      "requirement_ref": "req:88df32abe0d32f42f43f3145",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:positions",
+        "view:apps",
+        "view:private",
+        "view:public"
+      ]
+    },
+    {
+      "requirement_ref": "req:9052c01831628a60512a1166",
+      "semantic_refs": [
+        "resource:positions",
+        "resource:tickets",
+        "view:private_alpha",
+        "view:tickets"
+      ]
+    },
+    {
+      "requirement_ref": "req:9494399c77450a9876620c08",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_stable",
+        "view:release_details"
+      ]
+    },
+    {
+      "requirement_ref": "req:988957b583a3b286ef820d44",
+      "semantic_refs": [
+        "resource:positions",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:996a127ee64d084010444351",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:9d366440f8193a4775771d3c",
+      "semantic_refs": [
+        "resource:applications",
+        "view:apps"
+      ]
+    },
+    {
+      "requirement_ref": "req:9d7b060e2353472b02363400",
+      "semantic_refs": [
+        "resource:applications",
+        "view:apps"
+      ]
+    },
+    {
+      "requirement_ref": "req:a2c697fc3f350ada0cad2992",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:adc787def7f6b6c36b232118",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:positions",
+        "view:apps",
+        "view:private",
+        "view:public"
+      ]
+    },
+    {
+      "requirement_ref": "req:b1897938036a71bc6c0d0e58",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:b1a0f32723ececed762922d2",
+      "semantic_refs": [
+        "resource:tickets",
+        "view:tickets"
+      ]
+    },
+    {
+      "requirement_ref": "req:b79ccf75e89e47f970607587",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:positions",
+        "view:apps",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:b9f09180b3687d5309566222",
+      "semantic_refs": [
+        "query:ticket_search"
+      ]
+    },
+    {
+      "requirement_ref": "req:bd9a4e341968131d2bf6680a",
+      "semantic_refs": [
+        "resource:applications",
+        "view:apps"
+      ]
+    },
+    {
+      "requirement_ref": "req:bde4e0cdbc5c062ad7a96b4e",
+      "semantic_refs": [
+        "resource:positions",
+        "view:public"
+      ]
+    },
+    {
+      "requirement_ref": "req:c339201ece45c14b8c208ab0",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:comments",
+        "resource:positions",
+        "resource:tickets"
+      ]
+    },
+    {
+      "requirement_ref": "req:caf7f7d665b4ad4ab0ead184",
+      "semantic_refs": [
+        "resource:applications",
+        "view:apps"
+      ]
+    },
+    {
+      "requirement_ref": "req:cc1a0892f80478706698a2f9",
+      "semantic_refs": [
+        "command:comment",
+        "command:create_ticket",
+        "relationship:comment_ticket",
+        "relationship:position_app",
+        "relationship:ticket_app",
+        "resource:applications",
+        "resource:comments",
+        "resource:positions",
+        "resource:tickets",
+        "view:comment_editor",
+        "view:ticket_editor"
+      ]
+    },
+    {
+      "requirement_ref": "req:cdcab650f17a9c9d1633b110",
+      "semantic_refs": [
+        "query:catalog_source"
+      ]
+    },
+    {
+      "requirement_ref": "req:cf32a7d0ac0efa65c4d73d05",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:d418ced3ccd21c19c5945686",
+      "semantic_refs": [
+        "resource:applications",
+        "view:apps"
+      ]
+    },
+    {
+      "requirement_ref": "req:d8a67eae0380a92c0e3b187b",
+      "semantic_refs": [
+        "command:comment",
+        "command:create_ticket",
+        "query:ticket_search",
+        "query:ticket_status",
+        "resource:comments",
+        "resource:tickets",
+        "view:comment_editor",
+        "view:comments",
+        "view:ticket_details",
+        "view:ticket_editor",
+        "view:tickets"
+      ]
+    },
+    {
+      "requirement_ref": "req:da23aa05adc63ab32f0ff19d",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:dc1d24bef1ac4a65dffda575",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:positions",
+        "resource:tickets",
+        "view:apps",
+        "view:private",
+        "view:public",
+        "view:ticket_editor"
+      ]
+    },
+    {
+      "requirement_ref": "req:dff875aafe9fa6e557830c69",
+      "semantic_refs": [
+        "command:comment",
+        "command:create_ticket",
+        "query:ticket_search",
+        "query:ticket_status",
+        "resource:comments",
+        "resource:tickets",
+        "view:comment_editor",
+        "view:ticket_details",
+        "view:ticket_editor",
+        "view:tickets"
+      ]
+    },
+    {
+      "requirement_ref": "req:e2ffb6cd623bd94a17c801a2",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:e6df804ca5c4501a8db07363",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:ed6eb84f24dab9b6b5ca05f5",
+      "semantic_refs": [
+        "command:comment",
+        "command:create_ticket",
+        "resource:comments",
+        "resource:tickets",
+        "view:comment_editor",
+        "view:ticket_editor"
+      ]
+    },
+    {
+      "requirement_ref": "req:eec644143382be92f7b2448e",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:positions",
+        "view:private",
+        "view:private_stable",
+        "view:public"
+      ]
+    },
+    {
+      "requirement_ref": "req:f6797f216cd17004ae9ba9b9",
+      "semantic_refs": [
+        "resource:positions",
+        "view:public"
+      ]
+    },
+    {
+      "requirement_ref": "req:610fffd6ca9fc0c3e4f42570",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable",
+        "view:release_details"
+      ]
+    },
+    {
+      "requirement_ref": "req:e0888992b570b825219e301f",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable",
+        "view:release_details"
+      ]
+    },
+    {
+      "requirement_ref": "req:fa1fbbfcfc7bc714984c752c",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:eeb5e806ea55e419ac41002e",
+      "semantic_refs": [
+        "resource:applications",
+        "view:app_details"
+      ]
+    },
+    {
+      "requirement_ref": "req:b1b28f97cd7504084aba7517",
+      "semantic_refs": [
+        "relationship:ticket_app",
+        "resource:tickets",
+        "view:tickets"
+      ]
+    },
+    {
+      "requirement_ref": "req:dbe684557a6dfb9cfc9855be",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:comments",
+        "resource:positions",
+        "resource:tickets"
+      ]
+    },
+    {
+      "requirement_ref": "req:d3142a0a081790d57a35dbd0",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:bb6ad8fab533099dacfa1610",
+      "semantic_refs": [
+        "query:catalog_source",
+        "resource:comments",
+        "resource:tickets",
+        "view:comment_editor",
+        "view:ticket_editor"
+      ]
+    },
+    {
+      "requirement_ref": "req:2f87a7adba3dddb228e8f25a",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:a2944838799596a59485abfd",
+      "semantic_refs": [
+        "query:app_search",
+        "query:catalog_source",
+        "resource:applications",
+        "view:apps"
+      ]
+    },
+    {
+      "requirement_ref": "req:5a3ee415196f387b7d545830",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:positions",
+        "view:apps",
+        "view:private",
+        "view:public"
+      ]
+    },
+    {
+      "requirement_ref": "req:3cddeefe18110ff09ac21463",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_stable",
+        "view:release_details"
+      ]
+    },
+    {
+      "requirement_ref": "req:148286f0bf6a7d33084c2a1e",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:20e50272c1c9ea1cdf41ee7f",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:cf08643b6f09690cac657245",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:comments",
+        "resource:positions",
+        "resource:tickets"
+      ]
+    },
+    {
+      "requirement_ref": "req:e32c4a5b97588d13077d7c05",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:8d8cdfd4f5e32356c44cbc87",
+      "semantic_refs": [
+        "resource:applications",
+        "view:apps"
+      ]
+    },
+    {
+      "requirement_ref": "req:ac462076404e8c344b450be0",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable"
+      ]
+    },
+    {
+      "requirement_ref": "req:6654e9088fb1e381390ee75b",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:positions",
+        "resource:tickets",
+        "view:apps",
+        "view:private",
+        "view:public",
+        "view:ticket_editor"
+      ]
+    },
+    {
+      "requirement_ref": "req:d4790befbcfd4868beca9171",
+      "semantic_refs": [
+        "resource:applications",
+        "resource:positions",
+        "view:private",
+        "view:private_stable",
+        "view:public"
+      ]
+    },
+    {
+      "requirement_ref": "req:e4cd2ddb4b8e7b06a5204e56",
+      "semantic_refs": [
+        "resource:positions",
+        "view:private",
+        "view:private_alpha",
+        "view:private_stable",
+        "view:public",
+        "view:public_stable",
+        "view:release_details"
+      ]
+    }
+  ],
+  "automation_requirements": [
+    {
+      "requirement_ref": "req:3dcd0f02d1580c34eaa11c3a",
+      "reason": "external_integration",
+      "disclosure": {
+        "ru": "Операция не выполнена."
+      },
+      "acceptance": "Подключить Preview, Builder и Dev tickets Alpha к Core для выбранного приложения; при отказе показать диагностику без изменения версий.",
+      "statement": "Alpha предоставляет Preview, Builder и Dev tickets."
+    },
+    {
+      "requirement_ref": "req:4218886275ba832177f4fd7f",
+      "reason": "external_integration",
+      "disclosure": {
+        "ru": "Операция не выполнена."
+      },
+      "acceptance": "Использовать lifecycle plan/apply: изменения, Update только при наличии обновления, Remove Beta, Finalize с явным подтверждением. Только после успеха атомарно убрать принятую Beta и установить ту же версию Stable. Выбранная Beta скрывает Stable только на рабочем столе. При отказе сохранить версии и показать ошибку рядом с действием со ссылкой на диагностику.",
+      "statement": "Private Beta предоставляет последние изменения, Update при доступном обновлении, Remove Beta и Finalize с явным подтверждением."
+    },
+    {
+      "requirement_ref": "req:e2ffb6cd623bd94a17c801a2",
+      "reason": "external_integration",
+      "disclosure": {
+        "ru": "Операция не выполнена."
+      },
+      "acceptance": "Подключить явный выбор версии Private Stable и публикацию выбранной версии как Public Beta через Core с проверкой прав и подтверждением. При отмене или отказе сохранить версии и показать диагностику.",
+      "statement": "Private Stable позволяет выбрать версию и опубликовать её как Public Beta."
+    },
+    {
+      "requirement_ref": "req:bde4e0cdbc5c062ad7a96b4e",
+      "reason": "external_integration",
+      "disclosure": {
+        "ru": "Операция не выполнена."
+      },
+      "acceptance": "Получателю предоставить явный выбор Public Beta, издателю — подтверждаемый выпуск именно проверенной версии в Public Stable. Права получать из Core; при отказе сохранить выбор и версии и показать диагностику.",
+      "statement": "Public Beta позволяет получателю явно выбрать предварительную версию, а издателю — выпустить эту проверенную версию как Public Stable."
+    },
+    {
+      "requirement_ref": "req:552eecc0219f6d1702626b7c",
+      "reason": "external_integration",
+      "disclosure": {
+        "ru": "Операция не выполнена."
+      },
+      "acceptance": "Подключить выбор релиза, разрешённое обновление и состояние публикации Public Stable к Core. До подтверждения не показывать успех; при отказе сохранить версию и показать диагностику.",
+      "statement": "Public Stable предоставляет выбор релиза, обновление и состояние публикации."
+    },
+    {
+      "requirement_ref": "req:9d7b060e2353472b02363400",
+      "reason": "external_integration",
+      "disclosure": {
+        "ru": "Операция не выполнена."
+      },
+      "acceptance": "Подключить независимый выбор среды выполнения без продвижения разработки и публикации. При отказе сохранить размещение и показать диагностику.",
+      "statement": "Выбор среды выполнения независим от продвижения разработки."
+    },
+    {
+      "requirement_ref": "req:189468af7a7f03399710073f",
+      "reason": "external_integration",
+      "disclosure": {
+        "ru": "Операция не выполнена."
+      },
+      "acceptance": "Подключить закрепление и снятие с главной, настройки и доступ к Core с проверкой разрешений. Отмена и ошибка сохраняют подтверждённое состояние; ошибка содержит диагностику.",
+      "statement": "Общие действия: открыть, закрепить или убрать с главной, настройки и доступ."
+    },
+    {
+      "requirement_ref": "req:864b5bd52df8805e9f5ed2c7",
+      "reason": "external_integration",
+      "disclosure": {
+        "ru": "Операция не выполнена."
+      },
+      "acceptance": "Открывать подтверждённую выбранную версию либо явно переключать и открывать другую через Core. Локальное выделение не означает открытия. При отказе сохранить выбор и показать диагностику.",
+      "statement": "Действие открытия адаптивное: открыть выбранную версию либо переключить и открыть другую."
+    },
+    {
+      "requirement_ref": "req:d8a67eae0380a92c0e3b187b",
+      "reason": "external_integration",
+      "disclosure": {
+        "ru": "Заявки и комментарии сохраняются локально."
+      },
+      "acceptance": "Подключить список, поиск, состояние, детали, историю, новую заявку и комментарий к существующему Dev tickets выбранного приложения. При ошибке сохранять ввод и показывать диагностику; локальное сохранение не считать отправкой.",
+      "statement": "Нужны список, поиск и фильтр состояния, детали и история обращения, новая заявка на доработку и комментарий."
+    }
+  ],
+  "capability_gaps": []
+}

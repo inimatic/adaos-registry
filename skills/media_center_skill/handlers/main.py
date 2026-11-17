@@ -61,6 +61,9 @@ from media_center.enrichment import (  # noqa: E402
     metadata_provider_configuration,
 )
 from media_center.sync import MediaAgentSyncWorker  # noqa: E402
+from media_center.sync_state import SyncStateStore  # noqa: E402
+from media_center.read_models import dispose_read_models, interactive_read, read_deadline  # noqa: E402
+from media_center.health import health_projection  # noqa: E402
 
 
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".mkv", ".avi", ".wmv", ".ogv"}
@@ -87,7 +90,15 @@ class MediaRootOperationBusy(RuntimeError):
 
 
 def _repository() -> MediaCenterRepository:
-    return MediaCenterRepository()
+    path = str(default_db_path().resolve())
+    with _coordinator_lock:
+        if _coordinator_cached is not None and _coordinator_path == path:
+            return _coordinator_cached.repository
+    # The interactive-read decorator performs the only admitted fixture
+    # bootstrap before entering its read-only deadline. Repository lookup must
+    # never infer write authority from a ContextVar because a hot-reloaded
+    # runtime may temporarily retain module instances from both A/B slots.
+    return MediaCenterRepository(bootstrap_fixture=False)
 
 
 def _coordinator(
@@ -103,7 +114,7 @@ def _coordinator(
             with _coordinator_lock:
                 if _coordinator_cached is not None and _coordinator_path == path:
                     return _coordinator_cached
-            repo = MediaCenterRepository(path)
+            repo = MediaCenterRepository(path, bootstrap_fixture=False)
             coordinator = MediaCatalogCoordinator(repo)
             with _coordinator_lock:
                 _coordinator_cached = coordinator
@@ -332,6 +343,7 @@ def _agent_sync_runtime(
                 timeout_seconds=30.0,
             ),
             publish=lambda: _publish_library_snapshot(coordinator),
+            state_store=SyncStateStore(coordinator.repository),
         ),
     )
 
@@ -559,9 +571,11 @@ def _publish_library_snapshot(
 ) -> bool:
     try:
         from adaos.sdk.io import stream_variable_publish
+        from media_center.preview import binding as preview_data_binding
 
         profile = str(profile_id or "default").strip() or "default"
         surface_is_shared = _bool(shared_surface, False)
+        preview_binding = preview_data_binding() or {}
         cache_key = (
             str(catalog.repository.db_path.resolve()),
             profile,
@@ -576,6 +590,15 @@ def _publish_library_snapshot(
         if snapshot is None:
             agent_sync = _agent_sync_status()
             collection_state = catalog.collection_state(agent_sync=agent_sync)
+            if preview_binding:
+                collection_state = dict(collection_state)
+                collection_state["state"] = (
+                    "ready"
+                    if int(collection_state.get("available_count") or 0) > 0
+                    else "empty"
+                )
+                collection_state["configured"] = True
+                collection_state["updated_at"] = now_iso()
             catalog_revision = catalog.catalog_revision()
             personal_revision = catalog.profile_revision(profile)
             home = _cached_home_snapshot(
@@ -602,19 +625,21 @@ def _publish_library_snapshot(
                     _READY_LIBRARY_SNAPSHOT_CACHE.pop(
                         next(iter(_READY_LIBRARY_SNAPSHOT_CACHE)), None
                     )
+        variable_id = (
+            f"media_center.library.{profile}."
+            f"{'shared' if surface_is_shared else 'personal'}"
+        )
+        sequence = (
+            int(snapshot["catalog_revision"]) + int(snapshot["personal_revision"])
+        )
         stream_variable_publish(
             "media_center.library_state",
             snapshot,
-            var_id=(
-                f"media_center.library.{profile}."
-                f"{'shared' if surface_is_shared else 'personal'}"
-            ),
+            var_id=variable_id,
             # Both revisions are monotonic but advance independently. Their sum
             # advances whenever either plane changes; max() can repeat and make
             # clients reject a fresh replacement as stale.
-            seq=(
-                int(snapshot["catalog_revision"]) + int(snapshot["personal_revision"])
-            ),
+            seq=sequence,
             ttl_ms=120000,
             _meta={
                 **({"webspace_id": webspace_id} if webspace_id else {}),
@@ -623,6 +648,13 @@ def _publish_library_snapshot(
                     "shared_surface": surface_is_shared,
                 },
             },
+        )
+        _log.info(
+            "library snapshot published variable=%s seq=%s state=%s webspace=%s",
+            variable_id,
+            sequence,
+            str(dict(snapshot.get("collection_state") or {}).get("state") or ""),
+            str(webspace_id or "default"),
         )
         return True
     except Exception:
@@ -673,6 +705,9 @@ def _publish_operation_snapshot(
 def _invoke_agent(
     operation: str, arguments: Mapping[str, Any] | None = None, *, timeout: float = 15.0
 ) -> tuple[dict[str, Any] | None, str]:
+    from media_center.preview import binding
+    if binding() is not None:
+        return None, "preview_agent_provider_not_selected"
     try:
         from adaos.sdk.skills import invoke
 
@@ -953,6 +988,9 @@ def _skill_text(key: str, fallback: str) -> str:
 def _discover_resources(
     source: str = "all", limit: int | None = 5000
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    from media_center.preview import binding
+    if binding() is not None:
+        return [], {"ok": False, "error": "preview_live_discovery_disabled"}
     try:
         from adaos.sdk.io.media import list_media_resources
     except Exception as exc:
@@ -1063,6 +1101,9 @@ def _int_limit(value: Any, default: int, maximum: int) -> int:
     side_effects="local_write",
 )
 def ensure_schema(**_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repo = _repository()
     legacy = repo.ensure_schema()
     coordinator = _coordinator(repo).ensure_schema()
@@ -1074,8 +1115,16 @@ def ensure_schema(**_: Any) -> dict[str, Any]:
     side_effects="local_write",
 )
 def rehydrate(**_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repo = _repository()
     catalog = _coordinator(repo)
+    from media_center.preview import binding
+    scheduled = False
+    if binding() is None:
+        scheduled = background_runtime().ensure_bootstrap_started(
+            str(default_db_path().resolve()), _start_live_runtime)
     return {
         "ok": True,
         "schema": COORDINATOR_SCHEMA,
@@ -1084,14 +1133,15 @@ def rehydrate(**_: Any) -> dict[str, Any]:
             "ok": True,
             "deferred": True,
             "mode": "background_cursor_catchup",
-            "activation": "sys.ready",
+            "activation": "lifecycle.rehydrate_or_sys.ready",
+            "bootstrap_scheduled": scheduled,
             "worker_started": False,
             "status": {"state": "deferred", "revision": 0},
         },
         "enrichment": {
             "running": False,
             "deferred": True,
-            "activation": "sys.ready",
+            "activation": "lifecycle.rehydrate_or_sys.ready",
             "worker_started": False,
         },
     }
@@ -1319,6 +1369,9 @@ def _sync_agents(
 
 @subscribe("sys.ready")
 def on_sys_ready(_: Any) -> None:
+    from media_center.preview import binding
+    if binding() is not None:
+        return
     background_runtime().ensure_bootstrap_started(
         str(default_db_path().resolve()),
         _start_live_runtime,
@@ -1326,11 +1379,16 @@ def on_sys_ready(_: Any) -> None:
 
 
 def _start_live_runtime() -> None:
+    from media_center.preview import binding
+    if binding() is not None:
+        return
     catalog = _coordinator()
-    _publish_library_snapshot(catalog)
-    _publish_operation_snapshot(catalog)
+    # Progress must not depend on a cold/failed Home projection. In particular,
+    # start synchronization before publication can wait on slow storage.
     _agent_sync_runtime(catalog).ensure_started()
     _enrichment_runtime(catalog).ensure_started()
+    _publish_library_snapshot(catalog)
+    _publish_operation_snapshot(catalog)
 
 
 @subscribe(
@@ -1339,6 +1397,18 @@ def _start_live_runtime() -> None:
 )
 def on_media_center_snapshot_requested(event: Any) -> None:
     payload = _event_payload(event)
+    receiver = str(payload.get("receiver") or "")
+    if receiver not in {"media_center.library_state", "media_center.operation_state"}:
+        return
+    raw_params = payload.get("params")
+    params = dict(raw_params) if isinstance(raw_params, Mapping) else {}
+    key = ":".join((receiver, str(payload.get("webspace_id") or ""),
+                    str(params.get("profile_id") or payload.get("profile_id") or "default"),
+                    str(_bool(params.get("shared_surface", payload.get("shared_surface", False)), False))))
+    background_runtime().queue_projection(key, lambda: _publish_requested_snapshot(payload))
+
+
+def _publish_requested_snapshot(payload: Mapping[str, Any]) -> None:
     receiver = str(payload.get("receiver") or "")
     if receiver == "media_center.operation_state":
         _publish_operation_snapshot(
@@ -1369,6 +1439,9 @@ def on_media_center_snapshot_requested(event: Any) -> None:
 
 @subscribe("media_library_agent.catalog.changed")
 def on_agent_catalog_changed(event: Any) -> None:
+    from media_center.preview import binding
+    if binding() is not None:
+        return
     path = str(default_db_path().resolve())
     with _coordinator_lock:
         catalog = (
@@ -1384,6 +1457,9 @@ def on_agent_catalog_changed(event: Any) -> None:
 
 @subscribe("media_control.playback.observed")
 def on_playback_observed(event: Any) -> None:
+    from media_center.preview import binding
+    if binding() is not None:
+        return
     payload = _event_payload(event)
     item_id = str(payload.get("item_id") or "").strip()
     profile_id = str(payload.get("profile_id") or "default").strip() or "default"
@@ -1444,6 +1520,9 @@ def on_playback_observed(event: Any) -> None:
     side_effects="local_write",
 )
 def sync_agent(max_pages: int = 4, limit: int = 500, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     catalog = _coordinator()
     result = _run_agent_sync(catalog, max_pages=max_pages, limit=limit)
     _agent_sync_runtime(catalog).ensure_started()
@@ -1460,6 +1539,9 @@ def sync_agent(max_pages: int = 4, limit: int = 500, **_: Any) -> dict[str, Any]
     side_effects="local_write",
 )
 def scan_sources(source: str = "all", limit: int = 5000, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     resources, discovery = _discover_resources(source=source or "all", limit=limit)
     if not discovery.get("ok"):
         repo = _repository()
@@ -1475,8 +1557,11 @@ def scan_sources(source: str = "all", limit: int = 5000, **_: Any) -> dict[str, 
     return result
 
 
-@tool(summary="List configured media-center library folders.", side_effects="none")
+@tool(summary="List configured media-center library folders.", side_effects="read_only")
 def list_roots(include_disabled: bool = False, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     agent, _error = _invoke_agent(
         "list_roots", {"include_disabled": _bool(include_disabled, False)}
     )
@@ -1493,6 +1578,9 @@ def list_roots(include_disabled: bool = False, **_: Any) -> dict[str, Any]:
 def set_root_storage_policy(
     root_id: str = "", values: Mapping[str, Any] | None = None, **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     agent, error = _invoke_agent(
         "set_storage_policy",
         {"root_id": str(root_id or ""), "values": dict(values or {})},
@@ -1523,6 +1611,9 @@ def add_root(
     storage_policy: Mapping[str, Any] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     agent, _error = _invoke_agent(
         "add_root",
         {
@@ -1558,6 +1649,9 @@ def add_root(
     side_effects="local_write",
 )
 def remove_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     agent, _error = _invoke_agent("remove_root", {"root_id": root_id})
     if agent is not None:
         agent["owner"] = "media_library_agent"
@@ -1579,6 +1673,9 @@ def remove_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
     side_effects="local_write",
 )
 def delete_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     agent, _error = _invoke_agent("remove_root", {"root_id": root_id})
     if agent is not None:
         return {
@@ -1624,6 +1721,9 @@ def delete_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
 def scan_roots(
     root_id: str = "", path: str = "", limit: int = 1000, **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     arguments = {
         "root_id": root_id,
         "mode": "incremental",
@@ -1755,6 +1855,9 @@ def import_folder(
     storage_policy: Mapping[str, Any] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     agent, _error = _invoke_agent(
         "import_folder",
         {
@@ -1794,8 +1897,9 @@ def import_folder(
 
 @tool(
     summary="Return the media-center library projection for widgets and playback.",
-    side_effects="none",
+    side_effects="read_only",
 )
+@interactive_read
 def library(
     query: str = "",
     media_kind: str = "playable",
@@ -1817,21 +1921,16 @@ def library(
     projection: str = "full",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repo = _repository()
     catalog = _coordinator(repo)
-    scan: dict[str, Any] | None = None
     agent_sync: dict[str, Any] | None = None
     if _bool(auto_scan, True):
-        if catalog.catalog_revision() <= 0:
-            summary = repo.compact_summary()
-            agent_sync = _run_agent_sync(
-                catalog, max_pages=1, limit=500, timeout_seconds=5.0
-            )
-            if not agent_sync.get("ok") and int(summary.get("total_count") or 0) == 0:
-                scan = scan_sources(source="all", limit=5000)
-        else:
-            agent_sync = _agent_sync_status()
-        _agent_sync_runtime(catalog).ensure_started()
+        # Compatibility parameter: a read can observe the lifecycle worker,
+        # but cannot initialize a second worker or carry a read deadline into it.
+        agent_sync = _agent_sync_status()
     try:
         payload = catalog.list_items(
             query=query,
@@ -1860,8 +1959,6 @@ def library(
             ),
             i18n_key="runtime.media_center.error.invalid_media_catalog_cursor",
         )
-    if scan is not None:
-        payload["scan"] = scan
     if agent_sync is not None:
         payload["agent_sync"] = agent_sync
     projection_token = str(projection or "full").strip().lower()
@@ -1895,8 +1992,9 @@ def library(
 
 @tool(
     summary="Return bounded profile-aware metadata navigation facets.",
-    side_effects="none",
+    side_effects="read_only",
 )
+@interactive_read
 def metadata_facets(
     dimension: str = "genre",
     media_kind: str = "playable",
@@ -1905,6 +2003,9 @@ def metadata_facets(
     include_all: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _coordinator().metadata_facets(
         dimension=dimension,
         media_kind=media_kind,
@@ -1915,9 +2016,12 @@ def metadata_facets(
 
 
 @tool(
-    summary="Return managed external metadata provider settings.", side_effects="none"
+    summary="Return managed external metadata provider settings.", side_effects="read_only"
 )
 def get_metadata_settings(**_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     catalog = _coordinator()
     result = catalog.metadata_settings()
     settings = dict(result["settings"])
@@ -1946,6 +2050,9 @@ def set_metadata_settings(
     clear_tmdb_credential: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     from adaos.sdk.data.secrets import delete as secret_delete
     from adaos.sdk.data.secrets import set as secret_set
 
@@ -2034,15 +2141,19 @@ def set_metadata_settings(
     return current
 
 
-@tool(summary="List media-center catalog rows.", side_effects="none")
+@tool(summary="List media-center catalog rows.", side_effects="read_only")
 def list_items(**payload: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return library(**payload)
 
 
 @tool(
     summary="Run bounded local and federated agent search stages.",
-    side_effects="none",
+    side_effects="read_only",
 )
+@interactive_read
 def deep_search(
     query: str = "",
     profile_id: str = "default",
@@ -2051,6 +2162,9 @@ def deep_search(
     max_agents: int = 4,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     token = str(query or "").strip()
     bounded = max(1, min(30, int(limit or 30)))
     if not token:
@@ -2200,12 +2314,16 @@ def deep_search(
     }
 
 
-@tool(summary="Read one media-center catalog item.", side_effects="none")
+@tool(summary="Read one media-center catalog item.", side_effects="read_only")
+@interactive_read
 def get_item(
     item_id: str = "",
     profile_id: str = "default",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     if not str(item_id or "").strip():
         return {
             "ok": True,
@@ -2219,7 +2337,7 @@ def get_item(
 
 @tool(
     summary="Return the selected media item and a bounded playback queue.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def playback_queue(
     item_id: str = "",
@@ -2232,6 +2350,9 @@ def playback_queue(
     profile_id: str = "default",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repo = _repository()
     catalog = _coordinator(repo)
     selected_result = repo.get_item(item_id)
@@ -2279,7 +2400,7 @@ def playback_queue(
 
 @tool(
     summary="Select a media variant and route for one playback endpoint.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def playback_plan(
     item_id: str = "",
@@ -2292,6 +2413,9 @@ def playback_plan(
     profile_id: str = "default",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repo = _repository()
     result = _coordinator(repo).playback_plan(
         item_id,
@@ -2325,6 +2449,9 @@ def ensure_rendition(
     force: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     catalog = _coordinator()
     plan = catalog.playback_plan(
         item_id,
@@ -2402,13 +2529,16 @@ def ensure_rendition(
 
 @tool(
     summary="Return bounded recent media conversion operations from the source agent.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def rendition_operations(
     source_id: str = "",
     limit: int = 30,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     page_size = max(1, min(100, int(limit or 30)))
     agent, error = _invoke_agent(
         "list_rendition_jobs",
@@ -2529,7 +2659,7 @@ def rendition_operations(
 
 
 @tool(
-    summary="Build a bounded playback queue from a catalog source.", side_effects="none"
+    summary="Build a bounded playback queue from a catalog source.", side_effects="read_only"
 )
 def build_playback_queue(
     source_type: str = "item",
@@ -2545,6 +2675,9 @@ def build_playback_queue(
     start_item_id: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     result = _coordinator().build_queue(
         source_type=source_type,
         source_id=source_id,
@@ -2607,6 +2740,9 @@ def play_on(
     webspace_id: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     target = str(target_id or "").strip()
     if not target:
         return _skill_error(
@@ -2792,6 +2928,9 @@ def play_on(
     side_effects="local_write",
 )
 def set_favorite(item_id: str = "", favorite: bool = True, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     profile_id = str(_.get("profile_id") or "default")
     catalog = _coordinator()
     result = catalog.set_favorite(
@@ -2806,12 +2945,16 @@ def set_favorite(item_id: str = "", favorite: bool = True, **_: Any) -> dict[str
     return result
 
 
-@tool(summary="Return compact media-center catalog status.", side_effects="none")
+@tool(summary="Return compact media-center catalog status.", side_effects="read_only")
+@interactive_read
 def status(
     include_facets: bool = False,
     include_exact_counts: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repo = _repository()
     catalog = _coordinator(repo)
     summary = repo.compact_summary()
@@ -2825,8 +2968,12 @@ def status(
             "reason": "explicit_request_required",
         }
     )
+    sync = _agent_sync_status()
+    job_counts = catalog.background_job_counts()
     return {
         "ok": True,
+        "state": "ready",
+        "ready": True,
         "schema": COORDINATOR_SCHEMA,
         "summary": summary,
         "facets": facets,
@@ -2836,24 +2983,28 @@ def status(
         ),
         "storage": catalog.storage_status(),
         "background_jobs": {
-            "counts": catalog.background_job_counts(),
+            "counts": job_counts,
             "counts_by_kind": catalog.background_job_counts_by_kind(),
         },
-        "agent_sync": _agent_sync_status(),
+        "agent_sync": sync,
         "runtime_bootstrap": background_runtime().bootstrap_status(),
-        "enrichment": _enrichment_runtime(catalog).status(),
+        "enrichment": background_runtime().enrichment_status(),
+        "health": health_projection(read_ready=True, sync=sync, job_counts=job_counts),
     }
 
 
 @tool(
     summary="Export bounded sanitized Media Center diagnostics and repair proposals.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def diagnostic_export(
     deployment_id: str = "media-center-home",
     browser_diagnostics: Mapping[str, Any] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     catalog = _coordinator()
     coordinator_diagnostics = catalog.diagnostics()
     components: dict[str, Any] = {"coordinator": coordinator_diagnostics}
@@ -2914,11 +3065,14 @@ def diagnostic_export(
 
 @tool(
     summary="Return Media Center deployment and node administration state.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def deployment_status(
     deployment_id: str = "media-center-home", limit: int = 50, **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _topology().deployment_status(deployment_id, limit=limit)
 
 
@@ -2938,6 +3092,9 @@ def configure_deployment(
     deployment_id: str = "media-center-home",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     try:
         return _topology().configure_deployment(
             release_digest=release_digest,
@@ -2969,6 +3126,9 @@ def configure_deployment(
 def apply_deployment(
     plan_digest: str = "", idempotency_key: str = "", **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     try:
         return _topology().apply_deployment(
             plan_digest, idempotency_key=idempotency_key
@@ -2986,9 +3146,12 @@ def apply_deployment(
 
 
 @tool(
-    summary="Return one durable Media Center deployment operation.", side_effects="none"
+    summary="Return one durable Media Center deployment operation.", side_effects="read_only"
 )
 def deployment_operation_status(operation_id: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     try:
         return _topology().deployment_operation_status(operation_id)
     except Exception as exc:
@@ -3010,6 +3173,9 @@ def deployment_operation_status(operation_id: str = "", **_: Any) -> dict[str, A
 def drain_activation(
     activation_id: str = "", idempotency_key: str = "", **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     try:
         return _topology().drain_activation(
             activation_id, idempotency_key=idempotency_key
@@ -3031,6 +3197,9 @@ def drain_activation(
 def remove_activation(
     activation_id: str = "", idempotency_key: str = "", **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     try:
         return _topology().remove_activation(
             activation_id, idempotency_key=idempotency_key
@@ -3057,6 +3226,9 @@ def define_topology(
     deployment_id: str = "media-center-home",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     try:
         return _topology().define_topology(
             service_definition=service_definition or {},
@@ -3087,6 +3259,9 @@ def register_agent(
     lease_seconds: int = 300,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     try:
         return _topology().register_agent(
             instance or {},
@@ -3116,6 +3291,9 @@ def renew_agent(
     lease_seconds: int = 300,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     try:
         return _topology().renew_agent(
             instance_id,
@@ -3145,6 +3323,9 @@ def drain_agent(
     expected_revision: int = 1,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     try:
         return _topology().drain_agent(
             instance_id,
@@ -3171,6 +3352,9 @@ def observe_agent_topology(
     timeout_seconds: float = 60.0,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     try:
         return _topology().observe_agent_topology(
             instance_id,
@@ -3202,6 +3386,9 @@ def plan_topology_change(
     replica_role: str = "follower",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     try:
         return _topology().plan_topology_change(
             partition_id,
@@ -3231,6 +3418,9 @@ def apply_topology_change(
     idempotency_key: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     try:
         return _topology().apply_topology_change(
             plan_digest,
@@ -3248,8 +3438,11 @@ def apply_topology_change(
         )
 
 
-@tool(summary="Read one durable Media Center topology operation.", side_effects="none")
+@tool(summary="Read one durable Media Center topology operation.", side_effects="read_only")
 def topology_operation_status(operation_id: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     try:
         return _topology().topology_operation_status(operation_id)
     except Exception as exc:
@@ -3276,6 +3469,9 @@ def handoff_authority(
     lease_seconds: int = 120,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     try:
         return _topology().handoff_authority(
             partition_id,
@@ -3299,21 +3495,27 @@ def handoff_authority(
 
 @tool(
     summary="Return bounded generic distributed topology state for Media Center.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def topology_status(limit: int = 50, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _topology().distributed_status(limit=limit)
 
 
 @tool(
     summary="Explain route eligibility and partial participation for Media Center shards.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def explain_route(
     partition_ids: list[str] | None = None,
     dataset_id: str = "media-catalog-authority",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     try:
         return {
             "ok": True,
@@ -3332,13 +3534,17 @@ def explain_route(
         )
 
 
-@tool(summary="Return bounded home shelves for one media profile.", side_effects="none")
+@tool(summary="Return bounded home shelves for one media profile.", side_effects="read_only")
+@interactive_read(timeout=2.5)
 def home(
     profile_id: str = "default",
     limit: int = 12,
     shared_surface: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _coordinator().home(
         profile_id=profile_id,
         limit=limit,
@@ -3348,14 +3554,20 @@ def home(
 
 @tool(
     summary="List bounded Media Center profiles and their policies.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def list_profiles(limit: int = 20, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _coordinator().list_profiles(limit=limit)
 
 
-@tool(summary="Read one Media Center profile and its policy.", side_effects="none")
+@tool(summary="Read one Media Center profile and its policy.", side_effects="read_only")
 def get_profile(profile_id: str = "default", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _coordinator().get_profile(profile_id)
 
 
@@ -3369,6 +3581,9 @@ def set_profile_policy(
     values: Mapping[str, Any] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     catalog = _coordinator()
     result = catalog.set_profile_policy(
         profile_id,
@@ -3395,6 +3610,9 @@ def set_personal_state(
     hidden: bool | None = None,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     catalog = _coordinator()
     result = catalog.set_personal_state(
         item_id,
@@ -3412,11 +3630,14 @@ def set_personal_state(
 
 
 @tool(
-    summary="Return bounded explainable profile recommendations.", side_effects="none"
+    summary="Return bounded explainable profile recommendations.", side_effects="read_only"
 )
 def recommendations(
     profile_id: str = "default", limit: int = 12, **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _coordinator().recommendations(profile_id=profile_id, limit=limit)
 
 
@@ -3621,6 +3842,9 @@ def voice_request(
     limit: int = 5,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     profile = str(profile_id or "default").strip() or "default"
     bounded = max(1, min(10, int(limit or 5)))
     raw = str(text or "").strip()
@@ -3933,11 +4157,14 @@ def voice_request(
 
 @tool(
     summary="List typed media collections through an opaque cursor.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def list_collections(
     kind: str = "", limit: int = 30, cursor: str = "", **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     try:
         return _coordinator().collections(kind=kind, limit=limit, cursor=cursor)
     except ValueError:
@@ -3949,7 +4176,7 @@ def list_collections(
 
 @tool(
     summary="Browse one collection, its child collections, and a bounded item page.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def collection_contents(
     collection_id: str = "",
@@ -3958,6 +4185,9 @@ def collection_contents(
     cursor: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     try:
         return _coordinator().collection_contents(
             collection_id,
@@ -3974,7 +4204,7 @@ def collection_contents(
 
 @tool(
     summary="Browse bounded catalog folders through an opaque cursor.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def browse_folders(
     agent_id: str = "",
@@ -3985,6 +4215,9 @@ def browse_folders(
     cursor: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     try:
         return _coordinator().folders(
             agent_id=agent_id,
@@ -4009,6 +4242,9 @@ def create_playlist(
     item_ids: list[str] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     catalog = _coordinator()
     result = catalog.create_playlist(
         profile_id=profile_id,
@@ -4025,13 +4261,16 @@ def create_playlist(
     return result
 
 
-@tool(summary="List playlists visible to one profile.", side_effects="none")
+@tool(summary="List playlists visible to one profile.", side_effects="read_only")
 def list_playlists(
     profile_id: str = "default",
     limit: int = 30,
     cursor: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     try:
         return _coordinator().playlists(
             profile_id=profile_id, limit=limit, cursor=cursor
@@ -4040,7 +4279,7 @@ def list_playlists(
         return _skill_error("invalid_media_catalog_cursor")
 
 
-@tool(summary="Read one bounded playlist page.", side_effects="none")
+@tool(summary="Read one bounded playlist page.", side_effects="read_only")
 def playlist_items(
     playlist_id: str = "",
     profile_id: str = "default",
@@ -4048,6 +4287,9 @@ def playlist_items(
     cursor: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     try:
         return _coordinator().playlist_items(
             playlist_id,
@@ -4072,6 +4314,9 @@ def update_playlist(
     item_ids: list[str] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     catalog = _coordinator()
     result = catalog.update_playlist(
         playlist_id,
@@ -4100,6 +4345,9 @@ def delete_playlist(
     expected_revision: int = 1,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     catalog = _coordinator()
     result = catalog.delete_playlist(
         playlist_id,
@@ -4126,6 +4374,9 @@ def apply_correction(
     actor_ref: str = "profile:default",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     catalog = _coordinator()
     result = catalog.apply_correction(
         operation=operation,
@@ -4161,6 +4412,9 @@ def update_item_metadata(
     reject_providers: list[str] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     token = str(item_id or "").strip()
     if not token:
         return _skill_error(
@@ -4219,6 +4473,9 @@ def review_item_artwork(
     artwork_url: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     token = str(item_id or "").strip()
     if not token:
         return _skill_error(
@@ -4301,19 +4558,28 @@ def review_item_artwork(
 def reverse_correction(
     correction_id: str = "", actor_ref: str = "profile:default", **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     return _coordinator().reverse_correction(correction_id, actor_ref=actor_ref)
 
 
-@tool(summary="List bounded metadata claims and provenance.", side_effects="none")
+@tool(summary="List bounded metadata claims and provenance.", side_effects="read_only")
 def metadata_claims(subject_ref: str = "", limit: int = 30, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _coordinator().metadata_claims(subject_ref, limit=limit)
 
 
 @tool(
     summary="Return cheap non-destructive duplicate and variant candidates.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def duplicate_candidates(limit: int = 30, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _coordinator().duplicate_candidates(limit=limit)
 
 
@@ -4328,6 +4594,9 @@ def save_checkpoint(
     completed: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     catalog = _coordinator()
     result = catalog.checkpoint(
         item_id,
@@ -4352,6 +4621,9 @@ def save_checkpoint(
 def queue_background_job(
     kind: str = "", subject_ref: str = "", priority: int = 100, **_: Any
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     catalog = _coordinator()
     result = catalog.queue_background_job(kind, subject_ref, priority=priority)
     if result.get("ok"):
@@ -4373,6 +4645,9 @@ def add_playlist_item(
     profile_id: str = "default",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     catalog = _coordinator()
     result = catalog.add_playlist_item(
         playlist_id, profile_id=profile_id, item_id=item_id
@@ -4396,6 +4671,9 @@ def compact_storage(
     time_budget_seconds: float = 300.0,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     catalog = _coordinator()
     bounded_batches = max(1, min(1000, int(max_batches or 250)))
     bounded_limit = max(10, min(1000, int(limit or 1000)))
@@ -4424,6 +4702,9 @@ def compact_storage(
     side_effects="local_write",
 )
 def optimize_storage(reclaim: bool = False, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     catalog = _coordinator()
     storage = catalog.storage_status()
     logical = dict(storage.get("logical_compaction") or {})
@@ -4457,15 +4738,25 @@ def optimize_storage(reclaim: bool = False, **_: Any) -> dict[str, Any]:
         )
 
 
-@tool(summary="List bounded background media operations.", side_effects="none")
+@tool(summary="List bounded background media operations.", side_effects="read_only")
 def operations(limit: int = 30, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _coordinator().operations(limit=limit)
 
 
 @tool(summary="Stop the process-local enrichment worker.", side_effects="local_write")
 def dispose(**_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     global _coordinator_cached, _coordinator_path
-    background = background_runtime().dispose(timeout=30.0)
+    deadline = time.monotonic() + 30.0
+    readers = dispose_read_models(timeout=5.0)
+    background = background_runtime().dispose(timeout=max(0.0, deadline-time.monotonic()))
+    if readers.get("stopped") is not True:
+        raise RuntimeError("media_center_read_drain_timeout")
     if background.get("stopped") is not True:
         raise RuntimeError("media_center_background_drain_timeout")
     with _coordinator_lock:
@@ -4482,14 +4773,18 @@ def dispose(**_: Any) -> dict[str, Any]:
         "schema": COORDINATOR_SCHEMA,
         "disposed": True,
         "background": background,
+        "readers": readers,
     }
 
 
 @tool(
     summary="Explain the MVP media-center workflow and admitted next steps.",
-    side_effects="none",
+    side_effects="read_only",
 )
 def next_steps(**_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     steps = [
         {
             "id": "scan",
@@ -4530,6 +4825,9 @@ def next_steps(**_: Any) -> dict[str, Any]:
     side_effects="local_write",
 )
 def chat(text: str = "", **payload: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     raw = str(text or "").strip()
     folded = raw.casefold()
     if any(token in folded for token in ("folder", "folders", "root", "roots", "папк")):

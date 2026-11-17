@@ -182,6 +182,14 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 160
+        },
+        "view": {
+          "type": "string",
+          "enum": [
+            "full",
+            "dashboard"
+          ],
+          "default": "full"
         }
       },
       "required": [
@@ -189,5 +197,870 @@
       ],
       "additionalProperties": false
     }
+  },
+  {
+    "availability": "enabled",
+    "id": "applications.lifecycle.finalize",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "application_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "candidate_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "expected_revision": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "release_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "webspace_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "application_id",
+        "candidate_id",
+        "release_digest",
+        "expected_revision",
+        "idempotency_key"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "adapter": "adaos.sdk.applications",
+      "handler": "applications_lifecycle_finalize",
+      "published_by": "plane:applications"
+    },
+    "output_schema": {
+      "additionalProperties": true,
+      "properties": {
+        "audit_event_id": {
+          "type": "string"
+        },
+        "dry_run": {
+          "type": "boolean"
+        },
+        "error": {
+          "additionalProperties": true,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "details": {
+              "type": "object"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        },
+        "meta": {
+          "type": "object"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "result": {
+          "additionalProperties": true,
+          "anyOf": [
+            {
+              "required": [
+                "operation"
+              ]
+            },
+            {
+              "required": [
+                "would_plan"
+              ]
+            },
+            {
+              "required": [
+                "would_apply"
+              ]
+            },
+            {
+              "required": [
+                "would_recover"
+              ]
+            },
+            {
+              "required": [
+                "would_publish"
+              ]
+            },
+            {
+              "required": [
+                "would_cancel"
+              ]
+            }
+          ],
+          "properties": {
+            "action": {
+              "type": "string"
+            },
+            "application_id": {
+              "type": "string"
+            },
+            "operation": {
+              "additionalProperties": true,
+              "properties": {
+                "actor_ref": {
+                  "type": "string"
+                },
+                "application_id": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "expected_revision": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "idempotency_key": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "operation_id": {
+                  "type": "string"
+                },
+                "plan": {
+                  "additionalProperties": true,
+                  "properties": {
+                    "access": {
+                      "properties": {
+                        "mode": {
+                          "enum": [
+                            "publisher_local",
+                            "public_channel",
+                            "trial_redemption"
+                          ]
+                        },
+                        "redemption_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "acknowledge_write_loss": {
+                      "type": "boolean"
+                    },
+                    "action": {
+                      "enum": [
+                        "renew_beta",
+                        "promote_stable",
+                        "retain_local_beta",
+                        "deactivate_beta",
+                        "restore_stable",
+                        "uninstall",
+                        "uninstall_beta",
+                        "delete_trial",
+                        "recover_runtime",
+                        "select_runtime"
+                      ]
+                    },
+                    "affected_webspace_ids": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "application_id": {
+                      "type": "string"
+                    },
+                    "candidate_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "compatibility": {
+                      "additionalProperties": true,
+                      "properties": {
+                        "contract_locks_present": {
+                          "type": "boolean"
+                        },
+                        "migration": {
+                          "properties": {
+                            "count": {
+                              "type": "integer"
+                            },
+                            "required": {
+                              "type": "boolean"
+                            },
+                            "rollback_mode": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "permissions": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "platform": {
+                          "type": "object"
+                        },
+                        "validation_evidence_count": {
+                          "type": "integer"
+                        }
+                      },
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "components": {
+                      "items": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "artifact_id": {
+                            "type": "string"
+                          },
+                          "component_ref": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "lifecycle": {
+                            "type": "string"
+                          },
+                          "package_digest": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "conflicts": {
+                      "items": {
+                        "additionalProperties": true,
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "data_disposition": {
+                      "type": "string"
+                    },
+                    "data_policy": {
+                      "type": "string"
+                    },
+                    "expected_lifecycle_revision": {
+                      "type": "string"
+                    },
+                    "expected_revision": {
+                      "type": "integer"
+                    },
+                    "expires_at": {
+                      "type": "string"
+                    },
+                    "installation_revision": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "kind": {
+                      "enum": [
+                        "install",
+                        "update",
+                        "remove",
+                        "select_track",
+                        "relocate_component",
+                        "install_component",
+                        "remove_component"
+                      ]
+                    },
+                    "migration_required": {
+                      "type": "boolean"
+                    },
+                    "permission_review": {
+                      "additionalProperties": true,
+                      "properties": {
+                        "approval_permissions": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "approval_required": {
+                          "type": "boolean"
+                        },
+                        "diff": {
+                          "additionalProperties": true,
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        },
+                        "items": {
+                          "items": {
+                            "additionalProperties": true,
+                            "properties": {
+                              "approval_policy": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "purpose": {
+                                "type": "string"
+                              },
+                              "requirement": {
+                                "enum": [
+                                  "required",
+                                  "optional"
+                                ]
+                              },
+                              "sensitive": {
+                                "type": "boolean"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "optional": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "profile_digest": {
+                          "type": "string"
+                        },
+                        "required": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "schema": {
+                          "type": "string"
+                        }
+                      },
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "permissions": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "placement_change": {
+                      "additionalProperties": true,
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "previous_expires_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "release_digest": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "removal": {
+                      "additionalProperties": true,
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "renewed_expires_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "required_apply_capability": {
+                      "description": "Confirm planned operations through lifecycle.apply for applications.apply, lifecycle.publish for applications.publish (Finalize), or lifecycle.recover for applications.recover. Always pass the same operation_id, plan_digest and idempotency_key. Observe uncertain acknowledgement using applications.get_operation before another mutation.",
+                      "enum": [
+                        "applications.apply",
+                        "applications.publish",
+                        "applications.recover"
+                      ]
+                    },
+                    "review_summary": {
+                      "type": "string"
+                    },
+                    "runtime_target": {
+                      "properties": {
+                        "expected_revision": {
+                          "type": "integer"
+                        },
+                        "previous_release_digest": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "previous_source": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "release_digest": {
+                          "type": "string"
+                        },
+                        "runtime_root_ref": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "webspace_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "schema": {
+                      "type": "string"
+                    },
+                    "snapshot": {
+                      "additionalProperties": true,
+                      "properties": {
+                        "consistency_boundary": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "mode": {
+                          "type": "string"
+                        },
+                        "required": {
+                          "type": "boolean"
+                        },
+                        "retention": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_release_digest": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "source_version": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "subscription_change": {
+                      "additionalProperties": true,
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "subscription_default": {
+                      "additionalProperties": true,
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "target_position_id": {
+                      "enum": [
+                        "private_beta",
+                        "private_stable"
+                      ]
+                    },
+                    "target_version": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "webspace_id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "plan_digest": {
+                  "type": "string"
+                },
+                "recovery_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "result": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "revision": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "schema": {
+                  "const": "adaos.application.operation.v1"
+                },
+                "status": {
+                  "enum": [
+                    "planned",
+                    "applying",
+                    "succeeded",
+                    "failed",
+                    "unknown",
+                    "reconciling",
+                    "cancelled"
+                  ]
+                },
+                "subnet_ref": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "schema",
+                "operation_id",
+                "application_id",
+                "kind",
+                "status",
+                "plan_digest",
+                "idempotency_key",
+                "plan",
+                "result",
+                "revision"
+              ],
+              "type": "object"
+            },
+            "operation_id": {
+              "type": "string"
+            },
+            "would_apply": {
+              "type": "boolean"
+            },
+            "would_cancel": {
+              "type": "boolean"
+            },
+            "would_plan": {
+              "type": "boolean"
+            },
+            "would_publish": {
+              "type": "boolean"
+            },
+            "would_recover": {
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "status": {
+          "type": "string"
+        },
+        "surface": {
+          "enum": [
+            "development",
+            "operations"
+          ],
+          "type": "string"
+        },
+        "tool_id": {
+          "type": "string"
+        },
+        "trace_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "trace_id",
+        "tool_id",
+        "surface",
+        "ok",
+        "status",
+        "dry_run"
+      ],
+      "type": "object"
+    },
+    "required_capability": "applications.publish",
+    "side_effects": "write",
+    "stability": "experimental",
+    "summary": "Confirm exact local Beta once; Core completes Stable adoption; Core owns admission, data protection and operation history.",
+    "surface": "operations",
+    "title": "Confirm exact local Beta once; Core completes Stable adoption"
+  },
+  {
+    "availability": "enabled",
+    "id": "applications.lifecycle.show",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "application_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "webspace_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "application_id"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "adapter": "adaos.sdk.applications",
+      "handler": "applications_lifecycle_show",
+      "published_by": "plane:applications"
+    },
+    "output_schema": {
+      "additionalProperties": true,
+      "properties": {
+        "audit_event_id": {
+          "type": "string"
+        },
+        "dry_run": {
+          "type": "boolean"
+        },
+        "error": {
+          "additionalProperties": true,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "details": {
+              "type": "object"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        },
+        "meta": {
+          "type": "object"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "result": {
+          "type": [
+            "object",
+            "array",
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "surface": {
+          "enum": [
+            "development",
+            "operations"
+          ],
+          "type": "string"
+        },
+        "tool_id": {
+          "type": "string"
+        },
+        "trace_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "trace_id",
+        "tool_id",
+        "surface",
+        "ok",
+        "status",
+        "dry_run"
+      ],
+      "type": "object"
+    },
+    "required_capability": "applications.read",
+    "side_effects": "none",
+    "stability": "experimental",
+    "summary": "Read Core Application lifecycle; Core owns admission, data protection and operation history.",
+    "surface": "operations",
+    "title": "Read Core Application lifecycle"
+  },
+  {
+    "availability": "enabled",
+    "id": "applications.lifecycle.events",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "application_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "metadata": {
+      "adapter": "adaos.sdk.applications",
+      "handler": "applications_lifecycle_events",
+      "published_by": "plane:applications"
+    },
+    "output_schema": {
+      "additionalProperties": true,
+      "properties": {
+        "audit_event_id": {
+          "type": "string"
+        },
+        "dry_run": {
+          "type": "boolean"
+        },
+        "error": {
+          "additionalProperties": true,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "details": {
+              "type": "object"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        },
+        "meta": {
+          "type": "object"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "result": {
+          "type": [
+            "object",
+            "array",
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "surface": {
+          "enum": [
+            "development",
+            "operations"
+          ],
+          "type": "string"
+        },
+        "tool_id": {
+          "type": "string"
+        },
+        "trace_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "trace_id",
+        "tool_id",
+        "surface",
+        "ok",
+        "status",
+        "dry_run"
+      ],
+      "type": "object"
+    },
+    "required_capability": "applications.read",
+    "side_effects": "none",
+    "stability": "experimental",
+    "summary": "Read Core lifecycle events; Core owns admission, data protection and operation history.",
+    "surface": "operations",
+    "title": "Read Core lifecycle events"
   }
 ]

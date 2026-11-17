@@ -1,0 +1,318 @@
+{
+    "schema": "adaos.webui.v1",
+    "generated_by": "builder_skill",
+    "ui": {
+        "application": {
+            "desktop": {
+                "pageSchema": {
+                    "id": "context_chat",
+                    "title": "Context Chat",
+                    "layout": {
+                        "version": 2,
+                        "pattern": "workbench",
+                        "density": "comfortable",
+                        "contentWidth": "fluid",
+                        "scroll": "regions",
+                        "regions": [
+                            {
+                                "id": "projects",
+                                "role": "navigation",
+                                "label": "Проекты",
+                                "priority": 90,
+                                "scroll": "region",
+                                "size": {
+                                    "minPx": 240,
+                                    "preferredPx": 264,
+                                    "maxPx": 280
+                                },
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "stack"
+                                }
+                            },
+                            {
+                                "id": "conversation",
+                                "role": "main",
+                                "priority": 100,
+                                "scroll": "region",
+                                "size": {
+                                    "minPx": 350
+                                },
+                                "presentation": {
+                                    "wide": "pane",
+                                    "compact": "stack"
+                                }
+                            }
+                        ],
+                        "variants": [
+                            {
+                                "id": "with-context",
+                                "when": "$state.contextChatContextOpen === true",
+                                "pattern": "workbench",
+                                "density": "comfortable",
+                                "contentWidth": "fluid",
+                                "scroll": "regions",
+                                "regions": [
+                                    {
+                                        "id": "projects",
+                                        "role": "navigation",
+                                        "label": "Проекты",
+                                        "priority": 90,
+                                        "scroll": "region",
+                                        "size": {
+                                            "minPx": 240,
+                                            "preferredPx": 264,
+                                            "maxPx": 280
+                                        },
+                                        "presentation": {
+                                            "wide": "pane",
+                                            "compact": "stack"
+                                        }
+                                    },
+                                    {
+                                        "id": "conversation",
+                                        "role": "main",
+                                        "priority": 100,
+                                        "scroll": "region",
+                                        "size": {
+                                            "minPx": 350
+                                        },
+                                        "presentation": {
+                                            "wide": "pane",
+                                            "compact": "stack"
+                                        }
+                                    },
+                                    {
+                                        "id": "context",
+                                        "role": "inspector",
+                                        "label": "Контекст",
+                                        "priority": 80,
+                                        "scroll": "region",
+                                        "size": {
+                                            "minPx": 285,
+                                            "preferredPx": 320,
+                                            "maxPx": 340
+                                        },
+                                        "presentation": {
+                                            "wide": "pane",
+                                            "compact": "stack"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "conversation",
+                                "default": true,
+                                "pattern": "workbench",
+                                "density": "comfortable",
+                                "contentWidth": "fluid",
+                                "scroll": "regions",
+                                "regions": [
+                                    {
+                                        "id": "projects",
+                                        "role": "navigation",
+                                        "label": "Проекты",
+                                        "priority": 90,
+                                        "scroll": "region",
+                                        "size": {
+                                            "minPx": 240,
+                                            "preferredPx": 264,
+                                            "maxPx": 280
+                                        },
+                                        "presentation": {
+                                            "wide": "pane",
+                                            "compact": "stack"
+                                        }
+                                    },
+                                    {
+                                        "id": "conversation",
+                                        "role": "main",
+                                        "priority": 100,
+                                        "scroll": "region",
+                                        "size": {
+                                            "minPx": 350
+                                        },
+                                        "presentation": {
+                                            "wide": "pane",
+                                            "compact": "stack"
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "widgets": [
+                        {
+                            "id": "context-chat-projects",
+                            "type": "collection.projectList",
+                            "area": "projects",
+                            "inputs": {
+                                "connection": {
+                                    "session": "context-chat",
+                                    "service": "context_chat_service",
+                                    "title": "Context Chat",
+                                    "subtitle": "Ваш контекст. Ваш разговор.",
+                                    "contextStateKey": "contextChatContextOpen",
+                                    "pollMs": 2500,
+                                    "account": {
+                                        "label": "ChatGPT",
+                                        "buttonLabel": "Continue with ChatGPT ↗",
+                                        "authOrigin": "https://auth.openai.com",
+                                        "usageUrl": "https://chatgpt.com/settings/usage"
+                                    },
+                                    "accept": [
+                                        ".txt",
+                                        ".md",
+                                        ".markdown",
+                                        ".json",
+                                        ".csv",
+                                        ".html",
+                                        ".log",
+                                        ".docx",
+                                        ".xlsx",
+                                        ".pdf"
+                                    ],
+                                    "maxFileBytes": 10485760,
+                                    "tools": [
+                                        "files",
+                                        "web_search"
+                                    ],
+                                    "protocol": "adaos.project-conversation.v2",
+                                    "content": {
+                                        "format": "markdown",
+                                        "copy": true,
+                                        "plainCopy": true
+                                    },
+                                    "icon": "resource:context_chat.icon"
+                                }
+                            }
+                        },
+                        {
+                            "id": "context-chat-conversation",
+                            "type": "ui.projectConversation",
+                            "area": "conversation",
+                            "inputs": {
+                                "connection": {
+                                    "session": "context-chat",
+                                    "service": "context_chat_service",
+                                    "title": "Context Chat",
+                                    "subtitle": "Ваш контекст. Ваш разговор.",
+                                    "contextStateKey": "contextChatContextOpen",
+                                    "pollMs": 2500,
+                                    "account": {
+                                        "label": "ChatGPT",
+                                        "buttonLabel": "Continue with ChatGPT ↗",
+                                        "authOrigin": "https://auth.openai.com",
+                                        "usageUrl": "https://chatgpt.com/settings/usage"
+                                    },
+                                    "accept": [
+                                        ".txt",
+                                        ".md",
+                                        ".markdown",
+                                        ".json",
+                                        ".csv",
+                                        ".html",
+                                        ".log",
+                                        ".docx",
+                                        ".xlsx",
+                                        ".pdf"
+                                    ],
+                                    "maxFileBytes": 10485760,
+                                    "tools": [
+                                        "files",
+                                        "web_search"
+                                    ],
+                                    "protocol": "adaos.project-conversation.v2",
+                                    "content": {
+                                        "format": "markdown",
+                                        "copy": true,
+                                        "plainCopy": true
+                                    },
+                                    "icon": "resource:context_chat.icon"
+                                }
+                            }
+                        },
+                        {
+                            "id": "context-chat-context",
+                            "type": "item.conversationContext",
+                            "area": "context",
+                            "inputs": {
+                                "connection": {
+                                    "session": "context-chat",
+                                    "service": "context_chat_service",
+                                    "title": "Context Chat",
+                                    "subtitle": "Ваш контекст. Ваш разговор.",
+                                    "contextStateKey": "contextChatContextOpen",
+                                    "pollMs": 2500,
+                                    "account": {
+                                        "label": "ChatGPT",
+                                        "buttonLabel": "Continue with ChatGPT ↗",
+                                        "authOrigin": "https://auth.openai.com",
+                                        "usageUrl": "https://chatgpt.com/settings/usage"
+                                    },
+                                    "accept": [
+                                        ".txt",
+                                        ".md",
+                                        ".markdown",
+                                        ".json",
+                                        ".csv",
+                                        ".html",
+                                        ".log",
+                                        ".docx",
+                                        ".xlsx",
+                                        ".pdf"
+                                    ],
+                                    "maxFileBytes": 10485760,
+                                    "tools": [
+                                        "files",
+                                        "web_search"
+                                    ],
+                                    "protocol": "adaos.project-conversation.v2",
+                                    "content": {
+                                        "format": "markdown",
+                                        "copy": true,
+                                        "plainCopy": true
+                                    },
+                                    "icon": "resource:context_chat.icon"
+                                }
+                            }
+                        }
+                    ],
+                    "meta": {
+                        "builder": {
+                            "empty_canvas": false,
+                            "proto": "001",
+                            "ui_revision": "001",
+                            "scenario_id": "context_chat"
+                        }
+                    },
+                    "title_i18n": "scenario.context_chat.title",
+                    "initialState": {
+                        "contextChatContextOpen": false
+                    }
+                }
+            },
+            "resources": {
+                "context_chat.i18n.en": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "en",
+                    "path": "assets/i18n/en.json",
+                    "mime": "application/json",
+                    "delivery": "core"
+                },
+                "context_chat.i18n.ru": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "ru",
+                    "path": "assets/i18n/ru.json",
+                    "mime": "application/json",
+                    "delivery": "core"
+                }
+            }
+        },
+        "version": "0.3.2",
+        "manifest": "webui.json"
+    },
+    "resources": {}
+}

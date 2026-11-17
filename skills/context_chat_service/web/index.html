@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Context Chat</title><link rel="stylesheet" href="assets/style.css"><script type="module" src="assets/app.js"></script></head>
+<body>
+  <div id="app" class="app">
+    <aside class="sidebar" id="sidebar" aria-label="Проекты">
+      <a class="brand" href="./"><span class="brand-mark">c<span>·</span></span><span>Context Chat<small>Ваш контекст. Ваш разговор.</small></span></a>
+      <button class="primary new-project" id="new-project"><span>＋</span> Новый проект</button>
+      <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Найти проект" aria-label="Поиск проектов"></label>
+      <div class="sidebar-caption">ПРОЕКТЫ <span id="project-count">0</span></div>
+      <nav id="projects" class="project-list" aria-label="Список проектов"></nav>
+      <div class="local-note"><span class="local-dot"></span> Данные на вашем устройстве</div>
+      <button class="account-card" id="account-button"><span class="account-icon">◎</span><span><strong id="account-label">ChatGPT не подключён</strong><small id="account-caption">Подключить личный аккаунт</small></span><span class="account-arrow">↗</span></button>
+    </aside>
+    <main class="workspace">
+      <header class="topbar">
+        <button class="icon mobile-only" id="open-projects" aria-label="Открыть проекты">☰</button>
+        <div class="project-heading"><span class="eyebrow">ПРОСТРАНСТВО ДЛЯ РАЗГОВОРА</span><h1 id="project-title">Context Chat</h1></div>
+        <div class="topbar-actions"><label class="model-picker"><span class="model-dot"></span><select id="model" aria-label="Модель"><option value="">Подключите ChatGPT</option></select></label><button class="icon" id="edit-project" aria-label="Настройки проекта" title="Настройки проекта" disabled>⋯</button><button class="quiet" id="context-toggle" aria-expanded="false">▤ <span>Контекст</span><span class="count" id="source-count">0</span></button></div>
+      </header>
+      <div id="error" class="error-banner" role="alert" hidden><span id="error-text"></span><button id="dismiss-error" aria-label="Закрыть сообщение">×</button></div>
+      <div class="work-area">
+        <section class="conversation" aria-label="Разговор">
+          <div class="messages" id="messages" aria-live="polite"></div>
+          <div class="composer-wrap">
+            <div class="draft-files" id="draft-files"></div>
+            <div class="composer" id="composer"><textarea id="draft" rows="2" maxlength="30000" placeholder="О чём поговорим?" aria-label="Сообщение"></textarea><div class="composer-footer"><button class="attach" id="attach" aria-label="Прикрепить файлы" title="Добавить документ в контекст">＋<span>Файл</span></button><span class="composer-shortcut">Enter — отправить · Shift+Enter — перенос</span><button class="send" id="send" aria-label="Отправить сообщение" disabled>↑</button><button class="stop" id="stop" hidden>■ Остановить</button></div></div>
+            <div class="composer-note" id="composer-note">Создайте проект, чтобы начать разговор.</div>
+          </div>
+        </section>
+        <aside class="context-panel" id="context-panel" aria-label="Контекст проекта" hidden>
+          <div class="panel-heading"><strong>Контекст проекта</strong><button class="icon" id="close-context" aria-label="Закрыть контекст">×</button></div>
+          <div class="tabs" role="tablist"><button role="tab" id="sources-tab" aria-selected="true">Источники <span id="tab-count">0</span></button><button role="tab" id="memory-tab" aria-selected="false">Память</button></div>
+          <div id="context-content" class="context-content"></div>
+        </aside>
+      </div>
+    </main>
+  </div>
+  <div class="scrim" id="scrim" hidden></div>
+  <input type="file" id="files" multiple hidden accept=".txt,.md,.markdown,.json,.csv,.html,.log,.docx,.xlsx">
+  <dialog id="modal"><div class="modal-head"><h2 id="modal-title"></h2><button class="icon" id="close-modal" aria-label="Закрыть окно">×</button></div><div id="modal-body"></div></dialog>
+  <div class="toast" id="toast" role="status" hidden></div>
+</body></html>

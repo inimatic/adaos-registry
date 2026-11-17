@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:vision.descriptors.manage.browser-local",
+  "binding_definition_digest": "sha256:9ccc80312d5f9cc134d4e5bba60d4edbd297aeb5810edd95f14252577d4f02f4",
+  "logical_entrypoint": "vision.descriptors.browser-local",
+  "package": {
+    "kind": "skill",
+    "id": "cv_descriptor",
+    "version": "0.1.14",
+    "digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:fd6828db10ec8ec1260851416a00b086aa51856e0337671b11b4ce0db43ea56e"
+}

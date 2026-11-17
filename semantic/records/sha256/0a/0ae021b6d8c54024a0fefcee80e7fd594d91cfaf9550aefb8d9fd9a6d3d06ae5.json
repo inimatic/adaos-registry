@@ -1,0 +1,54 @@
+{
+  "claim_ref": "evidence-claim:application-release/ae438a5e2e0891d17a022212",
+  "claim_kind": "capability_conformance",
+  "subjects": [
+    {
+      "kind": "capability_contract",
+      "ref": "capability:application.ui.render",
+      "digest": "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7"
+    },
+    {
+      "kind": "binding_definition",
+      "ref": "binding-definition:application.ui.render.webui-v1",
+      "digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1"
+    }
+  ],
+  "environment": {
+    "profile_ref": "profile:local/default",
+    "profile_digest": "sha256:d7203057c8f93156f5b97e9be834eb42a9e511a0094db467ad4a6127d7726049"
+  },
+  "dependencies": [
+    {
+      "ref": "project-release:web_desktop",
+      "observed_version": "0.3.94",
+      "fingerprint": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd"
+    }
+  ],
+  "suite_digest": "sha256:d8d6a4db5c1c4ca410b18b160fa12c78b5105d0c91888aba25992b8e57cf344e",
+  "evidence_digest": "sha256:b9d2d7567044f203960ff67cb1f37cdcd9cc8aabcf7bf1b4d19f3fca0942028f",
+  "provenance": {
+    "issuer": "adaos:application-release-admission",
+    "runner": "trusted-release-validation",
+    "run_id": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd"
+  },
+  "issued_at": "2026-11-02T13:48:32+00:00",
+  "freshness": {
+    "max_age_seconds": 2592000,
+    "invalidated_by": [
+      "dependency_change",
+      "environment_change",
+      "revocation"
+    ]
+  },
+  "result": "verified",
+  "redaction": {
+    "portable": true,
+    "omitted_fields": [
+      "credentials",
+      "local_evidence_context"
+    ]
+  },
+  "portability_scope": "portable",
+  "schema": "adaos.evidence.claim.v1",
+  "claim_digest": "sha256:0ae021b6d8c54024a0fefcee80e7fd594d91cfaf9550aefb8d9fd9a6d3d06ae5"
+}

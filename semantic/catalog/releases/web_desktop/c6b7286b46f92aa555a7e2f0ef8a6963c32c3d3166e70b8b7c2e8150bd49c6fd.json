@@ -1,0 +1,1434 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "web_desktop",
+    "legacy_project_id": "web_desktop",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "web_desktop",
+    "display": {
+      "title": "Management",
+      "summary": "Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.",
+      "categories": [
+        "system",
+        "desktop"
+      ]
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "desktop",
+        "presentation_ref": "scenario:web_desktop"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 4,
+    "created_at": "2026-09-19T09:55:35+00:00",
+    "updated_at": "2026-09-30T19:49:46+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "web_desktop",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "web_desktop",
+    "version": "0.3.94",
+    "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "web_desktop",
+      "version": "0.3.94",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:applications-beta-reconciliation-20261025",
+        "revision": "sha256:24142d242e08f2f75a5a98bd4f3adf69fe17819cc8d53a6d7d502a7be7083a53",
+        "path_scope": [
+          "projects/web_desktop/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "web_desktop",
+          "version": "0.3.102",
+          "digest": "sha256:7eb88ae8198c99b334a6af526d737a201057b8e56ca268033daab5b5b62df6d8",
+          "manifest_digest": "sha256:8cbb957749a50b1c1489978939c6c75d41ce0c73ee5522fbdd9e2d0aaba528d9",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:applications-beta-reconciliation-20261025",
+            "revision": "sha256:24142d242e08f2f75a5a98bd4f3adf69fe17819cc8d53a6d7d502a7be7083a53",
+            "path_scope": [
+              "scenarios/web_desktop/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/web_desktop",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "web_desktop_runtime_skill",
+          "version": "0.1.64",
+          "digest": "sha256:6f10723641c9f39194bd45cdf9def680f5369e95f23ee23d4d27813c9483ca1c",
+          "manifest_digest": "sha256:a1341b5a3f6993cf5ef02991502be2b0bc99011bd33d630330fe71cea7205438",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:applications-beta-reconciliation-20261025",
+            "revision": "sha256:24142d242e08f2f75a5a98bd4f3adf69fe17819cc8d53a6d7d502a7be7083a53",
+            "path_scope": [
+              "skills/web_desktop_runtime_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/web_desktop_runtime_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [
+        {
+          "kind": "skill",
+          "artifact_id": "browsers_skill",
+          "version": "0.15.26",
+          "package_digest": "sha256:58fa06163cd062a7a5748342be175328e542f9b4d514699b8487cce03779df56",
+          "optional": false,
+          "version_spec": "==0.15.26"
+        },
+        {
+          "kind": "skill",
+          "artifact_id": "conversation_companions",
+          "version": "0.3.2",
+          "package_digest": "sha256:1012970a54a84651267c434cfacc48a3b5f6b1c9685285e63114791be3381d47",
+          "optional": false,
+          "version_spec": "==0.3.2"
+        },
+        {
+          "kind": "skill",
+          "artifact_id": "greet_on_boot_skill",
+          "version": "0.2.4",
+          "package_digest": "sha256:eb695ac298aed7839c2cb7ac4d098b8313cdcd8887073e4fad8b645304e3feae",
+          "optional": false,
+          "version_spec": "==0.2.4"
+        },
+        {
+          "kind": "skill",
+          "artifact_id": "infrastate_skill",
+          "version": "0.75.94",
+          "package_digest": "sha256:b6869dd1f060f8f08c871fc208369a2c9ad77e2afce4b6ededbfc29248741a8b",
+          "optional": false,
+          "version_spec": "==0.75.94"
+        },
+        {
+          "kind": "skill",
+          "artifact_id": "pair_new_device_skill",
+          "version": "0.1.0",
+          "package_digest": "sha256:ddac2904f52eea9e23a1b13cf530ae5dc6e4a8f33a44374685ca90df110a4ded",
+          "optional": false,
+          "version_spec": "==0.1.0"
+        },
+        {
+          "kind": "skill",
+          "artifact_id": "voice_chat_skill",
+          "version": "0.7.8",
+          "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c",
+          "optional": false,
+          "version_spec": "==0.7.8"
+        },
+        {
+          "kind": "skill",
+          "artifact_id": "web_desktop_skill",
+          "version": "0.2.5",
+          "package_digest": "sha256:a06afbebe11e168fe97b3f1a44f4848cad1a8bd554715d9dd54ae015d084df55",
+          "optional": false,
+          "version_spec": "==0.2.5"
+        }
+      ],
+      "permissions": [
+        "applications.apply",
+        "applications.develop",
+        "applications.plan",
+        "applications.read",
+        "applications.recover",
+        "profile.read.self",
+        "profile.write.self",
+        "storage.blob",
+        "workspace.read",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:24142d242e08f2f75a5a98bd4f3adf69fe17819cc8d53a6d7d502a7be7083a53",
+          "builder": "adaos.dev.project.push"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:web_desktop",
+          "consumer_ref": "scenario:web_desktop",
+          "consumer_digest": "sha256:7eb88ae8198c99b334a6af526d737a201057b8e56ca268033daab5b5b62df6d8",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": false,
+          "unresolved": [
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "mcp:users_access.summary",
+              "location": "webui.json.ui.application.desktop.pageSchema.widgets[5].dataSource"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "mcp:users_access.summary",
+              "location": "webui.json.ui.application.desktop.pageSchema.widgets[12].dataSource"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "mcp:users_access.summary",
+              "location": "webui.json.ui.application.desktop.pageSchema.widgets[13].dataSource"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "mcp:users_access.current_profile",
+              "location": "webui.json.ui.application.desktop.pageSchema.widgets[17].dataSource"
+            }
+          ],
+          "source_artifacts": {
+            "assets/i18n/en.json": "sha256:61291427a3eec445313b25021fac13cef74cc6a5f5c1927056ea26df2efeea8e",
+            "assets/i18n/ru.json": "sha256:4a5e1b18257dc7ff8d1865bd95f18e7b0855d464a5ad79b621e8dff60adf61ec",
+            "scenario.json": "sha256:e61074d9f33959b4928b0776434e30e7e1d75158594f71975bad1f139c11ee52",
+            "webui.json": "sha256:77157869fcd57a694bbadc467ae5e0b7d6b8f316fda031aee54b22e44c519d9a",
+            ".adaos/package-manifest.json": "sha256:8cbb957749a50b1c1489978939c6c75d41ce0c73ee5522fbdd9e2d0aaba528d9"
+          },
+          "edges": [
+            {
+              "contract_ref": "mcp:applications.lifecycle.operations",
+              "contract_digest": "sha256:d81c9f45613f71479f1d54f8fb5d8307956eb10464295df133194a41d4fe6ff0",
+              "surface": [
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[8].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.lifecycle.show",
+              "contract_digest": "sha256:692185633bc73fc8f98df1725c58778301fb3b8296caf529ca0419ed07723dab",
+              "surface": [
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[0].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.lifecycle.trials",
+              "contract_digest": "sha256:ee06b2d8ec7a8aa635962ff732bfa90201ecb7305b45e104e883751ca823ea70",
+              "surface": [
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[6].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "mcp:applications.list",
+              "contract_digest": "sha256:f8695c320e52ea12d52997816afaf65d8a381a00682db98ea6da9672d4c74308",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[49].dataSource"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:action.type:openModal",
+              "contract_digest": "sha256:4821d1cbc2df9415a1eb8b0dd540846f25ae6fc9e2daa40d8772a0fd0eef6e8a",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[49].actions[1]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:collection.grid",
+              "contract_digest": "sha256:81d69c2cc16321a6d74050c040b41c7e77208af8d7bf5e465854ae3856a809b6",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[1]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:collection.tree",
+              "contract_digest": "sha256:bc694ccdaaeb94c065ec1212a78b15db7c5b3ded811f4ece3157979601af321b",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[7]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:desktop.widgets",
+              "contract_digest": "sha256:08f094effda36a9749c2780ae8c3f44a583b331470e9a7d84f7ab3d2f2549420",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[24]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:disclosure.accordion",
+              "contract_digest": "sha256:f6340972338c1c0c8c8461c5b27ec7fb829560b13539ba34a7d14743b36be3d1",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[35]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:input.toggle",
+              "contract_digest": "sha256:bf776985f8ed1a5b1fe2c280dd5e3dcab675a230b1d7ec7616e16b47655e8c77",
+              "surface": [
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[1]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[5]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:item.details",
+              "contract_digest": "sha256:6b35434a3583e3bc268dbbbb2766f578c5654383f6553f26d5a54dfa0f268933",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[13]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[15]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[18]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[19]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[28]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[29]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[40]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[48]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[4]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[9]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[0]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[3]",
+                "webui.json.ui.application.modals.pair-browser.schema.widgets[0]",
+                "webui.json.ui.application.modals.pair-node.schema.widgets[0]",
+                "webui.json.ui.application.modals.pair-telegram.schema.widgets[0]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:navigation.tabs",
+              "contract_digest": "sha256:effdfc57c291163b1ef2fdcd9b3defa1e300f69dbf69a00ed71d93bfcf55a84b",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[0]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[14]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[25]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.actions",
+              "contract_digest": "sha256:b11889d561895633c7bb4f0fd286b2f3557ac4d2c9cce07adbbc4443c04ad543",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[26]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[8]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[2]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[4]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[7]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[9]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.chat",
+              "contract_digest": "sha256:5b02fb6676892a0e06473ad29ec8866d28a7ad591d375dcf14a77c5677d6f93c",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[16]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.form",
+              "contract_digest": "sha256:b5cc0b5f87908980b433525b03fd59da750ca7b44a5648c830ce7aef6c224e59",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[10]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[17]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[20]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[21]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[22]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[23]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[27]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[33]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[34]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[36]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[41]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.list",
+              "contract_digest": "sha256:79d56efa97d78bf2d5cb7a5130cc8b9d13422b43e52eca0372729d76c4a0439d",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[12]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[2]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[3]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[45]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[49]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[5]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[6]",
+                "webui.json.ui.application.modals.core-application-lifecycle.schema.widgets[8]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.queryToolbar",
+              "contract_digest": "sha256:4e9a3386820eadff8e89b8e065770b2dad9e0f9dc14cd4bf72e59a769dd59e20",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[11]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[6]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:visual.metricTile",
+              "contract_digest": "sha256:90cd62868f55844e8894cc6e413bf7ef9fdfc72545f9c1329127b017db1c37ab",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[30]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[31]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[32]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[37]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[38]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[39]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[44]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[46]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:visual.multiMetricArc",
+              "contract_digest": "sha256:d6cd2f8c2946862c8f14003554a979275d2feb897f58575547db21170cebc778",
+              "surface": [
+                "webui.json.ui.application.desktop.pageSchema.widgets[42]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[43]",
+                "webui.json.ui.application.desktop.pageSchema.widgets[47]"
+              ],
+              "exposure": "compiled"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:7766f6d8ee8091516881a9c11315520a61d9a3dade8f7d6e8ceb86b1673e0ba7",
+          "digest": "sha256:7766f6d8ee8091516881a9c11315520a61d9a3dade8f7d6e8ceb86b1673e0ba7",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:web_desktop",
+          "consumer_ref": "skill:web_desktop_runtime_skill",
+          "consumer_digest": "sha256:6f10723641c9f39194bd45cdf9def680f5369e95f23ee23d4d27813c9483ca1c",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": false,
+          "unresolved": [
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.navigation.registration_destination",
+              "location": "handlers/connect.py:289"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:311"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:80"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.navigation.build_url",
+              "location": "handlers/connect.py:294"
+            },
+            {
+              "code": "sdk_callback_usage_unknown",
+              "location": "handlers/connect.py:311"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:326"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:81"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:82"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.navigation.build_url",
+              "location": "handlers/connect.py:320"
+            },
+            {
+              "code": "sdk_callback_usage_unknown",
+              "location": "handlers/connect.py:326"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:81"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:82"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:91"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:91"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:123"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:91"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:125"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:125"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/connect.py:101"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.navigation",
+              "location": "handlers/connect.py"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.device_access.rename_device",
+              "location": "handlers/main.py:1529"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.device_access.assign_browser_parent_device",
+              "location": "handlers/main.py:1543"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.device_access.identify_device",
+              "location": "handlers/main.py:1565"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.device_access.detach_device",
+              "location": "handlers/main.py:2289"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.device_access.list_endpoint_devices",
+              "location": "handlers/main.py:661"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.profile.get_profile",
+              "location": "handlers/main.py:739"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.access_links.list_browser_links",
+              "location": "handlers/main.py:1366"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.profile.update_settings",
+              "location": "handlers/main.py:2185"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.profile.update_preferences",
+              "location": "handlers/main.py:2187"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.access_links.get_browser_link",
+              "location": "handlers/main.py:575"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.access_links.get_browser_link",
+              "location": "handlers/main.py:780"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.subscribe",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.tool",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.access_links",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.device_access",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.profile",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.StreamRuntime",
+              "location": "handlers/system_bootstrap_stream.py:40"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/system_bootstrap_stream.py:27"
+            },
+            {
+              "code": "sdk_alias_dataflow_unknown",
+              "location": "handlers/system_bootstrap_stream.py:31"
+            },
+            {
+              "code": "sdk_alias_dataflow_unknown",
+              "location": "handlers/system_bootstrap_stream.py:43"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.StreamReceiver",
+              "location": "handlers/system_bootstrap_stream.py:42"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.ProjectionContext",
+              "location": "handlers/system_bootstrap_stream.py:79"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.ProjectionContext",
+              "location": "handlers/system_bootstrap_stream.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.StreamReceiver",
+              "location": "handlers/system_bootstrap_stream.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.StreamRuntime",
+              "location": "handlers/system_bootstrap_stream.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.stream_publish",
+              "location": "handlers/system_bootstrap_stream.py"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.StreamRuntime",
+              "location": "handlers/system_stream.py:68"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/system_stream.py:25"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.ProjectionContext",
+              "location": "handlers/system_stream.py:77"
+            },
+            {
+              "code": "sdk_alias_dataflow_unknown",
+              "location": "handlers/system_stream.py:46"
+            },
+            {
+              "code": "sdk_alias_dataflow_unknown",
+              "location": "handlers/system_stream.py:71"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.StreamReceiver",
+              "location": "handlers/system_stream.py:70"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.ProjectionContext",
+              "location": "handlers/system_stream.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.StreamReceiver",
+              "location": "handlers/system_stream.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.StreamRuntime",
+              "location": "handlers/system_stream.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.io.stream_publish",
+              "location": "handlers/system_stream.py"
+            }
+          ],
+          "source_artifacts": {
+            ".adaos/package-manifest.json": "sha256:a1341b5a3f6993cf5ef02991502be2b0bc99011bd33d630330fe71cea7205438"
+          },
+          "edges": [
+            {
+              "contract_ref": "sdk:adaos.sdk.access.invocation",
+              "contract_digest": "sha256:8e8679f5589bee83edf99b83035e041e483bb084347cc25e25896f313b1d1a2a",
+              "surface": [
+                "handlers/main.py:1257",
+                "handlers/updates.py:7"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.access.require",
+              "contract_digest": "sha256:4e4bc6a53b1bf3c808258429293dafcfa334aa72690c1d75021676748d87230f",
+              "surface": [
+                "handlers/builder.py:6",
+                "handlers/connect.py:707",
+                "handlers/main.py:1142",
+                "handlers/main.py:1238",
+                "handlers/main.py:124",
+                "handlers/main.py:1256",
+                "handlers/main.py:1278",
+                "handlers/main.py:1323",
+                "handlers/main.py:1519",
+                "handlers/main.py:1542",
+                "handlers/main.py:1561",
+                "handlers/main.py:1636",
+                "handlers/main.py:1999",
+                "handlers/main.py:2106",
+                "handlers/main.py:2138",
+                "handlers/main.py:2227",
+                "handlers/main.py:2259",
+                "handlers/main.py:2277",
+                "handlers/main.py:2359",
+                "handlers/nodes.py:7",
+                "handlers/updates.py:6",
+                "handlers/usage.py:22"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.applications.get_current_builder_application",
+              "contract_digest": "sha256:16b0b91f56ea91ea1852ca94ef57f6e44ff3341349e6689ebeaf6c580787407a",
+              "surface": [
+                "handlers/builder.py:15"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.applications.list_applications",
+              "contract_digest": "sha256:e9737e91f37fded421a5d9c2a88a5e3b9c540f16d335edc9c9fd3677ea0f1d93",
+              "surface": [
+                "handlers/main.py:1067"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.applications.list_development_projects",
+              "contract_digest": "sha256:0a274b4c6c3ad2da42659cd7346df0e71372ddb6f1fb176170471c43a45ddab8",
+              "surface": [
+                "handlers/main.py:2005"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.control_plane.get_workspace_object",
+              "contract_digest": "sha256:49ca56c790123dcda894c4c143c68aa8351d9bca75dec95bafe2a0abf15e1759",
+              "surface": [
+                "handlers/main.py:766"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.control_plane.list_browser_session_objects",
+              "contract_digest": "sha256:f3f0ea87a3e5b493fac743624671b88fd5234e3d0036e52fa2dfa49b7a6866f3",
+              "surface": [
+                "handlers/main.py:1358"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.control_plane.list_device_objects",
+              "contract_digest": "sha256:e7e1a6a389136bf09186a537e585e72cc1e16067113c32edd03c98aa62c4ea4c",
+              "surface": [
+                "handlers/main.py:1337",
+                "handlers/main.py:1347"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.data.blob.put_upload",
+              "contract_digest": "sha256:b6578a24e635deecc920c6d13f9432de25b14d2bb742548d2c9f50204c3648a3",
+              "surface": [
+                "handlers/main.py:20",
+                "handlers/main.py:2238"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.subscriptions.get_codex_usage_snapshot",
+              "contract_digest": "sha256:90f1ea5adc7b8e1ea6756d40854fc7cd3405f2dbd188d020dffe42a6f6a325af",
+              "surface": [
+                "handlers/usage.py:24"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.system.get_operational_snapshot",
+              "contract_digest": "sha256:0255fe4e3ece96e464d995189dad1b0e13cb3e51d6cac8639b36d77e225956f9",
+              "surface": [
+                "handlers/main.py:1394",
+                "handlers/main.py:1659",
+                "handlers/system_stream.py:48"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.system.get_runtime_controls",
+              "contract_digest": "sha256:9e0baaea9ce524468423400defcd549c33b6e201506b0e0643d98b59b8947d9d",
+              "surface": [
+                "handlers/main.py:1239"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.system.rename_current_node",
+              "contract_digest": "sha256:eee4084ef1198ddc2143a281e0a9d5c8e2911f1ed02130c3f61fda405dc546ef",
+              "surface": [
+                "handlers/nodes.py:11"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.system.rename_local_subnet",
+              "contract_digest": "sha256:eee4084ef1198ddc2143a281e0a9d5c8e2911f1ed02130c3f61fda405dc546ef",
+              "surface": [
+                "handlers/main.py:127"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.system.request_core_update",
+              "contract_digest": "sha256:b45a1b20513146bf489b2fe9e0e8a65dffe8041fc14756484b7a30a0f467af7a",
+              "surface": [
+                "handlers/updates.py:15"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.system.set_core_autoupdate",
+              "contract_digest": "sha256:9e3935feef9a250237a11b6cf59522d1cea27d85260355e54a50d8c695706ff4",
+              "surface": [
+                "handlers/updates.py:22"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.system.set_runtime_control",
+              "contract_digest": "sha256:3792a49fe76d24dfa0440a97d9d9e318a1be3656c8c7a7982762e246304ed75c",
+              "surface": [
+                "handlers/main.py:1264"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.web.application_get_pinned_panels",
+              "contract_digest": "sha256:33bc84c2cbd77d97f75e81561ef2eebb742288d50935e2e8fcaff1f938112e89",
+              "surface": [
+                "handlers/main.py:1280",
+                "handlers/main.py:21",
+                "handlers/main.py:2372"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.web.application_set_pinned_panels",
+              "contract_digest": "sha256:ed09b34dcefd5f60da1c000f0a0f5d67c8b64cb4e25c0a85c46c771e3512d640",
+              "surface": [
+                "handlers/main.py:21",
+                "handlers/main.py:2387"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.web.desktop_get_pinned_applications",
+              "contract_digest": "sha256:cefe7437b4a0e9c1dd63bb7f466d2ad368d7496ca5f0a1af95b639c3fc5256b3",
+              "surface": [
+                "handlers/main.py:21",
+                "handlers/main.py:983"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.web.webspace_rename",
+              "contract_digest": "sha256:7893738c04e60087d90103d66c04338387481ee3452d3211411db9291d2c3063",
+              "surface": [
+                "handlers/main.py:21",
+                "handlers/main.py:2172"
+              ],
+              "exposure": "static"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:5fb306d24ff49c719b6a1c3b60a21047811aaf191284ef78e6b606b59ce09b11",
+          "digest": "sha256:5fb306d24ff49c719b6a1c3b60a21047811aaf191284ef78e6b606b59ce09b11",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:5992339a5ac5a289304f880cd1ceeb244ffdcaddd6ed87d3dea754fb79514135",
+        "sha256:cbc24789d6d226f34f2ef9922771983ce1df9f7edf6aec6962e0dc8b562cfb71",
+        "sha256:d28b4f7b2b8f31aed6faa5fb70093675338e54a686af9589f5068d3ba263355d"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:815d26aa58b70628fc7d10c47931d1d528e9c1769e6ddff345aeedfbaa40d3f9",
+        "profiles": [
+          "adaos.default_install.v1",
+          "adaos.desktop.shell.v1"
+        ],
+        "members": [
+          {
+            "ref": "scenario:web_desktop",
+            "package_digest": "sha256:7eb88ae8198c99b334a6af526d737a201057b8e56ca268033daab5b5b62df6d8",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "presents"
+            ]
+          },
+          {
+            "ref": "skill:web_desktop_runtime_skill",
+            "package_digest": "sha256:6f10723641c9f39194bd45cdf9def680f5369e95f23ee23d4d27813c9483ca1c",
+            "role": "implementation",
+            "exposure": "project_only",
+            "lifecycle": "bound",
+            "relations": [
+              "realizes"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "desktop",
+            "presentation": "scenario:web_desktop",
+            "default": true,
+            "bindings": {
+              "shell": "web_desktop"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "desktop"
+          ],
+          "validation_profiles": [
+            "desktop.default"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "retain",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "applications.apply",
+              "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "applications.develop",
+              "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "applications.plan",
+              "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "applications.read",
+              "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+              "approval_policy": "owner_only"
+            },
+            {
+              "id": "applications.recover",
+              "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+              "approval_policy": "owner_only",
+              "sensitive": true
+            },
+            {
+              "id": "profile.read.self",
+              "purpose": "Read the signed-in user's display profile and portable preferences.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "profile.write.self",
+              "purpose": "Update the signed-in user's own display profile and portable preferences.",
+              "approval_policy": "grant_on_install",
+              "sensitive": true
+            },
+            {
+              "id": "storage.blob",
+              "purpose": "Store and retrieve the signed-in user's content-addressed profile avatar.",
+              "approval_policy": "grant_on_install",
+              "sensitive": true
+            },
+            {
+              "id": "workspace.read",
+              "purpose": "Open desktop applications and read desktop launcher state.",
+              "approval_policy": "grant_on_install"
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Update the user's desktop layout, pins, widgets, and preferences.",
+              "approval_policy": "grant_on_install",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [],
+            "sent_off_device": [],
+            "linked_to_user": [],
+            "tracking": false,
+            "retention": null
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [],
+          "privacy_labels": {
+            "collected": [],
+            "sent_off_device": false,
+            "linked_to_user": false,
+            "tracking": false
+          }
+        },
+        "application_roles": [
+          {
+            "id": "desktop_lifecycle_owner",
+            "title": "Desktop lifecycle owner",
+            "grants": [
+              "applications.apply",
+              "applications.develop",
+              "applications.plan",
+              "applications.read",
+              "applications.recover",
+              "desktop.open",
+              "desktop.settings.write",
+              "profile.read.self",
+              "profile.write.self",
+              "storage.blob",
+              "workspace.read",
+              "workspace.write"
+            ],
+            "assignable_to": [
+              "owner"
+            ],
+            "default_for": {
+              "owner": "desktop_lifecycle_owner"
+            },
+            "requires_permissions": [
+              "applications.apply",
+              "applications.develop",
+              "applications.plan",
+              "applications.read",
+              "applications.recover",
+              "profile.read.self",
+              "profile.write.self",
+              "storage.blob",
+              "workspace.read",
+              "workspace.write"
+            ]
+          },
+          {
+            "id": "desktop_member",
+            "title": "Desktop member",
+            "grants": [
+              "desktop.open",
+              "profile.read.self",
+              "profile.write.self",
+              "storage.blob",
+              "workspace.read"
+            ],
+            "assignable_to": [
+              "child",
+              "guest",
+              "member"
+            ],
+            "default_for": {},
+            "requires_permissions": [
+              "profile.read.self",
+              "profile.write.self",
+              "storage.blob",
+              "workspace.read"
+            ]
+          },
+          {
+            "id": "desktop_owner",
+            "title": "Desktop owner",
+            "grants": [
+              "desktop.open",
+              "desktop.settings.write",
+              "profile.read.self",
+              "profile.write.self",
+              "storage.blob",
+              "workspace.read",
+              "workspace.write"
+            ],
+            "assignable_to": [
+              "admin",
+              "co_owner",
+              "owner"
+            ],
+            "default_for": {},
+            "requires_permissions": [
+              "profile.read.self",
+              "profile.write.self",
+              "storage.blob",
+              "workspace.read",
+              "workspace.write"
+            ]
+          }
+        ]
+      },
+      "catalog": {
+        "title": "Management",
+        "description": "Default AdaOS desktop shell with project-owned connection flows, voice bridge, and browser surface support.",
+        "categories": [
+          "desktop",
+          "system"
+        ],
+        "tags": [
+          "browser",
+          "default-install",
+          "onboarding",
+          "shell",
+          "voice"
+        ],
+        "icon": "desktop-outline",
+        "title_i18n": {
+          "en": "Management",
+          "ru": "Управление"
+        },
+        "description_i18n": {
+          "en": "Default AdaOS desktop shell, join flow, voice bridge, and browser surface support.",
+          "ru": "Стандартная веб-оболочка AdaOS, подключение устройств, голосовой мост и поддержка браузерных интерфейсов."
+        }
+      },
+      "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd"
+    },
+    "accepted_candidate_id": "web_desktop-0-3-94-8150bd49c6fd",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "immutable-package-and-consumer-preflight",
+        "refs": [
+          "e2e\\artifacts\\applications\\20261026-core-lifecycle-final\\platform-contract-tests.xml"
+        ],
+        "browser_workflow_status": "pending",
+        "live_inference_tested": false
+      }
+    ],
+    "provenance_refs": [
+      "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "applications.apply",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "applications.develop",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "applications.plan",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "applications.read",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "approval_policy": "owner_only"
+        },
+        {
+          "id": "applications.recover",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "approval_policy": "owner_only",
+          "sensitive": true
+        },
+        {
+          "id": "profile.read.self",
+          "purpose": "Read the signed-in user's display profile and portable preferences.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "profile.write.self",
+          "purpose": "Update the signed-in user's own display profile and portable preferences.",
+          "approval_policy": "grant_on_install",
+          "sensitive": true
+        },
+        {
+          "id": "storage.blob",
+          "purpose": "Store and retrieve the signed-in user's content-addressed profile avatar.",
+          "approval_policy": "grant_on_install",
+          "sensitive": true
+        },
+        {
+          "id": "workspace.read",
+          "purpose": "Open desktop applications and read desktop launcher state.",
+          "approval_policy": "grant_on_install"
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Update the user's desktop layout, pins, widgets, and preferences.",
+          "approval_policy": "grant_on_install",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [],
+        "sent_off_device": [],
+        "linked_to_user": [],
+        "tracking": false,
+        "retention": null
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [],
+      "privacy_labels": {
+        "collected": [],
+        "sent_off_device": false,
+        "linked_to_user": false,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:d703bb7ec4f04547ad49cee52ec38897949100a6c54c4dedd703d5b558ccb3c2",
+    "application_roles": [
+      {
+        "id": "desktop_lifecycle_owner",
+        "title": "Desktop lifecycle owner",
+        "grants": [
+          "applications.apply",
+          "applications.develop",
+          "applications.plan",
+          "applications.read",
+          "applications.recover",
+          "desktop.open",
+          "desktop.settings.write",
+          "profile.read.self",
+          "profile.write.self",
+          "storage.blob",
+          "workspace.read",
+          "workspace.write"
+        ],
+        "assignable_to": [
+          "owner"
+        ],
+        "default_for": {
+          "owner": "desktop_lifecycle_owner"
+        },
+        "requires_permissions": [
+          "applications.apply",
+          "applications.develop",
+          "applications.plan",
+          "applications.read",
+          "applications.recover",
+          "profile.read.self",
+          "profile.write.self",
+          "storage.blob",
+          "workspace.read",
+          "workspace.write"
+        ]
+      },
+      {
+        "id": "desktop_member",
+        "title": "Desktop member",
+        "grants": [
+          "desktop.open",
+          "profile.read.self",
+          "profile.write.self",
+          "storage.blob",
+          "workspace.read"
+        ],
+        "assignable_to": [
+          "child",
+          "guest",
+          "member"
+        ],
+        "default_for": {},
+        "requires_permissions": [
+          "profile.read.self",
+          "profile.write.self",
+          "storage.blob",
+          "workspace.read"
+        ]
+      },
+      {
+        "id": "desktop_owner",
+        "title": "Desktop owner",
+        "grants": [
+          "desktop.open",
+          "desktop.settings.write",
+          "profile.read.self",
+          "profile.write.self",
+          "storage.blob",
+          "workspace.read",
+          "workspace.write"
+        ],
+        "assignable_to": [
+          "admin",
+          "co_owner",
+          "owner"
+        ],
+        "default_for": {},
+        "requires_permissions": [
+          "profile.read.self",
+          "profile.write.self",
+          "storage.blob",
+          "workspace.read",
+          "workspace.write"
+        ]
+      }
+    ],
+    "role_model_digest": "sha256:44a1ae06a02cffc6741740bf5c47805c61104c3a837fd892e4c128f00d44d670",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "web_desktop",
+      "release_digest": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [],
+      "permissions": [
+        {
+          "id": "applications.apply",
+          "title": "Applications.Apply",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "required": true
+        },
+        {
+          "id": "applications.develop",
+          "title": "Applications.Develop",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "required": true
+        },
+        {
+          "id": "applications.plan",
+          "title": "Applications.Plan",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "required": true
+        },
+        {
+          "id": "applications.read",
+          "title": "Applications.Read",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "required": true
+        },
+        {
+          "id": "applications.recover",
+          "title": "Applications.Recover",
+          "purpose": "Observe and explicitly manage reviewed Core application lifecycle operations.",
+          "required": true
+        },
+        {
+          "id": "profile.read.self",
+          "title": "Profile.Read.Self",
+          "purpose": "Read the signed-in user's display profile and portable preferences.",
+          "required": true
+        },
+        {
+          "id": "profile.write.self",
+          "title": "Profile.Write.Self",
+          "purpose": "Update the signed-in user's own display profile and portable preferences.",
+          "required": true
+        },
+        {
+          "id": "storage.blob",
+          "title": "Storage.Blob",
+          "purpose": "Store and retrieve the signed-in user's content-addressed profile avatar.",
+          "required": true
+        },
+        {
+          "id": "workspace.read",
+          "title": "Workspace.Read",
+          "purpose": "Open desktop applications and read desktop launcher state.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Update the user's desktop layout, pins, widgets, and preferences.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:7205a83f0a871dd9fefba65e92db9a0f47ed507da084c964f3c2b85f46125301"
+  },
+  "channels": {
+    "stable": "sha256:c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd"
+  },
+  "semantic": {
+    "projection_digest": "sha256:a7a1f98372bfc838578dd1c2086b40d0e4f13c8797ffdc102b63e28451968369",
+    "path": "semantic/applications/web_desktop/c6b7286b46f92aa555a7e2f0ef8a6963c32c3d3166e70b8b7c2e8150bd49c6fd.json"
+  },
+  "projection_digest": "sha256:ccafe8668b47f85785cd1d22d4be886c09aa311c6aaa53271a211787f799af1e"
+}

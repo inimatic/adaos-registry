@@ -11,6 +11,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, Iterable, Mapping
 from urllib.parse import quote, urlsplit, urlunsplit
+from .read_models import ReadModelUnavailable, read_deadline
 
 
 SCHEMA_VERSION = "adaos.media_center.catalog.v1"
@@ -42,21 +43,22 @@ def now_iso() -> str:
 
 
 def default_db_path() -> Path:
+    from .preview import binding, catalog_path
+
+    if binding() is not None:
+        return catalog_path()
     override = _text(os.environ.get("MEDIA_CENTER_DB_PATH"))
     if override:
         path = Path(override).expanduser()
-        path.parent.mkdir(parents=True, exist_ok=True)
+        if not read_deadline():
+            path.parent.mkdir(parents=True, exist_ok=True)
         return path
 
-    try:
-        from adaos.sdk.data.skill_env import skill_env_path
+    from adaos.sdk.data.skill_env import skill_data_root
 
-        env_path = Path(skill_env_path())
-        data_root = env_path.parents[1] if env_path.parent.name == "db" else env_path.parent
-        db_dir = data_root / "db"
-    except Exception:
-        db_dir = Path(__file__).resolve().parents[1] / ".skill_state" / "db"
-    db_dir.mkdir(parents=True, exist_ok=True)
+    db_dir = Path(skill_data_root()) / "db"
+    if not read_deadline():
+        db_dir.mkdir(parents=True, exist_ok=True)
     return db_dir / "media_center.sqlite3"
 
 
@@ -71,10 +73,12 @@ def schema_revision_is_current(
     path = Path(db_path)
     if not path.exists():
         return False
-    for attempt in range(_SCHEMA_READ_ATTEMPTS):
+    deadline = read_deadline()
+    attempts = 1 if deadline else _SCHEMA_READ_ATTEMPTS
+    for attempt in range(attempts):
         try:
             with closing(
-                sqlite3.connect(str(path), timeout=_SCHEMA_READ_TIMEOUT_SECONDS)
+                sqlite3.connect(str(path), timeout=(0.025 if deadline else _SCHEMA_READ_TIMEOUT_SECONDS))
             ) as connection:
                 row = connection.execute(
                     f"SELECT value FROM {table} WHERE key=?",
@@ -84,6 +88,8 @@ def schema_revision_is_current(
             message = str(exc).lower()
             if "no such table" in message:
                 return False
+            if deadline:
+                raise ReadModelUnavailable(unavailable_error) from exc
             transient = any(token in message for token in ("locked", "busy"))
             if transient and attempt + 1 < _SCHEMA_READ_ATTEMPTS:
                 time.sleep(_SCHEMA_READ_RETRY_SECONDS[attempt])
@@ -96,93 +102,50 @@ def schema_revision_is_current(
 
 
 class MediaCenterRepository:
-    def __init__(self, db_path: str | Path | None = None):
+    def __init__(
+        self,
+        db_path: str | Path | None = None,
+        *,
+        bootstrap_fixture: bool = True,
+    ):
+        from .preview import binding, catalog_path, initialize_fixture
+        verified = binding()
+        if verified is not None and db_path is not None:
+            if Path(db_path).resolve() != catalog_path().resolve():
+                raise PermissionError("preview_data_root_mismatch")
         self.db_path = Path(db_path) if db_path is not None else default_db_path()
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.ensure_schema()
-        self._ensure_declared_preview_fixture()
-
-    def _ensure_declared_preview_fixture(self) -> None:
-        """Seed only the explicit Builder fixture profile, once per data root."""
-
-        try:
-            from adaos.sdk.data.preview_binding import preview_data_binding
-
-            binding = preview_data_binding() or {}
-        except Exception:
-            return
-        if str(binding.get("source_ref") or "") != "fixture:media_center:demo-v1":
-            return
-        with self.connect() as connection:
-            seeded = connection.execute(
-                "SELECT value FROM meta WHERE key='builder_fixture_revision'"
-            ).fetchone()
-            if seeded and str(seeded[0]) == "demo-v1":
-                return
-            count = int(
-                connection.execute(
-                    "SELECT COUNT(*) FROM catalog_items WHERE missing=0"
-                ).fetchone()[0]
-            )
-        if count == 0:
-            timestamp = "2026-11-01T12:00:00+00:00"
-            samples = [
-                ("fixture-video-1", "Aurora Station", "video/mp4", "Movies/Science Fiction", 1080),
-                ("fixture-video-2", "The Quiet Harbor", "video/mp4", "Movies/Drama", 2160),
-                ("fixture-series-1", "Northern Signals S01E01", "video/mp4", "Series/Northern Signals", 1080),
-                ("fixture-series-2", "Northern Signals S01E02", "video/mp4", "Series/Northern Signals", 1080),
-                ("fixture-audio-1", "Glass City", "audio/flac", "Music/Example Ensemble", 0),
-                ("fixture-audio-2", "Morning Lines", "audio/flac", "Music/Example Ensemble", 0),
-                ("fixture-book-1", "A Short History of Light", "audio/mpeg", "Audiobooks/Science", 0),
-                ("fixture-video-3", "Open Source Documentary", "video/webm", "Documentaries/Technology", 720),
-            ]
-            resources = []
-            for index, (resource_id, title, mime_type, folder, height) in enumerate(samples):
-                extension = ".flac" if mime_type == "audio/flac" else ".mp3" if mime_type == "audio/mpeg" else ".webm" if mime_type == "video/webm" else ".mp4"
-                name = f"{title.replace(' ', '-')}{extension}"
-                resources.append(
-                    {
-                        "schema": "adaos.media.resource.v1",
-                        "source": "builder_fixture",
-                        "id": resource_id,
-                        "resource_id": resource_id,
-                        "name": name,
-                        "title": title,
-                        "mime_type": mime_type,
-                        "size_bytes": 10_000_000 + index * 1_000_000,
-                        "modified_at": timestamp,
-                        "source_path": f"/fixture/{folder}/{name}",
-                        "metadata": {
-                            "folder_path": folder,
-                            "folder_segments": folder.split("/"),
-                            "technical": {
-                                "codec": "flac" if mime_type == "audio/flac" else "h264",
-                                "height": height,
-                            },
-                            "tags": ["builder-fixture", "demo"],
-                        },
-                    }
-                )
-            self.scan_resources(
-                resources,
-                source="builder_fixture",
-                mark_missing=False,
-            )
-        with self.connect() as connection:
-            connection.execute(
-                "INSERT OR REPLACE INTO meta(key,value) VALUES('builder_fixture_revision','demo-v1')"
-            )
-            connection.commit()
+        if bootstrap_fixture:
+            initialize_fixture(self, verified)
+        if read_deadline() or (verified is not None and verified.get("write_policy") == "none"
+                               and verified.get("mode") != "fixture"):
+            if not self._schema_is_current():
+                raise ReadModelUnavailable("catalog_initializing")
+        else:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            self.ensure_schema()
 
     def connect(self) -> sqlite3.Connection:
+        from .preview import binding, catalog_path
+        verified = binding()
+        if verified is not None and self.db_path.resolve() != catalog_path().resolve():
+            raise PermissionError("preview_data_root_mismatch")
+        deadline = read_deadline()
+        readonly = bool(deadline or (verified is not None
+                                    and verified.get("write_policy") == "none"
+                                    and verified.get("mode") != "fixture"))
         connection = sqlite3.connect(
-            str(self.db_path),
-            timeout=30,
+            (self.db_path.resolve().as_uri() + "?mode=ro" if readonly else str(self.db_path)),
+            uri=readonly,
+            timeout=0.025 if deadline else 2.0,
             factory=_ClosingConnection,
         )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys=ON")
-        connection.execute("PRAGMA busy_timeout=30000")
+        connection.execute(f"PRAGMA busy_timeout={25 if deadline else 2000}")
+        if readonly:
+            connection.execute("PRAGMA query_only=ON")
+        if deadline:
+            connection.set_progress_handler(lambda: int(time.monotonic() >= deadline), 1000)
         try:
             cache_mb = max(
                 8,
@@ -201,11 +164,14 @@ class MediaCenterRepository:
         connection.execute(f"PRAGMA mmap_size={mmap_mb * 1024 * 1024}")
         connection.execute("PRAGMA temp_store=MEMORY")
         try:
-            connection.execute("PRAGMA synchronous=NORMAL")
+            if not deadline:
+                connection.execute("PRAGMA busy_timeout=0")
+                connection.execute("PRAGMA synchronous=NORMAL")
         except sqlite3.OperationalError as exc:
             if not any(token in str(exc).lower() for token in ("locked", "busy")):
                 connection.close()
                 raise
+        connection.execute(f"PRAGMA busy_timeout={25 if deadline else 2000}")
         return connection
 
     def _schema_is_current(self) -> bool:

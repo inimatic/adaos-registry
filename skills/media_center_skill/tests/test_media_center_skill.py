@@ -72,6 +72,53 @@ main = importlib.util.module_from_spec(_HANDLER_SPEC)
 _HANDLER_SPEC.loader.exec_module(main)
 
 
+def test_home_allows_slow_aggregate_with_extended_deadline(monkeypatch):
+    from media_center import preview
+    from media_center.read_models import read_deadline
+
+    monkeypatch.setattr(preview, "prepare_fixture_read", lambda: None)
+
+    class Coordinator:
+        def home(self, **kwargs):
+            deadline = read_deadline()
+            time.sleep(1.8)
+            assert deadline > time.monotonic()
+            return {"items": ["completed"], "count": 1}
+
+    monkeypatch.setattr(main, "_coordinator", lambda: Coordinator())
+    assert main.home()["items"] == ["completed"]
+
+
+def test_home_over_budget_returns_loading_and_keeps_lane_bounded(monkeypatch):
+    from media_center import preview, read_models
+
+    monkeypatch.setattr(preview, "prepare_fixture_read", lambda: None)
+    lane = read_models.BoundedReadExecutor(workers=1)
+    monkeypatch.setattr(read_models, "_read_executor", lambda: lane)
+    entered = threading.Event()
+    release = threading.Event()
+
+    class Coordinator:
+        def home(self, **kwargs):
+            entered.set()
+            release.wait(4)
+            return {"items": ["completed"], "count": 1}
+
+    monkeypatch.setattr(main, "_coordinator", lambda: Coordinator())
+    try:
+        started = time.monotonic()
+        result = main.home()
+        elapsed = time.monotonic() - started
+        assert entered.is_set()
+        assert 2.35 <= elapsed < 3.5
+        assert (result["state"], result["ready"], result["reason"]) == (
+            "loading", False, "catalog_read_temporarily_unavailable")
+        assert main.home()["state"] == "loading"
+    finally:
+        release.set()
+        assert lane.dispose(timeout=2)["stopped"]
+
+
 def test_deployment_operation_status_is_exported_by_the_skill_contract() -> None:
     manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
     exported = set(manifest["exports"]["tools"])
@@ -81,7 +128,7 @@ def test_deployment_operation_status_is_exported_by_the_skill_contract() -> None
     assert definitions["deployment_operation_status"]["entry"] == (
         "handlers.main:deployment_operation_status"
     )
-    assert definitions["deployment_operation_status"]["side_effects"] == "none"
+    assert definitions["deployment_operation_status"]["side_effects"] == "read_only"
 
 
 def test_topology_mutations_declare_the_policy_write_capability() -> None:
@@ -186,8 +233,11 @@ def test_background_runtime_bootstrap_is_async_and_process_owned() -> None:
     assert receipt["bootstrap"]["stopped"] is True
 
 
-def test_rehydrate_defers_runtime_workers_until_sys_ready(monkeypatch) -> None:
+def test_rehydrate_schedules_workers_even_after_sys_ready_was_missed(monkeypatch) -> None:
     started: list[str] = []
+    scheduled = []
+    monkeypatch.setattr(main, "background_runtime", lambda: SimpleNamespace(
+        ensure_bootstrap_started=lambda key, callback: scheduled.append((key, callback)) or True))
 
     class Worker:
         def __init__(self, name: str):
@@ -235,9 +285,11 @@ def test_rehydrate_defers_runtime_workers_until_sys_ready(monkeypatch) -> None:
     assert started == []
     assert result["agent_sync"]["deferred"] is True
     assert result["agent_sync"]["mode"] == "background_cursor_catchup"
-    assert result["agent_sync"]["activation"] == "sys.ready"
+    assert result["agent_sync"]["activation"] == "lifecycle.rehydrate_or_sys.ready"
+    assert result["agent_sync"]["bootstrap_scheduled"] is True
+    assert len(scheduled) == 1 and scheduled[0][1] == main._start_live_runtime
     assert result["agent_sync"]["worker_started"] is False
-    assert result["enrichment"]["activation"] == "sys.ready"
+    assert result["enrichment"]["activation"] == "lifecycle.rehydrate_or_sys.ready"
     assert result["enrichment"]["worker_started"] is False
     assert result["catalog_revision"] == 42
 
@@ -283,7 +335,27 @@ def test_sys_ready_schedules_catalog_bootstrap_without_running_it_inline(
     assert started == []
     assert len(scheduled) == 1
     scheduled[0][1]()
-    assert started == ["library", "operations", "sync", "enrichment"]
+    assert started == ["sync", "enrichment", "library", "operations"]
+
+
+def test_read_tools_declare_workspace_read_for_application_access() -> None:
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    assert "workspace.read" in manifest["capabilities"]
+    assert manifest["runtime"]["activation"]["startup_allowed"] is True
+    assert manifest["runtime"]["activation"]["background_refresh"] is True
+
+
+def test_empty_catalog_read_never_pulls_agent_or_scans(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "empty-read.sqlite3"))
+    monkeypatch.setattr(main, "_run_agent_sync", lambda *a, **kw: pytest.fail("inline sync"))
+    monkeypatch.setattr(main, "scan_sources", lambda *a, **kw: pytest.fail("inline scan"))
+    class Worker:
+        def ensure_started(self):
+            return True
+    monkeypatch.setattr(main, "_agent_sync_runtime", lambda *a: Worker())
+    result = main.library(auto_scan=True)
+    assert result["items"] == []
+    assert "scan" not in result
 
 
 def test_catalog_change_during_bootstrap_does_not_open_the_catalog(
@@ -394,7 +466,8 @@ def test_repository_connect_keeps_default_sync_during_lock(
 
     assert repository.connect() is connection
     assert connection.closed is False
-    assert statements[-1] == "PRAGMA synchronous=NORMAL"
+    assert "PRAGMA synchronous=NORMAL" in statements
+    assert statements[-1] == "PRAGMA busy_timeout=2000"
 
 
 def test_coordinator_cache_fast_path_does_not_repeat_schema_check(
@@ -830,7 +903,7 @@ def test_catalog_page_queue_preserves_current_query_sort_and_start_item(
     }
 
 
-def test_library_auto_scan_uses_sdk_discovery_boundary(monkeypatch, tmp_path):
+def test_cold_library_read_reports_loading_without_initialization(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     monkeypatch.setattr(
         main,
@@ -851,12 +924,11 @@ def test_library_auto_scan_uses_sdk_discovery_boundary(monkeypatch, tmp_path):
     payload = main.library(auto_scan=True, limit=20)
 
     assert payload["ok"] is True
-    assert payload["scan"]["discovered_count"] == 1
-    assert (
-        payload["runtime"]["resource_boundary"]
-        == "adaos.sdk.io.media.list_media_resources"
-    )
-    assert payload["items"][0]["playable"] is True
+    assert payload["state"] == "loading"
+    assert payload["ready"] is False
+    assert payload["items"] == []
+    assert "scan" not in payload
+    assert not (tmp_path / "media_center.sqlite3").exists()
 
 
 def test_catalog_marks_previous_rows_missing_for_scanned_source(monkeypatch, tmp_path):
@@ -891,6 +963,7 @@ def test_playable_filter_excludes_images_by_default(monkeypatch, tmp_path):
 def test_kind_and_favorites_filters_are_exact(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
+    MediaCatalogCoordinator(repo)  # lifecycle initialization, not a read side effect
     repo.scan_resources(
         [_resource("clip.mp4"), _resource("song.mp3"), _resource("poster.jpg")]
     )
@@ -918,6 +991,7 @@ def test_kind_and_favorites_filters_are_exact(monkeypatch, tmp_path):
 def test_library_defaults_to_playable_media(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
+    MediaCatalogCoordinator(repo)
 
     repo.scan_resources(
         [_resource("clip.mp4"), _resource("song.mp3"), _resource("poster.jpg")]
@@ -934,6 +1008,7 @@ def test_library_defaults_to_playable_media(monkeypatch, tmp_path):
 def test_library_summary_projection_is_bounded_to_card_fields(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
+    MediaCatalogCoordinator(repo)
     repo.scan_resources([_resource("clip.mp4")])
 
     payload = main.library(
@@ -2649,7 +2724,9 @@ def test_status_and_collection_state_avoid_wide_catalog_summary(monkeypatch, tmp
     compact = repository.compact_summary()
     state = catalog.collection_state(agent_sync={"state": "idle"})
     diagnostics = catalog.diagnostics()
-    result = main.status()
+    # Exercise summary selection independently of host scheduling and the 250ms
+    # read lane budget, which is covered in test_read_models.py.
+    result = main.status.__wrapped__()
 
     assert compact["available_count"] == 1
     assert compact["total_bytes_exact"] is False
@@ -4270,7 +4347,7 @@ def test_library_snapshot_request_preserves_receiver_params(monkeypatch):
         lambda catalog, **kwargs: published.append((catalog, kwargs)),
     )
 
-    main.on_media_center_snapshot_requested(
+    main._publish_requested_snapshot(
         {
             "receiver": "media_center.library_state",
             "webspace_id": "television",
@@ -4291,6 +4368,41 @@ def test_library_snapshot_request_preserves_receiver_params(monkeypatch):
     ]
 
 
+def test_library_snapshot_variable_identity_isolated_by_preview_data_profile(
+    monkeypatch, tmp_path
+):
+    import adaos.sdk.io as sdk_io
+    from media_center import preview
+
+    published = []
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media-center.sqlite3")
+    )
+    binding = {
+        "profile_id": "demo-fixture",
+        "selection_generation": 7,
+    }
+    monkeypatch.setattr(preview, "binding", lambda: binding)
+    monkeypatch.setattr(
+        sdk_io,
+        "stream_variable_publish",
+        lambda receiver, value, **kwargs: published.append((receiver, value, kwargs)),
+    )
+
+    repository = MediaCenterRepository()
+    catalog = MediaCatalogCoordinator(repository)
+    assert main._publish_library_snapshot(catalog, profile_id="default") is True
+
+    assert published[0][0] == "media_center.library_state"
+    assert published[0][2]["var_id"] == "media_center.library.default.personal"
+    assert published[0][1]["collection_state"]["state"] == "empty"
+    assert published[0][1]["collection_state"]["configured"] is True
+
+    binding.update(profile_id="isolated-sandbox", selection_generation=8)
+    assert main._publish_library_snapshot(catalog, profile_id="default") is True
+    assert published[1][2]["var_id"] == "media_center.library.default.personal"
+
+
 def test_operation_snapshot_request_is_workspace_scoped(monkeypatch):
     published = []
     coordinator = object()
@@ -4301,7 +4413,7 @@ def test_operation_snapshot_request_is_workspace_scoped(monkeypatch):
         lambda catalog, **kwargs: published.append((catalog, kwargs)),
     )
 
-    main.on_media_center_snapshot_requested(
+    main._publish_requested_snapshot(
         {
             "receiver": "media_center.operation_state",
             "webspace_id": "desktop",

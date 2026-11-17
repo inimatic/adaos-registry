@@ -21,6 +21,7 @@ from media_control.repository import (  # noqa: E402
     stable_id,
     text,
 )
+from media_control.playback_policy import playback_is_confirmed  # noqa: E402
 
 
 _ACTIVE_NOW_PLAYING_PROJECTIONS: dict[str, dict[str, Any]] = {}
@@ -50,11 +51,7 @@ def _publish_playback_observation(
     endpoint_state = session.get("endpoint_state")
     if not isinstance(endpoint_state, Mapping):
         endpoint_state = {}
-    playback_confirmed = bool(
-        endpoint_state.get("playback_confirmed")
-        or position_ms > 0
-        or state == "ended"
-    )
+    playback_confirmed = playback_is_confirmed(endpoint_state, position_ms=position_ms, state=state)
     try:
         publish_event(
             "media_control.playback.observed",
@@ -74,7 +71,7 @@ def _publish_playback_observation(
                 "media_error_code": max(
                     0, int(endpoint_state.get("media_error_code") or 0)
                 ),
-                "completed": bool(
+                "completed": playback_confirmed and bool(
                     state == "ended"
                     or (duration_ms > 0 and position_ms >= duration_ms * 0.95)
                 ),
@@ -426,11 +423,17 @@ def on_now_playing_subscription_changed(event: Any) -> None:
 
 @tool(summary="Ensure the durable Media Center control-plane schema.", side_effects="local_write")
 def ensure_schema(**_: Any) -> dict[str, Any]:
-    return _repository().ensure_schema()
+    from adaos.sdk.access import require
+
+    require('workspace.write')
+    return _repository().ensure_schema(force=True)
 
 
-@tool(summary="Rehydrate bounded now-playing state after activation.", side_effects="none")
+@tool(summary="Rehydrate bounded now-playing state after activation.", side_effects="read_only")
 def rehydrate(webspace_id: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     repository = _repository()
     _publish_updates(repository, webspace_id=webspace_id)
     return repository.diagnostics()
@@ -447,6 +450,9 @@ def drain_runtime(**_: Any) -> dict[str, Any]:
     invocations commit or roll back before returning, so reaching this hook
     through the fenced lifecycle executor is the quiescence boundary.
     """
+    from adaos.sdk.access import require
+
+    require('workspace.write')
 
     return {
         "ok": True,
@@ -466,6 +472,9 @@ def register_target(
     capabilities: Mapping[str, Any] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     result = _repository().register_target(
         endpoint_id,
         webspace_id=webspace_id,
@@ -492,6 +501,9 @@ def endpoint_inbox(
     queue_limit: int = 30,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     try:
         result = _repository().endpoint_inbox(
             endpoint_id,
@@ -508,7 +520,7 @@ def endpoint_inbox(
     return _result_or_error(result)
 
 
-@tool(summary="List bounded playback targets visible to a controller.", side_effects="none")
+@tool(summary="List bounded playback targets visible to a controller.", side_effects="read_only")
 def list_targets(
     include_unavailable: bool = False,
     limit: int = 50,
@@ -516,6 +528,9 @@ def list_targets(
     controller_playback_target_id: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     result = _repository().list_targets(
         include_unavailable=bool(include_unavailable), limit=limit
     )
@@ -551,6 +566,9 @@ def create_session(
     webspace_id: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository = _repository()
     result = repository.create_session(
         profile_id=profile_id,
@@ -590,6 +608,9 @@ def open_endpoint_session(
     lease_seconds: int = 120,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository = _repository()
     target_result = repository.register_target(
         endpoint_id,
@@ -620,8 +641,11 @@ def open_endpoint_session(
     return _result_or_error(result)
 
 
-@tool(summary="Read one playback session and a bounded queue page.", side_effects="none")
+@tool(summary="Read one playback session and a bounded queue page.", side_effects="read_only")
 def get_session(session_id: str = "", queue_limit: int = 10, queue_cursor: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     try:
         return _result_or_error(_repository().get_session(session_id, queue_limit=queue_limit, queue_cursor=queue_cursor))
     except ValueError:
@@ -640,6 +664,9 @@ def command(
     webspace_id: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository = _repository()
     try:
         result = repository.command(
@@ -670,6 +697,9 @@ def update_queue(
     webspace_id: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository = _repository()
     result = repository.update_queue(
         session_id,
@@ -696,6 +726,9 @@ def checkpoint(
     webspace_id: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository = _repository()
     result = repository.checkpoint(
         session_id,
@@ -711,7 +744,7 @@ def checkpoint(
     return _result_or_error(result)
 
 
-@tool(summary="Pull ordered target commands through an opaque cursor.", side_effects="none")
+@tool(summary="Pull ordered target commands through an opaque cursor.", side_effects="read_only")
 def pull_commands(
     target_id: str = "",
     session_id: str = "",
@@ -719,6 +752,9 @@ def pull_commands(
     limit: int = 50,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     try:
         return _result_or_error(
             _repository().pull_commands(
@@ -734,6 +770,9 @@ def pull_commands(
 
 @tool(summary="Acknowledge endpoint application of one playback command.", side_effects="local_write")
 def acknowledge_command(command_id: str = "", status: str = "applied", result: Mapping[str, Any] | None = None, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     return _result_or_error(_repository().acknowledge_command(command_id, status=status, result=result))
 
 
@@ -748,6 +787,9 @@ def reconcile_endpoint(
     webspace_id: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository = _repository()
     result = repository.reconcile_endpoint(
         session_id,
@@ -763,33 +805,48 @@ def reconcile_endpoint(
     return _result_or_error(result)
 
 
-@tool(summary="Read effective profile and target playback settings.", side_effects="none")
+@tool(summary="Read effective profile and target playback settings.", side_effects="read_only")
 def get_settings(profile_id: str = "default", target_id: str = "", **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _repository().get_settings(profile_id=profile_id, target_id=target_id)
 
 
 @tool(summary="Update profile and target playback settings.", side_effects="local_write")
 def set_settings(profile_id: str = "default", target_id: str = "", values: Mapping[str, Any] | None = None, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     return _result_or_error(_repository().set_settings(profile_id=profile_id, target_id=target_id, values=dict(values or {})))
 
 
-@tool(summary="Return bounded now-playing sessions for remote controls.", side_effects="none")
+@tool(summary="Return bounded now-playing sessions for remote controls.", side_effects="read_only")
 def now_playing(profile_id: str = "", target_id: str = "", limit: int = 20, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _result_or_error(_repository().now_playing(profile_id=profile_id, target_id=target_id, limit=limit))
 
 
 @tool(summary="Record one bounded playback quality metric.", side_effects="local_write")
 def record_qoe(session_id: str = "", metric: str = "", value: float = 0, dimensions: Mapping[str, Any] | None = None, **_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     return _result_or_error(_repository().record_qoe(session_id, metric=metric, value=value, dimensions=dimensions))
 
 
-@tool(summary="Return bounded aggregate and recent playback QoE evidence.", side_effects="none")
+@tool(summary="Return bounded aggregate and recent playback QoE evidence.", side_effects="read_only")
 def qoe_summary(
     session_id: str = "",
     target_id: str = "",
     limit: int = 30,
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _result_or_error(
         _repository().qoe_summary(
             session_id=session_id, target_id=target_id, limit=limit
@@ -808,6 +865,9 @@ def voice_command(
     idempotency_key: str = "",
     **_: Any,
 ) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.write')
     repository = _repository()
     resolved_session = text(session_id)
     if not resolved_session:
@@ -849,6 +909,9 @@ def voice_command(
     )
 
 
-@tool(summary="Return compact control-plane diagnostics.", side_effects="none")
+@tool(summary="Return compact control-plane diagnostics.", side_effects="read_only")
 def status(**_: Any) -> dict[str, Any]:
+    from adaos.sdk.access import require
+
+    require('workspace.read')
     return _repository().diagnostics()

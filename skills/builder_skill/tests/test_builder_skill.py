@@ -19194,3 +19194,120 @@ def test_change_intake_honors_automation_only_directive_for_ambiguous_clauses() 
         "implementation and its tests" in item["acceptance_criteria"][0]
         for item in issues
     )
+
+
+def test_chat_owns_single_sync_update_result_emit(monkeypatch) -> None:
+    skill = _load_module()
+    session = {"scenario_id": "builder", "artifact_root": "/dev/scenarios/builder"}
+    binding = {"runtime_scenario_id": "builder", "dev_webspace_id": "desktop-dev"}
+    emitted: list[str] = []
+
+    monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
+    monkeypatch.setattr(
+        skill.developer_prompt_context,
+        "get",
+        lambda *_args: {"workflow_state": "automation"},
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *_args: {"governed": {"state": "published"}},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda text, **_kwargs: emitted.append(str(text)),
+    )
+
+    def _update(**kwargs):
+        if skill._should_emit_api_tool_chat(kwargs["_meta"]):
+            skill._safe_emit_chat("Updated once.")
+        return {"ok": True, "status": "llm_repaired", "message": "Updated once."}
+
+    monkeypatch.setattr(skill, "update_current_scenario", _update)
+
+    result = skill.chat(
+        "Repair the saved candidate.",
+        webspace_id="desktop",
+        _meta={"action_source": "api_tool_call"},
+    )
+
+    assert result["status"] == "llm_repaired"
+    assert emitted == ["Updated once."]
+
+
+
+def test_explicit_desktop_scenario_creation_does_not_edit_selected_project() -> None:
+    skill = _load_module()
+    text = (
+        'Create a new desktop scenario named "E2E Notes" for keeping short '
+        'personal notes. Keep it in Prototype and do not publish it.'
+    )
+
+    parsed = skill._parse_builder_command(text, has_session=True)
+
+    assert parsed["intent"] == "project.create"
+
+
+
+def test_explicit_tool_confirmation_is_discoverable_and_uses_the_same_identity_guard(monkeypatch):
+    skill = _load_module()
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    declaration = next(item for item in manifest["tools"] if item["name"] == "create_application_draft")
+    assert "confirmed_technical_application_id" in declaration["input_schema"]["properties"]
+    calls = []
+    monkeypatch.setattr(skill.sdk_builder_applications, "publisher_context", lambda: {"publisher_ref": "publisher:test"})
+    monkeypatch.setattr(skill, "create_scenario_draft", lambda **kw: calls.append(kw) or {"ok": False, "status": "draft_creation_failed"})
+    result = skill.create_application_draft("Create an Application with exact technical id owned_confirmed_app.",
+        confirmed_technical_application_id="owned_confirmed_app", webspace_id="owned-test")
+    assert result["application_id"] == calls[0]["scenario_id"] == "owned_confirmed_app"
+
+
+
+def test_compact_provider_outputs_match_the_discoverable_tool_manifest():
+    from adaos.services.artifact_pipeline.cbs_authoring import compile_cbs_provider_files
+    names = ("skill.yaml", "handlers/main.py", "contracts/provider.cbs.yaml",
+        "contracts/capability.contract.json", "contracts/binding.definition.json")
+    compiled = compile_cbs_provider_files({name: (SKILL_ROOT / name).read_bytes() for name in names},
+        kind="skill", allow_generated_outputs=True)
+    operation = next(item for item in compiled.capability.to_dict()["operations"] if item["operation_id"] == "create_application_draft")
+    assert "confirmed_technical_application_id" in operation["input_schema"]["properties"]
+
+
+
+@pytest.mark.parametrize("conflict", ["idea", "argument", "legacy_confirmation"])
+def test_explicit_tool_confirmation_conflicts_fail_before_publisher_or_creation(monkeypatch, conflict):
+    skill = _load_module()
+    monkeypatch.setattr(skill.sdk_builder_applications, "publisher_context", lambda: pytest.fail("conflict must fail before publisher"))
+    monkeypatch.setattr(skill, "create_scenario_draft", lambda **kw: pytest.fail("conflict must fail before creation"))
+    kwargs = {"idea": "Create an Application with exact technical id owned_confirmed_app.",
+        "confirmed_technical_application_id": "owned_confirmed_app", "webspace_id": "owned-test"}
+    if conflict == "idea": kwargs["idea"] = "Create an Application with exact technical id other_app."
+    if conflict == "argument": kwargs["application_id"] = "other_app"
+    if conflict == "legacy_confirmation": kwargs["_meta"] = {"application_id": "other_app", "technical_application_id_confirmed": True}
+    result = skill.create_application_draft(**kwargs)
+    assert result["ok"] is False and result["status"] == "application_identity_confirmation_invalid"
+
+
+
+def test_safe_emit_chat_does_not_wait_for_stuck_append(monkeypatch) -> None:
+    skill = _load_module()
+
+    import adaos.sdk.io.out as io_out
+
+    calls: list[str] = []
+
+    def _slow_chat_append(text, **_kwargs):
+        calls.append(text)
+        time.sleep(1.0)
+
+    monkeypatch.setattr(skill, "CHAT_APPEND_TIMEOUT_S", 0.02)
+    monkeypatch.setattr(io_out, "chat_append", _slow_chat_append)
+
+    started = time.perf_counter()
+    skill._safe_emit_chat("hello", webspace_id="desktop")
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < 0.5
+    assert calls
+

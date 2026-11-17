@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.102
+version: 0.8.108
 description: Distributed Media Center coordinator with federated discovery, bounded
   catalog, personalization, and rendition-aware playback.
 supported_locales:
@@ -11,7 +11,31 @@ webui:
   file: webui.json
 runtime:
   python: '3.11'
+  activation:
+    mode: lazy
+    startup_allowed: true
+    background_refresh: true
+    assessment:
+      schema: adaos.skill.activation_assessment.v1
+      assessor: builder.compiler
+      classification: startup_event_subscriber
+      handler_digest: sha256:8d0d994fc4700656b18ddb338a97928e1774fca07b010ca2d12a883dc4e20e94
+      observed_subscriptions:
+      - media_control.playback.observed
+      - media_library_agent.catalog.changed
+      - sys.ready
+      - webio.stream.snapshot.requested
+      declared_subscriptions:
+      - media_control.playback.observed
+      - media_library_agent.catalog.changed
+      - sys.ready
+      - webio.stream.snapshot.requested
+      dynamic_subscription_count: 0
+      tool_count: 74
+      reasons:
+      - startup_subscription_requires_early_handler_registration
 capabilities:
+- workspace.read
 - workspace.write
 - storage.relational
 - media.catalog
@@ -41,10 +65,10 @@ dependencies:
 - requests>=2.31.0
 events:
   subscribe:
+  - media_control.playback.observed
+  - media_library_agent.catalog.changed
   - sys.ready
   - webio.stream.snapshot.requested
-  - media_library_agent.catalog.changed
-  - media_control.playback.observed
   publish:
   - io.out.stream.publish
 lifecycle:
@@ -87,7 +111,7 @@ memory_budget:
     max_items: 2048
     cleanup_hook: dispose
   background_workers:
-    max_threads: 2
+    max_threads: 6
     cleanup_hook: dispose
 exports:
   tools:
@@ -167,6 +191,10 @@ exports:
   - chat
 tools:
 - name: ensure_schema
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Apply the durable media-center catalog schema.
   entry: handlers.main:ensure_schema
   side_effects: local_write
@@ -176,6 +204,10 @@ tools:
   output_schema:
     type: object
 - name: rehydrate
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Re-open durable catalog state after activation.
   entry: handlers.main:rehydrate
   side_effects: local_write
@@ -185,6 +217,10 @@ tools:
   output_schema:
     type: object
 - name: scan_sources
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Reconcile SDK media resources from Media Server and legacy media_indexer
     into the durable catalog.
   entry: handlers.main:scan_sources
@@ -208,9 +244,13 @@ tools:
   output_schema:
     type: object
 - name: list_roots
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: List configured media-center library folders.
   entry: handlers.main:list_roots
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -221,6 +261,10 @@ tools:
   output_schema:
     type: object
 - name: add_root
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Add a local folder to the media-center import set.
   entry: handlers.main:add_root
   side_effects: local_write
@@ -243,6 +287,10 @@ tools:
   output_schema:
     type: object
 - name: set_root_storage_policy
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Configure managed rendition and artwork storage for one media folder.
   entry: handlers.main:set_root_storage_policy
   side_effects: local_write
@@ -261,6 +309,10 @@ tools:
   output_schema:
     type: object
 - name: remove_root
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Disable a configured media-center library folder.
   entry: handlers.main:remove_root
   side_effects: local_write
@@ -275,6 +327,10 @@ tools:
   output_schema:
     type: object
 - name: delete_root
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Delete a configured folder, its catalog rows, and exact core media
     resource links without deleting source files.
   entry: handlers.main:delete_root
@@ -290,6 +346,10 @@ tools:
   output_schema:
     type: object
 - name: scan_roots
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Register playable files from configured folders without copying media
     bytes.
   entry: handlers.main:scan_roots
@@ -311,6 +371,10 @@ tools:
   output_schema:
     type: object
 - name: import_folder
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Add a folder and register its playable files in place.
   entry: handlers.main:import_folder
   side_effects: local_write
@@ -339,10 +403,14 @@ tools:
   output_schema:
     type: object
 - name: library
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Return a widget-ready catalog projection with items, summary, facets,
     and playback descriptors.
   entry: handlers.main:library
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -429,9 +497,13 @@ tools:
   output_schema:
     type: object
 - name: metadata_facets
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Return bounded profile-aware categories for metadata navigation.
   entry: handlers.main:metadata_facets
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -468,9 +540,13 @@ tools:
   output_schema:
     type: object
 - name: get_metadata_settings
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Return managed external metadata provider settings without secrets.
   entry: handlers.main:get_metadata_settings
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -484,6 +560,10 @@ tools:
   output_schema:
     type: object
 - name: set_metadata_settings
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Update external metadata providers and the protected TMDb credential.
   entry: handlers.main:set_metadata_settings
   side_effects: local_write
@@ -514,18 +594,26 @@ tools:
   output_schema:
     type: object
 - name: list_items
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Alias for library for generic catalog widgets.
   entry: handlers.main:list_items
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     additionalProperties: true
   output_schema:
     type: object
 - name: get_item
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Read one media-center catalog item.
   entry: handlers.main:get_item
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -537,9 +625,13 @@ tools:
   output_schema:
     type: object
 - name: deep_search
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Run bounded coordinator and source-agent full-text search stages.
   entry: handlers.main:deep_search
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -569,9 +661,13 @@ tools:
   output_schema:
     type: object
 - name: playback_queue
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Return the selected item first and at most ten playable queue entries.
   entry: handlers.main:playback_queue
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -601,10 +697,14 @@ tools:
   output_schema:
     type: object
 - name: playback_plan
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Select a deterministic media variant and direct or routed delivery
     plan for one endpoint.
   entry: handlers.main:playback_plan
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -633,6 +733,10 @@ tools:
   output_schema:
     type: object
 - name: ensure_rendition
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Plan and queue one browser-compatible rendition on the source-owning
     agent.
   entry: handlers.main:ensure_rendition
@@ -670,10 +774,14 @@ tools:
   output_schema:
     type: object
 - name: rendition_operations
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Return a bounded compact projection of recent conversion operations
     from the source-owning media-library agent.
   entry: handlers.main:rendition_operations
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -688,10 +796,14 @@ tools:
   output_schema:
     type: object
 - name: build_playback_queue
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Build an ordered playback snapshot from an item, work, collection,
     folder, playlist, or the current bounded catalog page.
   entry: handlers.main:build_playback_queue
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -738,6 +850,10 @@ tools:
   output_schema:
     type: object
 - name: play_on
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Move an ordered media context to one available playback endpoint.
   entry: handlers.main:play_on
   side_effects: device_control
@@ -793,6 +909,10 @@ tools:
   output_schema:
     type: object
 - name: set_favorite
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Mark or unmark one catalog item as favorite.
   entry: handlers.main:set_favorite
   side_effects: local_write
@@ -813,6 +933,10 @@ tools:
   output_schema:
     type: object
 - name: sync_agent
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Pull bounded idempotent source deltas from the local media library
     agent.
   entry: handlers.main:sync_agent
@@ -835,9 +959,13 @@ tools:
   output_schema:
     type: object
 - name: home
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Return bounded home shelves for one media profile.
   entry: handlers.main:home
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -856,9 +984,13 @@ tools:
   output_schema:
     type: object
 - name: list_profiles
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: List bounded Media Center profiles and their library policies.
   entry: handlers.main:list_profiles
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -871,9 +1003,13 @@ tools:
   output_schema:
     type: object
 - name: get_profile
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Read one Media Center profile and its library policy.
   entry: handlers.main:get_profile
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -884,6 +1020,10 @@ tools:
   output_schema:
     type: object
 - name: set_profile_policy
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Revision-safely update media-kind, maturity, explicit-content, and
     shared-surface policy.
   entry: handlers.main:set_profile_policy
@@ -928,6 +1068,10 @@ tools:
   output_schema:
     type: object
 - name: set_personal_state
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Set a profile-scoped rating or hidden flag for one catalog item.
   entry: handlers.main:set_personal_state
   side_effects: local_write
@@ -952,10 +1096,14 @@ tools:
   output_schema:
     type: object
 - name: recommendations
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Return bounded profile-scoped recommendations with explainable local
     signals and opt-out.
   entry: handlers.main:recommendations
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -971,6 +1119,10 @@ tools:
   output_schema:
     type: object
 - name: voice_request
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Resolve structured voice discovery, collection, favorite, target, status,
     playback, and transport intents.
   entry: handlers.main:voice_request
@@ -1047,9 +1199,13 @@ tools:
   output_schema:
     type: object
 - name: list_collections
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: List typed media collections through an opaque cursor.
   entry: handlers.main:list_collections
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -1066,9 +1222,13 @@ tools:
   output_schema:
     type: object
 - name: collection_contents
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Browse one collection, its children, and one bounded item page.
   entry: handlers.main:collection_contents
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -1091,9 +1251,13 @@ tools:
   output_schema:
     type: object
 - name: browse_folders
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Browse lazy folder children through an opaque cursor.
   entry: handlers.main:browse_folders
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -1114,6 +1278,10 @@ tools:
   output_schema:
     type: object
 - name: create_playlist
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Create a profile-owned personal, household, or shared playlist.
   entry: handlers.main:create_playlist
   side_effects: local_write
@@ -1145,9 +1313,13 @@ tools:
   output_schema:
     type: object
 - name: list_playlists
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: List playlists visible to one profile.
   entry: handlers.main:list_playlists
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -1165,6 +1337,10 @@ tools:
   output_schema:
     type: object
 - name: add_playlist_item
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Add one available media item to a profile-owned playlist.
   entry: handlers.main:add_playlist_item
   side_effects: local_write
@@ -1185,9 +1361,13 @@ tools:
   output_schema:
     type: object
 - name: playlist_items
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Read one bounded playlist page.
   entry: handlers.main:playlist_items
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -1209,6 +1389,10 @@ tools:
   output_schema:
     type: object
 - name: update_playlist
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Revision-safely replace playlist metadata and order.
   entry: handlers.main:update_playlist
   side_effects: local_write
@@ -1245,6 +1429,10 @@ tools:
   output_schema:
     type: object
 - name: delete_playlist
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Revision-safely remove a playlist without deleting media.
   entry: handlers.main:delete_playlist
   side_effects: local_write
@@ -1266,6 +1454,10 @@ tools:
   output_schema:
     type: object
 - name: apply_correction
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Apply an audited reversible metadata, merge, split, or regroup correction.
   entry: handlers.main:apply_correction
   side_effects: local_write
@@ -1294,6 +1486,10 @@ tools:
   output_schema:
     type: object
 - name: update_item_metadata
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Correct one media item's metadata or reject an incorrect provider match.
   entry: handlers.main:update_item_metadata
   side_effects: local_write
@@ -1341,6 +1537,10 @@ tools:
   output_schema:
     type: object
 - name: review_item_artwork
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Confirm or replace one media item's artwork as an audited manual choice.
   entry: handlers.main:review_item_artwork
   side_effects: local_write
@@ -1366,6 +1566,10 @@ tools:
   output_schema:
     type: object
 - name: reverse_correction
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Reverse one audited catalog correction.
   entry: handlers.main:reverse_correction
   side_effects: local_write
@@ -1383,9 +1587,13 @@ tools:
   output_schema:
     type: object
 - name: metadata_claims
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: List bounded metadata claims with provenance.
   entry: handlers.main:metadata_claims
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -1402,9 +1610,13 @@ tools:
   output_schema:
     type: object
 - name: duplicate_candidates
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Return non-destructive duplicate and variant candidates.
   entry: handlers.main:duplicate_candidates
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -1417,6 +1629,10 @@ tools:
   output_schema:
     type: object
 - name: save_checkpoint
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Persist a profile-scoped resume checkpoint.
   entry: handlers.main:save_checkpoint
   side_effects: local_write
@@ -1444,6 +1660,10 @@ tools:
   output_schema:
     type: object
 - name: queue_background_job
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Queue background enrichment or technical analysis.
   entry: handlers.main:queue_background_job
   side_effects: local_write
@@ -1472,6 +1692,10 @@ tools:
   output_schema:
     type: object
 - name: compact_storage
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Run bounded resumable logical catalog compaction.
   entry: handlers.main:compact_storage
   side_effects: local_write
@@ -1498,6 +1722,10 @@ tools:
   output_schema:
     type: object
 - name: optimize_storage
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Optimize catalog indexes and optionally reclaim SQLite disk space after
     bounded logical compaction.
   entry: handlers.main:optimize_storage
@@ -1512,9 +1740,13 @@ tools:
   output_schema:
     type: object
 - name: operations
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: List bounded observable background media operations.
   entry: handlers.main:operations
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -1527,6 +1759,10 @@ tools:
   output_schema:
     type: object
 - name: dispose
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Stop the process-local enrichment worker.
   entry: handlers.main:dispose
   side_effects: local_write
@@ -1536,19 +1772,27 @@ tools:
   output_schema:
     type: object
 - name: status
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Return compact media-center catalog status.
   entry: handlers.main:status
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     additionalProperties: true
   output_schema:
     type: object
 - name: diagnostic_export
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Export bounded path- and secret-redacted operations diagnostics and
     reviewed repair proposals.
   entry: handlers.main:diagnostic_export
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -1562,9 +1806,13 @@ tools:
   output_schema:
     type: object
 - name: deployment_status
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Return bounded Project deployment and per-node activation state.
   entry: handlers.main:deployment_status
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -1580,6 +1828,10 @@ tools:
   output_schema:
     type: object
 - name: configure_deployment
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Persist desired placement and create a reviewed dry-run deployment
     plan.
   entry: handlers.main:configure_deployment
@@ -1624,6 +1876,10 @@ tools:
   output_schema:
     type: object
 - name: apply_deployment
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Apply one explicitly reviewed immutable deployment plan.
   entry: handlers.main:apply_deployment
   side_effects: external_io
@@ -1641,9 +1897,13 @@ tools:
   output_schema:
     type: object
 - name: deployment_operation_status
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Return one durable Project deployment operation by id.
   entry: handlers.main:deployment_operation_status
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -1656,6 +1916,10 @@ tools:
   output_schema:
     type: object
 - name: drain_activation
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Cordon and drain one component activation.
   entry: handlers.main:drain_activation
   side_effects: external_io
@@ -1673,6 +1937,10 @@ tools:
   output_schema:
     type: object
 - name: remove_activation
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Remove one drained activation while retaining media and derived data.
   entry: handlers.main:remove_activation
   side_effects: external_io
@@ -1690,6 +1958,10 @@ tools:
   output_schema:
     type: object
 - name: define_topology
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Define logical Media Center service groups and datasets through the
     public SDK.
   entry: handlers.main:define_topology
@@ -1721,6 +1993,10 @@ tools:
   output_schema:
     type: object
 - name: register_agent
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Admit one exact deployed library-agent activation into the authority
     plane.
   entry: handlers.main:register_agent
@@ -1745,6 +2021,10 @@ tools:
   output_schema:
     type: object
 - name: renew_agent
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Renew one admitted library-agent membership in the authority plane.
   entry: handlers.main:renew_agent
   side_effects: local_write
@@ -1779,6 +2059,10 @@ tools:
   output_schema:
     type: object
 - name: drain_agent
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Drain one admitted library agent from distributed routes.
   entry: handlers.main:drain_agent
   side_effects: local_write
@@ -1798,6 +2082,10 @@ tools:
   output_schema:
     type: object
 - name: observe_agent_topology
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Ask an admitted agent to verify a local replica, then commit it in
     the authority plane.
   entry: handlers.main:observe_agent_topology
@@ -1825,6 +2113,10 @@ tools:
   output_schema:
     type: object
 - name: plan_topology_change
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Create and persist a reviewed immutable topology-change plan.
   entry: handlers.main:plan_topology_change
   side_effects: local_write
@@ -1863,6 +2155,10 @@ tools:
   output_schema:
     type: object
 - name: apply_topology_change
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Apply one explicitly reviewed immutable topology-change plan.
   entry: handlers.main:apply_topology_change
   side_effects: external_io
@@ -1881,9 +2177,13 @@ tools:
   output_schema:
     type: object
 - name: topology_operation_status
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Read one durable topology operation without scanning topology history.
   entry: handlers.main:topology_operation_status
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     required:
@@ -1896,6 +2196,10 @@ tools:
   output_schema:
     type: object
 - name: handoff_authority
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Perform one explicit fenced authority handoff with expected revision
     and epoch.
   entry: handlers.main:handoff_authority
@@ -1931,9 +2235,13 @@ tools:
   output_schema:
     type: object
 - name: topology_status
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Return bounded generic distributed service and data topology state.
   entry: handlers.main:topology_status
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -1946,10 +2254,14 @@ tools:
   output_schema:
     type: object
 - name: explain_route
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Explain route eligibility, freshness, and partial participation for
     source shards.
   entry: handlers.main:explain_route
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     properties:
@@ -1970,15 +2282,23 @@ tools:
   output_schema:
     type: object
 - name: next_steps
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
   description: Return admitted MVP workflow steps and production roadmap boundary.
   entry: handlers.main:next_steps
-  side_effects: none
+  side_effects: read_only
   input_schema:
     type: object
     additionalProperties: true
   output_schema:
     type: object
 - name: chat
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
   description: Small conversational control entrypoint for scan/search/help commands.
   entry: handlers.main:chat
   side_effects: local_write
@@ -1995,6 +2315,28 @@ tools:
   output_schema:
     type: object
 data_routes:
+- surface: widget:media-center-home
+  route: tool
+  tool: home
+  owner: skill:media_center_skill
+  first_paint: bounded home shelves for the selected Application data scope
+  recovery: repeat home after catalog invalidation or profile changes
+  guard_visibility: catalog metadata and safe artwork descriptors only
+  budget:
+    max_payload_bytes: 524288
+    max_items: 120
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - state_dependency_changed
+    - targeted_invalidation
+    cache_ttl_ms: 1000
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - media_center.catalog
 - surface: app-shell:media-library
   route: stream
   receiver: media_center.library_state
@@ -2022,7 +2364,10 @@ data_routes:
   owner: skill:media_center_skill
   first_paint: compact catalog status
   recovery: repeat status after scan invalidation
-  guard_visibility: aggregate media counts and source facets only
+  guard_visibility: Aggregate catalog counts, source facets and bounded operational
+    health states for liveness, read readiness, ingest freshness, storage, endpoint
+    observation and retained job outcomes. No filesystem paths, endpoint identities,
+    credentials or individual job details in the operational health presentation.
   budget:
     max_payload_bytes: 65536
     snapshot_policy: manual
@@ -2486,7 +2831,7 @@ nlu_hints:
           type: object
       additionalProperties: true
   entities: []
-updated_at: '2026-09-28T00:19:52+00:00'
+updated_at: '2026-11-10T03:45:20+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.947+5749.575b2f508

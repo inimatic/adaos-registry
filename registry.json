@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-10-13T10:39:54+00:00",
+  "updated_at": "2026-11-16T14:24:54+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -68,10 +68,39 @@
     },
     {
       "kind": "skill",
+      "id": "applications_skill",
+      "name": "applications_skill",
+      "version": "0.1.17",
+      "updated_at": "2026-11-16T14:24:54+00:00",
+      "path": "skills/applications_skill",
+      "manifest": "skills/applications_skill/skill.yaml",
+      "source": {
+        "path": "skills/applications_skill",
+        "manifest": "skills/applications_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "applications_skill",
+        "id": "applications_skill"
+      },
+      "description": "Project-owned resource implementation for project:applications. Realize the accepted Prototype according to the separate Automation brief.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "applications",
+        "release": "applications@0.1.67",
+        "release_digest": "sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8",
+        "package_digest": "sha256:4bb829c4bf3c7ebe1deebc96fad6d11029747c9c1f39ea0cc8991fa7c3b95810"
+      },
+      "tools_count": 8
+    },
+    {
+      "kind": "skill",
       "id": "automation_manager_prototype_skill",
       "name": "automation_manager_prototype_skill",
       "version": "0.1.6",
-      "updated_at": "2026-09-29T17:34:19+00:00",
+      "updated_at": "2026-11-06T11:23:32+00:00",
       "path": "skills/automation_manager_prototype_skill",
       "manifest": "skills/automation_manager_prototype_skill/skill.yaml",
       "source": {
@@ -88,9 +117,9 @@
       "runtime_python": "3.11",
       "activation": {
         "mode": "package_lock",
-        "project_id": "automation_manager_prototype",
-        "release": "automation_manager_prototype@0.1.7",
-        "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
+        "project_id": "applications",
+        "release": "applications@0.1.58",
+        "release_digest": "sha256:65f3ccceab9a8c60858646ad43463fe47d98d8754bc097073ea5bd6382234039",
         "package_digest": "sha256:56688ee94ae3e6a8f72a791ba87f8f1aaedbbe255454cc05c721cc1c1e8c6d0b"
       },
       "tools_count": 5
@@ -99,8 +128,8 @@
       "kind": "skill",
       "id": "browsers_skill",
       "name": "browsers_skill",
-      "version": "0.15.24",
-      "updated_at": "2026-09-21T01:06:30+00:00",
+      "version": "0.15.26",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/browsers_skill",
       "manifest": "skills/browsers_skill/skill.yaml",
       "source": {
@@ -114,21 +143,21 @@
       },
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 19,
+      "tools_count": 20,
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.86",
-        "release_digest": "sha256:b7c43103f3a2c2ed1588007309cc4ba2c13448360ab9d5627f6212063055a139",
-        "package_digest": "sha256:a9845236d2c671e108310f27acff6bc28c6f1ff9a2508b2510764274ebe6f04d"
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
+        "package_digest": "sha256:58fa06163cd062a7a5748342be175328e542f9b4d514699b8487cce03779df56"
       }
     },
     {
       "kind": "skill",
       "id": "builder_automation_skill",
       "name": "builder_automation_skill",
-      "version": "0.2.5",
-      "updated_at": "2026-09-26T11:03:22+00:00",
+      "version": "0.2.10",
+      "updated_at": "2026-11-06T03:41:03+00:00",
       "path": "skills/builder_automation_skill",
       "manifest": "skills/builder_automation_skill/skill.yaml",
       "source": {
@@ -143,14 +172,14 @@
       "description": "System adapter for the Builder Automation stage and its local Codex implementation loop.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 3,
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.19",
-        "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-        "package_digest": "sha256:f3af7ec654916d7b1d8c82fa8c6ce11a6d8bc3fea6094f5be126c6bc5cc769a0"
-      }
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:9d4a342f78a7f7069cc9766e60f845f4c9cd0f3fc8187af1a55c1d318cf50fd1"
+      },
+      "tools_count": 3
     },
     {
       "kind": "skill",
@@ -178,8 +207,8 @@
       "kind": "skill",
       "id": "builder_sdk_control_skill",
       "name": "builder_sdk_control_skill",
-      "version": "0.2.6",
-      "updated_at": "2026-09-30T19:41:56+00:00",
+      "version": "0.2.29",
+      "updated_at": "2026-11-06T03:41:03+00:00",
       "path": "skills/builder_sdk_control_skill",
       "manifest": "skills/builder_sdk_control_skill/skill.yaml",
       "source": {
@@ -194,21 +223,21 @@
       "description": "SDK-only backend for the functional Builder DEV scenario.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 85,
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.19",
-        "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-        "package_digest": "sha256:da1694cf275d78c9d79484208b8d7ddb5fdd1cb1943946ee021abab1cc48d257"
-      }
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:0eef8cd6506e84969ef9a43c84974f7b7a3ff52c1d7874de5f15d5a361ff2739"
+      },
+      "tools_count": 87
     },
     {
       "kind": "skill",
       "id": "builder_skill",
       "name": "builder_skill",
-      "version": "0.4.5",
-      "updated_at": "2026-09-26T11:02:50+00:00",
+      "version": "0.4.50",
+      "updated_at": "2026-11-06T03:41:03+00:00",
       "path": "skills/builder_skill",
       "manifest": "skills/builder_skill/skill.yaml",
       "source": {
@@ -223,21 +252,49 @@
       "description": "Rapid prototyping Builder skill for creating and editing scenario UI drafts from voice or text dialog.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 28,
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.19",
-        "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-        "package_digest": "sha256:0a0d4341e83fd64ba08cc3da7713e9700b4a3d2062f4fcd821157b74c136bff0"
-      }
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:0cba00832b1f979901b3d374672639dad9b79c7690b20cd59a013938d2e46e75"
+      },
+      "tools_count": 35
+    },
+    {
+      "kind": "skill",
+      "id": "context_chat_service",
+      "name": "context_chat_service",
+      "version": "0.3.4",
+      "updated_at": "2026-10-27T16:02:12+00:00",
+      "path": "skills/context_chat_service",
+      "manifest": "skills/context_chat_service/skill.yaml",
+      "source": {
+        "path": "skills/context_chat_service",
+        "manifest": "skills/context_chat_service/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "context_chat_service",
+        "id": "context_chat_service"
+      },
+      "description": "Личный ChatGPT: проекты, переписка, документы и редактируемая память.",
+      "entry": "handlers/main.py",
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "context_chat",
+        "release": "context_chat@0.5.2",
+        "release_digest": "sha256:3e9ebc366f7e541a5d5618538a0b960a6bd6d047e0c7ea754d9541a3167d0c52",
+        "package_digest": "sha256:bdfe4f6813e5d2608e7e9459ad5ac2f6a5538928245279ff2e27eeb278e681ef"
+      },
+      "tools_count": 3
     },
     {
       "kind": "skill",
       "id": "conversation_companions",
       "name": "conversation_companions",
-      "version": "0.3.0-beta.3",
-      "updated_at": "2026-10-05T21:36:00+00:00",
+      "version": "0.3.2",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/conversation_companions",
       "manifest": "skills/conversation_companions/skill.yaml",
       "source": {
@@ -252,6 +309,13 @@
       "description": "Conversational characters plus a beta Companion operator grounded in the AdaOS Companion Control Plane.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "web_desktop",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
+        "package_digest": "sha256:1012970a54a84651267c434cfacc48a3b5f6b1c9685285e63114791be3381d47"
+      },
       "tools_count": 16
     },
     {
@@ -281,15 +345,15 @@
       "id": "cv_descriptor",
       "name": "cv_descriptor",
       "version": "0.1.14",
-      "updated_at": "2026-09-27T21:45:34+00:00",
+      "updated_at": "2026-11-06T14:35:20+00:00",
       "path": "skills/cv_descriptor",
       "manifest": "skills/cv_descriptor/skill.yaml",
       "source": {
         "path": "skills/cv_descriptor",
         "manifest": "skills/cv_descriptor/skill.yaml",
         "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:7be931c95c7bee6e42ac6a10e1169a191f83856b801d13abd8b1b6b8a712a667",
+        "repository": "adaos-dev:applications-beta-reconciliation-20261025",
+        "revision": "sha256:9e1ab44f35f3809c034f332a85d7ee4fbfa81217ebd46e2a6ddb80eb6f811081",
         "path_scope": [
           "projects/cv_descriptor_lab/"
         ]
@@ -304,17 +368,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "cv_descriptor_lab",
-        "release": "cv_descriptor_lab@0.1.22",
-        "release_digest": "sha256:79c9b75dba86a5fed8e6043edbb66d272115b9a98a6c6a08ea1dcf4d6cfe4074",
-        "package_digest": "sha256:291c278a48dc278d512877cce46e9df4ab570066c7bb40607e5f32035f18381c"
+        "release": "cv_descriptor_lab@0.1.23",
+        "release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
+        "package_digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21"
       },
       "tools_count": 11,
       "channels": {
         "stable": {
-          "release": "cv_descriptor_lab@0.1.22",
-          "release_digest": "sha256:79c9b75dba86a5fed8e6043edbb66d272115b9a98a6c6a08ea1dcf4d6cfe4074",
-          "source_revision": "sha256:7be931c95c7bee6e42ac6a10e1169a191f83856b801d13abd8b1b6b8a712a667",
-          "package_digest": "sha256:291c278a48dc278d512877cce46e9df4ab570066c7bb40607e5f32035f18381c",
+          "release": "cv_descriptor_lab@0.1.23",
+          "release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
+          "source_revision": "sha256:9e1ab44f35f3809c034f332a85d7ee4fbfa81217ebd46e2a6ddb80eb6f811081",
+          "package_digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21",
           "version": "0.1.14"
         }
       }
@@ -406,7 +470,7 @@
       "id": "gmail_mail_client_provider_skill",
       "name": "gmail_mail_client_provider_skill",
       "version": "0.1.1",
-      "updated_at": "2026-09-24T02:07:46+00:00",
+      "updated_at": "2026-09-24T02:29:50+00:00",
       "path": "skills/gmail_mail_client_provider_skill",
       "manifest": "skills/gmail_mail_client_provider_skill/skill.yaml",
       "source": {
@@ -421,14 +485,21 @@
       "description": "Application-local Gmail SDK adapter with transient mail reads and durable send deduplication.",
       "entry": "{'module': 'handlers.main', 'callable': 'connection_status'}",
       "runtime_python": "3.11",
-      "tools_count": 8
+      "tools_count": 8,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "gmail_mail_client",
+        "release": "gmail_mail_client@0.1.4",
+        "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+        "package_digest": "sha256:57945818da0ee3173d4a861523ef2feb15dc4a60ac89ad5852bd81f7a7d975ff"
+      }
     },
     {
       "kind": "skill",
       "id": "greet_on_boot_skill",
       "name": "greet_on_boot_skill",
       "version": "0.2.4",
-      "updated_at": "2026-09-02T21:06:22+00:00",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/greet_on_boot_skill",
       "manifest": "skills/greet_on_boot_skill/skill.yaml",
       "source": {
@@ -446,8 +517,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.86",
-        "release_digest": "sha256:b7c43103f3a2c2ed1588007309cc4ba2c13448360ab9d5627f6212063055a139",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "package_digest": "sha256:eb695ac298aed7839c2cb7ac4d098b8313cdcd8887073e4fad8b645304e3feae"
       }
     },
@@ -524,7 +595,7 @@
       "id": "infrastate_skill",
       "name": "infrastate_skill",
       "version": "0.75.94",
-      "updated_at": "2026-09-21T13:44:39+00:00",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/infrastate_skill",
       "manifest": "skills/infrastate_skill/skill.yaml",
       "source": {
@@ -541,8 +612,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.86",
-        "release_digest": "sha256:b7c43103f3a2c2ed1588007309cc4ba2c13448360ab9d5627f6212063055a139",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "package_digest": "sha256:b6869dd1f060f8f08c871fc208369a2c9ad77e2afce4b6ededbfc29248741a8b"
       },
       "tools_count": 8
@@ -576,8 +647,8 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.8.101",
-      "updated_at": "2026-09-28T00:19:52+00:00",
+      "version": "0.8.108",
+      "updated_at": "2026-11-10T06:22:27+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
       "source": {
@@ -592,21 +663,21 @@
       "description": "Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 74,
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.119",
-        "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-        "package_digest": "sha256:aad0bd1ff168ae47a33f2e21fe7fe6475c5b45b19e723fc71247b62111d7c316"
-      }
+        "release": "media_center@0.6.136",
+        "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+        "package_digest": "sha256:ccfbbfd997480f71ac4baa28278390c23b8e7cbbbd4ebe5f52f13f40238efc04"
+      },
+      "tools_count": 74
     },
     {
       "kind": "skill",
       "id": "media_control_skill",
       "name": "media_control_skill",
-      "version": "0.2.27",
-      "updated_at": "2026-09-28T00:20:12+00:00",
+      "version": "0.2.33",
+      "updated_at": "2026-11-10T06:22:27+00:00",
       "path": "skills/media_control_skill",
       "manifest": "skills/media_control_skill/skill.yaml",
       "source": {
@@ -621,14 +692,14 @@
       "description": "Persistent Media Center control plane for playback targets, sessions, queues, commands, checkpoints, and settings.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 22,
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.119",
-        "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-        "package_digest": "sha256:0e1ef12365424d00bec2f5848a074768ef479779ed7ca9b146462ba117f28630"
-      }
+        "release": "media_center@0.6.136",
+        "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+        "package_digest": "sha256:2704515567196974c13964f14bc4b5ff7b4b38848b1a4f2d3c9466540adc311f"
+      },
+      "tools_count": 22
     },
     {
       "kind": "skill",
@@ -660,8 +731,8 @@
       "kind": "skill",
       "id": "media_library_agent",
       "name": "media_library_agent",
-      "version": "0.6.57",
-      "updated_at": "2026-09-28T00:20:04+00:00",
+      "version": "0.6.63",
+      "updated_at": "2026-11-10T06:22:27+00:00",
       "path": "skills/media_library_agent",
       "manifest": "skills/media_library_agent/skill.yaml",
       "source": {
@@ -675,14 +746,14 @@
       },
       "description": "Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.",
       "runtime_python": "3.11",
-      "tools_count": 31,
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.119",
-        "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-        "package_digest": "sha256:96d6f252130a2f7ddc2938e5c09895f2b6695de3854b9a019c159444ea4b48c2"
-      }
+        "release": "media_center@0.6.136",
+        "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+        "package_digest": "sha256:211be29c62ed43c42dfee1a9795987bd10dd313e864ea54f3535aa2b18da30fd"
+      },
+      "tools_count": 31
     },
     {
       "kind": "skill",
@@ -853,15 +924,15 @@
       "id": "notebook_skill",
       "name": "notebook_skill",
       "version": "0.2.5",
-      "updated_at": "2026-09-27T21:52:07+00:00",
+      "updated_at": "2026-11-05T13:57:21+00:00",
       "path": "skills/notebook_skill",
       "manifest": "skills/notebook_skill/skill.yaml",
       "source": {
         "path": "skills/notebook_skill",
         "manifest": "skills/notebook_skill/skill.yaml",
         "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:0fea3cd2bd3866cb83c366f47dcf4e8db587b27f701e90b5e62b6d21347eb695",
+        "repository": "adaos-dev:applications-beta-reconciliation-20261025",
+        "revision": "sha256:80c287262f723333f4d622b584be825928c7c29b1f9e808a095658677b6472ee",
         "path_scope": [
           "projects/notebook/"
         ]
@@ -877,16 +948,16 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "notebook",
-        "release": "notebook@0.1.3",
-        "release_digest": "sha256:23fe7aa94ba1d556ce8a54edabc798ae5e12a89c673d84d17a651e06e073532b",
-        "package_digest": "sha256:3bdf7d3213f67525527a3561c4598860ff640eace96e18a6d56a096813326ef6"
+        "release": "notebook@0.1.4",
+        "release_digest": "sha256:3f1cf717532c0714289442562c9a982f4b322f443885afcadcc9ae9bf0c2f650",
+        "package_digest": "sha256:b9a1786fb075c939b26df02225711f45b96bc4c8db411a30d26ad7918e9fdfae"
       },
       "channels": {
         "stable": {
-          "release": "notebook@0.1.3",
-          "release_digest": "sha256:23fe7aa94ba1d556ce8a54edabc798ae5e12a89c673d84d17a651e06e073532b",
-          "source_revision": "sha256:0fea3cd2bd3866cb83c366f47dcf4e8db587b27f701e90b5e62b6d21347eb695",
-          "package_digest": "sha256:3bdf7d3213f67525527a3561c4598860ff640eace96e18a6d56a096813326ef6",
+          "release": "notebook@0.1.4",
+          "release_digest": "sha256:3f1cf717532c0714289442562c9a982f4b322f443885afcadcc9ae9bf0c2f650",
+          "source_revision": "sha256:80c287262f723333f4d622b584be825928c7c29b1f9e808a095658677b6472ee",
+          "package_digest": "sha256:b9a1786fb075c939b26df02225711f45b96bc4c8db411a30d26ad7918e9fdfae",
           "version": "0.2.5"
         }
       }
@@ -896,7 +967,7 @@
       "id": "pair_new_device_skill",
       "name": "pair_new_device_skill",
       "version": "0.1.0",
-      "updated_at": "2026-05-06T07:55:12+00:00",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/pair_new_device_skill",
       "manifest": "skills/pair_new_device_skill/skill.yaml",
       "source": {
@@ -915,10 +986,39 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.86",
-        "release_digest": "sha256:b7c43103f3a2c2ed1588007309cc4ba2c13448360ab9d5627f6212063055a139",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "package_digest": "sha256:ddac2904f52eea9e23a1b13cf530ae5dc6e4a8f33a44374685ca90df110a4ded"
       }
+    },
+    {
+      "kind": "skill",
+      "id": "prompt_engineer_skill",
+      "name": "prompt_engineer_skill",
+      "version": "0.7.11",
+      "updated_at": "2026-11-06T03:41:03+00:00",
+      "path": "skills/prompt_engineer_skill",
+      "manifest": "skills/prompt_engineer_skill/skill.yaml",
+      "source": {
+        "path": "skills/prompt_engineer_skill",
+        "manifest": "skills/prompt_engineer_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "prompt_engineer_skill",
+        "id": "prompt_engineer_skill"
+      },
+      "description": "Prompt IDE backend skill that manages dev scenarios/skills, technical specs and git operations.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "adaos_builder",
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:40e66e3e02ccb865fc0dbc069b1a0103ab66bf29dde36a1bb696f80340168be0"
+      },
+      "tools_count": 27
     },
     {
       "kind": "skill",
@@ -1449,7 +1549,7 @@
       "id": "voice_chat_skill",
       "name": "voice_chat_skill",
       "version": "0.7.8",
-      "updated_at": "2026-09-27T21:52:48+00:00",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/voice_chat_skill",
       "manifest": "skills/voice_chat_skill/skill.yaml",
       "source": {
@@ -1467,8 +1567,8 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.86",
-        "release_digest": "sha256:b7c43103f3a2c2ed1588007309cc4ba2c13448360ab9d5627f6212063055a139",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c"
       }
     },
@@ -1541,8 +1641,8 @@
       "kind": "skill",
       "id": "web_desktop_runtime_skill",
       "name": "web_desktop_runtime_skill",
-      "version": "0.1.61",
-      "updated_at": "2026-10-08T21:26:33+00:00",
+      "version": "0.1.71",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/web_desktop_runtime_skill",
       "manifest": "skills/web_desktop_runtime_skill/skill.yaml",
       "source": {
@@ -1560,18 +1660,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.86",
-        "release_digest": "sha256:b7c43103f3a2c2ed1588007309cc4ba2c13448360ab9d5627f6212063055a139",
-        "package_digest": "sha256:23829eb27bd63cd017940be733d6061a01f11fddd106102dc6bf153965f2e122"
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
+        "package_digest": "sha256:4c949cec939d027733d47ff2a7d2d33caad76654a54b9d14eb48cff629e7260b"
       },
-      "tools_count": 26
+      "tools_count": 35
     },
     {
       "kind": "skill",
       "id": "web_desktop_skill",
       "name": "web_desktop_skill",
-      "version": "0.2.4",
-      "updated_at": "2026-08-11T09:30:21+00:00",
+      "version": "0.2.5",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "skills/web_desktop_skill",
       "manifest": "skills/web_desktop_skill/skill.yaml",
       "source": {
@@ -1590,9 +1690,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.86",
-        "release_digest": "sha256:b7c43103f3a2c2ed1588007309cc4ba2c13448360ab9d5627f6212063055a139",
-        "package_digest": "sha256:dc6b9e208019a45a30e2d155e310802559c21a7ff6262acfb9fd524ec4a543de"
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
+        "package_digest": "sha256:a06afbebe11e168fe97b3f1a44f4848cad1a8bd554715d9dd54ae015d084df55"
       }
     },
     {
@@ -1671,8 +1771,8 @@
       "kind": "scenario",
       "id": "applications",
       "name": "applications",
-      "version": "0.1.74",
-      "updated_at": "2026-09-27T17:07:47+00:00",
+      "version": "0.1.97",
+      "updated_at": "2026-11-16T14:24:54+00:00",
       "path": "scenarios/applications",
       "manifest": "scenarios/applications/scenario.yaml",
       "source": {
@@ -1680,7 +1780,7 @@
         "manifest": "scenarios/applications/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:26a06fe2a0df11fe7c4296f48ad066041372de9131b0e9618ce23ab915c3345f",
+        "revision": "sha256:102b9b77b9abc2c0e2159787afcb61dd89538aa013cf75e3016ef18e29eeaee6",
         "path_scope": [
           "projects/applications/"
         ]
@@ -1696,6 +1796,11 @@
         "key": "scenario.applications.title"
       },
       "description": "Builder-created rapid prototype scenario.",
+      "skills": {
+        "required": [
+          "applications_skill"
+        ]
+      },
       "io": {
         "input": [
           "voice",
@@ -1710,17 +1815,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "applications",
-        "release": "applications@0.1.44",
-        "release_digest": "sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710",
-        "package_digest": "sha256:e3741e74db660de49effba207188279156f5fbf2be2bd399f4e22aa504cc0db4"
+        "release": "applications@0.1.67",
+        "release_digest": "sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8",
+        "package_digest": "sha256:d82804ad93fbc46c3faa411e48bafc03c34f4370091b679dd03474f24daf933f"
       },
       "channels": {
         "stable": {
-          "release": "applications@0.1.44",
-          "release_digest": "sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710",
-          "source_revision": "sha256:26a06fe2a0df11fe7c4296f48ad066041372de9131b0e9618ce23ab915c3345f",
-          "package_digest": "sha256:e3741e74db660de49effba207188279156f5fbf2be2bd399f4e22aa504cc0db4",
-          "version": "0.1.74"
+          "release": "applications@0.1.67",
+          "release_digest": "sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8",
+          "source_revision": "sha256:102b9b77b9abc2c0e2159787afcb61dd89538aa013cf75e3016ef18e29eeaee6",
+          "package_digest": "sha256:d82804ad93fbc46c3faa411e48bafc03c34f4370091b679dd03474f24daf933f",
+          "version": "0.1.97"
         }
       }
     },
@@ -1780,8 +1885,8 @@
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.103",
-      "updated_at": "2026-09-27T17:42:00+00:00",
+      "version": "0.2.115",
+      "updated_at": "2026-11-06T03:41:03+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.yaml",
       "source": {
@@ -1789,7 +1894,7 @@
         "manifest": "scenarios/builder/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:79f1e92adb6c137c43eb770003aef02a660fe7be83a964b028f5aa096c58763b",
+        "revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
         "path_scope": [
           "projects/adaos_builder/"
         ]
@@ -1815,17 +1920,69 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.19",
-        "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-        "package_digest": "sha256:18f30e668e057eb3913034ddd13d892003f4b28af46cb4cb3eeb02563687c79b"
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:0bc61280d319dfd1ed6862e801d7f4c4b87fe98f6d72e3ed60476e82bbce0746"
       },
       "channels": {
         "stable": {
-          "release": "adaos_builder@0.3.19",
-          "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-          "source_revision": "sha256:79f1e92adb6c137c43eb770003aef02a660fe7be83a964b028f5aa096c58763b",
-          "package_digest": "sha256:18f30e668e057eb3913034ddd13d892003f4b28af46cb4cb3eeb02563687c79b",
-          "version": "0.2.103"
+          "release": "adaos_builder@0.3.42",
+          "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+          "source_revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
+          "package_digest": "sha256:0bc61280d319dfd1ed6862e801d7f4c4b87fe98f6d72e3ed60476e82bbce0746",
+          "version": "0.2.115"
+        }
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "context_chat",
+      "name": "context_chat",
+      "version": "0.3.2",
+      "updated_at": "2026-10-27T16:02:12+00:00",
+      "path": "scenarios/context_chat",
+      "manifest": "scenarios/context_chat/scenario.yaml",
+      "source": {
+        "path": "scenarios/context_chat",
+        "manifest": "scenarios/context_chat/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:08f1a51319f87f8ca8c5923a19eccf9962120b4331879d68c399b99cf1216146",
+        "path_scope": [
+          "projects/context_chat/"
+        ]
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "context_chat",
+        "id": "context_chat"
+      },
+      "title": "Context Chat",
+      "title_i18n": {
+        "key": "scenario.context_chat.title",
+        "fallback": "Context Chat"
+      },
+      "description": "Личный чат с ChatGPT: проекты, контекст, файлы и управляемая память.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "context_chat_service"
+        ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "context_chat",
+        "release": "context_chat@0.5.2",
+        "release_digest": "sha256:3e9ebc366f7e541a5d5618538a0b960a6bd6d047e0c7ea754d9541a3167d0c52",
+        "package_digest": "sha256:71b58de6e73488bb22e96212bbf19f789f9e3c878c2a57f996b4a68bde9ea76c"
+      },
+      "channels": {
+        "stable": {
+          "release": "context_chat@0.5.2",
+          "release_digest": "sha256:3e9ebc366f7e541a5d5618538a0b960a6bd6d047e0c7ea754d9541a3167d0c52",
+          "source_revision": "sha256:08f1a51319f87f8ca8c5923a19eccf9962120b4331879d68c399b99cf1216146",
+          "package_digest": "sha256:71b58de6e73488bb22e96212bbf19f789f9e3c878c2a57f996b4a68bde9ea76c",
+          "version": "0.3.2"
         }
       }
     },
@@ -1926,12 +2083,18 @@
       "id": "gmail_mail_client",
       "name": "gmail_mail_client",
       "version": "0.1.2",
-      "updated_at": "2026-09-24T02:08:08+00:00",
+      "updated_at": "2026-09-24T02:29:50+00:00",
       "path": "scenarios/gmail_mail_client",
       "manifest": "scenarios/gmail_mail_client/scenario.yaml",
       "source": {
         "path": "scenarios/gmail_mail_client",
-        "manifest": "scenarios/gmail_mail_client/scenario.yaml"
+        "manifest": "scenarios/gmail_mail_client/scenario.yaml",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+        "revision": "sha256:05a29791dea8402855aaf1d52075dbe21579e49f2a59fc7d951d01dc5377bda6",
+        "path_scope": [
+          "projects/gmail_mail_client/"
+        ]
       },
       "install": {
         "kind": "scenario",
@@ -1949,6 +2112,22 @@
         "required": [
           "gmail_mail_client_provider_skill"
         ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "gmail_mail_client",
+        "release": "gmail_mail_client@0.1.4",
+        "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+        "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa"
+      },
+      "channels": {
+        "stable": {
+          "release": "gmail_mail_client@0.1.4",
+          "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+          "source_revision": "sha256:05a29791dea8402855aaf1d52075dbe21579e49f2a59fc7d951d01dc5377bda6",
+          "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa",
+          "version": "0.1.2"
+        }
       }
     },
     {
@@ -2015,8 +2194,8 @@
       "kind": "scenario",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.6.46",
-      "updated_at": "2026-09-28T00:19:43+00:00",
+      "version": "0.6.55",
+      "updated_at": "2026-11-10T06:22:27+00:00",
       "path": "scenarios/media_center",
       "manifest": "scenarios/media_center/scenario.yaml",
       "source": {
@@ -2024,7 +2203,7 @@
         "manifest": "scenarios/media_center/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:26cc45e45b2d218b85ce95a89f38b0486057b3240b2ae9e8125cd0e119e161d7",
+        "revision": "sha256:a4cc8ad93e0c77fdfebd72f84072c80a7ee743fb3e4ca991a87848570e637ce5",
         "path_scope": [
           "projects/media_center/"
         ]
@@ -2051,18 +2230,51 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.119",
-        "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-        "package_digest": "sha256:50f4cf9c8c8185ad91b43f72671e5615fb28461a1b24dca5ac1b5edbe3f26b47"
+        "release": "media_center@0.6.136",
+        "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+        "package_digest": "sha256:5dfc7118608b49a18b962b9bf651896296fbcb81b39a73d5b56fbac6bc8ff0b3"
       },
       "channels": {
         "stable": {
-          "release": "media_center@0.6.119",
-          "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-          "source_revision": "sha256:26cc45e45b2d218b85ce95a89f38b0486057b3240b2ae9e8125cd0e119e161d7",
-          "package_digest": "sha256:50f4cf9c8c8185ad91b43f72671e5615fb28461a1b24dca5ac1b5edbe3f26b47",
-          "version": "0.6.46"
+          "release": "media_center@0.6.136",
+          "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+          "source_revision": "sha256:a4cc8ad93e0c77fdfebd72f84072c80a7ee743fb3e4ca991a87848570e637ce5",
+          "package_digest": "sha256:5dfc7118608b49a18b962b9bf651896296fbcb81b39a73d5b56fbac6bc8ff0b3",
+          "version": "0.6.55"
         }
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "prompt_engineer_scenario",
+      "name": "prompt_engineer_scenario",
+      "version": "0.3.15",
+      "updated_at": "2026-11-06T03:41:03+00:00",
+      "path": "scenarios/prompt_engineer_scenario",
+      "manifest": "scenarios/prompt_engineer_scenario/scenario.yaml",
+      "source": {
+        "path": "scenarios/prompt_engineer_scenario",
+        "manifest": "scenarios/prompt_engineer_scenario/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "prompt_engineer_scenario",
+        "id": "prompt_engineer_scenario"
+      },
+      "title": "Prompt IDE",
+      "description": "Prompt engineering IDE workspace for dev skills and scenarios.",
+      "skills": {
+        "required": [
+          "prompt_engineer_skill",
+          "builder_automation_skill"
+        ]
+      },
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "adaos_builder",
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:dc96cb929cd446e01a062758f1b319ee8ca3f7bf33c5924c82eda2787e3d3e97"
       }
     },
     {
@@ -2194,8 +2406,8 @@
       "kind": "scenario",
       "id": "skill_preview",
       "name": "skill_preview",
-      "version": "0.1.4",
-      "updated_at": "2026-09-26T11:02:38+00:00",
+      "version": "0.1.8",
+      "updated_at": "2026-11-06T03:41:03+00:00",
       "path": "scenarios/skill_preview",
       "manifest": "scenarios/skill_preview/scenario.yaml",
       "source": {
@@ -2208,6 +2420,10 @@
         "id": "skill_preview"
       },
       "title": "Skill Preview",
+      "title_i18n": {
+        "key": "scenario.skill_preview.title",
+        "fallback": "Skill Preview"
+      },
       "description": "Generic metadata and README projection for a Builder-selected skill without an explicit presentation.",
       "trigger": "manual",
       "skills": {
@@ -2218,9 +2434,9 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.19",
-        "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-        "package_digest": "sha256:c4ff9395354d2c6905a47b9dc8185064374f45f05b1381981cde90596a02219f"
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+        "package_digest": "sha256:4cb1ad036097bd975874877090d5789482e6a4f77a760438f529796de0b5c546"
       }
     },
     {
@@ -2430,8 +2646,8 @@
       "kind": "scenario",
       "id": "web_desktop",
       "name": "web_desktop",
-      "version": "0.3.97",
-      "updated_at": "2026-10-13T10:02:26+00:00",
+      "version": "0.3.111",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "scenarios/web_desktop",
       "manifest": "scenarios/web_desktop/scenario.yaml",
       "source": {
@@ -2439,7 +2655,7 @@
         "manifest": "scenarios/web_desktop/scenario.yaml",
         "forge": "content-addressed-dev",
         "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:a89794b58bc1a74237fc1214d48949007b07309ff25879ac0d0da72917a4f184",
+        "revision": "sha256:798e166fc01a77c4f69e3e7dbc24416e311f912dea3e283857df643b7fc46bab",
         "path_scope": [
           "projects/web_desktop/"
         ]
@@ -2468,17 +2684,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.86",
-        "release_digest": "sha256:b7c43103f3a2c2ed1588007309cc4ba2c13448360ab9d5627f6212063055a139",
-        "package_digest": "sha256:37bad2fee18b0b28687f3b8cbfe8782fa9e6b4ad3e8e1989ff98c2545bc6d2e0"
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
+        "package_digest": "sha256:1f80b67715db42177db2d81fc11fbad69297672679d4ef569ab86ae526a46331"
       },
       "channels": {
         "stable": {
-          "release": "web_desktop@0.3.86",
-          "release_digest": "sha256:b7c43103f3a2c2ed1588007309cc4ba2c13448360ab9d5627f6212063055a139",
-          "source_revision": "sha256:a89794b58bc1a74237fc1214d48949007b07309ff25879ac0d0da72917a4f184",
-          "package_digest": "sha256:37bad2fee18b0b28687f3b8cbfe8782fa9e6b4ad3e8e1989ff98c2545bc6d2e0",
-          "version": "0.3.97"
+          "release": "web_desktop@0.3.99",
+          "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
+          "source_revision": "sha256:798e166fc01a77c4f69e3e7dbc24416e311f912dea3e283857df643b7fc46bab",
+          "package_digest": "sha256:1f80b67715db42177db2d81fc11fbad69297672679d4ef569ab86ae526a46331",
+          "version": "0.3.111"
         }
       }
     },
@@ -2547,8 +2763,8 @@
       "kind": "project",
       "id": "adaos_builder",
       "name": "adaos_builder",
-      "version": "0.3.19",
-      "updated_at": "2026-09-30T19:51:20+00:00",
+      "version": "0.3.42",
+      "updated_at": "2026-11-06T03:41:03+00:00",
       "path": "projects/adaos_builder",
       "manifest": "projects/adaos_builder/project.yaml",
       "source": {
@@ -2575,6 +2791,7 @@
       ],
       "tags": [
         "builder",
+        "prompt-ide",
         "project",
         "devspace"
       ],
@@ -2617,6 +2834,20 @@
           ]
         },
         {
+          "id": "prompt-ide",
+          "title": "Prompt IDE",
+          "title_i18n": {
+            "en": "Prompt IDE",
+            "ru": "Prompt IDE"
+          },
+          "default": false,
+          "optional": true,
+          "components": [
+            "scenario:prompt_engineer_scenario",
+            "skill:prompt_engineer_skill"
+          ]
+        },
+        {
           "id": "skill-preview",
           "title": "Skill preview",
           "title_i18n": {
@@ -2632,12 +2863,14 @@
       ],
       "components": [
         "scenario:builder",
+        "scenario:prompt_engineer_scenario",
         "scenario:skill_preview",
         "skill:builder_skill",
         "skill:builder_sdk_control_skill",
-        "skill:builder_automation_skill"
+        "skill:builder_automation_skill",
+        "skill:prompt_engineer_skill"
       ],
-      "components_count": 5,
+      "components_count": 7,
       "profiles": [
         "adaos.builder.v1",
         "adaos.development.workbench.v1"
@@ -2645,18 +2878,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "adaos_builder",
-        "release": "adaos_builder@0.3.19",
-        "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
+        "release": "adaos_builder@0.3.42",
+        "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
         "primary_component": "scenario:builder",
-        "package_digest": "sha256:18f30e668e057eb3913034ddd13d892003f4b28af46cb4cb3eeb02563687c79b"
+        "package_digest": "sha256:0bc61280d319dfd1ed6862e801d7f4c4b87fe98f6d72e3ed60476e82bbce0746"
       },
       "channels": {
         "stable": {
-          "release": "adaos_builder@0.3.19",
-          "release_digest": "sha256:e0b8c4355d0ce2b285f947e92e805d82193e9921e340a8a8233142f8e9f7dd4a",
-          "source_revision": "sha256:79f1e92adb6c137c43eb770003aef02a660fe7be83a964b028f5aa096c58763b",
-          "package_digest": "sha256:18f30e668e057eb3913034ddd13d892003f4b28af46cb4cb3eeb02563687c79b",
-          "version": "0.3.19"
+          "release": "adaos_builder@0.3.42",
+          "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
+          "source_revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
+          "package_digest": "sha256:0bc61280d319dfd1ed6862e801d7f4c4b87fe98f6d72e3ed60476e82bbce0746",
+          "version": "0.3.42"
         }
       }
     },
@@ -2664,8 +2897,8 @@
       "kind": "project",
       "id": "applications",
       "name": "applications",
-      "version": "0.1.44",
-      "updated_at": "2026-09-27T17:10:01+00:00",
+      "version": "0.1.67",
+      "updated_at": "2026-11-16T14:24:54+00:00",
       "path": "projects/applications",
       "manifest": "projects/applications/project.yaml",
       "source": {
@@ -2698,27 +2931,28 @@
       "install_default": false,
       "features": [],
       "components": [
-        "scenario:applications"
+        "scenario:applications",
+        "skill:applications_skill"
       ],
-      "components_count": 1,
+      "components_count": 2,
       "profiles": [
         "adaos.system.applications.v1"
       ],
       "activation": {
         "mode": "package_lock",
         "project_id": "applications",
-        "release": "applications@0.1.44",
-        "release_digest": "sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710",
+        "release": "applications@0.1.67",
+        "release_digest": "sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8",
         "primary_component": "scenario:applications",
-        "package_digest": "sha256:e3741e74db660de49effba207188279156f5fbf2be2bd399f4e22aa504cc0db4"
+        "package_digest": "sha256:d82804ad93fbc46c3faa411e48bafc03c34f4370091b679dd03474f24daf933f"
       },
       "channels": {
         "stable": {
-          "release": "applications@0.1.44",
-          "release_digest": "sha256:8b07964fa31009c554629a4eb79cc29bdd8b846431832f6d1911c6e5bc739710",
-          "source_revision": "sha256:26a06fe2a0df11fe7c4296f48ad066041372de9131b0e9618ce23ab915c3345f",
-          "package_digest": "sha256:e3741e74db660de49effba207188279156f5fbf2be2bd399f4e22aa504cc0db4",
-          "version": "0.1.44"
+          "release": "applications@0.1.67",
+          "release_digest": "sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8",
+          "source_revision": "sha256:102b9b77b9abc2c0e2159787afcb61dd89538aa013cf75e3016ef18e29eeaee6",
+          "package_digest": "sha256:d82804ad93fbc46c3faa411e48bafc03c34f4370091b679dd03474f24daf933f",
+          "version": "0.1.67"
         }
       }
     },
@@ -2777,10 +3011,63 @@
     },
     {
       "kind": "project",
+      "id": "context_chat",
+      "name": "context_chat",
+      "version": "0.5.2",
+      "updated_at": "2026-10-27T16:02:12+00:00",
+      "path": "projects/context_chat",
+      "manifest": "projects/context_chat/project.yaml",
+      "source": {
+        "path": "projects/context_chat",
+        "manifest": "projects/context_chat/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "name": "context_chat",
+        "id": "context_chat"
+      },
+      "title": "Context Chat",
+      "description": "Проекты и отдельные чаты: Markdown и формулы, документы, изолированная память, модели и сила reasoning.",
+      "publication": {
+        "stage": "beta",
+        "visibility": "unlisted",
+        "channel": "beta"
+      },
+      "stage": "beta",
+      "visibility": "unlisted",
+      "channel": "beta",
+      "install_default": false,
+      "features": [],
+      "components": [
+        "scenario:context_chat",
+        "skill:context_chat_service"
+      ],
+      "components_count": 2,
+      "profiles": [],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "context_chat",
+        "release": "context_chat@0.5.2",
+        "release_digest": "sha256:3e9ebc366f7e541a5d5618538a0b960a6bd6d047e0c7ea754d9541a3167d0c52",
+        "primary_component": "scenario:context_chat",
+        "package_digest": "sha256:71b58de6e73488bb22e96212bbf19f789f9e3c878c2a57f996b4a68bde9ea76c"
+      },
+      "channels": {
+        "stable": {
+          "release": "context_chat@0.5.2",
+          "release_digest": "sha256:3e9ebc366f7e541a5d5618538a0b960a6bd6d047e0c7ea754d9541a3167d0c52",
+          "source_revision": "sha256:08f1a51319f87f8ca8c5923a19eccf9962120b4331879d68c399b99cf1216146",
+          "package_digest": "sha256:71b58de6e73488bb22e96212bbf19f789f9e3c878c2a57f996b4a68bde9ea76c",
+          "version": "0.5.2"
+        }
+      }
+    },
+    {
+      "kind": "project",
       "id": "cv_descriptor_lab",
       "name": "cv_descriptor_lab",
-      "version": "0.1.22",
-      "updated_at": "2026-09-27T22:03:38+00:00",
+      "version": "0.1.23",
+      "updated_at": "2026-11-06T14:35:20+00:00",
       "path": "projects/cv_descriptor_lab",
       "manifest": "projects/cv_descriptor_lab/project.yaml",
       "source": {
@@ -2842,18 +3129,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "cv_descriptor_lab",
-        "release": "cv_descriptor_lab@0.1.22",
-        "release_digest": "sha256:79c9b75dba86a5fed8e6043edbb66d272115b9a98a6c6a08ea1dcf4d6cfe4074",
+        "release": "cv_descriptor_lab@0.1.23",
+        "release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
         "primary_component": "skill:cv_descriptor",
-        "package_digest": "sha256:291c278a48dc278d512877cce46e9df4ab570066c7bb40607e5f32035f18381c"
+        "package_digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21"
       },
       "channels": {
         "stable": {
-          "release": "cv_descriptor_lab@0.1.22",
-          "release_digest": "sha256:79c9b75dba86a5fed8e6043edbb66d272115b9a98a6c6a08ea1dcf4d6cfe4074",
-          "source_revision": "sha256:7be931c95c7bee6e42ac6a10e1169a191f83856b801d13abd8b1b6b8a712a667",
-          "package_digest": "sha256:291c278a48dc278d512877cce46e9df4ab570066c7bb40607e5f32035f18381c",
-          "version": "0.1.22"
+          "release": "cv_descriptor_lab@0.1.23",
+          "release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
+          "source_revision": "sha256:9e1ab44f35f3809c034f332a85d7ee4fbfa81217ebd46e2a6ddb80eb6f811081",
+          "package_digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21",
+          "version": "0.1.23"
         }
       }
     },
@@ -2915,7 +3202,7 @@
       "id": "gmail_mail_client",
       "name": "gmail_mail_client",
       "version": "0.1.4",
-      "updated_at": "2026-09-27T06:32:27+00:00",
+      "updated_at": "2026-09-24T02:29:50+00:00",
       "path": "projects/gmail_mail_client",
       "manifest": "projects/gmail_mail_client/project.yaml",
       "source": {
@@ -2944,7 +3231,24 @@
         "skill:gmail_mail_client_provider_skill"
       ],
       "components_count": 2,
-      "profiles": []
+      "profiles": [],
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "gmail_mail_client",
+        "release": "gmail_mail_client@0.1.4",
+        "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+        "primary_component": "scenario:gmail_mail_client",
+        "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa"
+      },
+      "channels": {
+        "stable": {
+          "release": "gmail_mail_client@0.1.4",
+          "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
+          "source_revision": "sha256:05a29791dea8402855aaf1d52075dbe21579e49f2a59fc7d951d01dc5377bda6",
+          "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa",
+          "version": "0.1.4"
+        }
+      }
     },
     {
       "kind": "project",
@@ -2985,8 +3289,8 @@
       "kind": "project",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.6.119",
-      "updated_at": "2026-09-28T00:22:13+00:00",
+      "version": "0.6.136",
+      "updated_at": "2026-11-10T06:22:27+00:00",
       "path": "projects/media_center",
       "manifest": "projects/media_center/project.yaml",
       "source": {
@@ -3075,18 +3379,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "media_center",
-        "release": "media_center@0.6.119",
-        "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
+        "release": "media_center@0.6.136",
+        "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
         "primary_component": "scenario:media_center",
-        "package_digest": "sha256:50f4cf9c8c8185ad91b43f72671e5615fb28461a1b24dca5ac1b5edbe3f26b47"
+        "package_digest": "sha256:5dfc7118608b49a18b962b9bf651896296fbcb81b39a73d5b56fbac6bc8ff0b3"
       },
       "channels": {
         "stable": {
-          "release": "media_center@0.6.119",
-          "release_digest": "sha256:2f72b6d2ec0dd5777ff3c8627517b3db835b66840ed71753b5a477285518f473",
-          "source_revision": "sha256:26cc45e45b2d218b85ce95a89f38b0486057b3240b2ae9e8125cd0e119e161d7",
-          "package_digest": "sha256:50f4cf9c8c8185ad91b43f72671e5615fb28461a1b24dca5ac1b5edbe3f26b47",
-          "version": "0.6.119"
+          "release": "media_center@0.6.136",
+          "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
+          "source_revision": "sha256:a4cc8ad93e0c77fdfebd72f84072c80a7ee743fb3e4ca991a87848570e637ce5",
+          "package_digest": "sha256:5dfc7118608b49a18b962b9bf651896296fbcb81b39a73d5b56fbac6bc8ff0b3",
+          "version": "0.6.136"
         }
       }
     },
@@ -3158,8 +3462,8 @@
       "kind": "project",
       "id": "notebook",
       "name": "notebook",
-      "version": "0.1.3",
-      "updated_at": "2026-09-27T22:04:44+00:00",
+      "version": "0.1.4",
+      "updated_at": "2026-11-05T13:57:21+00:00",
       "path": "projects/notebook",
       "manifest": "projects/notebook/project.yaml",
       "source": {
@@ -3210,18 +3514,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "notebook",
-        "release": "notebook@0.1.3",
-        "release_digest": "sha256:23fe7aa94ba1d556ce8a54edabc798ae5e12a89c673d84d17a651e06e073532b",
+        "release": "notebook@0.1.4",
+        "release_digest": "sha256:3f1cf717532c0714289442562c9a982f4b322f443885afcadcc9ae9bf0c2f650",
         "primary_component": "skill:notebook_skill",
-        "package_digest": "sha256:3bdf7d3213f67525527a3561c4598860ff640eace96e18a6d56a096813326ef6"
+        "package_digest": "sha256:b9a1786fb075c939b26df02225711f45b96bc4c8db411a30d26ad7918e9fdfae"
       },
       "channels": {
         "stable": {
-          "release": "notebook@0.1.3",
-          "release_digest": "sha256:23fe7aa94ba1d556ce8a54edabc798ae5e12a89c673d84d17a651e06e073532b",
-          "source_revision": "sha256:0fea3cd2bd3866cb83c366f47dcf4e8db587b27f701e90b5e62b6d21347eb695",
-          "package_digest": "sha256:3bdf7d3213f67525527a3561c4598860ff640eace96e18a6d56a096813326ef6",
-          "version": "0.1.3"
+          "release": "notebook@0.1.4",
+          "release_digest": "sha256:3f1cf717532c0714289442562c9a982f4b322f443885afcadcc9ae9bf0c2f650",
+          "source_revision": "sha256:80c287262f723333f4d622b584be825928c7c29b1f9e808a095658677b6472ee",
+          "package_digest": "sha256:b9a1786fb075c939b26df02225711f45b96bc4c8db411a30d26ad7918e9fdfae",
+          "version": "0.1.4"
         }
       }
     },
@@ -3755,8 +4059,8 @@
       "kind": "project",
       "id": "web_desktop",
       "name": "web_desktop",
-      "version": "0.3.86",
-      "updated_at": "2026-10-13T10:39:54+00:00",
+      "version": "0.3.99",
+      "updated_at": "2026-11-15T11:56:44+00:00",
       "path": "projects/web_desktop",
       "manifest": "projects/web_desktop/project.yaml",
       "source": {
@@ -3826,18 +4130,18 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "web_desktop",
-        "release": "web_desktop@0.3.86",
-        "release_digest": "sha256:b7c43103f3a2c2ed1588007309cc4ba2c13448360ab9d5627f6212063055a139",
+        "release": "web_desktop@0.3.99",
+        "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "primary_component": "scenario:web_desktop",
-        "package_digest": "sha256:37bad2fee18b0b28687f3b8cbfe8782fa9e6b4ad3e8e1989ff98c2545bc6d2e0"
+        "package_digest": "sha256:1f80b67715db42177db2d81fc11fbad69297672679d4ef569ab86ae526a46331"
       },
       "channels": {
         "stable": {
-          "release": "web_desktop@0.3.86",
-          "release_digest": "sha256:b7c43103f3a2c2ed1588007309cc4ba2c13448360ab9d5627f6212063055a139",
-          "source_revision": "sha256:a89794b58bc1a74237fc1214d48949007b07309ff25879ac0d0da72917a4f184",
-          "package_digest": "sha256:37bad2fee18b0b28687f3b8cbfe8782fa9e6b4ad3e8e1989ff98c2545bc6d2e0",
-          "version": "0.3.86"
+          "release": "web_desktop@0.3.99",
+          "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
+          "source_revision": "sha256:798e166fc01a77c4f69e3e7dbc24416e311f912dea3e283857df643b7fc46bab",
+          "package_digest": "sha256:1f80b67715db42177db2d81fc11fbad69297672679d4ef569ab86ae526a46331",
+          "version": "0.3.99"
         }
       }
     }

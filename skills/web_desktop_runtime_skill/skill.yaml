@@ -1,5 +1,5 @@
 name: web_desktop_runtime_skill
-version: 0.1.62
+version: 0.1.71
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -11,7 +11,7 @@ runtime:
       schema: adaos.skill.activation_assessment.v1
       assessor: builder.compiler
       classification: event_subscriber
-      handler_digest: sha256:c3148707e575dfa4b5a596f827f3f2aec9e234a8832baf7b4f45a159c36448f1
+      handler_digest: sha256:26b124b88367d84cff75c9201da0126a37bb8146b814a6f2874af792084ada05
       observed_subscriptions:
       - economic.subscription.changed
       - root.subscription.changed
@@ -25,7 +25,7 @@ runtime:
       - webio.stream.snapshot.requested
       - webio.stream.subscription.changed
       dynamic_subscription_count: 0
-      tool_count: 26
+      tool_count: 35
       reasons:
       - event_subscriptions_require_early_handler_registration
 description: Project-owned runtime actions for opening Web Desktop applications, managing
@@ -1336,6 +1336,248 @@ tools:
         type: string
       applied:
         type: boolean
+- name: get_node_maintenance
+  description: Selected-node maintenance through the Core owner.
+  entry: handlers.main:get_node_maintenance
+  side_effects: read_only
+  permissions:
+  - workspace.read
+  application_access:
+    permission: workspace.read
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      section:
+        type: string
+        enum:
+        - storage
+        - recovery
+        - testing
+    required:
+    - target_node_id
+  output_schema:
+    type: object
+- name: plan_storage_location
+  description: Selected-node maintenance through the Core owner.
+  entry: handlers.main:plan_storage_location
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      role:
+        type: string
+      desired_path:
+        type: string
+      expected_revision:
+        type: integer
+        minimum: 0
+    required:
+    - target_node_id
+    - role
+    - desired_path
+    - expected_revision
+  output_schema:
+    type: object
+- name: save_storage_location
+  description: Selected-node maintenance through the Core owner.
+  entry: handlers.main:save_storage_location
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      plan_digest:
+        type: string
+        pattern: ^[a-f0-9]{64}$
+    required:
+    - target_node_id
+    - plan_digest
+  output_schema:
+    type: object
+- name: advance_storage_inventory
+  description: Selected-node maintenance through the Core owner.
+  entry: handlers.main:advance_storage_inventory
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      role:
+        type: string
+      restart:
+        type: boolean
+    required:
+    - target_node_id
+    - role
+  output_schema:
+    type: object
+- name: plan_validation_campaign
+  description: Selected-node maintenance through the Core owner.
+  entry: handlers.main:plan_validation_campaign
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      suite_id:
+        type: string
+      node_id:
+        type: string
+      target_build:
+        type: string
+    required:
+    - target_node_id
+    - suite_id
+    - node_id
+  output_schema:
+    type: object
+- name: start_validation_campaign
+  description: Selected-node maintenance through the Core owner.
+  entry: handlers.main:start_validation_campaign
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      plan_digest:
+        type: string
+        pattern: ^[a-f0-9]{64}$
+    required:
+    - target_node_id
+    - plan_digest
+  output_schema:
+    type: object
+- name: plan_storage_migration
+  description: Governed selected-node data migration; review precedes execution.
+  entry: handlers.main:plan_storage_migration
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      role:
+        type: string
+      expected_revision:
+        type: integer
+        minimum: 0
+      desired_path:
+        type: string
+    required:
+    - target_node_id
+    - role
+    - expected_revision
+    - desired_path
+  output_schema:
+    type: object
+- name: start_storage_migration
+  description: Governed selected-node data migration; review precedes execution.
+  entry: handlers.main:start_storage_migration
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      plan_digest:
+        type: string
+        pattern: ^[a-f0-9]{64}$
+    required:
+    - target_node_id
+    - plan_digest
+  output_schema:
+    type: object
+- name: control_storage_migration
+  description: Governed selected-node data migration; review precedes execution.
+  entry: handlers.main:control_storage_migration
+  side_effects: runtime_write
+  permissions:
+  - workspace.write
+  application_access:
+    permission: workspace.write
+    capability: desktop.settings.write
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      target_node_id:
+        type: string
+        minLength: 1
+      job_id:
+        type: string
+        pattern: ^[a-f0-9]{64}$
+      action:
+        type: string
+        enum:
+        - status
+        - resume
+        - cancel
+    required:
+    - target_node_id
+    - job_id
+    - action
+  output_schema:
+    type: object
 exports:
   tools:
   - web_desktop_runtime_drain
@@ -1364,6 +1606,15 @@ exports:
   - prepare_connection
   - unlink_node
   - rename_subnet
+  - get_node_maintenance
+  - plan_storage_location
+  - save_storage_location
+  - advance_storage_inventory
+  - plan_validation_campaign
+  - start_validation_campaign
+  - plan_storage_migration
+  - start_storage_migration
+  - control_storage_migration
 data_routes:
 - surface: system-hardware
   route: stream
@@ -1574,4 +1825,4 @@ data_routes:
     invalidation_tags:
     - web_desktop.preferences
 prototype: default
-updated_at: '2026-10-08T21:26:33+00:00'
+updated_at: '2026-11-15T09:23:30+00:00'

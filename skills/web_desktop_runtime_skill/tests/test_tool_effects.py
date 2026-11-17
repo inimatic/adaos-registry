@@ -10,6 +10,15 @@ def test_public_tool_effects():
         (Path(__file__).resolve().parents[1] / "skill.yaml").read_text(encoding="utf-8")
     )
     expected = {
+        "get_node_maintenance": "read_only",
+        "plan_storage_location": "runtime_write",
+        "save_storage_location": "runtime_write",
+        "plan_storage_migration": "runtime_write",
+        "start_storage_migration": "runtime_write",
+        "control_storage_migration": "runtime_write",
+        "advance_storage_inventory": "runtime_write",
+        "plan_validation_campaign": "runtime_write",
+        "start_validation_campaign": "runtime_write",
         "web_desktop_runtime_drain": "runtime_write",
         "web_desktop_runtime_dispose": "runtime_write",
         "web_desktop_runtime_rehydrate": "runtime_write",

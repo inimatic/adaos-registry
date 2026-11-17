@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:resource.records.application-owned",
+  "binding_definition_digest": "sha256:e01fd2659dbdb5199765ad08a5b66abccf99fbc7d850b2265558c20285ef51eb",
+  "logical_entrypoint": "resource.records.application-owned",
+  "package": {
+    "kind": "skill",
+    "id": "automation_manager_prototype_skill",
+    "version": "0.1.6",
+    "digest": "sha256:56688ee94ae3e6a8f72a791ba87f8f1aaedbbe255454cc05c721cc1c1e8c6d0b"
+  },
+  "physical_member": "handlers/main.py",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:24c4959aa5e26f47db8091c055731ea53406cc80816af1d1d02bc7cf26ab8417"
+}

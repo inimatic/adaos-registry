@@ -29,6 +29,60 @@ from .operational import project as _project_operational_dashboard
 from .operational import number as _operational_number
 
 
+@tool("get_node_maintenance", summary="Read selected-node storage, recovery and testing.", stability="experimental")
+def get_node_maintenance(target_node_id: str, section: str = "storage"):
+    from .maintenance import snapshot
+    return snapshot(section, target_node_id)
+
+
+@tool("plan_storage_location", summary="Review a desired placement without moving data.", stability="experimental")
+def plan_storage_location(target_node_id: str, role: str, desired_path: str, expected_revision: int):
+    from .maintenance import plan_location
+    return plan_location(target_node_id, role=role, desired_path=desired_path, expected_revision=expected_revision)
+
+
+@tool("save_storage_location", summary="Save the exact reviewed desired placement.", stability="experimental")
+def save_storage_location(target_node_id: str, plan_digest: str):
+    from .maintenance import apply_location
+    return apply_location(target_node_id, plan_digest)
+
+
+@tool("advance_storage_inventory", summary="Continue selected-node storage measurement.", stability="experimental")
+def advance_storage_inventory(target_node_id: str, role: str, restart: bool = False):
+    from adaos.sdk import maintenance
+    return maintenance.advance_inventory(role, restart)
+
+
+@tool("plan_storage_migration", summary="Review copying, verification and cutover of saved placement.", stability="experimental")
+def plan_storage_migration(target_node_id: str, role: str, expected_revision: int, desired_path: str):
+    from adaos.sdk import maintenance
+    return {**maintenance.plan_migration(role, expected_revision, desired_path), "target_node_id": target_node_id}
+
+
+@tool("start_storage_migration", summary="Start the exact reviewed data migration.", stability="experimental")
+def start_storage_migration(target_node_id: str, plan_digest: str):
+    from adaos.sdk import maintenance
+    return {**maintenance.start_migration(plan_digest), "target_node_id": target_node_id}
+
+
+@tool("control_storage_migration", summary="Read, resume or cancel a durable storage migration.", stability="experimental")
+def control_storage_migration(target_node_id: str, job_id: str, action: str):
+    from adaos.sdk import maintenance
+    return {**maintenance.control_migration(job_id, action), "target_node_id": target_node_id}
+
+
+@tool("plan_validation_campaign", summary="Review an allowlisted observe-only campaign.", stability="experimental")
+def plan_validation_campaign(target_node_id: str, suite_id: str, node_id: str, target_build: str = ""):
+    from adaos.sdk import maintenance
+    return {**maintenance.plan_testing(suite_id, node_id, target_build), "target_node_id": target_node_id}
+
+
+@tool("start_validation_campaign", summary="Queue the exact reviewed validation campaign.", stability="experimental")
+def start_validation_campaign(target_node_id: str, plan_digest: str):
+    from adaos.sdk import maintenance
+    return maintenance.apply_testing(plan_digest)
+
+
 _MAX_DEVICE_INVENTORY_PAGE_SIZE = 500
 _REDEVICE_SYNC_INTERVAL_S = 20.0
 _REDEVICE_SYNC_LOCK = Lock()
@@ -874,6 +928,10 @@ def _project_application(model: dict[str, Any]) -> dict[str, Any]:
     )
     categories = _categories(application)
     local_beta_active = _bool_value(model.get("local_beta_active"))
+    active_release = _mapping(model.get("active_release"))
+    active_project_release = _mapping(active_release.get("project_release"))
+    lifecycle = _mapping(model.get("lifecycle"))
+    admission = _mapping(lifecycle.get("runtime")) or _mapping(model.get("runtime_admission"))
     installed = (
         _bool_value(model.get("installed", application.get("installed")))
         or local_beta_active
@@ -928,6 +986,8 @@ def _project_application(model: dict[str, Any]) -> dict[str, Any]:
         "installed_state": "installed" if installed else "not_installed",
         "local_beta_active": local_beta_active,
         "effective_version": _first_string(
+            active_project_release.get("version"),
+            active_release.get("version"),
             effective.get("version"),
             effective_release.get("version"),
             installed_release.get("version"),
@@ -939,8 +999,13 @@ def _project_application(model: dict[str, Any]) -> dict[str, Any]:
         "channel": effective_channel,
         "update_state": update_state,
         "has_update": has_update,
+        "runtime_admission": admission.get("admission", "unknown"),
+        "runtime_reason": admission.get("reason", "AdmissionNotObserved"),
+        "runtime_expires_at": admission.get("expires_at"),
+        "attention": _mapping(model.get("attention")),
         "scenario_id": scenario_id,
-        "launchable": bool(installed and scenario_id),
+        "launchable": bool(installed and scenario_id and admission.get("admission") not in {
+            "expired", "unavailable", "recovery_required"}),
     }
 
 

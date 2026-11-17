@@ -379,7 +379,12 @@ class MediaCatalogCoordinator:
 
     def __init__(self, repository: MediaCenterRepository):
         self.repository = repository
-        self.ensure_schema()
+        from .read_models import ReadModelUnavailable, read_deadline
+        if read_deadline():
+            if not self._schema_is_current():
+                raise ReadModelUnavailable("coordinator_initializing")
+        else:
+            self.ensure_schema()
 
     def _schema_is_current(self) -> bool:
         return schema_revision_is_current(

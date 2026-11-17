@@ -1,0 +1,464 @@
+name: gmail_mail_client_provider_skill
+version: 0.1.1
+description: Application-local Gmail SDK adapter with transient mail reads and durable
+  send deduplication.
+supported_locales:
+- en
+- ru
+entry:
+  module: handlers.main
+  callable: connection_status
+default_tool: connection_status
+runtime:
+  python: '3.11'
+dependencies: []
+events:
+  subscribe: []
+  publish: []
+exports:
+  tools:
+  - connection_status
+  - begin_connection
+  - list_messages
+  - get_message
+  - list_labels
+  - mutate_message
+  - prepare_send
+  - send_message
+tools:
+- name: connection_status
+  description: connection status
+  entry: handlers.main:connection_status
+  side_effects: none
+  permissions:
+  - workspace.read
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties: {}
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok: &id002
+        type: boolean
+      error: &id001
+        type: string
+        maxLength: 2048
+      message: *id001
+      status: *id001
+      retryable: &id003
+        type: boolean
+      email_address: *id001
+    additionalProperties: false
+- name: begin_connection
+  description: begin connection
+  entry: handlers.main:begin_connection
+  side_effects: external_write
+  permissions:
+  - workspace.write
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties: {}
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok: *id002
+      error: *id001
+      message: *id001
+      status: *id001
+      retryable: *id003
+      authorization_url:
+        type: string
+        maxLength: 8192
+      expires_at: *id001
+    additionalProperties: false
+- name: list_messages
+  description: list messages
+  entry: handlers.main:list_messages
+  side_effects: none
+  permissions:
+  - workspace.read
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties:
+      query: &id004
+        type: string
+      tab: *id004
+      label: *id004
+      page_token: *id004
+      unread:
+        type:
+        - boolean
+        - string
+      starred:
+        type:
+        - boolean
+        - string
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok: *id002
+      error: *id001
+      message: *id001
+      status: *id001
+      retryable: *id003
+      items:
+        type: array
+        maxItems: 25
+        items: &id006
+          type: object
+          additionalProperties: false
+          properties:
+            id: &id005
+              type: string
+              maxLength: 256
+            threadId: *id005
+            labelIds:
+              type: array
+              maxItems: 100
+              items: *id005
+            subject: *id001
+            from: *id001
+            date: *id001
+            snippet: *id001
+            body:
+              type: string
+              maxLength: 50000
+            isUnread:
+              type: boolean
+            isStarred:
+              type: boolean
+            icon: *id001
+      nextPageToken: *id001
+      pagination:
+        type: array
+        maxItems: 1
+        items:
+          type: object
+          properties:
+            id: *id005
+            nextPageToken: *id001
+            summary: *id001
+          required:
+          - id
+          - nextPageToken
+          - summary
+          additionalProperties: false
+    additionalProperties: false
+- name: get_message
+  description: get message
+  entry: handlers.main:get_message
+  side_effects: none
+  permissions:
+  - workspace.read
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties:
+      id: *id004
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok: *id002
+      error: *id001
+      message: *id001
+      status: *id001
+      retryable: *id003
+      item: *id006
+    additionalProperties: false
+- name: list_labels
+  description: list labels
+  entry: handlers.main:list_labels
+  side_effects: none
+  permissions:
+  - workspace.read
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties: {}
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok: *id002
+      error: *id001
+      message: *id001
+      status: *id001
+      retryable: *id003
+      items:
+        type: array
+        maxItems: 500
+        items:
+          type: object
+          required:
+          - id
+          - name
+          properties:
+            id: *id005
+            name: *id001
+          additionalProperties: false
+    additionalProperties: false
+- name: mutate_message
+  description: mutate message
+  entry: handlers.main:mutate_message
+  side_effects: external_write
+  permissions:
+  - workspace.write
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties:
+      id: *id004
+      action:
+        enum:
+        - archive
+        - trash
+        - mark_read
+        - mark_unread
+        - star
+        - unstar
+        - label
+        - remove_label
+      label: *id004
+    additionalProperties: false
+    required:
+    - id
+    - action
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok: *id002
+      error: *id001
+      message: *id001
+      status: *id001
+      retryable: *id003
+      item: *id006
+    additionalProperties: false
+- name: prepare_send
+  description: prepare send
+  entry: handlers.main:prepare_send
+  side_effects: none
+  permissions:
+  - workspace.write
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties: {}
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok: *id002
+      error: *id001
+      message: *id001
+      status: *id001
+      retryable: *id003
+      command_id:
+        type: string
+        format: uuid
+    additionalProperties: false
+- name: send_message
+  description: send message
+  entry: handlers.main:send_message
+  side_effects: external_write
+  permissions:
+  - workspace.write
+  - providers.google.gmail
+  application_access:
+    permission: providers.google.gmail
+    capability: providers.google.gmail
+  input_schema:
+    type: object
+    properties:
+      command_id:
+        type: string
+        format: uuid
+      values:
+        type: object
+        required:
+        - to
+        - subject
+        - body
+        properties:
+          to: *id004
+          subject: *id004
+          body: *id004
+        additionalProperties: false
+    additionalProperties: false
+    required:
+    - command_id
+    - values
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok: *id002
+      error: *id001
+      message: *id001
+      status: *id001
+      retryable: *id003
+      delivery_status:
+        enum:
+        - confirmed
+        - unknown
+      id: *id005
+      duplicate:
+        type: boolean
+    additionalProperties: false
+data_routes:
+- surface: widget:connection-status
+  route: tool
+  tool: connection_status
+  first_paint: empty until the authorized read completes
+  recovery: Explicit retry; clear private content on error or selection change.
+  guard_visibility: show the read error without reporting success
+  budget:
+    max_payload_bytes: 2097152
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 1
+    preserve_last_value: false
+    invalidation_tags:
+    - gmail.connection
+- surface: widget:message-list
+  route: tool
+  tool: list_messages
+  first_paint: empty until the authorized read completes
+  recovery: Explicit retry; clear private content on error or selection change.
+  guard_visibility: show the read error without reporting success
+  budget:
+    max_payload_bytes: 2097152
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 1
+    preserve_last_value: false
+    invalidation_tags:
+    - gmail.mail
+- surface: widget:message-details
+  route: tool
+  tool: get_message
+  first_paint: empty until the authorized read completes
+  recovery: Explicit retry; clear private content on error or selection change.
+  guard_visibility: show the read error without reporting success
+  budget:
+    max_payload_bytes: 2097152
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 1
+    preserve_last_value: false
+    invalidation_tags:
+    - gmail.mail
+- surface: widget:label-selector
+  route: tool
+  tool: list_labels
+  first_paint: empty until the authorized read completes
+  recovery: Explicit retry; clear private content on error or selection change.
+  guard_visibility: show the read error without reporting success
+  budget:
+    max_payload_bytes: 2097152
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 1
+    preserve_last_value: false
+    invalidation_tags:
+    - gmail.mail
+- surface: widget:mail-pagination
+  route: tool
+  tool: list_messages
+  first_paint: empty until the authorized read completes
+  recovery: Explicit retry; clear private content on error or selection change.
+  guard_visibility: show the read error without reporting success
+  budget:
+    max_payload_bytes: 2097152
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 1
+    preserve_last_value: false
+    invalidation_tags:
+    - gmail.mail
+prototype: default
+updated_at: '2026-09-24T02:07:46+00:00'
+capabilities:
+- providers.google.gmail
+- storage.relational
+- workspace.read
+- workspace.write
+data_lifecycle:
+  schema: adaos.skill.data_lifecycle.v1
+  execution: native_tools
+  databases:
+  - path: send_commands.sqlite3
+    migrations:
+    - version: 1
+      name: send_command_reservations
+      statements:
+      - CREATE TABLE IF NOT EXISTS send_commands (scope TEXT NOT NULL, command_id
+        TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('unknown','confirmed')),
+        message_id TEXT, PRIMARY KEY(scope,command_id))

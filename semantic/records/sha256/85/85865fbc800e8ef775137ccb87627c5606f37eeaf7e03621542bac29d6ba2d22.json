@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:application.ui.render.webui-v1",
+  "binding_definition_digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+  "logical_entrypoint": "application.ui.render.webui-v1",
+  "package": {
+    "kind": "scenario",
+    "id": "applications",
+    "version": "0.1.91",
+    "digest": "sha256:5d73859112b0047e3fc601c0081781471c9df8a2d350f4db19b32366e7d24acb"
+  },
+  "physical_member": "webui.json",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:85865fbc800e8ef775137ccb87627c5606f37eeaf7e03621542bac29d6ba2d22"
+}

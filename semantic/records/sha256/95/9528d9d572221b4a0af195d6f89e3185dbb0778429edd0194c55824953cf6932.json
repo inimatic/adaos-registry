@@ -1,0 +1,14 @@
+{
+  "binding_definition_ref": "binding-definition:application.ui.render.webui-v1",
+  "binding_definition_digest": "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+  "logical_entrypoint": "application.ui.render.webui-v1",
+  "package": {
+    "kind": "scenario",
+    "id": "context_chat",
+    "version": "0.3.2",
+    "digest": "sha256:71b58de6e73488bb22e96212bbf19f789f9e3c878c2a57f996b4a68bde9ea76c"
+  },
+  "physical_member": "webui.json",
+  "schema": "adaos.binding.delivery.v1",
+  "delivery_digest": "sha256:9528d9d572221b4a0af195d6f89e3185dbb0778429edd0194c55824953cf6932"
+}

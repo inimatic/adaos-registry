@@ -1,0 +1,979 @@
+{
+    "schema": "adaos.webui.v1",
+    "generated_by": "builder_skill",
+    "ui": {
+        "application": {
+            "desktop": {
+                "pageSchema": {
+                    "id": "gmail_mail_client",
+                    "title": "Gmail Mail Client",
+                    "layout": {
+                        "version": 2,
+                        "pattern": "document",
+                        "density": "comfortable",
+                        "contentWidth": "bounded",
+                        "scroll": "page",
+                        "regions": [
+                            {
+                                "id": "main",
+                                "role": "main",
+                                "priority": 100,
+                                "scroll": "page",
+                                "presentation": {
+                                    "compact": "stack",
+                                    "wide": "pane"
+                                }
+                            }
+                        ]
+                    },
+                    "widgets": [
+                        {
+                            "area": "main",
+                            "id": "mail-topbar-actions",
+                            "type": "ui.actions",
+                            "title": "Mail",
+                            "title_i18n": "app.mail.title",
+                            "inputs": {
+                                "variant": "adaptiveToolbar",
+                                "appearance": "quiet",
+                                "buttons": [
+                                    {
+                                        "id": "action-compose",
+                                        "label": "Compose",
+                                        "label_i18n": "action.compose",
+                                        "kind": "primary",
+                                        "fill": "solid",
+                                        "priority": 100
+                                    },
+                                    {
+                                        "id": "action-archive",
+                                        "label": "Archive",
+                                        "label_i18n": "action.archive",
+                                        "priority": 80,
+                                        "enabledIf": "$state.selectedMessageId !== ''"
+                                    },
+                                    {
+                                        "id": "action-trash",
+                                        "label": "Trash",
+                                        "label_i18n": "action.trash",
+                                        "kind": "danger",
+                                        "priority": 70,
+                                        "enabledIf": "$state.selectedMessageId !== ''"
+                                    },
+                                    {
+                                        "id": "action-mark-read",
+                                        "label": "Mark as read",
+                                        "label_i18n": "action.mark_read",
+                                        "priority": 60,
+                                        "enabledIf": "$state.selectedMessageId !== ''"
+                                    },
+                                    {
+                                        "id": "action-mark-unread",
+                                        "label": "Mark as unread",
+                                        "label_i18n": "action.mark_unread",
+                                        "priority": 50,
+                                        "enabledIf": "$state.selectedMessageId !== ''"
+                                    },
+                                    {
+                                        "id": "action-star",
+                                        "label": "Star",
+                                        "label_i18n": "action.star",
+                                        "priority": 40,
+                                        "enabledIf": "$state.selectedMessageId !== ''"
+                                    },
+                                    {
+                                        "id": "action-label",
+                                        "label": "Label",
+                                        "label_i18n": "action.label",
+                                        "priority": 30,
+                                        "optionsDataSource": {
+                                            "kind": "skill",
+                                            "name": "gmail_mail_client_provider_skill.list_labels",
+                                            "params": {},
+                                            "invalidationTags": [
+                                                "gmail.mail"
+                                            ]
+                                        },
+                                        "optionValuePath": "id",
+                                        "optionLabelPath": "name",
+                                        "enabledIf": "$state.selectedMessageId !== ''"
+                                    },
+                                    {
+                                        "id": "action-unstar",
+                                        "label": "Unstar",
+                                        "label_i18n": "action.unstar",
+                                        "enabledIf": "$state.selectedMessageId !== ''"
+                                    },
+                                    {
+                                        "id": "action-remove-label",
+                                        "label": "Remove label",
+                                        "label_i18n": "action.remove_label",
+                                        "priority": 30,
+                                        "optionsDataSource": {
+                                            "kind": "skill",
+                                            "name": "gmail_mail_client_provider_skill.list_labels",
+                                            "params": {},
+                                            "invalidationTags": [
+                                                "gmail.mail"
+                                            ]
+                                        },
+                                        "optionValuePath": "id",
+                                        "optionLabelPath": "name",
+                                        "enabledIf": "$state.selectedMessageId !== ''"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:action-compose",
+                                    "type": "callSkill",
+                                    "target": "gmail_mail_client_provider_skill.prepare_send",
+                                    "params": {},
+                                    "invalidates": [],
+                                    "resultStateKey": "sendCommand"
+                                },
+                                {
+                                    "on": "click:action-compose",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "compose-modal"
+                                    }
+                                },
+                                {
+                                    "on": "click:action-archive",
+                                    "type": "callSkill",
+                                    "params": {
+                                        "id": "$state.selectedMessageId",
+                                        "action": "archive",
+                                        "label": "$state.selectedLabel"
+                                    },
+                                    "target": "gmail_mail_client_provider_skill.mutate_message",
+                                    "invalidates": [
+                                        "gmail.mail"
+                                    ],
+                                    "enabledIf": "$state.selectedMessageId !== ''"
+                                },
+                                {
+                                    "on": "click:action-trash",
+                                    "type": "callSkill",
+                                    "params": {
+                                        "id": "$state.selectedMessageId",
+                                        "action": "trash",
+                                        "label": "$state.selectedLabel"
+                                    },
+                                    "target": "gmail_mail_client_provider_skill.mutate_message",
+                                    "invalidates": [
+                                        "gmail.mail"
+                                    ],
+                                    "enabledIf": "$state.selectedMessageId !== ''"
+                                },
+                                {
+                                    "on": "click:action-mark-read",
+                                    "type": "callSkill",
+                                    "params": {
+                                        "id": "$state.selectedMessageId",
+                                        "action": "mark_read",
+                                        "label": "$state.selectedLabel"
+                                    },
+                                    "target": "gmail_mail_client_provider_skill.mutate_message",
+                                    "invalidates": [
+                                        "gmail.mail"
+                                    ],
+                                    "enabledIf": "$state.selectedMessageId !== ''"
+                                },
+                                {
+                                    "on": "click:action-mark-unread",
+                                    "type": "callSkill",
+                                    "params": {
+                                        "id": "$state.selectedMessageId",
+                                        "action": "mark_unread",
+                                        "label": "$state.selectedLabel"
+                                    },
+                                    "target": "gmail_mail_client_provider_skill.mutate_message",
+                                    "invalidates": [
+                                        "gmail.mail"
+                                    ],
+                                    "enabledIf": "$state.selectedMessageId !== ''"
+                                },
+                                {
+                                    "on": "click:action-star",
+                                    "type": "callSkill",
+                                    "params": {
+                                        "id": "$state.selectedMessageId",
+                                        "action": "star",
+                                        "label": "$state.selectedLabel"
+                                    },
+                                    "target": "gmail_mail_client_provider_skill.mutate_message",
+                                    "invalidates": [
+                                        "gmail.mail"
+                                    ],
+                                    "enabledIf": "$state.selectedMessageId !== ''"
+                                },
+                                {
+                                    "on": "click:action-label",
+                                    "type": "callSkill",
+                                    "params": {
+                                        "id": "$state.selectedMessageId",
+                                        "action": "label",
+                                        "label": "$event.value"
+                                    },
+                                    "target": "gmail_mail_client_provider_skill.mutate_message",
+                                    "invalidates": [
+                                        "gmail.mail"
+                                    ],
+                                    "enabledIf": "$state.selectedMessageId !== ''"
+                                },
+                                {
+                                    "on": "click:action-unstar",
+                                    "type": "callSkill",
+                                    "target": "gmail_mail_client_provider_skill.mutate_message",
+                                    "params": {
+                                        "id": "$state.selectedMessageId",
+                                        "action": "unstar"
+                                    },
+                                    "invalidates": [
+                                        "gmail.mail"
+                                    ],
+                                    "enabledIf": "$state.selectedMessageId !== ''"
+                                },
+                                {
+                                    "on": "click:action-remove-label",
+                                    "type": "callSkill",
+                                    "params": {
+                                        "id": "$state.selectedMessageId",
+                                        "action": "remove_label",
+                                        "label": "$event.value"
+                                    },
+                                    "target": "gmail_mail_client_provider_skill.mutate_message",
+                                    "invalidates": [
+                                        "gmail.mail"
+                                    ],
+                                    "enabledIf": "$state.selectedMessageId !== ''"
+                                }
+                            ]
+                        },
+                        {
+                            "area": "main",
+                            "id": "connection-banner",
+                            "type": "ui.actions",
+                            "title": "Connection",
+                            "title_i18n": "section.connection",
+                            "inputs": {
+                                "variant": "stack",
+                                "appearance": "quiet",
+                                "buttons": [
+                                    {
+                                        "id": "btn-connect",
+                                        "label": "Connect / reconnect Gmail",
+                                        "label_i18n": "connection.connect"
+                                    },
+                                    {
+                                        "id": "btn-retry",
+                                        "label": "Refresh status and mail",
+                                        "label_i18n": "connection.refresh"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:btn-connect",
+                                    "type": "callSkill",
+                                    "target": "gmail_mail_client_provider_skill.begin_connection",
+                                    "params": {},
+                                    "invalidates": [
+                                        "gmail.connection"
+                                    ],
+                                    "resultStateKey": "gmailConnection"
+                                },
+                                {
+                                    "on": "click:btn-connect",
+                                    "type": "openUrl",
+                                    "params": {
+                                        "url": "$state.gmailConnection.authorization_url",
+                                        "target": "_blank",
+                                        "withAuth": false
+                                    }
+                                },
+                                {
+                                    "on": "click:btn-connect",
+                                    "type": "updateState",
+                                    "params": {
+                                        "gmailConnection": {}
+                                    }
+                                },
+                                {
+                                    "on": "click:btn-retry",
+                                    "type": "callSkill",
+                                    "target": "gmail_mail_client_provider_skill.connection_status",
+                                    "params": {},
+                                    "invalidates": [
+                                        "gmail.connection",
+                                        "gmail.mail"
+                                    ],
+                                    "resultStateKey": "connectionStatus",
+                                    "resultPath": "status"
+                                }
+                            ]
+                        },
+                        {
+                            "id": "connection-status",
+                            "area": "main",
+                            "type": "item.details",
+                            "title": "Connection status",
+                            "title_i18n": "connection.status",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "gmail_mail_client_provider_skill.connection_status",
+                                "params": {},
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "gmail.connection"
+                                ],
+                                "preserveLastValue": false,
+                                "maxRequestHz": 1
+                            },
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "id": "status",
+                                        "label": "Status",
+                                        "path": "status"
+                                    },
+                                    {
+                                        "id": "account",
+                                        "label": "Account",
+                                        "path": "email_address"
+                                    },
+                                    {
+                                        "id": "error",
+                                        "label": "Error",
+                                        "path": "error"
+                                    }
+                                ]
+                            },
+                            "loading": {
+                                "loadingText": "Loading Gmail...",
+                                "emptyText": "No data.",
+                                "degradedText": "Gmail unavailable or permission denied. Connect or refresh to retry.",
+                                "retainLastValue": false
+                            }
+                        },
+                        {
+                            "area": "main",
+                            "id": "mail-tabs",
+                            "type": "navigation.tabs",
+                            "inputs": {
+                                "selectedStateKey": "activeTab",
+                                "buttons": [
+                                    {
+                                        "id": "inbox",
+                                        "label": "Inbox",
+                                        "label_i18n": "tab.inbox"
+                                    },
+                                    {
+                                        "id": "starred",
+                                        "label": "Starred",
+                                        "label_i18n": "tab.starred"
+                                    },
+                                    {
+                                        "id": "sent",
+                                        "label": "Sent",
+                                        "label_i18n": "tab.sent"
+                                    },
+                                    {
+                                        "id": "trash",
+                                        "label": "Trash",
+                                        "label_i18n": "tab.trash"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeTab": "$event.id",
+                                        "pageToken": "",
+                                        "selectedMessageId": ""
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "area": "main",
+                            "id": "query-toolbar",
+                            "type": "ui.queryToolbar",
+                            "inputs": {
+                                "controls": [
+                                    {
+                                        "id": "q-search",
+                                        "label": "Search mail",
+                                        "label_i18n": "search.mail",
+                                        "kind": "search",
+                                        "stateKey": "q",
+                                        "inputType": "search"
+                                    },
+                                    {
+                                        "id": "f-unread",
+                                        "label": "Unread only",
+                                        "label_i18n": "filter.unread",
+                                        "kind": "filter",
+                                        "stateKey": "onlyUnread",
+                                        "inputType": "select",
+                                        "options": [
+                                            {
+                                                "value": "",
+                                                "label": "All",
+                                                "label_i18n": "filter.all"
+                                            },
+                                            {
+                                                "value": true,
+                                                "label": "Unread",
+                                                "label_i18n": "filter.only_unread"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "f-starred",
+                                        "label": "Starred only",
+                                        "label_i18n": "filter.starred",
+                                        "kind": "filter",
+                                        "stateKey": "onlyStarred",
+                                        "inputType": "select",
+                                        "options": [
+                                            {
+                                                "value": "",
+                                                "label": "All",
+                                                "label_i18n": "filter.all"
+                                            },
+                                            {
+                                                "value": true,
+                                                "label": "Starred",
+                                                "label_i18n": "filter.only_starred"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "change",
+                                    "type": "updateState",
+                                    "params": {
+                                        "pageToken": "",
+                                        "selectedMessageId": ""
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "area": "main",
+                            "id": "label-selector",
+                            "type": "ui.actions",
+                            "title": "Label",
+                            "title_i18n": "selector.label.title",
+                            "inputs": {
+                                "buttons": [
+                                    {
+                                        "id": "select-label",
+                                        "label": "Label",
+                                        "label_i18n": "selector.label.title",
+                                        "stateKey": "selectedLabel",
+                                        "optionsDataSource": {
+                                            "kind": "skill",
+                                            "name": "gmail_mail_client_provider_skill.list_labels",
+                                            "params": {},
+                                            "invalidationTags": [
+                                                "gmail.mail"
+                                            ],
+                                            "preserveLastValue": false,
+                                            "maxRequestHz": 1
+                                        },
+                                        "optionValuePath": "id",
+                                        "optionLabelPath": "name",
+                                        "displaySelectedLabel": true
+                                    },
+                                    {
+                                        "id": "clear-label",
+                                        "label": "All labels",
+                                        "label_i18n": "labels.all"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:select-label",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedLabel": "$event.value",
+                                        "pageToken": "",
+                                        "selectedMessageId": ""
+                                    }
+                                },
+                                {
+                                    "on": "click:clear-label",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedLabel": "",
+                                        "pageToken": "",
+                                        "selectedMessageId": ""
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "area": "main",
+                            "id": "message-list",
+                            "type": "ui.list",
+                            "title": "Messages",
+                            "title_i18n": "list.messages",
+                            "inputs": {
+                                "variant": "list",
+                                "titleKey": "subject",
+                                "subtitleKey": "from",
+                                "badgeKey": "date",
+                                "iconKey": "icon",
+                                "currentKey": "current",
+                                "disabledKey": "disabled",
+                                "buttons": [
+                                    {
+                                        "id": "row-star",
+                                        "label": "Star",
+                                        "label_i18n": "row.star",
+                                        "icon": "star"
+                                    },
+                                    {
+                                        "id": "row-archive",
+                                        "label": "Archive",
+                                        "label_i18n": "row.archive",
+                                        "icon": "archive"
+                                    },
+                                    {
+                                        "id": "row-trash",
+                                        "label": "Trash",
+                                        "label_i18n": "row.trash",
+                                        "icon": "trash"
+                                    }
+                                ],
+                                "emptyText": "No matching messages."
+                            },
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "gmail_mail_client_provider_skill.list_messages",
+                                "cacheTtlMs": 0,
+                                "params": {
+                                    "query": "$state.q",
+                                    "tab": "$state.activeTab",
+                                    "unread": "$state.onlyUnread",
+                                    "starred": "$state.onlyStarred",
+                                    "label": "$state.selectedLabel",
+                                    "page_token": "$state.pageToken"
+                                },
+                                "invalidationTags": [
+                                    "gmail.mail"
+                                ],
+                                "preserveLastValue": false,
+                                "maxRequestHz": 1
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedMessageId": "$event.id",
+                                        "selectedMessageTitle": "$event.subject"
+                                    }
+                                },
+                                {
+                                    "on": "click:row-star",
+                                    "type": "callSkill",
+                                    "target": "gmail_mail_client_provider_skill.mutate_message",
+                                    "params": {
+                                        "id": "$event.id",
+                                        "action": "star"
+                                    },
+                                    "invalidates": [
+                                        "gmail.mail"
+                                    ]
+                                },
+                                {
+                                    "on": "click:row-archive",
+                                    "type": "callSkill",
+                                    "target": "gmail_mail_client_provider_skill.mutate_message",
+                                    "params": {
+                                        "id": "$event.id",
+                                        "action": "archive"
+                                    },
+                                    "invalidates": [
+                                        "gmail.mail"
+                                    ]
+                                },
+                                {
+                                    "on": "click:row-trash",
+                                    "type": "callSkill",
+                                    "target": "gmail_mail_client_provider_skill.mutate_message",
+                                    "params": {
+                                        "id": "$event.id",
+                                        "action": "trash"
+                                    },
+                                    "invalidates": [
+                                        "gmail.mail"
+                                    ]
+                                }
+                            ],
+                            "loading": {
+                                "loadingText": "Loading Gmail...",
+                                "emptyText": "No data.",
+                                "degradedText": "Gmail unavailable or permission denied. Connect or refresh to retry.",
+                                "retainLastValue": false
+                            }
+                        },
+                        {
+                            "id": "mail-pagination",
+                            "area": "main",
+                            "type": "ui.form",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "gmail_mail_client_provider_skill.list_messages",
+                                "cacheTtlMs": 0,
+                                "params": {
+                                    "query": "$state.q",
+                                    "tab": "$state.activeTab",
+                                    "unread": "$state.onlyUnread",
+                                    "starred": "$state.onlyStarred",
+                                    "label": "$state.selectedLabel",
+                                    "page_token": "$state.pageToken"
+                                },
+                                "invalidationTags": [
+                                    "gmail.mail"
+                                ],
+                                "preserveLastValue": false,
+                                "maxRequestHz": 1
+                            },
+                            "inputs": {
+                                "recordsPath": "pagination",
+                                "selectedStateKey": "paginationId",
+                                "fields": [
+                                    {
+                                        "id": "summary",
+                                        "type": "shortText",
+                                        "label": "Page",
+                                        "readonly": true
+                                    }
+                                ],
+                                "buttons": [
+                                    {
+                                        "id": "next-page",
+                                        "label": "Next page",
+                                        "label_i18n": "page.next"
+                                    },
+                                    {
+                                        "id": "first-page",
+                                        "label": "First page",
+                                        "label_i18n": "page.first"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "id": "next-page",
+                                    "on": "click:next-page",
+                                    "type": "updateState",
+                                    "enabledIf": "$event.record.nextPageToken !== ''",
+                                    "params": {
+                                        "pageToken": "$event.record.nextPageToken",
+                                        "selectedMessageId": ""
+                                    }
+                                },
+                                {
+                                    "id": "first-page",
+                                    "on": "click:first-page",
+                                    "type": "updateState",
+                                    "params": {
+                                        "pageToken": "",
+                                        "selectedMessageId": ""
+                                    }
+                                }
+                            ],
+                            "loading": {
+                                "loadingText": "Loading Gmail...",
+                                "emptyText": "No data.",
+                                "degradedText": "Gmail unavailable or permission denied. Connect or refresh to retry.",
+                                "retainLastValue": false
+                            }
+                        },
+                        {
+                            "area": "main",
+                            "id": "message-details",
+                            "type": "item.details",
+                            "title": "$state.selectedMessageTitle",
+                            "inputs": {
+                                "presentation": "section",
+                                "fields": [
+                                    {
+                                        "id": "field-from",
+                                        "label": "From",
+                                        "label_i18n": "field.from",
+                                        "path": "from"
+                                    },
+                                    {
+                                        "id": "field-date",
+                                        "label": "Date",
+                                        "label_i18n": "field.date",
+                                        "path": "date"
+                                    },
+                                    {
+                                        "id": "field-body",
+                                        "label": "Message",
+                                        "label_i18n": "field.body",
+                                        "path": "body"
+                                    }
+                                ],
+                                "emptyText": "Select a message.",
+                                "selectedStateKey": "selectedMessageId"
+                            },
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "gmail_mail_client_provider_skill.get_message",
+                                "cacheTtlMs": 0,
+                                "params": {
+                                    "id": "$state.selectedMessageId"
+                                },
+                                "invalidationTags": [
+                                    "gmail.mail"
+                                ],
+                                "preserveLastValue": false,
+                                "maxRequestHz": 1
+                            },
+                            "loading": {
+                                "loadingText": "Loading Gmail...",
+                                "emptyText": "No data.",
+                                "degradedText": "Gmail unavailable or permission denied. Connect or refresh to retry.",
+                                "retainLastValue": false
+                            }
+                        },
+                        {
+                            "area": "main",
+                            "id": "automation-disclosure",
+                            "type": "ui.actions",
+                            "inputs": {
+                                "variant": "stack",
+                                "buttons": [
+                                    {
+                                        "id": "info-externals",
+                                        "label": "Uses Gmail modify access to read, label, archive, trash and send on request. No background tasks. Core holds OAuth credentials. Mail bodies remain transient; only send command IDs and outcomes are retained.",
+                                        "label_i18n": "disclosure.beta",
+                                        "disabled": true
+                                    }
+                                ]
+                            }
+                        }
+                    ],
+                    "meta": {
+                        "builder": {
+                            "empty_canvas": true,
+                            "proto": "007",
+                            "ui_revision": "007",
+                            "scenario_id": "gmail_mail_client",
+                            "cbs_intent": {
+                                "schema": "adaos.builder.cbs_intent.v1",
+                                "requirements": [
+                                    {
+                                        "id": "mail_messages_manage",
+                                        "capability_ref": "capability:mail.messages.manage",
+                                        "contract_range": "^1.0.0",
+                                        "origin": "human_explicit"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "title_i18n": {
+                        "key": "scenario.gmail_mail_client.title",
+                        "fallback": "Gmail Mail Client"
+                    },
+                    "initialState": {
+                        "connectionStatus": "disconnected",
+                        "activeTab": "inbox",
+                        "q": "",
+                        "onlyUnread": "",
+                        "onlyStarred": "",
+                        "selectedLabel": "",
+                        "selectedMessageId": "",
+                        "selectedMessageTitle": "",
+                        "pageToken": "",
+                        "paginationId": "page"
+                    }
+                }
+            },
+            "resources": {
+                "gmail_mail_client.i18n.en": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "en",
+                    "path": "assets/i18n/en.json",
+                    "mime": "application/json",
+                    "delivery": "core"
+                },
+                "gmail_mail_client.i18n.ru": {
+                    "kind": "data",
+                    "role": "i18n",
+                    "locale": "ru",
+                    "path": "assets/i18n/ru.json",
+                    "mime": "application/json",
+                    "delivery": "core"
+                }
+            },
+            "modals": {
+                "compose-modal": {
+                    "id": "compose-modal",
+                    "title": "Compose",
+                    "title_i18n": "modal.compose.title",
+                    "schema": {
+                        "id": "compose_modal_schema",
+                        "layout": {
+                            "version": 2,
+                            "pattern": "document",
+                            "density": "comfortable",
+                            "contentWidth": "bounded",
+                            "scroll": "page",
+                            "regions": [
+                                {
+                                    "id": "modal-main",
+                                    "role": "main",
+                                    "priority": 100,
+                                    "scroll": "page",
+                                    "presentation": {
+                                        "compact": "stack",
+                                        "wide": "pane"
+                                    }
+                                }
+                            ]
+                        },
+                        "widgets": [
+                            {
+                                "id": "compose-actions",
+                                "area": "modal-main",
+                                "type": "ui.form",
+                                "interaction": {
+                                    "submit": {
+                                        "defaultAction": "compose-send"
+                                    }
+                                },
+                                "inputs": {
+                                    "resetOnSuccess": true,
+                                    "closeOnSuccess": true,
+                                    "fields": [
+                                        {
+                                            "id": "to",
+                                            "type": "shortText",
+                                            "label": "To",
+                                            "required": true,
+                                            "label_i18n": "compose.to"
+                                        },
+                                        {
+                                            "id": "subject",
+                                            "type": "shortText",
+                                            "label": "Subject",
+                                            "required": true,
+                                            "label_i18n": "compose.subject"
+                                        },
+                                        {
+                                            "id": "body",
+                                            "type": "longText",
+                                            "label": "Body",
+                                            "required": true,
+                                            "label_i18n": "compose.body"
+                                        }
+                                    ],
+                                    "buttons": [
+                                        {
+                                            "id": "compose-send",
+                                            "label": "Send",
+                                            "label_i18n": "action.send",
+                                            "kind": "primary"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "submit",
+                                        "type": "callSkill",
+                                        "target": "gmail_mail_client_provider_skill.send_message",
+                                        "params": {
+                                            "command_id": "$state.sendCommand.command_id",
+                                            "values": "$event.values"
+                                        },
+                                        "invalidates": [
+                                            "gmail.mail"
+                                        ],
+                                        "resultStateKey": "sendResult",
+                                        "id": "compose-send"
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "send-guidance",
+                                "area": "modal-main",
+                                "type": "ui.actions",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "send-help",
+                                            "label": "If sending is unconfirmed, check Sent in Gmail before composing again. Retrying the same command never sends twice.",
+                                            "label_i18n": "send.guidance",
+                                            "disabled": true
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "compose-cancel-actions",
+                                "area": "modal-main",
+                                "type": "ui.actions",
+                                "inputs": {
+                                    "buttons": [
+                                        {
+                                            "id": "compose-cancel",
+                                            "label": "Cancel",
+                                            "label_i18n": "action.cancel"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:compose-cancel",
+                                        "type": "closeModal"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        "version": "0.1.2",
+        "manifest": "webui.json"
+    },
+    "nlu": {
+        "llm_hints": {
+            "aliases": [
+                "Gmail Mail Client"
+            ],
+            "primary_actions": [
+                {
+                    "intent": "builder.chat",
+                    "notes": "Prototype UI is edited through builder_skill.chat.",
+                    "supported_operations": [
+                        "add_field",
+                        "remove_field",
+                        "update_mock_data",
+                        "change_view_representation",
+                        "move_form_action",
+                        "set_checkbox_column"
+                    ]
+                }
+            ]
+        }
+    }
+}
