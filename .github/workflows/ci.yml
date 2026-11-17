@@ -1,14 +1,46 @@
-# Development: dev2027. Release and delivery: qualified main only.
-name: validate-scenario
-'on':
+name: Qualify registry source contracts
+on:
   pull_request:
-    branches:
-    - main
-    - dev2027
+    branches: [main, dev2027]
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: registry-contracts-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
-  validate:
-    runs-on: ubuntu-latest
+  consumers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
-    - uses: actions/checkout@v4
-    - name: Schema lint (placeholder)
-      run: echo "ok"
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: inimatic/adaos
+          ref: main
+          path: .tmp/core
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: astral-sh/setup-uv@v5
+      - name: Install the exact Core SDK environment
+        run: |
+          uv sync --project .tmp/core --locked --extra dev
+          echo "Registry source: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Core SDK source: $(git -C .tmp/core rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Qualify recovered component and application contracts
+        env:
+          ADAOS_TESTING: '1'
+          PYTHONIOENCODING: utf-8
+        run: |
+          set -euo pipefail
+          for suite in skills/builder_skill skills/builder_sdk_control_skill skills/media_center_skill skills/media_control_skill skills/media_library_agent skills/media_indexer_skill skills/slideshow_skill skills/infrastate_skill projects/media_center scenarios/builder scenarios/media_center; do
+            if [ -d "$suite/tests" ]; then
+              name="${suite//\//-}"
+              .tmp/core/.venv/bin/python -m pytest "$suite/tests" -q --import-mode=importlib \
+                --basetemp=".tmp/pytest-$name" --junitxml=".tmp/$name.xml"
+            fi
+          done

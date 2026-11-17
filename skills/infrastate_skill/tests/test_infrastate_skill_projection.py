@@ -5666,6 +5666,7 @@ def test_infrastate_rehydrate_projects_retained_status_before_return(monkeypatch
         )
     )
     mod = _load_infrastate_module()
+    _enable_projection_demand(mod, "infrastate.summary", webspace_id="desktop")
     projected: list[tuple[dict[str, object], str | None, str]] = []
 
     monkeypatch.setattr(mod, "_invalidate_runtime_caches", lambda **_kwargs: None)
@@ -5677,7 +5678,7 @@ def test_infrastate_rehydrate_projects_retained_status_before_return(monkeypatch
         },
     )
 
-    async def _capture_project(sections, *, webspace_id=None, reason=""):
+    async def _capture_project(sections, *, webspace_id=None, selected_node_id=None, reason=""):
         projected.append((dict(sections), webspace_id, reason))
 
     monkeypatch.setattr(mod, "_project_sections_async", _capture_project)
