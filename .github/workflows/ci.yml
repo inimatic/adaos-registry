@@ -31,16 +31,25 @@ jobs:
           uv sync --project .tmp/core --locked --extra dev
           echo "Registry source: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
           echo "Core SDK source: $(git -C .tmp/core rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Export exact source contracts without mutable publication state
+        run: |
+          mkdir -p .tmp/consumer-source
+          git archive HEAD skills scenarios projects schemas | tar -x -C .tmp/consumer-source
+          echo "Source closure excludes the aggregate published catalog and channel pointers. Package tests qualify source; publication stays owned by Core." >> "$GITHUB_STEP_SUMMARY"
       - name: Qualify recovered component and application contracts
         env:
+          ADAOS_CORE_ROOT: ${{ github.workspace }}/.tmp/core
           ADAOS_TESTING: '1'
           PYTHONIOENCODING: utf-8
         run: |
           set -euo pipefail
+          sdk_python="$PWD/.tmp/core/.venv/bin/python"
+          cd .tmp/consumer-source
+          mkdir -p .tmp
           for suite in skills/builder_skill skills/builder_sdk_control_skill skills/media_center_skill skills/media_control_skill skills/media_library_agent skills/media_indexer_skill skills/slideshow_skill skills/infrastate_skill projects/media_center scenarios/builder scenarios/media_center; do
             if [ -d "$suite/tests" ]; then
               name="${suite//\//-}"
-              .tmp/core/.venv/bin/python -m pytest "$suite/tests" -q \
+              "$sdk_python" -m pytest "$suite/tests" -q \
                 --basetemp=".tmp/pytest-$name" --junitxml=".tmp/$name.xml"
             fi
           done
