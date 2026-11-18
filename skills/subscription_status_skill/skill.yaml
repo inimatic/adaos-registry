@@ -1,11 +1,14 @@
 name: subscription_status_skill
-version: 0.1.31
+version: 0.1.36
+capabilities:
+- ai.inference
+- ai.connections.manage
+- workspace.read
+- workspace.write
+- network.egress
 description: User-facing AdaOS subscription status widget and modal backed by the
   local economic entitlement snapshot with explicit Root refresh.
 webui_owner: shared
-capabilities:
-- workspace.read
-- workspace.write
 runtime:
   python: '3.11'
   activation:
@@ -16,6 +19,11 @@ runtime:
       client_presence: true
       webspace_scope: active
 data_projections:
+- scope: current_user
+  slot: subscription_status.ai_connection
+  targets:
+  - backend: yjs
+    path: data/subscription_ai_connection
 - scope: current_user
   slot: subscription_status.snapshot
   targets:
@@ -41,13 +49,80 @@ events:
   - subnet.member.status.changed
 default_tool: get_status
 tools:
+- name: chatgpt_status
+  description: Read owner-private Core ChatGPT connection status.
+  entry: handlers.main:chatgpt_status
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type:
+        - string
+        - 'null'
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: connect_chatgpt
+  description: Continue with ChatGPT. Opens official OAuth on the AdaOS host.
+  entry: handlers.main:connect_chatgpt
+  side_effects: external_write
+  input_schema:
+    type: object
+    properties: {}
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: verify_chatgpt
+  description: Perform a small real model request using the personal plan.
+  entry: handlers.main:verify_chatgpt
+  side_effects: external_write
+  input_schema:
+    type: object
+    properties: {}
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: cancel_chatgpt_sign_in
+  description: Cancel the pending Core ChatGPT sign-in.
+  entry: handlers.main:cancel_chatgpt_sign_in
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties: {}
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: disconnect_chatgpt
+  description: Disconnect ChatGPT for all applications; preserves Chat history.
+  entry: handlers.main:disconnect_chatgpt
+  side_effects: external_write
+  input_schema:
+    type: object
+    properties:
+      confirmed:
+        type: boolean
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: adopt_chatgpt
+  description: Move the existing Context Chat session into Core with explicit owner
+    consent.
+  entry: handlers.main:adopt_chatgpt
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      confirmed:
+        type: boolean
+    additionalProperties: false
+  output_schema:
+    type: object
 - name: subscription_status_drain
   description: Quiesce the reconstructible subscription projection before a release
     switch.
   entry: handlers.main:subscription_status_drain
   side_effects: local_write
-  permissions:
-  - workspace.write
   input_schema:
     type: object
     properties:
@@ -66,8 +141,6 @@ tools:
   description: Rebuild the subscription projection after a release switch.
   entry: handlers.main:subscription_status_rehydrate
   side_effects: local_write
-  permissions:
-  - workspace.write
   input_schema:
     type: object
     properties:
@@ -86,8 +159,6 @@ tools:
   description: Return and project the current local AdaOS subscription status.
   entry: handlers.main:get_status
   side_effects: local_write
-  permissions:
-  - workspace.write
   input_schema:
     type: object
     properties:
@@ -107,8 +178,6 @@ tools:
     status widget projection.
   entry: handlers.main:refresh_status
   side_effects: local_write
-  permissions:
-  - workspace.write
   input_schema:
     type: object
     properties:
@@ -123,8 +192,6 @@ tools:
   description: Return current AdaOS subscription resources and quota status rows.
   entry: handlers.main:list_resources
   side_effects: local_write
-  permissions:
-  - workspace.write
   input_schema:
     type: object
     properties:
@@ -139,8 +206,6 @@ tools:
   description: Return current AdaOS subscription usage window rows.
   entry: handlers.main:list_usage_history
   side_effects: local_write
-  permissions:
-  - workspace.write
   input_schema:
     type: object
     properties:
@@ -155,8 +220,6 @@ tools:
   description: Record a local user request to change the AdaOS subscription plan.
   entry: handlers.main:request_plan_change
   side_effects: local_write
-  permissions:
-  - workspace.write
   input_schema:
     type: object
     properties:
@@ -183,7 +246,7 @@ nlu:
     - show AdaOS subscription status
     - показать подписку AdaOS
     tool: get_status
-updated_at: '2026-09-27T21:52:37+00:00'
+updated_at: '2026-10-21T21:20:39+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.950+5766.76010ad67

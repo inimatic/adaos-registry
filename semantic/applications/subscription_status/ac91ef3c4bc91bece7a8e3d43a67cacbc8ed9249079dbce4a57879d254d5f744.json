@@ -1,0 +1,98 @@
+{
+  "schema": "adaos.semantic_registry.application_release.v1",
+  "project_id": "subscription_status",
+  "version": "0.1.20",
+  "application_ref": "application:subscription_status",
+  "presentation_ref": "skill:subscription_status_skill",
+  "project_release_digest": "sha256:ac91ef3c4bc91bece7a8e3d43a67cacbc8ed9249079dbce4a57879d254d5f744",
+  "source_ref": {
+    "schema": "adaos.artifact.source_ref.v1",
+    "forge": "content-addressed-dev",
+    "repository": "adaos-local:subscription-observation-repair",
+    "revision": "sha256:92e5a7bf60e9e099ad515dde690e42c1e185617b3bb3eee08a607b38b5a98335",
+    "path_scope": [
+      "projects/subscription_status/"
+    ]
+  },
+  "compilation_digest": "sha256:0496af1e7ba4961d768544b965906b4b8f877618baa38ad97dd5d857e299b452",
+  "semantic_revision_digest": "sha256:c2ac05aec7b21b3e3f8799955e63179d0021e7568d7c14b3d35d803287ea2d57",
+  "requirements": [
+    {
+      "requirement_ref": "requirement:application.subscription_status.subscriptions.status.inspect",
+      "capability_ref": "capability:subscriptions.status.inspect",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:49a32a295c06bb9cb9ef9fa70a699fc4aaaa62f7cc76a7a786fe5df1886c6d1d"
+    }
+  ],
+  "portable_artifacts": {
+    "adaos.binding.definition.v1": [
+      "sha256:cea5e4742a06b5c0242faae0261d4e0e8d773dcd09bc304660a7e965502f0b48"
+    ],
+    "adaos.binding.delivery.v1": [
+      "sha256:69cae7862fc8b025b774fe033c023c02e83ee0581f1e983da36ea5ba8c4d8fbe"
+    ],
+    "adaos.capability.contract.v1": [
+      "sha256:3e6dce93023e64c1d700ca9728d492ad1d28d316f61b68a4824a35b5649c0266"
+    ],
+    "adaos.evidence.claim.v1": [
+      "sha256:fb4e4ed8b547eb252637d8808c6de59700c0e25d43501078243e9a838323cc36"
+    ]
+  },
+  "distribution": {
+    "thin": {
+      "requirements_only": true,
+      "registry_required": true
+    },
+    "resolved": {
+      "project_release_digest": "sha256:ac91ef3c4bc91bece7a8e3d43a67cacbc8ed9249079dbce4a57879d254d5f744",
+      "package_closure": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "subscription_status_skill",
+          "version": "0.1.36",
+          "digest": "sha256:cba0afb7289f6c8971a3768af8d2c0c4b7bb3893016720df04559a225256942b",
+          "manifest_digest": "sha256:d6c453dcea119c589ad6426cd138686a079342ef180c5d63b578a4b74ede36b5",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-local:subscription-observation-repair",
+            "revision": "sha256:92e5a7bf60e9e099ad515dde690e42c1e185617b3bb3eee08a607b38b5a98335",
+            "path_scope": [
+              "skills/subscription_status_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/subscription_status_skill",
+          "schema_locks": []
+        }
+      ],
+      "portable_artifact_digests": [
+        "sha256:3e6dce93023e64c1d700ca9728d492ad1d28d316f61b68a4824a35b5649c0266",
+        "sha256:69cae7862fc8b025b774fe033c023c02e83ee0581f1e983da36ea5ba8c4d8fbe",
+        "sha256:cea5e4742a06b5c0242faae0261d4e0e8d773dcd09bc304660a7e965502f0b48",
+        "sha256:fb4e4ed8b547eb252637d8808c6de59700c0e25d43501078243e9a838323cc36"
+      ]
+    }
+  },
+  "projection_digest": "sha256:56dfc95757b5f20ae680a15f307d0837d439729f86b18007214d9d784cdf6de0"
+}

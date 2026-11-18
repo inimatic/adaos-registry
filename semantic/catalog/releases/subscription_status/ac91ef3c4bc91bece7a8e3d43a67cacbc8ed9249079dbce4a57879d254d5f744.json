@@ -1,0 +1,527 @@
+{
+  "schema": "adaos.semantic_registry.public_application_release.v1",
+  "application": {
+    "schema": "adaos.application.v1",
+    "application_id": "subscription_status",
+    "legacy_project_id": "subscription_status",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "slug": "subscription_status",
+    "display": {
+      "title": "Subscriptions",
+      "summary": "User-facing AdaOS subscription status widget and modal backed by the local economic entitlement snapshot with explicit Root refresh."
+    },
+    "kind": "application",
+    "visibility": "public",
+    "entrypoints": [
+      {
+        "entrypoint_id": "subscriptions",
+        "presentation_ref": "skill:subscription_status_skill"
+      }
+    ],
+    "publisher": {
+      "publisher_ref": "subnet:sn_6acf0c01",
+      "display_name": "Домашний ассистент",
+      "subnet_short_ref": "sn_6acf0c01",
+      "release_key_ref": "artifact-signing:subnet:sn_6acf0c01:sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "release_key_fingerprint": "sha256:eeb8de87fcbaaacb876a1e7e55a0ebcd9a2a16a550d9ad508679cab0a4d44d6a",
+      "home_zone": "ru",
+      "trust_relation": "local"
+    },
+    "protection": {
+      "system_application": false,
+      "bootstrap_capable": false,
+      "active_installation_removable": true,
+      "recovery_surfaces": []
+    },
+    "lifecycle": "active",
+    "revision": 4,
+    "created_at": "2026-09-25T22:07:53+00:00",
+    "updated_at": "2026-11-17T19:30:03+00:00"
+  },
+  "release": {
+    "schema": "adaos.application.release.v1",
+    "application_id": "subscription_status",
+    "publisher_ref": "subnet:sn_6acf0c01",
+    "legacy_project_id": "subscription_status",
+    "version": "0.1.20",
+    "release_digest": "sha256:ac91ef3c4bc91bece7a8e3d43a67cacbc8ed9249079dbce4a57879d254d5f744",
+    "project_release": {
+      "schema": "adaos.artifact.project_release.v1",
+      "project_id": "subscription_status",
+      "version": "0.1.20",
+      "source_ref": {
+        "schema": "adaos.artifact.source_ref.v1",
+        "forge": "content-addressed-dev",
+        "repository": "adaos-local:subscription-observation-repair",
+        "revision": "sha256:92e5a7bf60e9e099ad515dde690e42c1e185617b3bb3eee08a607b38b5a98335",
+        "path_scope": [
+          "projects/subscription_status/"
+        ]
+      },
+      "components": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "subscription_status_skill",
+          "version": "0.1.36",
+          "digest": "sha256:cba0afb7289f6c8971a3768af8d2c0c4b7bb3893016720df04559a225256942b",
+          "manifest_digest": "sha256:d6c453dcea119c589ad6426cd138686a079342ef180c5d63b578a4b74ede36b5",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-local:subscription-observation-repair",
+            "revision": "sha256:92e5a7bf60e9e099ad515dde690e42c1e185617b3bb3eee08a607b38b5a98335",
+            "path_scope": [
+              "skills/subscription_status_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/subscription_status_skill",
+          "schema_locks": []
+        }
+      ],
+      "resolved_dependencies": [],
+      "permissions": [
+        "network.egress",
+        "workspace.write"
+      ],
+      "migrations": [],
+      "validation_evidence": [
+        {
+          "schema": "adaos.artifact.project_release_build_evidence.v1",
+          "source_revision": "sha256:92e5a7bf60e9e099ad515dde690e42c1e185617b3bb3eee08a607b38b5a98335",
+          "builder": "adaos.dev.project.push"
+        },
+        {
+          "schema": "adaos.consumer_contract_usage_lock.v1",
+          "application_ref": "project:subscription_status",
+          "consumer_ref": "skill:subscription_status_skill",
+          "consumer_digest": "sha256:cba0afb7289f6c8971a3768af8d2c0c4b7bb3893016720df04559a225256942b",
+          "producer_digest": "sha256:890c26e2dc408fd8ecc1106a129624370da8a201681d6b88554a951943739930",
+          "complete": false,
+          "unresolved": [
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.ctx_current_user.set",
+              "location": "handlers/main.py:26"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.skill_env.skill_state_dir",
+              "location": "handlers/main.py:130"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.ctx_current_user.set",
+              "location": "handlers/main.py:455"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.ctx_current_user.set",
+              "location": "handlers/main.py:510"
+            },
+            {
+              "code": "contract_not_indexed",
+              "contract_ref": "sdk:adaos.sdk.data.ctx_current_user.set",
+              "location": "handlers/main.py:601"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:612"
+            },
+            {
+              "code": "dynamic_python_usage",
+              "location": "handlers/main.py:613"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.subscribe",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.core.decorators.tool",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.data.ctx_current_user",
+              "location": "handlers/main.py"
+            },
+            {
+              "code": "sdk_module_usage_unresolved",
+              "module": "adaos.sdk.skill_env.skill_state_dir",
+              "location": "handlers/main.py"
+            }
+          ],
+          "source_artifacts": {
+            "contracts/binding.definition.json": "sha256:3e474c83655db6352df2e8405b0c53abd29b81418a6627514833b2a5f51626a4",
+            "contracts/capability.contract.json": "sha256:d8054796b470f094731774b156f7be3c44331338916e9077d44965656f956c6b",
+            "webui.json": "sha256:175f187f5f801dd99176154b5d5d281c81587483ef778fc3d8028f1026508b86",
+            ".adaos/package-manifest.json": "sha256:d6c453dcea119c589ad6426cd138686a079342ef180c5d63b578a4b74ede36b5"
+          },
+          "edges": [
+            {
+              "contract_ref": "sdk:adaos.sdk.ai.adopt_context_chat_connection",
+              "contract_digest": "sha256:bcbe5c5366f02d4b3c191dbcfdfcdfd111cf9395e8151deb700f4b2eaaa39619",
+              "surface": [
+                "handlers/main.py:56"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.ai.cancel_sign_in",
+              "contract_digest": "sha256:ccc70835c281229c45175f92d521e8fce1d809577b3843289eb8e85abfec2afb",
+              "surface": [
+                "handlers/main.py:44"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.ai.connect",
+              "contract_digest": "sha256:ccc70835c281229c45175f92d521e8fce1d809577b3843289eb8e85abfec2afb",
+              "surface": [
+                "handlers/main.py:34"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.ai.disconnect",
+              "contract_digest": "sha256:ccc70835c281229c45175f92d521e8fce1d809577b3843289eb8e85abfec2afb",
+              "surface": [
+                "handlers/main.py:51"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.ai.status",
+              "contract_digest": "sha256:ccc70835c281229c45175f92d521e8fce1d809577b3843289eb8e85abfec2afb",
+              "surface": [
+                "handlers/main.py:19"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.ai.verify",
+              "contract_digest": "sha256:ccc70835c281229c45175f92d521e8fce1d809577b3843289eb8e85abfec2afb",
+              "surface": [
+                "handlers/main.py:39"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "sdk:adaos.sdk.subscriptions.project_codex_usage_window",
+              "contract_digest": "sha256:4899cacf872c925efec6e1c52c52d9b782a2b43215db69e1abe35070f2f6fc0f",
+              "surface": [
+                "handlers/main.py:12",
+                "handlers/main.py:399"
+              ],
+              "exposure": "static"
+            },
+            {
+              "contract_ref": "webui:item.details",
+              "contract_digest": "sha256:6b35434a3583e3bc268dbbbb2766f578c5654383f6553f26d5a54dfa0f268933",
+              "surface": [
+                "webui.json.registry.modals.subscription_status_modal.schema.widgets[1]",
+                "webui.json.registry.modals.subscription_status_modal.schema.widgets[4]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.actions",
+              "contract_digest": "sha256:b11889d561895633c7bb4f0fd286b2f3557ac4d2c9cce07adbbc4443c04ad543",
+              "surface": [
+                "webui.json.registry.modals.subscription_status_modal.schema.widgets[2]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.form",
+              "contract_digest": "sha256:b5cc0b5f87908980b433525b03fd59da750ca7b44a5648c830ce7aef6c224e59",
+              "surface": [
+                "webui.json.registry.modals.subscription_status_modal.schema.widgets[9]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:ui.table",
+              "contract_digest": "sha256:c7d328ca61b335e3dfdd62f69274df7157c1a4400c58ffa8d7ff7af9f4ed3af8",
+              "surface": [
+                "webui.json.registry.modals.subscription_status_modal.schema.widgets[5]",
+                "webui.json.registry.modals.subscription_status_modal.schema.widgets[6]",
+                "webui.json.registry.modals.subscription_status_modal.schema.widgets[7]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:visual.metricTile",
+              "contract_digest": "sha256:90cd62868f55844e8894cc6e413bf7ef9fdfc72545f9c1329127b017db1c37ab",
+              "surface": [
+                "webui.json.registry.modals.subscription_status_modal.schema.widgets[3]",
+                "webui.json.registry.modals.subscription_status_modal.schema.widgets[8]"
+              ],
+              "exposure": "compiled"
+            },
+            {
+              "contract_ref": "webui:visual.multiMetricArc",
+              "contract_digest": "sha256:d6cd2f8c2946862c8f14003554a979275d2feb897f58575547db21170cebc778",
+              "surface": [
+                "webui.json.widgets[0]"
+              ],
+              "exposure": "compiled"
+            }
+          ],
+          "usage_lock_id": "consumer_contract_usage_lock:sha256:e113889d33dc7e7af4cea80863beb55b5f4f176c4b3d8683264c6211122d0a2f",
+          "digest": "sha256:e113889d33dc7e7af4cea80863beb55b5f4f176c4b3d8683264c6211122d0a2f",
+          "recorded_at": "1970-01-01T00:00:00+00:00"
+        }
+      ],
+      "schema_locks": [],
+      "migration_locks": [],
+      "validation_evidence_refs": [
+        "sha256:11ef327f95e2bae3805a4dec2db06fbcac2ef21d74bac8cc7dffa5178d68b1c7",
+        "sha256:4a6efa7467b3ac3bd37bfa0303f7f2ccaa7211836c61a07fe0d7e3dac01a73c0"
+      ],
+      "composition_lock": {
+        "schema": "adaos.artifact.project_composition_lock.v1",
+        "project_definition_digest": "sha256:b5995f1253802ec34f48eeba907af7bfd790d92e16d22db95239e3e87d7822ad",
+        "profiles": [
+          "adaos.builder.component_project.v1"
+        ],
+        "members": [
+          {
+            "ref": "skill:subscription_status_skill",
+            "package_digest": "sha256:cba0afb7289f6c8971a3768af8d2c0c4b7bb3893016720df04559a225256942b",
+            "role": "primary",
+            "exposure": "application",
+            "lifecycle": "bound",
+            "relations": [
+              "uses"
+            ]
+          }
+        ],
+        "project_dependencies": [],
+        "entrypoints": [
+          {
+            "id": "subscriptions",
+            "presentation": "skill:subscription_status_skill",
+            "default": true,
+            "bindings": {
+              "surface": "subscription_status"
+            }
+          }
+        ],
+        "compatibility": {
+          "required_entrypoints": [
+            "subscriptions"
+          ],
+          "required_contracts": [
+            "capability:subscriptions.status.inspect@^1.0.0"
+          ],
+          "validation_profiles": [
+            "subscriptions.local"
+          ]
+        },
+        "lifecycle": {
+          "uninstall": {
+            "components": "remove_if_unreferenced",
+            "runtime_data": "retain",
+            "source_artifacts": "retain"
+          }
+        },
+        "permission_profile": {
+          "schema": "adaos.application.permission_profile.v1",
+          "required": [
+            {
+              "id": "network.egress",
+              "purpose": "Request official ChatGPT sign-in and explicit personal-plan verification through Core AI; credentials remain in Core.",
+              "approval_policy": "grant_on_install",
+              "sensitive": true
+            },
+            {
+              "id": "workspace.write",
+              "purpose": "Refresh and persist the local subscription projection and explicit plan-change requests.",
+              "approval_policy": "grant_on_install",
+              "sensitive": true
+            }
+          ],
+          "optional": [],
+          "secrets": [],
+          "data_practices": {
+            "collected": [
+              "plan_change_request",
+              "subscription_status",
+              "usage_summary"
+            ],
+            "sent_off_device": [
+              "chatgpt_sign_in",
+              "explicit_verification_prompt"
+            ],
+            "linked_to_user": [
+              "plan_change_request",
+              "subscription_status"
+            ],
+            "tracking": false,
+            "retention": "The current local entitlement projection and explicit requests are retained."
+          },
+          "llm_model_use": [],
+          "notifications": [],
+          "background_actions": [],
+          "external_providers": [
+            {
+              "id": "openai.chatgpt",
+              "purpose": "Owner-consented sign-in and a short explicit access check through Core AI.",
+              "credential_custody": "core"
+            }
+          ],
+          "privacy_labels": {
+            "collected": [
+              "plan_change_request",
+              "subscription_status",
+              "usage_summary"
+            ],
+            "sent_off_device": true,
+            "linked_to_user": true,
+            "tracking": false
+          }
+        },
+        "application_roles": []
+      },
+      "catalog": {
+        "title": "Subscriptions",
+        "description": "User-facing AdaOS subscription status widget and modal backed by the local economic entitlement snapshot with explicit Root refresh.",
+        "categories": [
+          "account",
+          "system"
+        ],
+        "tags": [
+          "cbs-provider",
+          "subscriptions",
+          "usage"
+        ]
+      },
+      "release_digest": "sha256:ac91ef3c4bc91bece7a8e3d43a67cacbc8ed9249079dbce4a57879d254d5f744"
+    },
+    "accepted_candidate_id": "subscription_status-0-1-20-79d254d5f744",
+    "acceptance_evidence": [
+      {
+        "status": "passed",
+        "validator": "local-shared-context-repair",
+        "refs": [
+          "e2e/artifacts/shared-application-context-20261027/core-and-subscription-tests.xml"
+        ],
+        "browser_workflow_status": "pending",
+        "live_inference_tested": false
+      }
+    ],
+    "provenance_refs": [
+      "sha256:ac91ef3c4bc91bece7a8e3d43a67cacbc8ed9249079dbce4a57879d254d5f744"
+    ],
+    "permission_profile": {
+      "schema": "adaos.application.permission_profile.v1",
+      "required": [
+        {
+          "id": "network.egress",
+          "purpose": "Request official ChatGPT sign-in and explicit personal-plan verification through Core AI; credentials remain in Core.",
+          "approval_policy": "grant_on_install",
+          "sensitive": true
+        },
+        {
+          "id": "workspace.write",
+          "purpose": "Refresh and persist the local subscription projection and explicit plan-change requests.",
+          "approval_policy": "grant_on_install",
+          "sensitive": true
+        }
+      ],
+      "optional": [],
+      "secrets": [],
+      "data_practices": {
+        "collected": [
+          "plan_change_request",
+          "subscription_status",
+          "usage_summary"
+        ],
+        "sent_off_device": [
+          "chatgpt_sign_in",
+          "explicit_verification_prompt"
+        ],
+        "linked_to_user": [
+          "plan_change_request",
+          "subscription_status"
+        ],
+        "tracking": false,
+        "retention": "The current local entitlement projection and explicit requests are retained."
+      },
+      "llm_model_use": [],
+      "notifications": [],
+      "background_actions": [],
+      "external_providers": [
+        {
+          "id": "openai.chatgpt",
+          "purpose": "Owner-consented sign-in and a short explicit access check through Core AI.",
+          "credential_custody": "core"
+        }
+      ],
+      "privacy_labels": {
+        "collected": [
+          "plan_change_request",
+          "subscription_status",
+          "usage_summary"
+        ],
+        "sent_off_device": true,
+        "linked_to_user": true,
+        "tracking": false
+      }
+    },
+    "permission_profile_digest": "sha256:7ba219d6bfaa203464c0a73ef2cfa2dfe1b39bb993baf99f459fa61b4adc8340",
+    "application_roles": [],
+    "role_model_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "addresses_report_ids": [],
+    "lifecycle": "trial",
+    "setup_contract": {
+      "schema": "adaos.application.setup_contract.v1",
+      "application_id": "subscription_status",
+      "release_digest": "sha256:ac91ef3c4bc91bece7a8e3d43a67cacbc8ed9249079dbce4a57879d254d5f744",
+      "version": 1,
+      "components": [],
+      "connected_accounts": [
+        {
+          "id": "openai.chatgpt",
+          "title": "openai.chatgpt",
+          "purpose": "Owner-consented sign-in and a short explicit access check through Core AI.",
+          "required": true,
+          "scopes": []
+        }
+      ],
+      "permissions": [
+        {
+          "id": "network.egress",
+          "title": "Network.Egress",
+          "purpose": "Request official ChatGPT sign-in and explicit personal-plan verification through Core AI; credentials remain in Core.",
+          "required": true
+        },
+        {
+          "id": "workspace.write",
+          "title": "Workspace.Write",
+          "purpose": "Refresh and persist the local subscription projection and explicit plan-change requests.",
+          "required": true
+        }
+      ],
+      "placement": {
+        "required": true,
+        "title": "Runtime placement"
+      },
+      "verification": []
+    },
+    "setup_contract_digest": "sha256:86c8c878d5e3f6e6c7aa3a70ed983a88425aa1cd2f092ca0ad8a2b01d6d58b86"
+  },
+  "channels": {
+    "stable": "sha256:ac91ef3c4bc91bece7a8e3d43a67cacbc8ed9249079dbce4a57879d254d5f744"
+  },
+  "semantic": {
+    "projection_digest": "sha256:56dfc95757b5f20ae680a15f307d0837d439729f86b18007214d9d784cdf6de0",
+    "path": "semantic/applications/subscription_status/ac91ef3c4bc91bece7a8e3d43a67cacbc8ed9249079dbce4a57879d254d5f744.json"
+  },
+  "projection_digest": "sha256:4662084ec09d27e83d599e4cbcdb7163f117dc3780f1291abc7b6279a22a147a"
+}

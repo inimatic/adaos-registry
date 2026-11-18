@@ -18,21 +18,7 @@ def test_compact_cbs_provider_compiles_to_package_neutral_contracts():
         for path in root.rglob("*")
         if path.is_file() and ".runtime" not in path.parts
     }
-    if "contracts/provider.cbs.yaml" not in files:
-        capability = json.loads((root / CAPABILITY_OUTPUT_PATH).read_text(encoding="utf-8"))
-        binding = json.loads((root / BINDING_OUTPUT_PATH).read_text(encoding="utf-8"))
-        assert capability["capability_ref"] == "capability:subscriptions.status.inspect"
-        assert binding["binding_definition_ref"] == (
-            "binding-definition:subscriptions.status.inspect.adaos-root-local"
-        )
-        return
-
-    authored_files = {
-        path: content
-        for path, content in files.items()
-        if path not in {CAPABILITY_OUTPUT_PATH, BINDING_OUTPUT_PATH}
-    }
-    compiled = compile_cbs_provider_files(authored_files, kind="skill")
+    compiled = compile_cbs_provider_files(files, kind="skill")
 
     assert compiled is not None
     assert compiled.capability.capability_ref == "capability:subscriptions.status.inspect"
@@ -52,6 +38,19 @@ def _load_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_chatgpt_management_projects_no_identity_or_tokens(monkeypatch):
+    module = _load_module()
+    projection = _Projection()
+    monkeypatch.setattr(module, 'ctx_current_user', projection)
+    monkeypatch.setattr(module.ai, 'status', lambda: {'connected': True, 'plan_enabled': True,
+        'binding_ref': 'private-binding', 'credential_owner': 'user:private-owner',
+        'email': 'private@example.invalid', 'inference_verified': True})
+    assert module.chatgpt_status('desktop')['connected'] is True
+    projected = json.dumps(projection.values)
+    assert 'private@example.invalid' not in projected and 'private-binding' not in projected
+    assert 'private-owner' not in projected
 
 
 class _Projection:
@@ -85,13 +84,12 @@ def test_webui_reads_subscription_projection_without_calling_write_tools() -> No
     assert all(source.get("kind") == "y" for source in data_sources)
     assert all(source.get("scope") == "shared" for source in data_sources)
     assert {source.get("path") for source in data_sources} == {
+        "data/subscription_ai_connection",
         "data/subscription_status",
         "data/subscription_status/raw",
         "data/subscription_status/resources",
         "data/subscription_status/usage_history",
         "data/subscription_status/codex_models",
-        "data/subscription_status/codex_applications",
-        "data/subscription_status/codex_iterations",
         "data/subscription_status/refresh",
     }
 
@@ -143,14 +141,15 @@ def test_subscription_modal_refreshes_after_user_identity_is_ready() -> None:
 
     modal = webui["registry"]["modals"]["subscription_status_modal"]["schema"]
     command_bar = next(widget for widget in modal["widgets"] if widget["id"] == "subscription-status-actions")
-    mount_action = next(action for action in command_bar["actions"] if action["on"] == "mount")
-
-    assert mount_action == {
-        "on": "mount",
-        "type": "callSkill",
-        "target": "subscription_status_skill.refresh_status",
-        "params": {"webspace_id": "$client.webspaceId"},
-    }
+    assert not any(action["on"] == "mount" for action in command_bar["actions"])
+    initial = modal["autoActions"]
+    assert len(initial) == 2
+    assert all(entry["once"] is True and entry["intervalMs"] == 1000 for entry in initial)
+    assert [entry["action"]["target"] for entry in initial] == [
+        "subscription_status_skill.get_status", "subscription_status_skill.chatgpt_status"]
+    assert initial[0]["action"]["params"] == {
+        "webspace_id": "$client.webspaceId", "refresh_root_if_missing": False}
+    assert initial[1]["action"]["params"] == {"webspace_id": "$client.webspaceId"}
 
 
 def test_status_projection_exposes_quota_rows(monkeypatch) -> None:
@@ -575,34 +574,6 @@ def test_codex_models_display_unknown_cost_without_fabricating_zero(monkeypatch)
     assert rows[1]["estimated_usd"] == ""
     assert rows[1]["cost_status"] == "unavailable"
     assert rows[1]["model"] == "Unknown"
-
-
-def test_codex_usage_is_projected_by_application_and_iteration(monkeypatch):
-    module = _load_module()
-    monkeypatch.setattr(module, "_read_plan_change_request", lambda: {})
-    payload = module._projection_payload({"usage": {"codex.api.tokens": {
-        "usage_breakdown": {"window_24h": {"by_application": [{
-            "application_id": "notes", "application_type": "scenario",
-            "runs": 2, "fresh_input_tokens": 60, "cached_input_tokens": 100,
-            "output_tokens": 15, "reasoning_tokens": 6, "billable_tokens": 175,
-            "last_seen_at": "2026-10-05T09:10:00Z",
-            "iterations": [
-                {"builder_session_id": "automation.scenario.notes", "builder_iteration": 1,
-                 "runs": 1, "fresh_input_tokens": 40, "cached_input_tokens": 20,
-                 "output_tokens": 5, "reasoning_tokens": 2, "billable_tokens": 65},
-                {"builder_session_id": "automation.scenario.notes", "builder_iteration": 0,
-                 "runs": 1, "fresh_input_tokens": 20, "cached_input_tokens": 80,
-                 "output_tokens": 10, "reasoning_tokens": 4, "billable_tokens": 110},
-            ],
-        }]}}}}})
-
-    application = payload["codex_applications"]["items"][0]
-    iterations = payload["codex_iterations"]["items"]
-    assert application["application_id"] == "notes"
-    assert application["iteration_count"] == 2
-    assert "iterations" not in application
-    assert [row["iteration"] for row in iterations] == [1, 0]
-    assert sum(row["billable_tokens"] for row in iterations) == 175
 
 
 def test_usage_arc_does_not_fabricate_exhaustion_when_remaining_is_unknown(monkeypatch):
