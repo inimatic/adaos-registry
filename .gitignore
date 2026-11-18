@@ -9,3 +9,5 @@ scenarios/.devtime/
 .runtime/
 __pycache__/
 *.py[cod]
+
+.tmp/

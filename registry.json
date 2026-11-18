@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-16T14:24:54+00:00",
+  "updated_at": "2026-11-18T09:30:32.833831+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -94,35 +94,6 @@
         "package_digest": "sha256:4bb829c4bf3c7ebe1deebc96fad6d11029747c9c1f39ea0cc8991fa7c3b95810"
       },
       "tools_count": 8
-    },
-    {
-      "kind": "skill",
-      "id": "automation_manager_prototype_skill",
-      "name": "automation_manager_prototype_skill",
-      "version": "0.1.6",
-      "updated_at": "2026-11-06T11:23:32+00:00",
-      "path": "skills/automation_manager_prototype_skill",
-      "manifest": "skills/automation_manager_prototype_skill/skill.yaml",
-      "source": {
-        "path": "skills/automation_manager_prototype_skill",
-        "manifest": "skills/automation_manager_prototype_skill/skill.yaml"
-      },
-      "install": {
-        "kind": "skill",
-        "name": "automation_manager_prototype_skill",
-        "id": "automation_manager_prototype_skill"
-      },
-      "description": "Project-owned resource implementation for project:automation_manager_prototype. Realize the accepted Prototype according to the separate Automation brief.",
-      "entry": "handlers/main.py",
-      "runtime_python": "3.11",
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "applications",
-        "release": "applications@0.1.58",
-        "release_digest": "sha256:65f3ccceab9a8c60858646ad43463fe47d98d8754bc097073ea5bd6382234039",
-        "package_digest": "sha256:56688ee94ae3e6a8f72a791ba87f8f1aaedbbe255454cc05c721cc1c1e8c6d0b"
-      },
-      "tools_count": 5
     },
     {
       "kind": "skill",
@@ -1574,28 +1545,6 @@
     },
     {
       "kind": "skill",
-      "id": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
-      "name": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
-      "version": "0.1.5",
-      "updated_at": "2026-09-16T11:13:13+00:00",
-      "path": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
-      "manifest": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill/skill.yaml",
-      "source": {
-        "path": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
-        "manifest": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill/skill.yaml"
-      },
-      "install": {
-        "kind": "skill",
-        "name": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
-        "id": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill"
-      },
-      "description": "Persistent volunteer roster with caller-authorized transactional operations.",
-      "entry": "{'module': 'handlers.main'}",
-      "runtime_python": "3.11",
-      "tools_count": 7
-    },
-    {
-      "kind": "skill",
       "id": "weather_skill",
       "name": "weather_skill",
       "version": "2.6.30",
@@ -1694,28 +1643,6 @@
         "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
         "package_digest": "sha256:a06afbebe11e168fe97b3f1a44f4848cad1a8bd554715d9dd54ae015d084df55"
       }
-    },
-    {
-      "kind": "skill",
-      "id": "workbench_test_20260914_b_skill",
-      "name": "workbench_test_20260914_b_skill",
-      "version": "0.1.7",
-      "updated_at": "2026-09-15T21:19:20+00:00",
-      "path": "skills/workbench_test_20260914_b_skill",
-      "manifest": "skills/workbench_test_20260914_b_skill/skill.yaml",
-      "source": {
-        "path": "skills/workbench_test_20260914_b_skill",
-        "manifest": "skills/workbench_test_20260914_b_skill/skill.yaml"
-      },
-      "install": {
-        "kind": "skill",
-        "name": "workbench_test_20260914_b_skill",
-        "id": "workbench_test_20260914_b_skill"
-      },
-      "description": "Project-owned resource implementation for project:workbench_test_20260914_b. Realize the accepted Prototype according to the separate Automation brief.",
-      "entry": "handlers/main.py",
-      "runtime_python": "3.11",
-      "tools_count": 12
     },
     {
       "kind": "skill",
@@ -1826,58 +1753,6 @@
           "source_revision": "sha256:102b9b77b9abc2c0e2159787afcb61dd89538aa013cf75e3016ef18e29eeaee6",
           "package_digest": "sha256:d82804ad93fbc46c3faa411e48bafc03c34f4370091b679dd03474f24daf933f",
           "version": "0.1.97"
-        }
-      }
-    },
-    {
-      "kind": "scenario",
-      "id": "automation_manager_prototype",
-      "name": "automation_manager_prototype",
-      "version": "0.1.7",
-      "updated_at": "2026-09-29T17:34:26+00:00",
-      "path": "scenarios/automation_manager_prototype",
-      "manifest": "scenarios/automation_manager_prototype/scenario.yaml",
-      "source": {
-        "path": "scenarios/automation_manager_prototype",
-        "manifest": "scenarios/automation_manager_prototype/scenario.yaml",
-        "forge": "content-addressed-dev",
-        "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
-        "revision": "sha256:8c559609d6f143366bccb811b362977f035c3f5dd110d1dbaa58b04dac57e5f5",
-        "path_scope": [
-          "projects/automation_manager_prototype/"
-        ]
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "automation_manager_prototype",
-        "id": "automation_manager_prototype"
-      },
-      "title": "Automation Manager — Operator Panel (demo)",
-      "title_i18n": {
-        "key": "prototype.automation_manager_ru_v3_rulocale_fix.r4.title",
-        "fallback": "Automation Manager — Operator Panel (demo)"
-      },
-      "description": "Empty AdaOS desktop canvas ready for Builder authoring.",
-      "trigger": "manual",
-      "skills": {
-        "required": [
-          "automation_manager_prototype_skill"
-        ]
-      },
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "automation_manager_prototype",
-        "release": "automation_manager_prototype@0.1.7",
-        "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
-        "package_digest": "sha256:98388a24ac1b2f7607a5783137d12be2c9bdd2cb8d623a1ceff48e8da4e29de2"
-      },
-      "channels": {
-        "stable": {
-          "release": "automation_manager_prototype@0.1.7",
-          "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
-          "source_revision": "sha256:8c559609d6f143366bccb811b362977f035c3f5dd110d1dbaa58b04dac57e5f5",
-          "package_digest": "sha256:98388a24ac1b2f7607a5783137d12be2c9bdd2cb8d623a1ceff48e8da4e29de2",
-          "version": "0.1.7"
         }
       }
     },
@@ -2128,36 +2003,6 @@
           "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa",
           "version": "0.1.2"
         }
-      }
-    },
-    {
-      "kind": "scenario",
-      "id": "inbox_triage",
-      "name": "inbox_triage",
-      "version": "0.1.4",
-      "updated_at": "2026-09-24T18:14:41+00:00",
-      "path": "scenarios/inbox_triage",
-      "manifest": "scenarios/inbox_triage/scenario.yaml",
-      "source": {
-        "path": "scenarios/inbox_triage",
-        "manifest": "scenarios/inbox_triage/scenario.yaml"
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "inbox_triage",
-        "id": "inbox_triage"
-      },
-      "title": "Inbox Triage",
-      "title_i18n": {
-        "key": "scenario.inbox_triage.title",
-        "fallback": "Inbox Triage"
-      },
-      "description": "Focused inbox triage using an explicitly attached shared mail connection.",
-      "trigger": "manual",
-      "skills": {
-        "required": [
-          "gmail_cbs_cleanroom_skill"
-        ]
       }
     },
     {
@@ -2554,41 +2399,6 @@
     },
     {
       "kind": "scenario",
-      "id": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
-      "name": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
-      "version": "0.1.2",
-      "updated_at": "2026-09-05T06:51:22+00:00",
-      "path": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
-      "manifest": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e/scenario.yaml",
-      "source": {
-        "path": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
-        "manifest": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e/scenario.yaml"
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
-        "id": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e"
-      },
-      "title": "Trial Workspace Lifecycle E2E 20260905 with a simple status field",
-      "title_i18n": {
-        "key": "scenario.trial_workspace_lifecycle_e2e_20260905_w_5decc38e.title",
-        "fallback": "Trial Workspace Lifecycle E2E 20260905 with a simple status field"
-      },
-      "description": "Builder-created rapid prototype scenario.",
-      "io": {
-        "input": [
-          "voice",
-          "text"
-        ],
-        "output": [
-          "voice",
-          "text",
-          "web"
-        ]
-      }
-    },
-    {
-      "kind": "scenario",
       "id": "users_access",
       "name": "users_access",
       "version": "0.1.21",
@@ -2611,36 +2421,6 @@
       },
       "description": "Manage people, invitations, roles, devices, sessions, and application access from one protected system application.",
       "trigger": "manual"
-    },
-    {
-      "kind": "scenario",
-      "id": "volunteer_roster_test_-20260916-e2e80de3bec9621",
-      "name": "volunteer_roster_test_-20260916-e2e80de3bec9621",
-      "version": "0.1.5",
-      "updated_at": "2026-09-16T11:13:18+00:00",
-      "path": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621",
-      "manifest": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621/scenario.yaml",
-      "source": {
-        "path": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621",
-        "manifest": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621/scenario.yaml"
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "volunteer_roster_test_-20260916-e2e80de3bec9621",
-        "id": "volunteer_roster_test_-20260916-e2e80de3bec9621"
-      },
-      "title": "Volunteer Roster [TEST]-20260916-e2e80de3bec9621",
-      "title_i18n": {
-        "key": "scenario.volunteer_roster_test_-20260916-e2e80de3bec9621.title",
-        "fallback": "Volunteer Roster [TEST]-20260916-e2e80de3bec9621"
-      },
-      "description": "Persistent volunteer roster for a community event.",
-      "trigger": "manual",
-      "skills": {
-        "required": [
-          "volunteer_roster_test_-20260916-e2e80de3bec9621_skill"
-        ]
-      }
     },
     {
       "kind": "scenario",
@@ -2696,35 +2476,6 @@
           "package_digest": "sha256:1f80b67715db42177db2d81fc11fbad69297672679d4ef569ab86ae526a46331",
           "version": "0.3.111"
         }
-      }
-    },
-    {
-      "kind": "scenario",
-      "id": "workbench_test_20260914_b",
-      "name": "workbench_test_20260914_b",
-      "version": "0.1.8",
-      "updated_at": "2026-09-15T21:19:25+00:00",
-      "path": "scenarios/workbench_test_20260914_b",
-      "manifest": "scenarios/workbench_test_20260914_b/scenario.yaml",
-      "source": {
-        "path": "scenarios/workbench_test_20260914_b",
-        "manifest": "scenarios/workbench_test_20260914_b/scenario.yaml"
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "workbench_test_20260914_b",
-        "id": "workbench_test_20260914_b"
-      },
-      "title": "Список чтения",
-      "title_i18n": {
-        "key": "scenario.workbench_test_20260914_b.title",
-        "fallback": "Список чтения"
-      },
-      "trigger": "manual",
-      "skills": {
-        "required": [
-          "workbench_test_20260914_b_skill"
-        ]
       }
     },
     {
@@ -2885,11 +2636,11 @@
       },
       "channels": {
         "stable": {
+          "version": "0.3.42",
           "release": "adaos_builder@0.3.42",
           "release_digest": "sha256:b639278a6b3fce82ec19f2491708b0bfc48a663773e73511ed66a9123ba55946",
           "source_revision": "sha256:419b65998933818dc0f3274e2f08b393a8237f421d9ff191938cb06a2006a8d2",
-          "package_digest": "sha256:0bc61280d319dfd1ed6862e801d7f4c4b87fe98f6d72e3ed60476e82bbce0746",
-          "version": "0.3.42"
+          "package_digest": "sha256:0bc61280d319dfd1ed6862e801d7f4c4b87fe98f6d72e3ed60476e82bbce0746"
         }
       }
     },
@@ -2948,64 +2699,11 @@
       },
       "channels": {
         "stable": {
+          "version": "0.1.67",
           "release": "applications@0.1.67",
           "release_digest": "sha256:03615f0d5b6d0d6932177dc69b72967b27a1d66829e64f8084383df899f55cf8",
           "source_revision": "sha256:102b9b77b9abc2c0e2159787afcb61dd89538aa013cf75e3016ef18e29eeaee6",
-          "package_digest": "sha256:d82804ad93fbc46c3faa411e48bafc03c34f4370091b679dd03474f24daf933f",
-          "version": "0.1.67"
-        }
-      }
-    },
-    {
-      "kind": "project",
-      "id": "automation_manager_prototype",
-      "name": "automation_manager_prototype",
-      "version": "0.1.7",
-      "updated_at": "2026-09-29T19:35:56+00:00",
-      "path": "projects/automation_manager_prototype",
-      "manifest": "projects/automation_manager_prototype/project.yaml",
-      "source": {
-        "path": "projects/automation_manager_prototype",
-        "manifest": "projects/automation_manager_prototype/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "automation_manager_prototype",
-        "id": "automation_manager_prototype"
-      },
-      "title": "Automation Manager Prototype",
-      "description": "Title: Automation Manager Prototype. Russian dashboard prototype for automation machines, warm pods, Codex accounts, remote tasks and audit events.",
-      "publication": {
-        "stage": "alpha",
-        "visibility": "unlisted",
-        "channel": "stable"
-      },
-      "stage": "alpha",
-      "visibility": "unlisted",
-      "channel": "stable",
-      "install_default": false,
-      "features": [],
-      "components": [
-        "scenario:automation_manager_prototype",
-        "skill:automation_manager_prototype_skill"
-      ],
-      "components_count": 2,
-      "profiles": [],
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "automation_manager_prototype",
-        "release": "automation_manager_prototype@0.1.7",
-        "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
-        "primary_component": "scenario:automation_manager_prototype",
-        "package_digest": "sha256:98388a24ac1b2f7607a5783137d12be2c9bdd2cb8d623a1ceff48e8da4e29de2"
-      },
-      "channels": {
-        "stable": {
-          "release": "automation_manager_prototype@0.1.7",
-          "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
-          "source_revision": "sha256:8c559609d6f143366bccb811b362977f035c3f5dd110d1dbaa58b04dac57e5f5",
-          "package_digest": "sha256:98388a24ac1b2f7607a5783137d12be2c9bdd2cb8d623a1ceff48e8da4e29de2",
-          "version": "0.1.7"
+          "package_digest": "sha256:d82804ad93fbc46c3faa411e48bafc03c34f4370091b679dd03474f24daf933f"
         }
       }
     },
@@ -3054,11 +2752,11 @@
       },
       "channels": {
         "stable": {
+          "version": "0.5.2",
           "release": "context_chat@0.5.2",
           "release_digest": "sha256:3e9ebc366f7e541a5d5618538a0b960a6bd6d047e0c7ea754d9541a3167d0c52",
           "source_revision": "sha256:08f1a51319f87f8ca8c5923a19eccf9962120b4331879d68c399b99cf1216146",
-          "package_digest": "sha256:71b58de6e73488bb22e96212bbf19f789f9e3c878c2a57f996b4a68bde9ea76c",
-          "version": "0.5.2"
+          "package_digest": "sha256:71b58de6e73488bb22e96212bbf19f789f9e3c878c2a57f996b4a68bde9ea76c"
         }
       }
     },
@@ -3136,11 +2834,11 @@
       },
       "channels": {
         "stable": {
+          "version": "0.1.23",
           "release": "cv_descriptor_lab@0.1.23",
           "release_digest": "sha256:b740e8dfcd1310b903295a9b6c050fe2b7daabeba51feef7d0955b06cc17dd98",
           "source_revision": "sha256:9e1ab44f35f3809c034f332a85d7ee4fbfa81217ebd46e2a6ddb80eb6f811081",
-          "package_digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21",
-          "version": "0.1.23"
+          "package_digest": "sha256:88cd4c3719fdfb0ee1ee4ed8b155bcbf331df4ccc07270de66e05d485c7fcb21"
         }
       }
     },
@@ -3148,7 +2846,7 @@
       "kind": "project",
       "id": "gmail_cbs_cleanroom",
       "name": "gmail_cbs_cleanroom",
-      "version": "0.1.12",
+      "version": "0.1.11",
       "updated_at": "2026-09-30T16:01:27+00:00",
       "path": "projects/gmail_cbs_cleanroom",
       "manifest": "projects/gmail_cbs_cleanroom/project.yaml",
@@ -3189,11 +2887,11 @@
       },
       "channels": {
         "stable": {
-          "release": "gmail_cbs_cleanroom@0.1.12",
-          "release_digest": "sha256:08dbd8e6bf70ff1436aaf39a24dd2100f3a79c751ffa97b18defb9f4713a9795",
-          "source_revision": "sha256:6ff38a9554e23a62f19d86841cf58c1f22ff48eeb21bc3313397a850a4f61d3b",
-          "package_digest": "sha256:353d66081638c8eb000d48994531bf6ad14bb29b64de0c6d34a9de4b106eabbc",
-          "version": "0.1.12"
+          "version": "0.1.11",
+          "release": "gmail_cbs_cleanroom@0.1.11",
+          "release_digest": "sha256:717489abd8ae0c2c66a502b63afb6c94e58d8621a54b635d014669ae3dc7137f",
+          "source_revision": "sha256:8a0759b6f8bd2e534d8bcc9cd2a161c918c958dadfcb776a580482e3f5bc6984",
+          "package_digest": "sha256:937fc0cd8feb8829a9e43d9e571698feef11ba20822d34efec44ab515bda2adb"
         }
       }
     },
@@ -3242,48 +2940,13 @@
       },
       "channels": {
         "stable": {
+          "version": "0.1.4",
           "release": "gmail_mail_client@0.1.4",
           "release_digest": "sha256:8dde211ab6f6ce5c47059c56ae8e837933026ce3dad55929e58d71c79ddb2c06",
           "source_revision": "sha256:05a29791dea8402855aaf1d52075dbe21579e49f2a59fc7d951d01dc5377bda6",
-          "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa",
-          "version": "0.1.4"
+          "package_digest": "sha256:6970f562cb7f91260aad69758884545c02b2e87984346c0b4cedba6b873e5caa"
         }
       }
-    },
-    {
-      "kind": "project",
-      "id": "inbox_triage",
-      "name": "inbox_triage",
-      "version": "0.1.4",
-      "updated_at": "2026-09-27T06:32:27+00:00",
-      "path": "projects/inbox_triage",
-      "manifest": "projects/inbox_triage/project.yaml",
-      "source": {
-        "path": "projects/inbox_triage",
-        "manifest": "projects/inbox_triage/project.yaml"
-      },
-      "install": {
-        "kind": "project",
-        "name": "inbox_triage",
-        "id": "inbox_triage"
-      },
-      "title": "Inbox Triage",
-      "description": "Create a new private AdaOS Application named Inbox Triage, technical id mail_inbox_triage, from scratch.\n\nIts semantic Application requires capability:mail.messages.manage version ^1.0.0. Keep semantic intent provider-, package-, skill-, account-, and credential-neutral. At materialization time reuse an installed compatible Capability Binding and its shared Core-owned connected Gmail credential through an explicit user attachment when available. Do not create, copy, fork, or edit any Gmail provider implementation. If no reusable connection exists, offer fresh OAuth setup.\n\nThis is not a mail client. It is a focused inbox triage tool: show unread messages older than seven days and optionally starred messages; show sender, subject, date, and snippet; allow explicit mark-read, archive, star/unstar, and trash actions. Do not implement compose, send, label administration, attachment browsing, or mailbox settings.\n\nThe Prototype must be safe and deterministic. Represent loading, empty, authorization-required, reusable-account-available, connected, offline, permission-denied, provider-error, and success states without contacting Gmail and without storing secrets or real mail. Provide responsive wide and compact layouts. Explain least privilege. Prototype data is disposable synthetic review data; Automation must replace it with the selected compatible binding after acceptance.",
-      "publication": {
-        "stage": "alpha",
-        "visibility": "unlisted",
-        "channel": "stable"
-      },
-      "stage": "alpha",
-      "visibility": "unlisted",
-      "channel": "stable",
-      "install_default": false,
-      "features": [],
-      "components": [
-        "scenario:inbox_triage"
-      ],
-      "components_count": 1,
-      "profiles": []
     },
     {
       "kind": "project",
@@ -3386,11 +3049,11 @@
       },
       "channels": {
         "stable": {
+          "version": "0.6.136",
           "release": "media_center@0.6.136",
           "release_digest": "sha256:e9afed799ffe731e6100548ac7b53a4c19b96698bf050c9574ccb3dc87a3562c",
           "source_revision": "sha256:a4cc8ad93e0c77fdfebd72f84072c80a7ee743fb3e4ca991a87848570e637ce5",
-          "package_digest": "sha256:5dfc7118608b49a18b962b9bf651896296fbcb81b39a73d5b56fbac6bc8ff0b3",
-          "version": "0.6.136"
+          "package_digest": "sha256:5dfc7118608b49a18b962b9bf651896296fbcb81b39a73d5b56fbac6bc8ff0b3"
         }
       }
     },
@@ -3450,11 +3113,11 @@
       },
       "channels": {
         "stable": {
+          "version": "0.2.0",
           "release": "nlu_teacher@0.2.0",
           "release_digest": "sha256:3fb802a3d758ea87606a058e9bcf6541926a422ddfbe2004c2592c4abc2f82cd",
           "source_revision": "sha256:f47fa1da93f63adb5779c9499013363a8d03506de7f3801ebb3907b102fa83db",
-          "package_digest": "sha256:62faa91f473f21c3da41f7e42a05d507ebd1d990ba7fcd1ce564aa8e7841b9dd",
-          "version": "0.2.0"
+          "package_digest": "sha256:62faa91f473f21c3da41f7e42a05d507ebd1d990ba7fcd1ce564aa8e7841b9dd"
         }
       }
     },
@@ -3521,11 +3184,11 @@
       },
       "channels": {
         "stable": {
+          "version": "0.1.4",
           "release": "notebook@0.1.4",
           "release_digest": "sha256:3f1cf717532c0714289442562c9a982f4b322f443885afcadcc9ae9bf0c2f650",
           "source_revision": "sha256:80c287262f723333f4d622b584be825928c7c29b1f9e808a095658677b6472ee",
-          "package_digest": "sha256:b9a1786fb075c939b26df02225711f45b96bc4c8db411a30d26ad7918e9fdfae",
-          "version": "0.1.4"
+          "package_digest": "sha256:b9a1786fb075c939b26df02225711f45b96bc4c8db411a30d26ad7918e9fdfae"
         }
       }
     },
@@ -3639,11 +3302,11 @@
       },
       "channels": {
         "stable": {
+          "version": "0.1.24",
           "release": "redevice_control@0.1.24",
           "release_digest": "sha256:2e3e56a749c4fa564a342026f547b72d92b38059a52f7bed61cae31dee2afb07",
           "source_revision": "sha256:79e0e35ecabcf18c7a856df3bc51cceb45b55fe5fbae6a5007b1386f814a8eeb",
-          "package_digest": "sha256:6237c5c19b0d6b63af97b2e02cebf1bfd959f8893399752d96aff396995c1f7d",
-          "version": "0.1.24"
+          "package_digest": "sha256:6237c5c19b0d6b63af97b2e02cebf1bfd959f8893399752d96aff396995c1f7d"
         }
       }
     },
@@ -3759,11 +3422,11 @@
       },
       "channels": {
         "stable": {
+          "version": "0.1.25",
           "release": "research_platform@0.1.25",
           "release_digest": "sha256:0496c61257a67e794bdd0196b52b04c7162d333a7e43721286ebc2646887db00",
           "source_revision": "21e4b84bd6affa3525607b15ef24811c525ce4e9",
-          "package_digest": "sha256:17dcda30d7a897bc1d4c129d81ae19f00b6e573c64530828d6d07b5320aa3628",
-          "version": "0.1.25"
+          "package_digest": "sha256:17dcda30d7a897bc1d4c129d81ae19f00b6e573c64530828d6d07b5320aa3628"
         }
       }
     },
@@ -3831,11 +3494,11 @@
       },
       "channels": {
         "stable": {
+          "version": "0.1.6",
           "release": "slideshow@0.1.6",
           "release_digest": "sha256:bdfd4beb2e09927b1d86b7b1b3eb14ad41b5a864ed843362e38aa150400826cd",
           "source_revision": "sha256:ea61e5452bda636c8bc49f3d6e81a8e46085e6252791aee57cc82d7ce3840e1c",
-          "package_digest": "sha256:7c2bd1333a90bff966e09788deac6de70212131d523cdaa6a1e7b8d7b644e5ab",
-          "version": "0.1.6"
+          "package_digest": "sha256:7c2bd1333a90bff966e09788deac6de70212131d523cdaa6a1e7b8d7b644e5ab"
         }
       }
     },
@@ -3904,11 +3567,11 @@
       },
       "channels": {
         "stable": {
+          "version": "0.1.18",
           "release": "subscription_status@0.1.18",
           "release_digest": "sha256:8510b66f85cf0837766fd7550bb534c9bff38d21962a3b5d3906fdedcda0ff30",
           "source_revision": "sha256:41b8befb088010b9efeebb09756835a0ce8ad789f6a12cd166cd8069c8488872",
-          "package_digest": "sha256:b7388cf6732b95483a9210bfd9799f87e4edc18feb78fb63455ccabd7a00202c",
-          "version": "0.1.18"
+          "package_digest": "sha256:b7388cf6732b95483a9210bfd9799f87e4edc18feb78fb63455ccabd7a00202c"
         }
       }
     },
@@ -3976,11 +3639,11 @@
       },
       "channels": {
         "stable": {
+          "version": "0.1.9",
           "release": "voice@0.1.9",
           "release_digest": "sha256:e97d4959a1d4d651741c45e0f6f9c7216969945f9c8bb9ad2025af6f408cab97",
           "source_revision": "sha256:376cfc5074d765eba3ebadcc6bace2124d4d0db464812b5f1868c85b57c740cc",
-          "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c",
-          "version": "0.1.9"
+          "package_digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c"
         }
       }
     },
@@ -4047,11 +3710,11 @@
       },
       "channels": {
         "stable": {
+          "version": "0.1.4",
           "release": "weather@0.1.4",
           "release_digest": "sha256:e2b1300946e5437babe19e21cfd3cbc5e187d4ddda4ee7776105df67fc86fad7",
           "source_revision": "sha256:36141add66a7c71b72f4b8ac2ec699afb14a8b58fb4c7e6641374a937a1bd86e",
-          "package_digest": "sha256:014cd7480deda54a649d3ee227feffdf0a1c09cafcd260b62222bec517a6380a",
-          "version": "0.1.4"
+          "package_digest": "sha256:014cd7480deda54a649d3ee227feffdf0a1c09cafcd260b62222bec517a6380a"
         }
       }
     },
@@ -4137,13 +3800,548 @@
       },
       "channels": {
         "stable": {
+          "version": "0.3.99",
           "release": "web_desktop@0.3.99",
           "release_digest": "sha256:661a2acc18125546fa351b7bfc8240a6293cfe5c107e9a4992cdb1f31758aa21",
           "source_revision": "sha256:798e166fc01a77c4f69e3e7dbc24416e311f912dea3e283857df643b7fc46bab",
-          "package_digest": "sha256:1f80b67715db42177db2d81fc11fbad69297672679d4ef569ab86ae526a46331",
-          "version": "0.3.99"
+          "package_digest": "sha256:1f80b67715db42177db2d81fc11fbad69297672679d4ef569ab86ae526a46331"
         }
       }
+    },
+    {
+      "kind": "project",
+      "id": "mail_focus_reader",
+      "name": "mail_focus_reader",
+      "path": "projects/mail_focus_reader",
+      "manifest": "projects/mail_focus_reader/project.yaml",
+      "source": {
+        "path": "projects/mail_focus_reader",
+        "manifest": "projects/mail_focus_reader/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "id": "mail_focus_reader",
+        "name": "mail_focus_reader"
+      },
+      "version": "0.1.4",
+      "channels": {
+        "stable": {
+          "version": "0.1.4",
+          "release": "mail_focus_reader@0.1.4",
+          "release_digest": "sha256:dcf069de8867b654d79ef17d6278b67d450a84bfc53eb2e7650fd615230fe53d",
+          "source_revision": "sha256:9e7b9b17f4b1bebfa2514f9978ea931cf3a719ffb27fc8b38e111a56de3a6d5a",
+          "package_digest": "sha256:39dbbeee6e87d158a347b2bd075dbee193a686ac30c78fe9a339f25dd681c150"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "adaos_drive",
+      "name": "adaos_drive",
+      "path": "projects/adaos_drive",
+      "manifest": "projects/adaos_drive/project.yaml",
+      "source": {
+        "path": "projects/adaos_drive",
+        "manifest": "projects/adaos_drive/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "id": "adaos_drive",
+        "name": "adaos_drive"
+      },
+      "version": "0.1.21",
+      "channels": {
+        "stable": {
+          "version": "0.1.21",
+          "release": "adaos_drive@0.1.21",
+          "release_digest": "sha256:613e6ec9ef6d78330b953dd9517efa65e0c4711e32b3c77c911bf58b22e085ec",
+          "source_revision": "sha256:db6f9ac19dcfc66d9afec1bd5710ed9df85229f7d629d837e8cbe10525328e45",
+          "package_digest": "sha256:26772515101a345a87067d608ca62329d5af629dbc41337298b586ef04d5b79d"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "semantic_ui_demo",
+      "name": "semantic_ui_demo",
+      "path": "projects/semantic_ui_demo",
+      "manifest": "projects/semantic_ui_demo/project.yaml",
+      "source": {
+        "path": "projects/semantic_ui_demo",
+        "manifest": "projects/semantic_ui_demo/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "id": "semantic_ui_demo",
+        "name": "semantic_ui_demo"
+      },
+      "version": "0.10.28",
+      "channels": {
+        "stable": {
+          "version": "0.10.28",
+          "release": "semantic_ui_demo@0.10.28",
+          "release_digest": "sha256:675f32d34f00fbc0ec6e68f61997fe0d1bb7aecacbd3e51d1ae3ac0f0627efc0",
+          "source_revision": "sha256:8fff1ddac0a9b64a430835e6a0e7602a3b69c0dd95d0ce71c433d3a46803e091",
+          "package_digest": "sha256:86ed65adf32f0850dd12ac94e4f7c5b01bd942815b7950d67a496a6cb06baeb5"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+      "name": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+      "path": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146",
+      "manifest": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/project.yaml",
+      "source": {
+        "path": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146",
+        "manifest": "projects/flowboard_lab_for_safely_prototyping_a_r_17528146/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "id": "flowboard_lab_for_safely_prototyping_a_r_17528146",
+        "name": "flowboard_lab_for_safely_prototyping_a_r_17528146"
+      },
+      "version": "0.1.17",
+      "channels": {
+        "stable": {
+          "version": "0.1.17",
+          "release": "flowboard_lab_for_safely_prototyping_a_r_17528146@0.1.17",
+          "release_digest": "sha256:9794e4f50c83b45d7772b4c7d5832c39b4fe89c6b0872d6b281acb03756080f4",
+          "source_revision": "sha256:eda72b2f2e81596ac3e12f65edaac28c30e37b523bfa11ee1fe2d1cd9543f65d",
+          "package_digest": "sha256:5dcb1be2da6de0f87cc8bd5f9feee5bd16b2910e3ca2eba54357d409efddab84"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "users_access",
+      "name": "users_access",
+      "path": "projects/users_access",
+      "manifest": "projects/users_access/project.yaml",
+      "source": {
+        "path": "projects/users_access",
+        "manifest": "projects/users_access/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "id": "users_access",
+        "name": "users_access"
+      },
+      "version": "0.1.21",
+      "channels": {
+        "stable": {
+          "version": "0.1.21",
+          "release": "users_access@0.1.21",
+          "release_digest": "sha256:56b4a980eacf222cadea789e1fc506aeee7a327db83771f808ee53257bb8f256",
+          "source_revision": "sha256:84f3dbe8333de9c8a8109cfc5f4210bfb63b4dde1252aca319f0c803f3e17a04",
+          "package_digest": "sha256:52687d368e4ec16da141e66d1daa98b65921c3700480d3f4557c413706336ef4"
+        }
+      }
+    },
+    {
+      "kind": "project",
+      "id": "research_tlp",
+      "name": "research_tlp",
+      "path": "projects/research_tlp",
+      "manifest": "projects/research_tlp/project.yaml",
+      "source": {
+        "path": "projects/research_tlp",
+        "manifest": "projects/research_tlp/project.yaml"
+      },
+      "install": {
+        "kind": "project",
+        "id": "research_tlp",
+        "name": "research_tlp"
+      },
+      "version": "0.3.18",
+      "channels": {
+        "stable": {
+          "version": "0.3.18",
+          "release": "research_tlp@0.3.18",
+          "release_digest": "sha256:ad8c1d22fb71bb4d1a15809765f2dc8194a4f10fb9571de8afda2d50eb477e39",
+          "source_revision": "sha256:13b00c9a6153d7c33e4b2b579c34feb24562f0c461047c94b4c15bc5d5ce6a39",
+          "package_digest": "sha256:b781b84bbde2c1463add855db7dd7428695ac3c2085b3b809ebb84b9d9db933c"
+        }
+      }
+    }
+  ],
+  "retired_entries": [
+    {
+      "collection": "skills",
+      "entry": {
+        "kind": "skill",
+        "id": "automation_manager_prototype_skill",
+        "name": "automation_manager_prototype_skill",
+        "version": "0.1.6",
+        "updated_at": "2026-11-06T11:23:32+00:00",
+        "path": "skills/automation_manager_prototype_skill",
+        "manifest": "skills/automation_manager_prototype_skill/skill.yaml",
+        "source": {
+          "path": "skills/automation_manager_prototype_skill",
+          "manifest": "skills/automation_manager_prototype_skill/skill.yaml"
+        },
+        "install": {
+          "kind": "skill",
+          "name": "automation_manager_prototype_skill",
+          "id": "automation_manager_prototype_skill"
+        },
+        "description": "Project-owned resource implementation for project:automation_manager_prototype. Realize the accepted Prototype according to the separate Automation brief.",
+        "entry": "handlers/main.py",
+        "runtime_python": "3.11",
+        "activation": {
+          "mode": "package_lock",
+          "project_id": "applications",
+          "release": "applications@0.1.58",
+          "release_digest": "sha256:65f3ccceab9a8c60858646ad43463fe47d98d8754bc097073ea5bd6382234039",
+          "package_digest": "sha256:56688ee94ae3e6a8f72a791ba87f8f1aaedbbe255454cc05c721cc1c1e8c6d0b"
+        },
+        "tools_count": 5
+      },
+      "reason": "source_and_verified_distribution_unavailable"
+    },
+    {
+      "collection": "skills",
+      "entry": {
+        "kind": "skill",
+        "id": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+        "name": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+        "version": "0.1.5",
+        "updated_at": "2026-09-16T11:13:13+00:00",
+        "path": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+        "manifest": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill/skill.yaml",
+        "source": {
+          "path": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+          "manifest": "skills/volunteer_roster_test_-20260916-e2e80de3bec9621_skill/skill.yaml"
+        },
+        "install": {
+          "kind": "skill",
+          "name": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill",
+          "id": "volunteer_roster_test_-20260916-e2e80de3bec9621_skill"
+        },
+        "description": "Persistent volunteer roster with caller-authorized transactional operations.",
+        "entry": "{'module': 'handlers.main'}",
+        "runtime_python": "3.11",
+        "tools_count": 7
+      },
+      "reason": "source_and_verified_distribution_unavailable"
+    },
+    {
+      "collection": "skills",
+      "entry": {
+        "kind": "skill",
+        "id": "workbench_test_20260914_b_skill",
+        "name": "workbench_test_20260914_b_skill",
+        "version": "0.1.7",
+        "updated_at": "2026-09-15T21:19:20+00:00",
+        "path": "skills/workbench_test_20260914_b_skill",
+        "manifest": "skills/workbench_test_20260914_b_skill/skill.yaml",
+        "source": {
+          "path": "skills/workbench_test_20260914_b_skill",
+          "manifest": "skills/workbench_test_20260914_b_skill/skill.yaml"
+        },
+        "install": {
+          "kind": "skill",
+          "name": "workbench_test_20260914_b_skill",
+          "id": "workbench_test_20260914_b_skill"
+        },
+        "description": "Project-owned resource implementation for project:workbench_test_20260914_b. Realize the accepted Prototype according to the separate Automation brief.",
+        "entry": "handlers/main.py",
+        "runtime_python": "3.11",
+        "tools_count": 12
+      },
+      "reason": "source_and_verified_distribution_unavailable"
+    },
+    {
+      "collection": "scenarios",
+      "entry": {
+        "kind": "scenario",
+        "id": "automation_manager_prototype",
+        "name": "automation_manager_prototype",
+        "version": "0.1.7",
+        "updated_at": "2026-09-29T17:34:26+00:00",
+        "path": "scenarios/automation_manager_prototype",
+        "manifest": "scenarios/automation_manager_prototype/scenario.yaml",
+        "source": {
+          "path": "scenarios/automation_manager_prototype",
+          "manifest": "scenarios/automation_manager_prototype/scenario.yaml",
+          "forge": "content-addressed-dev",
+          "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+          "revision": "sha256:8c559609d6f143366bccb811b362977f035c3f5dd110d1dbaa58b04dac57e5f5",
+          "path_scope": [
+            "projects/automation_manager_prototype/"
+          ]
+        },
+        "install": {
+          "kind": "scenario",
+          "name": "automation_manager_prototype",
+          "id": "automation_manager_prototype"
+        },
+        "title": "Automation Manager — Operator Panel (demo)",
+        "title_i18n": {
+          "key": "prototype.automation_manager_ru_v3_rulocale_fix.r4.title",
+          "fallback": "Automation Manager — Operator Panel (demo)"
+        },
+        "description": "Empty AdaOS desktop canvas ready for Builder authoring.",
+        "trigger": "manual",
+        "skills": {
+          "required": [
+            "automation_manager_prototype_skill"
+          ]
+        },
+        "activation": {
+          "mode": "package_lock",
+          "project_id": "automation_manager_prototype",
+          "release": "automation_manager_prototype@0.1.7",
+          "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
+          "package_digest": "sha256:98388a24ac1b2f7607a5783137d12be2c9bdd2cb8d623a1ceff48e8da4e29de2"
+        },
+        "channels": {
+          "stable": {
+            "release": "automation_manager_prototype@0.1.7",
+            "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
+            "source_revision": "sha256:8c559609d6f143366bccb811b362977f035c3f5dd110d1dbaa58b04dac57e5f5",
+            "package_digest": "sha256:98388a24ac1b2f7607a5783137d12be2c9bdd2cb8d623a1ceff48e8da4e29de2",
+            "version": "0.1.7"
+          }
+        }
+      },
+      "reason": "source_and_verified_distribution_unavailable"
+    },
+    {
+      "collection": "scenarios",
+      "entry": {
+        "kind": "scenario",
+        "id": "inbox_triage",
+        "name": "inbox_triage",
+        "version": "0.1.4",
+        "updated_at": "2026-09-24T18:14:41+00:00",
+        "path": "scenarios/inbox_triage",
+        "manifest": "scenarios/inbox_triage/scenario.yaml",
+        "source": {
+          "path": "scenarios/inbox_triage",
+          "manifest": "scenarios/inbox_triage/scenario.yaml"
+        },
+        "install": {
+          "kind": "scenario",
+          "name": "inbox_triage",
+          "id": "inbox_triage"
+        },
+        "title": "Inbox Triage",
+        "title_i18n": {
+          "key": "scenario.inbox_triage.title",
+          "fallback": "Inbox Triage"
+        },
+        "description": "Focused inbox triage using an explicitly attached shared mail connection.",
+        "trigger": "manual",
+        "skills": {
+          "required": [
+            "gmail_cbs_cleanroom_skill"
+          ]
+        }
+      },
+      "reason": "source_and_verified_distribution_unavailable"
+    },
+    {
+      "collection": "scenarios",
+      "entry": {
+        "kind": "scenario",
+        "id": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+        "name": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+        "version": "0.1.2",
+        "updated_at": "2026-09-05T06:51:22+00:00",
+        "path": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+        "manifest": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e/scenario.yaml",
+        "source": {
+          "path": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+          "manifest": "scenarios/trial_workspace_lifecycle_e2e_20260905_w_5decc38e/scenario.yaml"
+        },
+        "install": {
+          "kind": "scenario",
+          "name": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e",
+          "id": "trial_workspace_lifecycle_e2e_20260905_w_5decc38e"
+        },
+        "title": "Trial Workspace Lifecycle E2E 20260905 with a simple status field",
+        "title_i18n": {
+          "key": "scenario.trial_workspace_lifecycle_e2e_20260905_w_5decc38e.title",
+          "fallback": "Trial Workspace Lifecycle E2E 20260905 with a simple status field"
+        },
+        "description": "Builder-created rapid prototype scenario.",
+        "io": {
+          "input": [
+            "voice",
+            "text"
+          ],
+          "output": [
+            "voice",
+            "text",
+            "web"
+          ]
+        }
+      },
+      "reason": "source_and_verified_distribution_unavailable"
+    },
+    {
+      "collection": "scenarios",
+      "entry": {
+        "kind": "scenario",
+        "id": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "name": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "version": "0.1.5",
+        "updated_at": "2026-09-16T11:13:18+00:00",
+        "path": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621",
+        "manifest": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621/scenario.yaml",
+        "source": {
+          "path": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621",
+          "manifest": "scenarios/volunteer_roster_test_-20260916-e2e80de3bec9621/scenario.yaml"
+        },
+        "install": {
+          "kind": "scenario",
+          "name": "volunteer_roster_test_-20260916-e2e80de3bec9621",
+          "id": "volunteer_roster_test_-20260916-e2e80de3bec9621"
+        },
+        "title": "Volunteer Roster [TEST]-20260916-e2e80de3bec9621",
+        "title_i18n": {
+          "key": "scenario.volunteer_roster_test_-20260916-e2e80de3bec9621.title",
+          "fallback": "Volunteer Roster [TEST]-20260916-e2e80de3bec9621"
+        },
+        "description": "Persistent volunteer roster for a community event.",
+        "trigger": "manual",
+        "skills": {
+          "required": [
+            "volunteer_roster_test_-20260916-e2e80de3bec9621_skill"
+          ]
+        }
+      },
+      "reason": "source_and_verified_distribution_unavailable"
+    },
+    {
+      "collection": "scenarios",
+      "entry": {
+        "kind": "scenario",
+        "id": "workbench_test_20260914_b",
+        "name": "workbench_test_20260914_b",
+        "version": "0.1.8",
+        "updated_at": "2026-09-15T21:19:25+00:00",
+        "path": "scenarios/workbench_test_20260914_b",
+        "manifest": "scenarios/workbench_test_20260914_b/scenario.yaml",
+        "source": {
+          "path": "scenarios/workbench_test_20260914_b",
+          "manifest": "scenarios/workbench_test_20260914_b/scenario.yaml"
+        },
+        "install": {
+          "kind": "scenario",
+          "name": "workbench_test_20260914_b",
+          "id": "workbench_test_20260914_b"
+        },
+        "title": "Список чтения",
+        "title_i18n": {
+          "key": "scenario.workbench_test_20260914_b.title",
+          "fallback": "Список чтения"
+        },
+        "trigger": "manual",
+        "skills": {
+          "required": [
+            "workbench_test_20260914_b_skill"
+          ]
+        }
+      },
+      "reason": "source_and_verified_distribution_unavailable"
+    },
+    {
+      "collection": "projects",
+      "entry": {
+        "kind": "project",
+        "id": "automation_manager_prototype",
+        "name": "automation_manager_prototype",
+        "version": "0.1.7",
+        "updated_at": "2026-09-29T19:35:56+00:00",
+        "path": "projects/automation_manager_prototype",
+        "manifest": "projects/automation_manager_prototype/project.yaml",
+        "source": {
+          "path": "projects/automation_manager_prototype",
+          "manifest": "projects/automation_manager_prototype/project.yaml"
+        },
+        "install": {
+          "kind": "project",
+          "name": "automation_manager_prototype",
+          "id": "automation_manager_prototype"
+        },
+        "title": "Automation Manager Prototype",
+        "description": "Title: Automation Manager Prototype. Russian dashboard prototype for automation machines, warm pods, Codex accounts, remote tasks and audit events.",
+        "publication": {
+          "stage": "alpha",
+          "visibility": "unlisted",
+          "channel": "stable"
+        },
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable",
+        "install_default": false,
+        "features": [],
+        "components": [
+          "scenario:automation_manager_prototype",
+          "skill:automation_manager_prototype_skill"
+        ],
+        "components_count": 2,
+        "profiles": [],
+        "activation": {
+          "mode": "package_lock",
+          "project_id": "automation_manager_prototype",
+          "release": "automation_manager_prototype@0.1.7",
+          "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
+          "primary_component": "scenario:automation_manager_prototype",
+          "package_digest": "sha256:98388a24ac1b2f7607a5783137d12be2c9bdd2cb8d623a1ceff48e8da4e29de2"
+        },
+        "channels": {
+          "stable": {
+            "release": "automation_manager_prototype@0.1.7",
+            "release_digest": "sha256:0a935887357433baf6eefba85bc89d76e53ad833bca13dcea7b6e4e4b7cd8037",
+            "source_revision": "sha256:8c559609d6f143366bccb811b362977f035c3f5dd110d1dbaa58b04dac57e5f5",
+            "package_digest": "sha256:98388a24ac1b2f7607a5783137d12be2c9bdd2cb8d623a1ceff48e8da4e29de2",
+            "version": "0.1.7"
+          }
+        }
+      },
+      "reason": "source_and_verified_distribution_unavailable"
+    },
+    {
+      "collection": "projects",
+      "entry": {
+        "kind": "project",
+        "id": "inbox_triage",
+        "name": "inbox_triage",
+        "version": "0.1.4",
+        "updated_at": "2026-09-27T06:32:27+00:00",
+        "path": "projects/inbox_triage",
+        "manifest": "projects/inbox_triage/project.yaml",
+        "source": {
+          "path": "projects/inbox_triage",
+          "manifest": "projects/inbox_triage/project.yaml"
+        },
+        "install": {
+          "kind": "project",
+          "name": "inbox_triage",
+          "id": "inbox_triage"
+        },
+        "title": "Inbox Triage",
+        "description": "Create a new private AdaOS Application named Inbox Triage, technical id mail_inbox_triage, from scratch.\n\nIts semantic Application requires capability:mail.messages.manage version ^1.0.0. Keep semantic intent provider-, package-, skill-, account-, and credential-neutral. At materialization time reuse an installed compatible Capability Binding and its shared Core-owned connected Gmail credential through an explicit user attachment when available. Do not create, copy, fork, or edit any Gmail provider implementation. If no reusable connection exists, offer fresh OAuth setup.\n\nThis is not a mail client. It is a focused inbox triage tool: show unread messages older than seven days and optionally starred messages; show sender, subject, date, and snippet; allow explicit mark-read, archive, star/unstar, and trash actions. Do not implement compose, send, label administration, attachment browsing, or mailbox settings.\n\nThe Prototype must be safe and deterministic. Represent loading, empty, authorization-required, reusable-account-available, connected, offline, permission-denied, provider-error, and success states without contacting Gmail and without storing secrets or real mail. Provide responsive wide and compact layouts. Explain least privilege. Prototype data is disposable synthetic review data; Automation must replace it with the selected compatible binding after acceptance.",
+        "publication": {
+          "stage": "alpha",
+          "visibility": "unlisted",
+          "channel": "stable"
+        },
+        "stage": "alpha",
+        "visibility": "unlisted",
+        "channel": "stable",
+        "install_default": false,
+        "features": [],
+        "components": [
+          "scenario:inbox_triage"
+        ],
+        "components_count": 1,
+        "profiles": []
+      },
+      "reason": "source_and_verified_distribution_unavailable"
     }
   ]
 }
