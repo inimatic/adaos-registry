@@ -1,7 +1,11 @@
 # Development and main delivery
 
 `dev2027` is the default development branch. Local development and VS Code use
-this branch. Development pushes and pull requests receive bounded static checks.
+this branch. Ordinary development pushes allocate no CI runners. Pull requests
+receive bounded static checks for checked source/configuration changes. Required
+PR statuses still run on every PR where branch protection requires them, avoiding
+permanently pending checks. Known documentation-only main pushes do not qualify
+or deploy an unchanged application.
 Full regression runs on `dev2027` in the daily cycle where this repository has a
 regression suite. An unchanged successfully qualified revision is reused.
 
