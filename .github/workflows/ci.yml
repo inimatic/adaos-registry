@@ -1,8 +1,16 @@
 name: Qualify registry source contracts
 on:
   pull_request:
+    paths-ignore:
+    - 'README.md'
+    - 'CHANGELOG.md'
+    - '.github/BRANCHING.md'
     branches: [main, dev2027]
   push:
+    paths-ignore:
+    - 'README.md'
+    - 'CHANGELOG.md'
+    - '.github/BRANCHING.md'
     branches: [main]
   workflow_dispatch: {}
 permissions:

@@ -1,11 +1,19 @@
-# Development: dev2027. Release and delivery: qualified main only.
+# Development pushes allocate no CI runners. Qualify reviewed code before release.
 name: Static checks
 'on':
-  push:
-    branches:
-    - main
-    - dev2027
-  pull_request: {}
+  pull_request:
+    paths:
+    - '**/*.py'
+    - '.github/**/*.yml'
+    - '.github/**/*.yaml'
+    - '**/package.json'
+    - '**/package-lock.json'
+    - '**/registry.json'
+    - '**/pyproject.toml'
+    - '**/*.mjs'
+    - '**/*.cjs'
+    - '**/*.sh'
+    - '**/*.go'
   workflow_dispatch: {}
 permissions:
   contents: read
