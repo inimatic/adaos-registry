@@ -38,6 +38,96 @@ def canonical_digest(value: dict) -> str:
         sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
 
 
+def test_proof_path(root: Path, digest: str) -> Path:
+    if not DIGEST.fullmatch(str(digest)):
+        raise ValueError('catalog_test_proof_release_digest_invalid')
+    return root / 'semantic/test-acceptance' / (digest.removeprefix('sha256:') + '.json')
+
+
+def validate_test_proof(root: Path, *, project_id: str, version: str, release_digest: str,
+                        package_digest: str | None = None, source_revision: str | None = None,
+                        source_branch: str | None = None) -> dict:
+    proof = read_json(test_proof_path(root, release_digest))
+    expected = {'schema':'adaos.application.catalog_test_proof.v1', 'status':'passed',
+                'project_id':project_id, 'version':version, 'release_digest':release_digest}
+    if (any(proof.get(key) != value for key,value in expected.items())
+            or canonical_digest({k:v for k,v in proof.items() if k != 'proof_digest'}) != proof.get('proof_digest')):
+        raise ValueError('catalog_test_proof_identity_mismatch')
+    packages = proof.get('package_digests')
+    if (not isinstance(packages, list) or not packages or len(packages) != len(set(packages))
+            or any(not DIGEST.fullmatch(str(item)) for item in packages)
+            or (package_digest is not None and package_digest not in packages)
+            or (source_revision is not None and proof.get('source_revision') != source_revision)
+            or (source_branch is not None and proof.get('source_branch') != source_branch)
+            or not proof.get('source_branch')
+            or not re.fullmatch(r'(?:[0-9a-f]{40}|[0-9a-f]{64})', str(proof.get('source_revision') or ''))
+            or any(not DIGEST.fullmatch(str(proof.get(key) or '')) for key in
+                   ('source_snapshot_digest','environment_digest','candidate_acceptance_digest','test_receipt_digest'))):
+        raise ValueError('catalog_test_proof_release_mismatch')
+    plan = proof.get('test_plan') or {}
+    suites = plan.get('suites')
+    rows = proof.get('packages')
+    if (plan.get('schema') != 'adaos.project.test_plan.v1'
+            or plan.get('complete_suite') is not True or not isinstance(suites,list) or not suites
+            or any(not isinstance(ref,str) for ref in suites) or len(suites) != len(set(suites))
+            or not isinstance(rows,list) or any(not isinstance(row,dict) for row in rows)
+            or sorted(suites) != sorted(row.get('ref','') for row in rows)
+            or any(not re.fullmatch(r'[0-9a-f]{64}',str(row.get('log_sha256') or ''))
+                   or not isinstance(row.get('statuses'),list) or not row['statuses']
+                   or any(status != 'passed' for status in row['statuses']) for row in rows)):
+        raise ValueError('catalog_test_proof_plan_incomplete')
+    return proof
+
+
+def retain_test_proof(root: Path, proof: dict) -> str:
+    path = test_proof_path(root, proof['release_digest'])
+    expected = {key:proof[key] for key in ('project_id','version','release_digest','source_branch','source_revision')}
+    if path.is_file():
+        existing = validate_test_proof(root, **expected)
+        if existing['package_digests'] != proof['package_digests']:
+            raise ValueError('catalog_test_proof_immutable_identity_conflict')
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = root / '.tmp/registry-catalog-validation' / path.name
+        temporary.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_text(json.dumps(proof, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
+        temporary.replace(path)
+        try:
+            validate_test_proof(root, **expected)
+        except (ValueError, TypeError):
+            path.unlink()
+            raise
+    return path.relative_to(root).as_posix()
+
+
+def _baseline_identities(root: Path, base_ref: str | None) -> set[tuple]:
+    if base_ref is None:
+        return set()
+    if not re.fullmatch(r'(?:HEAD\^?|[0-9a-f]{40}|[0-9a-f]{64})', base_ref):
+        raise ValueError('catalog_base_revision_invalid')
+    def historical(path, *, required=False):
+        result = subprocess.run(['git','-C',str(root),'show',base_ref+':'+path],
+            capture_output=True, timeout=10, check=False)
+        if result.returncode:
+            if required:
+                raise ValueError('catalog_base_revision_unavailable')
+            return {}
+        if len(result.stdout) > 2*1024*1024:
+            raise ValueError('catalog_base_record_too_large')
+        return json.loads(result.stdout)
+    catalog = historical('registry.json', required=True)
+    identities = set()
+    for kind in ('projects','skills','scenarios'):
+        for row in catalog.get(kind,[]):
+            for pointer in (row.get('channels') or {}).values():
+                identities.add((str(pointer.get('release','')).split('@',1)[0],pointer.get('version'),
+                    pointer.get('release_digest'),pointer.get('package_digest'),pointer.get('source_revision')))
+    # Prerelease catalog entries do not replace the stable source manifest.
+    for row in historical('semantic/catalog/index.json').get('releases',{}).values():
+        identities.add((None,row.get('version'),row.get('release_digest'),row.get('projection_digest'),None))
+    return identities
+
+
 def published_projects(root: Path) -> dict:
     path = root / "semantic/catalog/index.json"
     if not path.is_file():
@@ -71,10 +161,12 @@ def published_projects(root: Path) -> dict:
     return result
 
 
-def validate(root: Path, *, retire_unavailable: bool = False, synchronize_published: bool = False) -> dict:
+def validate(root: Path, *, retire_unavailable: bool = False, synchronize_published: bool = False,
+             base_ref: str | None = None) -> dict:
     root = root.resolve()
     catalog = read_json(root / "registry.json")
     original_digest = canonical_digest(catalog)
+    baseline = _baseline_identities(root, base_ref)
     try:
         tracked = subprocess.run(["git", "-C", str(root), "ls-files", "-v", "--",
             "skills/*/skill.yaml", "scenarios/*/scenario.yaml", "projects/*/project.yaml"],
@@ -88,6 +180,23 @@ def validate(root: Path, *, retire_unavailable: bool = False, synchronize_publis
     semantic = read_json(semantic_path).get("application_releases", {}) if semantic_path.is_file() else {}
     errors, retired, counts = [], [], {}
     published = published_projects(root)
+    public_index = root / 'semantic/catalog/index.json'
+    if public_index.is_file():
+        for entry in read_json(public_index).get('releases',{}).values():
+            record = read_json(safe_path(root,entry['path']))
+            project = (record.get('release') or {}).get('project_release') or {}
+            digest = entry.get('release_digest')
+            historical = (None,project.get('version'),digest,entry.get('projection_digest'),None) in baseline
+            if test_proof_path(root,digest).is_file() or not historical:
+                try:
+                    proof = validate_test_proof(root, project_id=project['project_id'],version=project['version'],
+                        release_digest=digest,source_revision=project['source_ref']['revision'],
+                        source_branch=project.get('source_branch','main'))
+                    if sorted(proof['package_digests']) != sorted(row['digest'] for row in project['components']):
+                        raise ValueError('catalog_test_proof_composition_mismatch')
+                except (OSError,ValueError,KeyError,TypeError) as exc:
+                    errors.append({'entry':str(entry.get('application_id') or digest),
+                        'code':'public_application_tests_unverified:'+type(exc).__name__})
     if synchronize_published:
         existing = {e.get("id"): e for e in catalog.get("projects", [])}
         for identifier, pointer in published.items():
@@ -161,6 +270,15 @@ def validate(root: Path, *, retire_unavailable: bool = False, synchronize_publis
                     faults.append("published_release_binding_mismatch:" + channel)
                 else:
                     has_retained_release = True
+                    identity = (project,pointer['version'],pointer['release_digest'],
+                                pointer['package_digest'],pointer.get('source_revision'))
+                    if test_proof_path(root,pointer['release_digest']).is_file() or identity not in baseline:
+                        try:
+                            validate_test_proof(root,project_id=project,version=pointer['version'],
+                                release_digest=pointer['release_digest'],package_digest=pointer['package_digest'],
+                                source_revision=pointer.get('source_revision'))
+                        except (OSError,ValueError,KeyError,TypeError):
+                            faults.append('published_release_tests_unverified:'+channel)
             if not manifest.is_file() and manifest_path not in sparse_manifests and not has_retained_release:
                 if retire_unavailable and all(f.startswith("published_release_binding_missing:") for f in faults):
                     retired.append({"collection": collection, "entry": entry,
@@ -189,8 +307,10 @@ def main():
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--retire-unavailable", action="store_true")
     parser.add_argument("--synchronize-published", action="store_true")
+    parser.add_argument('--base-ref', help='Exact previous Git revision; only unchanged historical identities are grandfathered')
     args = parser.parse_args()
-    result = validate(args.root, retire_unavailable=args.retire_unavailable, synchronize_published=args.synchronize_published)
+    result = validate(args.root, retire_unavailable=args.retire_unavailable,
+        synchronize_published=args.synchronize_published, base_ref=args.base_ref)
     print(json.dumps(result, ensure_ascii=False))
     return 0 if result["ok"] else 1
 
