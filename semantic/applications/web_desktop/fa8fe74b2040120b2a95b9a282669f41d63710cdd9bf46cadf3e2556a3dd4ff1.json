@@ -1,0 +1,274 @@
+{
+  "schema": "adaos.semantic_registry.application_release.v1",
+  "project_id": "web_desktop",
+  "version": "0.3.106",
+  "application_ref": "application:web_desktop",
+  "presentation_ref": "scenario:web_desktop",
+  "project_release_digest": "sha256:fa8fe74b2040120b2a95b9a282669f41d63710cdd9bf46cadf3e2556a3dd4ff1",
+  "source_ref": {
+    "schema": "adaos.artifact.source_ref.v1",
+    "forge": "adaos-root",
+    "repository": "inimatic/adaos-forge",
+    "revision": "c384911be8a9237b7ab2ad194409275e0262459f",
+    "path_scope": [
+      "subnets/sn_6acf0c01/nodes/8db40740-b3ff-44bf-baf5-9fb013b35b01/projects/web_desktop/source/projects/web_desktop/"
+    ]
+  },
+  "compilation_digest": "sha256:aa8bb27688d3effefff87b3c7131728b2aea8ed92766f818d9cd689983aa6b53",
+  "semantic_revision_digest": "sha256:217d85408006c4e39353e6250298fbb6d2271b29674e0c341c580e7f40dd0f2b",
+  "requirements": [
+    {
+      "requirement_ref": "requirement:application.web_desktop.ui",
+      "capability_ref": "capability:application.ui.render",
+      "contract_range": "^1.0.0",
+      "environment_target": {
+        "profile_ref": "profile:local/default",
+        "allowed_modes": [
+          "production"
+        ]
+      },
+      "policy_constraints": {
+        "locality": "remote_allowed",
+        "privacy": "application-declared",
+        "required_authorities": []
+      },
+      "evidence_threshold": {
+        "required_claim_kinds": [
+          "capability_conformance"
+        ],
+        "allow_stale": false
+      },
+      "schema": "adaos.application.requirement.v1",
+      "requirement_digest": "sha256:b8ca1e6ca47e1b1e80d834a1a96d2083a7ef37e03b171b101974bea051fac1c2"
+    }
+  ],
+  "portable_artifacts": {
+    "adaos.binding.definition.v1": [
+      "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+      "sha256:b1c43acc9b83ee92afb193cffedc3364d34d72d25d95abfbe5e6ca9f63e84bea"
+    ],
+    "adaos.binding.delivery.v1": [
+      "sha256:280e7c9eae343629b5fd8bfee890c16e3308ca0cd7b8e593362f1adedae05ed6",
+      "sha256:4a7dba97909e2be0fbf5249b6a021f05b0486295744d309925c8d3427a994947"
+    ],
+    "adaos.capability.contract.v1": [
+      "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7",
+      "sha256:bb413af827bcbb801ac8fb7640957b04d1f120a5f2da9f32c8d2a99aa97901a0"
+    ],
+    "adaos.evidence.claim.v1": [
+      "sha256:8916c17031801d5a19ca9f031b2e46ec2f956ec7587966bb74ab7e6af3f92ad1",
+      "sha256:eac136db87b00803d466964005309a288803146d75bd91172abe250dc51b515d"
+    ]
+  },
+  "distribution": {
+    "thin": {
+      "requirements_only": true,
+      "registry_required": true
+    },
+    "resolved": {
+      "project_release_digest": "sha256:fa8fe74b2040120b2a95b9a282669f41d63710cdd9bf46cadf3e2556a3dd4ff1",
+      "package_closure": [
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "scenario",
+          "artifact_id": "web_desktop",
+          "version": "0.3.117",
+          "digest": "sha256:0d098b1bad5d05c3bc0e1b6066eefde1c2eb7dc8d760995979a89d4a20a058ab",
+          "manifest_digest": "sha256:1aaddf123b7d3c0bb608ca34843f6e57517c6adb25a0b1ab115c7ccd7cca6bb9",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "adaos-root",
+            "repository": "inimatic/adaos-forge",
+            "revision": "c384911be8a9237b7ab2ad194409275e0262459f",
+            "path_scope": [
+              "subnets/sn_6acf0c01/nodes/8db40740-b3ff-44bf-baf5-9fb013b35b01/projects/web_desktop/source/scenarios/web_desktop/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "scenarios/web_desktop",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "browsers_skill",
+          "version": "0.15.26",
+          "digest": "sha256:58fa06163cd062a7a5748342be175328e542f9b4d514699b8487cce03779df56",
+          "manifest_digest": "sha256:29763f76c0427db7c23c806978805c5d412c03cf87adab2b543aad6bf13e2542",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:applications-beta-reconciliation-20261025",
+            "revision": "sha256:24142d242e08f2f75a5a98bd4f3adf69fe17819cc8d53a6d7d502a7be7083a53",
+            "path_scope": [
+              "skills/browsers_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/browsers_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "conversation_companions",
+          "version": "0.3.2",
+          "digest": "sha256:1012970a54a84651267c434cfacc48a3b5f6b1c9685285e63114791be3381d47",
+          "manifest_digest": "sha256:c20b5121f38651943ae83a4a00ca97af9c17750d8ed7e80772af46875f0e0ed8",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:applications-beta-reconciliation-20261025",
+            "revision": "sha256:24142d242e08f2f75a5a98bd4f3adf69fe17819cc8d53a6d7d502a7be7083a53",
+            "path_scope": [
+              "skills/conversation_companions/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/conversation_companions",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "greet_on_boot_skill",
+          "version": "0.2.4",
+          "digest": "sha256:eb695ac298aed7839c2cb7ac4d098b8313cdcd8887073e4fad8b645304e3feae",
+          "manifest_digest": "sha256:4294ff410a7829789946ba7fa77e5df80f1c9adae56befad05ce29a9ac9870ef",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "adaos-root",
+            "repository": "inimatic/adaos-registry",
+            "revision": "a6038c69c74efba37b9122338e2710490adcb8e9",
+            "path_scope": [
+              "subnets/sn_6acf0c01/nodes/8db40740-b3ff-44bf-baf5-9fb013b35b01/skills/greet_on_boot_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:97eaecaa7aec8468e53d5a8d467f5918539853115b19899d4d6f2817b5545bf9",
+          "materialization_path": "skills/greet_on_boot_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "infrastate_skill",
+          "version": "0.75.94",
+          "digest": "sha256:b6869dd1f060f8f08c871fc208369a2c9ad77e2afce4b6ededbfc29248741a8b",
+          "manifest_digest": "sha256:db8218dd8361aec36624750a6246d042c4b0ae9eb3ed9d33fdbf9b9eb202ecbb",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:0b33c2eeaf6dcc6d2d8f25def8b9e33134221435f7cd287256c49e8bf715b2cd",
+            "path_scope": [
+              "skills/infrastate_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/infrastate_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "pair_new_device_skill",
+          "version": "0.1.0",
+          "digest": "sha256:ddac2904f52eea9e23a1b13cf530ae5dc6e4a8f33a44374685ca90df110a4ded",
+          "manifest_digest": "sha256:a1e3fa8fdd95cfcbd5e775ef6621d7e5347d724419ae455d5e85011889ae1906",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:d7ec37f48304cd6c470177499b7b7f0ea88bb5bec9122923892fc924036c5d90",
+            "path_scope": [
+              "skills/pair_new_device_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:97eaecaa7aec8468e53d5a8d467f5918539853115b19899d4d6f2817b5545bf9",
+          "materialization_path": "skills/pair_new_device_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "voice_chat_skill",
+          "version": "0.7.8",
+          "digest": "sha256:88b3f475d5765ada7374f07a81149221e5788bef885b93adf464eb451faf409c",
+          "manifest_digest": "sha256:bad55e4d0152325f4a25870fb9881b4d79a3c1adfae5ce449955912ce5e173b9",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:sn_6acf0c01:8db40740-b3ff-44bf-baf5-9fb013b35b01",
+            "revision": "sha256:376cfc5074d765eba3ebadcc6bace2124d4d0db464812b5f1868c85b57c740cc",
+            "path_scope": [
+              "skills/voice_chat_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/voice_chat_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "web_desktop_runtime_skill",
+          "version": "0.1.77",
+          "digest": "sha256:6ca40e1941056f88b31eaf304e16042b26ed5c7b3dadf028ac2ac2dc2e7f4eda",
+          "manifest_digest": "sha256:2dca8846e0e1871970afc610e9dfab4595b3e227c2249c8ae5f5dcf60a22f7d8",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "adaos-root",
+            "repository": "inimatic/adaos-forge",
+            "revision": "c384911be8a9237b7ab2ad194409275e0262459f",
+            "path_scope": [
+              "subnets/sn_6acf0c01/nodes/8db40740-b3ff-44bf-baf5-9fb013b35b01/projects/web_desktop/source/skills/web_desktop_runtime_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/web_desktop_runtime_skill",
+          "schema_locks": []
+        },
+        {
+          "schema": "adaos.artifact.package_ref.v1",
+          "kind": "skill",
+          "artifact_id": "web_desktop_skill",
+          "version": "0.2.5",
+          "digest": "sha256:a06afbebe11e168fe97b3f1a44f4848cad1a8bd554715d9dd54ae015d084df55",
+          "manifest_digest": "sha256:7291b1be99d5d15f11f9a0858cb20ba6e4986a9ee954aa115346dfe9aa6cbf09",
+          "source_ref": {
+            "schema": "adaos.artifact.source_ref.v1",
+            "forge": "content-addressed-dev",
+            "repository": "adaos-dev:applications-beta-reconciliation-20261025",
+            "revision": "sha256:24142d242e08f2f75a5a98bd4f3adf69fe17819cc8d53a6d7d502a7be7083a53",
+            "path_scope": [
+              "skills/web_desktop_skill/"
+            ]
+          },
+          "builder_id": "adaos.package_builder.v1",
+          "build_policy_digest": "sha256:ef97a6c5b14fec011e626e2bc93a9e4d95911eb7b1313f58099c707b7e569bde",
+          "materialization_path": "skills/web_desktop_skill",
+          "schema_locks": []
+        }
+      ],
+      "portable_artifact_digests": [
+        "sha256:280e7c9eae343629b5fd8bfee890c16e3308ca0cd7b8e593362f1adedae05ed6",
+        "sha256:39c10c68006ef1f68872405043a965c0e9c6556a1c0610b51057597d40a210e1",
+        "sha256:4a7dba97909e2be0fbf5249b6a021f05b0486295744d309925c8d3427a994947",
+        "sha256:80af210724a692a94eb623e31ac23cf956097d50a78fc772613d55fd2a1e38d7",
+        "sha256:8916c17031801d5a19ca9f031b2e46ec2f956ec7587966bb74ab7e6af3f92ad1",
+        "sha256:b1c43acc9b83ee92afb193cffedc3364d34d72d25d95abfbe5e6ca9f63e84bea",
+        "sha256:bb413af827bcbb801ac8fb7640957b04d1f120a5f2da9f32c8d2a99aa97901a0",
+        "sha256:eac136db87b00803d466964005309a288803146d75bd91172abe250dc51b515d"
+      ]
+    }
+  },
+  "projection_digest": "sha256:58f62fe8fdec8859236fcb214b7ade80bc5f95a16b6c2fc6d736983e2df47088"
+}

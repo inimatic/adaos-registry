@@ -1,0 +1,42 @@
+{
+  "schema": "adaos.application.catalog_test_proof.v1",
+  "status": "passed",
+  "project_id": "web_desktop",
+  "version": "0.3.106",
+  "release_digest": "sha256:fa8fe74b2040120b2a95b9a282669f41d63710cdd9bf46cadf3e2556a3dd4ff1",
+  "source_branch": "main",
+  "source_revision": "c384911be8a9237b7ab2ad194409275e0262459f",
+  "package_digests": [
+    "sha256:0d098b1bad5d05c3bc0e1b6066eefde1c2eb7dc8d760995979a89d4a20a058ab",
+    "sha256:6ca40e1941056f88b31eaf304e16042b26ed5c7b3dadf028ac2ac2dc2e7f4eda"
+  ],
+  "source_snapshot_digest": "sha256:77d89247d5e52ff911f6b1f932ebbe54fa41649f48af8aa20fb512ac823a856d",
+  "environment_digest": "sha256:35dd35c074d05c93979226e228003a2dfea49e1c3d83c1bceeb1b50a8cbf8d21",
+  "candidate_acceptance_digest": "sha256:f4de88b3ae40b35c41ced857abe757edc4da6c3a1b6d2145773bbc255d67533e",
+  "test_receipt_digest": "sha256:1224af600b8f3d80b538985ae14c69efe9a785b473cd8ecd0347ec1a3894dc59",
+  "test_plan": {
+    "schema": "adaos.project.test_plan.v1",
+    "suites": [
+      "scenario:web_desktop",
+      "skill:web_desktop_runtime_skill"
+    ],
+    "complete_suite": true
+  },
+  "packages": [
+    {
+      "ref": "scenario:web_desktop",
+      "log_sha256": "af9ad6b4f43793c080955e77b4c94caa585084195afd214a79c46fdbeb8768c5",
+      "statuses": [
+        "passed"
+      ]
+    },
+    {
+      "ref": "skill:web_desktop_runtime_skill",
+      "log_sha256": "996310402ed7e7a4429ee87699661120768e8d628e4e1d64e59b608d02d5cf87",
+      "statuses": [
+        "passed"
+      ]
+    }
+  ],
+  "proof_digest": "sha256:8a66d8e6f3e0a7be0c7bdf0d4cfa0ec1b15512c6b9218b6e001261cad3f2cf95"
+}
