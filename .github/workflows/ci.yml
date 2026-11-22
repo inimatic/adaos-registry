@@ -29,10 +29,12 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
+        fetch-depth: 2
         sparse-checkout-cone-mode: false
         sparse-checkout: |
           /registry.json
           /.github/scripts/validate_registry.py
+          /.github/scripts/test_validate_registry.py
           /semantic/
           /skills/*/skill.yaml
           /scenarios/*/scenario.yaml
@@ -41,4 +43,10 @@ jobs:
       with:
         python-version: '3.11'
     - name: Validate published identities, versions and retained release bindings
-      run: python .github/scripts/validate_registry.py
+      run: |
+        legacy_base=$(python .github/scripts/validate_registry.py --legacy-baseline)
+        if ! git cat-file -e "$legacy_base^{commit}" 2>/dev/null; then
+          git fetch --no-tags --depth=1 origin "$legacy_base"
+        fi
+        python .github/scripts/test_validate_registry.py
+        python .github/scripts/validate_registry.py
