@@ -11,6 +11,10 @@ import subprocess
 
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 VERSION = re.compile(r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:[-+][0-9A-Za-z.-]+)?\Z")
+# Published main immediately before mandatory full-plan proof adoption. This is
+# an immutable migration boundary, never an arbitrary previous (possibly failed)
+# push. Every later identity requires a proof on every qualification attempt.
+LEGACY_PUBLISHED_CATALOG_REVISION = "a4f3b955524cd8c971028bc44f466dc9065efb8e"
 
 
 def safe_path(root: Path, value: str) -> Path:
@@ -116,15 +120,19 @@ def _baseline_identities(root: Path, base_ref: str | None) -> set[tuple]:
             raise ValueError('catalog_base_record_too_large')
         return json.loads(result.stdout)
     catalog = historical('registry.json', required=True)
+    bindings = historical('semantic/index.json').get('application_releases', {})
     identities = set()
     for kind in ('projects','skills','scenarios'):
         for row in catalog.get(kind,[]):
             for pointer in (row.get('channels') or {}).values():
-                identities.add((str(pointer.get('release','')).split('@',1)[0],pointer.get('version'),
-                    pointer.get('release_digest'),pointer.get('package_digest'),pointer.get('source_revision')))
+                project = str(pointer.get('release','')).split('@',1)[0]
+                binding = bindings.get('project:'+project+'@'+str(pointer.get('release_digest')), {})
+                identities.add(('channel', project, pointer.get('version'),
+                    pointer.get('release_digest'),pointer.get('package_digest'),pointer.get('source_revision'),
+                    pointer.get('source_branch', 'main'), binding.get('projection_digest')))
     # Prerelease catalog entries do not replace the stable source manifest.
     for row in historical('semantic/catalog/index.json').get('releases',{}).values():
-        identities.add((None,row.get('version'),row.get('release_digest'),row.get('projection_digest'),None))
+        identities.add(('public',row.get('version'),row.get('release_digest'),row.get('projection_digest')))
     return identities
 
 
@@ -166,7 +174,9 @@ def validate(root: Path, *, retire_unavailable: bool = False, synchronize_publis
     root = root.resolve()
     catalog = read_json(root / "registry.json")
     original_digest = canonical_digest(catalog)
-    baseline = _baseline_identities(root, base_ref)
+    if base_ref is not None and not re.fullmatch(r'(?:HEAD\^?|[0-9a-f]{40}|[0-9a-f]{64})', base_ref):
+        raise ValueError('catalog_base_revision_invalid')
+    baseline = _baseline_identities(root, LEGACY_PUBLISHED_CATALOG_REVISION)
     try:
         tracked = subprocess.run(["git", "-C", str(root), "ls-files", "-v", "--",
             "skills/*/skill.yaml", "scenarios/*/scenario.yaml", "projects/*/project.yaml"],
@@ -186,7 +196,19 @@ def validate(root: Path, *, retire_unavailable: bool = False, synchronize_publis
             record = read_json(safe_path(root,entry['path']))
             project = (record.get('release') or {}).get('project_release') or {}
             digest = entry.get('release_digest')
-            historical = (None,project.get('version'),digest,entry.get('projection_digest'),None) in baseline
+            if (canonical_digest({k:v for k,v in record.items() if k != 'projection_digest'}) != record.get('projection_digest')
+                    or record.get('projection_digest') != entry.get('projection_digest')):
+                errors.append({'entry':str(entry.get('application_id') or digest),
+                    'code':'public_application_projection_digest_mismatch'})
+                continue
+            if (project.get('release_digest') != digest
+                    or (record.get('release') or {}).get('release_digest') != digest
+                    or project.get('version') != entry.get('version')
+                    or (record.get('release') or {}).get('application_id') != entry.get('application_id')):
+                errors.append({'entry':str(entry.get('application_id') or digest),
+                    'code':'public_application_release_identity_mismatch'})
+                continue
+            historical = ('public',project.get('version'),digest,entry.get('projection_digest')) in baseline
             if test_proof_path(root,digest).is_file() or not historical:
                 try:
                     proof = validate_test_proof(root, project_id=project['project_id'],version=project['version'],
@@ -270,9 +292,10 @@ def validate(root: Path, *, retire_unavailable: bool = False, synchronize_publis
                     faults.append("published_release_binding_mismatch:" + channel)
                 else:
                     has_retained_release = True
-                    identity = (project,pointer['version'],pointer['release_digest'],
-                                pointer['package_digest'],pointer.get('source_revision'))
-                    if test_proof_path(root,pointer['release_digest']).is_file() or identity not in baseline:
+                    release_identity = ('channel',project,pointer['version'],pointer['release_digest'],
+                                pointer['package_digest'],pointer.get('source_revision'),
+                                pointer.get('source_branch','main'), binding.get('projection_digest'))
+                    if test_proof_path(root,pointer['release_digest']).is_file() or release_identity not in baseline:
                         try:
                             validate_test_proof(root,project_id=project,version=pointer['version'],
                                 release_digest=pointer['release_digest'],package_digest=pointer['package_digest'],
@@ -307,8 +330,12 @@ def main():
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--retire-unavailable", action="store_true")
     parser.add_argument("--synchronize-published", action="store_true")
-    parser.add_argument('--base-ref', help='Exact previous Git revision; only unchanged historical identities are grandfathered')
+    parser.add_argument('--base-ref', help='Previous source revision (does not expand the fixed legacy allowance)')
+    parser.add_argument('--legacy-baseline', action='store_true', help='Print the immutable pre-enforcement catalog revision')
     args = parser.parse_args()
+    if args.legacy_baseline:
+        print(LEGACY_PUBLISHED_CATALOG_REVISION)
+        return 0
     result = validate(args.root, retire_unavailable=args.retire_unavailable,
         synchronize_published=args.synchronize_published, base_ref=args.base_ref)
     print(json.dumps(result, ensure_ascii=False))
